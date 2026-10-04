@@ -33,13 +33,21 @@ describe("resolveTaskPoll", () => {
   })
 
   it("Known progress reports rounded percent and records lastProgress", () => {
-    const result = resolveTaskPoll(taskWith(knownProgress), null, true)
+    const result = resolveTaskPoll(
+      { type: "Running", value: taskWith(knownProgress) },
+      null,
+      true
+    )
     expect(result.action).toEqual({ kind: "progress", percent: 42 })
     expect(result.nextLastProgress).toEqual(knownProgress)
   })
 
   it("Failed progress produces a failed action with the task's error message", () => {
-    const result = resolveTaskPoll(taskWith(failedProgress), null, true)
+    const result = resolveTaskPoll(
+      { type: "Failed", value: taskWith(failedProgress) },
+      null,
+      true
+    )
     expect(result.action).toEqual({
       kind: "failed",
       message: "Download failed"
@@ -48,40 +56,34 @@ describe("resolveTaskPoll", () => {
   })
 
   it("Failed progress with no cause falls back to an empty message instead of throwing", () => {
-    const result = resolveTaskPoll(taskWith(failedProgressNoCause), null, true)
+    const result = resolveTaskPoll(
+      { type: "Failed", value: taskWith(failedProgressNoCause) },
+      null,
+      true
+    )
     expect(result.action).toEqual({ kind: "failed", message: "" })
   })
 
-  it("data === null after a Failed observation does NOT show the success toast", () => {
-    const result = resolveTaskPoll(null, failedProgress, true)
-    expect(result.action).toEqual({
-      kind: "completed",
-      showSuccessToast: false
+  it.each([null, { type: "Unavailable" } as const])(
+    "missing history never certifies success: %j",
+    (outcome) => {
+      expect(resolveTaskPoll(outcome, knownProgress, true).action.kind).toBe(
+        "failed"
+      )
+    }
+  )
+  it("dismissed failure is a distinct stop action even before the first poll", () => {
+    expect(resolveTaskPoll({ type: "Dismissed" }, null, true).action).toEqual({
+      kind: "dismissed"
     })
-    expect(result.nextLastProgress).toBeNull()
   })
-
-  it("data === null after a non-failed observation shows the success toast for worlds", () => {
-    const result = resolveTaskPoll(null, knownProgress, true)
-    expect(result.action).toEqual({
+  it("only explicit success shows the requested completion toast", () => {
+    expect(resolveTaskPoll({ type: "Succeeded" }, null, true).action).toEqual({
       kind: "completed",
       showSuccessToast: true
     })
-  })
-
-  it("data === null with no prior progress observed shows the success toast for worlds", () => {
-    const result = resolveTaskPoll(null, null, true)
-    expect(result.action).toEqual({
-      kind: "completed",
-      showSuccessToast: true
-    })
-  })
-
-  it("data === null never shows the success toast for non-world addons", () => {
-    const result = resolveTaskPoll(null, knownProgress, false)
-    expect(result.action).toEqual({
-      kind: "completed",
-      showSuccessToast: false
-    })
+    expect(
+      resolveTaskPoll({ type: "Succeeded" }, knownProgress, false).action
+    ).toEqual({ kind: "completed", showSuccessToast: false })
   })
 })

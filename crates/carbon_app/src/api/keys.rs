@@ -101,6 +101,8 @@ keys! {
         CHANGE_MODPACK                              = "changeModpack";
         REPAIR_MODPACK                              = "repairModpack";
         GET_REPAIR_PREVIEW                          = "getRepairPreview";
+        GET_DATAPACK_WORLDS                        = "getDatapackWorlds";
+        COPY_DATAPACK                             = "copyDatapack";
         GET_PENDING_SETUP                          = "getPendingSetup";
         CANCEL_PENDING_SETUP                       = "cancelPendingSetup";
         CHECK_PACK_ORIGIN                           = "checkPackOrigin";
@@ -165,7 +167,10 @@ keys! {
     vtask {
         GET_TASKS                                   = "getTasks";
         GET_TASK                                    = "getTask";
+        GET_TASK_OUTCOME                            = "getTaskOutcome";
         DISMISS_TASK                                = "dismissTask";
+        GET_TASK_WARNINGS                           = "getTaskWarnings";
+        ACKNOWLEDGE_TASK_WARNINGS                   = "acknowledgeTaskWarnings";
     }
 
     settings {

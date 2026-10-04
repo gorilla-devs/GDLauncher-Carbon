@@ -26,8 +26,8 @@ export type Procedures = {
         { key: "instance.getLogs", input: FEInstanceId, result: GameLogEntry[] } | 
         { key: "instance.getModSources", input: FEInstanceId, result: ModSources } | 
         { key: "instance.getModpackInfo", input: FEInstanceId | null, result: FEInstanceModpackInfo | null } | 
-        { key: "instance.getRepairPreview", input: RepairPreviewArgs, result: FERepairPreview } |
-        { key: "instance.getPendingSetup", input: FEInstanceId, result: PendingSetupStatus } |
+        { key: "instance.getPendingSetup", input: FEInstanceId, result: PendingSetupStatus } | 
+        { key: "instance.getRepairPreview", input: RepairPreviewArgs, result: FERepairPreview } | 
         { key: "instance.getSharePreview", input: string, result: FESharePreview } | 
         { key: "instance.getUserQuota", input: never, result: FEQuotaInfo } | 
         { key: "instance.getUserShares", input: FEGetUserSharesArgs, result: FEPaginatedShares } | 
@@ -96,6 +96,8 @@ export type Procedures = {
         { key: "systeminfo.getTotalRAM", input: never, result: string } | 
         { key: "systeminfo.getUsedRAM", input: never, result: string } | 
         { key: "vtask.getTask", input: FETaskId | null, result: FETask | null } | 
+        { key: "vtask.getTaskOutcome", input: FETaskId | null, result: FETaskOutcome } | 
+        { key: "vtask.getTaskWarnings", input: never, result: FETaskWarnings[] } | 
         { key: "vtask.getTasks", input: never, result: FETask[] },
     mutations: 
         { key: "account.cancelGdlAccountDeletion", input: string, result: FECancelDeletionStatus } | 
@@ -214,6 +216,7 @@ export type Procedures = {
         { key: "settings.setSearchSidebarDocked", input: boolean, result: null } | 
         { key: "settings.setSettings", input: FESettingsUpdate, result: null } | 
         { key: "settings.setWorldDeletionWarningDismissed", input: boolean, result: null } | 
+        { key: "vtask.acknowledgeTaskWarnings", input: FETaskId, result: null } | 
         { key: "vtask.dismissTask", input: FETaskId, result: null },
     subscriptions: never
 };
@@ -274,7 +277,7 @@ export type CancelPendingSetup = { instance: FEInstanceId; expected_operation: s
 
 export type FEUntrackedLabel = "Unknown" | "DisabledPackFile"
 
-export type ExportTarget = "Curseforge" | "Modrinth" | "Gdlauncher"
+export type FETaskWarnings = { id: FETaskId; name: Translation; subject: string | null; warnings: FETaskWarning[] }
 
 export type FEManagedJavaArchMap = { [key: FEManagedJavaArch]: FEManagedJavaVersion[] }
 
@@ -287,6 +290,8 @@ export type FEModdedManifestVersion = { id: string; stable: boolean; loaders: FE
 export type FEServerDetails = { id: FEServerId; name: string; favorite: boolean; serverType: ServerType; gameVersion: string; port: number; motd: string; maxPlayers: number; onlineMode: boolean; xmx: number; xms: number; extraJavaArgs: string; autoRestart: boolean; dateCreated: string; lastStarted: string | null; state: FEServerState; iconRevision: number | null; modloaderType: string | null; modloaderVersion: string | null; modpackInfo: FEServerModpackInfo | null; autoRestartAbandoned: boolean }
 
 export type FEInstanceId = number
+
+export type FEDependencyPlatform = "Curseforge" | "Modrinth"
 
 export type FESettingsUpdate = { theme?: Set<string> | null; language?: Set<string> | null; reducedMotion?: Set<boolean> | null; discordIntegration?: Set<boolean> | null; releaseChannel?: Set<FEReleaseChannel> | null; concurrentDownloads?: Set<number> | null; downloadDependencies?: Set<boolean> | null; instancesSortBy?: Set<InstancesSortBy | null> | null; instancesSortByAsc?: Set<boolean> | null; instancesGroupBy?: Set<InstancesGroupBy | null> | null; instancesGroupByAsc?: Set<boolean> | null; instancesDuplicateFavorites?: Set<boolean> | null; instancesTileSize?: Set<number> | null; deletionThroughRecycleBin?: Set<boolean> | null; showFeatured?: Set<boolean> | null; xmx?: Set<number> | null; xms?: Set<number> | null; preLaunchHook?: Set<string | null> | null; wrapperCommand?: Set<string | null> | null; postExitHook?: Set<string | null> | null; launcherActionOnGameLaunch?: Set<FELauncherActionOnGameLaunch> | null; showAppCloseWarning?: Set<boolean> | null; gameResolution?: Set<GameResolution | null> | null; javaCustomArgs?: Set<string> | null; autoManageJavaSystemProfiles?: Set<boolean> | null; modSources?: Set<ModSources> | null; termsAndPrivacyAccepted?: Set<boolean> | null; gdlAccountId?: Set<string | null> | null }
 
@@ -367,6 +372,8 @@ export type McType = "old_alpha" | "old_beta" | "release" | "snapshot"
 
 export type McType = "old_alpha" | "old_beta" | "release" | "snapshot"
 
+export type FETask = { id: FETaskId; name: Translation; progress: Progress; downloaded: string; download_total: string; active_subtasks: FESubtask[] }
+
 export type FEServerGroupId = number
 
 export type FEManagedJavaVersion = { id: string; name: string; downloadUrl: string; javaVersion: string }
@@ -402,9 +409,7 @@ export type FEModResponse = { data: CFFEMod; pagination: CFFEPagination | null }
 
 export type CauseSegment = { display: string; debug: string; code?: string | null; data?: any | null }
 
-export type ExploreQuery = { instance_id: FEInstanceId; path: string[] }
-
-export type InstanceFolder = "Root" | "Data" | "Mods" | "Configs" | "Screenshots" | "Saves" | "Logs" | "CrashReports" | "ResourcePacks" | "TexturePacks" | "ShaderPacks"
+export type FESubtask = { name: Translation; progress: FESubtaskProgress }
 
 export type StandardVersion = { release: string; modloaders: ModLoader[] }
 
@@ -544,7 +549,9 @@ export type InstallLatestServerMod = { serverId: FEServerId; modSource: ServerLa
 
 export type MRFELicense = { id: string; name: string; url: string | null }
 
-export type FEQuotaInfo = { usedKilobytes: number; totalKilobytes: number }
+export type Progress = { type: "Indeterminate" } | { type: "Known"; value: number } | { type: "Failed"; value: FeError }
+
+export type ImportRequest = { session: string; index: number; name: string | null }
 
 export type MRFEProjectSupportRange = "required" | "optional" | "unsupported" | "unknown"
 
@@ -555,7 +562,7 @@ export type UsernameAvailability = "available" | "taken" | "notallowed"
 
 export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
 
-export type Translation = { translation: "InstanceTaskDeleting" } | { translation: "InstanceTaskLaunch"; args: { name: string } } | { translation: "InstanceTaskPrepare"; args: { name: string } } | { translation: "InstanceTaskCheckPackOrigin"; args: { name: string } } | { translation: "InstanceTaskCheckPackOriginVersions" } | { translation: "InstanceTaskLaunchRequestVersions" } | { translation: "InstanceTaskLaunchRequestModpack" } | { translation: "InstanceTaskLaunchDownloadModpack" } | { translation: "InstanceTaskLaunchDownloadModpackFiles" } | { translation: "InstanceTaskLaunchExtractModpackFiles" } | { translation: "InstanceTaskLaunchRequestAddonMetadata" } | { translation: "InstanceTaskLaunchApplyStagedPatches" } | { translation: "InstanceTaskLaunchDownloadJava" } | { translation: "InstanceTaskLaunchExtractJava" } | { translation: "InstanceTaskRequestModloaderInfo" } | { translation: "InstanceTaskRequestMinecraftFiles" } | { translation: "InstanceTaskLaunchCheckingFiles" } | { translation: "InstanceTaskLaunchDownloadFiles" } | { translation: "InstanceTaskGeneratingPackInfo" } | { translation: "InstanceTaskFillCache" } | { translation: "InstanceTaskLaunchExtractNatives" } | { translation: "InstanceTaskReconstructAssets" } | { translation: "InstanceTaskLaunchRunForgeProcessors" } | { translation: "InstanceTaskLaunchRunNeoforgeProcessors" } | { translation: "InstanceTaskInstallMod"; args: { mod_name: string; instance_name: string } } | { translation: "InstanceTaskInstallWorldCopy"; args: { world_name: string; instance_name: string } } | { translation: "InstanceTaskInstallModDownloadFile" } | { translation: "ServerTaskInstall"; args: { server_name: string } } | { translation: "ServerTaskInstallFromModpack"; args: { server_name: string } } | { translation: "ServerTaskDownloadServerPack"; args: { server_name: string } } | { translation: "ServerTaskExtractServerPack" } | { translation: "ServerTaskDownloadModpackFiles" } | { translation: "ServerTaskExtractModpackOverrides" } | { translation: "ServerTaskDownloadServerJar" } | { translation: "ServerTaskInstallModloader" } | { translation: "ServerTaskInstallMod"; args: { mod_name: string; server_name: string } } | { translation: "ServerTaskInstallModDownloadFile" } | { translation: "FinalizingImport" } | { translation: "InstanceImportLegacyBadConfigFile" } | { translation: "InstanceImportCfZipMalformed" } | { translation: "InstanceImportCfZipMissingManifest" } | { translation: "InstanceImportCfZipMalformedManifest" } | { translation: "InstanceImportCfZipNotMinecraftModpack" } | { translation: "InstanceImportMrpackMalformed" } | { translation: "InstanceImportMrpackMissingManifest" } | { translation: "InstanceImportMrpackMalformedManifest" } | { translation: "InstanceImportGdlpackMalformed" } | { translation: "InstanceImportGdlpackMissingManifest" } | { translation: "InstanceImportGdlpackMalformedManifest" } | { translation: "InstanceImportMmcZipMalformed" } | { translation: "InstanceImportMmcZipMissingConfig" } | { translation: "InstanceExport" } | { translation: "InstanceExportCreatingBundle" } | { translation: "InstanceExportCalculateSize" } | { translation: "InstanceExportScanningMods" } | { translation: "InstanceImportShareCode" } | { translation: "CacheTaskLocal"; args: { instance_name: string } } | { translation: "CacheTaskCurseForge"; args: { instance_name: string } } | { translation: "CacheTaskModrinth"; args: { instance_name: string } } | { translation: "CacheSubtaskScanningFiles" } | { translation: "CacheSubtaskQueryingPlatform"; args: { platform: string } } | { translation: "CacheSubtaskDownloadingImages" } | { translation: "CacheSubtaskFinalizingCache" } | { translation: "CacheStatusTitle" } | { translation: "CacheStatusNoActiveTasks" } | { translation: "CacheStatusIdle" } | { translation: "CacheStatusRunning" } | { translation: "CacheStatusFailed" } | { translation: "CacheStatusActiveTasks"; args: { count: number } } | { translation: "CacheStatusActiveCount"; args: { count: number } } | { translation: "CacheStatusOperationsInfo" } | { translation: "CacheErrorGeneric" } | { translation: "CacheSubtaskScanningDirectories" } | { translation: "CacheSubtaskQueryingPlatformDatabase"; args: { platform: string } } | { translation: "CacheSubtaskDownloadingThumbnails" } | { translation: "CacheSubtaskProcessingFiles" } | { translation: "CacheProgressDirectories"; args: { current: number; total: number } } | { translation: "CacheProgressFiles"; args: { current: number; total: number } } | { translation: "CacheCleanup" }
+export type Translation = { translation: "InstanceTaskDeleting" } | { translation: "InstanceTaskLaunch"; args: { name: string } } | { translation: "InstanceTaskPrepare"; args: { name: string } } | { translation: "InstanceTaskCheckPackOrigin"; args: { name: string } } | { translation: "InstanceTaskCheckPackOriginVersions" } | { translation: "InstanceTaskLaunchRequestVersions" } | { translation: "InstanceTaskLaunchRequestModpack" } | { translation: "InstanceTaskLaunchDownloadModpack" } | { translation: "InstanceTaskLaunchDownloadModpackFiles" } | { translation: "InstanceTaskLaunchExtractModpackFiles" } | { translation: "InstanceTaskLaunchRequestAddonMetadata" } | { translation: "InstanceTaskLaunchApplyStagedPatches" } | { translation: "InstanceTaskLaunchDownloadJava" } | { translation: "InstanceTaskLaunchExtractJava" } | { translation: "InstanceTaskRequestModloaderInfo" } | { translation: "InstanceTaskRequestMinecraftFiles" } | { translation: "InstanceTaskLaunchCheckingFiles" } | { translation: "InstanceTaskLaunchDownloadFiles" } | { translation: "InstanceTaskGeneratingPackInfo" } | { translation: "InstanceTaskFillCache" } | { translation: "InstanceTaskLaunchExtractNatives" } | { translation: "InstanceTaskReconstructAssets" } | { translation: "InstanceTaskLaunchRunForgeProcessors" } | { translation: "InstanceTaskLaunchRunNeoforgeProcessors" } | { translation: "InstanceTaskInstallMod"; args: { mod_name: string; instance_name: string } } | { translation: "InstanceTaskStageDatapack"; args: { mod_name: string; instance_name: string } } | { translation: "InstanceTaskInstallWorldCopy"; args: { world_name: string; instance_name: string } } | { translation: "InstanceTaskInstallModDownloadFile" } | { translation: "ServerTaskInstall"; args: { server_name: string } } | { translation: "ServerTaskInstallFromModpack"; args: { server_name: string } } | { translation: "ServerTaskDownloadServerPack"; args: { server_name: string } } | { translation: "ServerTaskExtractServerPack" } | { translation: "ServerTaskDownloadModpackFiles" } | { translation: "ServerTaskExtractModpackOverrides" } | { translation: "ServerTaskDownloadServerJar" } | { translation: "ServerTaskInstallModloader" } | { translation: "ServerTaskInstallMod"; args: { mod_name: string; server_name: string } } | { translation: "ServerTaskInstallModDownloadFile" } | { translation: "FinalizingImport" } | { translation: "InstanceImportLegacyBadConfigFile" } | { translation: "InstanceImportCfZipMalformed" } | { translation: "InstanceImportCfZipMissingManifest" } | { translation: "InstanceImportCfZipMalformedManifest" } | { translation: "InstanceImportCfZipNotMinecraftModpack" } | { translation: "InstanceImportMrpackMalformed" } | { translation: "InstanceImportMrpackMissingManifest" } | { translation: "InstanceImportMrpackMalformedManifest" } | { translation: "InstanceImportGdlpackMalformed" } | { translation: "InstanceImportGdlpackMissingManifest" } | { translation: "InstanceImportGdlpackMalformedManifest" } | { translation: "InstanceImportMmcZipMalformed" } | { translation: "InstanceImportMmcZipMissingConfig" } | { translation: "InstanceExport" } | { translation: "InstanceExportCreatingBundle" } | { translation: "InstanceExportCalculateSize" } | { translation: "InstanceExportScanningMods" } | { translation: "InstanceImportShareCode" } | { translation: "CacheTaskLocal"; args: { instance_name: string } } | { translation: "CacheTaskCurseForge"; args: { instance_name: string } } | { translation: "CacheTaskModrinth"; args: { instance_name: string } } | { translation: "CacheSubtaskScanningFiles" } | { translation: "CacheSubtaskQueryingPlatform"; args: { platform: string } } | { translation: "CacheSubtaskDownloadingImages" } | { translation: "CacheSubtaskFinalizingCache" } | { translation: "CacheStatusTitle" } | { translation: "CacheStatusNoActiveTasks" } | { translation: "CacheStatusIdle" } | { translation: "CacheStatusRunning" } | { translation: "CacheStatusFailed" } | { translation: "CacheStatusActiveTasks"; args: { count: number } } | { translation: "CacheStatusActiveCount"; args: { count: number } } | { translation: "CacheStatusOperationsInfo" } | { translation: "CacheErrorGeneric" } | { translation: "CacheSubtaskScanningDirectories" } | { translation: "CacheSubtaskQueryingPlatformDatabase"; args: { platform: string } } | { translation: "CacheSubtaskDownloadingThumbnails" } | { translation: "CacheSubtaskProcessingFiles" } | { translation: "CacheProgressDirectories"; args: { current: number; total: number } } | { translation: "CacheProgressFiles"; args: { current: number; total: number } } | { translation: "CacheCleanup" }
 
 /**
  * Identity of the installed pack whose preview was reviewed.
@@ -588,7 +595,7 @@ export type ModSource = { Curseforge: CurseforgeMod } | { Modrinth: ModrinthMod 
 
 export type BanIpRequest = { serverId: FEServerId; ip: string; reason: string | null }
 
-export type FESubtask = { name: Translation; progress: FESubtaskProgress }
+export type CFFEModLinks = { websiteUrl: string | null; wikiUrl: string | null; issuesUrl: string | null; sourceUrl: string | null }
 
 export type FEMoveServerGroupTarget = { beforeGroup: FEServerGroupId } | { beforeServer: FEServerId } | "endOfLibrary"
 
@@ -605,7 +612,7 @@ export type FERepairAction = "Replace" | "Create" | "Delete" | "Keep" | "Replace
 
 export type ServerType = "vanilla" | "forge" | "neoforge" | "fabric" | "quilt"
 
-export type FEJavaOverride = { Profile: string | null } | { Path: string | null }
+export type FESubtaskProgress = { download: { downloaded: string; total: string } } | { item: { current: number; total: number } } | "opaque"
 
 export type MRFEUser = { username: string; name: string | null; id: string; avatar_url: string | null }
 
@@ -668,9 +675,9 @@ export type FEModFileChangelogResponse = { data: string; pagination: CFFEPaginat
 
 export type MRFESearchFacetOr = MRFESearchFacet[]
 
-export type FEDuplicateGroup = { modid: string; files: FEDuplicateSide[] }
+export type UnbanIpRequest = { serverId: FEServerId; ip: string }
 
-export type CoreModuleStatus = "VerifyingTermsAndPrivacy" | "LoadAndMigrate" | "LaunchBackgroundTasks" | "RefreshMSAuth" | "RequestingCode" | "PollingCode" | "McLogin" | "XboxAuth" | "MCEntitlements" | "McProfile" | "ExchangingGdlToken" | "AccountRefreshComplete"
+export type ImportEntry = { Valid: ImportableInstance } | { Invalid: InvalidImportEntry }
 
 export type CFFEModParameters = { modId: number }
 
@@ -700,13 +707,15 @@ export type AccountStatus = "ok" | "expired" | "refreshing" | "invalid"
 
 export type MRFEProjectVersionsFilters = { project_id: MRFEProjectID; game_versions?: string[] | null; loaders?: string[] | null; limit?: number | null; offset?: number | null }
 
-export type MoveGroupTarget = { BeforeGroup: FEGroupId } | { BeforeInstance: FEInstanceId } | "EndOfLibrary"
-
-export type Progress = { type: "Indeterminate" } | { type: "Known"; value: number } | { type: "Failed"; value: FeError }
-
-export type ImportableInstance = { filename: string; instance_name: string }
-
-export type FEGDLAccountStatus = { status: "valid"; value: FEGDLAccount } | { status: "invalid" } | { status: "skipped" } | { status: "unset" }
+/**
+ * Result shape for the cancel-deletion mutation. `NoScheduledDeletion`
+ * is an info-level outcome (the sweep already promoted or the user
+ * wasn't scheduled) and the UI should auto-resync against the server
+ * state rather than surface it as an error. Shape mirrors
+ * `FERequestDeletionStatus` (untagged enum) so the TS union is
+ * `"success" | "noScheduledDeletion" | { failed: string | null }`.
+ */
+export type FECancelDeletionStatus = "success" | "noScheduledDeletion" | { failed: string | null }
 
 export type FESearchResult = { entry_index: number; pos: number; len: number }
 
@@ -763,7 +772,7 @@ export type CFFEModFilesParametersQuery = { gameVersion?: string | null; modLoad
 
 export type CFFEModFileParameters = { modId: number; fileId: number }
 
-export type MRFESearchIndex = "relevance" | "downloads" | "follows" | "newest" | "updated"
+export type FETaskWarning = { type: "SkippedDependency"; value: { name: string | null; platform: FEDependencyPlatform; project_id: string; reason: FESkippedDependencyReason } } | { type: "ReplacedPinnedVersion"; value: { name: string; project_id: string; pinned: string; installed: string } } | { type: "ConflictingVersions"; value: { name: string; platform: FEDependencyPlatform; project_id: string; installed: string } }
 
 export type LibrarySortCriteria = "name" | "lastPlayed" | "mostPlayed" | "dateCreated"
 
@@ -785,6 +794,7 @@ export type FESettings = { theme: string; language: string; reducedMotion: boole
 export type MRFEDependency = { version_id: string | null; project_id: string | null; file_name: string | null; dependency_type: MRFEDependencyType }
 
 export type FETask = { id: FETaskId; name: Translation; progress: Progress; downloaded: number; download_total: number; active_subtasks: FESubtask[] }
+export type FETaskOutcome = { type: "Running"; value: FETask } | { type: "Failed"; value: FETask } | { type: "Succeeded" } | { type: "Dismissed" } | { type: "Unavailable" }
 
 export type MRFEVersion = { name: string; version_number: string; changelog: string | null; dependencies: MRFEDependency[]; game_versions: string[]; version_type: MRFEVersionType; loaders: string[]; featured: boolean; status: MRFEStatus | null; requested_status: MRFERequestedVersionStatus | null; id: string; project_id: string; author_id: string; date_published: string; downloads: number; files: MRFEVersionFile[] }
 
@@ -912,7 +922,7 @@ export type EnrollmentStatus = "refreshingMSAuth" | "requestingCode" | { polling
 
 export type CFFECategory = { id: number; name: string; slug: string; url: string; iconUrl: string | null; dateModified: string; isClass: boolean | null; classId: FEUnifiedSearchType | null; parentCategoryId: number | null; displayIndex: number | null }
 
-export type FETaskId = number
+export type EnrollmentStatus = "refreshingMSAuth" | "requestingCode" | { pollingCode: DeviceCode } | { waitingForBrowser: { auth_url: string; redirect_uri: string; expires_at: string } } | "mcLogin" | "xboxAuth" | "mcentitlements" | "mcProfile" | { needsProfileCreation: { flow_id: string; verification_retry: boolean; access_token: string } } | { complete: { flow_id: string; account: AccountEntry } } | { failed: EnrollmentError }
 
 export type ImportableInstance = { filename: string; instance_name: string }
 
@@ -935,7 +945,7 @@ export type GameLogId = number
 
 export type FECreateJavaProfileArgs = { profileName: string; javaId: string | null }
 
-export type FEManagedJavaSetupArgs = { os: FEManagedJavaOs; arch: FEManagedJavaArch; vendor: FEVendor; id: string }
+export type FETaskId = number
 
 export type ImportEntityStatus = { entity: ImportEntity; supported: boolean; selection_type: ImportEntitySelectionType }
 
@@ -959,5 +969,7 @@ export type FEChangeDisplayNameStatus = { status: "success" } | { status: "faile
 
 export type FERequestEmailChange = { email: string; uuid: string }
 
-export type CancelPendingSetup = { instance: FEInstanceId; expected_operation: string };
-export type PendingSetupStatus = { pending: boolean; operation: string | null; installed_version: string | null; pending_version: string | null; can_cancel: boolean; reason: string | null };
+export type BanPlayerRequest = { serverId: FEServerId; username: string; reason: string | null }
+
+export type DatapackWorld = { name: string; identity: string }
+export type CopyDatapack = { instance_id: number; mod_id: string; world: DatapackWorld }

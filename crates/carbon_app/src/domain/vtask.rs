@@ -45,3 +45,82 @@ impl PartialEq for Progress {
         }
     }
 }
+
+/// Something a task did differently from what was asked, reported to the user
+/// after the task succeeds.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TaskWarning {
+    /// A required dependency was left out because it cannot be installed.
+    SkippedDependency {
+        /// The project's name, when the platform still knows it.
+        name: Option<String>,
+        /// Where the requirement was declared, to name it when `name` is unknown.
+        platform: DependencyPlatform,
+        /// The platform's project id, or the file name of a dependency declared
+        /// by file name only.
+        project_id: String,
+        reason: SkippedDependencyReason,
+    },
+    /// A required dependency was installed at another release than the one
+    /// the addon pins, because the pinned one is not for this game and loader.
+    ReplacedPinnedVersion {
+        name: String,
+        project_id: String,
+        /// Version numbers as the platform shows them.
+        pinned: String,
+        installed: String,
+    },
+    /// Two addons in one installation ask for different versions of a
+    /// dependency; only one of them can be installed.
+    ConflictingVersions {
+        name: String,
+        platform: DependencyPlatform,
+        project_id: String,
+        /// The version number that was installed, as the platform shows it.
+        installed: String,
+    },
+    /// A world was installed as a new save under another name, because a
+    /// save already has its own (an earlier install of the same map, or a
+    /// map called "New World"). The existing save is not touched.
+    WorldNameTaken {
+        /// The world's own folder name.
+        name: String,
+        /// The new save's name, with a "(copy N)" suffix.
+        saved_as: String,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DependencyPlatform {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkippedDependencyReason {
+    /// No version for this Minecraft version and loader.
+    NoCompatibleVersion,
+    /// The author only allows downloads from the CurseForge website.
+    NotDownloadable,
+    /// The platform no longer serves it, or it is not on the platform at all.
+    Unavailable,
+    /// Its authors mark it as not running on servers.
+    NotForServers,
+    /// It was installed when the installation started, and was removed from
+    /// the server before the installation finished.
+    RemovedDuringInstall,
+    /// It is installed but disabled. It is left as it is, so the addon may not
+    /// load until the user enables it.
+    Disabled,
+}
+
+/// Warnings of a task that succeeded, kept until the UI acknowledges them.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TaskWarnings {
+    pub id: VisualTaskId,
+    pub name: Translation,
+    /// What the warnings are about when the task name does not say it plainly,
+    /// for example the project title of an addon whose version is named "4.0".
+    pub subject: Option<String>,
+    pub warnings: Vec<TaskWarning>,
+}

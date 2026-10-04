@@ -15,6 +15,7 @@ interface InstanceItemProps {
   }
   isLoading: boolean
   isInstalled: boolean
+  staged?: boolean
   hoveredInstanceId: number | null
   onSelect: (instanceId: number) => void
   onMouseEnter: (instanceId: number) => void
@@ -65,11 +66,23 @@ export const InstanceItem = (props: InstanceItemProps) => {
               }
             >
               <span class="ml-1 text-green-400">
-                <Trans key="instances:_trn_status_installed" />
+                <Show
+                  when={props.staged}
+                  fallback={<Trans key="instances:_trn_status_installed" />}
+                >
+                  <Trans key="content:_trn_datapack_downloaded" />
+                </Show>
               </span>
             </Show>
             <Show when={props.isLoading && !props.instance.locked}>
-              <span class="ml-1 text-blue-400">• Installing...</span>
+              <span class="ml-1 text-blue-400">
+                <Show
+                  when={props.staged}
+                  fallback={<Trans key="instances:_trn_status_installing" />}
+                >
+                  <Trans key="instances:_trn_status_downloading" />
+                </Show>
+              </span>
             </Show>
           </div>
         </div>

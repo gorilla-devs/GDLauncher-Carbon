@@ -1,4 +1,5 @@
 {
+  "_trn_instance_task_stage_datapack": "Téléchargement du pack de données {{mod_name}} pour {{instance_name}}",
   "_trn_instance_task_launch": "Lancement de {{name}}",
   "_trn_instance_task_launch_request_versions": "Requête des versions",
   "_trn_instance_task_launch_download_files": "Téléchargement des fichiers du jeu",

@@ -444,6 +444,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
+        query GET_DATAPACK_WORLDS[app, id: FEInstanceId] {
+            app.instance_manager().datapack_worlds(id.into()).await
+        }
+        mutation COPY_DATAPACK[app, request: crate::managers::instance::datapacks::CopyDatapack] {
+            app.instance_manager().copy_datapack(request).await
+        }
+
         mutation INSTALL_MOD[app, imod: InstallMod] {
             let task = match imod.mod_source {
                 ModSource::Curseforge(cf_mod) => {

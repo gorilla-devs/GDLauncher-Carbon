@@ -20,6 +20,7 @@ interface InstallButtonProps {
   onDownload: () => void
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
+  staged?: boolean
   copyPresentation?: ReturnType<typeof worldVersionCopy>
   testId?: string
 }
@@ -56,7 +57,12 @@ export const InstallButton = (props: InstallButtonProps) => {
               fallback={
                 <Switch>
                   <Match when={props.isInstalled()}>
-                    <Trans key="content:_trn_mod.downloaded" />
+                    <Show
+                      when={props.staged}
+                      fallback={<Trans key="content:_trn_mod.downloaded" />}
+                    >
+                      <Trans key="content:_trn_datapack_downloaded" />
+                    </Show>
                   </Match>
                   <Match when={props.instanceLocked()}>
                     <Trans key="instances:_trn_instance_locked" />

@@ -121,17 +121,7 @@ export const useAddonData = () => {
 
       setAddonsStore(reconcile(dataWithOptimisticUpdates, { key: "id" }))
 
-      // Clean up updatingModIds for mods that truly don't have updates anymore
-      // (i.e., the update completed successfully)
-      allAddons.data.forEach((addon) => {
-        if (!addon.has_update && currentlyUpdating.has(addon.id)) {
-          setUpdatingModIds((prev) => {
-            const next = new Set(prev)
-            next.delete(addon.id)
-            return next
-          })
-        }
-      })
+      // Accepted task completion owns updating state; cache visibility is not success.
     }
   })
 

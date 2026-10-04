@@ -437,3 +437,205 @@ fn task07r1_r4_scan_preserves_source_only_for_current_physical_hash() {
         );
     }
 }
+
+/// Fabric API in a server's `mods/`, with its metadata and both platforms'
+/// hash caches: CurseForge knows the bytes as project 306612 file 5 and
+/// Modrinth as project P7dR8mSH version `hash-version`.
+fn fabric_api_known_to_both_platforms(conn: &mut Connection) -> [u8; 64] {
+    use carbon_repos::repos::mod_metadata as metadata;
+    let sha = [9u8; 64];
+    let now = DbDateTime(chrono::Utc::now().fixed_offset());
+    metadata::insert_metadata_conn(
+        &wg(conn),
+        "fabric",
+        1,
+        &sha,
+        &[0; 20],
+        "fabric",
+        Some("Fabric API"),
+        Some("fabric-api"),
+        None,
+        None,
+        None,
+        now,
+    )
+    .unwrap();
+    mfc::upsert_server_mod_file_cache_at_location_conn(
+        &wg(conn),
+        7,
+        "fabric-api.jar",
+        "mods/fabric-api.jar",
+        3,
+        true,
+        "mods",
+        "fabric",
+        now,
+    )
+    .unwrap();
+    metadata::upsert_cf_mod_cache_conn(
+        &wg(conn),
+        1,
+        306612,
+        5,
+        "Fabric API",
+        "0.92",
+        "fabric-api",
+        "",
+        "",
+        1,
+        "",
+        now,
+        "fabric",
+    )
+    .unwrap();
+    metadata::upsert_mr_mod_cache_conn(
+        &wg(conn),
+        &hex::encode(sha),
+        "P7dR8mSH",
+        "hash-version",
+        "Fabric API",
+        "0.92",
+        "fabric-api",
+        "",
+        "",
+        1,
+        "",
+        "fabric-api.jar",
+        "https://fixture.invalid/not-requested",
+        now,
+        "fabric",
+    )
+    .unwrap();
+    sha
+}
+
+fn fresh_db(root: &std::path::Path) -> Connection {
+    let mut conn = Connection::open(root.join("fixture.db")).unwrap();
+    carbon_repos::get_migrations()
+        .0
+        .to_latest(&mut conn)
+        .unwrap();
+    conn.execute_batch("PRAGMA foreign_keys=OFF").unwrap();
+    conn
+}
+
+/// (cfProjectId, cfFileId, mrProjectId, mrVersionId) of the only row.
+fn identity(conn: &mut Connection) -> (Option<i32>, Option<i32>, Option<String>, Option<String>) {
+    let mut rows = mfc::get_server_mods_full_conn(&wg(conn), 7).unwrap();
+    assert_eq!(rows.len(), 1);
+    let row = rows.remove(0);
+    (
+        row.cf_project_id,
+        row.cf_file_id,
+        row.mr_project_id,
+        row.mr_version_id,
+    )
+}
+
+/// A copy installed from one platform is still known to the other: the
+/// recorded source (the version the user picked) overrides only its own
+/// platform, and the other keeps the identity its cache matched by hash, as
+/// 2.0.40 returned it.
+#[test]
+fn recorded_source_overrides_only_its_own_platform() {
+    for (platform, project, version, expected) in [
+        (
+            "mr",
+            "P7dR8mSH",
+            "picked",
+            (
+                Some(306612),
+                Some(5),
+                Some("P7dR8mSH".to_owned()),
+                Some("picked".to_owned()),
+            ),
+        ),
+        (
+            "cf",
+            "306612",
+            "77",
+            (
+                Some(306612),
+                Some(77),
+                Some("P7dR8mSH".to_owned()),
+                Some("hash-version".to_owned()),
+            ),
+        ),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let mut conn = fresh_db(root.path());
+        let sha = fabric_api_known_to_both_platforms(&mut conn);
+        assert_eq!(
+            mfc::publish_server_source_conn(
+                &wg(&mut conn),
+                7,
+                "mods",
+                "mods/fabric-api.jar",
+                platform,
+                project,
+                version,
+                &sha,
+                DbDateTime(chrono::Utc::now().fixed_offset()),
+            )
+            .unwrap(),
+            1
+        );
+        assert_eq!(identity(&mut conn), expected, "source {platform}");
+    }
+}
+
+/// A source recorded for other bytes than the file has now is ignored: both
+/// platforms fall back to the hash caches instead of losing their ids.
+#[test]
+fn source_for_other_bytes_falls_back_to_the_hash_caches() {
+    for platform in ["cf", "mr"] {
+        let root = tempfile::tempdir().unwrap();
+        let mut conn = fresh_db(root.path());
+        fabric_api_known_to_both_platforms(&mut conn);
+        conn.execute(
+            "UPDATE ServerModFileCache SET sourcePlatform=?1, sourceProjectId='1', sourceVersionId='2', sourceSha512=?2",
+            rusqlite::params![platform, &[1u8; 64][..]],
+        )
+        .unwrap();
+        assert_eq!(
+            identity(&mut conn),
+            (
+                Some(306612),
+                Some(5),
+                Some("P7dR8mSH".to_owned()),
+                Some("hash-version".to_owned()),
+            ),
+            "stale {platform} source"
+        );
+    }
+}
+
+/// A row 2.0.40 wrote or a scan found records no source: both platforms'
+/// ids come from the hash caches, as before; a copy no platform knows has
+/// none. The jar's loader mod id is returned either way.
+#[test]
+fn row_without_a_source_keeps_the_hash_identity_and_mod_id() {
+    let root = tempfile::tempdir().unwrap();
+    let mut conn = fresh_db(root.path());
+    fabric_api_known_to_both_platforms(&mut conn);
+    assert_eq!(
+        identity(&mut conn),
+        (
+            Some(306612),
+            Some(5),
+            Some("P7dR8mSH".to_owned()),
+            Some("hash-version".to_owned()),
+        )
+    );
+    let row = mfc::get_server_mods_full_conn(&wg(&mut conn), 7)
+        .unwrap()
+        .remove(0);
+    assert_eq!(row.source_platform, None);
+    assert_eq!(row.modid.as_deref(), Some("fabric-api"));
+    assert_eq!(row.cache_cf_project_id, Some(306612));
+    assert_eq!(row.cache_mr_project_id.as_deref(), Some("P7dR8mSH"));
+
+    conn.execute_batch("DELETE FROM CurseForgeModCache; DELETE FROM ModrinthModCache;")
+        .unwrap();
+    assert_eq!(identity(&mut conn), (None, None, None, None));
+}

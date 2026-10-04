@@ -49,7 +49,7 @@ import GuideLayout from "../../components/GuideLayout.astro"
 
   <h2>Dependencies</h2>
   <p>
-    Many mods depend on libraries (Architectury, Cloth Config, Fabric API, etc.). Dependencies are resolved when you first install a mod, the launcher pulls in anything it needs. Updates don't automatically bump existing libraries, though, so if a newer version of a mod requires a newer version of a library you already have, you'll need to update that library yourself from the Addons tab.
+    Many mods depend on libraries (Architectury, Cloth Config, Fabric API, etc.). When you install a mod, the launcher adds any required library you don't have yet. When you update a mod, it only adds libraries the new version requires for the first time, and none at all for a disabled mod, so the game keeps loading the same mods until you enable it. If the game then reports a missing library, install that library from the Addons tab. Libraries you already have are kept as they are, even when the new version asks for a different build, so if a newer version of a mod needs a newer version of a library you already have, update that library yourself from the Addons tab. If a required library has no version for your Minecraft version and mod loader, the mod is still installed and GDLauncher shows a notice naming the library it skipped.
   </p>
   <p>
     If a mod crashes or warns about a missing/outdated dependency after an update, the addon's page on CurseForge or Modrinth lists what version it needs.

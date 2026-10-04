@@ -36,11 +36,199 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation DISMISS_TASK[app, task: FETaskId] {
             app.task_manager().dismiss_task(task.into()).await
         }
+
+        query GET_TASK_OUTCOME[app, task: Option<FETaskId>] {
+            Ok(match task {
+                Some(task) => FETaskOutcome::from(app.task_manager().get_task_outcome(task.into()).await),
+                None => FETaskOutcome::Unavailable,
+            })
+        }
+
+        // Warnings of succeeded tasks the UI has not shown yet.
+        query GET_TASK_WARNINGS[app, args: ()] {
+            Ok(app.task_manager().get_task_warnings().await
+               .into_iter()
+               .map(FETaskWarnings::from)
+               .collect::<Vec<_>>())
+        }
+
+        mutation ACKNOWLEDGE_TASK_WARNINGS[app, task: FETaskId] {
+            app.task_manager().acknowledge_task_warnings(task.into()).await;
+            Ok(())
+        }
+    }
+}
+
+#[derive(Type, Serialize)]
+pub struct FETaskWarnings {
+    id: FETaskId,
+    name: Translation,
+    /// What the warnings are about (an addon's project title), when the task
+    /// name does not say it plainly.
+    subject: Option<String>,
+    warnings: Vec<FETaskWarning>,
+}
+
+#[derive(Type, Serialize)]
+#[serde(tag = "type", content = "value")]
+pub enum FETaskWarning {
+    SkippedDependency {
+        /// Unknown when the platform no longer serves the project.
+        name: Option<String>,
+        platform: FEDependencyPlatform,
+        /// A project id, or the file name of a dependency declared by file only.
+        project_id: String,
+        reason: FESkippedDependencyReason,
+    },
+    /// Installed at another release than the addon pins, because the pinned
+    /// one is not for this Minecraft version and loader.
+    ReplacedPinnedVersion {
+        name: String,
+        project_id: String,
+        pinned: String,
+        installed: String,
+    },
+    /// Two addons in one installation ask for different versions of a
+    /// dependency; `installed` is the one that was installed.
+    ConflictingVersions {
+        name: String,
+        platform: FEDependencyPlatform,
+        project_id: String,
+        installed: String,
+    },
+    /// A world was installed as the new save `saved_as`, because a save
+    /// named `name` already exists; that save was not changed.
+    WorldNameTaken { name: String, saved_as: String },
+}
+
+#[derive(Type, Serialize)]
+pub enum FEDependencyPlatform {
+    Curseforge,
+    Modrinth,
+}
+
+#[derive(Type, Serialize)]
+pub enum FESkippedDependencyReason {
+    NoCompatibleVersion,
+    NotDownloadable,
+    Unavailable,
+    NotForServers,
+    RemovedDuringInstall,
+    /// Installed but disabled: enabling it is up to the user.
+    Disabled,
+}
+
+#[derive(Type, Serialize)]
+pub enum FEPreviousPackFilesReason {
+}
+
+impl From<domain::DependencyPlatform> for FEDependencyPlatform {
+    fn from(value: domain::DependencyPlatform) -> Self {
+        match value {
+            domain::DependencyPlatform::Curseforge => Self::Curseforge,
+            domain::DependencyPlatform::Modrinth => Self::Modrinth,
+        }
+    }
+}
+
+impl From<domain::TaskWarnings> for FETaskWarnings {
+    fn from(value: domain::TaskWarnings) -> Self {
+        Self {
+            id: value.id.into(),
+            name: value.name,
+            subject: value.subject,
+            warnings: value.warnings.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<domain::TaskWarning> for FETaskWarning {
+    fn from(value: domain::TaskWarning) -> Self {
+        match value {
+            domain::TaskWarning::SkippedDependency {
+                name,
+                platform,
+                project_id,
+                reason,
+            } => Self::SkippedDependency {
+                name,
+                platform: platform.into(),
+                project_id,
+                reason: match reason {
+                    domain::SkippedDependencyReason::NoCompatibleVersion => {
+                        FESkippedDependencyReason::NoCompatibleVersion
+                    }
+                    domain::SkippedDependencyReason::NotDownloadable => {
+                        FESkippedDependencyReason::NotDownloadable
+                    }
+                    domain::SkippedDependencyReason::Unavailable => {
+                        FESkippedDependencyReason::Unavailable
+                    }
+                    domain::SkippedDependencyReason::NotForServers => {
+                        FESkippedDependencyReason::NotForServers
+                    }
+                    domain::SkippedDependencyReason::RemovedDuringInstall => {
+                        FESkippedDependencyReason::RemovedDuringInstall
+                    }
+                    domain::SkippedDependencyReason::Disabled => {
+                        FESkippedDependencyReason::Disabled
+                    }
+                },
+            },
+            domain::TaskWarning::ReplacedPinnedVersion {
+                name,
+                project_id,
+                pinned,
+                installed,
+            } => Self::ReplacedPinnedVersion {
+                name,
+                project_id,
+                pinned,
+                installed,
+            },
+            domain::TaskWarning::ConflictingVersions {
+                name,
+                platform,
+                project_id,
+                installed,
+            } => Self::ConflictingVersions {
+                name,
+                platform: platform.into(),
+                project_id,
+                installed,
+            },
+            domain::TaskWarning::WorldNameTaken { name, saved_as } => {
+                Self::WorldNameTaken { name, saved_as }
+            }
+        }
     }
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
 pub struct FETaskId(pub i32);
+
+#[derive(Type, Serialize)]
+#[serde(tag = "type", content = "value")]
+pub enum FETaskOutcome {
+    Running(FETask),
+    Failed(FETask),
+    Succeeded,
+    Dismissed,
+    Unavailable,
+}
+
+impl From<crate::managers::vtask::TaskOutcome> for FETaskOutcome {
+    fn from(value: crate::managers::vtask::TaskOutcome) -> Self {
+        use crate::managers::vtask::TaskOutcome;
+        match value {
+            TaskOutcome::Running(task) => Self::Running(task.into()),
+            TaskOutcome::Failed(task) => Self::Failed(task.into()),
+            TaskOutcome::Succeeded => Self::Succeeded,
+            TaskOutcome::Dismissed => Self::Dismissed,
+            TaskOutcome::Unavailable => Self::Unavailable,
+        }
+    }
+}
 
 impl From<domain::VisualTaskId> for FETaskId {
     fn from(value: domain::VisualTaskId) -> Self {

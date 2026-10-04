@@ -5,6 +5,7 @@ import { createColumnHelper } from "@tanstack/solid-table"
 
 interface EnabledColumnConfig {
   onToggle: (row: any) => void
+  scopeTitle?: (row: any) => string | undefined
   isDisabled?: () => boolean
   /** Per-row: render no control at all for this row (as opposed to
    *  `isDisabled`, which renders a greyed-out Switch with a tooltip). */
@@ -44,6 +45,7 @@ export const createEnabledColumn = (config: EnabledColumnConfig) => {
           >
             <div
               class="group"
+              title={config.scopeTitle?.(row)}
               data-testid="mod-row-toggle"
               onMouseDown={(e) => e.stopPropagation()}
             >

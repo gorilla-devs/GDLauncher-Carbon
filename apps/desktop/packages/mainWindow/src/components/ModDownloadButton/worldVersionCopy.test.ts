@@ -27,7 +27,11 @@ describe("world version copy presentation", () => {
     expect(translated(request.disclosure)).toContain("additional disk space")
     row = undefined // scanner refresh must not change the pending request's message
     expect(worldVersionCopy("world", 2, row)).toBeUndefined()
-    const completion = resolveTaskPoll(null, { type: "Known", value: 1 }, true)
+    const completion = resolveTaskPoll(
+      { type: "Succeeded" },
+      { type: "Known", value: 1 },
+      true
+    )
     expect(completion.action).toEqual({
       kind: "completed",
       showSuccessToast: true
@@ -51,13 +55,10 @@ describe("world version copy presentation", () => {
 
   it("does not report successful copying after task failure", () => {
     const result = resolveTaskPoll(
-      null,
+      { type: "Dismissed" },
       { type: "Failed", value: { cause: [], backtrace: "" } },
       true
     )
-    expect(result.action).toEqual({
-      kind: "completed",
-      showSuccessToast: false
-    })
+    expect(result.action).toEqual({ kind: "dismissed" })
   })
 })

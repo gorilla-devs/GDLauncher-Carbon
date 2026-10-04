@@ -1,65 +1,64 @@
-import { FETask, Progress } from "@gd/core_module/bindings"
+import { FETaskOutcome, Progress } from "@gd/core_module/bindings"
+import { i18n, type NamespacedTranslationKey } from "@gd/i18n"
 
-/** What the vtask poll effect should do for one `vtask.getTask` observation.
- *  Kept as plain data so the branching can be unit tested without a Solid
- *  reactive graph — the effect in `ModDownloadButton` interprets this to
- *  drive its signals/toasts/mutation. */
+/** Text for an outcome the launcher reports itself. Callers count a failure
+ *  by its message, so it is never empty: without a loaded bundle the key
+ *  itself stands in. */
+export function addonOutcomeText(key: NamespacedTranslationKey): string {
+  return i18n.t(key) || key
+}
+
 export type TaskPollAction =
   | { kind: "progress"; percent: number }
   | { kind: "failed"; message: string }
   | { kind: "completed"; showSuccessToast: boolean }
+  | { kind: "dismissed" }
   | { kind: "noop" }
 
 export interface TaskPollResult {
   action: TaskPollAction
-  /** Next value for the `lastProgress` signal. */
   nextLastProgress: Progress | null
 }
 
-/** Decides what a poll of `vtask.getTask` means for the button.
- *
- *  `taskData` is `undefined` while the query hasn't resolved yet, `null`
- *  once the backend no longer knows the task (completed and forgotten), or
- *  the live `FETask` while it's tracked.
- *
- *  A task that fails never transitions to `null` on its own — it sits at
- *  `Failed` until dismissed. So `Failed` is handled here directly (own
- *  `"failed"` action) rather than waiting for a later `null` observation.
- *  `lastProgress` still gets threaded through so that if a `null` is ever
- *  observed for a task whose last known state was `Failed` (e.g. dismissed
- *  by another consumer of the same task before this effect saw the `null`
- *  itself), the success toast stays suppressed. */
+/** Only explicit success certifies an accepted attempt. Missing history and
+ * acknowledged failure cannot become success for a late observer. */
 export function resolveTaskPoll(
-  taskData: FETask | null | undefined,
+  outcome: FETaskOutcome | null | undefined,
   lastProgress: Progress | null,
-  isWorld: boolean
+  showSuccessToast: boolean
 ): TaskPollResult {
-  const progress = taskData?.progress
-
-  if (progress?.type === "Known") {
+  if (outcome === undefined)
+    return { action: { kind: "noop" }, nextLastProgress: lastProgress }
+  if (outcome?.type === "Succeeded")
+    return {
+      action: { kind: "completed", showSuccessToast },
+      nextLastProgress: null
+    }
+  if (outcome?.type === "Dismissed")
+    return { action: { kind: "dismissed" }, nextLastProgress: null }
+  if (!outcome || outcome.type === "Unavailable")
+    return {
+      action: {
+        kind: "failed",
+        message: addonOutcomeText(
+          "notifications:_trn_addon_outcome_unavailable"
+        )
+      },
+      nextLastProgress: null
+    }
+  const progress = outcome.value.progress
+  if (progress.type === "Failed")
+    return {
+      action: {
+        kind: "failed",
+        message: progress.value.cause[0]?.display || ""
+      },
+      nextLastProgress: progress
+    }
+  if (progress.type === "Known")
     return {
       action: { kind: "progress", percent: Math.round(progress.value * 100) },
       nextLastProgress: progress
     }
-  }
-
-  if (progress?.type === "Failed") {
-    const message = progress.value.cause[0]?.display
-    return {
-      action: { kind: "failed", message: message || "" },
-      nextLastProgress: progress
-    }
-  }
-
-  if (taskData === null) {
-    return {
-      action: {
-        kind: "completed",
-        showSuccessToast: isWorld && lastProgress?.type !== "Failed"
-      },
-      nextLastProgress: null
-    }
-  }
-
-  return { action: { kind: "noop" }, nextLastProgress: lastProgress }
+  return { action: { kind: "noop" }, nextLastProgress: progress }
 }

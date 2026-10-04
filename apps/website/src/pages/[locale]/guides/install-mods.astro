@@ -130,7 +130,7 @@ const m = meta[locale]
       <p>手動でファイルを追加した後はホーム画面に戻ってインスタンスをもう一度クリックすると、GDLauncher が再スキャンして新しい Mod を検出します。</p>
 
       <h2>うまく行かないとき</h2>
-      <p>Mod が動かない場合、原因の定番はバージョンずれとローダー違い。Minecraft バージョンが厳密に一致していて、ローダーも正しいかを確認. Forge 用 Mod は Fabric では動きません (逆も同様)。Mod ページで必要な依存関係が抜けていないかも要チェック。</p>
+      <p>Mod が動かない場合、原因の定番はバージョンずれとローダー違い。Minecraft バージョンが厳密に一致していて、ローダーも正しいかを確認. Forge 用 Mod は Fabric では動きません (逆も同様)。Mod ページで必要な依存関係が抜けていないかも要チェック。必須の依存関係に互換バージョンが見つからない場合でも、GDLauncher は Mod 本体をインストールし、スキップした依存関係の名前を通知で表示します。</p>
       <p>起動時のクラッシュは大抵どこかで競合しています。最近追加した Mod を 1 つずつ外して原因を特定しましょう。相性が悪い組み合わせも存在します。Mod を大量に入れているなら RAM 不足の可能性も (<a href={localizedPath("/guides/allocate-more-ram", locale)}>RAM ガイド</a>)。</p>
     </Fragment>
   )}
@@ -155,7 +155,7 @@ const m = meta[locale]
       <p>수동으로 파일을 추가한 뒤 홈 화면으로 돌아가 인스턴스를 다시 클릭하면 GDLauncher가 재스캔해 새 모드를 인식합니다.</p>
 
       <h2>잘 안될 때</h2>
-      <p>모드가 안 돌아간다면 흔한 원인은 버전이나 로더가 안 맞는 것입니다. 모드가 정확히 같은 Minecraft 버전과 같은 모드 로더를 위한 것인지 확인하세요. Forge 모드는 Fabric에서 안 돌고 반대도 같습니다. 모드 페이지에서 빠진 의존성도 살펴보세요.</p>
+      <p>모드가 안 돌아간다면 흔한 원인은 버전이나 로더가 안 맞는 것입니다. 모드가 정확히 같은 Minecraft 버전과 같은 모드 로더를 위한 것인지 확인하세요. Forge 모드는 Fabric에서 안 돌고 반대도 같습니다. 모드 페이지에서 빠진 의존성도 살펴보세요. 필수 의존성에 호환되는 버전이 없으면 GDLauncher는 모드만 설치하고, 건너뛴 의존성의 이름을 알림으로 보여 줍니다.</p>
       <p>실행 시 크래시는 보통 어딘가에서 충돌이 있다는 뜻입니다. 가장 최근에 추가한 모드부터 하나씩 제거해 범인을 찾으세요. 두 모드가 그냥 안 맞을 때도 있습니다. 모드가 아주 많다면 RAM이 더 필요할 수도 있습니다(<a href={localizedPath("/guides/allocate-more-ram", locale)}>RAM 가이드</a>).</p>
     </Fragment>
   )}
@@ -180,7 +180,7 @@ const m = meta[locale]
       <p>Nach dem manuellen Ablegen geh zurück zum Startbildschirm und klick die Instanz nochmal an. GDLauncher scannt neu und erkennt die neuen Mods.</p>
 
       <h2>Wenn was nicht klappt</h2>
-      <p>Mod läuft nicht? Die üblichen Verdächtigen sind Versions-Mismatches und Mod-Loader-Mismatches. Stell sicher, dass der Mod genau für deine Minecraft-Version und den richtigen Mod-Loader ist, ein Forge-Mod läuft nicht auf Fabric und umgekehrt. Prüf die Mod-Seite auf fehlende Abhängigkeiten.</p>
+      <p>Mod läuft nicht? Die üblichen Verdächtigen sind Versions-Mismatches und Mod-Loader-Mismatches. Stell sicher, dass der Mod genau für deine Minecraft-Version und den richtigen Mod-Loader ist, ein Forge-Mod läuft nicht auf Fabric und umgekehrt. Prüf die Mod-Seite auf fehlende Abhängigkeiten. Findet GDLauncher für eine benötigte Abhängigkeit keine passende Version, installiert er den Mod trotzdem und nennt dir die übersprungene Abhängigkeit in einer Meldung.</p>
       <p>Crashes beim Start bedeuten meist Konflikte. Entferne kürzlich hinzugefügte Mods einen nach dem anderen, bis du den Übeltäter findest. Manchmal vertragen sich zwei Mods einfach nicht. Wenn du viele Mods hast, brauchst du vielleicht mehr RAM (siehe <a href={localizedPath("/guides/allocate-more-ram", locale)}>RAM-Guide</a>).</p>
     </Fragment>
   )}
@@ -205,7 +205,7 @@ const m = meta[locale]
       <p>Après avoir ajouté des fichiers manuellement, retourne à l'écran d'accueil et reclique sur l'instance. GDLauncher rescanne et détecte les nouveaux mods.</p>
 
       <h2>Quand ça plante</h2>
-      <p>Si un mod ne marche pas, les suspects habituels sont les versions et les mod loaders qui ne correspondent pas. Vérifie que le mod est exactement pour ta version de Minecraft et le bon mod loader, un mod Forge ne marche pas sur Fabric et inversement. Regarde la page du mod pour les dépendances manquantes.</p>
+      <p>Si un mod ne marche pas, les suspects habituels sont les versions et les mod loaders qui ne correspondent pas. Vérifie que le mod est exactement pour ta version de Minecraft et le bon mod loader, un mod Forge ne marche pas sur Fabric et inversement. Regarde la page du mod pour les dépendances manquantes. Si GDLauncher ne trouve aucune version compatible d'une dépendance requise, il installe quand même le mod et t'indique dans une notification la dépendance qu'il a laissée de côté.</p>
       <p>Crash au démarrage ? Probablement un conflit. Retire les mods récemment ajoutés un par un jusqu'à trouver le coupable. Parfois deux mods ne se supportent juste pas. Si tu as beaucoup de mods, tu auras peut-être besoin de plus de RAM (voir notre <a href={localizedPath("/guides/allocate-more-ram", locale)}>guide RAM</a>).</p>
     </Fragment>
   )}
@@ -230,7 +230,7 @@ const m = meta[locale]
       <p>Tras añadir archivos manualmente, vuelve a la pantalla principal y haz clic en la instancia otra vez. GDLauncher reescaneará y detectará los nuevos mods.</p>
 
       <h2>Cuando algo falla</h2>
-      <p>Si un mod no funciona, los sospechosos habituales son versiones y mod loaders que no encajan. Asegúrate de que el mod es exactamente para tu versión de Minecraft y el mod loader correcto, un mod de Forge no funciona en Fabric y al revés. Revisa la página del mod por dependencias que falten.</p>
+      <p>Si un mod no funciona, los sospechosos habituales son versiones y mod loaders que no encajan. Asegúrate de que el mod es exactamente para tu versión de Minecraft y el mod loader correcto, un mod de Forge no funciona en Fabric y al revés. Revisa la página del mod por dependencias que falten. Si GDLauncher no encuentra una versión compatible de una dependencia obligatoria, instala el mod igualmente y te muestra un aviso con el nombre de la dependencia que omitió.</p>
       <p>Crashes al lanzar suelen indicar un conflicto. Quita los mods añadidos recientemente uno a uno hasta encontrar el culpable. A veces dos mods simplemente no se llevan bien. Si tienes muchos mods, puede que necesites más RAM (mira nuestra <a href={localizedPath("/guides/allocate-more-ram", locale)}>guía de RAM</a>).</p>
     </Fragment>
   )}
@@ -255,7 +255,7 @@ const m = meta[locale]
       <p>Depois de adicionar arquivos manualmente, volte para a tela inicial e clique na instância de novo. O GDLauncher faz uma re-varredura e detecta os novos mods.</p>
 
       <h2>Quando dá ruim</h2>
-      <p>Se um mod não funciona, os culpados de sempre são versões e mod loaders incompatíveis. Confirme que o mod é exatamente para a sua versão do Minecraft e para o mod loader certo, mod do Forge não roda no Fabric e vice-versa. Veja na página do mod se está faltando alguma dependência.</p>
+      <p>Se um mod não funciona, os culpados de sempre são versões e mod loaders incompatíveis. Confirme que o mod é exatamente para a sua versão do Minecraft e para o mod loader certo, mod do Forge não roda no Fabric e vice-versa. Veja na página do mod se está faltando alguma dependência. Se o GDLauncher não encontrar uma versão compatível de uma dependência obrigatória, ele instala o mod mesmo assim e mostra um aviso com o nome da dependência que ficou de fora.</p>
       <p>Crash na inicialização geralmente é conflito. Remova os mods adicionados recentemente um por um até achar o responsável. Às vezes dois mods simplesmente não se dão. Se você tem muitos mods, pode precisar de mais RAM (veja nosso <a href={localizedPath("/guides/allocate-more-ram", locale)}>guia de RAM</a>).</p>
     </Fragment>
   )}
@@ -280,7 +280,7 @@ const m = meta[locale]
       <p>Dopo aver aggiunto file manualmente, torna alla schermata principale e clicca di nuovo sull'istanza: GDLauncher fa una nuova scansione e riconosce le Mod appena aggiunte.</p>
 
       <h2>Quando qualcosa non va</h2>
-      <p>Se una Mod non funziona, i sospettati di sempre sono versioni e Mod loader che non corrispondono. Verifica che la Mod sia esattamente per la tua versione di Minecraft e per il giusto Mod loader: una Mod per Forge non gira su Fabric e viceversa. Controlla la pagina della Mod per eventuali dipendenze mancanti.</p>
+      <p>Se una Mod non funziona, i sospettati di sempre sono versioni e Mod loader che non corrispondono. Verifica che la Mod sia esattamente per la tua versione di Minecraft e per il giusto Mod loader: una Mod per Forge non gira su Fabric e viceversa. Controlla la pagina della Mod per eventuali dipendenze mancanti. Se GDLauncher non trova una versione compatibile di una dipendenza obbligatoria, installa comunque la Mod e ti mostra un avviso con il nome della dipendenza saltata.</p>
       <p>Crash all'avvio? Di solito è un conflitto. Rimuovi le Mod aggiunte di recente uno alla volta finché non trovi il colpevole. A volte due Mod proprio non si sopportano. Se hai molte Mod potresti aver bisogno di più RAM (vedi la nostra <a href={localizedPath("/guides/allocate-more-ram", locale)}>guida sulla RAM</a>).</p>
     </Fragment>
   )}

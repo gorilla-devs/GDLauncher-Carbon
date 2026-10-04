@@ -1,3 +1,8 @@
+import {
+  addonDownloadingToServer,
+  addonInstallCompletion,
+  addonInstallFailure
+} from "./addonInstallScope"
 import { rspc } from "@/utils/rspcClient"
 import { Switch, Match, createSignal, createEffect, createMemo } from "solid-js"
 import {
@@ -109,12 +114,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
   // Handle task progress for single instance button
   const task = rspc.createQuery(() => ({
-    queryKey: ["vtask.getTask", taskId()],
+    queryKey: ["vtask.getTaskOutcome", taskId()],
     enabled: taskId() !== null
-  }))
-
-  const dismissTaskMutation = rspc.createMutation(() => ({
-    mutationKey: ["vtask.dismissTask"]
   }))
 
   createEffect(() => {
@@ -123,7 +124,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     const { action, nextLastProgress } = resolveTaskPoll(
       task?.data,
       lastProgress(),
-      props.addon?.type === "world"
+      true
     )
     setLastProgress(nextLastProgress)
 
@@ -139,22 +140,22 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       )
       setLoading(false)
       setPendingInstall(false)
-      const failedTaskId = taskId()
       setTaskId(null)
       setProgress(null)
       // Retire the failure from `lastProgress` too — otherwise it would
       // outlive this task and suppress the success toast of whatever gets
       // tracked next (see this signal's own doc comment above).
       setLastProgress(null)
-      if (failedTaskId !== null) {
-        dismissTaskMutation.mutate(failedTaskId)
-      }
-    } else if (action.kind === "completed") {
-      if (action.showSuccessToast) {
+    } else if (action.kind === "completed" || action.kind === "dismissed") {
+      if (action.kind === "completed" && action.showSuccessToast) {
         toast.success(
           copyRequest()
             ? t(copyRequest()!.completion)
-            : `${props.addon?.title || "World"} installed successfully`,
+            : addonInstallCompletion(
+                props.addon?.title || "Addon",
+                props.addon?.type,
+                !!props.selectedServerId
+              ),
           { duration: 2000 }
         )
       }
@@ -291,7 +292,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
         await installModMutation.mutateAsync({
           mod_source: modInstallObj(),
           instance_id: instanceId,
-          install_deps: !replacesMod,
+          install_deps: true,
           replaces_mod: replacesMod
         })
       }
@@ -302,47 +303,6 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       setProgress(null)
     }
   }
-
-  // Watch for installation completion and clear states reactively
-  const [wasInstalled, setWasInstalled] = createSignal(false)
-  const [isInitialized, setIsInitialized] = createSignal(false)
-
-  createEffect(() => {
-    const installed = isInstalled()
-    const isWorld = props.addon?.type === "world"
-
-    // For other addon types: show toast when transitioning from not installed to installed
-    // Skip on initial mount to avoid showing toast for already-installed versions
-    if (!isWorld && installed && !wasInstalled() && isInitialized()) {
-      toast.success(`${props.addon?.title || "Addon"} installed successfully`, {
-        duration: 2000
-      })
-    }
-
-    // Track installed state changes
-    if (installed !== wasInstalled()) {
-      setWasInstalled(installed)
-    }
-
-    // For worlds, `taskId() === null` conflates "the install has not started
-    // yet" with "the install finished". `pendingInstall` marks the
-    // not-yet-tracked window between click (when `loading` flips true) and
-    // vtask completion, closing the gap. Only clear loading here if the
-    // install genuinely finished (`pendingInstall` false means either the
-    // vtask poll's null branch already ran, or the attempt failed and the
-    // catch cleared it). For toast delivery, see vtask-poll effect above
-    // (apps/desktop/e2e-tests/helpers/mods.ts:installModIntoInstance).
-    if (installed || (isWorld && !pendingInstall() && taskId() === null)) {
-      setLoading(false)
-      setTaskId(null)
-      setProgress(null)
-    }
-
-    // Mark as initialized after first run
-    if (!isInitialized()) {
-      setIsInitialized(true)
-    }
-  })
 
   return (
     <Switch>
@@ -383,6 +343,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           progress={progress}
           isInstalled={isInstalled}
           instanceLocked={() => props.instanceLocked ?? false}
+          staged={props.addon?.type === "datapack"}
           copyPresentation={worldVersionCopy(
             props.addon?.type,
             props.fileId,

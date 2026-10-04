@@ -114,6 +114,9 @@ pub fn main() {
             // Clean up leftover temp files/folders from previous sessions
             let temp_path = carbon_rt_path::TempPath::new(runtime_path.join("temp"));
             temp_path.cleanup_all().await;
+            // And addon install staging an earlier session left in the data
+            // folder (quit or crashed mid-install, or kept by an older build).
+            managers::instance::installer::publication::sweep_stale_staging(&runtime_path).await;
 
             info!("Starting Carbon App v{}", app_version::APP_VERSION);
 

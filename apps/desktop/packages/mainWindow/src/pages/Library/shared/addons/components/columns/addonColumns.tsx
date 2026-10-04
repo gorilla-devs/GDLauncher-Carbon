@@ -32,6 +32,7 @@ export interface AddonColumnConfig {
 
   // Locking (instance-specific, optional)
   isLocked?: () => boolean
+  isStaged?: (row: any) => boolean
 
   // Icon/thumbnail (optional — needs getImageUrl)
   getImageUrl?: (row: any) => string | null
@@ -282,7 +283,14 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
                   fallback={
                     <Show
                       when={isUpdating()}
-                      fallback={<Trans key="content:_trn_update_mod" />}
+                      fallback={
+                        <Show
+                          when={config.isStaged?.(row)}
+                          fallback={<Trans key="content:_trn_update_mod" />}
+                        >
+                          <Trans key="content:_trn_datapack_update_hint" />
+                        </Show>
+                      }
                     >
                       <Trans key="general:_trn_updating" />
                     </Show>
@@ -300,6 +308,10 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
     // 8. Enabled toggle
     createEnabledColumn({
       onToggle: config.onToggleMod,
+      scopeTitle: (row) =>
+        config.isStaged?.(row)
+          ? t("content:_trn_datapack_toggle_hint")
+          : undefined,
       isDisabled: config.isLocked,
       // Through `config.getAddonType`, never `row.addon_type` directly: the
       // two tables this file serves carry the field under different names
@@ -338,7 +350,12 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
                   />
                 </TooltipTrigger>
                 <TooltipContent>
-                  <Trans key="instances:_trn_switch_version" />
+                  <Show
+                    when={config.isStaged?.(row)}
+                    fallback={<Trans key="instances:_trn_switch_version" />}
+                  >
+                    <Trans key="content:_trn_datapack_switch_hint" />
+                  </Show>
                 </TooltipContent>
               </Tooltip>
             </div>
@@ -351,6 +368,10 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
     // 10. Delete
     createDeleteColumn({
       onDelete: config.onDeleteMod,
+      label: (row) =>
+        config.isStaged?.(row)
+          ? t("content:_trn_datapack_delete_hint")
+          : undefined,
       isDisabled: config.isLocked,
       disabledTooltip: lockedTooltip
     })

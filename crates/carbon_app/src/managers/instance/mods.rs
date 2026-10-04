@@ -8,6 +8,7 @@ use crate::domain::instance::{self as domain, info};
 use crate::managers::AppInner;
 use crate::managers::instance::InstanceType;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
+use anyhow::Context;
 use anyhow::{anyhow, bail};
 use carbon_platforms::curseforge::FileReleaseType;
 use carbon_platforms::curseforge::filters::{
@@ -177,18 +178,101 @@ impl ManagerRef<'_, InstanceManager> {
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.to_owned()).into())
     }
 
+    /// Whether addons may change now: the pack is not locked, the instance is
+    /// not being deleted, and no pending setup can stage or apply content
+    /// beside them. A queued or preparing launch, or the first install of a
+    /// new instance, does not hold them by itself: Play installs the game,
+    /// Java and the loader, never the addon folders, and 2.0.40 allowed edits
+    /// meanwhile. A setup that does write them (a pack install, update or
+    /// repair) holds them through its `.setup` session. Install, publication
+    /// and commit all check here, so an install admitted before Play still
+    /// finishes while the game prepares.
     pub(super) async fn ensure_modpack_not_locked(
         &self,
         instance_id: InstanceId,
     ) -> anyhow::Result<()> {
-        let instances = self.instances.read().await;
-        let instance = instances
-            .get(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?;
-
-        if let Some(modpack) = instance.data()?.config.modpack.as_ref() {
-            if modpack.locked {
+        let (shortpath, config, preparing) = {
+            let instances = self.instances.read().await;
+            let instance = instances
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?;
+            let data = instance.data()?;
+            if data.config.modpack.as_ref().is_some_and(|pack| pack.locked) {
                 bail!("Modpack is locked");
+            }
+            if matches!(
+                data.state,
+                super::run::LaunchState::Queued(_)
+                    | super::run::LaunchState::Preparing(_)
+                    | super::run::LaunchState::Deleting
+            ) {
+                bail!("Wait for the current instance setup before changing addons");
+            }
+            let preparing = matches!(
+                data.state,
+                super::run::LaunchState::Queued(_) | super::run::LaunchState::Preparing(_)
+            );
+            (instance.shortpath.clone(), data.config.clone(), preparing)
+        };
+        let path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath);
+        let setup = path.get_root().join(".setup");
+        if addon_metadata(&setup).await?.is_some() {
+            use super::modpack::session::{Kind, Phase, Producer, Session};
+            let session = Session::load(&path.get_root())
+                .await?
+                .context("Unverified pending setup; finish or cancel it before changing addons")?;
+            let initial = session.producer == Producer::Create
+                && session.kind == Kind::VersionOnly
+                && session.phase == Phase::Reserved;
+            let imported = session.producer == Producer::Import
+                && session.kind == Kind::ImportedComplete
+                && session.phase == Phase::Committed;
+            let installed = super::schema::parse_instance_config(&session.installed_config)?;
+            if session.instance_id != Some(*instance_id)
+                || !(initial || imported)
+                || session.pending_config.is_some()
+                || session.requested_pack.is_some()
+                || session.target.is_some()
+                || session.original_options.is_some()
+                || session.archive.is_some()
+                || session.copied_to.is_some()
+                || !same_addon_game_version(&installed.game_configuration.version, &version)
+                || installed.modpack != modpack
+            {
+                bail!("A setup is pending. Finish or cancel it before changing addons");
+            }
+            for marker in [
+                "change-pack-version.json",
+                "repair",
+                "apply-started",
+                "representation-transitions",
+                "staging-packinfo.json",
+            ] {
+                if addon_metadata(&setup.join(marker)).await?.is_some() {
+                    bail!("A setup is pending. Finish or cancel it before changing addons");
+                }
+            };
+            if !allowed {
+                // Play is already finishing it: "press Play" would not help.
+                if preparing {
+                    bail!(PREPARING_SETUP_REFUSAL);
+                }
+                bail!(
+                    "{}",
+                    pending_setup_refusal(
+                        &root,
+                        instance_id,
+                        &config,
+                        pending.as_ref(),
+                        PendingChange::Addons
+                    )
+                    .await?
+                );
             }
         }
 
@@ -1320,8 +1404,8 @@ pub(crate) mod tests {
 
     /// A failed or cancelled version-only install keeps its setup until that
     /// version installs. Addons can still be added, toggled and removed
-    /// beside it, in either phase, as in 2.0.40; pack setups, apply markers
-    /// and a queued or running preparation still hold them.
+    /// beside it, in either phase, and while it installs, as in 2.0.40; pack
+    /// setups, apply markers and a deletion still hold them.
     #[tokio::test]
     async fn versiononly_pending_install_keeps_addon_edits() {
         use crate::domain::vtask::VisualTaskId;
@@ -1533,15 +1617,36 @@ pub(crate) mod tests {
             refused(marker.into()).await;
             std::fs::remove_file(marker_path).unwrap();
         }
-        // A queued or running preparation.
+        // A queued or running preparation of this version-only setup (the
+        // first install of a new instance, or Play) never touches the addon
+        // folders: edits go ahead meanwhile, as in 2.0.40. While it finishes a
+        // pack setup they wait, and the reason says so rather than "press
+        // Play".
         for state in [
             LaunchState::Queued(VisualTaskId(900)),
             LaunchState::Preparing(VisualTaskId(900)),
         ] {
             let name = format!("{state:?}");
             set_state(state).await;
-            refused(name).await;
+            app.instance_manager()
+                .enable_mod(id, row.id.clone(), false)
+                .await
+                .unwrap_or_else(|error| panic!("{name}: {error:#}"));
+            assert!(disabled.exists() && !path.exists(), "{name}");
+            app.instance_manager()
+                .enable_mod(id, row.id.clone(), true)
+                .await
+                .unwrap_or_else(|error| panic!("{name}: {error:#}"));
+            assert!(path.exists() && !disabled.exists(), "{name}");
+            write(&pack);
+            let message = refused(format!("{name} with a pack setup")).await;
+            assert_eq!(message, super::PREPARING_SETUP_REFUSAL, "{name}");
+            write(&committed);
         }
+        // An instance being deleted.
+        set_state(LaunchState::Deleting).await;
+        let message = refused("Deleting".into()).await;
+        assert!(message.contains("being deleted"), "{message}");
         set_state(LaunchState::Inactive { failed_task: None }).await;
 
         app.instance_manager()
@@ -2360,5 +2465,20 @@ pub(crate) mod tests {
             path.exists(),
             "a directory must survive a file-addon delete"
         );
+    }
+}
+
+pub(super) fn same_addon_game_version(
+    a: &Option<crate::domain::instance::info::GameVersion>,
+    b: &Option<crate::domain::instance::info::GameVersion>,
+) -> bool {
+    use crate::domain::instance::info::GameVersion;
+    match (a, b) {
+        (Some(GameVersion::Standard(a)), Some(GameVersion::Standard(b))) => {
+            a.release == b.release && a.modloaders == b.modloaders
+        }
+        (Some(GameVersion::Custom(a)), Some(GameVersion::Custom(b))) => a == b,
+        (None, None) => true,
+        _ => false,
     }
 }

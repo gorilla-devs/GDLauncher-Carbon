@@ -6,20 +6,29 @@ const state = vi.hoisted(() => ({
   preference: { isLoading: true, data: undefined as boolean | undefined },
   ensureQueryData: vi.fn(),
   deleteMod: vi.fn(),
-  openModal: vi.fn()
+  openModal: vi.fn(),
+  query: vi.fn(),
+  updateMod: vi.fn(),
+  errorToast: vi.fn()
 }))
 
+vi.mock(
+  "@/components/ModDownloadButton/hooks/resolveTaskPoll",
+  () =>
+    import("../../../../../../components/ModDownloadButton/hooks/resolveTaskPoll")
+)
+vi.mock("@gd/ui", () => ({ toast: { error: state.errorToast } }))
 vi.mock("@solidjs/router", () => ({ useParams: () => state.params }))
 vi.mock("@/utils/rspcClient", () => ({
   queryClient: { ensureQueryData: state.ensureQueryData },
   rspc: {
-    useContext: () => ({ client: { query: vi.fn() } }),
+    useContext: () => ({ client: { query: state.query } }),
     createQuery: () => state.preference,
     createMutation: (options: () => { mutationKey: string[] }) => ({
       mutateAsync:
         options().mutationKey[0] === "instance.deleteMod"
           ? state.deleteMod
-          : vi.fn(),
+          : state.updateMod,
       mutate: vi.fn()
     })
   }
@@ -212,4 +221,42 @@ describe("addon deletion target identity", () => {
       }
     }
   )
+})
+
+describe("captured row update outcomes", () => {
+  it.each(["Failed", "Dismissed", "Unavailable", "Succeeded"] as const)(
+    "settles the accepted row on %s without losing retained failure feedback",
+    async (type) => {
+      state.updateMod.mockResolvedValue(73)
+      state.query.mockResolvedValue({
+        type,
+        value: {
+          progress: {
+            type: "Failed",
+            value: { cause: [{ display: "Required library failed" }] }
+          }
+        }
+      })
+      const { actions, optimistic, refetch } = setup()
+      await actions.handleUpdateMod(addon("mod-a", "mods"))
+      expect(state.query).toHaveBeenCalledWith(["vtask.getTaskOutcome", 73])
+      expect(optimistic.stopUpdatingMod).toHaveBeenCalledWith("mod-a")
+      expect(refetch).toHaveBeenCalledOnce()
+      if (type === "Failed" || type === "Unavailable")
+        expect(state.errorToast).toHaveBeenCalledOnce()
+      else expect(state.errorToast).not.toHaveBeenCalled()
+    }
+  )
+  it("does not report an old accepted row outcome into another instance", async () => {
+    state.updateMod.mockResolvedValue(73)
+    state.query.mockImplementation(async () => {
+      state.params.id = "2"
+      return { type: "Failed" }
+    })
+    const { actions, optimistic, refetch } = setup()
+    await actions.handleUpdateMod(addon("mod-a", "mods"))
+    expect(optimistic.stopUpdatingMod).not.toHaveBeenCalled()
+    expect(refetch).not.toHaveBeenCalled()
+    expect(state.errorToast).not.toHaveBeenCalled()
+  })
 })

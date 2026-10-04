@@ -1,3 +1,8 @@
+import { toast } from "@gd/ui"
+import {
+  addonOutcomeText,
+  resolveTaskPoll
+} from "@/components/ModDownloadButton/hooks/resolveTaskPoll"
 import { useParams } from "@solidjs/router"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -78,9 +83,11 @@ export const useAddonMutations = (
 
   // Track active polling intervals for cleanup
   const activeIntervals = new Set<number>()
+  let disposed = false
 
   // Clean up all active intervals when component unmounts
   onCleanup(() => {
+    disposed = true
     activeIntervals.forEach((intervalId) => clearInterval(intervalId))
     activeIntervals.clear()
   })
@@ -136,45 +143,55 @@ export const useAddonMutations = (
     optimisticUpdates.startUpdatingMod(mod.id)
     optimisticUpdates.optimisticUpdateAddon(mod.id)
 
+    const instanceId = parseInt(params.id, 10)
     try {
-      await updateModMutation.mutateAsync({
-        instance_id: parseInt(params.id, 10),
+      const taskId = await updateModMutation.mutateAsync({
+        instance_id: instanceId,
         mod_id: mod.id
       })
-
-      // Poll for the update to complete
-      // The backend task runs async, so we need to wait for it
-      let attempts = 0
-      const maxAttempts = 20 // 10 seconds total
-
-      const pollInterval = setInterval(async () => {
-        attempts++
-        await refetchAddons()
-
-        if (attempts >= maxAttempts) {
-          clearInterval(pollInterval)
-          activeIntervals.delete(pollInterval as unknown as number)
-          // If we hit max attempts, stop showing as updating
-          optimisticUpdates.stopUpdatingMod(mod.id)
+      const poll = async () => {
+        if (!isCurrentInstance(instanceId)) return
+        try {
+          const task = await ctx.client.query(["vtask.getTaskOutcome", taskId])
+          if (!isCurrentInstance(instanceId)) return
+          const { action } = resolveTaskPoll(task, null, false)
+          if (
+            action.kind === "failed" ||
+            action.kind === "completed" ||
+            action.kind === "dismissed"
+          ) {
+            if (action.kind === "failed")
+              toast.error("Addon update failed", {
+                description: action.message
+              })
+            optimisticUpdates.stopUpdatingMod(mod.id)
+            await refetchAddons()
+            return // Retained failures remain inspectable from the navbar.
+          }
+        } catch {
+          /* A read failure cannot certify completion. */
         }
-      }, 500) as unknown as number
-
-      // Track the interval for cleanup
-      activeIntervals.add(pollInterval)
-
-      // The stopUpdatingMod will be called automatically when the mod no longer has updates
-      // This happens in the useAddonData reconciliation logic
+        if (!isCurrentInstance(instanceId)) return
+        const timer = setTimeout(() => {
+          activeIntervals.delete(timer as unknown as number)
+          void poll()
+        }, 500)
+        activeIntervals.add(timer as unknown as number)
+      }
+      await poll()
     } catch (error) {
       console.error("Failed to update mod:", error)
       // Stop updating state and rollback on error
-      optimisticUpdates.stopUpdatingMod(mod.id)
-      optimisticUpdates.rollbackToServerState()
+      if (isCurrentInstance(instanceId)) {
+        optimisticUpdates.stopUpdatingMod(mod.id)
+        optimisticUpdates.rollbackToServerState()
+      }
       throw error // Re-throw to handle in UI
     }
   }
 
   const isCurrentInstance = (instanceId: number) =>
-    parseInt(params.id, 10) === instanceId
+    !disposed && parseInt(params.id, 10) === instanceId
 
   const performDeleteMod = async (
     instanceId: number,

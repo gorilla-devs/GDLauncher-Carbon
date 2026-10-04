@@ -1,4 +1,5 @@
 {
+  "_trn_instance_task_stage_datapack": "{{instance_name}} 用にデータパック {{mod_name}} をダウンロード中",
   "_trn_instance_task_launch": "{{name}} を起動中",
   "_trn_instance_task_launch_request_versions": "バージョン情報を取得中",
   "_trn_instance_task_launch_download_files": "ゲームファイルをダウンロード中",

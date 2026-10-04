@@ -1,9 +1,12 @@
+import { retryCapturedAddonFailure } from "@/components/AddonFailures/controller"
+import { resolveTaskPoll } from "@/components/ModDownloadButton/hooks/resolveTaskPoll"
 import { Button, Progress, Spinner } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { getTaskTranslationKey } from "@gd/i18n/helpers"
 import { createSignal, onMount, onCleanup, Match, Switch, Show } from "solid-js"
 import type {
   FETask,
+  FETaskOutcome,
   FESubtask,
   Translation,
   ShaderLoaderVerification
@@ -33,6 +36,7 @@ const Installing = (props: StepProps) => {
   const [stepCount, setStepCount] = createSignal(1)
   const [error, setError] = createSignal<string | null>(null)
   const [destroyed, setDestroyed] = createSignal(false)
+  const [failedTaskId, setFailedTaskId] = createSignal<number | null>(null)
   const [currentTask, setCurrentTask] = createSignal<FETask | null>(null)
 
   // Lock the backdrop close before any await fires. The ModalsManager reads
@@ -49,15 +53,26 @@ const Installing = (props: StepProps) => {
 
   const waitForTask = async (taskId: number): Promise<void> => {
     while (!destroyed()) {
-      const task = await ctx.client.query(["vtask.getTask", taskId])
-      if (task === null) return
-      setCurrentTask(task)
-      if (task.progress.type === "Failed") {
-        const cause = task.progress.value.cause[0]?.display
-        throw new Error(cause ?? "Task failed")
+      let outcome: FETaskOutcome
+      try {
+        outcome = await ctx.client.query(["vtask.getTaskOutcome", taskId])
+      } catch {
+        // A read failure does not retire the accepted attempt or offer a retry.
+        await new Promise((r) => setTimeout(r, 200))
+        continue
       }
-      if (task.progress.type === "Known" && task.progress.value >= 1.0) {
-        return
+      if (destroyed()) return
+      if (outcome.type === "Running" || outcome.type === "Failed")
+        setCurrentTask(outcome.value)
+      const { action } = resolveTaskPoll(outcome, null, false)
+      if (action.kind === "completed") return
+      if (action.kind === "failed" || action.kind === "dismissed") {
+        if (outcome.type === "Failed") setFailedTaskId(taskId)
+        throw new Error(
+          action.kind === "failed"
+            ? action.message
+            : t("notifications:_trn_addon_attempt_dismissed")
+        )
       }
       await new Promise((r) => setTimeout(r, 200))
     }
@@ -191,10 +206,24 @@ const Installing = (props: StepProps) => {
     modalsContext?.closeModal()
   }
 
-  const retry = () => {
+  const retry = async () => {
+    const failedAttempt = failedTaskId()
     setError(null)
     setShaderInstallRunning(true)
-    void run()
+    try {
+      await retryCapturedAddonFailure(
+        failedAttempt,
+        (id) => ctx.client.query(["vtask.getTaskOutcome", id]),
+        (id) => ctx.client.mutation(["vtask.dismissTask", id]),
+        async () => {
+          setFailedTaskId(null)
+          if (!destroyed()) await run()
+        }
+      )
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error))
+      setShaderInstallRunning(false)
+    }
   }
 
   onMount(() => {

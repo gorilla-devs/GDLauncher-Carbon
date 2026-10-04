@@ -1,4 +1,5 @@
 {
+  "_trn_instance_task_stage_datapack": "Скачивание датапака {{mod_name}} для {{instance_name}}",
   "_trn_instance_task_launch": "Запуск {{name}}",
   "_trn_instance_task_launch_request_versions": "Запрос информации о версиях...",
   "_trn_instance_task_launch_download_files": "Загрузка файлов игры...",

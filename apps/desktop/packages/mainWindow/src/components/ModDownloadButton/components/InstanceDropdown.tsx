@@ -52,32 +52,6 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     }))
   }
 
-  // Watch for installation completion and clear loading states reactively
-  // This prevents the gap between "Installing" and "Installed"
-  createEffect(() => {
-    if (isDropdownOpen() && props.addon) {
-      // Skip installation detection for worlds since they don't appear in mods list
-      // and would cause infinite refetching
-      if (props.addon.type === "world") {
-        return
-      }
-
-      props.filteredInstances().forEach((instance) => {
-        const instanceQuery = getInstanceModsQuery(instance.id)
-        const isLoading = props.instanceLoadingStates().get(instance.id)
-
-        if (isLoading && instanceQuery.data) {
-          const mods = instanceQuery.data || []
-          const isNowInstalled = !!isModInstalledInInstance(mods, props.addon)
-
-          if (isNowInstalled) {
-            props.clearInstanceLoadingState(instance.id)
-          }
-        }
-      })
-    }
-  })
-
   createEffect(() => {
     const timer = setTimeout(() => {
       if (inputRef) {
@@ -126,6 +100,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
 
     return (
       <InstanceItem
+        staged={props.addon?.type === "datapack"}
         instance={instance}
         isLoading={isLoading()}
         isInstalled={isInstalled()}

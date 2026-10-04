@@ -6,7 +6,7 @@ import { Trans } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import { createSignal, onCleanup } from "solid-js"
 import { Mod } from "@gd/core_module/bindings"
-import { RSPCError } from "@/utils/rspcClient"
+import { updateAddonBatch } from "@/components/ModDownloadButton/hooks/updateAddonBatch"
 
 interface Props {
   instanceId: number
@@ -17,6 +17,8 @@ interface Props {
 const ModsUpdater = (props: ModalProps) => {
   const data: () => Props = () => props?.data
   const modalsContext = useModal()
+  const ctx = rspc.useContext()
+  const captured = { ...data(), mods: [...data().mods] }
   const [modsUpdated, setModsUpdated] = createSignal(0)
   const [isDestroyed, setIsDestroyed] = createSignal(false)
 
@@ -28,44 +30,46 @@ const ModsUpdater = (props: ModalProps) => {
     mutationKey: ["instance.updateMod"],
     onError: (err) => {
       console.error(err)
-      toast.error(`Error updating mod: ${err?.message}`)
     }
   }))
 
   const updateMods = async () => {
-    for (const modId of data().mods) {
-      try {
-        await updateModMutation.mutateAsync({
-          instance_id: data().instanceId,
-          mod_id: modId.id
-        })
-      } catch (err) {
-        console.error(err)
-        toast.error(`Error updating mod: ${(err as RSPCError)?.message}`)
-      } finally {
+    const outcome = await updateAddonBatch(
+      captured.mods,
+      (mod) =>
+        updateModMutation.mutateAsync({
+          instance_id: captured.instanceId,
+          mod_id: mod.id
+        }),
+      (id) => ctx.client.query(["vtask.getTaskOutcome", id]),
+      () => !isDestroyed(),
+      (mod, error) => {
+        if (error !== undefined)
+          toast.error(
+            t("content:_trn_mods_updater.update_failed", {
+              name: mod.filename,
+              interpolation: { escapeValue: false }
+            }),
+            { description: error }
+          )
         setModsUpdated((prev) => prev + 1)
       }
-
-      if (isDestroyed()) return
+    )
+    if (outcome.abandoned || isDestroyed()) return
+    if (outcome.failed === 0) {
+      toast.success(
+        captured.mods.some((mod) => mod.addon_type === "datapacks")
+          ? t("content:_trn_mods_updater.success_datapacks")
+          : t("content:_trn_mods_updater.success")
+      )
     }
-
-    // Add a delay to ensure all backend tasks complete
-    // The WebSocket invalidation will trigger the data refresh
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-
-    toast.success("Mods updated successfully!")
-
-    // Call the onComplete callback if provided
-    const onComplete = data().onComplete
-    if (onComplete) {
-      onComplete()
-    }
-
+    captured.onComplete?.()
     modalsContext?.closeModal()
   }
 
+  // The oldest update still running.
   const currentModName = () => {
-    const mod = data().mods[modsUpdated()]
+    const mod = running()[0]
 
     if (!mod) return ""
 

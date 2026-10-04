@@ -5,6 +5,7 @@ import { createColumnHelper } from "@tanstack/solid-table"
 
 interface DeleteColumnConfig {
   onDelete: (row: any) => void
+  label?: (row: any) => string | undefined
   isDisabled?: () => boolean
   disabledTooltip?: JSX.Element
 }
@@ -50,7 +51,12 @@ export const createDeleteColumn = (config: DeleteColumnConfig) => {
                 />
               </TooltipTrigger>
               <TooltipContent>
-                <Trans key="content:_trn_delete_mod" />
+                <Show
+                  when={config.label?.(row)}
+                  fallback={<Trans key="content:_trn_delete_mod" />}
+                >
+                  {config.label?.(row)}
+                </Show>
               </TooltipContent>
             </Tooltip>
           </Show>

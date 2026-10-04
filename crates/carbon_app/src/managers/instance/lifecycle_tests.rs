@@ -18,7 +18,7 @@ pub(super) struct Pause {
 }
 
 impl Hooks {
-    fn arm_path(&self, name: &'static str, path: &str) -> Arc<Pause> {
+    pub(super) fn arm_path(&self, name: &'static str, path: &str) -> Arc<Pause> {
         let pause = Arc::new(Pause::default());
         self.path_pauses
             .lock()

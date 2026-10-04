@@ -1,3 +1,4 @@
+pub mod datapacks;
 use self::export::InstanceExportManager;
 use self::importer::InstanceImportManager;
 use self::log::GameLog;

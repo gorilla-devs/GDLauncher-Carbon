@@ -55,7 +55,7 @@ import GuideLayout from "../../components/GuideLayout.astro"
 
   <h2>When things go wrong</h2>
   <p>
-    If a mod isn't working, the usual suspects are version mismatches and modloader mismatches. Make sure the mod is for your exact Minecraft version and the right mod loader, a Forge mod won't work on Fabric and vice versa. Check the mod's page for any dependencies you might be missing.
+    If a mod isn't working, the usual suspects are version mismatches and modloader mismatches. Make sure the mod is for your exact Minecraft version and the right mod loader, a Forge mod won't work on Fabric and vice versa. Check the mod's page for any dependencies you might be missing. If GDLauncher can't find a compatible version of a required dependency, it still installs the mod and shows a notice naming the dependency it skipped.
   </p>
   <p>
     Crashes on launch usually mean a conflict somewhere. Remove the most recently added mods one at a time until you find the culprit. Sometimes two mods just don't play nice together. If you have a ton of mods, you might also need more RAM (see our <a href="/guides/allocate-more-ram">RAM guide</a>).

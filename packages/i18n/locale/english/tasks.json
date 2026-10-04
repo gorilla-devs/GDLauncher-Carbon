@@ -1,4 +1,5 @@
 {
+  "_trn_instance_task_stage_datapack": "Downloading datapack {{mod_name}} for {{instance_name}}",
   "_trn_instance_task_install_world_copy": "Installing separate world copy {{world_name}} for {{instance_name}}; original save retained",
   "_trn_instance_task_launch": "Launching {{name}}",
   "_trn_instance_task_launch_request_versions": "Requesting versions",
@@ -45,5 +46,6 @@
   "_trn_server_task_extract_modpack_overrides": "Extracting overrides",
   "_trn_server_task_download_server_jar": "Downloading server jar",
   "_trn_server_task_install_modloader": "Installing modloader",
+  "_trn_server_task_install_mod": "Installing addons on {{server_name}}",
   "_trn_cache_cleanup": "Cleaning up cache"
 }

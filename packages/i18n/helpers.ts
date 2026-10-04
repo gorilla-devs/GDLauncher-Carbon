@@ -211,6 +211,7 @@ export function getTaskTranslationKey(taskType: string): NamespacedTranslationKe
     'InstanceTaskLaunchRunForgeProcessors': 'tasks:_trn_instance_task_launch_run_forge_processors',
     'InstanceTaskLaunchRunNeoforgeProcessors': 'tasks:_trn_instance_task_launch_run_neoforge_processors',
     'InstanceTaskInstallMod': 'tasks:_trn_instance_task_install_mod',
+    'InstanceTaskStageDatapack': 'tasks:_trn_instance_task_stage_datapack',
     'InstanceTaskInstallWorldCopy': 'tasks:_trn_instance_task_install_world_copy',
     'InstanceTaskLaunchInstallJava': 'tasks:_trn_instance_task_launch_install_java',
     'FinalizingImport': 'tasks:_trn_finalizing_import',
@@ -223,6 +224,7 @@ export function getTaskTranslationKey(taskType: string): NamespacedTranslationKe
     'ServerTaskExtractModpackOverrides': 'tasks:_trn_server_task_extract_modpack_overrides',
     'ServerTaskDownloadServerJar': 'tasks:_trn_server_task_download_server_jar',
     'ServerTaskInstallModloader': 'tasks:_trn_server_task_install_modloader',
+    'ServerTaskInstallMod': 'tasks:_trn_server_task_install_mod',
   }
   // Default to a valid key if type isn't mapped
   return mapping[taskType] ?? ('tasks:_trn_instance_task_prepare' as NamespacedTranslationKey)

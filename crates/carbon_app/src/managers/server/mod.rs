@@ -75,13 +75,61 @@ fn ensure_server_files_available(state: &ServerState) -> anyhow::Result<()> {
     // A server holding a marker from an earlier session passes here: the
     // marker check that follows (`refuse_unowned_marker`) removes it if its
     // process is gone, and otherwise refuses with the way out.
-    if !matches!(state, ServerState::Running { .. }) && !state.is_stopped_or_recovered() {
-        bail!(
-            "Server files are owned by installation or a lifecycle transition; retry when it settles"
-        );
+    match addon_turn(state) {
+        AddonTurn::Now => Ok(()),
+        AddonTurn::Deleting => bail!("This server is being deleted."),
+        AddonTurn::Wait => {
+            let (doing, done) = busy(state);
+            bail!("This server is still {doing}. Wait until it {done}, then try again.")
+        }
+    }
+}
+
+/// When an addon may change the files of a server in a given state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AddonTurn {
+    /// Now: the server runs or is stopped. A marker from an earlier session
+    /// is checked next (`refuse_unowned_marker`).
+    Now,
+    /// Once the installation, start or stop under way has ended. A modpack
+    /// install or Repair rewrites `mods/`, and a JVM that has not exited yet
+    /// may still hold its files.
+    Wait,
+    /// Never: the server is going away.
+    Deleting,
+}
+
+fn addon_turn(state: &ServerState) -> AddonTurn {
+    match state {
+        ServerState::Running { .. }
+        | ServerState::Stopped { .. }
+        | ServerState::RecoveredRunning { .. }
+        | ServerState::RecoveredUnverified { .. } => AddonTurn::Now,
+        ServerState::Installing(_) | ServerState::Starting(_) | ServerState::Stopping => {
+            AddonTurn::Wait
+        }
+        ServerState::Deleting => AddonTurn::Deleting,
     }
     Ok(())
 }
+
+/// What a server in a state an addon waits for is doing, and what it is
+/// once that has ended, for messages.
+fn busy(state: &ServerState) -> (&'static str, &'static str) {
+    match state {
+        ServerState::Installing(_) => ("installing", "has finished installing"),
+        ServerState::Starting(_) => ("starting", "is running"),
+        _ => ("stopping", "has stopped"),
+    }
+}
+
+/// How long an addon installation waits for an installation, start or stop
+/// of its server to end before it gives up and says so (see
+/// `ManagerRef<ServerManager>::addon_gate`). A modpack can take many minutes
+/// to install; a stop that takes this long did not end.
+const ADDON_WAIT_LIMIT: std::time::Duration = std::time::Duration::from_secs(30 * 60);
+/// How often a waiting addon installation looks at the server's state again.
+const ADDON_WAIT_POLL: std::time::Duration = std::time::Duration::from_millis(500);
 
 /// A server reads `.jar` mods from `mods/` and `.zip` datapacks from
 /// the selected world's `datapacks/`, and `cache_server_local` scans those two
@@ -258,7 +306,11 @@ pub struct ServerData {
 pub struct ServerManager {
     pub(crate) servers: RwLock<HashMap<ServerId, ServerData>>,
     server_op_locks: Arc<DashMap<ServerId, Arc<Mutex<()>>>>,
-    addon_installations: Arc<DashMap<ServerId, ()>>,
+    /// One addon installation per server at a time, in the order they were
+    /// asked for (tokio's mutex is fair), so each plans against what the one
+    /// before it published. A second Install waits behind the first instead
+    /// of being refused.
+    addon_installations: Arc<DashMap<ServerId, Arc<Mutex<()>>>>,
     server_logs: RwLock<HashMap<ServerLogId, watch::Sender<Vec<String>>>>,
     log_counter: Mutex<i32>,
     index_lock: Mutex<()>,
@@ -370,6 +422,14 @@ impl ServerManager {
     /// The stable gate serializing lifecycle and file changes of one server.
     fn op_lock(&self, id: ServerId) -> Arc<Mutex<()>> {
         self.server_op_locks
+            .entry(id)
+            .or_insert_with(|| Arc::new(Mutex::new(())))
+            .clone()
+    }
+    /// The turn of one addon installation on server `id` (see
+    /// `addon_installations`).
+    pub(crate) fn addon_queue(&self, id: ServerId) -> Arc<Mutex<()>> {
+        self.addon_installations
             .entry(id)
             .or_insert_with(|| Arc::new(Mutex::new(())))
             .clone()
@@ -1069,6 +1129,71 @@ impl ManagerRef<'_, ServerManager> {
             ensure_server_files_available(&server.state)?;
         }
         self.refuse_unowned_marker(id, root).await
+    }
+
+    /// The server gate for an addon installation on server `id` (`name`, for
+    /// messages), once its files may change: an installation, start or stop
+    /// of the server under way is waited for, without holding the gate,
+    /// instead of refused, so an addon picked meanwhile is installed once it
+    /// has ended. 2.0.40 wrote the addon at once whatever the server did. A
+    /// marker from an earlier session is checked as for every other addon
+    /// change. Gives up after [`ADDON_WAIT_LIMIT`], or when `cancel` fires.
+    pub(crate) async fn addon_gate(
+        self,
+        id: ServerId,
+        name: &str,
+        root: &std::path::Path,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> anyhow::Result<tokio::sync::OwnedMutexGuard<()>> {
+        self.addon_gate_within(id, name, root, cancel, ADDON_WAIT_LIMIT)
+            .await
+    }
+
+    async fn addon_gate_within(
+        self,
+        id: ServerId,
+        name: &str,
+        root: &std::path::Path,
+        cancel: &tokio_util::sync::CancellationToken,
+        limit: std::time::Duration,
+    ) -> anyhow::Result<tokio::sync::OwnedMutexGuard<()>> {
+        let deadline = tokio::time::Instant::now() + limit;
+        loop {
+            let guard = tokio::select! {
+                biased;
+                () = cancel.cancelled() => bail!("Server addon installation cancelled"),
+                guard = self.get_op_lock(id).lock_owned() => guard,
+            };
+            let state = self
+                .servers
+                .read()
+                .await
+                .get(&id)
+                .map(|server| server.state.clone())
+                .context("Server not found")?;
+            match addon_turn(&state) {
+                AddonTurn::Now => {
+                    self.refuse_unowned_marker(id, root).await?;
+                    return Ok(guard);
+                }
+                AddonTurn::Deleting => {
+                    bail!("{name} is being deleted, so the addon was not installed.")
+                }
+                AddonTurn::Wait => drop(guard),
+            }
+            let now = tokio::time::Instant::now();
+            if now >= deadline {
+                let (doing, done) = busy(&state);
+                bail!(
+                    "{name} is still {doing}, so the addon was not installed. Install it again once the server {done}."
+                );
+            }
+            tokio::select! {
+                biased;
+                () = cancel.cancelled() => bail!("Server addon installation cancelled"),
+                () = tokio::time::sleep(ADDON_WAIT_POLL.min(deadline - now)) => {}
+            }
+        }
     }
 
     pub(crate) fn get_op_lock(self, id: ServerId) -> Arc<Mutex<()>> {
@@ -4363,9 +4488,25 @@ mod tests {
 
     #[test]
     fn task07_pack_install_ownership_blocks_addon_and_properties_publication() {
-        assert!(ensure_server_files_available(&ServerState::Installing(VisualTaskId(1))).is_err());
-        assert!(ensure_server_files_available(&ServerState::Deleting).is_err());
-        assert!(ensure_server_files_available(&ServerState::Stopping).is_err());
+        // Refused with what the server is doing and the way out.
+        assert_eq!(
+            ensure_server_files_available(&ServerState::Installing(VisualTaskId(1)))
+                .unwrap_err()
+                .to_string(),
+            "This server is still installing. Wait until it has finished installing, then try again."
+        );
+        assert_eq!(
+            ensure_server_files_available(&ServerState::Deleting)
+                .unwrap_err()
+                .to_string(),
+            "This server is being deleted."
+        );
+        assert_eq!(
+            ensure_server_files_available(&ServerState::Stopping)
+                .unwrap_err()
+                .to_string(),
+            "This server is still stopping. Wait until it has stopped, then try again."
+        );
         ensure_server_files_available(&ServerState::Stopped { failed_task: None }).unwrap();
         ensure_server_files_available(&running_server_with_handle().state).unwrap();
     }

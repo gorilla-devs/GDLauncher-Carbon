@@ -1,3 +1,4 @@
+import { DatapackStaging } from "./components/DatapackStaging"
 import { Show, createMemo } from "solid-js"
 import {
   ContextMenuItem,
@@ -153,9 +154,18 @@ const Addons = () => {
     onToggleMod: addonMutations.handleToggleMod,
     onDeleteMod: addonMutations.handleDeleteMod,
     getDisplayName: (row) => row.metadata?.name || row.filename,
-    getSubtitle: (row) => (row.metadata?.name ? row.filename : null),
+    getSubtitle: (row) =>
+      row.addon_type === "datapacks"
+        ? t("content:_trn_datapack_row_subtitle", {
+            filename: row.filename,
+            interpolation: { escapeValue: false }
+          })
+        : row.metadata?.name
+          ? row.filename
+          : null,
     getAddonType: (row) => row.addon_type,
     isLocked: isInstanceLocked,
+    isStaged: (row) => row.addon_type === "datapacks",
     getImageUrl: (row) => {
       if (row.curseforge?.has_image) {
         return getModImageUrl(instanceId().toString(), row.id, "curseforge")
@@ -178,365 +188,479 @@ const Addons = () => {
   })
 
   return (
-    <AddonsPageLayout
-      isLoading={addonData.allAddons.isLoading}
-      filteredAddons={addonData.filteredAddons}
-      filterProps={{
-        searchQuery: addonData.searchQuery,
-        setSearchQuery: addonData.setSearchQuery,
-        enabledAddonTypes: addonData.enabledAddonTypes,
-        setEnabledAddonTypes: (type, enabled) =>
-          addonData.setEnabledAddonTypes(type as any, enabled),
-        addonTypes: visibleAddonTypes,
-        onAddAddons: () => addonMutations.gotoSearchPage(defaultSearchType()),
-        onOpenFolder: addonMutations.handleOpenFolder,
-        searchInputClass: "hidden lg:flex flex-1 min-w-0",
-        addButtonDisabled: isInstanceLocked(),
-        addButtonTooltip: (
-          <Trans key="instances:_trn_locked_cannot_apply_changes" />
-        ),
-        extraActions: (
-          <>
-            <Select
-              value={addonData.platformFilter()}
-              onChange={(value) =>
-                value && addonData.setPlatformFilter(value as any)
-              }
-              options={["all", "curseforge", "modrinth", "local"]}
-              placeholder=""
-              disallowEmptySelection={true}
-              selectionBehavior="replace"
-              itemComponent={(itemProps) => {
-                const getLabel = (value: string) => {
-                  switch (value) {
-                    case "all":
-                      return t("content:_trn_filter.all")
-                    case "curseforge":
-                      return t("enums:_trn_curseforge")
-                    case "modrinth":
-                      return t("enums:_trn_modrinth")
-                    case "local":
-                      return t("content:_trn_filter.local")
-                    default:
-                      return value
-                  }
-                }
-                const getIcon = (value: string) => {
-                  switch (value) {
-                    case "all":
-                      return <div class="i-hugeicons:globe h-4 w-4" />
-                    case "curseforge":
-                      return <div class="i-simple-icons:curseforge h-4 w-4" />
-                    case "modrinth":
-                      return <div class="i-simple-icons:modrinth h-4 w-4" />
-                    case "local":
-                      return <div class="i-hugeicons:folder-01 h-4 w-4" />
-                    default:
-                      return null
-                  }
-                }
-                return (
-                  <SelectItem item={itemProps.item}>
-                    <div class="flex items-center gap-2">
-                      {getIcon(itemProps.item.rawValue)}
-                      {getLabel(itemProps.item.rawValue)}
-                    </div>
-                  </SelectItem>
-                )
-              }}
-            >
-              <SelectTrigger class="w-32 md:w-40">
-                <SelectValue<string>>
-                  {(state) => {
-                    const getLabel = (value: string) => {
-                      switch (value) {
-                        case "all":
-                          return t("content:_trn_filter.all")
-                        case "curseforge":
-                          return t("enums:_trn_curseforge")
-                        case "modrinth":
-                          return t("enums:_trn_modrinth")
-                        case "local":
-                          return t("content:_trn_filter.local")
-                        default:
-                          return value
-                      }
-                    }
-                    const getIcon = (value: string) => {
-                      switch (value) {
-                        case "all":
-                          return <div class="i-hugeicons:globe h-4 w-4" />
-                        case "curseforge":
-                          return (
-                            <div class="i-simple-icons:curseforge h-4 w-4" />
-                          )
-                        case "modrinth":
-                          return <div class="i-simple-icons:modrinth h-4 w-4" />
-                        case "local":
-                          return <div class="i-hugeicons:folder-01 h-4 w-4" />
-                        default:
-                          return null
-                      }
-                    }
-                    const selectedValue = state.selectedOption()
-                    return (
-                      <div class="flex items-center gap-2">
-                        {getIcon(selectedValue)}
-                        <span class="hidden sm:inline">
-                          {getLabel(selectedValue)}
-                        </span>
-                      </div>
-                    )
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent />
-            </Select>
-
-            <Show when={updateCount() > 0}>
-              <Tooltip>
-                <TooltipTrigger>
-                  <Button
-                    type="secondary"
-                    size="small"
-                    onClick={() =>
-                      addonMutations.handleUpdateAll(addonData.filteredAddons())
-                    }
-                    disabled={isInstanceLocked()}
-                    class="px-2"
-                  >
-                    <div class="i-hugeicons:download-02" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <Show
-                    when={!isInstanceLocked()}
-                    fallback={
-                      <Trans key="instances:_trn_locked_cannot_apply_changes" />
-                    }
-                  >
-                    <Trans
-                      key="content:_trn_update_all_count"
-                      options={{ count: updateCount() }}
-                    />
-                  </Show>
-                </TooltipContent>
-              </Tooltip>
-            </Show>
-          </>
-        )
-      }}
-      columns={columns}
-      tableState={addonData}
-      onTableReady={(table) => {
-        tableInstance = table
-      }}
-      scrollContainerId="main-container-instance-details"
-      onAddAddons={() => addonMutations.gotoSearchPage(defaultSearchType())}
-      contextMenuContent={({ selectedAddons, selectionCount }) => (
-        <Show
-          when={selectionCount() === 1}
-          fallback={
+    <>
+      <DatapackStaging
+        instanceId={instanceId()}
+        packs={addonData.addonsStore.filter(
+          (row) => row.addon_type === "datapacks"
+        )}
+        locked={isInstanceLocked()}
+      />
+      <AddonsPageLayout
+        isLoading={addonData.allAddons.isLoading}
+        filteredAddons={addonData.filteredAddons}
+        filterProps={{
+          searchQuery: addonData.searchQuery,
+          setSearchQuery: addonData.setSearchQuery,
+          enabledAddonTypes: addonData.enabledAddonTypes,
+          setEnabledAddonTypes: (type, enabled) =>
+            addonData.setEnabledAddonTypes(type as any, enabled),
+          addonTypes: visibleAddonTypes,
+          onAddAddons: () => addonMutations.gotoSearchPage(defaultSearchType()),
+          onOpenFolder: addonMutations.handleOpenFolder,
+          searchInputClass: "hidden lg:flex flex-1 min-w-0",
+          addButtonDisabled: isInstanceLocked(),
+          addButtonTooltip: (
+            <Trans key="instances:_trn_locked_cannot_apply_changes" />
+          ),
+          extraActions: (
             <>
-              <ContextMenuItem disabled>
-                {t("content:_trn_selected_count", {
-                  count: selectionCount()
-                })}
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              {/* Both sweeps filter on `canToggle` as well as on `enabled`,
+              <Select
+                value={addonData.platformFilter()}
+                onChange={(value) =>
+                  value && addonData.setPlatformFilter(value as any)
+                }
+                options={["all", "curseforge", "modrinth", "local"]}
+                placeholder=""
+                disallowEmptySelection={true}
+                selectionBehavior="replace"
+                itemComponent={(itemProps) => {
+                  const getLabel = (value: string) => {
+                    switch (value) {
+                      case "all":
+                        return t("content:_trn_filter.all")
+                      case "curseforge":
+                        return t("enums:_trn_curseforge")
+                      case "modrinth":
+                        return t("enums:_trn_modrinth")
+                      case "local":
+                        return t("content:_trn_filter.local")
+                      default:
+                        return value
+                    }
+                  }
+                  const getIcon = (value: string) => {
+                    switch (value) {
+                      case "all":
+                        return <div class="i-hugeicons:globe h-4 w-4" />
+                      case "curseforge":
+                        return <div class="i-simple-icons:curseforge h-4 w-4" />
+                      case "modrinth":
+                        return <div class="i-simple-icons:modrinth h-4 w-4" />
+                      case "local":
+                        return <div class="i-hugeicons:folder-01 h-4 w-4" />
+                      default:
+                        return null
+                    }
+                  }
+                  return (
+                    <SelectItem item={itemProps.item}>
+                      <div class="flex items-center gap-2">
+                        {getIcon(itemProps.item.rawValue)}
+                        {getLabel(itemProps.item.rawValue)}
+                      </div>
+                    </SelectItem>
+                  )
+                }}
+              >
+                <SelectTrigger class="w-32 md:w-40">
+                  <SelectValue<string>>
+                    {(state) => {
+                      const getLabel = (value: string) => {
+                        switch (value) {
+                          case "all":
+                            return t("content:_trn_filter.all")
+                          case "curseforge":
+                            return t("enums:_trn_curseforge")
+                          case "modrinth":
+                            return t("enums:_trn_modrinth")
+                          case "local":
+                            return t("content:_trn_filter.local")
+                          default:
+                            return value
+                        }
+                      }
+                      const getIcon = (value: string) => {
+                        switch (value) {
+                          case "all":
+                            return <div class="i-hugeicons:globe h-4 w-4" />
+                          case "curseforge":
+                            return (
+                              <div class="i-simple-icons:curseforge h-4 w-4" />
+                            )
+                          case "modrinth":
+                            return (
+                              <div class="i-simple-icons:modrinth h-4 w-4" />
+                            )
+                          case "local":
+                            return <div class="i-hugeicons:folder-01 h-4 w-4" />
+                          default:
+                            return null
+                        }
+                      }
+                      const selectedValue = state.selectedOption()
+                      return (
+                        <div class="flex items-center gap-2">
+                          {getIcon(selectedValue)}
+                          <span class="hidden sm:inline">
+                            {getLabel(selectedValue)}
+                          </span>
+                        </div>
+                      )
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
+
+              <Show when={updateCount() > 0}>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <Button
+                      type="secondary"
+                      size="small"
+                      onClick={() =>
+                        addonMutations.handleUpdateAll(
+                          addonData.filteredAddons()
+                        )
+                      }
+                      disabled={isInstanceLocked()}
+                      class="px-2"
+                    >
+                      <div class="i-hugeicons:download-02" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <Show
+                      when={!isInstanceLocked()}
+                      fallback={
+                        <Trans key="instances:_trn_locked_cannot_apply_changes" />
+                      }
+                    >
+                      <Trans
+                        key="content:_trn_update_all_count"
+                        options={{ count: updateCount() }}
+                      />
+                    </Show>
+                  </TooltipContent>
+                </Tooltip>
+              </Show>
+            </>
+          )
+        }}
+        columns={columns}
+        tableState={addonData}
+        onTableReady={(table) => {
+          tableInstance = table
+        }}
+        scrollContainerId="main-container-instance-details"
+        onAddAddons={() => addonMutations.gotoSearchPage(defaultSearchType())}
+        contextMenuContent={({ selectedAddons, selectionCount }) => (
+          <Show
+            when={selectionCount() === 1}
+            fallback={
+              <>
+                <ContextMenuItem disabled>
+                  {t("content:_trn_selected_count", {
+                    count: selectionCount()
+                  })}
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                {/* Both sweeps filter on `canToggle` as well as on `enabled`,
                   and so do the `Show`s that offer them. A world is always
                   reported enabled (the scanner hardcodes it — worlds have no
                   disabled spelling), so an unfiltered "Disable all" would
                   drag every world in a mixed selection into a rename that
                   cannot disable it and that no control can undo. */}
-              <Show
-                when={selectedAddons().some((a) => !a.enabled && canToggle(a))}
-              >
-                <ContextMenuItem
-                  disabled={isInstanceLocked()}
-                  onSelect={() => {
-                    Promise.all(
-                      selectedAddons()
-                        .filter((a) => !a.enabled && canToggle(a))
-                        .map((a) => addonMutations.handleToggleMod(a))
-                    )
-                  }}
+                <Show
+                  when={selectedAddons().some(
+                    (a) => !a.enabled && canToggle(a)
+                  )}
                 >
-                  <div class="i-hugeicons:toggle-off mr-2" />
-                  {t("content:_trn_enable_all")}
-                </ContextMenuItem>
-              </Show>
-              <Show
-                when={selectedAddons().some((a) => a.enabled && canToggle(a))}
-              >
-                <ContextMenuItem
-                  disabled={isInstanceLocked()}
-                  onSelect={() => {
-                    Promise.all(
-                      selectedAddons()
-                        .filter((a) => a.enabled && canToggle(a))
-                        .map((a) => addonMutations.handleToggleMod(a))
-                    )
-                  }}
-                >
-                  <div class="i-hugeicons:toggle-off mr-2" />
-                  {t("content:_trn_disable_all")}
-                </ContextMenuItem>
-              </Show>
-              <Show when={selectedAddons().some((a) => a.has_update)}>
-                <ContextMenuItem
-                  disabled={isInstanceLocked()}
-                  onSelect={() =>
-                    addonMutations.handleUpdateSelected(selectedAddons())
-                  }
-                >
-                  <div class="i-hugeicons:download-02 mr-2" />
-                  {t("content:_trn_update_selected")}
-                </ContextMenuItem>
-              </Show>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                disabled={isInstanceLocked()}
-                class="text-red-400 focus:text-red-300"
-                onSelect={() =>
-                  addonMutations.handleDeleteSelected(selectedAddons())
-                }
-              >
-                <div class="i-hugeicons:delete-02 mr-2" />
-                {t("content:_trn_delete_selected")}
-              </ContextMenuItem>
-            </>
-          }
-        >
-          <Show when={selectedAddons()[0]}>
-            {(addon) => {
-              const mod = () => addon()
-              const displayName = () => mod().metadata?.name || mod().filename
-              return (
-                <>
                   <ContextMenuItem
+                    disabled={isInstanceLocked()}
                     onSelect={() => {
-                      window.navigator.clipboard.writeText(displayName())
-                      toast.success(t("notifications:_trn_copied_to_clipboard"))
-                    }}
-                  >
-                    <div class="i-hugeicons:clipboard mr-2" />
-                    {t("content:_trn_copy_name")}
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <Show when={canToggle(mod())}>
-                    <ContextMenuItem
-                      data-testid="addon-context-toggle"
-                      disabled={isInstanceLocked()}
-                      onSelect={() => addonMutations.handleToggleMod(mod())}
-                    >
-                      <div class="i-hugeicons:toggle-off mr-2" />
-                      {mod().enabled
-                        ? t("content:_trn_disable_mod")
-                        : t("content:_trn_enable_mod")}
-                    </ContextMenuItem>
-                  </Show>
-                  <Show when={mod().has_update}>
-                    <ContextMenuItem
-                      disabled={isInstanceLocked()}
-                      onSelect={() => addonMutations.handleUpdateMod(mod())}
-                    >
-                      <div class="i-hugeicons:download-02 mr-2" />
-                      {t("content:_trn_update_mod")}
-                    </ContextMenuItem>
-                  </Show>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    onSelect={() => {
-                      modalsContext?.openModal(
-                        { name: "modDetails" },
-                        {
-                          mod: mod(),
-                          instanceId: instanceId()
-                        }
+                      Promise.all(
+                        selectedAddons()
+                          .filter((a) => !a.enabled && canToggle(a))
+                          .map((a) => addonMutations.handleToggleMod(a))
                       )
                     }}
                   >
-                    <div class="i-hugeicons:information-circle mr-2" />
-                    {t("content:_trn_view_details")}
+                    <div class="i-hugeicons:toggle-off mr-2" />
+                    {t("content:_trn_enable_all")}
                   </ContextMenuItem>
+                </Show>
+                <Show
+                  when={selectedAddons().some((a) => a.enabled && canToggle(a))}
+                >
                   <ContextMenuItem
-                    onSelect={() => addonMutations.handleOpenFolder()}
+                    disabled={isInstanceLocked()}
+                    onSelect={() => {
+                      Promise.all(
+                        selectedAddons()
+                          .filter((a) => a.enabled && canToggle(a))
+                          .map((a) => addonMutations.handleToggleMod(a))
+                      )
+                    }}
                   >
-                    <div class="i-hugeicons:folder-open mr-2" />
-                    {t("instances:_trn_open_folder")}
+                    <div class="i-hugeicons:toggle-off mr-2" />
+                    {t("content:_trn_disable_all")}
                   </ContextMenuItem>
-                  <Show when={mod().curseforge || mod().modrinth}>
-                    <Show
-                      when={mod().curseforge && mod().modrinth}
-                      fallback={
+                </Show>
+                <Show when={selectedAddons().some((a) => a.has_update)}>
+                  <ContextMenuItem
+                    disabled={isInstanceLocked()}
+                    onSelect={() =>
+                      addonMutations.handleUpdateSelected(selectedAddons())
+                    }
+                  >
+                    <div class="i-hugeicons:download-02 mr-2" />
+                    {t("content:_trn_update_selected")}
+                  </ContextMenuItem>
+                </Show>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  disabled={isInstanceLocked()}
+                  class="text-red-400 focus:text-red-300"
+                  onSelect={() =>
+                    addonMutations.handleDeleteSelected(selectedAddons())
+                  }
+                >
+                  <div class="i-hugeicons:delete-02 mr-2" />
+                  {t("content:_trn_delete_selected")}
+                </ContextMenuItem>
+              </>
+            }
+          >
+            <Show when={selectedAddons()[0]}>
+              {(addon) => {
+                const mod = () => addon()
+                const displayName = () => mod().metadata?.name || mod().filename
+                return (
+                  <>
+                    <ContextMenuItem
+                      onSelect={() => {
+                        window.navigator.clipboard.writeText(displayName())
+                        toast.success(
+                          t("notifications:_trn_copied_to_clipboard")
+                        )
+                      }}
+                    >
+                      <div class="i-hugeicons:clipboard mr-2" />
+                      {t("content:_trn_copy_name")}
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <Show when={canToggle(mod())}>
+                      <ContextMenuItem
+                        data-testid="addon-context-toggle"
+                        disabled={isInstanceLocked()}
+                        onSelect={() => addonMutations.handleToggleMod(mod())}
+                      >
+                        <div class="i-hugeicons:toggle-off mr-2" />
+                        {mod().enabled
+                          ? t("content:_trn_disable_mod")
+                          : t("content:_trn_enable_mod")}
+                      </ContextMenuItem>
+                    </Show>
+                    <Show when={mod().has_update}>
+                      <ContextMenuItem
+                        disabled={isInstanceLocked()}
+                        onSelect={() => addonMutations.handleUpdateMod(mod())}
+                      >
+                        <div class="i-hugeicons:download-02 mr-2" />
+                        {t("content:_trn_update_mod")}
+                      </ContextMenuItem>
+                    </Show>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      onSelect={() => {
+                        modalsContext?.openModal(
+                          { name: "modDetails" },
+                          {
+                            mod: mod(),
+                            instanceId: instanceId()
+                          }
+                        )
+                      }}
+                    >
+                      <div class="i-hugeicons:information-circle mr-2" />
+                      {t("content:_trn_view_details")}
+                    </ContextMenuItem>
+                    <ContextMenuItem
+                      onSelect={() => addonMutations.handleOpenFolder()}
+                    >
+                      <div class="i-hugeicons:folder-open mr-2" />
+                      {t("instances:_trn_open_folder")}
+                    </ContextMenuItem>
+                    <Show when={mod().curseforge || mod().modrinth}>
+                      <Show
+                        when={mod().curseforge && mod().modrinth}
+                        fallback={
+                          <ContextMenuSub gutter={8} shift={-5}>
+                            <ContextMenuSubTrigger class="data-[state=open]:bg-darkSlate-700">
+                              <div class="flex items-center gap-2">
+                                <Show
+                                  when={mod().curseforge}
+                                  fallback={
+                                    <img
+                                      src={ModrinthLogo}
+                                      class="h-4 w-4"
+                                      alt="Modrinth"
+                                    />
+                                  }
+                                >
+                                  <img
+                                    src={CurseforgeLogo}
+                                    class="h-4 w-4"
+                                    alt="CurseForge"
+                                  />
+                                </Show>
+                                <span>
+                                  {t(
+                                    getViewOnKey(
+                                      mod().curseforge
+                                        ? "curseforge"
+                                        : "modrinth"
+                                    )
+                                  )}
+                                </span>
+                              </div>
+                            </ContextMenuSubTrigger>
+                            <ContextMenuPortal>
+                              <ContextMenuSubContent>
+                                <ContextMenuItem
+                                  onSelect={() => {
+                                    if (mod().curseforge) {
+                                      navigator.navigate(
+                                        `/addon/${mod().curseforge!.project_id}/curseforge`
+                                      )
+                                    } else if (mod().modrinth) {
+                                      navigator.navigate(
+                                        `/addon/${mod().modrinth!.project_id}/modrinth`
+                                      )
+                                    }
+                                  }}
+                                >
+                                  <div class="i-hugeicons:dashboard-square-01 mr-2" />
+                                  {t("content:_trn_open_in_app")}
+                                </ContextMenuItem>
+                                <ContextMenuItem
+                                  onSelect={() => {
+                                    if (mod().curseforge) {
+                                      window.open(
+                                        `https://www.curseforge.com/minecraft/mc-mods/${mod().curseforge!.urlslug}`,
+                                        "_blank"
+                                      )
+                                    } else if (mod().modrinth) {
+                                      window.open(
+                                        `https://modrinth.com/mod/${mod().modrinth!.project_id}`,
+                                        "_blank"
+                                      )
+                                    }
+                                  }}
+                                >
+                                  <div class="flex flex-1 items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2">
+                                      <div class="i-hugeicons:dashboard-square-01 h-4 w-4" />
+                                      <span>
+                                        {t("content:_trn_open_in_browser")}
+                                      </span>
+                                    </div>
+                                    <div class="i-hugeicons:link-square-02 text-lightSlate-500 h-4 w-4" />
+                                  </div>
+                                </ContextMenuItem>
+                              </ContextMenuSubContent>
+                            </ContextMenuPortal>
+                          </ContextMenuSub>
+                        }
+                      >
+                        {/* Both platforms */}
                         <ContextMenuSub gutter={8} shift={-5}>
                           <ContextMenuSubTrigger class="data-[state=open]:bg-darkSlate-700">
                             <div class="flex items-center gap-2">
-                              <Show
-                                when={mod().curseforge}
-                                fallback={
-                                  <img
-                                    src={ModrinthLogo}
-                                    class="h-4 w-4"
-                                    alt="Modrinth"
-                                  />
-                                }
-                              >
-                                <img
-                                  src={CurseforgeLogo}
-                                  class="h-4 w-4"
-                                  alt="CurseForge"
-                                />
-                              </Show>
-                              <span>
-                                {t(
-                                  getViewOnKey(
-                                    mod().curseforge ? "curseforge" : "modrinth"
-                                  )
-                                )}
-                              </span>
+                              <div class="i-hugeicons:link-square-02 h-4 w-4" />
+                              <span>{t("content:_trn_view_on_platform")}</span>
                             </div>
                           </ContextMenuSubTrigger>
                           <ContextMenuPortal>
                             <ContextMenuSubContent>
                               <ContextMenuItem
-                                onSelect={() => {
-                                  if (mod().curseforge) {
-                                    navigator.navigate(
-                                      `/addon/${mod().curseforge!.project_id}/curseforge`
-                                    )
-                                  } else if (mod().modrinth) {
-                                    navigator.navigate(
-                                      `/addon/${mod().modrinth!.project_id}/modrinth`
-                                    )
-                                  }
-                                }}
+                                onSelect={() =>
+                                  navigator.navigate(
+                                    `/addon/${mod().curseforge!.project_id}/curseforge`
+                                  )
+                                }
                               >
-                                <div class="i-hugeicons:dashboard-square-01 mr-2" />
-                                {t("content:_trn_open_in_app")}
+                                <div class="flex items-center gap-2">
+                                  <img
+                                    src={CurseforgeLogo}
+                                    class="h-4 w-4"
+                                    alt="CurseForge"
+                                  />
+                                  {t("content:_trn_curseforge_open_in_app")}
+                                </div>
                               </ContextMenuItem>
                               <ContextMenuItem
-                                onSelect={() => {
-                                  if (mod().curseforge) {
-                                    window.open(
-                                      `https://www.curseforge.com/minecraft/mc-mods/${mod().curseforge!.urlslug}`,
-                                      "_blank"
-                                    )
-                                  } else if (mod().modrinth) {
-                                    window.open(
-                                      `https://modrinth.com/mod/${mod().modrinth!.project_id}`,
-                                      "_blank"
-                                    )
-                                  }
-                                }}
+                                onSelect={() =>
+                                  window.open(
+                                    `https://www.curseforge.com/minecraft/mc-mods/${mod().curseforge!.urlslug}`,
+                                    "_blank"
+                                  )
+                                }
                               >
                                 <div class="flex flex-1 items-center justify-between gap-2">
                                   <div class="flex items-center gap-2">
-                                    <div class="i-hugeicons:dashboard-square-01 h-4 w-4" />
+                                    <img
+                                      src={CurseforgeLogo}
+                                      class="h-4 w-4"
+                                      alt="CurseForge"
+                                    />
                                     <span>
-                                      {t("content:_trn_open_in_browser")}
+                                      {t(
+                                        "content:_trn_curseforge_open_in_browser"
+                                      )}
+                                    </span>
+                                  </div>
+                                  <div class="i-hugeicons:link-square-02 text-lightSlate-500 h-4 w-4" />
+                                </div>
+                              </ContextMenuItem>
+                              <ContextMenuSeparator />
+                              <ContextMenuItem
+                                onSelect={() =>
+                                  navigator.navigate(
+                                    `/addon/${mod().modrinth!.project_id}/modrinth`
+                                  )
+                                }
+                              >
+                                <div class="flex items-center gap-2">
+                                  <img
+                                    src={ModrinthLogo}
+                                    class="h-4 w-4"
+                                    alt="Modrinth"
+                                  />
+                                  {t("content:_trn_modrinth_open_in_app")}
+                                </div>
+                              </ContextMenuItem>
+                              <ContextMenuItem
+                                onSelect={() =>
+                                  window.open(
+                                    `https://modrinth.com/mod/${mod().modrinth!.project_id}`,
+                                    "_blank"
+                                  )
+                                }
+                              >
+                                <div class="flex flex-1 items-center justify-between gap-2">
+                                  <div class="flex items-center gap-2">
+                                    <img
+                                      src={ModrinthLogo}
+                                      class="h-4 w-4"
+                                      alt="Modrinth"
+                                    />
+                                    <span>
+                                      {t(
+                                        "content:_trn_modrinth_open_in_browser"
+                                      )}
                                     </span>
                                   </div>
                                   <div class="i-hugeicons:link-square-02 text-lightSlate-500 h-4 w-4" />
@@ -545,119 +669,26 @@ const Addons = () => {
                             </ContextMenuSubContent>
                           </ContextMenuPortal>
                         </ContextMenuSub>
-                      }
-                    >
-                      {/* Both platforms */}
-                      <ContextMenuSub gutter={8} shift={-5}>
-                        <ContextMenuSubTrigger class="data-[state=open]:bg-darkSlate-700">
-                          <div class="flex items-center gap-2">
-                            <div class="i-hugeicons:link-square-02 h-4 w-4" />
-                            <span>{t("content:_trn_view_on_platform")}</span>
-                          </div>
-                        </ContextMenuSubTrigger>
-                        <ContextMenuPortal>
-                          <ContextMenuSubContent>
-                            <ContextMenuItem
-                              onSelect={() =>
-                                navigator.navigate(
-                                  `/addon/${mod().curseforge!.project_id}/curseforge`
-                                )
-                              }
-                            >
-                              <div class="flex items-center gap-2">
-                                <img
-                                  src={CurseforgeLogo}
-                                  class="h-4 w-4"
-                                  alt="CurseForge"
-                                />
-                                {t("content:_trn_curseforge_open_in_app")}
-                              </div>
-                            </ContextMenuItem>
-                            <ContextMenuItem
-                              onSelect={() =>
-                                window.open(
-                                  `https://www.curseforge.com/minecraft/mc-mods/${mod().curseforge!.urlslug}`,
-                                  "_blank"
-                                )
-                              }
-                            >
-                              <div class="flex flex-1 items-center justify-between gap-2">
-                                <div class="flex items-center gap-2">
-                                  <img
-                                    src={CurseforgeLogo}
-                                    class="h-4 w-4"
-                                    alt="CurseForge"
-                                  />
-                                  <span>
-                                    {t(
-                                      "content:_trn_curseforge_open_in_browser"
-                                    )}
-                                  </span>
-                                </div>
-                                <div class="i-hugeicons:link-square-02 text-lightSlate-500 h-4 w-4" />
-                              </div>
-                            </ContextMenuItem>
-                            <ContextMenuSeparator />
-                            <ContextMenuItem
-                              onSelect={() =>
-                                navigator.navigate(
-                                  `/addon/${mod().modrinth!.project_id}/modrinth`
-                                )
-                              }
-                            >
-                              <div class="flex items-center gap-2">
-                                <img
-                                  src={ModrinthLogo}
-                                  class="h-4 w-4"
-                                  alt="Modrinth"
-                                />
-                                {t("content:_trn_modrinth_open_in_app")}
-                              </div>
-                            </ContextMenuItem>
-                            <ContextMenuItem
-                              onSelect={() =>
-                                window.open(
-                                  `https://modrinth.com/mod/${mod().modrinth!.project_id}`,
-                                  "_blank"
-                                )
-                              }
-                            >
-                              <div class="flex flex-1 items-center justify-between gap-2">
-                                <div class="flex items-center gap-2">
-                                  <img
-                                    src={ModrinthLogo}
-                                    class="h-4 w-4"
-                                    alt="Modrinth"
-                                  />
-                                  <span>
-                                    {t("content:_trn_modrinth_open_in_browser")}
-                                  </span>
-                                </div>
-                                <div class="i-hugeicons:link-square-02 text-lightSlate-500 h-4 w-4" />
-                              </div>
-                            </ContextMenuItem>
-                          </ContextMenuSubContent>
-                        </ContextMenuPortal>
-                      </ContextMenuSub>
+                      </Show>
                     </Show>
-                  </Show>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    data-testid="addon-context-delete"
-                    disabled={isInstanceLocked()}
-                    class="text-red-400 focus:text-red-300"
-                    onSelect={() => addonMutations.handleDeleteMod(mod())}
-                  >
-                    <div class="i-hugeicons:delete-02 mr-2" />
-                    {t("content:_trn_delete_mod")}
-                  </ContextMenuItem>
-                </>
-              )
-            }}
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      data-testid="addon-context-delete"
+                      disabled={isInstanceLocked()}
+                      class="text-red-400 focus:text-red-300"
+                      onSelect={() => addonMutations.handleDeleteMod(mod())}
+                    >
+                      <div class="i-hugeicons:delete-02 mr-2" />
+                      {t("content:_trn_delete_mod")}
+                    </ContextMenuItem>
+                  </>
+                )
+              }}
+            </Show>
           </Show>
-        </Show>
-      )}
-    />
+        )}
+      />
+    </>
   )
 }
 

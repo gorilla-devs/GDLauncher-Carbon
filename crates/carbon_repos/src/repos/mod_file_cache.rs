@@ -112,6 +112,12 @@ pub struct ServerAddonFullRow {
     pub source_sha512: Option<Vec<u8>>,
     pub location: String,
     pub sha512: Vec<u8>,
+    /// The CurseForge and Modrinth identity of the bytes (here and in
+    /// `cf_project_id`/`mr_project_id`): the source an install recorded
+    /// overrides only its own platform, with the version the user picked;
+    /// the other platform keeps the identity its cache matched by hash, as in
+    /// 2.0.40, so a copy installed from one platform is recognised from the
+    /// other. A source recorded for other bytes falls back to the caches.
     pub cf_file_id: Option<i32>,
     pub mr_version_id: Option<String>,
     pub id: String,
@@ -128,6 +134,14 @@ pub struct ServerAddonFullRow {
     pub mr_project_id: Option<String>,
     #[nullable(false)]
     pub has_mr_image: bool,
+    /// The loader mod id parsed from the jar.
+    pub modid: Option<String>,
+    /// The CurseForge and Modrinth projects that publish these exact bytes,
+    /// whatever source the row records. `cf_project_id`/`mr_project_id` let a
+    /// recorded source override its own platform's; the dependency check
+    /// accepts every identity of the bytes.
+    pub cache_cf_project_id: Option<i32>,
+    pub cache_mr_project_id: Option<String>,
 }
 
 /// The three raw image blobs for a single file, in platform priority order.
@@ -264,6 +278,12 @@ queries! {
          FROM ModFileCache WHERE instanceId = :instance_id";
     fn update_mod_file_enabled(id: &str, enabled: bool, updated_at: DbDateTime) -> usize =
         "UPDATE ModFileCache SET enabled = :enabled, lastUpdatedAt = :updated_at WHERE id = :id";
+    // Caller must hold the instance gate and prove an actual rollback restored
+    // this exact artifact. A later ID occupant never gets overwritten.
+    fn restore_mod_file_cache_identity(current_id: &str, restored_id: &str, instance_id: i32, filename: &str, addon_type: &str, updated_at: DbDateTime) -> usize =
+        "UPDATE ModFileCache SET id = :restored_id, lastUpdatedAt = :updated_at
+         WHERE id = :current_id AND instanceId = :instance_id AND filename = :filename AND addonType = :addon_type
+         AND NOT EXISTS (SELECT 1 FROM ModFileCache WHERE id = :restored_id)";
     fn delete_mod_file_cache_by_id(id: &str) -> usize =
         "DELETE FROM ModFileCache WHERE id = :id";
     fn delete_mod_file_cache_by_instance_filename(instance_id: i32, filename: &str) -> usize =
@@ -317,15 +337,18 @@ queries! {
            AND EXISTS (SELECT 1 FROM ModMetadata m WHERE m.id=ServerModFileCache.metadataId AND m.sha512=:sha512)";
 
     // --- server addon list (thin flat tree) ----------------------------------
+    // A recorded source overrides only its own platform's ids; the other
+    // platform's come from the hash-matched caches (see `ServerAddonFullRow`).
     fn get_server_mods_full(server_id: i32) -> Vec<ServerAddonFullRow> =
         "SELECT f.sourcePlatform AS sourcePlatform, f.sourceProjectId AS sourceProjectId, f.sourceVersionId AS sourceVersionId, f.sourceSha512 AS sourceSha512, m.sha512 AS sha512,
-                CASE WHEN f.sourcePlatform='cf' AND f.sourceSha512=m.sha512 THEN CAST(f.sourceVersionId AS INTEGER) WHEN f.sourcePlatform IS NULL THEN c.fileId ELSE NULL END AS cfFileId,
-                CASE WHEN f.sourcePlatform='mr' AND f.sourceSha512=m.sha512 THEN f.sourceVersionId WHEN f.sourcePlatform IS NULL THEN r.versionId ELSE NULL END AS mrVersionId, f.location AS location, f.id AS id, f.filename AS filename, f.enabled AS enabled,
+                CASE WHEN f.sourcePlatform='cf' AND f.sourceSha512=m.sha512 THEN CAST(f.sourceVersionId AS INTEGER) ELSE c.fileId END AS cfFileId,
+                CASE WHEN f.sourcePlatform='mr' AND f.sourceSha512=m.sha512 THEN f.sourceVersionId ELSE r.versionId END AS mrVersionId, f.location AS location, f.id AS id, f.filename AS filename, f.enabled AS enabled,
                 f.addonType AS addonType, f.filesize AS filesize,
                 m.name AS metaName,
                 (li.metadataId IS NOT NULL) AS hasLocalImage,
-                CASE WHEN f.sourcePlatform='cf' AND f.sourceSha512=m.sha512 THEN CAST(f.sourceProjectId AS INTEGER) WHEN f.sourcePlatform IS NULL THEN c.projectId ELSE NULL END AS cfProjectId, (ci.metadataId IS NOT NULL) AS hasCfImage,
-                CASE WHEN f.sourcePlatform='mr' AND f.sourceSha512=m.sha512 THEN f.sourceProjectId WHEN f.sourcePlatform IS NULL THEN r.projectId ELSE NULL END AS mrProjectId, (ri.metadataId IS NOT NULL) AS hasMrImage
+                CASE WHEN f.sourcePlatform='cf' AND f.sourceSha512=m.sha512 THEN CAST(f.sourceProjectId AS INTEGER) ELSE c.projectId END AS cfProjectId, (ci.metadataId IS NOT NULL) AS hasCfImage,
+                CASE WHEN f.sourcePlatform='mr' AND f.sourceSha512=m.sha512 THEN f.sourceProjectId ELSE r.projectId END AS mrProjectId, (ri.metadataId IS NOT NULL) AS hasMrImage,
+                m.modid AS modid, c.projectId AS cacheCfProjectId, r.projectId AS cacheMrProjectId
          FROM ServerModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN LocalModImageCache li ON li.metadataId = m.id

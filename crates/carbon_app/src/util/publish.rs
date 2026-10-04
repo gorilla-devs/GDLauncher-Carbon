@@ -401,7 +401,7 @@ fn no_replace_unsupported(error: &io::Error) -> bool {
 }
 
 /// EXDEV on unix, ERROR_NOT_SAME_DEVICE on Windows.
-fn crosses_devices(error: &io::Error) -> bool {
+pub(crate) fn crosses_devices(error: &io::Error) -> bool {
     const CODE: i32 = if cfg!(windows) { 17 } else { 18 };
     error.kind() == io::ErrorKind::CrossesDevices || error.raw_os_error() == Some(CODE)
 }
