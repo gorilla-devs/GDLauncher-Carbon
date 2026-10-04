@@ -353,6 +353,10 @@ impl ManagerRef<'_, InstanceManager> {
                 name: config.name.clone(),
             },
         });
+        // Shown once this task succeeds, like the task's own warnings.
+        for warning in setup_request.iter().flat_map(|request| &request.warnings) {
+            task.warn(warning.clone());
+        }
 
         let id = self.app.task_manager().spawn_task(&task).await;
 
@@ -369,7 +373,7 @@ impl ManagerRef<'_, InstanceManager> {
             super::modpack::session::settle_replacement(&root).await?;
             if let Some(request) = setup_request {
                 use super::modpack::session::{self as setups, Producer, Kind};
-                let setups::Request { producer, kind, files, options, reset, replaces } = request;
+                let setups::Request { producer, kind, files, options, reset, replaces, warnings } = request;
                 let setup = root.join(".setup");
                 // The pending setup this request retires, and whether its
                 // payload goes once it is retired (see below).
@@ -423,6 +427,7 @@ impl ManagerRef<'_, InstanceManager> {
                 let built: anyhow::Result<_> = async {
                     let mut session = Session::new(&config, producer, kind, options)?;
                     session.instance_id = Some(instance_id.0);
+                    session.warnings = warnings;
                     session.requested_pack = files.iter().find(|(name, _)| name == "change-pack-version.json")
                         .map(|(_, bytes)| String::from_utf8(bytes.clone())).transpose()?;
                     // A repair that replaces an interrupted setup continues it.
@@ -2291,3 +2296,6 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+pub(super) use modpack::execute_plan as execute_import_baseline_test_plan;

@@ -204,6 +204,22 @@ impl ManagerRef<'_, VisualTaskManager> {
         }
     }
 
+    /// The warnings a running task will report if it succeeds.
+    #[cfg(test)]
+    pub(crate) async fn running_task_warnings(
+        self,
+        id: VisualTaskId,
+    ) -> Option<Vec<domain::TaskWarning>> {
+        let tasks = self.tasks.read().await;
+        let task = tasks.get(&id)?;
+        Some(
+            task.warnings
+                .lock()
+                .expect("this mutex can never witness a panic")
+                .clone(),
+        )
+    }
+
     /// Warnings of succeeded tasks, oldest first, until acknowledged.
     pub async fn get_task_warnings(self) -> Vec<domain::TaskWarnings> {
         self.warnings.read().await.iter().cloned().collect()

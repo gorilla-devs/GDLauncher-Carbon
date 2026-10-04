@@ -40,6 +40,7 @@ fn extract_fe_error(
     entry: &(dyn std::error::Error + 'static),
 ) -> (Option<String>, Option<serde_json::Value>) {
     use crate::managers::account::gdl_account::{AvatarUploadError, InstanceShareError};
+    use crate::managers::instance::modpack::ChangeVersionRefusal;
     use crate::managers::instance::run::InsufficientMemoryError;
     use crate::managers::server::{EulaNotAcceptedError, RecoveredServerError};
 
@@ -58,6 +59,7 @@ fn extract_fe_error(
         InstanceShareError,
         AvatarUploadError,
         InsufficientMemoryError,
+        ChangeVersionRefusal,
         EulaNotAcceptedError,
         RecoveredServerError
     );

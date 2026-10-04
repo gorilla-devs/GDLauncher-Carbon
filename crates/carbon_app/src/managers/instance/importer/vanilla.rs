@@ -1,7 +1,7 @@
 //! Minecraft Launcher, Lunar, Badlion and Feather importer; all share the `.minecraft` directory.
 
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
     sync::Arc,
 };
@@ -16,13 +16,14 @@ use super::{
     InternalImportEntry,
     common::{
         DeclaredModLoader, ImportedSettings, ParsedVersionId, apply_imported_settings,
-        copy_game_dir, dedup_paths, first_existing_dir, group_for_import, icon_from_data_url,
-        json_i64, json_positive_u32, json_string, json_trimmed_string,
+        copy_game_dir, copy_optional_game_dir, dedup_paths, first_existing_dir, group_for_import,
+        icon_from_data_url, json_i64, json_positive_u32, json_string, json_trimmed_string,
         looks_like_minecraft_version, parse_version_id, read_json_value, resolve_standard_version,
     },
-    technic::versions_from_version_json,
+    technic::{is_release_id, versions_from_version_json},
 };
 use crate::{
+    api::translation::Translation,
     domain::{
         instance::info::{GameVersion, StandardVersion},
         vtask::VisualTaskId,
@@ -76,6 +77,9 @@ enum VersionRef {
     },
     LatestRelease,
     LatestSnapshot,
+    /// An installed version folder whose Minecraft version cannot be told.
+    /// Importing it as some other version would drop its mod loader.
+    Unresolved,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -93,13 +97,21 @@ struct Importable {
     version: VersionRef,
     last_played: Option<DateTime<Utc>>,
     settings: ImportedSettings,
+    /// A profile's own game folder that did not exist at scan time: the
+    /// official launcher creates it on first launch, so it imports empty.
+    game_dir_missing: bool,
 }
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
+        let mut warnings = value.settings.warnings();
+        if value.game_dir_missing {
+            warnings.push(Translation::InstanceImportGameDirMissing);
+        }
         Self {
             filename: value.filename,
             instance_name: value.name,
+            warnings,
         }
     }
 }
@@ -133,8 +145,8 @@ impl VanillaImporter {
         Ok(first_existing_dir(candidates))
     }
 
-    async fn scan_entries(&self, game_dir: &Path) -> Vec<Importable> {
-        let installed = read_installed_versions(game_dir).await;
+    async fn scan_entries(&self, game_dir: &Path) -> anyhow::Result<Vec<Importable>> {
+        let installed = read_installed_versions(game_dir).await?;
 
         let mut entries = match self.flavor {
             VanillaFlavor::Minecraft => launcher_profile_entries(game_dir, &installed).await,
@@ -156,10 +168,11 @@ impl VanillaImporter {
                 version,
                 last_played: None,
                 settings: ImportedSettings::default(),
+                game_dir_missing: false,
             });
         }
 
-        entries
+        Ok(entries)
     }
 }
 
@@ -180,14 +193,14 @@ impl InstanceImporter for VanillaImporter {
             return Ok(());
         };
 
-        let entries = self.scan_entries(&game_dir).await;
+        let entries = self.scan_entries(&game_dir).await?;
 
         if entries.len() == 1 {
             let entry = entries.into_iter().next().unwrap();
             self.state
                 .write()
                 .await
-                .set_single(InternalImportEntry::Valid(entry))
+                .set_single(profile_entry(entry))
                 .await;
             app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             return Ok(());
@@ -197,7 +210,7 @@ impl InstanceImporter for VanillaImporter {
             self.state
                 .write()
                 .await
-                .push_multi(InternalImportEntry::Valid(entry))
+                .push_multi(profile_entry(entry))
                 .await;
             app.invalidate(GET_IMPORT_SCAN_STATUS, None);
         }
@@ -238,6 +251,9 @@ impl InstanceImporter for VanillaImporter {
             VersionRef::Exact { minecraft, loaders } => {
                 resolve_standard_version(app, minecraft, loaders).await
             }
+            VersionRef::Unresolved => {
+                anyhow::bail!("Cannot tell which Minecraft version this profile uses; rescan")
+            }
             VersionRef::LatestRelease | VersionRef::LatestSnapshot => {
                 let manifest = app.minecraft_manager().get_minecraft_manifest().await?;
                 let release = if instance.version == VersionRef::LatestSnapshot {
@@ -258,10 +274,12 @@ impl InstanceImporter for VanillaImporter {
         let initializer = |instance_path: PathBuf| {
             let instance = &instance;
             async move {
-                copy_game_dir(&instance.game_dir, &instance_path, |path| {
-                    !is_launcher_managed(path)
-                })
-                .await?;
+                let filter = |path: &Path| !is_launcher_managed(path);
+                if instance.game_dir_missing {
+                    copy_optional_game_dir(&instance.game_dir, &instance_path, filter).await?;
+                } else {
+                    copy_game_dir(&instance.game_dir, &instance_path, filter).await?;
+                }
                 Ok(())
             }
         };
@@ -364,29 +382,69 @@ fn looks_like_game_dir(path: &Path) -> bool {
             .any(|d| path.join(d).is_dir())
 }
 
-async fn read_installed_versions(game_dir: &Path) -> HashMap<String, ParsedVersionId> {
+/// `versions/` only helps tell profiles' versions apart, so a folder that
+/// cannot be listed costs that help, not the scan: profiles still come from
+/// launcher_profiles.json, and ids not read here are parsed from the id.
+async fn read_installed_versions(
+    game_dir: &Path,
+) -> anyhow::Result<HashMap<String, ParsedVersionId>> {
     let mut installed = HashMap::new();
+    let mut parents = HashMap::new();
+    let mut unread = HashSet::new();
 
-    let Ok(mut dir) = tokio::fs::read_dir(game_dir.join("versions")).await else {
-        return installed;
+    let versions_dir = game_dir.join("versions");
+    let mut dir = match super::common::scan_directory(&versions_dir).await {
+        Ok(dir) => dir,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(installed),
+        Err(e) => {
+            warn!("Cannot list {versions_dir:?}, reading versions from their ids: {e}");
+            return Ok(installed);
+        }
     };
 
-    while let Ok(Some(entry)) = dir.next_entry().await {
+    loop {
+        let entry = match dir.next_entry().await {
+            Ok(Some(entry)) => entry,
+            Ok(None) => break,
+            Err(e) => {
+                warn!("Cannot finish listing {versions_dir:?}: {e}");
+                break;
+            }
+        };
         let path = entry.path();
         if !path.is_dir() {
             continue;
         }
         let id = entry.file_name().to_string_lossy().to_string();
 
-        let mut parsed = match read_json_value(&path.join(format!("{id}.json"))).await {
-            Some(json) => versions_from_version_json(&json),
+        let json = read_json_value(&path.join(format!("{id}.json"))).await;
+        let mut parsed = match &json {
+            Some(json) => versions_from_version_json(json),
             None => parse_version_id(&id),
         };
 
+        match &json {
+            Some(json) => {
+                if parsed.minecraft.is_none() {
+                    parsed.minecraft = minecraft_from_version_json_hints(json);
+                }
+                if let Some(parent) = json_trimmed_string(json, "inheritsFrom") {
+                    parents.insert(id.clone(), parent);
+                }
+            }
+            None => {
+                unread.insert(id.clone());
+            }
+        }
+
         // A json that only names itself is a vanilla version.
         if parsed.minecraft.is_none()
-            && looks_like_minecraft_version(&id)
             && parsed.loaders.is_empty()
+            && !parents.contains_key(&id)
+            && (looks_like_minecraft_version(&id)
+                || json
+                    .as_ref()
+                    .is_some_and(|json| is_mojang_version(json, &id)))
         {
             parsed.minecraft = Some(id.clone());
         }
@@ -394,7 +452,99 @@ async fn read_installed_versions(game_dir: &Path) -> HashMap<String, ParsedVersi
         installed.insert(id, parsed);
     }
 
-    installed
+    inherit_from_installed_parents(&mut installed, &parents, &unread);
+
+    Ok(installed)
+}
+
+/// Experimental snapshots Mojang published outside the version list
+/// (`1.19_deep_dark_experimental_snapshot-1`) carry their own client and Mojang's
+/// main class under their real id. These ids start with a digit, which tells them
+/// from a renamed copy (`MyVanilla`).
+fn is_mojang_version(json: &serde_json::Value, id: &str) -> bool {
+    id.starts_with(|c: char| c.is_ascii_digit())
+        && json_trimmed_string(json, "id").as_deref() == Some(id)
+        && json.pointer("/downloads/client").is_some()
+        && json_trimmed_string(json, "mainClass").as_deref()
+            == Some("net.minecraft.client.main.Main")
+}
+
+/// Loader installers name the release in places other than `inheritsFrom`:
+/// Forge and NeoForge pass `--fml.mcVersion`, older jsons carry `jar`, and
+/// some launchers write `clientVersion`.
+fn minecraft_from_version_json_hints(json: &serde_json::Value) -> Option<String> {
+    let fml = json
+        .pointer("/arguments/game")
+        .and_then(|args| args.as_array())
+        .and_then(|args| {
+            args.iter()
+                .skip_while(|arg| arg.as_str() != Some("--fml.mcVersion"))
+                .nth(1)
+                .and_then(|value| value.as_str())
+                .map(|value| value.trim().to_string())
+        });
+    fml.into_iter()
+        .chain(json_trimmed_string(json, "clientVersion"))
+        .chain(json_trimmed_string(json, "jar"))
+        .find(|value| is_release_id(value))
+}
+
+/// A renamed pack folder (`ATM10`) usually inherits from the loader's own
+/// folder (`neoforge-21.1.77`), which names the release. Follow `inheritsFrom`
+/// through the installed folders and keep every loader found along the way,
+/// also when the folder already names its release (`"jar": "1.21.1"`): that
+/// says nothing about the loader its parent brings.
+fn inherit_from_installed_parents(
+    installed: &mut HashMap<String, ParsedVersionId>,
+    parents: &HashMap<String, String>,
+    unread: &HashSet<String>,
+) {
+    let mut resolved = Vec::new();
+    for (id, parsed) in installed.iter() {
+        let mut minecraft = parsed.minecraft.clone();
+        let mut loaders = parsed.loaders.clone();
+        let mut unknown_parent = false;
+        let mut seen = HashSet::from([id.as_str()]);
+        let mut current = parents.get(id);
+        while let Some(parent) = current {
+            if !seen.insert(parent.as_str()) {
+                break;
+            }
+            let read_parent = installed.get(parent).filter(|_| !unread.contains(parent));
+            let from_id;
+            let (parent_minecraft, parent_loaders) = match read_parent {
+                Some(parsed) => (parsed.minecraft.clone(), &parsed.loaders),
+                // A parent whose json cannot be read can only be judged by its id.
+                None => {
+                    from_id = parse_version_id(parent);
+                    let release = from_id.minecraft.clone().filter(|m| is_release_id(m));
+                    unknown_parent = !is_release_id(parent) && from_id.loaders.is_empty();
+                    (release, &from_id.loaders)
+                }
+            };
+            for loader in parent_loaders {
+                if !loaders.iter().any(|l| l.type_ == loader.type_) {
+                    loaders.push(loader.clone());
+                }
+            }
+            minecraft = minecraft.or(parent_minecraft);
+            current = parents.get(parent);
+        }
+        if parents.contains_key(id) {
+            // Whether that parent brings a loader cannot be told, and guessing
+            // "none" would import a modded profile as vanilla.
+            if unknown_parent && loaders.is_empty() {
+                minecraft = None;
+            }
+            resolved.push((id.clone(), minecraft, loaders));
+        }
+    }
+    for (id, minecraft, loaders) in resolved {
+        if let Some(parsed) = installed.get_mut(&id) {
+            parsed.minecraft = minecraft;
+            parsed.loaders = loaders;
+        }
+    }
 }
 
 fn release_sort_key(id: &str) -> Option<Vec<u32>> {
@@ -418,10 +568,17 @@ fn version_ref(version_id: &str, installed: &HashMap<String, ParsedVersionId>) -
         _ => {}
     }
 
-    let parsed = installed
-        .get(version_id.trim())
-        .cloned()
-        .unwrap_or_else(|| parse_version_id(version_id));
+    let parsed = match installed.get(version_id.trim()) {
+        // An installed folder was read and still names no release (a renamed
+        // or self-contained modded version). Falling back to the latest
+        // release would silently drop its loader.
+        Some(parsed) if parsed.minecraft.is_none() => {
+            warn!("Cannot tell which Minecraft version the installed `{version_id}` is");
+            return VersionRef::Unresolved;
+        }
+        Some(parsed) => parsed.clone(),
+        None => parse_version_id(version_id),
+    };
 
     match parsed.minecraft {
         Some(minecraft) => VersionRef::Exact {
@@ -483,7 +640,6 @@ async fn launcher_profile_entries(
                     let d = PathBuf::from(d);
                     if d.is_absolute() { d } else { game_dir.join(d) }
                 })
-                .filter(|d| d.is_dir())
                 .unwrap_or_else(|| game_dir.to_path_buf());
 
             let icon = json_string(profile, "icon")
@@ -525,6 +681,7 @@ async fn launcher_profile_entries(
                 version: version_ref(&version_id, installed),
                 last_played,
                 settings,
+                game_dir_missing: false,
             });
         }
     }
@@ -579,6 +736,7 @@ async fn client_entries(
             },
             last_played: None,
             settings: ImportedSettings::default(),
+            game_dir_missing: false,
         })
         .collect()
 }
@@ -800,7 +958,7 @@ mod test {
         .unwrap();
 
         let importer = VanillaImporter::new(VanillaFlavor::Minecraft);
-        let mut entries = importer.scan_entries(game_dir).await;
+        let mut entries = importer.scan_entries(game_dir).await.unwrap();
         entries.sort_by(|a, b| a.filename.cmp(&b.filename));
         assert_eq!(entries.len(), 3);
 
@@ -854,7 +1012,7 @@ mod test {
         write_version(game_dir, "24w10a", serde_json::json!({ "id": "24w10a" }));
 
         let importer = VanillaImporter::new(VanillaFlavor::Minecraft);
-        let entries = importer.scan_entries(game_dir).await;
+        let entries = importer.scan_entries(game_dir).await.unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "Minecraft");
         assert_eq!(
@@ -866,7 +1024,7 @@ mod test {
         );
 
         let empty = tempfile::tempdir().unwrap();
-        let entries = importer.scan_entries(empty.path()).await;
+        let entries = importer.scan_entries(empty.path()).await.unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].version, VersionRef::LatestRelease);
     }
@@ -891,7 +1049,7 @@ mod test {
             serde_json::json!({ "id": "BadlionClient-1.16.5", "inheritsFrom": "1.16.5" }),
         );
 
-        let installed = read_installed_versions(game_dir).await;
+        let installed = read_installed_versions(game_dir).await.unwrap();
 
         let feather = client_entries(VanillaFlavor::Feather, game_dir, &installed).await;
         assert_eq!(feather.len(), 1);
@@ -910,7 +1068,7 @@ mod test {
         assert_eq!(badlion[0].name, "Badlion Client 1.16.5");
 
         let importer = VanillaImporter::new(VanillaFlavor::Lunar);
-        let entries = importer.scan_entries(game_dir).await;
+        let entries = importer.scan_entries(game_dir).await.unwrap();
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0].name, "Lunar Client");
         assert_eq!(
@@ -1076,5 +1234,558 @@ mod test {
         }
 
         assert_eq!(game_dir_hint_from_settings(&client).await, None);
+    }
+}
+
+#[cfg(test)]
+mod task13_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task13_unavailable_explicit_profile_keeps_source() {
+        let t = tempfile::tempdir().unwrap();
+        let missing = t.path().join("detached");
+        std::fs::write(t.path().join("launcher_profiles.json"), serde_json::json!({"profiles":{"custom":{"name":"Synthetic custom", "gameDir":missing,"lastVersionId":"1.20.1"},"default":{"lastVersionId":"1.20.1"}}}).to_string()).unwrap();
+        let entries = launcher_profile_entries(t.path(), &HashMap::new()).await;
+        assert_eq!(
+            entries
+                .iter()
+                .find(|e| e.name == "Synthetic custom")
+                .unwrap()
+                .game_dir,
+            missing
+        );
+        assert_eq!(
+            entries
+                .iter()
+                .find(|e| e.name == "default")
+                .unwrap()
+                .game_dir,
+            t.path()
+        );
+        // A profile never started in the official launcher has no game folder
+        // yet: it imports empty with its version, and the row says so.
+        let InternalImportEntry::Valid(custom) = profile_entry(
+            entries
+                .iter()
+                .find(|e| e.name == "Synthetic custom")
+                .unwrap()
+                .clone(),
+        ) else {
+            panic!("a profile without its game folder yet was refused")
+        };
+        assert!(custom.game_dir_missing);
+        assert_eq!(
+            ImportableInstance::from(custom).warnings,
+            [Translation::InstanceImportGameDirMissing]
+        );
+        // Something that is there but is not a folder stays unavailable.
+        std::fs::write(&missing, b"not a folder").unwrap();
+        assert!(matches!(
+            profile_entry(
+                entries
+                    .iter()
+                    .find(|e| e.name == "Synthetic custom")
+                    .unwrap()
+                    .clone()
+            ),
+            InternalImportEntry::Invalid(_)
+        ));
+        assert!(matches!(
+            profile_entry(
+                entries
+                    .iter()
+                    .find(|e| e.name == "default")
+                    .unwrap()
+                    .clone()
+            ),
+            InternalImportEntry::Valid(_)
+        ));
+    }
+}
+
+fn profile_entry(mut entry: Importable) -> InternalImportEntry<Importable> {
+    entry.settings.skip_missing_java_path();
+    if entry.version == VersionRef::Unresolved {
+        return InternalImportEntry::Invalid(super::InvalidImportEntry {
+            name: format!("{} ({})", entry.name, entry.filename),
+            reason: Translation::InstanceImportUnknownMinecraftVersion,
+        });
+    }
+    match std::fs::metadata(&entry.game_dir) {
+        Ok(metadata) if metadata.is_dir() => InternalImportEntry::Valid(entry),
+        // The official launcher creates a profile's game folder on first launch,
+        // so a profile that was never started has none: import it empty. A
+        // folder whose drive is not there at all stays unavailable instead.
+        Err(e)
+            if e.kind() == std::io::ErrorKind::NotFound && volume_is_present(&entry.game_dir) =>
+        {
+            entry.game_dir_missing = true;
+            InternalImportEntry::Valid(entry)
+        }
+        _ => InternalImportEntry::Invalid(super::InvalidImportEntry {
+            name: format!("{} ({})", entry.name, entry.game_dir.display()),
+            reason: Translation::InstanceImportSourceUnavailable,
+        }),
+    }
+}
+
+/// Whether the drive or share a path lives on is reachable. A link whose target
+/// is gone counts as not reachable: it points at a folder that existed.
+fn volume_is_present(path: &Path) -> bool {
+    let dangling_link = path
+        .ancestors()
+        .find(|ancestor| ancestor.symlink_metadata().is_ok())
+        .is_some_and(|ancestor| !ancestor.exists());
+    !dangling_link && volume_root(path).is_dir()
+}
+
+/// The folder that only exists while a path's drive is connected: `E:\` or
+/// `\\server\share` on Windows, and the usual removable-drive mount points on
+/// macOS and Linux. Anywhere else the drive cannot be told from the path, so `/`
+/// is all there is to check.
+fn volume_root(path: &Path) -> &Path {
+    let root = path.ancestors().last().unwrap_or(path);
+    let mut components = path.components();
+    if components.next() != Some(std::path::Component::RootDir) {
+        return root;
+    }
+    let names: Vec<&str> = components
+        .map(|name| name.as_os_str().to_str().unwrap_or_default())
+        .collect();
+    let depth = match names.as_slice() {
+        ["Volumes" | "mnt", _, ..] | ["media", _] => 2,
+        // `/media/<user>/<drive>` and `/run/media/<user>/<drive>`.
+        ["media", _, _, ..] => 3,
+        ["run", "media", _, _, ..] => 4,
+        _ => return root,
+    };
+    path.ancestors().nth(names.len() - depth).unwrap_or(root)
+}
+
+#[cfg(test)]
+mod installed_version_tests {
+    use super::*;
+    use crate::domain::instance::info::ModLoaderType;
+
+    fn write_version(game_dir: &Path, id: &str, json: serde_json::Value) {
+        let dir = game_dir.join("versions").join(id);
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join(format!("{id}.json")), json.to_string()).unwrap();
+    }
+
+    fn neoforge(minecraft: &str, loader: &str) -> VersionRef {
+        VersionRef::Exact {
+            minecraft: minecraft.into(),
+            loaders: vec![DeclaredModLoader::new(ModLoaderType::Neoforge, loader)],
+        }
+    }
+
+    /// Renamed or self-contained pack folders used to be imported as a vanilla
+    /// "latest release" instance, silently dropping their mod loader.
+    #[tokio::test]
+    async fn custom_version_folders_keep_their_release_and_loader() {
+        let t = tempfile::tempdir().unwrap();
+        let game_dir = t.path();
+        write_version(game_dir, "1.21.1", serde_json::json!({ "id": "1.21.1" }));
+        write_version(
+            game_dir,
+            "neoforge-21.1.77",
+            serde_json::json!({
+                "id": "neoforge-21.1.77",
+                "inheritsFrom": "1.21.1",
+                "libraries": [{ "name": "net.neoforged:neoforge:21.1.77" }]
+            }),
+        );
+        // Inherits from the loader's folder rather than from a release.
+        write_version(
+            game_dir,
+            "ATM10",
+            serde_json::json!({ "id": "ATM10", "inheritsFrom": "neoforge-21.1.77" }),
+        );
+        write_version(
+            game_dir,
+            "1.21.1-ATM10",
+            serde_json::json!({ "id": "1.21.1-ATM10", "inheritsFrom": "ATM10" }),
+        );
+        // Self-contained: no inheritsFrom, the release only in the FML arguments.
+        write_version(
+            game_dir,
+            "Merged Pack",
+            serde_json::json!({
+                "id": "Merged Pack",
+                "libraries": [{ "name": "net.neoforged:neoforge:21.1.80" }],
+                "arguments": { "game": ["--fml.neoForgeVersion", "21.1.80", "--fml.mcVersion", "1.21.1"] }
+            }),
+        );
+        // Nothing names a release.
+        write_version(
+            game_dir,
+            "Mystery",
+            serde_json::json!({
+                "id": "Mystery",
+                "libraries": [{ "name": "net.neoforged:neoforge:21.1.80" }]
+            }),
+        );
+        let installed = read_installed_versions(game_dir).await.unwrap();
+        assert_eq!(
+            version_ref("ATM10", &installed),
+            neoforge("1.21.1", "21.1.77")
+        );
+        assert_eq!(
+            version_ref("1.21.1-ATM10", &installed),
+            neoforge("1.21.1", "21.1.77")
+        );
+        assert_eq!(
+            version_ref("Merged Pack", &installed),
+            neoforge("1.21.1", "21.1.80")
+        );
+        assert_eq!(version_ref("Mystery", &installed), VersionRef::Unresolved);
+        // Ids that are not installed keep the existing handling.
+        assert_eq!(
+            version_ref("1.20.4", &installed),
+            VersionRef::Exact {
+                minecraft: "1.20.4".into(),
+                loaders: vec![],
+            }
+        );
+
+        std::fs::write(
+            game_dir.join("launcher_profiles.json"),
+            serde_json::json!({"profiles":{"m":{"name":"Mystery pack","lastVersionId":"Mystery"}}})
+                .to_string(),
+        )
+        .unwrap();
+        let entries = VanillaImporter::new(VanillaFlavor::Minecraft)
+            .scan_entries(game_dir)
+            .await
+            .unwrap();
+        let [entry] = entries.as_slice() else {
+            panic!("expected one profile")
+        };
+        assert!(matches!(
+            profile_entry(entry.clone()),
+            InternalImportEntry::Invalid(super::super::InvalidImportEntry {
+                reason: Translation::InstanceImportUnknownMinecraftVersion,
+                ..
+            })
+        ));
+    }
+
+    /// A release hint (`jar`, `clientVersion`, `--fml.mcVersion`) says nothing
+    /// about the loader a parent brings; stopping there imported these as vanilla.
+    #[tokio::test]
+    async fn a_release_hint_keeps_the_loader_of_its_parents() {
+        let t = tempfile::tempdir().unwrap();
+        let game_dir = t.path();
+        write_version(game_dir, "1.21.1", serde_json::json!({ "id": "1.21.1" }));
+        write_version(
+            game_dir,
+            "neoforge-21.1.77",
+            serde_json::json!({
+                "id": "neoforge-21.1.77",
+                "inheritsFrom": "1.21.1",
+                "libraries": [{ "name": "net.neoforged:neoforge:21.1.77" }]
+            }),
+        );
+        for (id, hint) in [
+            ("Jar", serde_json::json!({ "jar": "1.21.1" })),
+            (
+                "ClientVersion",
+                serde_json::json!({ "clientVersion": "1.21.1" }),
+            ),
+            (
+                "Fml",
+                serde_json::json!({ "arguments": { "game": ["--fml.mcVersion", "1.21.1"] } }),
+            ),
+        ] {
+            let mut json = serde_json::json!({ "id": id, "inheritsFrom": "neoforge-21.1.77" });
+            json.as_object_mut()
+                .unwrap()
+                .extend(hint.as_object().unwrap().clone());
+            write_version(game_dir, id, json);
+        }
+        // One step further from the loader.
+        write_version(
+            game_dir,
+            "Chained",
+            serde_json::json!({ "id": "Chained", "inheritsFrom": "Jar", "jar": "1.21.1" }),
+        );
+        // The parent is not installed; its id still names the loader.
+        write_version(
+            game_dir,
+            "MyLite",
+            serde_json::json!({
+                "id": "MyLite",
+                "inheritsFrom": "1.12.2-forge-14.23.5.2860",
+                "jar": "1.12.2"
+            }),
+        );
+        write_version(
+            game_dir,
+            "MissingLoaderFolder",
+            serde_json::json!({ "id": "MissingLoaderFolder", "inheritsFrom": "neoforge-21.1.80" }),
+        );
+        write_version(
+            game_dir,
+            "NoHintNoFolder",
+            serde_json::json!({
+                "id": "NoHintNoFolder",
+                "inheritsFrom": "1.20.1-forge-47.2.0"
+            }),
+        );
+        // Nothing tells what these parents bring, so vanilla would be a guess.
+        write_version(
+            game_dir,
+            "UnknownParent",
+            serde_json::json!({ "id": "UnknownParent", "inheritsFrom": "SomePack", "jar": "1.21.1" }),
+        );
+        std::fs::create_dir_all(game_dir.join("versions").join("NoJson")).unwrap();
+        write_version(
+            game_dir,
+            "UnreadParent",
+            serde_json::json!({ "id": "UnreadParent", "inheritsFrom": "NoJson", "jar": "1.21.1" }),
+        );
+        // Plain inheritance from a release stays vanilla.
+        write_version(
+            game_dir,
+            "Plain",
+            serde_json::json!({ "id": "Plain", "inheritsFrom": "1.21.1", "jar": "1.21.1" }),
+        );
+        write_version(
+            game_dir,
+            "Detached",
+            serde_json::json!({ "id": "Detached", "inheritsFrom": "1.20.4", "jar": "1.20.4" }),
+        );
+
+        let installed = read_installed_versions(game_dir).await.unwrap();
+        for id in ["Jar", "ClientVersion", "Fml", "Chained"] {
+            assert_eq!(
+                version_ref(id, &installed),
+                neoforge("1.21.1", "21.1.77"),
+                "{id}"
+            );
+        }
+        assert_eq!(
+            version_ref("MyLite", &installed),
+            VersionRef::Exact {
+                minecraft: "1.12.2".into(),
+                loaders: vec![DeclaredModLoader::new(ModLoaderType::Forge, "14.23.5.2860")],
+            }
+        );
+        assert_eq!(
+            version_ref("NoHintNoFolder", &installed),
+            VersionRef::Exact {
+                minecraft: "1.20.1".into(),
+                loaders: vec![DeclaredModLoader::new(ModLoaderType::Forge, "47.2.0")],
+            }
+        );
+        for id in ["MissingLoaderFolder", "UnknownParent", "UnreadParent"] {
+            assert_eq!(version_ref(id, &installed), VersionRef::Unresolved, "{id}");
+        }
+        for (id, minecraft) in [("Plain", "1.21.1"), ("Detached", "1.20.4")] {
+            assert_eq!(
+                version_ref(id, &installed),
+                VersionRef::Exact {
+                    minecraft: minecraft.into(),
+                    loaders: vec![],
+                },
+                "{id}"
+            );
+        }
+    }
+
+    /// Published versions outside the release grammar were refused with "can't
+    /// tell which version this profile uses", with their id right there.
+    #[tokio::test]
+    async fn mojang_versions_with_unusual_ids_keep_their_id() {
+        let t = tempfile::tempdir().unwrap();
+        let game_dir = t.path();
+        let vanilla = |id: &str| {
+            serde_json::json!({
+                "id": id,
+                "mainClass": "net.minecraft.client.main.Main",
+                "downloads": { "client": { "url": "https://example.invalid/client.jar" } }
+            })
+        };
+        let ids = [
+            "22w13oneblockatatime",
+            "3D Shareware v1.34",
+            "1.19_deep_dark_experimental_snapshot-1",
+        ];
+        for id in ids {
+            write_version(game_dir, id, vanilla(id));
+        }
+        // A renamed copy, and a modded json with the client it patches.
+        write_version(game_dir, "MyVanilla", vanilla("MyVanilla"));
+        write_version(
+            game_dir,
+            "1.20.1_tweaked_version_folder",
+            serde_json::json!({
+                "id": "1.20.1_tweaked_version_folder",
+                "mainClass": "net.minecraft.launchwrapper.Launch",
+                "downloads": { "client": { "url": "https://example.invalid/client.jar" } }
+            }),
+        );
+        let installed = read_installed_versions(game_dir).await.unwrap();
+        for id in ids {
+            assert_eq!(
+                version_ref(id, &installed),
+                VersionRef::Exact {
+                    minecraft: id.into(),
+                    loaders: vec![],
+                },
+                "{id}"
+            );
+        }
+        for id in ["MyVanilla", "1.20.1_tweaked_version_folder"] {
+            assert_eq!(version_ref(id, &installed), VersionRef::Unresolved, "{id}");
+        }
+    }
+
+    fn profile_with_game_dir(game_dir: PathBuf) -> Importable {
+        Importable {
+            filename: "1.20.1".into(),
+            game_dir,
+            name: "Profile".into(),
+            icon: None,
+            version: VersionRef::Exact {
+                minecraft: "1.20.1".into(),
+                loaders: vec![],
+            },
+            last_played: None,
+            settings: ImportedSettings::default(),
+            game_dir_missing: false,
+        }
+    }
+
+    fn assert_unavailable(game_dir: PathBuf) {
+        assert!(!volume_is_present(&game_dir), "{game_dir:?}");
+        assert!(
+            matches!(
+                profile_entry(profile_with_game_dir(game_dir.clone())),
+                InternalImportEntry::Invalid(super::super::InvalidImportEntry {
+                    reason: Translation::InstanceImportSourceUnavailable,
+                    ..
+                })
+            ),
+            "{game_dir:?}"
+        );
+    }
+
+    #[test]
+    fn removable_drive_mount_points_are_the_volume() {
+        for (path, volume) in [
+            ("/Volumes/USB/mc", "/Volumes/USB"),
+            ("/Volumes/USB", "/Volumes/USB"),
+            ("/mnt/usb/games/mc", "/mnt/usb"),
+            ("/media/me/USB/mc", "/media/me/USB"),
+            ("/media/usb", "/media/usb"),
+            ("/run/media/me/USB/mc", "/run/media/me/USB"),
+            ("/home/me/mc", "/"),
+            ("/opt/games/mc", "/"),
+            ("/media", "/"),
+            ("/run/user/1000/mc", "/"),
+        ] {
+            assert_eq!(volume_root(Path::new(path)), Path::new(volume), "{path}");
+        }
+    }
+
+    /// An unplugged drive must not look like a game folder that was never
+    /// created: the row asks to reconnect it instead of importing nothing.
+    #[test]
+    fn a_game_folder_on_a_missing_drive_stays_unavailable() {
+        for path in [
+            "/Volumes/gdl-no-such-drive/mc",
+            "/mnt/gdl-no-such-drive/mc",
+            "/media/gdl-no-such-user/gdl-no-such-drive/mc",
+            "/run/media/gdl-no-such-user/gdl-no-such-drive/mc",
+        ] {
+            assert_unavailable(PathBuf::from(path));
+        }
+    }
+
+    /// A game folder that may simply not have been created yet still imports.
+    #[test]
+    fn a_never_created_game_folder_on_a_present_drive_imports_empty() {
+        let t = tempfile::tempdir().unwrap();
+        let InternalImportEntry::Valid(entry) =
+            profile_entry(profile_with_game_dir(t.path().join("never-launched")))
+        else {
+            panic!("a never-created game folder was refused")
+        };
+        assert!(entry.game_dir_missing);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_to_a_folder_that_is_gone_stays_unavailable() {
+        let t = tempfile::tempdir().unwrap();
+        let link = t.path().join("mc");
+        std::os::unix::fs::symlink("/mnt/gdl-no-such-drive/mc", &link).unwrap();
+        assert_unavailable(link.clone());
+        assert_unavailable(link.join("nested"));
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_game_folder_on_an_unused_drive_letter_stays_unavailable() {
+        let unused = ('D'..='Z')
+            .rev()
+            .map(|letter| PathBuf::from(format!("{letter}:\\")))
+            .find(|root| !root.exists())
+            .expect("every drive letter is in use");
+        assert_eq!(volume_root(&unused.join("mc")), unused.as_path());
+        assert_unavailable(unused.join("mc"));
+    }
+
+    /// A Java picked by hand that is gone since would stop every launch.
+    #[test]
+    fn a_profile_with_a_missing_java_imports_without_it() {
+        let t = tempfile::tempdir().unwrap();
+        let mut profile = profile_with_game_dir(t.path().to_path_buf());
+        profile.settings.java_path = Some(
+            t.path()
+                .join("jre1.8.0_51")
+                .join("javaw.exe")
+                .display()
+                .to_string(),
+        );
+        let InternalImportEntry::Valid(entry) = profile_entry(profile) else {
+            panic!("a profile with a stale Java path was refused")
+        };
+        assert_eq!(entry.settings.java_path, None);
+        assert_eq!(
+            ImportableInstance::from(entry).warnings,
+            [Translation::InstanceImportJavaPathSkipped]
+        );
+    }
+
+    /// An unreadable versions/ folder used to fail the whole scan with no rows.
+    #[tokio::test]
+    async fn an_unreadable_versions_folder_still_lists_profiles() {
+        let t = tempfile::tempdir().unwrap();
+        let game_dir = t.path();
+        write_version(game_dir, "1.20.1", serde_json::json!({ "id": "1.20.1" }));
+        std::fs::write(
+            game_dir.join("launcher_profiles.json"),
+            serde_json::json!({"profiles":{"a":{"name":"Plain","lastVersionId":"1.20.1"}}})
+                .to_string(),
+        )
+        .unwrap();
+        let versions = game_dir.join("versions");
+        super::super::common::fail_scan_directory(versions.clone());
+        let entries = VanillaImporter::new(VanillaFlavor::Minecraft)
+            .scan_entries(game_dir)
+            .await;
+        super::super::common::clear_scan_failure(&versions);
+        let entries = entries.unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries[0].version,
+            VersionRef::Exact {
+                minecraft: "1.20.1".into(),
+                loaders: vec![],
+            }
+        );
     }
 }

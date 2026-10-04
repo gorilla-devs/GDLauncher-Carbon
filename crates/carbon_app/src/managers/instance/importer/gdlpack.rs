@@ -30,6 +30,7 @@ impl From<Importable> for ImportableInstance {
         Self {
             filename: value.filename,
             instance_name: value.manifest.name,
+            warnings: Vec::new(),
         }
     }
 }
@@ -141,13 +142,11 @@ impl GdlpackImporter {
 impl InstanceImporter for GdlpackImporter {
     async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()> {
         if scan_path.is_file() {
-            if let Ok(Some(entry)) = self.scan_archive(app, scan_path).await {
+            if let Some(entry) = self.scan_archive(app, scan_path).await? {
                 self.state.write().await.set_single(entry).await;
             }
         } else if scan_path.is_dir() {
-            let Ok(mut dir) = tokio::fs::read_dir(&scan_path).await else {
-                return Ok(());
-            };
+            let mut dir = super::common::scan_directory(&scan_path).await?;
 
             let mut futures = Vec::new();
 
@@ -162,15 +161,18 @@ impl InstanceImporter for GdlpackImporter {
                     // Only scan .gdlpack files
                     if ext == Some("gdlpack".to_string()) {
                         futures.push(async move {
-                            if let Ok(Some(entry)) = self.scan_archive(app, entry.path()).await {
+                            if let Some(entry) = self.scan_archive(app, entry.path()).await? {
                                 self.state.write().await.push_multi(entry).await;
                             }
+                            Ok::<_, anyhow::Error>(())
                         })
                     }
                 }
             }
 
-            futures::future::join_all(futures).await;
+            for result in futures::future::join_all(futures).await {
+                result?;
+            }
         }
 
         Ok(())

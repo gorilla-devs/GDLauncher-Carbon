@@ -99,6 +99,7 @@ keys! {
         GET_ALL_INSTANCES                           = "getAllInstances";
         CREATE_INSTANCE                             = "createInstance";
         CHANGE_MODPACK                              = "changeModpack";
+        CANCEL_MODPACK_CHANGE_CHECK                 = "cancelModpackChangeCheck";
         REPAIR_MODPACK                              = "repairModpack";
         GET_REPAIR_PREVIEW                          = "getRepairPreview";
         GET_DATAPACK_WORLDS                        = "getDatapackWorlds";

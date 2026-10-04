@@ -42,9 +42,11 @@ struct Importable {
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
+        let warnings = value.settings.warnings();
         Self {
             filename: value.filename,
             instance_name: value.name,
+            warnings,
         }
     }
 }
@@ -172,7 +174,7 @@ impl InstanceImporter for TechnicImporter {
             return Ok(());
         }
 
-        let (single, packs) = locate_packs(&scan_path).await;
+        let (single, packs) = locate_packs(&scan_path).await?;
 
         if single {
             if let Some(pack) = packs.into_iter().next() {
@@ -276,21 +278,21 @@ fn is_launcher_file(relative: &Path) -> bool {
     first == "bin" || first == "natives" || first == "cache"
 }
 
-async fn locate_packs(scan_path: &Path) -> (bool, Vec<LocatedPack>) {
+async fn locate_packs(scan_path: &Path) -> anyhow::Result<(bool, Vec<LocatedPack>)> {
     if is_pack_dir(scan_path) {
         let launcher_root = scan_path
             .parent()
             .filter(|p| dir_name(p) == "modpacks")
             .and_then(|p| p.parent())
             .map(Path::to_path_buf);
-        return (
+        return Ok((
             true,
             vec![LocatedPack {
                 slug: dir_name(scan_path),
                 path: scan_path.to_path_buf(),
                 launcher_root,
             }],
-        );
+        ));
     }
 
     let (launcher_root, modpacks_dir) =
@@ -322,8 +324,13 @@ async fn locate_packs(scan_path: &Path) -> (bool, Vec<LocatedPack>) {
     }
 
     // Packs installedPacks doesn't mention (or no installedPacks at all).
-    if let Ok(mut dir) = tokio::fs::read_dir(&modpacks_dir).await {
-        while let Ok(Some(entry)) = dir.next_entry().await {
+    let dir = match super::common::scan_directory(&modpacks_dir).await {
+        Ok(dir) => Some(dir),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound && launcher_root.is_some() => None,
+        Err(e) => return Err(e.into()),
+    };
+    if let Some(mut dir) = dir {
+        while let Some(entry) = dir.next_entry().await? {
             let path = entry.path();
             if !path.is_dir() || packs.iter().any(|p| p.path == path) || !is_pack_dir(&path) {
                 continue;
@@ -336,7 +343,7 @@ async fn locate_packs(scan_path: &Path) -> (bool, Vec<LocatedPack>) {
         }
     }
 
-    (false, packs)
+    Ok((false, packs))
 }
 
 fn is_pack_dir(path: &Path) -> bool {
@@ -447,7 +454,26 @@ fn merge_versions(into: &mut ParsedVersionId, from: ParsedVersionId) {
     }
 }
 
-/// Libraries are the most reliable loader source, the id the most reliable Minecraft version.
+// A folder label is only a fallback when it matches a release ID grammar.
+// In particular, a digit prefix does not make "1.20.1-MyPack" authoritative.
+pub(super) fn is_release_id(value: &str) -> bool {
+    static RELEASE: std::sync::LazyLock<regex::Regex> = std::sync::LazyLock::new(|| {
+        regex::Regex::new(concat!(
+            r"^(?:",
+            r"[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-(?:snapshot-[0-9]+|(?:pre|rc)-?[0-9]+)| Pre-[Rr]elease [0-9]+| Release Candidate [0-9]+)?",
+            // Published exceptional snapshots have named suffix families; do
+            // not accept arbitrary appended pack names as release authority.
+            r"|[0-9]{2}w[0-9]{2}(?:[a-z](?:_or_[a-z])?|craftmine|potato|infinite|oneblockatatime)",
+            r"|3D Shareware v1\.34",
+            r"|1\.RV-Pre[0-9]+",
+            r"|[abc][0-9]+(?:\.[0-9]+)+[a-z]?(?:_[0-9]+[a-z]?)?(?:-pre[0-9]+)?",
+            r"|rd-[0-9]+|inf-[0-9]+(?:-[0-9]+)?",
+            r")$"
+        )).expect("release ID grammar")
+    });
+    RELEASE.is_match(value)
+}
+
 pub(super) fn versions_from_version_json(json: &serde_json::Value) -> ParsedVersionId {
     let mut result = ParsedVersionId::default();
 
@@ -467,8 +493,8 @@ pub(super) fn versions_from_version_json(json: &serde_json::Value) -> ParsedVers
         .unwrap_or_default();
 
     result.minecraft = json_string(json, "inheritsFrom")
-        .filter(|v| looks_like_minecraft_version(v))
-        .or(from_id.minecraft.clone())
+        .filter(|v| is_release_id(v))
+        .or(from_id.minecraft.clone().filter(|v| is_release_id(v)))
         .or(from_libraries.minecraft.clone());
 
     // Keep the id's loader when the libraries don't mention one (very old Forge jsons).
@@ -838,7 +864,7 @@ mod test {
         )
         .unwrap();
 
-        let (single, mut packs) = locate_packs(root).await;
+        let (single, mut packs) = locate_packs(root).await.unwrap();
         assert!(!single);
         packs.sort_by(|a, b| a.slug.cmp(&b.slug));
         assert_eq!(
@@ -857,11 +883,11 @@ mod test {
             ]
         );
 
-        let (single, packs) = locate_packs(&tekkit).await;
+        let (single, packs) = locate_packs(&tekkit).await.unwrap();
         assert!(single);
         assert_eq!(packs[0].launcher_root, Some(root.to_path_buf()));
 
-        let (single, packs) = locate_packs(&modpacks).await;
+        let (single, packs) = locate_packs(&modpacks).await.unwrap();
         assert!(!single);
         assert_eq!(packs.len(), 2);
 
@@ -882,5 +908,141 @@ mod test {
         assert!(is_launcher_file(Path::new("bin")));
         assert!(!is_launcher_file(Path::new("mods/foo.jar")));
         assert!(!is_launcher_file(Path::new("config/foo.cfg")));
+    }
+}
+
+#[cfg(test)]
+mod task13_release_controls {
+    use super::*;
+    #[test]
+    fn task13_ordinary_and_legacy_release_ids_remain_supported() {
+        for id in [
+            "1.20.1",
+            "24w14a",
+            "b1.7.3",
+            "a1.2.6",
+            "c0.30_01c",
+            "rd-132211",
+        ] {
+            assert_eq!(
+                versions_from_version_json(&serde_json::json!({"id":id}))
+                    .minecraft
+                    .as_deref(),
+                Some(id)
+            );
+        }
+        assert!(
+            versions_from_version_json(&serde_json::json!({"id":"ATM9"}))
+                .minecraft
+                .is_none()
+        );
+    }
+}
+
+#[cfg(test)]
+mod task13_round01_controls {
+    use super::*;
+    #[test]
+    fn task13_round01_release_provenance_and_supported_ids() {
+        for id in [
+            "1.20.1",
+            "24w14a",
+            "1.21-pre1",
+            "1.21-rc1",
+            "1.14 Pre-Release 1",
+            "b1.7.3",
+            "b1.9-pre1",
+            "a1.2.6",
+            "c0.30_01c",
+            "rd-132211",
+            "inf-20100618",
+        ] {
+            assert_eq!(
+                versions_from_version_json(&serde_json::json!({"id":id}))
+                    .minecraft
+                    .as_deref(),
+                Some(id),
+                "{id}"
+            );
+        }
+        for id in ["1.20.1-forge-47.2.0", "fabric-loader-0.15.0-1.20.1"] {
+            assert_eq!(
+                versions_from_version_json(&serde_json::json!({"id":id}))
+                    .minecraft
+                    .as_deref(),
+                Some("1.20.1")
+            );
+        }
+        let conflict = serde_json::json!({"id":"1.20.4","libraries":[{"name":"net.minecraftforge:forge:1.20.1-47.2.0"}]});
+        assert_eq!(
+            versions_from_version_json(&conflict).minecraft.as_deref(),
+            Some("1.20.4")
+        );
+        let inherited = serde_json::json!({"id":"1.20.1-Custom","inheritsFrom":"1.19.4","libraries":[{"name":"net.minecraftforge:forge:1.20.1-47.2.0"}]});
+        assert_eq!(
+            versions_from_version_json(&inherited).minecraft.as_deref(),
+            Some("1.19.4")
+        );
+        assert!(
+            versions_from_version_json(&serde_json::json!({"id":"1.20.1-Custom"}))
+                .minecraft
+                .is_none()
+        );
+    }
+}
+
+#[cfg(test)]
+mod task13_round02_tests {
+    use super::*;
+    #[test]
+    fn task13_round02_preserves_all_previously_supported_official_ids() {
+        let ids: Vec<_> = include_str!("fixtures/task13_official_release_ids.txt")
+            .lines()
+            .filter(|line| !line.is_empty() && !line.starts_with('#'))
+            .collect();
+        assert_eq!(ids.len(), 903, "keep the attributed cached corpus complete");
+        let mut rejected = Vec::new();
+        for id in ids {
+            let direct = versions_from_version_json(&serde_json::json!({"id":id})).minecraft;
+            let inherited = versions_from_version_json(
+                &serde_json::json!({"id":"Synthetic Custom", "inheritsFrom":id}),
+            )
+            .minecraft;
+            if direct.as_deref() != Some(id) || inherited.as_deref() != Some(id) {
+                rejected.push((id, direct, inherited));
+            }
+        }
+        assert!(
+            rejected.is_empty(),
+            "{} cached official IDs failed direct/inherited production parsing: {rejected:?}",
+            rejected.len()
+        );
+    }
+}
+
+#[cfg(test)]
+mod task13_round02_custom_controls {
+    use super::*;
+    #[test]
+    fn task13_round02_release_shaped_pack_labels_remain_unproven() {
+        for id in [
+            "1.20.1-ATM9",
+            "26.4-snapshot-MyPack",
+            "26.4-snapshot-2-ATM",
+            "25w14mypack",
+            "b1.3b-custom",
+            "1.RV-Pre1-custom",
+        ] {
+            assert!(
+                versions_from_version_json(&serde_json::json!({"id":id}))
+                    .minecraft
+                    .is_none(),
+                "custom label became authority: {id}"
+            );
+            let library = versions_from_version_json(
+                &serde_json::json!({"id":id,"libraries":[{"name":"net.minecraftforge:forge:1.20.1-47.2.0"}]}),
+            );
+            assert_eq!(library.minecraft.as_deref(), Some("1.20.1"));
+        }
     }
 }

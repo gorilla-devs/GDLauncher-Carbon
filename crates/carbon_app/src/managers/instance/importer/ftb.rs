@@ -51,9 +51,11 @@ struct Importable {
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
+        let warnings = value.settings.warnings();
         Self {
             filename: value.filename,
             instance_name: value.name,
+            warnings,
         }
     }
 }
@@ -110,6 +112,7 @@ impl FtbImporter {
             })));
         };
 
+        parsed.settings.skip_missing_java_path();
         let icon = find_icon(&path, parsed.art.as_deref());
 
         if let Some(instances_dir) = path.parent() {
@@ -168,21 +171,40 @@ impl InstanceImporter for FtbImporter {
         }
 
         if scan_path.join("instance.json").is_file() {
-            if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
+            if let Some(entry) = self.scan_instance(scan_path).await? {
                 self.state.write().await.set_single(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
             return Ok(());
         }
 
-        let instances_dir = if is_app_root(&scan_path) {
-            instances_dir_for_root(&scan_path).await
-        } else {
-            scan_path
+        let app_root = is_app_root(&scan_path).then(|| scan_path.clone());
+        let instances_dir = match &app_root {
+            Some(root) => instances_dir_for_root(root).await,
+            None => scan_path,
         };
 
-        let Ok(mut dir) = tokio::fs::read_dir(&instances_dir).await else {
-            return Ok(());
+        let mut dir = match super::common::scan_directory(&instances_dir).await {
+            Ok(dir) => dir,
+            // An app folder without instances has nothing to import, unless its
+            // settings point at a folder that is gone (an unplugged drive).
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                let Some(root) = app_root else {
+                    return Err(e.into());
+                };
+                return match configured_instances_dir(&root).await {
+                    Some(configured)
+                        if configured != root.join("instances") && !configured.is_dir() =>
+                    {
+                        Err(anyhow!(e).context(format!(
+                            "The FTB App's instances folder {} is not available",
+                            configured.display()
+                        )))
+                    }
+                    _ => Ok(()),
+                };
+            }
+            Err(e) => return Err(e.into()),
         };
 
         while let Some(entry) = dir.next_entry().await? {
@@ -191,7 +213,7 @@ impl InstanceImporter for FtbImporter {
                 continue;
             }
 
-            if let Ok(Some(entry)) = self.scan_instance(entry_path).await {
+            if let Some(entry) = self.scan_instance(entry_path).await? {
                 self.state.write().await.push_multi(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
@@ -324,6 +346,18 @@ fn app_home_candidates() -> Vec<PathBuf> {
 }
 
 async fn instances_dir_for_root(root: &Path) -> PathBuf {
+    for location in configured_instance_locations(root).await {
+        if location.is_dir() {
+            return location;
+        }
+    }
+
+    root.join("instances")
+}
+
+/// Every `instanceLocation` the app's settings files name, existing or not.
+async fn configured_instance_locations(root: &Path) -> Vec<PathBuf> {
+    let mut locations = Vec::new();
     for settings in [
         root.join("storage").join("settings.json"),
         root.join("bin").join("settings.json"),
@@ -334,18 +368,19 @@ async fn instances_dir_for_root(root: &Path) -> PathBuf {
         };
         if let Some(location) = json_trimmed_string(&json, "instanceLocation") {
             let location = PathBuf::from(location);
-            let resolved = if location.is_absolute() {
+            locations.push(if location.is_absolute() {
                 location
             } else {
                 root.join(location)
-            };
-            if resolved.is_dir() {
-                return resolved;
-            }
+            });
         }
     }
+    locations
+}
 
-    root.join("instances")
+/// The first configured `instanceLocation`, whether or not it exists.
+async fn configured_instances_dir(root: &Path) -> Option<PathBuf> {
+    configured_instance_locations(root).await.into_iter().next()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -704,5 +739,75 @@ mod test {
         assert!(is_launcher_file(Path::new("version.json")));
         assert!(!is_launcher_file(Path::new("mods/foo.jar")));
         assert!(!is_launcher_file(Path::new("saves/world/level.dat")));
+    }
+}
+
+#[cfg(test)]
+mod missing_folder_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn an_app_folder_without_instances_is_an_empty_result_or_names_the_missing_one() {
+        let env = crate::setup_managers_for_test().await;
+        let t = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(t.path().join("storage")).unwrap();
+        std::fs::write(t.path().join("storage/settings.json"), "{}").unwrap();
+        let scanner = FtbImporter::new();
+        scanner
+            .scan(&env.app, t.path().to_path_buf())
+            .await
+            .unwrap();
+        assert!(matches!(
+            scanner.get_status().await,
+            ImportScanStatus::NoResults
+        ));
+
+        let elsewhere = t.path().join("unplugged").join("instances");
+        std::fs::write(
+            t.path().join("storage/settings.json"),
+            serde_json::json!({ "instanceLocation": elsewhere }).to_string(),
+        )
+        .unwrap();
+        let error = FtbImporter::new()
+            .scan(&env.app, t.path().to_path_buf())
+            .await
+            .unwrap_err();
+        assert!(
+            format!("{error:#}").contains(&elsewhere.display().to_string()),
+            "{error:#}"
+        );
+    }
+}
+
+#[cfg(test)]
+mod stale_java_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_java_path_that_is_gone_is_left_out() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(
+            t.path().join("instance.json"),
+            serde_json::json!({
+                "uuid": "x",
+                "name": "Pack",
+                "mcVersion": "1.20.1",
+                "jrePath": "/gdl-no-such-folder/bin/java"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let Some(InternalImportEntry::Valid(entry)) = FtbImporter::new()
+            .scan_instance(t.path().to_path_buf())
+            .await
+            .unwrap()
+        else {
+            panic!("an instance with a stale Java path was refused")
+        };
+        assert_eq!(entry.settings.java_path, None);
+        assert_eq!(
+            ImportableInstance::from(entry).warnings,
+            [Translation::InstanceImportJavaPathSkipped]
+        );
     }
 }

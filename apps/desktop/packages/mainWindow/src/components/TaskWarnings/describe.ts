@@ -1,5 +1,6 @@
 import type {
   FEDependencyPlatform,
+  FEPreviousPackFilesReason,
   FESkippedDependencyReason,
   FETaskWarning,
   FETaskWarnings
@@ -33,6 +34,20 @@ const SKIP_REASON: Record<FESkippedDependencyReason, NamespacedTranslationKey> =
 const UNNAMED: Record<FEDependencyPlatform, NamespacedTranslationKey> = {
   Curseforge: "notifications:_trn_addon_dependency_unnamed_curseforge",
   Modrinth: "notifications:_trn_addon_dependency_unnamed_modrinth"
+}
+
+const PREVIOUS_PACK_FILES: Record<
+  FEPreviousPackFilesReason,
+  NamespacedTranslationKey
+> = {
+  VersionUnavailable: "notifications:_trn_modpack_previous_version_unavailable",
+  VersionUnreadable: "notifications:_trn_modpack_previous_version_unreadable",
+  SomeFilesUnchecked: "notifications:_trn_modpack_previous_files_unchecked"
+}
+
+const PLATFORM_NAME: Record<FEDependencyPlatform, string> = {
+  Curseforge: "CurseForge",
+  Modrinth: "Modrinth"
 }
 
 // Names come from CurseForge, Modrinth and the user's own instance names, and
@@ -112,6 +127,10 @@ function describeWarning(warning: FETaskWarning, t: Translate): string {
         saved_as: warning.value.saved_as,
         interpolation: noEscape
       })
+    case "PreviousPackFilesKept":
+      return t(PREVIOUS_PACK_FILES[warning.value.reason], {
+        platform: PLATFORM_NAME[warning.value.platform]
+      })
   }
 }
 
@@ -120,16 +139,37 @@ function nonEmpty(value: unknown): string | null {
 }
 
 /** Toast content for a succeeded task's warnings: which required
- * dependencies were left out or installed at another version than asked,
- * why, and what the user can do about it. */
+ * dependencies were left out, are installed but disabled, or were installed
+ * at another version than asked,
+ * which of a modpack's files were not installed, which files a modpack
+ * version change kept, or under which name a world was saved because its
+ * own was taken, why, and what the user can do about it. */
 export function describeTaskWarnings(
   entry: FETaskWarnings,
   t: Translate
 ): WarningToast | null {
   const lines = entry.warnings.map((warning) => describeWarning(warning, t))
   if (lines.length === 0) return null
-  const title = warnedSubject(entry, t)
   const args = taskArgs(entry)
+  // A modpack version change runs as the instance's preparation task, whose
+  // name carries the instance's name.
+  if (
+    entry.warnings.every((warning) => warning.type === "PreviousPackFilesKept")
+  ) {
+    const instance = nonEmpty(args.name)
+    return {
+      title:
+        instance !== null
+          ? t("notifications:_trn_modpack_update_kept_files_in_instance", {
+              instance,
+              interpolation: noEscape
+            })
+          : t("notifications:_trn_modpack_update_kept_files"),
+      lines,
+      hint: t("notifications:_trn_modpack_update_kept_files_hint")
+    }
+  }
+  const title = warnedSubject(entry, t)
   const instance = nonEmpty(args.instance_name)
   const server = nonEmpty(args.server_name)
   // A missing dependency is the more likely reason the game will not start.

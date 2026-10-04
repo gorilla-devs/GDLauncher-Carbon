@@ -2690,6 +2690,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 // Preparation retires the superseded setup under this same gate.
                 reset: supersede,
                 replaces: None,
+                warnings: Vec::new(),
             };
             let (_handle, task_id) = self
                 .prepare_game_admitted(

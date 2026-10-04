@@ -13,10 +13,11 @@ use super::{
     GET_IMPORT_SCAN_STATUS, ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter,
     InternalImportEntry, InvalidImportEntry,
     common::{
-        DeclaredModLoader, ImportedSettings, apply_imported_settings, copy_game_dir,
-        datetime_from_epoch_millis, dedup_paths, dir_name, find_image_with_any_extension,
-        first_existing_dir, group_for_import, normalize_forge_version, parse_loader_type,
-        read_json_value, resolve_standard_version, seconds_played_from_i64,
+        DeclaredModLoader, ImportedSettings, SkippedSetting, apply_imported_settings,
+        copy_game_dir, datetime_from_epoch_millis, dedup_paths, dir_name,
+        find_image_with_any_extension, first_existing_dir, group_for_import,
+        normalize_forge_version, parse_loader_type, read_json_value, resolve_standard_version,
+        seconds_played_from_i64,
     },
 };
 use crate::{
@@ -48,6 +49,7 @@ struct Importable {
     filename: String,
     path: PathBuf,
     game_dir: PathBuf,
+    game_dir_required: bool,
     name: String,
     icon_path: Option<PathBuf>,
     minecraft_version: String,
@@ -60,9 +62,11 @@ struct Importable {
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
+        let warnings = value.settings.warnings();
         Self {
             filename: value.filename,
             instance_name: value.name,
+            warnings,
         }
     }
 }
@@ -107,7 +111,7 @@ impl MmcImporter {
                 warn!("Cannot read {cfg_path:?}: {e}");
                 return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
                     name: filename,
-                    reason: Translation::InstanceImportLegacyBadConfigFile,
+                    reason: Translation::InstanceImportConfigUnreadable,
                 })));
             }
         };
@@ -127,14 +131,27 @@ impl MmcImporter {
             })));
         };
 
+        meta.settings.skip_missing_java_path();
         let icon_path = find_icon(&path, meta.icon_key.as_deref()).await;
 
         if let Some(instances_dir) = path.parent() {
             meta.settings.group = group_of_instance(instances_dir, &filename).await;
         }
 
+        let game_dir_required = match game_dir(&path).try_exists() {
+            Ok(exists) => exists,
+            Err(e) => {
+                warn!("Cannot check the game folder of {path:?}: {e}");
+                return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
+                    name: filename,
+                    reason: Translation::InstanceImportSourceUnavailable,
+                })));
+            }
+        };
+
         Ok(Some(InternalImportEntry::Valid(Importable {
             filename: filename.clone(),
+            game_dir_required,
             game_dir: game_dir(&path),
             path,
             name: meta.name.unwrap_or(filename),
@@ -239,6 +256,7 @@ fn instance_settings(cfg: &HashMap<String, String>) -> ImportedSettings {
         settings.pre_launch_hook = value("PreLaunchCommand");
         settings.post_exit_hook = value("PostExitCommand");
         settings.wrapper_command = value("WrapperCommand");
+        skip_launcher_variable_commands(&mut settings);
     }
     if enabled("OverrideWindow") {
         if let (Some(w), Some(h)) = (number("MinecraftWinWidth"), number("MinecraftWinHeight")) {
@@ -267,7 +285,7 @@ impl InstanceImporter for MmcImporter {
         }
 
         if scan_path.join("instance.cfg").is_file() {
-            if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
+            if let Some(entry) = self.scan_instance(scan_path).await? {
                 self.state.write().await.set_single(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
@@ -275,14 +293,34 @@ impl InstanceImporter for MmcImporter {
         }
 
         // The launcher's data directory is accepted as well as its instances directory.
-        let instances_dir = if is_launcher_data_dir(&scan_path) {
-            instances_dir_for_data_dir(&scan_path).await
-        } else {
-            scan_path
+        let data_dir = is_launcher_data_dir(&scan_path).then(|| scan_path.clone());
+        let instances_dir = match &data_dir {
+            Some(data_dir) => instances_dir_for_data_dir(data_dir).await,
+            None => scan_path,
         };
 
-        let Ok(mut dir) = tokio::fs::read_dir(&instances_dir).await else {
-            return Ok(());
+        let mut dir = match super::common::scan_directory(&instances_dir).await {
+            Ok(dir) => dir,
+            // A data folder without instances has nothing to import, unless
+            // its settings point at a folder that is gone (an unplugged drive).
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                let Some(data_dir) = data_dir else {
+                    return Err(e.into());
+                };
+                return match configured_instances_dir(&data_dir).await {
+                    Some(configured)
+                        if configured != data_dir.join("instances") && !configured.is_dir() =>
+                    {
+                        Err(anyhow!(e).context(format!(
+                            "{}'s instances folder {} is not available",
+                            self.flavor.label(),
+                            configured.display()
+                        )))
+                    }
+                    _ => Ok(()),
+                };
+            }
+            Err(e) => return Err(e.into()),
         };
 
         while let Some(entry) = dir.next_entry().await? {
@@ -291,7 +329,7 @@ impl InstanceImporter for MmcImporter {
                 continue;
             }
 
-            if let Ok(Some(entry)) = self.scan_instance(entry_path).await {
+            if let Some(entry) = self.scan_instance(entry_path).await? {
                 self.state.write().await.push_multi(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
@@ -344,7 +382,21 @@ impl InstanceImporter for MmcImporter {
         let initializer = |instance_path: PathBuf| {
             let instance = &instance;
             async move {
-                copy_game_dir(&instance.game_dir, &instance_path, |_| true).await?;
+                anyhow::ensure!(
+                    tokio::fs::metadata(&instance.path).await?.is_dir(),
+                    "Import source {} is unavailable; rescan",
+                    instance.path.display()
+                );
+                if instance.game_dir_required {
+                    copy_game_dir(&instance.game_dir, &instance_path, |_| true).await?;
+                } else {
+                    super::common::copy_optional_game_dir(
+                        &instance.game_dir,
+                        &instance_path,
+                        |_| true,
+                    )
+                    .await?;
+                }
                 Ok(())
             }
         };
@@ -1036,4 +1088,173 @@ mod test {
         std::fs::create_dir_all(tmp.path().join(".minecraft")).unwrap();
         assert_eq!(game_dir(tmp.path()), tmp.path().join(".minecraft"));
     }
+}
+
+#[cfg(test)]
+mod task13_tests {
+    use super::*;
+    async fn scan_valid(importer: &MmcImporter, path: &Path) -> Importable {
+        match importer.scan_instance(path.to_path_buf()).await.unwrap() {
+            Some(InternalImportEntry::Valid(entry)) => entry,
+            other => panic!("expected an importable instance, got {other:?}"),
+        }
+    }
+
+    /// The packwiz setup Prism documents: the instance and its files import,
+    /// only the command GDLauncher cannot run is left out, and the row says so.
+    #[tokio::test]
+    async fn task13_enabled_placeholder_commands_are_skipped_not_refused() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(
+            t.path().join("mmc-pack.json"),
+            r#"{"components":[{"uid":"net.minecraft","version":"1.20.1"}]}"#,
+        )
+        .unwrap();
+        std::fs::write(
+            t.path().join("instance.cfg"),
+            "name=Synthetic\nOverrideCommands=true\nPreLaunchCommand=\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar https://example.invalid/pack.toml\nPostExitCommand=echo done\nWrapperCommand=%INST_DIR%\\\\wrap.cmd\n",
+        )
+        .unwrap();
+        let importer = MmcImporter::new(MmcFlavor::Prism);
+        assert!(matches!(
+            importer
+                .scan_instance(t.path().to_path_buf())
+                .await
+                .unwrap(),
+            Some(InternalImportEntry::Invalid(_))
+        ));
+        std::fs::write(
+            t.path().join("instance.cfg"),
+            "name=Synthetic\nOverrideCommands=false\nPreLaunchCommand=echo $INST_DIR\n",
+        )
+        .unwrap();
+        let entry = scan_valid(&importer, t.path()).await;
+        assert_eq!(entry.settings.pre_launch_hook, None);
+        assert!(ImportableInstance::from(entry).warnings.is_empty());
+        for command in ["echo ordinary", "printf %s hello", "echo 100%"] {
+            assert!(!has_launcher_placeholder(command));
+        }
+        for command in ["echo $INST_DIR", "echo ${INST_DIR}", "echo %INST_DIR%"] {
+            assert!(has_launcher_placeholder(command));
+            assert!(needs_launcher_expansion(command));
+        }
+        // A shell GDLauncher starts expands the environment by itself, but it
+        // has no `INST_*` to read, and nothing else expands a bare command.
+        for command in [
+            r#"sh -c "cp $HOME/a b""#,
+            r#"/bin/bash -c 'echo ${HOME}'"#,
+            r"C:\Windows\System32\cmd.exe /c echo %APPDATA%",
+            r#""powershell.exe" -Command "echo $env:APPDATA""#,
+            r#""C:\Program Files\Git\bin\bash.exe" -c "echo $HOME""#,
+            r#""C:\Program Files\PowerShell\7\pwsh.exe" -Command "echo $env:APPDATA""#,
+            r#"'/opt/my tools/zsh' -c 'echo $HOME'"#,
+            r#"/opt/my\ tools/zsh -c 'echo $HOME'"#,
+        ] {
+            assert!(!needs_launcher_expansion(command), "{command}");
+        }
+        for command in [
+            "$HOME/sync.sh",
+            "%APPDATA%\\sync.cmd",
+            r#"sh -c "$INST_JAVA -jar a.jar""#,
+            r#"cmd /c %INST_DIR%\sync.cmd"#,
+            r#""$HOME/bin/bash" -c "echo hello""#,
+            r#""C:\Program Files\Tool\tool.exe" %APPDATA%"#,
+            r#"sh -c "echo $HOME"#,
+        ] {
+            assert!(needs_launcher_expansion(command), "{command}");
+        }
+    }
+}
+
+/// Prism and MultiMC fill `$INST_JAVA`, `%INST_DIR%` and the environment into
+/// these commands before running them; GDLauncher runs them as written, so such
+/// a command would fail at every launch. Each one is left out, the rest of the
+/// instance still imports, and the row says so (packwiz setups are the usual case).
+/// The notes keep what was dropped, as the pack's URL may only be in there.
+fn skip_launcher_variable_commands(settings: &mut ImportedSettings) {
+    let mut dropped = Vec::new();
+    for (name, command) in [
+        ("PreLaunchCommand", &mut settings.pre_launch_hook),
+        ("PostExitCommand", &mut settings.post_exit_hook),
+        ("WrapperCommand", &mut settings.wrapper_command),
+    ] {
+        if command.as_deref().is_some_and(needs_launcher_expansion) {
+            warn!("Not importing {name}: it uses launcher variables");
+            dropped.extend(command.take().map(|command| format!("{name}={command}")));
+        }
+    }
+    if dropped.is_empty() {
+        return;
+    }
+    let dropped = dropped.join("\n");
+    settings.notes = Some(match settings.notes.take() {
+        Some(notes) => format!("{notes}\n\n{dropped}"),
+        None => dropped,
+    });
+    settings.skip(SkippedSetting::LauncherVariableCommands);
+}
+
+/// `INST_*` only exists inside the source launcher. Other variables are the
+/// environment, which a shell the command starts expands by itself.
+fn needs_launcher_expansion(command: &str) -> bool {
+    let uses_instance_variable = ["$INST_", "${INST_", "%INST_"]
+        .iter()
+        .any(|prefix| command.contains(prefix));
+    uses_instance_variable || (has_launcher_placeholder(command) && !starts_a_shell(command))
+}
+
+/// Reads the program the way the hook runner (`split_hook_command`) splits the
+/// line: POSIX style on macOS and Linux, and with backslashes kept on Windows,
+/// where most of these commands come from. Either way quotes group words
+/// (`"C:\Program Files\Git\bin\bash.exe"`, `'/opt/my tools/zsh'`). A program
+/// that needs expanding itself cannot start at all.
+fn starts_a_shell(command: &str) -> bool {
+    [
+        shlex::split(command),
+        shlex::split(&command.replace('\\', "\\\\")),
+    ]
+    .into_iter()
+    .filter_map(|words| words?.into_iter().next())
+    .any(|program| is_shell_program(&program))
+}
+
+fn is_shell_program(program: &str) -> bool {
+    if has_launcher_placeholder(program) {
+        return false;
+    }
+    let name = program
+        .rsplit(['/', '\\'])
+        .next()
+        .unwrap_or_default()
+        .to_ascii_lowercase();
+    let name = name.strip_suffix(".exe").unwrap_or(&name);
+    [
+        "sh",
+        "bash",
+        "dash",
+        "zsh",
+        "fish",
+        "cmd",
+        "powershell",
+        "pwsh",
+    ]
+    .contains(&name)
+}
+
+fn has_launcher_placeholder(value: &str) -> bool {
+    let bytes = value.as_bytes();
+    bytes.iter().enumerate().any(|(i, b)| {
+        if *b == b'$' {
+            return bytes
+                .get(i + 1)
+                .is_some_and(|next| next.is_ascii_alphabetic() || *next == b'_' || *next == b'{');
+        }
+        if *b == b'%' {
+            let rest = &value[i + 1..];
+            return rest.split_once('%').is_some_and(|(name, _)| {
+                !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+            });
+        }
+        false
+    })
 }

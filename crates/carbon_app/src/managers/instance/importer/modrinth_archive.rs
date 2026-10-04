@@ -49,6 +49,7 @@ impl From<Importable> for ImportableInstance {
         Self {
             filename: value.filename,
             instance_name: value.index.name,
+            warnings: Vec::new(),
         }
     }
 }
@@ -116,17 +117,7 @@ impl ModrinthArchiveImporter {
             }
         };
 
-        let mut file = tokio::fs::File::from_std(file);
-        let mut sha512 = Sha512::new();
-        carbon_scheduler::buffered_digest(&mut file, |chunk| {
-            sha512.update(chunk);
-        })
-        .await?;
-
-        let sha512: [u8; 64] = sha512.finalize().into();
-        let sha512 = hex::encode(sha512);
-
-        drop(file);
+        let sha512 = archive_digest(file).await?;
 
         let version_response = app
             .modplatforms_manager()
@@ -174,27 +165,28 @@ impl ModrinthArchiveImporter {
 impl InstanceImporter for ModrinthArchiveImporter {
     async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()> {
         if scan_path.is_file() {
-            if let Ok(Some(entry)) = self.scan_archive(app, scan_path).await {
+            if let Some(entry) = self.scan_archive(app, scan_path).await? {
                 self.state.write().await.set_single(entry).await;
             }
         } else if scan_path.is_dir() {
-            let Ok(mut dir) = tokio::fs::read_dir(&scan_path).await else {
-                return Ok(());
-            };
+            let mut dir = super::common::scan_directory(&scan_path).await?;
 
             let mut futures = Vec::new();
 
             while let Some(entry) = dir.next_entry().await? {
                 if entry.metadata().await?.is_file() {
                     futures.push(async move {
-                        if let Ok(Some(entry)) = self.scan_archive(app, entry.path()).await {
+                        if let Some(entry) = self.scan_archive(app, entry.path()).await? {
                             self.state.write().await.push_multi(entry).await;
                         }
+                        Ok::<_, anyhow::Error>(())
                     })
                 }
             }
 
-            futures::future::join_all(futures).await;
+            for result in futures::future::join_all(futures).await {
+                result?;
+            }
         }
 
         Ok(())
@@ -225,19 +217,8 @@ impl InstanceImporter for ModrinthArchiveImporter {
         )
         .await?;
 
-        let version = GameVersion::Standard(gdl_version);
-
-        let instance_version_source = match &instance.meta {
-            Some(meta) => InstanceVersionSource::ModpackWithKnownVersion(
-                version,
-                Modpack::Modrinth(ModrinthModpack {
-                    project_id: meta.project_id.clone(),
-                    version_id: meta.version_id.clone(),
-                }),
-                true,
-            ),
-            None => InstanceVersionSource::Version(version),
-        };
+        let instance_version_source =
+            version_source(GameVersion::Standard(gdl_version), instance.meta.as_ref());
 
         // The icon is decorative and its URL is whatever the pack was
         // published with, so a rotted link costs the instance its artwork
@@ -280,5 +261,108 @@ impl InstanceImporter for ModrinthArchiveImporter {
             .prepare_game(id, None, None, true)
             .await
             .map(|r| r.1)
+    }
+}
+
+/// A pack file that matches a version published on Modrinth is paired with
+/// it, so its updates show and Change Modpack Version works. It stays
+/// unlocked, as a `.mrpack` import always was (and as a CurseForge `.zip`
+/// import is), so its mods can still be edited.
+fn version_source(version: GameVersion, meta: Option<&MrMetadata>) -> InstanceVersionSource {
+    match meta {
+        Some(meta) => InstanceVersionSource::ModpackWithKnownVersion(
+            version,
+            Modpack::Modrinth(ModrinthModpack {
+                project_id: meta.project_id.clone(),
+                version_id: meta.version_id.clone(),
+            }),
+            false,
+        ),
+        None => InstanceVersionSource::Version(version),
+    }
+}
+
+async fn archive_digest(file: fs::File) -> anyhow::Result<String> {
+    let mut file = tokio::fs::File::from_std(file);
+    tokio::io::AsyncSeekExt::rewind(&mut file).await?;
+    let mut sha512 = Sha512::new();
+    carbon_scheduler::buffered_digest(&mut file, |chunk| {
+        sha512.update(chunk);
+    })
+    .await?;
+
+    let sha512: [u8; 64] = sha512.finalize().into();
+    let sha512 = hex::encode(sha512);
+
+    Ok(sha512)
+}
+
+#[cfg(test)]
+mod task13_tests {
+    use super::*;
+    use std::io::{Seek, Write};
+    #[tokio::test]
+    async fn task13_archive_digest_covers_manifest_and_tail() {
+        let t = tempfile::tempdir().unwrap();
+        let path = t.path().join("synthetic.mrpack");
+        let mut zip = zip::ZipWriter::new(fs::File::create(&path).unwrap());
+        zip.start_file(
+            "modrinth.index.json",
+            zip::write::SimpleFileOptions::default(),
+        )
+        .unwrap();
+        zip.write_all(br#"{"formatVersion":1,"game":"minecraft","versionId":"fixture","name":"Synthetic","files":[],"dependencies":{"minecraft":"1.20.1"}}"#).unwrap();
+        zip.start_file(
+            "overrides/options.txt",
+            zip::write::SimpleFileOptions::default(),
+        )
+        .unwrap();
+        zip.write_all(b"synthetic options").unwrap();
+        zip.finish().unwrap();
+        let mut file = fs::File::open(&path).unwrap();
+        {
+            let mut zip = zip::ZipArchive::new(&mut file).unwrap();
+            let index: ModpackIndex =
+                serde_json::from_reader(zip.by_name("modrinth.index.json").unwrap()).unwrap();
+            assert_eq!(index.name, "Synthetic");
+        }
+        assert!(file.stream_position().unwrap() > 0);
+        assert_eq!(
+            archive_digest(file).await.unwrap(),
+            hex::encode(Sha512::digest(fs::read(path).unwrap()))
+        );
+    }
+
+    /// A `.mrpack` that matches a published version is paired with it but
+    /// stays editable, as `.mrpack` imports were in 2.0.40.
+    #[test]
+    fn matched_mrpack_is_paired_but_unlocked() {
+        use crate::domain::instance::info::StandardVersion;
+        let version = || {
+            GameVersion::Standard(StandardVersion {
+                release: "1.20.1".into(),
+                modloaders: Default::default(),
+            })
+        };
+        let meta = MrMetadata {
+            name: "Synthetic".into(),
+            project_id: "project".into(),
+            version_id: "version".into(),
+            image_url: None,
+        };
+        let InstanceVersionSource::ModpackWithKnownVersion(_, Modpack::Modrinth(pack), locked) =
+            version_source(version(), Some(&meta))
+        else {
+            panic!("a matched pack is paired with its Modrinth version")
+        };
+        assert_eq!(
+            (pack.project_id.as_str(), pack.version_id.as_str()),
+            ("project", "version")
+        );
+        assert!(!locked);
+        assert!(matches!(
+            version_source(version(), None),
+            InstanceVersionSource::Version(_)
+        ));
     }
 }

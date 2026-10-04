@@ -373,7 +373,7 @@ async fn parse_mrpack_with_budgets(
     Ok((index, hashes))
 }
 
-async fn parse_mrpack_coverage(
+pub(super) async fn parse_mrpack_coverage(
     path: &Path,
     entry_budget: u64,
     total_budget: u64,
@@ -467,6 +467,69 @@ async fn parse_mrpack_coverage(
     .await
     .context("archive parsing task panicked")?
 }
+/// Required installed ownership is distinct from best-effort origin preview.
+/// Every eligible common/client override is streamed under one actual-byte
+/// budget; any error discards the inventory, including earlier complete hashes.
+pub(super) async fn parse_mrpack_inventory(
+    path: &Path,
+    index_budget: u64,
+    override_budget: u64,
+) -> anyhow::Result<(ModpackIndex, HashMap<String, [u8; 64]>)> {
+    let path = path.to_path_buf();
+    spawn_blocking(move || {
+        let mut archive = zip::ZipArchive::new(std::fs::File::open(&path)?)?;
+        let index = {
+            let mut file = archive.by_name("modrinth.index.json")?;
+            anyhow::ensure!(file.size() <= index_budget, "Installed MRPack index exceeds its verification budget; keep this instance and import the target version separately");
+            let mut remaining = index_budget;
+            let mut bytes = Vec::new();
+            read_inventory_bytes(&mut file, &mut remaining, |chunk| bytes.extend_from_slice(chunk))?;
+            serde_json::from_slice::<ModpackIndex>(&bytes)?
+        };
+        let mut remaining = override_budget;
+        let mut hashes = HashMap::new();
+        for layer in ["overrides", "client-overrides"] {
+            for i in 0..archive.len() {
+                let mut entry = archive.by_index(i)?;
+                let Some(enclosed) = entry.enclosed_name() else { continue };
+                let Ok(relative) = enclosed.strip_prefix(layer) else { continue };
+                if entry.is_dir() || is_symlink_mode(entry.unix_mode()) { continue; }
+                if secure_path_join(Path::new("/"), relative).is_err() { continue; }
+                let Some(key) = packinfo_key_from_relative(relative) else { continue };
+                anyhow::ensure!(entry.size() <= remaining, "Installed MRPack override inventory exceeds its cumulative verification budget; keep this instance and import the target version separately");
+                let mut digest = Sha512::new();
+                read_inventory_bytes(&mut entry, &mut remaining, |chunk| digest.update(chunk))
+                    .with_context(|| format!("Reading required installed override {key}"))?;
+                hashes.insert(key, digest.finalize().into());
+            }
+        }
+        Ok((index, hashes))
+    }).await.context("installed archive inventory task panicked")?
+}
+
+/// Unlike preview hashing, this never reads past the remaining shared budget.
+/// Exhaustion before verified EOF is an error, not proof of complete coverage.
+fn read_inventory_bytes<R: std::io::Read>(
+    reader: &mut R,
+    remaining: &mut u64,
+    mut consume: impl FnMut(&[u8]),
+) -> anyhow::Result<()> {
+    let mut buffer = [0u8; 64 * 1024];
+    loop {
+        anyhow::ensure!(
+            *remaining > 0,
+            "Installed inventory verification budget exhausted before verified EOF; keep this instance and import the target version separately"
+        );
+        let limit = (*remaining).min(buffer.len() as u64) as usize;
+        let n = reader.read(&mut buffer[..limit])?;
+        if n == 0 {
+            return Ok(());
+        }
+        *remaining -= n as u64;
+        consume(&buffer[..n]);
+    }
+}
+
 /// Downloads (or reuses an already-correct cached copy of) `file` to `dest`
 /// via `carbon_net::download_multiple`, the same download primitive the rest
 /// of the launcher uses for game/mod/modpack files — **not**
@@ -1784,5 +1847,33 @@ mod task09_read_failure {
             match_against_index(&untracked, &index, &hashes),
             HashSet::from(["/keep".to_owned()])
         );
+    }
+}
+
+#[cfg(test)]
+mod task13_round01_budget_controls {
+    use super::*;
+    #[test]
+    fn task13_round01_required_reader_never_overshoots_or_resets_shared_work() {
+        let mut remaining = 10;
+        let mut first = std::io::Cursor::new(b"123456".to_vec());
+        read_inventory_bytes(&mut first, &mut remaining, |_| {}).unwrap();
+        assert_eq!(remaining, 4);
+        let mut second = std::io::Cursor::new(b"123456789".to_vec());
+        assert!(read_inventory_bytes(&mut second, &mut remaining, |_| {}).is_err());
+        assert_eq!(remaining, 0);
+        assert_eq!(
+            second.position(),
+            4,
+            "do not spend even a buffer past the shared remainder"
+        );
+        let mut equality = std::io::Cursor::new(b"1234".to_vec());
+        let mut equality_budget = 4;
+        assert!(read_inventory_bytes(&mut equality, &mut equality_budget, |_| {}).is_err());
+        assert_eq!(equality.position(), 4);
+        let mut complete = std::io::Cursor::new(b"1234".to_vec());
+        let mut enough = 5;
+        read_inventory_bytes(&mut complete, &mut enough, |_| {}).unwrap();
+        assert_eq!(enough, 1);
     }
 }

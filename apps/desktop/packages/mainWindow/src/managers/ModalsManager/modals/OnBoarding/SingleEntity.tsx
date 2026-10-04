@@ -1,8 +1,8 @@
 import { rspc, queryClient } from "@/utils/rspcClient"
+import { extractErrorDisplay } from "@/utils/rspcErrorText"
 import {
   ImportEntityStatus,
-  ImportableInstance,
-  InvalidImportEntry
+  ImportableInstance
 } from "@gd/core_module/bindings"
 import {
   Button,
@@ -20,18 +20,21 @@ import {
   Show,
   Switch,
   createEffect,
-  createSignal
+  createSignal,
+  onCleanup
 } from "solid-js"
 import { createAsyncEffect } from "@/utils/asyncEffect"
 import { createStore } from "solid-js/store"
 import SingleCheckBox from "./SingleCheckBox"
+import { createImportBatch } from "./importBatch"
+import { scanRows, type ScanRow } from "./importSelection"
 import { Trans, useTransContext } from "@gd/i18n"
 import { getImportErrorTranslationKey } from "@gd/i18n/helpers"
 import { ENTITIES } from "@/utils/constants"
 import { useModal } from "../.."
 
 const [instances, setInstances] = createSignal<string[]>([])
-const [globalInstances, setGlobalInstances] = createSignal<any[]>([])
+const [globalInstances, setGlobalInstances] = createSignal<ScanRow[]>([])
 export { instances, setInstances, globalInstances }
 
 const SingleEntity = (props: {
@@ -43,11 +46,21 @@ const SingleEntity = (props: {
   const [path, setPath] = createSignal<string | undefined>(undefined)
   const [inputValue, setInputValue] = createSignal(path())
   const [isImporting, setIsImporting] = createSignal(false)
+  const [session, setSession] = createSignal<string>()
+  const [requestError, setRequestError] = createSignal<string>()
+  const cancelScan = rspc.createMutation(() => ({
+    mutationKey: ["instance.cancelImportScan"]
+  }))
+  onCleanup(() => {
+    ++scanRequest
+    setSession(undefined)
+    void cancelScan.mutateAsync(undefined)
+  })
 
   const [instance, setInstance] = createStore<{
     noResult: string | undefined
-    singleResult: ImportableInstance | undefined
-    multiResult: (ImportableInstance | InvalidImportEntry)[] | undefined
+    singleResult: (ImportableInstance & ScanRow) | undefined
+    multiResult: ScanRow[] | undefined
     isLoading?: boolean
   }>({
     noResult: undefined,
@@ -67,41 +80,69 @@ const SingleEntity = (props: {
     mutationKey: ["instance.importInstance"]
   }))
 
+  const runBatch = createImportBatch()
   const handleBeginImport = async () => {
-    setIsImporting(true)
-
-    // Fire all import requests in parallel (backend will queue them)
-    const importPromises = instances().map((filename) => {
-      const index = globalInstances().findIndex(
-        (x: any) => x.filename === filename
-      )
-      // filename is only the selection key and is often a UUID
-      const entry = globalInstances()[index]
-      return importInstanceMutation
-        .mutateAsync({
-          name: entry?.instance_name || filename,
-          index
-        })
-        .catch((error) => {
-          console.error("Import failed:", error)
-        })
+    const currentSession = session()
+    if (!currentSession) return
+    setRequestError(undefined)
+    await runBatch({
+      session: currentSession,
+      selectionIds: instances(),
+      rows: globalInstances(),
+      submit: (request) => importInstanceMutation.mutateAsync(request),
+      currentSession: session,
+      setBusy: setIsImporting,
+      removeSelections: (ids) =>
+        setInstances((selected) => selected.filter((id) => !ids.includes(id))),
+      // The translated text already says to rescan; the causes (English,
+      // and for a refused request also in the global toast) go to the log.
+      onUncertain: (errors) => {
+        console.warn("[import] Batch outcome uncertain:", errors)
+        setRequestError(t("instances:_trn_import_batch_uncertain"))
+      },
+      onSuccess: () => modalsContext?.closeModal()
     })
+  }
 
-    // Wait for all mutation calls to be sent
-    await Promise.all(importPromises)
+  let scanRequest = 0
+  const startScan = async (currentPath: string | undefined) => {
+    const request = ++scanRequest
+    setSession(undefined)
+    setInstances([])
+    setGlobalInstances([])
+    setRequestError(undefined)
+    if (!currentPath) {
+      await cancelScan.mutateAsync(undefined)
+      return undefined
+    }
+    const newSession = await scanImportableInstancesMutation.mutateAsync([
+      props.entity.entity,
+      currentPath
+    ])
+    if (request === scanRequest) setSession(newSession)
+  }
 
-    // Close modal after all requests are fired
-    modalsContext?.closeModal()
+  const retryScan = async () => {
+    try {
+      await startScan(path())
+    } catch (error) {
+      setRequestError(extractErrorDisplay(error))
+    }
   }
 
   const importScanStatus = rspc.createQuery(() => ({
     queryKey: ["instance.getImportScanStatus"]
   }))
 
+  const rowWarnings = (entry: ImportableInstance | undefined) =>
+    entry?.warnings.map((warning) =>
+      t(getImportErrorTranslationKey(warning.translation))
+    )
+
   const selectableFilenames = () =>
     (instance.multiResult ?? [])
-      .filter((entry): entry is ImportableInstance => "filename" in entry)
-      .map((entry) => entry.filename)
+      .filter((entry) => "filename" in entry)
+      .map((entry) => entry.selectionId)
 
   createEffect(() => {
     if (!entityDefaultPath.data) {
@@ -114,12 +155,7 @@ const SingleEntity = (props: {
   createAsyncEffect<string>((isStale, _prevPath) => {
     const currentPath = path()
 
-    const mutation = currentPath
-      ? scanImportableInstancesMutation.mutateAsync([
-          props.entity.entity,
-          currentPath
-        ])
-      : scanImportableInstancesMutation.mutateAsync([props.entity.entity, ""])
+    const mutation = startScan(currentPath)
 
     mutation
       .then(() => {
@@ -131,7 +167,7 @@ const SingleEntity = (props: {
         }
       })
       .catch((error) => {
-        console.error("Failed to scan importable instances:", error)
+        if (!isStale()) setRequestError(extractErrorDisplay(error))
       })
 
     return currentPath
@@ -139,6 +175,15 @@ const SingleEntity = (props: {
 
   createEffect(() => {
     const status = importScanStatus.data
+    if (!status || !session() || status.session !== session()) {
+      setInstance({
+        noResult: undefined,
+        singleResult: undefined,
+        multiResult: undefined,
+        isLoading: !!path()
+      })
+      return
+    }
     if (status) {
       const data = status.status
       if (status.scanning) {
@@ -153,35 +198,27 @@ const SingleEntity = (props: {
         if ("SingleResult" in data) {
           const res = data.SingleResult
           if ("Valid" in res) {
-            setGlobalInstances([res.Valid])
+            setGlobalInstances(scanRows([res], status.session))
             setInstance({
-              singleResult: res.Valid,
+              singleResult: scanRows(
+                [res],
+                status.session
+              )[0] as ImportableInstance & ScanRow,
               multiResult: undefined,
               noResult: undefined,
               isLoading: false
             })
           } else {
-            setGlobalInstances([res.Invalid])
+            setGlobalInstances(scanRows([res], status.session))
             setInstance({
               singleResult: undefined,
-              multiResult: [res.Invalid],
+              multiResult: scanRows([res], status.session),
               noResult: undefined,
               isLoading: false
             })
           }
         } else if ("MultiResult" in data) {
-          const entries = data.MultiResult.map((e) =>
-            "Valid" in e ? e.Valid : e.Invalid
-          ).sort((a, b) => {
-            const aValid = "filename" in a
-            const bValid = "filename" in b
-            if (aValid !== bValid) return aValid ? -1 : 1
-            const aName = "filename" in a ? a.instance_name : a.name
-            const bName = "filename" in b ? b.instance_name : b.name
-            return aName.localeCompare(bName, undefined, {
-              sensitivity: "base"
-            })
-          })
+          const entries = scanRows(data.MultiResult, status.session)
           setGlobalInstances(entries)
           setInstance({
             multiResult: entries,
@@ -334,6 +371,23 @@ const SingleEntity = (props: {
         </div>
       </div>
 
+      <Show
+        when={
+          requestError() ||
+          (importScanStatus.data?.session === session() &&
+            importScanStatus.data?.error)
+        }
+      >
+        <div role="alert" class="px-4 pb-3">
+          <p>{t("instances:_trn_import_scan_failed")}</p>
+          <p class="break-words text-sm">
+            {requestError() || importScanStatus.data?.error}
+          </p>
+          <Button type="secondary" onClick={retryScan}>
+            {t("instances:_trn_import_retry")}
+          </Button>
+        </div>
+      </Show>
       {/* Selection Header - fixed outside scroll */}
       <Show
         when={
@@ -373,7 +427,8 @@ const SingleEntity = (props: {
               <Show
                 when={
                   importScanStatus.data?.status === "NoResults" &&
-                  !importScanStatus.data?.scanning
+                  !importScanStatus.data?.scanning &&
+                  !importScanStatus.data?.error
                 }
               >
                 <div class="bg-darkSlate-800 flex h-40 w-full flex-col items-center justify-center gap-2 rounded-lg">
@@ -397,6 +452,8 @@ const SingleEntity = (props: {
                     <SingleCheckBox
                       title={entry.instance_name}
                       filename={entry.filename}
+                      selectionId={entry.selectionId}
+                      warnings={rowWarnings(entry)}
                       setList={setInstances}
                     />
                   ) : (
@@ -416,6 +473,8 @@ const SingleEntity = (props: {
               <SingleCheckBox
                 title={instance.singleResult?.instance_name}
                 filename={instance.singleResult?.filename}
+                selectionId={instance.singleResult?.selectionId}
+                warnings={rowWarnings(instance.singleResult)}
                 setList={setInstances}
               />
             </div>
@@ -441,7 +500,13 @@ const SingleEntity = (props: {
         </Button>
 
         <Button
-          disabled={instances().length === 0 || isImporting()}
+          disabled={
+            instances().length === 0 ||
+            isImporting() ||
+            !session() ||
+            importScanStatus.data?.scanning ||
+            importScanStatus.data?.session !== session()
+          }
           loading={isImporting()}
           type="primary"
           onClick={handleBeginImport}

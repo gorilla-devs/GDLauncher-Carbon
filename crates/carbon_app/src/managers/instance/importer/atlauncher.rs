@@ -43,9 +43,11 @@ struct Importable {
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
+        let warnings = value.settings.warnings();
         Self {
             filename: value.filename,
             instance_name: value.name,
+            warnings,
         }
     }
 }
@@ -87,7 +89,7 @@ impl AtLauncherImporter {
             .and_then(|text| serde_json::from_str::<serde_json::Value>(&text).ok())
             .and_then(|value| parse_instance_json(&value, &filename));
 
-        let Some(parsed) = parsed else {
+        let Some(mut parsed) = parsed else {
             warn!("Cannot read ATLauncher instance metadata at {json_path:?}");
             return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
                 name: filename,
@@ -95,6 +97,9 @@ impl AtLauncherImporter {
             })));
         };
 
+        // A JDK removed or updated since it was picked would stop every launch;
+        // the worlds and mods still come across and GDLauncher picks Java.
+        parsed.settings.skip_missing_java_path();
         let icon_path = find_icon(&path, parsed.pack_name.as_deref());
 
         Ok(Some(InternalImportEntry::Valid(Importable {
@@ -128,7 +133,7 @@ impl InstanceImporter for AtLauncherImporter {
         }
 
         if scan_path.join("instance.json").is_file() {
-            if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
+            if let Some(entry) = self.scan_instance(scan_path).await? {
                 self.state.write().await.set_single(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
@@ -141,9 +146,7 @@ impl InstanceImporter for AtLauncherImporter {
             scan_path
         };
 
-        let Ok(mut dir) = tokio::fs::read_dir(&instances_dir).await else {
-            return Ok(());
-        };
+        let mut dir = super::common::scan_directory(&instances_dir).await?;
 
         while let Some(entry) = dir.next_entry().await? {
             let entry_path = entry.path();
@@ -151,7 +154,7 @@ impl InstanceImporter for AtLauncherImporter {
                 continue;
             }
 
-            if let Ok(Some(entry)) = self.scan_instance(entry_path).await {
+            if let Some(entry) = self.scan_instance(entry_path).await? {
                 self.state.write().await.push_multi(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
@@ -335,7 +338,17 @@ fn instance_settings(launcher: Option<&serde_json::Value>) -> ImportedSettings {
     let mut settings = ImportedSettings {
         notes: json_trimmed_string(launcher, "description"),
         memory_max_mb: json_positive_u32(launcher, "maximumMemory"),
-        java_path: json_trimmed_string(launcher, "javaPath"),
+        java_path: json_trimmed_string(launcher, "javaPath").map(|value| {
+            let path = PathBuf::from(&value);
+            if path.is_dir() {
+                path.join("bin")
+                    .join(if cfg!(windows) { "java.exe" } else { "java" })
+                    .to_string_lossy()
+                    .into_owned()
+            } else {
+                value
+            }
+        }),
         ..Default::default()
     };
 
@@ -674,5 +687,76 @@ mod test {
                 .unwrap()
                 .is_none()
         );
+    }
+}
+
+#[cfg(test)]
+mod task13_tests {
+    use super::*;
+    #[test]
+    fn task13_java_home_maps_to_binary() {
+        let t = tempfile::tempdir().unwrap();
+        let binary = t
+            .path()
+            .join("bin")
+            .join(if cfg!(windows) { "java.exe" } else { "java" });
+        std::fs::create_dir_all(binary.parent().unwrap()).unwrap();
+        std::fs::write(&binary, b"synthetic, never execute").unwrap();
+        let settings = instance_settings(Some(&serde_json::json!({"javaPath":t.path()})));
+        assert_eq!(settings.java_path.as_deref(), binary.to_str());
+    }
+}
+
+#[cfg(test)]
+mod task13_java_controls {
+    use super::*;
+    #[tokio::test]
+    async fn task13_java_binary_and_unavailable_home_scan() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("Synthetic");
+        let home = t.path().join("java-home");
+        let binary = home
+            .join("bin")
+            .join(if cfg!(windows) { "java.exe" } else { "java" });
+        std::fs::create_dir(&root).unwrap();
+        std::fs::create_dir_all(binary.parent().unwrap()).unwrap();
+        std::fs::write(&binary, b"synthetic never executed").unwrap();
+        for declared in [&home, &binary] {
+            std::fs::write(
+                root.join("instance.json"),
+                serde_json::json!({"id":"1.20.1","launcher":{"javaPath":declared}}).to_string(),
+            )
+            .unwrap();
+            let Some(InternalImportEntry::Valid(entry)) = AtLauncherImporter::new()
+                .scan_instance(root.clone())
+                .await
+                .unwrap()
+            else {
+                panic!("usable Java declaration rejected")
+            };
+            assert_eq!(entry.settings.java_path.as_deref(), binary.to_str());
+        }
+        std::fs::remove_file(&binary).unwrap();
+        for declared in [&home, &binary] {
+            std::fs::write(
+                root.join("instance.json"),
+                serde_json::json!({"id":"1.20.1","launcher":{"javaPath":declared}}).to_string(),
+            )
+            .unwrap();
+            // A stale Java path no longer blocks the instance: it imports
+            // without the override and the row says why.
+            let Some(InternalImportEntry::Valid(entry)) = AtLauncherImporter::new()
+                .scan_instance(root.clone())
+                .await
+                .unwrap()
+            else {
+                panic!("stale Java path refused the instance")
+            };
+            assert_eq!(entry.settings.java_path, None);
+            assert_eq!(
+                ImportableInstance::from(entry).warnings,
+                [Translation::InstanceImportJavaPathSkipped]
+            );
+        }
     }
 }

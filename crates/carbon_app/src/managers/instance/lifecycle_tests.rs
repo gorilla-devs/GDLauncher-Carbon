@@ -3028,7 +3028,431 @@ fn config_files(count: usize) -> Vec<(String, Vec<u8>)> {
 async fn prepared_pack(
     app: &crate::App,
     name: &str,
-) -> anyhow::Result<(InstanceId, PathBuf)> {
+    files: Vec<(String, Vec<u8>)>,
+) -> anyhow::Result<(
+    InstanceId,
+    PathBuf,
+    String,
+    Vec<(String, Vec<u8>)>,
+    run::modpack::TSubtasks,
+    Option<super::modpack::RepairMarkerFile>,
+    Option<super::modpack::session::Owner>,
+)> {
+    let (id, root) = fixture(app, name).await?;
+    task08_archive(
+        &root,
+        &files
+            .iter()
+            .map(|(path, bytes)| (path.as_str(), bytes.as_slice()))
+            .collect::<Vec<_>>(),
+    )?;
+    let (shortpath, config) = app.instance_manager().current_config(id).await?;
+    let task = crate::managers::vtask::VisualTask::new(
+        crate::api::translation::Translation::InstanceTaskPrepare {
+            name: "fixture".into(),
+        },
+    );
+    let mut owner = None;
+    let (subtasks, _, options, _) = run::modpack::process_modpack(
+        app.clone(),
+        id,
+        true,
+        config,
+        shortpath.clone(),
+        &task,
+        true,
+        &mut owner,
+    )
+    .await?;
+    Ok((id, root, shortpath, files, subtasks, options, owner))
+}
+
+/// An apply stopped halfway leaves its published files as second names of
+/// the staged originals, so a config edited in place before the retry is
+/// edited in staging too. The retry must not refuse that as a changed
+/// original, and it keeps the edit.
+#[tokio::test]
+async fn resumed_apply_keeps_an_in_place_edit_of_a_published_file() -> anyhow::Result<()> {
+    use run::modpack::staging_test::fail_io;
+    use std::io::Write;
+    const EDITED: &[u8] = b"{\"edited\":true}";
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, shortpath, files, subtasks, options, owner) =
+        prepared_pack(&app, "resume-in-place-edit", config_files(8)).await?;
+    let live = |i: usize| root.join("instance").join(&files[i].0);
+    let staged = |i: usize| {
+        root.join(".setup")
+            .join("staging")
+            .join("instance")
+            .join(&files[i].0)
+    };
+
+    fail_io("link", live(4));
+    assert!(
+        run::modpack::process_modpack_staging(
+            app.clone(),
+            id,
+            shortpath.clone(),
+            &subtasks,
+            options.clone(),
+            None,
+            owner.as_ref(),
+        )
+        .await
+        .is_err()
+    );
+    for i in 0..4 {
+        assert!(same_file::is_same_file(live(i), staged(i))?);
+    }
+    assert!(!live(4).exists());
+
+    std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(live(1))?
+        .write_all(EDITED)?;
+    assert_eq!(std::fs::read(staged(1))?, EDITED);
+
+    run::modpack::process_modpack_staging(
+        app.clone(),
+        id,
+        shortpath,
+        &subtasks,
+        options,
+        None,
+        owner.as_ref(),
+    )
+    .await?;
+
+    for (i, (path, bytes)) in files.iter().enumerate() {
+        let expected = if i == 1 { EDITED } else { bytes.as_slice() };
+        assert_eq!(
+            tokio::fs::read(root.join("instance").join(path)).await?,
+            expected
+        );
+    }
+    assert!(!root.join(".setup/staging").exists());
+    let audit = tokio::fs::read_to_string(root.join(".install_audit/audit.txt")).await?;
+    assert!(
+        audit.contains("/config/pack/f01.json: already present"),
+        "{audit}"
+    );
+    Ok(())
+}
+
+/// An in-place edit of a published file also edits its staged original, and
+/// deleting or replacing the file afterwards leaves that original no longer
+/// matching the pack. The retry must not refuse it forever (an Applying setup
+/// cannot be cancelled): it finishes, keeps what the user did, and says how
+/// to get the pack's version back.
+#[tokio::test]
+async fn resumed_apply_finishes_after_a_published_file_is_edited_then_removed() -> anyhow::Result<()>
+{
+    use run::modpack::staging_test::fail_io;
+    use std::io::Write;
+    const REPLACEMENT: &[u8] = b"{\"replaced\":true}";
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, shortpath, files, subtasks, options, owner) =
+        prepared_pack(&app, "resume-edit-then-remove", config_files(8)).await?;
+    let live = |i: usize| root.join("instance").join(&files[i].0);
+
+    fail_io("link", live(4));
+    assert!(
+        run::modpack::process_modpack_staging(
+            app.clone(),
+            id,
+            shortpath.clone(),
+            &subtasks,
+            options.clone(),
+            None,
+            owner.as_ref(),
+        )
+        .await
+        .is_err()
+    );
+    for i in [1, 2] {
+        std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .open(live(i))?
+            .write_all(b"{\"edited\":true}")?;
+    }
+    // Deleted to "reset" it, and replaced by a tool that writes a new file.
+    std::fs::remove_file(live(1))?;
+    let fresh = root.join("instance/config/pack/.fresh");
+    std::fs::write(&fresh, REPLACEMENT)?;
+    std::fs::rename(&fresh, live(2))?;
+
+    run::modpack::process_modpack_staging(
+        app.clone(),
+        id,
+        shortpath,
+        &subtasks,
+        options,
+        None,
+        owner.as_ref(),
+    )
+    .await?;
+
+    assert!(!live(1).exists());
+    assert_eq!(std::fs::read(live(2))?, REPLACEMENT);
+    for (i, (path, bytes)) in files
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| ![1, 2].contains(i))
+    {
+        assert_eq!(
+            &std::fs::read(root.join("instance").join(path))?,
+            bytes,
+            "file {i}"
+        );
+    }
+    assert!(!root.join(".setup/staging").exists());
+    let audit = tokio::fs::read_to_string(root.join(".install_audit/audit.txt")).await?;
+    assert!(
+        audit.contains("/config/pack/f01.json: deleted by user"),
+        "{audit}"
+    );
+    assert!(
+        audit.contains(
+            "/config/pack/f01.json was changed while this setup was interrupted, so the \
+             modpack's copy of it could not be installed. Use Repair Modpack to restore it."
+        ),
+        "{audit}"
+    );
+    assert!(
+        audit.contains("/config/pack/f02.json: already present"),
+        "{audit}"
+    );
+    Ok(())
+}
+
+/// Files the first attempt linked before it failed get their folders synced
+/// by the retry, before Applied, although the retry publishes nothing there.
+#[cfg(not(windows))]
+#[tokio::test]
+async fn resumed_apply_syncs_the_folders_its_first_attempt_linked() -> anyhow::Result<()> {
+    use run::modpack::staging_test::{fail_io, syncs_under};
+    let app = crate::setup_managers_for_test().await;
+    let files = [
+        "config/a/one.json",
+        "config/a/two.json",
+        "config/b/three.json",
+    ]
+    .iter()
+    .map(|path| (path.to_string(), path.as_bytes().to_vec()))
+    .collect();
+    let (id, root, shortpath, files, subtasks, options, owner) =
+        prepared_pack(&app, "resume-folder-syncs", files).await?;
+    let data = root.join("instance");
+
+    fail_io("link", data.join("config/b/three.json"));
+    assert!(
+        run::modpack::process_modpack_staging(
+            app.clone(),
+            id,
+            shortpath.clone(),
+            &subtasks,
+            options.clone(),
+            None,
+            owner.as_ref(),
+        )
+        .await
+        .is_err()
+    );
+    assert!(data.join("config/a/two.json").exists());
+    assert_eq!(syncs_under(&data), HashMap::new());
+
+    run::modpack::process_modpack_staging(
+        app.clone(),
+        id,
+        shortpath,
+        &subtasks,
+        options,
+        None,
+        owner.as_ref(),
+    )
+    .await?;
+
+    for (path, bytes) in &files {
+        assert_eq!(&std::fs::read(data.join(path))?, bytes);
+    }
+    let expected: HashMap<PathBuf, usize> = [
+        data.clone(),
+        data.join("config"),
+        data.join("config/a"),
+        data.join("config/b"),
+    ]
+    .into_iter()
+    .map(|folder| (folder, 1))
+    .collect();
+    assert_eq!(syncs_under(&data), expected);
+    Ok(())
+}
+
+/// The staged pack is read in full once per apply, right before anything is
+/// published. Binding the target and publishing the preparation records do
+/// not re-hash what the preparation scan hashed moments earlier.
+#[tokio::test]
+async fn staged_sources_are_hashed_once_per_apply() -> anyhow::Result<()> {
+    use super::modpack::origin_check::hash_count;
+    const FILES: usize = 20;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, shortpath, files, subtasks, options, owner) =
+        prepared_pack(&app, "hashed-once", config_files(FILES)).await?;
+    let archive = root.join(".setup/modrinth");
+    let staged_hashes = || {
+        let mut counts = hash_count::under(&root.join(".setup"));
+        counts.remove(&archive);
+        counts
+    };
+    assert_eq!(
+        staged_hashes(),
+        HashMap::new(),
+        "preparation re-hashed its staged files"
+    );
+
+    run::modpack::process_modpack_staging(
+        app.clone(),
+        id,
+        shortpath,
+        &subtasks,
+        options,
+        None,
+        owner.as_ref(),
+    )
+    .await?;
+
+    let staging = root.join(".setup").join("staging").join("instance");
+    let expected: HashMap<_, _> = files
+        .iter()
+        .map(|(path, _)| (staging.join(path), 1))
+        .collect();
+    assert_eq!(staged_hashes(), expected);
+    Ok(())
+}
+
+/// A fresh install links its files without flushing each one. Every folder
+/// it published into (and those it created above them) is synced once, and
+/// while the setup is still Applying: committing deletes the staged names
+/// right after Applied is saved.
+#[cfg(not(windows))]
+#[tokio::test]
+async fn fresh_install_syncs_each_published_folder_once_before_applied() -> anyhow::Result<()> {
+    use run::modpack::staging_test::{hook, syncs_under};
+    let app = crate::setup_managers_for_test().await;
+    let files = [
+        "options.txt",
+        "config/pack/a.json",
+        "config/pack/b.json",
+        "kubejs/server_scripts/c.js",
+        "kubejs/server_scripts/d.js",
+    ]
+    .iter()
+    .map(|path| (path.to_string(), path.as_bytes().to_vec()))
+    .collect();
+    let (id, root, shortpath, files, subtasks, options, owner) =
+        prepared_pack(&app, "folder-syncs", files).await?;
+    let data = root.join("instance");
+    let phases = Arc::new(StdMutex::new(Vec::new()));
+    for folder in [data.join("config/pack"), data.clone()] {
+        let (phases, record) = (phases.clone(), root.join(".setup/setup-session.json"));
+        hook("sync-directory", folder, move || {
+            let session: serde_json::Value =
+                serde_json::from_slice(&std::fs::read(record).unwrap()).unwrap();
+            phases.lock().unwrap().push(session["phase"].clone());
+        });
+    }
+
+    run::modpack::process_modpack_staging(
+        app.clone(),
+        id,
+        shortpath,
+        &subtasks,
+        options,
+        None,
+        owner.as_ref(),
+    )
+    .await?;
+
+    for (path, bytes) in &files {
+        assert_eq!(&std::fs::read(data.join(path))?, bytes);
+    }
+    let expected: HashMap<PathBuf, usize> = [
+        data.clone(),
+        data.join("config"),
+        data.join("config/pack"),
+        data.join("kubejs"),
+        data.join("kubejs/server_scripts"),
+    ]
+    .into_iter()
+    .map(|folder| (folder, 1))
+    .collect();
+    assert_eq!(syncs_under(&data), expected);
+    assert_eq!(*phases.lock().unwrap(), ["Applying", "Applying"]);
+    Ok(())
+}
+
+fn task08_round2_cf_archive(root: &Path) -> anyhow::Result<()> {
+    use std::io::Write;
+    let mut zip = zip::ZipWriter::new(std::fs::File::create(root.join(".setup/curseforge"))?);
+    zip.start_file("manifest.json", zip::write::SimpleFileOptions::default())?;
+    zip.write_all(&serde_json::to_vec(&serde_json::json!({
+        "minecraft":{"version":"1.20.1","modLoaders":[]},"manifestType":"minecraftModpack","manifestVersion":1,
+        "name":"synthetic CF","version":"B","author":"fixture","overrides":"overrides",
+        "files":[{"projectID":100,"fileID":1000,"required":true},{"projectID":200,"fileID":2000,"required":true}]
+    }))?)?;
+    zip.finish()?;
+    Ok(())
+}
+fn task08_round2_cf_metadata() -> serde_json::Value {
+    use sha2::Digest;
+    let bytes = b"original downloadable";
+    let file = |id, mod_id, name| {
+        serde_json::json!({"id":id,"gameId":432,"modId":mod_id,"isAvailable":true,"displayName":name,"fileName":name,
+        "releaseType":1,"fileStatus":4,"hashes":[{"algo":2,"value":hex::encode(md5::Md5::digest(bytes))},{"algo":1,"value":hex::encode(sha1::Sha1::digest(bytes))}],
+        "fileDate":"2026-01-01T00:00:00Z","fileLength":bytes.len(),"downloadCount":0,"downloadUrl":"https://task08.invalid/original.jar",
+        "gameVersions":["1.20.1"],"sortableGameVersions":[],"dependencies":[],"fileFingerprint":0})
+    };
+    serde_json::json!({"minecraft":{"latest":{"release":"1.20.1","snapshot":"1.20.1"},"versions":[{
+        "id":"1.20.1","type":"release","url":"https://task08.invalid/version.json","time":"2026-01-01T00:00:00Z","releaseTime":"2026-01-01T00:00:00Z","sha1":"0000000000000000000000000000000000000000","complianceLevel":1}]},
+        "classes":{"100":6,"200":6},"files":{"1000":file(1000,100,"a.jar"),"2000":file(2000,200,"b.jar")}})
+}
+#[tokio::test]
+async fn task08_round2_cf_legacy_before() -> anyhow::Result<()> {
+    task08_round1_reenable(false, "legacy", true).await
+}
+#[tokio::test]
+async fn task08_round2_cf_legacy_after() -> anyhow::Result<()> {
+    task08_round1_reenable(true, "legacy", true).await
+}
+#[tokio::test]
+async fn task08_round2_cf_copy_before() -> anyhow::Result<()> {
+    task08_round1_reenable(false, "copy", true).await
+}
+#[tokio::test]
+async fn task08_round2_cf_copy_after() -> anyhow::Result<()> {
+    task08_round1_reenable(true, "copy", true).await
+}
+
+fn task08_round2_pack(version: &str) -> info::Modpack {
+    info::Modpack::Modrinth(info::ModrinthModpack {
+        project_id: "synthetic".into(),
+        version_id: version.into(),
+    })
+}
+/// A linked pack at version A with no setup and no `packinfo.json`, like a
+/// 2.0.40 import. A version change first records what A installed; the
+/// returned guard supplies that inventory, so no provider is asked for the
+/// synthetic version.
+async fn task08_round2_change_fixture(
+    app: &crate::App,
+    name: &str,
+) -> anyhow::Result<(
+    InstanceId,
+    PathBuf,
+    super::modpack::inventory_fixture::Guard,
+)> {
     let (id, root) = fixture(app, name).await?;
     tokio::fs::remove_dir_all(root.join(".setup")).await?;
     let (shortpath, mut config) = app.instance_manager().current_config(id).await?;
@@ -3039,7 +3463,8 @@ async fn prepared_pack(
     app.instance_manager()
         .persist_config(id, &shortpath, config)
         .await?;
-    Ok((id, root))
+    let inventory = super::modpack::inventory_fixture::set(root.clone(), Default::default());
+    Ok((id, root, inventory))
 }
 async fn task08_round2_wait_failed(app: &crate::App, id: InstanceId) -> anyhow::Result<()> {
     tokio::time::timeout(Duration::from_secs(5), async {
@@ -3060,25 +3485,19 @@ async fn task08_round2_wait_failed(app: &crate::App, id: InstanceId) -> anyhow::
     .await??;
     Ok(())
 }
-
-/// An apply stopped halfway leaves its published files as second names of
-/// the staged originals, so a config edited in place before the retry is
-/// edited in staging too. The retry must not refuse that as a changed
-/// original, and it keeps the edit.
 #[tokio::test]
-async fn resumed_apply_keeps_an_in_place_edit_of_a_published_file() -> anyhow::Result<()> {
-    use run::modpack::staging_test::fail_io;
-    use std::io::Write;
-    const EDITED: &[u8] = b"{\"edited\":true}";
+async fn task08_round2_request_drop_keeps_real_producer_owned() -> anyhow::Result<()> {
+    use super::modpack::session::{self, Session};
     let app = crate::setup_managers_for_test().await;
-    let (id, root) = task08_round2_change_fixture(&app, "producer-drop").await?;
+    let (id, root, _inventory) = task08_round2_change_fixture(&app, "producer-drop").await?;
     let permit = app
         .instance_manager
         .persistence_manager
         .instance_download_lock
         .acquire()
         .await?;
-    let pause = session::publication_fixture::arm(root.join(".setup/setup-session.json"));
+    // A request's setup is written beside `.setup`, its record last.
+    let pause = session::publication_fixture::arm_replacement(&root, session::RECORD);
     let before_handoff = app
         .instance_manager
         .test_hooks
@@ -3195,7 +3614,7 @@ async fn task08_round2_baseline_recorded(root: &Path) -> anyhow::Result<()> {
         serde_json::from_slice(&tokio::fs::read(root.join("packinfo.json")).await?)?;
     assert_eq!(
         record["verified_import_inventory"],
-        serde_json::json!({"schema": 1, "declared_files": 0})
+        serde_json::json!({"schema": 1, "declared_files": 0, "unchecked_files": 0})
     );
     Ok(())
 }
@@ -3228,7 +3647,7 @@ async fn task08_round2_settled(app: &crate::App, id: InstanceId) -> anyhow::Resu
 async fn task08_round2_normal_producer_returns_and_hands_off() -> anyhow::Result<()> {
     use super::modpack::session::Session;
     let app = crate::setup_managers_for_test().await;
-    let (id, root) = task08_round2_change_fixture(&app, "producer-normal").await?;
+    let (id, root, _inventory) = task08_round2_change_fixture(&app, "producer-normal").await?;
     let permit = app
         .instance_manager
         .persistence_manager
@@ -3271,29 +3690,163 @@ async fn task08_round2_normal_producer_returns_and_hands_off() -> anyhow::Result
     task08_round2_settled(&app, id).await
 }
 
-async fn task08_round2_producer_io_error(drop_request: bool) -> anyhow::Result<()> {
-    use super::modpack::session;
+/// A linked pack whose installed version the platform no longer serves
+/// still changes version (2.0.40 did): nothing is recorded, so the change
+/// keeps every file in place, and its task says why once it succeeds.
+#[tokio::test]
+async fn task08_round2_removed_installed_version_changes_without_a_record() -> anyhow::Result<()> {
+    use super::modpack::{inventory_fixture, session::Session};
+    use crate::domain::vtask::{DependencyPlatform, PreviousPackFilesReason, TaskWarning};
     let app = crate::setup_managers_for_test().await;
-    let (id, root) = task08_round2_change_fixture(&app, "producer-io-error").await?;
-    let pause = session::publication_fixture::arm(root.join(".setup/setup-session.json"));
-    let request = app
+    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-gone").await?;
+    drop(inventory);
+    let _gone = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Gone);
+    let permit = app
+        .instance_manager
+        .persistence_manager
+        .instance_download_lock
+        .acquire()
+        .await?;
+    let task = tokio::time::timeout(
+        Duration::from_secs(5),
+        app.instance_manager()
+            .change_modpack(id, task08_round2_pack("B")),
+    )
+    .await??;
+    assert!(
+        matches!(app.instance_manager.instances.read().await[&id].data()?.state, run::LaunchState::Queued(current) if current == task)
+    );
+    let saved = Session::load(&root).await?.unwrap();
+    assert_eq!(saved.instance_id, Some(id.0));
+    assert!(!root.join("packinfo.json").exists());
+    assert_eq!(
+        app.task_manager().running_task_warnings(task).await,
+        Some(vec![TaskWarning::PreviousPackFilesKept {
+            platform: DependencyPlatform::Modrinth,
+            reason: PreviousPackFilesReason::VersionUnavailable,
+        }])
+    );
+    tokio::fs::write(
+        root.join(".setup/setup-session.json"),
+        b"controlled invalid session",
+    )
+    .await?;
+    drop(permit);
+    task08_round2_settled(&app, id).await
+}
+
+/// The whole fallback through the real worker, up to the game install: a
+/// first attempt fails after the request, and pressing Play finishes the
+/// setup under another task, which still says why old files were kept. The
+/// change plans without a record, so every old file survives and the new
+/// version's record takes over.
+#[tokio::test]
+async fn task08_round2_removed_installed_version_applies_and_warns_when_resumed()
+-> anyhow::Result<()> {
+    use super::modpack::{inventory_fixture, session::Session};
+    use crate::domain::vtask::{DependencyPlatform, PreviousPackFilesReason, TaskWarning};
+    let kept = vec![TaskWarning::PreviousPackFilesKept {
+        platform: DependencyPlatform::Modrinth,
+        reason: PreviousPackFilesReason::VersionUnavailable,
+    }];
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-gone-apply").await?;
+    drop(inventory);
+    let _gone = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Gone);
+    tokio::fs::create_dir_all(root.join("instance/mods")).await?;
+    tokio::fs::write(root.join("instance/mods/old-a.jar"), b"old version").await?;
+    tokio::fs::write(root.join("instance/mods/mine.jar"), b"the user's").await?;
+    let permit = app
+        .instance_manager
+        .persistence_manager
+        .instance_download_lock
+        .acquire()
+        .await?;
+    let first = app
         .instance_manager()
-        .change_modpack(id, task08_round2_pack("B"));
-    let mut request = Box::pin(request);
-    tokio::select! {
-        _ = pause.entered.notified() => {},
-        result = &mut request => panic!("request missed publication: {result:?}"),
-        _ = tokio::time::sleep(Duration::from_secs(5)) => panic!("publication wait timed out"),
-    }
+        .change_modpack(id, task08_round2_pack("B"))
+        .await?;
+    assert_eq!(
+        app.task_manager().running_task_warnings(first).await,
+        Some(kept.clone())
+    );
+    // The archive the first attempt reads is broken, so that attempt fails.
+    tokio::fs::write(root.join(".setup/modrinth"), b"not an archive").await?;
+    drop(permit);
+    task08_round2_wait_failed(&app, id).await?;
+    assert_eq!(
+        Session::load(&root).await?.unwrap().warnings,
+        kept,
+        "the setup keeps its warning when its task fails"
+    );
+
+    task08_round1_archive(&root, false)?;
+    let staged = app.instance_manager().test_hooks.arm("setup_staged", id);
+    let (_, resumed) = app
+        .instance_manager()
+        .prepare_game(id, None, None, false)
+        .await?;
+    assert_ne!(resumed, first);
+    tokio::time::timeout(Duration::from_secs(30), staged.entered.notified()).await?;
+    assert_eq!(
+        app.task_manager().running_task_warnings(resumed).await,
+        Some(kept),
+        "the task that finishes the setup reports it"
+    );
+    assert_eq!(
+        tokio::fs::read(root.join("instance/mods/old-a.jar")).await?,
+        b"old version"
+    );
+    assert_eq!(
+        tokio::fs::read(root.join("instance/mods/mine.jar")).await?,
+        b"the user's"
+    );
+    assert_eq!(
+        tokio::fs::read(root.join("instance/target.txt")).await?,
+        b"target"
+    );
+    let promoted: serde_json::Value =
+        serde_json::from_slice(&tokio::fs::read(root.join("packinfo.json")).await?)?;
+    assert!(promoted.get("verified_import_inventory").is_none());
+    Ok(())
+}
+
+/// Asking for the installed version when the platform no longer serves it
+/// could only fail, and would leave a setup in the way of Play: it is refused
+/// before anything changes, and picking another version still works.
+#[tokio::test]
+async fn task08_round2_removed_installed_version_cannot_be_requested_again() -> anyhow::Result<()> {
+    use super::modpack::inventory_fixture;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-gone-same").await?;
+    drop(inventory);
+    let _gone = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Gone);
+    let error = app
+        .instance_manager()
+        .change_modpack(id, task08_round2_pack("A"))
+        .await
+        .unwrap_err();
+    assert_eq!(
+        error.to_string(),
+        "This version is no longer available. Pick another version."
+    );
+    let presented = serde_json::to_value(crate::error::FeError::from_anyhow(&error))?;
+    assert_eq!(presented["cause"][0]["code"], "MODPACK_VERSION_GONE");
+    assert!(!root.join(".setup").exists());
+    assert!(!root.join("packinfo.json").exists());
     assert!(matches!(
         app.instance_manager.instances.read().await[&id]
             .data()?
             .state,
-        run::LaunchState::Queued(_)
+        run::LaunchState::Inactive { failed_task: None }
     ));
-    // Real returned publication I/O failure, retaining the original temp evidence.
-    tokio::fs::rename(root.join(".setup"), root.join(".setup-injected-failure")).await?;
-    tokio::fs::write(root.join(".setup"), b"controlled non-directory").await?;
+    // Real returned publication I/O failure: something already holds the
+    // record's name, so its no-replace publication fails on every OS. Nothing
+    // is moved while the writer holds its temporary file open (Windows
+    // refuses to rename a folder with an open file inside).
+    let next = task08_round2_replacement(&root)?;
+    assert!(next.join("change-pack-version.json").is_file());
+    tokio::fs::create_dir(next.join(session::RECORD)).await?;
     if drop_request {
         drop(request);
         assert!(
@@ -3311,16 +3864,251 @@ async fn task08_round2_producer_io_error(drop_request: bool) -> anyhow::Result<(
         );
     }
     task08_round2_settled(&app, id).await?;
-    assert_eq!(
-        tokio::fs::read(root.join(".setup")).await?,
-        b"controlled non-directory"
-    );
-    assert!(
-        !root
-            .join(".setup-injected-failure/change-pack-version.json")
-            .exists()
-    );
+    // The failure published no setup and removed the replacement it was
+    // writing, request included: its record, written last, never completed
+    // it. The baseline packinfo.json from the inventory step remains.
+    assert!(!root.join(".setup").exists());
+    assert!(root.join("packinfo.json").exists());
+    assert!(!app.instance_manager.version_change_checks.contains_key(&id));
     Ok(())
+}
+
+/// A request can wait for the gate behind one whose modal was closed. Cancel
+/// stops both, so no update starts behind the player's back.
+#[tokio::test]
+async fn task08_round2_cancel_stops_every_overlapping_change() -> anyhow::Result<()> {
+    use super::modpack::inventory_fixture;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-overlap").await?;
+    drop(inventory);
+    let _hang = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Hang);
+    let request = || {
+        let app = app.clone();
+        tokio::spawn(async move {
+            app.instance_manager()
+                .change_modpack(id, task08_round2_pack("B"))
+                .await
+        })
+    };
+    let (first, second) = (request(), request());
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while app
+            .instance_manager
+            .version_change_checks
+            .get(&id)
+            .is_none_or(|running| running.len() < 2)
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await?;
+    app.instance_manager().cancel_version_change_check(id);
+    for change in [first, second] {
+        let error = tokio::time::timeout(Duration::from_secs(5), change)
+            .await??
+            .unwrap_err();
+        let presented = serde_json::to_value(crate::error::FeError::from_anyhow(&error))?;
+        assert_eq!(presented["cause"][0]["code"], "MODPACK_CHECK_CANCELLED");
+    }
+    assert!(!root.join(".setup").exists());
+    assert!(!app.instance_manager.version_change_checks.contains_key(&id));
+    Ok(())
+}
+
+/// The player stops a check that is taking long: the change ends without a
+/// setup or a record, and the next attempt can run.
+#[tokio::test]
+async fn task08_round2_cancelled_check_leaves_the_instance_as_it_was() -> anyhow::Result<()> {
+    use super::modpack::inventory_fixture;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-cancelled").await?;
+    drop(inventory);
+    let hang = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Hang);
+    // Nothing to stop yet.
+    app.instance_manager().cancel_version_change_check(id);
+
+    // A request still waiting for the instance's gate stops too.
+    let gate = app.instance_manager().lock_instance(id).await;
+    let queued = {
+        let app = app.clone();
+        tokio::spawn(async move {
+            app.instance_manager()
+                .change_modpack(id, task08_round2_pack("B"))
+                .await
+        })
+    };
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !app.instance_manager.version_change_checks.contains_key(&id) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await?;
+    app.instance_manager().cancel_version_change_check(id);
+    let error = tokio::time::timeout(Duration::from_secs(5), queued)
+        .await??
+        .unwrap_err();
+    let presented = serde_json::to_value(crate::error::FeError::from_anyhow(&error))?;
+    assert_eq!(presented["cause"][0]["code"], "MODPACK_CHECK_CANCELLED");
+    drop(gate);
+
+    let change = {
+        let app = app.clone();
+        tokio::spawn(async move {
+            app.instance_manager()
+                .change_modpack(id, task08_round2_pack("B"))
+                .await
+        })
+    };
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !app.instance_manager.version_change_checks.contains_key(&id) {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await?;
+    app.instance_manager().cancel_version_change_check(id);
+    let error = tokio::time::timeout(Duration::from_secs(5), change)
+        .await??
+        .unwrap_err();
+    let presented = serde_json::to_value(crate::error::FeError::from_anyhow(&error))?;
+    assert_eq!(presented["cause"][0]["code"], "MODPACK_CHECK_CANCELLED");
+    assert!(!root.join(".setup").exists());
+    assert!(!root.join("packinfo.json").exists());
+    assert!(!app.instance_manager.version_change_checks.contains_key(&id));
+    assert!(matches!(
+        app.instance_manager.instances.read().await[&id]
+            .data()?
+            .state,
+        run::LaunchState::Inactive { failed_task: None }
+    ));
+
+    drop(hang);
+    let _inventory = inventory_fixture::set(root.clone(), Default::default());
+    let permit = app
+        .instance_manager
+        .persistence_manager
+        .instance_download_lock
+        .acquire()
+        .await?;
+    app.instance_manager()
+        .change_modpack(id, task08_round2_pack("B"))
+        .await?;
+    assert!(root.join("packinfo.json").exists());
+    tokio::fs::write(
+        root.join(".setup/setup-session.json"),
+        b"controlled invalid session",
+    )
+    .await?;
+    drop(permit);
+    task08_round2_settled(&app, id).await
+}
+
+/// The platform can't be reached: the change is refused with a way out, and
+/// nothing is recorded or set up.
+#[tokio::test]
+async fn task08_round2_unreachable_platform_refuses_the_change() -> anyhow::Result<()> {
+    use super::modpack::inventory_fixture;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-offline").await?;
+    drop(inventory);
+    let _offline =
+        inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Unreachable);
+    let error = tokio::time::timeout(
+        Duration::from_secs(5),
+        app.instance_manager()
+            .change_modpack(id, task08_round2_pack("B")),
+    )
+    .await?
+    .unwrap_err();
+    assert!(
+        error.to_string().starts_with("Could not reach Modrinth"),
+        "{error:#}"
+    );
+    assert!(!root.join("packinfo.json").exists());
+    assert!(!root.join(".setup").exists());
+    assert!(matches!(
+        app.instance_manager.instances.read().await[&id]
+            .data()?
+            .state,
+        run::LaunchState::Inactive { .. }
+    ));
+    Ok(())
+}
+
+async fn task08_round2_producer_io_error(drop_request: bool) -> anyhow::Result<()> {
+    use super::modpack::session;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, _inventory) = task08_round2_change_fixture(&app, "producer-io-error").await?;
+    let pause = session::publication_fixture::arm_replacement(&root, session::RECORD);
+    let request = app
+        .instance_manager()
+        .change_modpack(id, task08_round2_pack("B"));
+    let mut request = Box::pin(request);
+    tokio::select! {
+        _ = pause.entered.notified() => {},
+        result = &mut request => panic!("request missed publication: {result:?}"),
+        _ = tokio::time::sleep(Duration::from_secs(5)) => panic!("publication wait timed out"),
+    }
+    assert!(matches!(
+        app.instance_manager.instances.read().await[&id]
+            .data()?
+            .state,
+        run::LaunchState::Queued(_)
+    ));
+    // Real returned publication I/O failure: something already holds the
+    // record's name, so its no-replace publication fails on every OS. Nothing
+    // is moved while the writer holds its temporary file open (Windows
+    // refuses to rename a folder with an open file inside).
+    let next = task08_round2_replacement(&root)?;
+    assert!(next.join("change-pack-version.json").is_file());
+    tokio::fs::create_dir(next.join(session::RECORD)).await?;
+    if drop_request {
+        drop(request);
+        assert!(
+            app.runtime_lifecycle
+                .begin_relocation("io-error-pending")
+                .is_err()
+        );
+        pause.release();
+    } else {
+        pause.release();
+        assert!(
+            tokio::time::timeout(Duration::from_secs(5), request)
+                .await?
+                .is_err()
+        );
+    }
+    task08_round2_settled(&app, id).await?;
+    // The failure published no setup and removed the replacement it was
+    // writing, request included: its record, written last, never completed
+    // it. The baseline packinfo.json from the inventory step remains.
+    assert!(!root.join(".setup").exists());
+    assert!(!next.exists());
+    assert!(std::fs::read_dir(&root)?.all(|entry| {
+        !entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".setup-next-")
+    }));
+    task08_round2_baseline_recorded(&root).await?;
+    Ok(())
+}
+/// The one replacement setup a request is writing (see
+/// `session::begin_replacement`).
+fn task08_round2_replacement(root: &Path) -> anyhow::Result<PathBuf> {
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(root)? {
+        let entry = entry?;
+        if entry
+            .file_name()
+            .to_string_lossy()
+            .starts_with(".setup-next-")
+        {
+            found.push(entry.path());
+        }
+    }
+    anyhow::ensure!(found.len() == 1, "expected one replacement: {found:?}");
+    Ok(found.remove(0))
 }
 #[tokio::test]
 async fn task08_round2_returned_io_error_releases_owned_producer() -> anyhow::Result<()> {
@@ -6513,6 +7301,167 @@ async fn linked_root_updates_and_repairs(link: fn(&Path, &Path)) -> anyhow::Resu
         .acquire()
         .await?;
     manager
+        .repair_modpack(
+            id,
+            super::modpack::RepairMarkerFile::default(),
+            status.discard_token.clone(),
+        )
+        .await?;
+    let repair = Session::load(&root).await?.expect("the repair's setup");
+    assert_eq!(repair.producer, Producer::Repair);
+    repairblocked_finish_repair(&app, id, &root, repair.owner()?).await?;
+    repairblocked_assert_b_installed(&app, id, &root).await?;
+    assert!(std::fs::symlink_metadata(&root)?.file_type().is_symlink());
+    assert!(moved.join("packinfo.json").is_file());
+    Ok(())
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn symlinked_instance_folder_updates_and_repairs() -> anyhow::Result<()> {
+    linked_root_updates_and_repairs(|link, target| {
+        std::os::unix::fs::symlink(target, link).unwrap()
+    })
+    .await
+}
+
+#[cfg(windows)]
+#[tokio::test]
+async fn junctioned_instance_folder_updates_and_repairs() -> anyhow::Result<()> {
+    linked_root_updates_and_repairs(|link, target| {
+        let status = std::process::Command::new("cmd")
+            .arg("/C")
+            .arg("mklink")
+            .arg("/J")
+            .arg(link)
+            .arg(target)
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "mklink /J failed for {}", link.display());
+    })
+    .await
+}
+
+/// A Repair that continues an interrupted change finishes it, so it reports
+/// what that change would have: the warning isn't lost with the retired setup.
+/// One that doesn't continue it installs the configured pack instead, and that
+/// change's warning no longer applies.
+#[tokio::test]
+async fn repairblocked_repair_continuing_a_change_keeps_its_warning() -> anyhow::Result<()> {
+    use super::modpack::session::{Phase, Session};
+    use crate::domain::vtask::{DependencyPlatform, PreviousPackFilesReason, TaskWarning};
+    let kept = vec![TaskWarning::PreviousPackFilesKept {
+        platform: DependencyPlatform::Modrinth,
+        reason: PreviousPackFilesReason::VersionUnavailable,
+    }];
+    let app = crate::setup_managers_for_test().await;
+    let _permit = app
+        .instance_manager
+        .persistence_manager
+        .instance_download_lock
+        .acquire()
+        .await?;
+    for (name, phase, continues) in [
+        ("repairblocked-warned-applying", Phase::Applying, true),
+        ("repairblocked-warned-resolved", Phase::Resolved, false),
+    ] {
+        let (id, root, owner) = repairblocked_resolved_change(&app, name).await?;
+        let mut session = Session::require(&root, &owner).await?;
+        session.phase = phase;
+        session.warnings = kept.clone();
+        session.save(&root, &owner).await?;
+        let status = app.instance_manager().pending_setup(id).await?;
+        let task = app
+            .instance_manager()
+            .repair_modpack(
+                id,
+                super::modpack::RepairMarkerFile::default(),
+                status.discard_token.clone(),
+            )
+            .await?;
+        let repair = Session::load(&root).await?.expect("the repair's setup");
+        assert_eq!(repair.replaces_interrupted.is_some(), continues, "{name}");
+        let expected = if continues { kept.clone() } else { Vec::new() };
+        assert_eq!(repair.warnings, expected, "{name}");
+        assert_eq!(
+            app.task_manager().running_task_warnings(task).await,
+            Some(expected),
+            "{name}"
+        );
+    }
+    Ok(())
+}
+
+/// An update that stopped while applying (part of B's files are in place,
+/// instance.json and packinfo.json still name A) can't be cancelled, and
+/// the installed record doesn't describe the files, so the preview is
+/// withheld. Repair retires it with its evidence and installs B, which the
+/// update was applying, over A's record.
+#[tokio::test]
+async fn repairblocked_interrupted_apply_is_replaced_by_its_target() -> anyhow::Result<()> {
+    use super::modpack::session::{Phase, Producer, Session};
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, owner) = repairblocked_resolved_change(&app, "repairblocked-applying").await?;
+    let mut session = Session::require(&root, &owner).await?;
+    session.phase = Phase::Applying;
+    session.save(&root, &owner).await?;
+    tokio::fs::write(root.join(".setup/apply-started"), b"").await?;
+    tokio::fs::create_dir(root.join(".setup/representation-transitions")).await?;
+    tokio::fs::write(
+        root.join(".setup/representation-transitions/transition.json"),
+        b"{\"evidence\":true}",
+    )
+    .await?;
+    tokio::fs::create_dir_all(root.join(".repair-recovery/cleanup-x/entry")).await?;
+    tokio::fs::write(
+        root.join(".repair-recovery/cleanup-x/entry/payload"),
+        b"kept",
+    )
+    .await?;
+    // Part of B is in place.
+    tokio::fs::write(root.join("instance/mods/pack.jar"), b"B").await?;
+    let record_before = tokio::fs::read(root.join("packinfo.json")).await?;
+    let target_before = tokio::fs::read(root.join("tmp-packinfo.json")).await?;
+    let recovery_before = legacy_tree(&root.join(".repair-recovery"));
+
+    let status = app.instance_manager().pending_setup(id).await?;
+    assert!(!status.can_cancel);
+    assert!(status.can_resume);
+    assert!(status.preview_withheld);
+    assert_eq!(status.installed_version.as_deref(), Some("A"));
+    assert_eq!(status.repair_version.as_deref(), Some("B"));
+    assert!(app.instance_manager().repair_preview(id).await.is_err());
+    // Its files can't be previewed, so none can be selected for removal.
+    let selection = super::modpack::CleanupSelection {
+        path: "/mods/user.jar".into(),
+        sha512: "a".repeat(128),
+        context: super::modpack::PackProofContext::from(&legacy_pack("A")),
+        proven: false,
+    };
+    let refused = app
+        .instance_manager()
+        .repair_modpack(
+            id,
+            super::modpack::RepairMarkerFile {
+                cleanup_selections: vec![selection],
+                ..Default::default()
+            },
+            status.discard_token.clone(),
+        )
+        .await
+        .expect_err("no cleanup without a preview");
+    assert!(refused.to_string().contains("removal"), "{refused}");
+    assert!(legacy_retired(&root)?.is_empty());
+
+    let instance_before = legacy_tree(&root.join("instance"));
+    let manager = app.instance_manager();
+    let _permit = manager
+        .persistence_manager
+        .instance_download_lock
+        .acquire()
+        .await?;
+    app.instance_manager()
         .repair_modpack(
             id,
             super::modpack::RepairMarkerFile::default(),

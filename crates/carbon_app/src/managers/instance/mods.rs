@@ -200,16 +200,9 @@ impl ManagerRef<'_, InstanceManager> {
                 .get(&instance_id)
                 .ok_or(InvalidInstanceIdError(instance_id))?;
             let data = instance.data()?;
-            if data.config.modpack.as_ref().is_some_and(|pack| pack.locked) {
-                bail!("Modpack is locked");
-            }
-            if matches!(
-                data.state,
-                super::run::LaunchState::Queued(_)
-                    | super::run::LaunchState::Preparing(_)
-                    | super::run::LaunchState::Deleting
-            ) {
-                bail!("Wait for the current instance setup before changing addons");
+            ensure_pack_unlocked(data.config.modpack.as_ref())?;
+            if matches!(data.state, super::run::LaunchState::Deleting) {
+                bail!("This instance is being deleted, so its addons can't be changed.");
             }
             let preparing = matches!(
                 data.state,
@@ -2938,4 +2931,13 @@ pub(super) fn same_addon_game_version(
         (None, None) => true,
         _ => false,
     }
+}
+
+pub(super) fn ensure_pack_unlocked(
+    pack: Option<&crate::domain::instance::info::ModpackInfo>,
+) -> anyhow::Result<()> {
+    if pack.is_some_and(|pack| pack.locked) {
+        bail!("Modpack is locked");
+    }
+    Ok(())
 }

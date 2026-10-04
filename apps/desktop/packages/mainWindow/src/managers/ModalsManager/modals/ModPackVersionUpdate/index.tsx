@@ -5,15 +5,27 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  Spinner
+  Spinner,
+  toast
 } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { extractErrorDisplay, rspc } from "@/utils/rspcClient"
-import { Show, createEffect, createSignal, createMemo } from "solid-js"
+import {
+  Show,
+  createEffect,
+  createSignal,
+  createMemo,
+  onCleanup
+} from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { Modpack } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import {
+  changeVersionRefusalText,
+  isChangeVersionCancelled,
+  offeredVersion
+} from "./changeVersionRefusal"
 
 interface Props {
   instanceId: number
@@ -35,6 +47,10 @@ const ModPackVersionUpdate = (props: ModalProps) => {
 
   const changeModpackMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.changeModpack"]
+  }))
+
+  const cancelCheckMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.cancelModpackChangeCheck"]
   }))
 
   // Pure reactive memo - no side effects.
@@ -147,15 +163,48 @@ const ModPackVersionUpdate = (props: ModalProps) => {
     )
   })
 
+  const version = createMemo(() =>
+    offeredVersion(selectedVersion(), versions())
+  )
+
   const [updateError, setUpdateError] = createSignal<string | null>(null)
+  // The first update of an imported pack first downloads and checks its
+  // installed version, which can take minutes. Said only once it's clear this
+  // isn't the usual instant request.
+  const [checking, setChecking] = createSignal(false)
+  const [cancelling, setCancelling] = createSignal(false)
+
+  // The modal can't be dismissed during the request, but another part of the
+  // app can still close it.
+  let closed = false
+  onCleanup(() => {
+    closed = true
+  })
+
+  const refusalText = (error: unknown) => {
+    const refusal = changeVersionRefusalText(error)
+    if (!refusal) return extractErrorDisplay(error)
+    return "params" in refusal ? t(refusal.key, refusal.params) : t(refusal.key)
+  }
+
+  const cancel = () => {
+    const id = instanceId()
+    if (changeModpackMutation.isPending && id) {
+      setCancelling(true)
+      cancelCheckMutation.mutate(id)
+    } else {
+      modalContext?.closeModal()
+    }
+  }
 
   const handleUpdate = async () => {
-    const version = selectedVersion()
+    const selected = version()
     const data = modpackData()
     const id = instanceId()
-    if (!version || !data || !id) return
+    if (!selected || !data || !id) return
 
     setUpdateError(null)
+    const checkingTimer = setTimeout(() => setChecking(true), 500)
     try {
       await changeModpackMutation.mutateAsync({
         instance: id,
@@ -165,19 +214,32 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             data.platform === "curseforge"
               ? {
                   project_id: data.projectId,
-                  file_id: parseInt(version)
+                  file_id: parseInt(selected)
                 }
               : {
                   project_id: data.projectId.toString(),
-                  version_id: version
+                  version_id: selected
                 }
         } as Modpack
       })
     } catch (e) {
-      setUpdateError(extractErrorDisplay(e))
+      if (isChangeVersionCancelled(e)) {
+        if (!closed) modalContext?.closeModal()
+      } else if (closed) {
+        toast.error(t("instances:_trn_change_version_failed"), {
+          description: refusalText(e)
+        })
+      } else {
+        setUpdateError(refusalText(e))
+      }
       return
+    } finally {
+      clearTimeout(checkingTimer)
+      setChecking(false)
+      setCancelling(false)
     }
 
+    if (closed) return
     modalContext?.closeModal()
     navigator.navigate("/library")
   }
@@ -187,6 +249,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
       noHeader={props.noHeader}
       title={props?.title}
       noPadding={true}
+      preventClose={changeModpackMutation.isPending}
     >
       <div class="w-120 flex flex-col gap-4 p-4">
         <Show when={response().isLoading || instance.isLoading}>
@@ -194,10 +257,11 @@ const ModPackVersionUpdate = (props: ModalProps) => {
         </Show>
         <Show when={!response().isLoading && !instance.isLoading}>
           <Select
-            value={selectedVersion()}
+            value={version()}
+            disabled={changeModpackMutation.isPending}
             onChange={(value) => value && setSelectedVersion(value)}
             options={versions().map((v) => v.id)}
-            placeholder=""
+            placeholder={t("instances:_trn_change_version_pick")}
             disallowEmptySelection={true}
             itemComponent={(itemProps) => {
               const version = versions().find(
@@ -245,6 +309,33 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             <SelectContent />
           </Select>
 
+          <Show when={versions().length > 0 && !version()}>
+            <div
+              data-testid="modpack-version-not-listed"
+              class="text-sm text-lightSlate-600"
+            >
+              <Trans key="instances:_trn_change_version_not_listed" />
+            </div>
+          </Show>
+
+          <Show when={versions().length === 0}>
+            <div
+              data-testid="modpack-version-none-listed"
+              class="text-sm text-lightSlate-600"
+            >
+              <Trans key="instances:_trn_change_version_none_listed" />
+            </div>
+          </Show>
+
+          <Show when={checking()}>
+            <div
+              data-testid="modpack-version-update-checking"
+              class="text-sm text-lightSlate-600"
+            >
+              <Trans key="instances:_trn_change_version_checking" />
+            </div>
+          </Show>
+
           <Show when={updateError()}>
             <div
               data-testid="modpack-version-update-error"
@@ -262,9 +353,9 @@ const ModPackVersionUpdate = (props: ModalProps) => {
           <div class="flex justify-between">
             <Button
               type="secondary"
-              onClick={() => {
-                modalContext?.closeModal()
-              }}
+              data-testid="modpack-version-update-cancel"
+              disabled={cancelling()}
+              onClick={cancel}
             >
               {t("instances:_trn_cancel_export")}
             </Button>
@@ -272,7 +363,8 @@ const ModPackVersionUpdate = (props: ModalProps) => {
               type="primary"
               data-testid="modpack-version-update-confirm"
               onClick={handleUpdate}
-              disabled={!selectedVersion() || changeModpackMutation.isPending}
+              loading={changeModpackMutation.isPending}
+              disabled={!version()}
             >
               {t("instances:_trn_instance_modal_instance_update")}
             </Button>

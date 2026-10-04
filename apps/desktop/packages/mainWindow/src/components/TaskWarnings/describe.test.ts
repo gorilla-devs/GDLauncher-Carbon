@@ -345,4 +345,108 @@ describe("describeTaskWarnings", () => {
       hint: "What the link points to was not changed. Copy the modpack's files there yourself, or replace the link with a normal folder and run Repair again."
     })
   })
+  it("says under which name a world was saved when a save already had its own, and that the existing save is untouched", async () => {
+    const i18n = i18next.createInstance()
+    await i18n.init({
+      lng: "en",
+      ns: ["notifications"],
+      resources: { en: { notifications: english } }
+    })
+    const translate: Translate = (key, options) =>
+      i18n.t(key as string, options)
+    const entry: FETaskWarnings = {
+      id: 16,
+      name: {
+        translation: "InstanceTaskInstallMod",
+        args: {
+          mod_name: "Parkour Paradise v2.zip",
+          instance_name: "Steve's Maps"
+        }
+      },
+      subject: "Parkour Paradise",
+      warnings: [
+        {
+          type: "WorldNameTaken",
+          value: {
+            name: "Parkour Paradise",
+            saved_as: "Parkour Paradise (copy 1)"
+          }
+        }
+      ]
+    }
+    expect(describeTaskWarnings(entry, translate)).toEqual({
+      title:
+        "Parkour Paradise was installed in Steve's Maps as a separate save",
+      lines: [
+        'A save named "Parkour Paradise" already exists, so this world was saved as "Parkour Paradise (copy 1)"'
+      ],
+      hint: "Your existing save was not changed. Both saves are listed in the instance's Addons tab and in Minecraft."
+    })
+  })
+  it("says which files a modpack update kept, why, and where to review them", async () => {
+    const i18n = i18next.createInstance()
+    await i18n.init({
+      lng: "en",
+      ns: ["notifications"],
+      resources: { en: { notifications: english } }
+    })
+    const translate: Translate = (key, options) =>
+      i18n.t(key as string, options)
+    const entry: FETaskWarnings = {
+      id: 17,
+      name: {
+        translation: "InstanceTaskPrepare",
+        args: { name: "Steve's Pack" }
+      },
+      subject: null,
+      warnings: [
+        {
+          type: "PreviousPackFilesKept",
+          value: { platform: "Curseforge", reason: "VersionUnavailable" }
+        }
+      ]
+    }
+    expect(describeTaskWarnings(entry, translate)).toEqual({
+      title:
+        "Steve's Pack was updated, but files from its previous version were kept",
+      lines: [
+        "Its previous version is no longer available on CurseForge, so GDLauncher could not tell that version's files from yours and kept them all."
+      ],
+      hint: "If a mod now shows up twice or the game does not start, open Repair in the instance settings: it lists the files the modpack does not track, and you can remove the ones you no longer need."
+    })
+    const reasons = (["VersionUnreadable", "SomeFilesUnchecked"] as const).map(
+      (reason) =>
+        describeTaskWarnings(
+          {
+            ...entry,
+            warnings: [
+              {
+                type: "PreviousPackFilesKept",
+                value: { platform: "Modrinth", reason }
+              }
+            ]
+          },
+          translate
+        )?.lines
+    )
+    expect(reasons).toEqual([
+      [
+        "The files of its previous version could not be checked, so GDLauncher could not tell them from yours and kept them all."
+      ],
+      [
+        "Some files of its previous version could not be checked, so they were kept."
+      ]
+    ])
+    expect(
+      describeTaskWarnings(
+        {
+          ...entry,
+          name: { translation: "InstanceTaskPrepare", args: { name: "" } }
+        },
+        translate
+      )?.title
+    ).toBe(
+      "The modpack was updated, but files from its previous version were kept"
+    )
+  })
 })

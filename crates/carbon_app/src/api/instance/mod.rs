@@ -119,6 +119,11 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .map(FETaskId::from)
         }
 
+        mutation CANCEL_MODPACK_CHANGE_CHECK[app, id: FEInstanceId] {
+            app.instance_manager().cancel_version_change_check(id.into());
+            Ok(())
+        }
+
         mutation REPAIR_MODPACK[app, args: RepairModpack] {
             app.instance_manager()
                 .repair_modpack(
@@ -595,7 +600,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation CANCEL_IMPORT_SCAN[app, args: ()] {
             app.instance_manager()
                 .import_manager()
-                .set_scan_target(None)
+                .set_scan_target(None).map(|_| ())
         }
 
         query GET_IMPORT_SCAN_STATUS[app, args: ()] {
@@ -609,7 +614,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation IMPORT_INSTANCE[app, req: ImportRequest] {
             app.instance_manager()
                 .import_manager()
-                .begin_import(req.index, req.name)
+                .begin_import(req.session, req.index, req.name)
                 .await
                 .map(FETaskId::from)
         }
@@ -2031,6 +2036,8 @@ pub enum ImportEntity {
 struct ImportableInstance {
     filename: String,
     instance_name: String,
+    /// Parts of the source that will not be imported; the row still imports.
+    warnings: Vec<Translation>,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -2054,6 +2061,8 @@ enum ImportScanStatus {
 
 #[derive(Type, Debug, Serialize)]
 struct FullImportScanStatus {
+    session: Option<String>,
+    error: Option<String>,
     scanning: bool,
     status: ImportScanStatus,
 }
@@ -2083,6 +2092,7 @@ struct ImportEntityStatus {
 
 #[derive(Type, Debug, Deserialize)]
 struct ImportRequest {
+    session: String,
     index: u32,
     name: Option<String>,
 }
@@ -2603,6 +2613,7 @@ impl From<importer::ImportableInstance> for ImportableInstance {
         Self {
             filename: value.filename,
             instance_name: value.instance_name,
+            warnings: value.warnings,
         }
     }
 }
@@ -2672,6 +2683,8 @@ impl From<importer::FullImportScanStatus> for FullImportScanStatus {
     fn from(value: importer::FullImportScanStatus) -> Self {
         Self {
             scanning: value.scanning,
+            session: value.session,
+            error: value.error,
             status: value.status.into(),
         }
     }

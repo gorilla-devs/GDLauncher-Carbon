@@ -29,9 +29,48 @@ use std::path::{Component, Path, PathBuf};
 
 pub mod apply_plan;
 pub mod disk_scan;
+mod imported_baseline;
 pub mod origin_check;
 pub mod packinfo;
 pub(crate) mod session;
+
+/// The version changes each instance is checking: usually one, but a request
+/// can wait for the gate behind another whose modal was closed.
+pub(super) type VersionChangeChecks =
+    dashmap::DashMap<InstanceId, Vec<std::sync::Arc<tokio_util::sync::CancellationToken>>>;
+
+/// Makes a version change's check stoppable through
+/// `cancel_version_change_check` while it lives.
+struct VersionChangeCheck<'a> {
+    checks: &'a VersionChangeChecks,
+    instance_id: InstanceId,
+    cancel: std::sync::Arc<tokio_util::sync::CancellationToken>,
+}
+
+impl<'a> VersionChangeCheck<'a> {
+    fn begin(
+        checks: &'a VersionChangeChecks,
+        instance_id: InstanceId,
+        cancel: &tokio_util::sync::CancellationToken,
+    ) -> Self {
+        let cancel = std::sync::Arc::new(cancel.clone());
+        checks.entry(instance_id).or_default().push(cancel.clone());
+        Self {
+            checks,
+            instance_id,
+            cancel,
+        }
+    }
+}
+
+impl Drop for VersionChangeCheck<'_> {
+    fn drop(&mut self) {
+        self.checks.remove_if_mut(&self.instance_id, |_, running| {
+            running.retain(|cancel| !std::sync::Arc::ptr_eq(cancel, &self.cancel));
+            running.is_empty()
+        });
+    }
+}
 
 impl ManagerRef<'_, InstanceManager> {
     pub async fn check_curseforge_modpack_updates(
@@ -147,6 +186,32 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         modpack: Modpack,
     ) -> anyhow::Result<VisualTaskId> {
+        let app = self.app.clone();
+        tokio::spawn(async move {
+            app.instance_manager()
+                .change_modpack_owned(instance_id, modpack)
+                .await
+        })
+        .await?
+    }
+
+    /// Stops every installed-version check a version change of this instance
+    /// is running, if any: each change then ends with
+    /// [`ChangeVersionRefusal::Cancelled`] and its setup never starts. Once
+    /// the setup has started this does nothing; the task runs on as usual.
+    pub fn cancel_version_change_check(self, instance_id: InstanceId) {
+        if let Some(checks) = self.version_change_checks.get(&instance_id) {
+            for check in checks.iter() {
+                check.cancel();
+            }
+        }
+    }
+
+    async fn change_modpack_owned(
+        self,
+        instance_id: InstanceId,
+        modpack: Modpack,
+    ) -> anyhow::Result<VisualTaskId> {
         use super::run::LaunchState;
 
         let runtime_activity = self
@@ -178,8 +243,10 @@ impl ManagerRef<'_, InstanceManager> {
             .get_instances()
             .get_instance_path(&instance.shortpath);
 
+        let installed_pack = data.config.modpack.as_ref().unwrap().modpack.clone();
         drop(instances);
 
+        let requests_installed = modpack == installed_pack;
         let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack))?;
 
         let setup_path = instance_path.get_root().join(".setup");
@@ -188,6 +255,35 @@ impl ManagerRef<'_, InstanceManager> {
             anyhow::bail!(
                 "Instance has not completed the setup phase, attempting to change the modpack may irreparably damage it."
             );
+        }
+
+        let platform = imported_baseline::platform(&installed_pack);
+        let baseline = imported_baseline::ensure_cancellable(
+            &instance_path.get_root(),
+            platform,
+            &cancel,
+            imported_baseline::resolve(self.app, &installed_pack, &cancel),
+        )
+        .await?;
+        #[cfg(test)]
+        self.test_hooks.pause("change_checked", instance_id).await;
+        // The check only looks between files, so a cancel can land after the
+        // last look. Asked once the check can no longer be stopped, so any
+        // cancel that reached it counts. A record it wrote stays for the next
+        // attempt to read.
+        drop(check);
+        if cancel.is_cancelled() {
+            return Err(ChangeVersionRefusal::Cancelled.into());
+        }
+        // Before a setup exists: one for this version could only fail, and it
+        // would keep the instance from starting until it is cancelled.
+        if requests_installed
+            && matches!(
+                baseline,
+                imported_baseline::Baseline::Unavailable { gone: true }
+            )
+        {
+            return Err(ChangeVersionRefusal::VersionGone.into());
         }
 
         self.run_prepare_with_setup_cleanup(
@@ -204,6 +300,7 @@ impl ManagerRef<'_, InstanceManager> {
                 options: None,
                 reset: false,
                 replaces: None,
+                warnings: baseline.warning(platform).into_iter().collect(),
             },
         )
         .await
@@ -302,6 +399,13 @@ impl ManagerRef<'_, InstanceManager> {
             .as_ref()
             .and_then(|pending| pending.target.clone())
             .unwrap_or_else(|| modpack.clone());
+        // Continuing an interrupted change finishes it, so this task says what
+        // that change would have said.
+        let warnings = pending
+            .as_ref()
+            .filter(|pending| pending.interrupted && pending.target.is_some())
+            .map(|pending| pending.warnings.clone())
+            .unwrap_or_default();
         let replaces = pending.map(|pending| session::Replaced {
             label: pending.label,
             interrupted: pending.interrupted,
@@ -355,6 +459,7 @@ impl ManagerRef<'_, InstanceManager> {
                 options: Some(options),
                 reset: true,
                 replaces,
+                warnings,
             },
         )
         .await
@@ -487,6 +592,7 @@ impl ManagerRef<'_, InstanceManager> {
                     interrupted,
                     keep_payload: session.changed_files(&root)
                         && session.producer != session::Producer::Repair,
+                    warnings: session.warnings.clone(),
                 }
             }
             // Without a readable record, the configured pack: 2.0.40 wrote an
@@ -498,6 +604,7 @@ impl ManagerRef<'_, InstanceManager> {
                     target: None,
                     interrupted: changed_files,
                     keep_payload: changed_files,
+                    warnings: Vec::new(),
                 }
             }
         };
@@ -841,6 +948,9 @@ struct PendingRepair {
     /// Its payload stays once it is retired (see
     /// [`session::Replaced::keep_payload`]).
     keep_payload: bool,
+    /// What it would have told the user once it succeeded (see
+    /// [`session::Request::warnings`]).
+    warnings: Vec<crate::domain::vtask::TaskWarning>,
 }
 
 /// Identity of the installed pack whose preview was reviewed.
@@ -1603,6 +1713,25 @@ mod tests {
     use carbon_rt_path::InstancePath;
     use std::collections::HashMap;
     use std::path::PathBuf;
+
+    /// One request ending leaves the other's check stoppable.
+    #[test]
+    fn version_change_check_ending_only_removes_its_own_entry() {
+        use super::{InstanceId, VersionChangeCheck, VersionChangeChecks};
+        use tokio_util::sync::CancellationToken;
+        let checks = VersionChangeChecks::new();
+        let id = InstanceId(7);
+        let (first, second) = (CancellationToken::new(), CancellationToken::new());
+        let first_check = VersionChangeCheck::begin(&checks, id, &first);
+        let second_check = VersionChangeCheck::begin(&checks, id, &second);
+        drop(second_check);
+        assert_eq!(checks.get(&id).unwrap().len(), 1);
+        checks.get(&id).unwrap()[0].cancel();
+        assert!(first.is_cancelled());
+        assert!(!second.is_cancelled());
+        drop(first_check);
+        assert!(!checks.contains_key(&id));
+    }
 
     // --- normalize_cleanup_path ---------------------------------------
 

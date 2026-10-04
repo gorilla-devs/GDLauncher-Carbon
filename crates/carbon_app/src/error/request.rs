@@ -37,6 +37,11 @@ pub enum RequestErrorDetails {
     #[error("malformed response: {details}")]
     MalformedResponse { details: MalformedResponseDetails }, // TODO: get body
 
+    /// The request could not be made, or led nowhere, whatever the network
+    /// does: a malformed address, an unsupported scheme, a redirect loop.
+    #[error("unusable request: {0}")]
+    UnusableRequest(String),
+
     #[error("unknown reqwest error: {0}")]
     Unknown(String),
 }
@@ -126,6 +131,8 @@ impl RequestErrorDetails {
             Self::MalformedResponse {
                 details: MalformedResponseDetails::UnknownDecodeError,
             }
+        } else if error.is_builder() || error.is_redirect() {
+            Self::UnusableRequest(format!("{error:#?}"))
         } else {
             Self::Unknown(format!("{error:#?}"))
         }
@@ -264,7 +271,9 @@ impl From<RequestError> for FERequestError {
                         details: details.into(),
                     }
                 }
-                RequestErrorDetails::Unknown(x) => FERequestErrorType::Unknown(x),
+                RequestErrorDetails::Unknown(x) | RequestErrorDetails::UnusableRequest(x) => {
+                    FERequestErrorType::Unknown(x)
+                }
             },
         }
     }

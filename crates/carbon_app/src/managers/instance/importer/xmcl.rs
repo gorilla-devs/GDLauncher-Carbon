@@ -54,9 +54,11 @@ struct Importable {
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
+        let warnings = value.settings.warnings();
         Self {
             filename: value.filename,
             instance_name: value.name,
+            warnings,
         }
     }
 }
@@ -114,6 +116,7 @@ impl XmclImporter {
             })));
         };
 
+        parsed.settings.skip_missing_java_path();
         let icon = resolve_icon(&path, parsed.icon.as_deref());
         parsed.settings.group = group;
 
@@ -157,7 +160,7 @@ impl InstanceImporter for XmclImporter {
                         .remove(&scan_path);
                 }
             }
-            if let Ok(Some(entry)) = self.scan_instance(scan_path, group).await {
+            if let Some(entry) = self.scan_instance(scan_path, group).await? {
                 self.state.write().await.set_single(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
@@ -175,8 +178,13 @@ impl InstanceImporter for XmclImporter {
             (scan_path.clone(), scan_path.parent().map(Path::to_path_buf))
         };
 
-        if let Ok(mut dir) = tokio::fs::read_dir(&instances_dir).await {
-            while let Ok(Some(entry)) = dir.next_entry().await {
+        let directory = match super::common::scan_directory(&instances_dir).await {
+            Ok(dir) => Some(dir),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound && app_data.is_some() => None,
+            Err(e) => return Err(e.into()),
+        };
+        if let Some(mut dir) = directory {
+            while let Some(entry) = dir.next_entry().await? {
                 let path = entry.path();
                 if path.is_dir() && !dir_name(&path).starts_with('.') {
                     instance_dirs.push(path);
@@ -196,7 +204,7 @@ impl InstanceImporter for XmclImporter {
 
         for path in instance_dirs {
             let group = groups.remove(&path);
-            if let Ok(Some(entry)) = self.scan_instance(path, group).await {
+            if let Some(entry) = self.scan_instance(path, group).await? {
                 self.state.write().await.push_multi(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }

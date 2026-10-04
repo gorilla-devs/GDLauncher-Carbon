@@ -1,19 +1,22 @@
 import { Checkbox } from "@gd/ui"
-import { Setter, Show } from "solid-js"
+import { For, Setter, Show } from "solid-js"
 import { instances } from "./SingleEntity"
 
 interface Props {
   title?: string
   filename?: string
+  selectionId?: string
   invalidReason?: string
+  /** What will be left out of this import; the row can still be selected. */
+  warnings?: string[]
   setList?: Setter<string[]>
   setInstance?: (_instance: string | undefined) => void
   isSingleInstance?: boolean
 }
 
 const SingleCheckBox = (props: Props) => {
-  // Use filename as unique identifier since instance names can be duplicated
-  const uniqueId = () => props.filename || props.title
+  // The session and backend index identify equal filenames across source roots.
+  const uniqueId = () => props.selectionId || props.filename || props.title
 
   const isInvalid = () => props.invalidReason !== undefined
 
@@ -65,7 +68,7 @@ const SingleCheckBox = (props: Props) => {
           {props.title ?? props.filename}
         </span>
         <Show when={isInvalid()}>
-          <span class="truncate text-xs text-yellow-500/80">
+          <span class="break-words text-xs text-yellow-500/80">
             {props.invalidReason}
           </span>
         </Show>
@@ -74,6 +77,16 @@ const SingleCheckBox = (props: Props) => {
             <div class="i-hugeicons:folder-01 shrink-0 text-xs" />
             {props.filename}
           </span>
+        </Show>
+        <Show when={!isInvalid()}>
+          <For each={props.warnings}>
+            {(warning) => (
+              <span class="flex items-start gap-1 break-words text-xs text-yellow-500/80">
+                <div class="i-hugeicons:alert-02 mt-0.5 shrink-0 text-xs" />
+                {warning}
+              </span>
+            )}
+          </For>
         </Show>
       </div>
     </div>

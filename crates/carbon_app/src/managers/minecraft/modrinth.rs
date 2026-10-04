@@ -418,7 +418,7 @@ async fn prepare_mrpack(
 
 /// Required MRPack members must carry a supported, usable digest. Reject every
 /// populated malformed supported field rather than silently downgrade integrity.
-fn required_checksum(
+pub(crate) fn required_checksum(
     file: &carbon_platforms::modrinth::version::ModrinthFile,
 ) -> anyhow::Result<carbon_net::Checksum> {
     for (name, value, length) in [

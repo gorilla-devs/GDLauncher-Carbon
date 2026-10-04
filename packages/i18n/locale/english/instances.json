@@ -251,6 +251,13 @@
   "_trn_repair_reason_case_aliased": "aliases a tracked file on this filesystem — kept",
   "_trn_repair_reason_disabled_replace_resumed": "pack now ships this disabled — outdated enabled copy will be removed",
   "_trn_change_version_failed": "The version change was not applied",
+  "_trn_change_version_checking": "Checking which files the installed version added. On a large modpack this can take a few minutes.",
+  "_trn_change_version_unreachable": "Could not reach {{platform}} to check which files the installed version of this modpack added. Check your connection, or try again in a few minutes if it is working.",
+  "_trn_change_version_unreachable_services": "Could not reach the online services needed to check which files the installed version of this modpack added. Check your connection, or try again in a few minutes if it is working.",
+  "_trn_change_version_gone": "This version is no longer available. Pick another version.",
+  "_trn_change_version_not_listed": "The installed version is not in this list. Pick the version you want.",
+  "_trn_change_version_none_listed": "No versions of this modpack could be listed. Check your connection and try again later. If the modpack was removed from its platform, use Unpair in the instance settings to keep this as a regular instance.",
+  "_trn_change_version_pick": "Pick a version",
   "_trn_no_instance_found": "No Instances found on this path",
   "_trn_export_path": "Export path",
   "_trn_exported_to": "Exported correctly to",
@@ -484,5 +491,11 @@
   "_trn_confirm_world_deletion_cancel": "Cancel",
   "_trn_confirm_world_deletion_confirm": "Delete world",
   "_trn_confirm_world_deletion_confirm_plural": "Delete worlds",
-  "_trn_confirm_world_deletion_confirm_selection": "Delete {{count}} addons"
+  "_trn_confirm_world_deletion_confirm_selection": "Delete {{count}} addons",
+  "_trn_import_scan_failed": "The scan or import could not finish. Check the source path and try again. Partial results remain available.",
+  "_trn_import_retry": "Retry scan",
+  "_trn_import_batch_uncertain": "Some imports may already exist. Check your library, then rescan before trying again. Accepted imports continue even if you close this window.",
+  "_trn_import_source_unavailable": "This source is unavailable. Reconnect its folder and scan again.",
+  "_trn_import_java_unavailable": "The configured Java binary is unavailable. Correct the source Java setting and scan again.",
+  "_trn_import_unsupported_hook": "This enabled command uses launcher variables GDLauncher cannot expand. Replace the command in the source launcher or disable its override, then scan again."
 }

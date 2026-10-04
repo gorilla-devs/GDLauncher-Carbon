@@ -1,6 +1,7 @@
 use std::{path::PathBuf, sync::Arc};
 
 use anyhow::anyhow;
+use futures::FutureExt;
 use serde::{Deserialize, Serialize};
 use strum_macros::EnumIter;
 use tokio::{
@@ -9,7 +10,7 @@ use tokio::{
     sync::{RwLock, mpsc, watch},
 };
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, info, trace};
+use tracing::{debug, info, instrument::WithSubscriber, trace};
 
 use crate::{
     api::{keys::instance::*, translation::Translation},
@@ -74,8 +75,16 @@ fn is_valid_share_code(share_code: &str) -> bool {
 
 #[derive(Debug)]
 pub struct InstanceImportManager {
-    scan_path: watch::Sender<Option<(Entity, PathBuf)>>,
-    scanner: RwLock<Option<(bool, Arc<dyn InstanceImporter>)>>,
+    scan_path: watch::Sender<Option<(String, Entity, PathBuf)>>,
+    scanner: RwLock<Option<ScanSession>>,
+}
+
+#[derive(Debug)]
+struct ScanSession {
+    id: String,
+    scanning: bool,
+    error: Option<String>,
+    scanner: Arc<dyn InstanceImporter>,
 }
 
 impl InstanceImportManager {
@@ -108,46 +117,52 @@ impl ManagerRef<'_, InstanceImportManager> {
         let app = self.app.clone();
 
         let handle = tokio::spawn(async move {
-            // 0-5%: Get presigned URL
-            let _ = tx.send(ImportShareCodeProgress::Progress(0)).await;
+            // The public request handle may be aborted on disconnect. Its owned
+            // worker settles storage creation and IO before releasing runtime use.
+            tokio::spawn(async move {
+                // 0-5%: Get presigned URL
+                let _ = tx.send(ImportShareCodeProgress::Progress(0)).await;
 
-            let presigned_url = app
-                .account_manager()
-                .get_presigned_download_url(share_code.clone())
-                .await?;
+                let presigned_url = app
+                    .account_manager()
+                    .get_presigned_download_url(share_code.clone())
+                    .await?;
 
-            let _ = tx.send(ImportShareCodeProgress::Progress(5)).await;
+                let _ = tx.send(ImportShareCodeProgress::Progress(5)).await;
 
-            let tmpdir = app
-                .settings_manager()
-                .runtime_path
-                .get_temp()
-                .maketmpdir()
-                .await?;
+                anyhow::ensure!(!cancel_token.is_cancelled(), "Import cancelled");
+                let runtime_activity = app.runtime_lifecycle.admit("share import archive")?;
+                let tmpdir = app
+                    .settings_manager()
+                    .runtime_path
+                    .get_temp()
+                    .maketmpdir()
+                    .await?;
 
-            let file_path = tmpdir.join(format!("{share_code}.gdlpack"));
+                with_share_archive(tmpdir, share_code, move |file_path| async move {
+                    let _runtime_activity = runtime_activity;
+                    let mut file = File::create(&file_path).await?;
 
-            info!(
-                "downloading instance share code {share_code} to {file_path:?} ({:?})",
-                tmpdir.into_path()
-            );
-
-            let mut file = File::create(&file_path).await?;
-
+                    let downloaded = async {
             // 5-90%: Download file with progress
             let client = reqwest::Client::new();
-            let response = client
-                .get(&presigned_url)
-                .send()
-                .await?
-                .error_for_status()?;
+            let response = tokio::select! {
+                biased;
+                _ = cancel_token.cancelled() => return Err(anyhow!("Import cancelled")),
+                response = client.get(&presigned_url).send() => response?.error_for_status()?,
+            };
 
             let total_size = response.content_length();
             let mut downloaded: u64 = 0;
             let mut stream = response.bytes_stream();
 
             use futures::StreamExt;
-            while let Some(chunk_result) = stream.next().await {
+            loop {
+                let chunk_result = tokio::select! {
+                    biased;
+                    _ = cancel_token.cancelled() => return Err(anyhow!("Import cancelled")),
+                    chunk = stream.next() => match chunk { Some(chunk) => chunk, None => break },
+                };
                 if cancel_token.is_cancelled() {
                     return Err(anyhow!("Import cancelled"));
                 }
@@ -172,140 +187,199 @@ impl ManagerRef<'_, InstanceImportManager> {
                 if let Some(total) = total_size {
                     let progress = (downloaded as f64 / total as f64 * 85.0 + 5.0) as i32;
                     let progress = progress.min(90);
-                    let _ = tx.send(ImportShareCodeProgress::Progress(progress)).await;
+                    tokio::select! {
+                        _ = cancel_token.cancelled() => return Err(anyhow!("Import cancelled")),
+                        _ = tx.send(ImportShareCodeProgress::Progress(progress)) => {},
+                    }
                 }
             }
 
             file.flush().await?;
+            Ok::<_, anyhow::Error>(())
+            }.await;
+                    drop(file.into_std().await);
+                    downloaded?;
+                    anyhow::ensure!(!cancel_token.is_cancelled(), "Import cancelled");
 
-            // 90-95%: Scan archive
-            let _ = tx.send(ImportShareCodeProgress::Progress(90)).await;
+                    // 90-95%: Scan archive
+                    let _ = tx.send(ImportShareCodeProgress::Progress(90)).await;
 
-            let scanner = Entity::GDLPack.create_importer()?;
-            scanner.scan(&app, file_path).await?;
+                    let scanner = Entity::GDLPack.create_importer()?;
+                    scanner.scan(&app, file_path).await?;
 
-            let _ = tx.send(ImportShareCodeProgress::Progress(95)).await;
+                    let _ = tx.send(ImportShareCodeProgress::Progress(95)).await;
 
-            // 95-100%: Begin import
-            let _ = scanner.begin_import(&app, 0, None).await?;
+                    // 95-100%: Begin import
+                    let _ = scanner.begin_import(&app, 0, None).await?;
 
-            let _ = tx.send(ImportShareCodeProgress::Progress(100)).await;
+                    let _ = tx.send(ImportShareCodeProgress::Progress(100)).await;
 
-            Ok(())
+                    Ok(())
+                })
+                .await
+            })
+            .await?
         });
 
         Ok((rx, handle))
     }
 
-    pub fn set_scan_target(self, path: Option<(Entity, PathBuf)>) -> anyhow::Result<()> {
+    pub fn set_scan_target(self, path: Option<(Entity, PathBuf)>) -> anyhow::Result<String> {
+        let id = uuid::Uuid::new_v4().to_string();
         self.scan_path
-            .send(path)
+            .send(path.map(|(entity, path)| (id.clone(), entity, path)))
             .map_err(|_| anyhow!("import scanning background task has died"))?;
-
-        Ok(())
+        self.app.invalidate(GET_IMPORT_SCAN_STATUS, None);
+        Ok(id)
     }
 
     pub fn launch_background_tasks(self) {
-        let mut rx = self.scan_path.subscribe();
+        let rx = self.scan_path.subscribe();
         let app = self.app.clone();
-
-        tokio::task::spawn(async move {
-            while rx.changed().await.is_ok() {
-                loop {
-                    let target = rx.borrow().clone();
-                    debug!({ target = ?target }, "import scanning target updated");
-                    let Some((entity, path)) = target else {
-                        *app.instance_manager()
-                            .import_manager()
-                            .scanner
-                            .write()
-                            .await = None;
-
-                        break;
-                    };
-
-                    let scanner = match entity.create_importer() {
-                        Ok(s) => s,
-                        Err(e) => {
-                            tracing::error!("Cannot create importer for {:?}: {}", entity, e);
-                            *app.instance_manager()
-                                .import_manager()
-                                .scanner
-                                .write()
-                                .await = None;
-                            continue;
-                        }
-                    };
-
-                    *app.instance_manager()
-                        .import_manager()
-                        .scanner
-                        .write()
-                        .await = Some((true, scanner.clone()));
-
-                    app.invalidate(GET_IMPORT_SCAN_STATUS, None);
-
-                    let fut = async {
-                        let r = scanner.scan(&app, path.clone()).await;
-
-                        {
-                            let import_manager = app.instance_manager().import_manager();
-
-                            let mut scanner = import_manager.scanner.write().await;
-
-                            if let Some((scanning, _)) = &mut *scanner {
-                                *scanning = false;
-                                app.invalidate(GET_IMPORT_SCAN_STATUS, None);
-                            }
-                        }
-
-                        if let Err(e) = r {
-                            tracing::error!({ error = ?e }, "instance scanning failed for path {path:?}");
-                        }
-                    };
-
-                    app.invalidate(GET_IMPORT_SCAN_STATUS, None);
-
-                    let target_changed = async {
-                        while rx.changed().await.is_ok() {
-                            if matches!(&*rx.borrow(), Some((e, p)) if e == &entity && p == &path) {
-                                break;
-                            }
-                        }
-                    };
-
-                    tokio::select! {
-                        _ = target_changed => continue,
-                        _ = fut => break,
-                    }
-                }
-            }
+        tokio::spawn(async move {
+            let manager = app.instance_manager().import_manager();
+            manager
+                .manager
+                .scan_loop(
+                    rx,
+                    |scanner, path| {
+                        let app = app.clone();
+                        async move { scanner.scan(&app, path).await }
+                    },
+                    || app.invalidate(GET_IMPORT_SCAN_STATUS, None),
+                )
+                .await;
         });
     }
 
     pub async fn scan_status(self) -> anyhow::Result<FullImportScanStatus> {
-        match self.scanner.read().await.as_ref() {
-            Some((scanning, scanner)) => Ok(FullImportScanStatus {
-                status: scanner.get_status().await,
-                scanning: *scanning,
-            }),
-            None => Ok(FullImportScanStatus {
-                status: ImportScanStatus::NoResults,
-                scanning: false,
-            }),
-        }
+        self.manager.status().await
     }
 
     pub async fn begin_import(
         self,
+        session: String,
         index: u32,
         name: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
-        trace!("Beginning import for option {index} with name {name:?}");
+        let scanner = self.manager.selected_scanner(&session).await?;
+        let runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit("accepted instance import")?;
+        let app = self.app.clone();
+        // Admission captures an immutable, completed scanner. Closing the modal
+        // revokes new requests, but cannot drop an accepted import's private IO.
+        tokio::spawn(async move {
+            let _runtime_activity = runtime_activity;
+            scanner.begin_import(&app, index, name).await
+        })
+        .await?
+    }
+}
 
-        match self.scanner.read().await.as_ref() {
-            Some((_, scanner)) => Ok(scanner.begin_import(self.app, index, name).await?),
-            None => Err(anyhow!("scan target is not set")),
+impl InstanceImportManager {
+    async fn scan_loop<Run, Fut, Notify>(
+        &self,
+        mut rx: watch::Receiver<Option<(String, Entity, PathBuf)>>,
+        run: Run,
+        notify: Notify,
+    ) where
+        Run: Fn(Arc<dyn InstanceImporter>, PathBuf) -> Fut,
+        Fut: std::future::Future<Output = anyhow::Result<()>>,
+        Notify: Fn(),
+    {
+        while rx.changed().await.is_ok() {
+            loop {
+                let target = rx.borrow_and_update().clone();
+                let Some((id, entity, path)) = target else {
+                    *self.scanner.write().await = None;
+                    notify();
+                    break;
+                };
+                let scanner = match entity.create_importer() {
+                    Ok(scanner) => scanner,
+                    Err(error) => {
+                        tracing::error!(%error, "Cannot create importer");
+                        break;
+                    }
+                };
+                *self.scanner.write().await = Some(ScanSession {
+                    id: id.clone(),
+                    scanning: true,
+                    error: None,
+                    scanner: scanner.clone(),
+                });
+                notify();
+                // A panicking importer must not take the scan task, and every
+                // later scan for every launcher, down with it.
+                let scan = std::panic::AssertUnwindSafe(run(scanner, path.clone())).catch_unwind();
+                tokio::select! {
+                    biased;
+                    _ = wait_for_target_change(&mut rx, &id) => continue,
+                    result = scan => {
+                        let result = result.unwrap_or_else(|panic| {
+                            let message = panic
+                                .downcast_ref::<&str>()
+                                .map(|m| m.to_string())
+                                .or_else(|| panic.downcast_ref::<String>().cloned())
+                                .unwrap_or_default();
+                            tracing::error!(%message, "Import scan panicked");
+                            Err(anyhow!(
+                                "The scan stopped unexpectedly. Try another folder, or send your logs to support."
+                            ))
+                        });
+                        let mut state = self.scanner.write().await;
+                        if let Some(state) = state.as_mut().filter(|s| s.id == id) {
+                            state.scanning = false;
+                            state.error = result.err().map(|e| format!("{}: {e:#}", path.display()));
+                        }
+                        notify();
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    async fn selected_scanner(&self, id: &str) -> anyhow::Result<Arc<dyn InstanceImporter>> {
+        let state = self.scanner.read().await;
+        let current = self.scan_path.borrow();
+        let state = state
+            .as_ref()
+            .filter(|s| s.id == id && !s.scanning && current.as_ref().is_some_and(|t| t.0 == id))
+            .ok_or_else(|| {
+                anyhow!(
+                    "Import scan changed or is still running; wait for completion or retry the scan"
+                )
+            })?;
+        Ok(state.scanner.clone())
+    }
+
+    async fn status(&self) -> anyhow::Result<FullImportScanStatus> {
+        let state = self.scanner.read().await;
+        let current = self.scan_path.borrow().clone();
+        let Some((id, _, _)) = current else {
+            return Ok(FullImportScanStatus {
+                scanning: false,
+                status: ImportScanStatus::NoResults,
+                session: None,
+                error: None,
+            });
+        };
+        match state.as_ref().filter(|s| s.id == id) {
+            Some(state) => Ok(FullImportScanStatus {
+                scanning: state.scanning,
+                status: state.scanner.get_status().await,
+                session: Some(id),
+                error: state.error.clone(),
+            }),
+            None => Ok(FullImportScanStatus {
+                scanning: true,
+                status: ImportScanStatus::NoResults,
+                session: Some(id),
+                error: None,
+            }),
         }
     }
 }
@@ -451,6 +525,8 @@ impl Entity {
 pub struct ImportableInstance {
     pub filename: String,
     pub instance_name: String,
+    /// Parts of the source left out of the import, shown before importing.
+    pub warnings: Vec<Translation>,
 }
 
 #[derive(Debug, Clone)]
@@ -472,6 +548,8 @@ pub enum ImportScanStatus {
 }
 
 pub struct FullImportScanStatus {
+    pub session: Option<String>,
+    pub error: Option<String>,
     pub scanning: bool,
     pub status: ImportScanStatus,
 }
@@ -519,7 +597,7 @@ impl<T: Clone + Into<ImportableInstance>> ImporterState<T> {
 
     async fn get(&self, index: u32) -> Option<&T> {
         match self {
-            Self::SingleResult(InternalImportEntry::Valid(entry)) => Some(entry),
+            Self::SingleResult(InternalImportEntry::Valid(entry)) if index == 0 => Some(entry),
             Self::MultiResult(entries) => entries
                 .get(index as usize)
                 .map(|r| match r {
@@ -685,16 +763,21 @@ mod test {
         std::fs::write(game.join("mods").join("foo.jar"), b"jar").unwrap();
         std::fs::write(game.join("saves").join("World").join("level.dat"), b"dat").unwrap();
         std::fs::write(game.join("options.txt"), "lang:en_us\n").unwrap();
+        // The override survives the scan only if its binary is there.
+        let java = good.join("java-binary");
+        std::fs::write(&java, b"").unwrap();
+        let java = java.to_str().unwrap().to_string();
+        let java_in_cfg = java.replace('\\', "\\\\");
         std::fs::write(
             good.join("instance.cfg"),
-            "[General]\nConfigVersion=1.2\nInstanceType=OneSix\nname=Good Pack\niconKey=mypack\nnotes=hello\n\
+            format!("[General]\nConfigVersion=1.2\nInstanceType=OneSix\nname=Good Pack\niconKey=mypack\nnotes=hello\n\
              totalTimePlayed=120\nlastLaunchTime=1700000000000\n\
              ManagedPack=true\nManagedPackType=flame\nManagedPackID=12345\nManagedPackVersionID=67890\n\
              OverrideMemory=true\nMinMemAlloc=1024\nMaxMemAlloc=8192\n\
              OverrideJavaArgs=true\nJvmArgs=-XX:+UseG1GC\n\
-             OverrideJavaLocation=true\nJavaPath=/usr/bin/java\n\
+             OverrideJavaLocation=true\nJavaPath={java_in_cfg}\n\
              OverrideCommands=true\nPreLaunchCommand=echo pre\nPostExitCommand=echo post\nWrapperCommand=gamemoderun\n\
-             OverrideWindow=true\nMinecraftWinWidth=1920\nMinecraftWinHeight=1080\n",
+             OverrideWindow=true\nMinecraftWinWidth=1920\nMinecraftWinHeight=1080\n"),
         )
         .unwrap();
         std::fs::write(
@@ -742,7 +825,7 @@ mod test {
         assert_eq!(details.extra_java_args.as_deref(), Some("-XX:+UseG1GC"));
         assert!(matches!(
             details.java_override,
-            Some(JavaOverride::Path(Some(ref p))) if p == "/usr/bin/java"
+            Some(JavaOverride::Path(Some(ref p))) if *p == java
         ));
         assert_eq!(details.pre_launch_hook.as_deref(), Some("echo pre"));
         assert_eq!(details.post_exit_hook.as_deref(), Some("echo post"));
@@ -784,5 +867,281 @@ mod test {
             "lang:en_us\n"
         );
         assert!(!root.join("instance").join("instance.cfg").exists());
+    }
+}
+
+async fn wait_for_target_change(
+    rx: &mut watch::Receiver<Option<(String, Entity, PathBuf)>>,
+    id: &str,
+) {
+    while rx.changed().await.is_ok() {
+        if !rx.borrow().as_ref().is_some_and(|target| target.0 == id) {
+            break;
+        }
+    }
+}
+#[cfg(test)]
+mod task13_watch_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task13_replacement_and_cancel_interrupt_active_scan() {
+        for target in [
+            Some(("B".into(), Entity::CurseForge, PathBuf::from("synthetic-B"))),
+            None,
+        ] {
+            let (tx, mut rx) = watch::channel(Some((
+                "A".into(),
+                Entity::CurseForge,
+                PathBuf::from("synthetic-A"),
+            )));
+            tx.send(target).unwrap();
+            assert!(
+                tokio::time::timeout(
+                    std::time::Duration::from_millis(50),
+                    wait_for_target_change(&mut rx, "A")
+                )
+                .await
+                .is_ok()
+            );
+        }
+    }
+}
+
+/// Retain temporary storage through outstanding IO even if the request is dropped.
+async fn with_share_archive<T, F, Fut>(
+    tmpdir: carbon_rt_path::TempEntry<carbon_rt_path::tempentry::Folder>,
+    share_code: String,
+    work: F,
+) -> anyhow::Result<T>
+where
+    T: Send + 'static,
+    F: FnOnce(PathBuf) -> Fut + Send + 'static,
+    Fut: std::future::Future<Output = anyhow::Result<T>> + Send + 'static,
+{
+    tokio::spawn(
+        async move {
+            let file_path = tmpdir.join(format!("{share_code}.gdlpack"));
+            info!(
+                "downloading instance share code {share_code} to {file_path:?} ({:?})",
+                &*tmpdir
+            );
+            work(file_path).await
+        }
+        .with_current_subscriber(),
+    )
+    .await?
+}
+
+#[cfg(test)]
+mod task13_temp_tests {
+    use super::*;
+    use tracing::Instrument;
+    #[tokio::test]
+    async fn task13_info_logging_retains_temporary_owner() {
+        let t = tempfile::tempdir().unwrap();
+        let tmp = carbon_rt_path::TempPath::new(t.path().to_path_buf())
+            .maketmpdir()
+            .await
+            .unwrap();
+        let directory = tmp.to_path_buf();
+        let subscriber = tracing_subscriber::fmt()
+            .with_max_level(tracing::Level::INFO)
+            .with_writer(std::io::sink)
+            .finish();
+        let task = with_share_archive(tmp, "synthetic".into(), |path| async move {
+            tokio::fs::write(path, b"synthetic archive").await?;
+            Ok(())
+        })
+        .with_subscriber(subscriber);
+        task.await.unwrap();
+        assert!(
+            !directory.exists(),
+            "completed import must release its temporary archive"
+        );
+    }
+}
+
+#[cfg(test)]
+mod task13_session_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task13_latest_target_runs_cancellation_revokes_and_errors_retry() {
+        let manager = Arc::new(InstanceImportManager::new());
+        let rx = manager.scan_path.subscribe();
+        let (started, mut starts) = mpsc::unbounded_channel();
+        let (notice, mut notices) = mpsc::unbounded_channel();
+        let copy = manager.clone();
+        let worker = tokio::spawn(async move {
+            copy.scan_loop(
+                rx,
+                move |_, path| {
+                    let started = started.clone();
+                    async move {
+                        started.send(path.clone()).unwrap();
+                        if path == PathBuf::from("A") {
+                            std::future::pending::<()>().await;
+                        }
+                        if path == PathBuf::from("B") {
+                            anyhow::bail!("synthetic late directory failure");
+                        }
+                        Ok(())
+                    }
+                },
+                || {
+                    let _ = notice.send(());
+                },
+            )
+            .await;
+        });
+        manager
+            .scan_path
+            .send(Some(("one".into(), Entity::CurseForge, "A".into())))
+            .unwrap();
+        assert_eq!(starts.recv().await.unwrap(), PathBuf::from("A"));
+        assert!(manager.selected_scanner("one").await.is_err());
+        manager
+            .scan_path
+            .send(Some(("two".into(), Entity::CurseForge, "B".into())))
+            .unwrap();
+        assert_eq!(
+            tokio::time::timeout(std::time::Duration::from_secs(1), starts.recv())
+                .await
+                .unwrap()
+                .unwrap(),
+            PathBuf::from("B")
+        );
+        loop {
+            let status = manager.status().await.unwrap();
+            if !status.scanning {
+                assert!(status.error.unwrap().contains("synthetic late"));
+                break;
+            }
+            notices.recv().await.unwrap();
+        }
+        assert!(manager.selected_scanner("one").await.is_err());
+        let accepted = manager.selected_scanner("two").await.unwrap();
+        manager.scan_path.send(None).unwrap();
+        assert!(manager.selected_scanner("two").await.is_err());
+        assert!(manager.status().await.unwrap().session.is_none());
+        assert!(matches!(
+            accepted.get_status().await,
+            ImportScanStatus::NoResults
+        ));
+        manager
+            .scan_path
+            .send(Some(("retry".into(), Entity::CurseForge, "C".into())))
+            .unwrap();
+        assert_eq!(starts.recv().await.unwrap(), PathBuf::from("C"));
+        loop {
+            let status = manager.status().await.unwrap();
+            if !status.scanning {
+                assert!(status.error.is_none());
+                break;
+            }
+            notices.recv().await.unwrap();
+        }
+        worker.abort();
+    }
+    #[tokio::test]
+    async fn task13_temp_survives_dropped_request_until_owned_io_settles() {
+        let t = tempfile::tempdir().unwrap();
+        let tmp = carbon_rt_path::TempPath::new(t.path().to_path_buf())
+            .maketmpdir()
+            .await
+            .unwrap();
+        let path = tmp.to_path_buf();
+        let (started, ready) = tokio::sync::oneshot::channel();
+        let (release, pending) = tokio::sync::oneshot::channel();
+        let (finished, done) = tokio::sync::oneshot::channel();
+        let request = tokio::spawn(with_share_archive(
+            tmp,
+            "synthetic".into(),
+            move |file| async move {
+                tokio::fs::write(&file, b"owned IO").await?;
+                started.send(()).unwrap();
+                pending.await.unwrap();
+                tokio::fs::write(&file, b"settled IO").await?;
+                let _ = finished.send(());
+                Err::<(), _>(anyhow!("synthetic completed error"))
+            },
+        ));
+        ready.await.unwrap();
+        request.abort();
+        assert!(path.exists());
+        release.send(()).unwrap();
+        done.await.unwrap();
+        for _ in 0..100 {
+            if !path.exists() {
+                return;
+            }
+            tokio::task::yield_now().await;
+        }
+        panic!("owned temporary storage remained after IO settlement");
+    }
+}
+
+#[cfg(test)]
+mod scan_panic_tests {
+    use super::*;
+
+    async fn finished(
+        manager: &InstanceImportManager,
+        session: &str,
+        notices: &mut mpsc::UnboundedReceiver<()>,
+    ) -> FullImportScanStatus {
+        loop {
+            let status = manager.status().await.unwrap();
+            if status.session.as_deref() == Some(session) && !status.scanning {
+                return status;
+            }
+            notices.recv().await.unwrap();
+        }
+    }
+
+    /// A drive root holding a legacy config.json used to panic the scanner and
+    /// leave every importer unusable until GDLauncher restarted.
+    #[tokio::test]
+    async fn a_panicking_scan_is_reported_and_later_scans_still_run() {
+        let manager = Arc::new(InstanceImportManager::new());
+        let rx = manager.scan_path.subscribe();
+        let (notice, mut notices) = mpsc::unbounded_channel();
+        let copy = manager.clone();
+        let worker = tokio::spawn(async move {
+            copy.scan_loop(
+                rx,
+                |_, path| async move {
+                    if path == PathBuf::from("panics") {
+                        panic!("synthetic importer bug");
+                    }
+                    Ok::<(), anyhow::Error>(())
+                },
+                || {
+                    let _ = notice.send(());
+                },
+            )
+            .await;
+        });
+        manager
+            .scan_path
+            .send(Some((
+                "one".into(),
+                Entity::LegacyGDLauncher,
+                "panics".into(),
+            )))
+            .unwrap();
+        let status = finished(&manager, "one", &mut notices).await;
+        let error = status.error.unwrap();
+        assert!(error.contains("The scan stopped unexpectedly"), "{error}");
+        // The bug's own text is for the log, not for the banner.
+        assert!(!error.contains("synthetic importer bug"), "{error}");
+
+        manager
+            .scan_path
+            .send(Some(("two".into(), Entity::CurseForge, "fine".into())))
+            .unwrap();
+        let status = finished(&manager, "two", &mut notices).await;
+        assert!(status.error.is_none());
+        assert!(!worker.is_finished());
+        worker.abort();
     }
 }

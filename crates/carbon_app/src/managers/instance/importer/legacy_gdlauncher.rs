@@ -1,7 +1,7 @@
 use super::{
     ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter, InternalImportEntry,
     InvalidImportEntry,
-    common::{ImportedSettings, apply_imported_settings},
+    common::{ImportedSettings, apply_imported_settings, dir_name},
 };
 use crate::{
     api::keys::instance::*,
@@ -18,20 +18,23 @@ use anyhow::anyhow;
 use chrono::{DateTime, NaiveDateTime, Utc};
 use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
-use tracing::trace;
+use tracing::{trace, warn};
 
 #[derive(Debug, Clone)]
 struct Importable {
     filename: String,
     path: PathBuf,
     config: LegacyGDLauncherConfig,
+    settings: ImportedSettings,
 }
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
+        let warnings = value.settings.warnings();
         Self {
             filename: value.filename.clone(),
             instance_name: value.filename,
+            warnings,
         }
     }
 }
@@ -77,25 +80,37 @@ impl LegacyGDLauncherImporter {
         &self,
         path: PathBuf,
     ) -> anyhow::Result<Option<InternalImportEntry<Importable>>> {
-        let config = path.join("config.json");
-        if !config.is_file() {
+        let config_path = path.join("config.json");
+        if !config_path.is_file() {
             return Ok(None);
         }
 
-        let config = tokio::fs::read_to_string(config).await?;
-        let config = serde_json::from_str::<LegacyGDLauncherConfig>(&config);
-        let filename = path
-            .file_name()
-            .expect("filename cannot be empty")
-            .to_string_lossy()
-            .to_string();
+        // A drive root has no folder name; it is named by its path instead.
+        let filename = dir_name(&path);
+        // One unreadable config (corrupt text, permissions, an offline cloud
+        // file) gets its own row instead of hiding the instances after it.
+        let config = match tokio::fs::read_to_string(&config_path).await {
+            Ok(config) => serde_json::from_str::<LegacyGDLauncherConfig>(&config),
+            Err(e) => {
+                warn!("Cannot read {config_path:?}: {e}");
+                return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
+                    name: filename,
+                    reason: Translation::InstanceImportConfigUnreadable,
+                })));
+            }
+        };
 
         match config {
-            Ok(config) => Ok(Some(InternalImportEntry::Valid(Importable {
-                filename,
-                path,
-                config,
-            }))),
+            Ok(config) => {
+                let mut settings = config.settings();
+                settings.skip_missing_java_path();
+                Ok(Some(InternalImportEntry::Valid(Importable {
+                    filename,
+                    path,
+                    config,
+                    settings,
+                })))
+            }
             Err(_) => Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
                 name: filename,
                 reason: Translation::InstanceImportLegacyBadConfigFile,
@@ -107,25 +122,8 @@ impl LegacyGDLauncherImporter {
 #[async_trait::async_trait]
 impl InstanceImporter for LegacyGDLauncherImporter {
     async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()> {
-        if scan_path.is_dir() {
-            let Ok(mut dir) = tokio::fs::read_dir(&scan_path).await else {
-                return Ok(());
-            };
-
-            while let Some(path) = dir.next_entry().await? {
-                if path.metadata().await?.is_dir() {
-                    if let Ok(Some(entry)) = self.scan_instance(path.path()).await {
-                        self.state.write().await.push_multi(entry).await;
-                        app.invalidate(GET_IMPORT_SCAN_STATUS, None);
-                    }
-                }
-            }
-        } else if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
-            self.state.write().await.set_single(entry).await;
-            app.invalidate(GET_IMPORT_SCAN_STATUS, None);
-        }
-
-        Ok(()) // TODO: invalidate on iter
+        self.scan_path(scan_path, &|| app.invalidate(GET_IMPORT_SCAN_STATUS, None))
+            .await
     }
 
     async fn get_status(&self) -> ImportScanStatus {
@@ -256,7 +254,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             }
         };
 
-        let settings = instance.config.settings();
+        let settings = &instance.settings;
 
         let id = app
             .instance_manager()
@@ -272,7 +270,7 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             )
             .await?;
 
-        apply_imported_settings(app, id, &settings).await;
+        apply_imported_settings(app, id, settings).await;
 
         app.instance_manager()
             .prepare_game(id, None, None, true)
@@ -393,5 +391,232 @@ mod test {
         assert_eq!(settings.extra_java_args.as_deref(), Some("-XX:+UseZGC"));
         assert_eq!(settings.memory(), None);
         assert_eq!(settings.notes, None);
+    }
+}
+
+impl LegacyGDLauncherImporter {
+    async fn scan_path(
+        &self,
+        scan_path: PathBuf,
+        notify: &(dyn Fn() + Send + Sync),
+    ) -> anyhow::Result<()> {
+        let scan_path = if scan_path
+            .file_name()
+            .is_some_and(|name| name == "config.json")
+            && scan_path.is_file()
+        {
+            scan_path
+                .parent()
+                .ok_or_else(|| anyhow!("Selected config has no parent"))?
+                .to_path_buf()
+        } else {
+            scan_path
+        };
+        if scan_path.join("config.json").is_file() {
+            if let Some(entry) = self.scan_instance(scan_path).await? {
+                self.state.write().await.set_single(entry).await;
+                notify();
+            }
+            return Ok(());
+        }
+        if scan_path.is_dir() {
+            let mut dir = super::common::scan_directory(&scan_path).await?;
+
+            while let Some(path) = dir.next_entry().await? {
+                match path.metadata().await {
+                    Ok(metadata) if metadata.is_dir() => {}
+                    Ok(_) => continue,
+                    Err(e) => {
+                        warn!("Cannot inspect {:?}, skipping it: {e}", path.path());
+                        continue;
+                    }
+                }
+                if let Some(entry) = self.scan_instance(path.path()).await? {
+                    self.state.write().await.push_multi(entry).await;
+                    notify();
+                }
+            }
+        } else if let Some(entry) = self.scan_instance(scan_path).await? {
+            self.state.write().await.set_single(entry).await;
+            notify();
+        }
+
+        Ok(()) // TODO: invalidate on iter
+    }
+}
+
+#[cfg(test)]
+mod task13_scan_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task13_single_root_and_config_selection() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("Synthetic");
+        std::fs::create_dir(&root).unwrap();
+        // Malformed recognized metadata remains a named Invalid row, not absence.
+        let config = root.join("config.json");
+        std::fs::write(&config, b"invalid synthetic metadata").unwrap();
+        for path in [root.clone(), config] {
+            let scanner = LegacyGDLauncherImporter::new();
+            scanner.scan_path(path, &|| {}).await.unwrap();
+            assert!(matches!(
+                scanner.get_status().await,
+                ImportScanStatus::SingleResult(super::super::ImportEntry::Invalid(_))
+            ));
+        }
+        let scanner = LegacyGDLauncherImporter::new();
+        scanner
+            .scan_path(t.path().to_path_buf(), &|| {})
+            .await
+            .unwrap();
+        assert!(matches!(
+            scanner.get_status().await,
+            ImportScanStatus::MultiResult(_)
+        ));
+    }
+}
+
+#[cfg(test)]
+mod task13_valid_controls {
+    use super::*;
+    #[tokio::test]
+    async fn task13_valid_single_config_collection_and_empty() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("Synthetic");
+        std::fs::create_dir(&root).unwrap();
+        let config = root.join("config.json");
+        std::fs::write(
+            &config,
+            r#"{"loader":{"loaderType":"vanilla","mcVersion":"1.20.1"}}"#,
+        )
+        .unwrap();
+        for path in [root, config] {
+            let scanner = LegacyGDLauncherImporter::new();
+            scanner.scan_path(path, &|| {}).await.unwrap();
+            assert!(matches!(
+                scanner.get_status().await,
+                ImportScanStatus::SingleResult(super::super::ImportEntry::Valid(_))
+            ));
+        }
+        let scanner = LegacyGDLauncherImporter::new();
+        scanner
+            .scan_path(t.path().to_path_buf(), &|| {})
+            .await
+            .unwrap();
+        let ImportScanStatus::MultiResult(entries) = scanner.get_status().await else {
+            panic!("missing collection")
+        };
+        assert_eq!(entries.len(), 1);
+        assert!(matches!(entries[0], super::super::ImportEntry::Valid(_)));
+        let empty = tempfile::tempdir().unwrap();
+        let scanner = LegacyGDLauncherImporter::new();
+        scanner
+            .scan_path(empty.path().to_path_buf(), &|| {})
+            .await
+            .unwrap();
+        assert!(matches!(
+            scanner.get_status().await,
+            ImportScanStatus::NoResults
+        ));
+    }
+}
+
+#[cfg(test)]
+mod entry_failure_tests {
+    use super::super::ImportEntry;
+    use super::*;
+
+    /// One config that cannot be read (here: not UTF-8) used to stop the scan
+    /// and hide every instance after it; now it is its own row.
+    #[tokio::test]
+    async fn an_unreadable_config_gets_its_own_row_and_the_scan_goes_on() {
+        let t = tempfile::tempdir().unwrap();
+        for name in ["Alpha", "Broken", "Zulu"] {
+            std::fs::create_dir(t.path().join(name)).unwrap();
+            std::fs::write(
+                t.path().join(name).join("config.json"),
+                r#"{"loader":{"loaderType":"vanilla","mcVersion":"1.20.1"}}"#,
+            )
+            .unwrap();
+        }
+        std::fs::write(t.path().join("Broken/config.json"), [0xff, 0xfe, 0x00]).unwrap();
+        let scanner = LegacyGDLauncherImporter::new();
+        scanner
+            .scan_path(t.path().to_path_buf(), &|| {})
+            .await
+            .unwrap();
+        let ImportScanStatus::MultiResult(entries) = scanner.get_status().await else {
+            panic!("missing collection")
+        };
+        let mut valid: Vec<_> = entries
+            .iter()
+            .filter_map(|e| match e {
+                ImportEntry::Valid(v) => Some(v.filename.clone()),
+                ImportEntry::Invalid(_) => None,
+            })
+            .collect();
+        valid.sort();
+        assert_eq!(valid, ["Alpha", "Zulu"]);
+        assert!(entries.iter().any(|e| matches!(
+            e,
+            ImportEntry::Invalid(InvalidImportEntry {
+                name,
+                reason: Translation::InstanceImportConfigUnreadable,
+            }) if name == "Broken"
+        )));
+    }
+
+    /// A folder without a name of its own (a drive root such as `E:\`) used to
+    /// panic the scanner and break every importer until GDLauncher restarted.
+    #[tokio::test]
+    async fn a_folder_without_a_name_does_not_panic() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::create_dir(t.path().join("sub")).unwrap();
+        std::fs::write(
+            t.path().join("config.json"),
+            r#"{"loader":{"loaderType":"vanilla","mcVersion":"1.20.1"}}"#,
+        )
+        .unwrap();
+        let unnamed = t.path().join("sub").join("..");
+        assert!(unnamed.file_name().is_none());
+        let entry = LegacyGDLauncherImporter::new()
+            .scan_instance(unnamed.clone())
+            .await
+            .unwrap();
+        let Some(InternalImportEntry::Valid(entry)) = entry else {
+            panic!("expected an importable instance")
+        };
+        assert_eq!(entry.filename, unnamed.to_string_lossy());
+    }
+}
+
+#[cfg(test)]
+mod stale_java_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_java_path_that_is_gone_is_left_out() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(
+            t.path().join("config.json"),
+            serde_json::json!({
+                "loader": { "loaderType": "vanilla", "mcVersion": "1.20.1" },
+                "customJavaPath": "/gdl-no-such-folder/bin/java"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let Some(InternalImportEntry::Valid(entry)) = LegacyGDLauncherImporter::new()
+            .scan_instance(t.path().to_path_buf())
+            .await
+            .unwrap()
+        else {
+            panic!("an instance with a stale Java path was refused")
+        };
+        assert_eq!(entry.settings.java_path, None);
+        assert_eq!(
+            ImportableInstance::from(entry).warnings,
+            [Translation::InstanceImportJavaPathSkipped]
+        );
     }
 }

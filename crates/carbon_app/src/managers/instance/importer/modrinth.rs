@@ -148,6 +148,9 @@ impl ModrinthAppImporter {
             .as_deref()
             .and_then(|icon| resolve_icon_path(&path, icon));
 
+        let mut settings = record.settings;
+        settings.skip_missing_java_path();
+
         Ok(Some(InternalImportEntry::Valid(Importable {
             filename,
             path,
@@ -158,7 +161,7 @@ impl ModrinthAppImporter {
             modpack,
             seconds_played: record.seconds_played,
             last_played: record.last_played,
-            settings: record.settings,
+            settings,
         })))
     }
 }
@@ -184,15 +187,19 @@ impl InstanceImporter for ModrinthAppImporter {
 
         if let Some(profile) = &layout.single_profile {
             let record = records.get(&dir_name(profile)).cloned();
-            if let Ok(Some(entry)) = self.scan_profile(profile.clone(), record).await {
+            if let Some(entry) = self.scan_profile(profile.clone(), record).await? {
                 self.state.write().await.set_single(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
             return Ok(());
         }
 
-        let Ok(mut dir) = tokio::fs::read_dir(&layout.profiles_dir).await else {
-            return Ok(());
+        let mut dir = match super::common::scan_directory(&layout.profiles_dir).await {
+            Ok(dir) => dir,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                return Err(metadata_error.unwrap_or_else(|| e.into()));
+            }
+            Err(e) => return Err(e.into()),
         };
 
         while let Some(entry) = dir.next_entry().await? {
@@ -202,7 +209,7 @@ impl InstanceImporter for ModrinthAppImporter {
             }
 
             let record = records.get(&dir_name(&entry_path)).cloned();
-            if let Ok(Some(entry)) = self.scan_profile(entry_path, record).await {
+            if let Some(entry) = self.scan_profile(entry_path, record).await? {
                 self.state.write().await.push_multi(entry).await;
                 app.invalidate(GET_IMPORT_SCAN_STATUS, None);
             }
@@ -1208,6 +1215,61 @@ mod test {
         assert_eq!(resolve_icon_path(&profile, ""), None);
     }
 
+    fn database_with_custom_dir(settings: &Path, custom: &Path) {
+        let conn = rusqlite::Connection::open(settings.join("app.db")).unwrap();
+        conn.execute_batch(&format!(
+            "CREATE TABLE settings (custom_dir TEXT NULL); INSERT INTO settings VALUES ('{}');",
+            custom.to_string_lossy().replace('\'', "''")
+        ))
+        .unwrap();
+    }
+
+    /// A data folder whose database points at an unplugged drive has nothing
+    /// to list; "No instance found" alone would hide why.
+    #[tokio::test]
+    async fn a_missing_configured_folder_is_named() {
+        let tmp = tempfile::tempdir().unwrap();
+        let settings = tmp.path().join("ModrinthApp");
+        std::fs::create_dir_all(settings.join("profiles").join("Leftover")).unwrap();
+        let gone = tmp.path().join("unplugged");
+        database_with_custom_dir(&settings, &gone);
+
+        let layout = Layout::detect(&settings);
+        let (_, error) = load_records_from_candidates(&layout, vec![settings.join("app.db")]).await;
+        let error = format!("{:#}", error.expect("the missing folder was not reported"));
+        assert!(error.contains(&gone.display().to_string()), "{error}");
+        assert!(error.contains("choose another folder"), "{error}");
+
+        // Also when there is no leftover folder to scan at all.
+        std::fs::remove_dir_all(settings.join("profiles")).unwrap();
+        let layout = Layout::detect(&settings);
+        let (_, error) = load_records_from_candidates(&layout, vec![settings.join("app.db")]).await;
+        assert!(error.is_some());
+
+        // A folder that exists but holds no profiles yet is not missing.
+        std::fs::create_dir_all(&gone).unwrap();
+        let (_, error) = load_records_from_candidates(&layout, vec![settings.join("app.db")]).await;
+        assert!(error.is_none(), "{error:?}");
+    }
+
+    /// Another install's database pointing somewhere gone says nothing about
+    /// the folder the user selected.
+    #[tokio::test]
+    async fn a_missing_folder_of_another_install_is_ignored() {
+        let tmp = tempfile::tempdir().unwrap();
+        let other = tmp.path().join("OtherInstall");
+        std::fs::create_dir_all(&other).unwrap();
+        database_with_custom_dir(&other, &tmp.path().join("unplugged"));
+        let selected = tmp.path().join("Selected");
+        std::fs::create_dir_all(selected.join("profiles")).unwrap();
+
+        let layout = Layout::detect(&selected);
+        let (records, error) =
+            load_records_from_candidates(&layout, vec![other.join("app.db")]).await;
+        assert!(records.is_empty());
+        assert!(error.is_none(), "{error:?}");
+    }
+
     #[tokio::test]
     async fn custom_dir_relocates_profiles() {
         let tmp = tempfile::tempdir().unwrap();
@@ -1227,6 +1289,36 @@ mod test {
         assert_eq!(
             profiles_dir_for_settings_dir(&settings).await,
             custom.join("profiles")
+        );
+    }
+}
+
+#[cfg(test)]
+mod stale_java_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_java_path_that_is_gone_is_left_out() {
+        let t = tempfile::tempdir().unwrap();
+        let record = ProfileRecord {
+            game_version: Some("1.20.1".into()),
+            settings: ImportedSettings {
+                java_path: Some("/gdl-no-such-folder/bin/java".into()),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let Some(InternalImportEntry::Valid(entry)) = ModrinthAppImporter::new()
+            .scan_profile(t.path().to_path_buf(), Some(record))
+            .await
+            .unwrap()
+        else {
+            panic!("a profile with a stale Java path was refused")
+        };
+        assert_eq!(entry.settings.java_path, None);
+        assert_eq!(
+            ImportableInstance::from(entry).warnings,
+            [Translation::InstanceImportJavaPathSkipped]
         );
     }
 }

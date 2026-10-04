@@ -102,6 +102,13 @@ pub enum FETaskWarning {
     /// A world was installed as the new save `saved_as`, because a save
     /// named `name` already exists; that save was not changed.
     WorldNameTaken { name: String, saved_as: String },
+    /// A modpack version change kept files of the version it replaced that it
+    /// could not check against that version; `platform` is where that version
+    /// was published.
+    PreviousPackFilesKept {
+        platform: FEDependencyPlatform,
+        reason: FEPreviousPackFilesReason,
+    },
 }
 
 #[derive(Type, Serialize)]
@@ -123,6 +130,12 @@ pub enum FESkippedDependencyReason {
 
 #[derive(Type, Serialize)]
 pub enum FEPreviousPackFilesReason {
+    /// The platform no longer serves the replaced version.
+    VersionUnavailable,
+    /// The replaced version's files could not be checked for another reason.
+    VersionUnreadable,
+    /// Some of the replaced version's files could not be checked.
+    SomeFilesUnchecked,
 }
 
 impl From<domain::DependencyPlatform> for FEDependencyPlatform {
@@ -205,6 +218,22 @@ impl From<domain::TaskWarning> for FETaskWarning {
             }
             domain::TaskWarning::WorldNameTaken { name, saved_as } => {
                 Self::WorldNameTaken { name, saved_as }
+            }
+            domain::TaskWarning::PreviousPackFilesKept { platform, reason } => {
+                Self::PreviousPackFilesKept {
+                    platform: platform.into(),
+                    reason: match reason {
+                        domain::PreviousPackFilesReason::VersionUnavailable => {
+                            FEPreviousPackFilesReason::VersionUnavailable
+                        }
+                        domain::PreviousPackFilesReason::VersionUnreadable => {
+                            FEPreviousPackFilesReason::VersionUnreadable
+                        }
+                        domain::PreviousPackFilesReason::SomeFilesUnchecked => {
+                            FEPreviousPackFilesReason::SomeFilesUnchecked
+                        }
+                    },
+                }
             }
         }
     }

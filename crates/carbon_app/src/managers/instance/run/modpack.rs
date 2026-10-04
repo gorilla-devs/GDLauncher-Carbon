@@ -2967,7 +2967,7 @@ async fn execute_representation(
 }
 
 #[cfg(test)]
-async fn execute_plan(
+pub(in crate::managers::instance) async fn execute_plan(
     entries: &[apply_plan::PlanEntry],
     root: &Path,
     staging: &Path,

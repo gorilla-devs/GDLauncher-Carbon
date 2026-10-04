@@ -1,7 +1,7 @@
 use super::{
     GET_IMPORT_SCAN_STATUS, ImportScanStatus, ImportableInstance, ImporterState, InstanceImporter,
     InternalImportEntry, InvalidImportEntry,
-    common::{ImportedSettings, apply_imported_settings, dedup_paths, read_json_value},
+    common::{ImportedSettings, apply_imported_settings, dedup_paths, dir_name, read_json_value},
 };
 use crate::api::translation::Translation;
 use crate::domain::instance::info::{CurseforgeModpack, GameVersion, Modpack};
@@ -14,7 +14,7 @@ use serde::Deserialize;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{info, trace};
+use tracing::{info, trace, warn};
 
 /// The app writes a relocated modding folder into its own `settings.json`, but it
 /// is closed source and the key is undocumented, so every absolute path in that
@@ -127,6 +127,7 @@ impl From<Importable> for ImportableInstance {
         Self {
             filename: value.filename,
             instance_name: value.meta.name,
+            warnings: Vec::new(),
         }
     }
 }
@@ -171,14 +172,20 @@ impl CurseforgeImporter {
 
         let manifest_path: PathBuf = path.join("manifest.json");
 
-        let config = tokio::fs::read_to_string(config).await?;
-        let config = serde_json::from_str::<CfMetadata>(&config);
-
-        let filename = path
-            .file_name()
-            .expect("filename cannot be empty")
-            .to_string_lossy()
-            .to_string();
+        // A drive root has no folder name; it is named by its path instead.
+        let filename = dir_name(&path);
+        // One unreadable config (corrupt text, permissions, an offline cloud
+        // file) gets its own row instead of hiding the instances after it.
+        let config = match tokio::fs::read_to_string(&config).await {
+            Ok(config) => serde_json::from_str::<CfMetadata>(&config),
+            Err(e) => {
+                warn!("Cannot read {config:?}: {e}");
+                return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
+                    name: filename,
+                    reason: Translation::InstanceImportConfigUnreadable,
+                })));
+            }
+        };
 
         let manifest = tokio::fs::read_to_string(manifest_path)
             .await
@@ -206,25 +213,8 @@ impl CurseforgeImporter {
 #[async_trait::async_trait]
 impl InstanceImporter for CurseforgeImporter {
     async fn scan(&self, app: &Arc<AppInner>, scan_path: PathBuf) -> anyhow::Result<()> {
-        if scan_path.is_dir() {
-            let Ok(mut dir) = tokio::fs::read_dir(&scan_path).await else {
-                return Ok(());
-            };
-
-            while let Some(path) = dir.next_entry().await? {
-                if path.metadata().await?.is_dir() {
-                    if let Ok(Some(entry)) = self.scan_instance(path.path()).await {
-                        self.state.write().await.push_multi(entry).await;
-                        app.invalidate(GET_IMPORT_SCAN_STATUS, None);
-                    }
-                }
-            }
-        } else if let Ok(Some(entry)) = self.scan_instance(scan_path).await {
-            self.state.write().await.set_single(entry).await;
-            app.invalidate(GET_IMPORT_SCAN_STATUS, None);
-        }
-
-        Ok(())
+        self.scan_path(scan_path, &|| app.invalidate(GET_IMPORT_SCAN_STATUS, None))
+            .await
     }
 
     async fn get_status(&self) -> ImportScanStatus {
@@ -339,7 +329,7 @@ impl InstanceImporter for CurseforgeImporter {
                     project_id: instance.meta.project_id,
                     file_id: instance.meta.file_id,
                 }),
-                instance.meta.is_unlocked,
+                source_locked(instance.meta.is_unlocked),
             ),
             None => InstanceVersionSource::Version(version),
         };
@@ -440,5 +430,295 @@ mod test {
         // A path that does not exist is ignored, so a wrong guess costs nothing.
         let missing = serde_json::json!({ "a": "/no/such/place", "b": "relative/path" });
         assert_eq!(find_instances_dir(&missing), None);
+    }
+}
+
+fn source_locked(is_unlocked: bool) -> bool {
+    !is_unlocked
+}
+#[cfg(test)]
+mod task13_tests {
+    #[test]
+    fn task13_cf_lock_matches_source_permissions() {
+        assert!(!super::source_locked(true));
+        assert!(super::source_locked(false));
+        use crate::domain::instance::info::{CurseforgeModpack, Modpack, ModpackInfo};
+        for is_unlocked in [false, true] {
+            let pack = ModpackInfo {
+                modpack: Modpack::Curseforge(CurseforgeModpack {
+                    project_id: 1,
+                    file_id: 2,
+                }),
+                locked: super::source_locked(is_unlocked),
+            };
+            assert_eq!(
+                crate::managers::instance::mods::ensure_pack_unlocked(Some(&pack)).is_ok(),
+                is_unlocked
+            );
+        }
+        assert!(crate::managers::instance::mods::ensure_pack_unlocked(None).is_ok());
+    }
+}
+
+impl CurseforgeImporter {
+    async fn scan_path(
+        &self,
+        scan_path: PathBuf,
+        notify: &(dyn Fn() + Send + Sync),
+    ) -> anyhow::Result<()> {
+        let scan_path = if scan_path
+            .file_name()
+            .is_some_and(|name| name == "minecraftinstance.json")
+            && scan_path.is_file()
+        {
+            scan_path
+                .parent()
+                .ok_or_else(|| anyhow!("Selected config has no parent"))?
+                .to_path_buf()
+        } else {
+            scan_path
+        };
+        if scan_path.join("minecraftinstance.json").is_file() {
+            if let Some(entry) = self.scan_instance(scan_path).await? {
+                self.state.write().await.set_single(entry).await;
+                notify();
+            }
+            return Ok(());
+        }
+        if scan_path.is_dir() {
+            let mut dir = super::common::scan_directory(&scan_path).await?;
+
+            while let Some(path) = dir.next_entry().await? {
+                match path.metadata().await {
+                    Ok(metadata) if metadata.is_dir() => {}
+                    Ok(_) => continue,
+                    Err(e) => {
+                        warn!("Cannot inspect {:?}, skipping it: {e}", path.path());
+                        continue;
+                    }
+                }
+                if let Some(entry) = self.scan_instance(path.path()).await? {
+                    self.state.write().await.push_multi(entry).await;
+                    notify();
+                }
+            }
+        } else if let Some(entry) = self.scan_instance(scan_path).await? {
+            self.state.write().await.set_single(entry).await;
+            notify();
+        }
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod task13_scan_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task13_single_root_and_config_selection() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("Synthetic");
+        std::fs::create_dir(&root).unwrap();
+        // Malformed recognized metadata remains a named Invalid row, not absence.
+        let config = root.join("minecraftinstance.json");
+        std::fs::write(&config, b"invalid synthetic metadata").unwrap();
+        for path in [root.clone(), config] {
+            let scanner = CurseforgeImporter::new();
+            scanner.scan_path(path, &|| {}).await.unwrap();
+            assert!(matches!(
+                scanner.get_status().await,
+                ImportScanStatus::SingleResult(super::super::ImportEntry::Invalid(_))
+            ));
+        }
+        let scanner = CurseforgeImporter::new();
+        scanner
+            .scan_path(t.path().to_path_buf(), &|| {})
+            .await
+            .unwrap();
+        assert!(matches!(
+            scanner.get_status().await,
+            ImportScanStatus::MultiResult(_)
+        ));
+    }
+}
+
+#[cfg(test)]
+mod task13_io_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task13_read_dir_error_is_not_empty_success() {
+        let t = tempfile::tempdir().unwrap();
+        super::super::common::fail_scan_directory(t.path().to_path_buf());
+        let scanner = CurseforgeImporter::new();
+        let error = scanner.scan_path(t.path().to_path_buf(), &|| {}).await;
+        assert!(
+            error.is_err(),
+            "failed scan must retain an actionable error"
+        );
+    }
+}
+
+#[cfg(test)]
+mod task13_partial_controls {
+    use super::*;
+    #[tokio::test]
+    async fn task13_partial_scan_retains_rows_and_retry_clears_fault() {
+        let t = tempfile::tempdir().unwrap();
+        for name in ["One", "Two"] {
+            let root = t.path().join(name);
+            std::fs::create_dir(&root).unwrap();
+            std::fs::write(
+                root.join("minecraftinstance.json"),
+                b"invalid synthetic metadata",
+            )
+            .unwrap();
+        }
+        super::super::common::fail_scan_after(t.path().to_path_buf(), 1);
+        let scanner = CurseforgeImporter::new();
+        assert!(
+            scanner
+                .scan_path(t.path().to_path_buf(), &|| {})
+                .await
+                .is_err()
+        );
+        let ImportScanStatus::MultiResult(rows) = scanner.get_status().await else {
+            panic!("partial rows lost")
+        };
+        assert_eq!(rows.len(), 1);
+        super::super::common::clear_scan_failure(t.path());
+        let retry = CurseforgeImporter::new();
+        retry
+            .scan_path(t.path().to_path_buf(), &|| {})
+            .await
+            .unwrap();
+        let ImportScanStatus::MultiResult(rows) = retry.get_status().await else {
+            panic!("retry rows lost")
+        };
+        assert_eq!(rows.len(), 2);
+        let empty = tempfile::tempdir().unwrap();
+        let scanner = CurseforgeImporter::new();
+        scanner
+            .scan_path(empty.path().to_path_buf(), &|| {})
+            .await
+            .unwrap();
+        assert!(matches!(
+            scanner.get_status().await,
+            ImportScanStatus::NoResults
+        ));
+    }
+}
+
+#[cfg(test)]
+mod task13_valid_controls {
+    use super::*;
+    #[tokio::test]
+    async fn task13_valid_single_config_collection_and_empty() {
+        let t = tempfile::tempdir().unwrap();
+        let root = t.path().join("Synthetic");
+        std::fs::create_dir(&root).unwrap();
+        let config = root.join("minecraftinstance.json");
+        std::fs::write(&config, r#"{"name":"Synthetic","projectID":1,"fileID":2,"gameVersion":"1.20.1","isUnlocked":true}"#).unwrap();
+        for path in [root, config] {
+            let scanner = CurseforgeImporter::new();
+            scanner.scan_path(path, &|| {}).await.unwrap();
+            assert!(matches!(
+                scanner.get_status().await,
+                ImportScanStatus::SingleResult(super::super::ImportEntry::Valid(_))
+            ));
+        }
+        let scanner = CurseforgeImporter::new();
+        scanner
+            .scan_path(t.path().to_path_buf(), &|| {})
+            .await
+            .unwrap();
+        let ImportScanStatus::MultiResult(entries) = scanner.get_status().await else {
+            panic!("missing collection")
+        };
+        assert_eq!(entries.len(), 1);
+        assert!(matches!(entries[0], super::super::ImportEntry::Valid(_)));
+        let empty = tempfile::tempdir().unwrap();
+        let scanner = CurseforgeImporter::new();
+        scanner
+            .scan_path(empty.path().to_path_buf(), &|| {})
+            .await
+            .unwrap();
+        assert!(matches!(
+            scanner.get_status().await,
+            ImportScanStatus::NoResults
+        ));
+    }
+}
+
+#[cfg(test)]
+mod entry_failure_tests {
+    use super::super::ImportEntry;
+    use super::*;
+
+    /// One minecraftinstance.json that cannot be read (here: not UTF-8) used to
+    /// stop the scan and hide every instance after it; now it is its own row.
+    #[tokio::test]
+    async fn an_unreadable_config_gets_its_own_row_and_the_scan_goes_on() {
+        let t = tempfile::tempdir().unwrap();
+        for name in ["Alpha", "Broken", "Zulu"] {
+            std::fs::create_dir(t.path().join(name)).unwrap();
+            std::fs::write(
+                t.path().join(name).join("minecraftinstance.json"),
+                b"invalid synthetic metadata",
+            )
+            .unwrap();
+        }
+        std::fs::write(
+            t.path().join("Broken/minecraftinstance.json"),
+            [0xff, 0xfe, 0x00],
+        )
+        .unwrap();
+        let scanner = CurseforgeImporter::new();
+        scanner
+            .scan_path(t.path().to_path_buf(), &|| {})
+            .await
+            .unwrap();
+        let ImportScanStatus::MultiResult(entries) = scanner.get_status().await else {
+            panic!("missing collection")
+        };
+        let mut names: Vec<_> = entries
+            .iter()
+            .map(|e| match e {
+                ImportEntry::Valid(v) => v.filename.clone(),
+                ImportEntry::Invalid(i) => i.name.clone(),
+            })
+            .collect();
+        names.sort();
+        assert_eq!(names, ["Alpha", "Broken", "Zulu"]);
+        // Unlike metadata that parses wrong, this may only need the file back.
+        let reason = |name: &str| {
+            entries.iter().find_map(|e| match e {
+                ImportEntry::Invalid(i) if i.name == name => Some(i.reason.clone()),
+                _ => None,
+            })
+        };
+        assert_eq!(
+            reason("Broken"),
+            Some(Translation::InstanceImportConfigUnreadable)
+        );
+        assert_eq!(
+            reason("Alpha"),
+            Some(Translation::InstanceImportLegacyBadConfigFile)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_folder_without_a_name_does_not_panic() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::create_dir(t.path().join("sub")).unwrap();
+        std::fs::write(t.path().join("minecraftinstance.json"), b"{}").unwrap();
+        let unnamed = t.path().join("sub").join("..");
+        assert!(unnamed.file_name().is_none());
+        assert!(
+            CurseforgeImporter::new()
+                .scan_instance(unnamed)
+                .await
+                .unwrap()
+                .is_some()
+        );
     }
 }

@@ -230,10 +230,17 @@ export function getTaskTranslationKey(taskType: string): NamespacedTranslationKe
   return mapping[taskType] ?? ('tasks:_trn_instance_task_prepare' as NamespacedTranslationKey)
 }
 
-/** Maps an invalid import entry's reason (a Translation variant) to a translation key */
+/** Maps an import row's refusal reason or warning (a Translation variant) to a translation key */
 export function getImportErrorTranslationKey(reason: string): NamespacedTranslationKey {
   const mapping: Record<string, NamespacedTranslationKey> = {
+    'InstanceImportSourceUnavailable': 'instances:_trn_import_source_unavailable',
+    'InstanceImportJavaPathSkipped': 'instances:_trn_import_java_path_skipped',
+    'InstanceImportCommandsSkipped': 'instances:_trn_import_commands_skipped',
+    'InstanceImportGameDirMissing': 'instances:_trn_import_game_dir_missing',
+    'InstanceImportUnknownMinecraftVersion': 'instances:_trn_import_unknown_minecraft_version',
+    'InstanceImportHmclRelativeRunDir': 'instances:_trn_import_hmcl_relative_run_dir',
     'InstanceImportLegacyBadConfigFile': 'instances:_trn_import_error_bad_config',
+    'InstanceImportConfigUnreadable': 'instances:_trn_import_config_unreadable',
     'InstanceImportCfZipMalformed': 'instances:_trn_import_error_archive_malformed',
     'InstanceImportMrpackMalformed': 'instances:_trn_import_error_archive_malformed',
     'InstanceImportGdlpackMalformed': 'instances:_trn_import_error_archive_malformed',

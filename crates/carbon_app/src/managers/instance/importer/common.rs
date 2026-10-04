@@ -8,6 +8,7 @@ use chrono::{DateTime, Utc};
 use tracing::{trace, warn};
 
 use crate::{
+    api::translation::Translation,
     domain::instance::{
         GroupId, InstanceId, InstanceSettingsUpdate,
         info::{GameResolution, JavaOverride, ModLoader, ModLoaderType, StandardVersion},
@@ -349,13 +350,48 @@ pub async fn copy_game_dir<F>(from: &Path, instance_path: &Path, filter: F) -> a
 where
     F: for<'a> Fn(&'a Path) -> bool,
 {
-    if from.is_dir() {
-        let to = instance_path.join("instance");
-        trace!("Copying game files from {from:?} to {to:?}");
-        carbon_rt_path::copy_dir_filter(from, &to, filter).await?;
-    } else {
-        trace!("Game directory {from:?} does not exist, importing an empty instance");
+    require_source_directory(from).await?;
+    let to = instance_path.join("instance");
+    carbon_rt_path::copy_dir_filter(from, &to, filter).await?;
+    tokio::fs::create_dir_all(instance_path.join(".setup/modpack-complete")).await?;
+    Ok(())
+}
+
+/// Validate a required selected root separately when it differs from its payload.
+pub(super) async fn require_source_directory(from: &Path) -> anyhow::Result<()> {
+    let metadata = tokio::fs::metadata(from).await.map_err(|e| {
+        anyhow::anyhow!(
+            "Import source {} is unavailable; reconnect it and rescan: {e}",
+            from.display()
+        )
+    })?;
+    anyhow::ensure!(
+        metadata.is_dir(),
+        "Import source {} is not a directory; rescan",
+        from.display()
+    );
+    Ok(())
+}
+
+/// Only callers that observed an optional/default payload absent during scanning may use this.
+pub async fn copy_optional_game_dir<F>(
+    from: &Path,
+    instance_path: &Path,
+    filter: F,
+) -> anyhow::Result<()>
+where
+    F: for<'a> Fn(&'a Path) -> bool,
+{
+    match tokio::fs::metadata(from).await {
+        Ok(meta) if meta.is_dir() => return copy_game_dir(from, instance_path, filter).await,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Ok(_) => anyhow::bail!(
+            "Optional import payload {} is not a directory",
+            from.display()
+        ),
+        Err(error) => return Err(error.into()),
     }
+
     tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete")).await?;
     Ok(())
 }
@@ -489,6 +525,46 @@ pub fn icon_from_data_url(data_url: &str) -> Option<(String, Vec<u8>)> {
     Some((format!("icon.{ext}"), bytes))
 }
 
+/// A source setting left out of an import because GDLauncher cannot use it.
+/// The instance is still imported; the row tells the user what was left out.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SkippedSetting {
+    /// The source's Java path no longer exists, so GDLauncher picks Java itself.
+    MissingJavaPath,
+    /// Enabled commands use launcher variables GDLauncher cannot fill in.
+    LauncherVariableCommands,
+}
+
+impl SkippedSetting {
+    pub fn translation(self) -> Translation {
+        match self {
+            Self::MissingJavaPath => Translation::InstanceImportJavaPathSkipped,
+            Self::LauncherVariableCommands => Translation::InstanceImportCommandsSkipped,
+        }
+    }
+}
+
+/// Launch runs the path as written, so a bare command (Prism's default `java`)
+/// is found the way launch would find it: on `PATH`. Windows also starts a path
+/// written without `.exe`.
+fn java_command_is_found(path: &str) -> bool {
+    if path.contains(['/', '\\']) {
+        return Path::new(path).is_file()
+            || (cfg!(windows) && Path::new(&format!("{path}.exe")).is_file());
+    }
+    let names = [path.to_string(), format!("{path}.exe")];
+    std::env::var_os("PATH").is_some_and(|dirs| {
+        std::env::split_paths(&dirs).any(|dir| names.iter().any(|name| dir.join(name).is_file()))
+    })
+}
+
+fn java_binary_in_folder(folder: &Path) -> Option<PathBuf> {
+    let binary = if cfg!(windows) { "java.exe" } else { "java" };
+    [folder.join(binary), folder.join("bin").join(binary)]
+        .into_iter()
+        .find(|path| path.is_file())
+}
+
 /// Memory in MB; resolution is `(width, height)`.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ImportedSettings {
@@ -502,9 +578,40 @@ pub struct ImportedSettings {
     pub post_exit_hook: Option<String>,
     pub wrapper_command: Option<String>,
     pub game_resolution: Option<(u32, u32)>,
+    /// Source settings dropped at scan time, shown on the import row.
+    pub skipped: Vec<SkippedSetting>,
 }
 
 impl ImportedSettings {
+    pub fn skip(&mut self, setting: SkippedSetting) {
+        if !self.skipped.contains(&setting) {
+            self.skipped.push(setting);
+        }
+    }
+
+    pub fn warnings(&self) -> Vec<Translation> {
+        self.skipped.iter().map(|s| s.translation()).collect()
+    }
+
+    /// A Java override whose binary is gone would stop every launch, so the
+    /// instance is imported without it and GDLauncher picks Java instead. A
+    /// folder holding Java points at its binary, as launch needs the binary.
+    pub fn skip_missing_java_path(&mut self) {
+        let Some(path) = self.java_path.as_deref() else {
+            return;
+        };
+        if java_command_is_found(path) {
+            return;
+        }
+        if let Some(binary) = java_binary_in_folder(Path::new(path)) {
+            self.java_path = Some(binary.to_string_lossy().into_owned());
+            return;
+        }
+        warn!("Source Java `{path}` no longer exists; importing without a Java override");
+        self.java_path = None;
+        self.skip(SkippedSetting::MissingJavaPath);
+    }
+
     /// `-Xmx`/`-Xms` become the memory settings (GDL passes its own); the rest is kept.
     pub fn absorb_jvm_args(&mut self, args: &str) {
         let mut rest: Vec<&str> = Vec::new();
@@ -634,6 +741,84 @@ pub async fn apply_imported_settings(
 
     if let Err(e) = app.instance_manager().update_instance(update).await {
         warn!("Cannot apply imported launch settings to instance {instance_id:?}: {e}");
+    }
+}
+
+#[cfg(test)]
+mod java_path_tests {
+    use super::*;
+
+    fn skipped(java_path: &str) -> ImportedSettings {
+        let mut settings = ImportedSettings {
+            java_path: Some(java_path.to_string()),
+            ..Default::default()
+        };
+        settings.skip_missing_java_path();
+        settings
+    }
+
+    #[test]
+    fn a_java_path_that_is_gone_is_dropped_and_reported() {
+        let t = tempfile::tempdir().unwrap();
+        let settings = skipped(&t.path().join("jre").join("javaw.exe").display().to_string());
+        assert_eq!(settings.java_path, None);
+        assert_eq!(settings.skipped, [SkippedSetting::MissingJavaPath]);
+    }
+
+    #[test]
+    fn a_java_binary_that_is_there_is_kept() {
+        let t = tempfile::tempdir().unwrap();
+        let binary = t.path().join("my-java");
+        std::fs::write(&binary, b"").unwrap();
+        let settings = skipped(binary.to_str().unwrap());
+        assert_eq!(settings.java_path.as_deref(), binary.to_str());
+        assert!(settings.skipped.is_empty());
+    }
+
+    /// Windows starts `C:\...\bin\javaw` as `javaw.exe`.
+    #[cfg(windows)]
+    #[test]
+    fn a_windows_path_without_exe_is_kept() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(t.path().join("javaw.exe"), b"").unwrap();
+        let declared = t.path().join("javaw").display().to_string();
+        let settings = skipped(&declared);
+        assert_eq!(settings.java_path.as_deref(), Some(declared.as_str()));
+        assert!(settings.skipped.is_empty());
+    }
+
+    /// Launch looks a bare command up on PATH, so that is what decides.
+    #[test]
+    fn a_bare_command_is_looked_up_on_path() {
+        let on_path = if cfg!(windows) { "cmd" } else { "sh" };
+        let settings = skipped(on_path);
+        assert_eq!(settings.java_path.as_deref(), Some(on_path));
+        assert!(settings.skipped.is_empty());
+
+        let settings = skipped("gdl-no-such-java-command");
+        assert_eq!(settings.java_path, None);
+        assert_eq!(settings.skipped, [SkippedSetting::MissingJavaPath]);
+    }
+
+    /// PCL can store the folder Java is in, and launch needs the binary.
+    #[test]
+    fn a_folder_holding_java_becomes_its_binary() {
+        let t = tempfile::tempdir().unwrap();
+        let binary_name = if cfg!(windows) { "java.exe" } else { "java" };
+        let bin = t.path().join("bin");
+        std::fs::create_dir_all(&bin).unwrap();
+        std::fs::write(bin.join(binary_name), b"").unwrap();
+        for folder in [t.path(), bin.as_path()] {
+            let settings = skipped(folder.to_str().unwrap());
+            assert_eq!(
+                settings.java_path.as_deref(),
+                bin.join(binary_name).to_str()
+            );
+            assert!(settings.skipped.is_empty());
+        }
+
+        let empty = tempfile::tempdir().unwrap();
+        assert_eq!(skipped(empty.path().to_str().unwrap()).java_path, None);
     }
 }
 
@@ -1032,9 +1217,120 @@ mod task06_tests {
             b"world"
         );
         let destination = root.path().join("empty");
-        copy_game_dir(&root.path().join("missing"), &destination, |_| true)
+        copy_optional_game_dir(&root.path().join("missing"), &destination, |_| true)
             .await
             .unwrap();
         assert!(destination.join(".setup/modpack-complete").is_dir());
+    }
+}
+
+#[cfg(test)]
+mod task13_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task13_moved_required_source_fails_without_completion() {
+        let t = tempfile::tempdir().unwrap();
+        let source = t.path().join("source");
+        std::fs::create_dir(&source).unwrap();
+        std::fs::write(source.join("world"), b"synthetic world").unwrap();
+        std::fs::rename(&source, t.path().join("moved")).unwrap();
+        let dest = t.path().join("destination");
+        assert!(copy_game_dir(&source, &dest, |_| true).await.is_err());
+        assert!(!dest.join(".setup/modpack-complete").exists());
+        assert_eq!(
+            std::fs::read(t.path().join("moved/world")).unwrap(),
+            b"synthetic world"
+        );
+    }
+}
+
+pub(super) struct ScanDirectory {
+    inner: tokio::fs::ReadDir,
+    #[cfg(test)]
+    path: PathBuf,
+    #[cfg(test)]
+    delivered: usize,
+}
+impl ScanDirectory {
+    pub async fn next_entry(&mut self) -> std::io::Result<Option<tokio::fs::DirEntry>> {
+        #[cfg(test)]
+        if SCAN_FAILURES
+            .lock()
+            .unwrap()
+            .get(&self.path)
+            .is_some_and(|limit| self.delivered >= *limit)
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "synthetic iteration failure",
+            ));
+        }
+        let result = self.inner.next_entry().await?;
+        #[cfg(test)]
+        {
+            if result.is_some() {
+                self.delivered += 1;
+            }
+        }
+        Ok(result)
+    }
+}
+pub(super) async fn scan_directory(path: &Path) -> std::io::Result<ScanDirectory> {
+    #[cfg(test)]
+    if SCAN_FAILURES.lock().unwrap().get(path) == Some(&0) {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "synthetic scan IO failure",
+        ));
+    }
+    Ok(ScanDirectory {
+        inner: tokio::fs::read_dir(path).await?,
+        #[cfg(test)]
+        path: path.to_path_buf(),
+        #[cfg(test)]
+        delivered: 0,
+    })
+}
+#[cfg(test)]
+static SCAN_FAILURES: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<PathBuf, usize>>,
+> = std::sync::LazyLock::new(Default::default);
+#[cfg(test)]
+pub(super) fn fail_scan_directory(path: PathBuf) {
+    SCAN_FAILURES.lock().unwrap().insert(path, 0);
+}
+
+#[cfg(test)]
+pub(super) fn fail_scan_after(path: PathBuf, count: usize) {
+    SCAN_FAILURES.lock().unwrap().insert(path, count);
+}
+#[cfg(test)]
+pub(super) fn clear_scan_failure(path: &Path) {
+    SCAN_FAILURES.lock().unwrap().remove(path);
+}
+#[cfg(test)]
+mod task13_copy_controls {
+    use super::*;
+    #[tokio::test]
+    async fn task13_present_empty_and_optional_missing_are_distinct() {
+        let t = tempfile::tempdir().unwrap();
+        let source = t.path().join("source");
+        std::fs::create_dir(&source).unwrap();
+        let empty = t.path().join("empty");
+        copy_game_dir(&source, &empty, |_| true).await.unwrap();
+        assert!(empty.join(".setup/modpack-complete").exists());
+        std::fs::create_dir_all(source.join("saves/World")).unwrap();
+        std::fs::write(source.join("saves/World/marker"), b"synthetic world").unwrap();
+        let copied = t.path().join("copied");
+        copy_game_dir(&source, &copied, |_| true).await.unwrap();
+        assert_eq!(
+            std::fs::read(copied.join("instance/saves/World/marker")).unwrap(),
+            b"synthetic world"
+        );
+        let optional = t.path().join("optional");
+        copy_optional_game_dir(&t.path().join("absent"), &optional, |_| true)
+            .await
+            .unwrap();
+        assert!(optional.join(".setup/modpack-complete").exists());
     }
 }

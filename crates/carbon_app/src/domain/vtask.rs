@@ -47,8 +47,9 @@ impl PartialEq for Progress {
 }
 
 /// Something a task did differently from what was asked, reported to the user
-/// after the task succeeds.
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// after the task succeeds. Stored in a setup's record until that setup
+/// finishes (see `modpack::session::Session::warnings`).
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum TaskWarning {
     /// A required dependency was left out because it cannot be installed.
     SkippedDependency {
@@ -95,15 +96,37 @@ pub enum TaskWarning {
         /// The new save's name, with a "(copy N)" suffix.
         saved_as: String,
     },
+    /// A modpack version change kept files of the version it replaced that it
+    /// could not check against that version, rather than risk removing the
+    /// user's own: every file in place when the version itself could not be
+    /// read. A file it kept may now sit beside the new version's copy.
+    PreviousPackFilesKept {
+        /// Where the replaced version was published.
+        platform: DependencyPlatform,
+        reason: PreviousPackFilesReason,
+    },
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DependencyPlatform {
     Curseforge,
     Modrinth,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub enum PreviousPackFilesReason {
+    /// The platform no longer serves the replaced version.
+    VersionUnavailable,
+    /// The replaced version's files could not be checked for another reason,
+    /// such as an archive format the launcher does not know, or a folder that
+    /// won't take their record.
+    VersionUnreadable,
+    /// Some of the replaced version's files could not be checked, for example
+    /// because the platform no longer serves them.
+    SomeFilesUnchecked,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum SkippedDependencyReason {
     /// No version for this Minecraft version and loader.
     NoCompatibleVersion,

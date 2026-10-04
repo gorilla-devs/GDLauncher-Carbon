@@ -35,9 +35,11 @@ struct Importable {
 
 impl From<Importable> for ImportableInstance {
     fn from(value: Importable) -> Self {
+        let warnings = value.meta.settings.warnings();
         Self {
             filename: value.filename.clone(),
             instance_name: value.meta.name.unwrap_or(value.filename),
+            warnings,
         }
     }
 }
@@ -94,9 +96,7 @@ impl InstanceImporter for MmcArchiveImporter {
                 self.state.write().await.set_single(entry).await;
             }
         } else if scan_path.is_dir() {
-            let Ok(mut dir) = tokio::fs::read_dir(&scan_path).await else {
-                return Ok(());
-            };
+            let mut dir = super::common::scan_directory(&scan_path).await?;
 
             while let Some(entry) = dir.next_entry().await? {
                 let path = entry.path();
@@ -180,7 +180,12 @@ impl InstanceImporter for MmcArchiveImporter {
                     .await??;
 
                 let instance_root = extract_root.join(&instance.prefix);
-                copy_game_dir(&game_dir(&instance_root), &instance_path, |_| true).await?;
+                super::common::copy_optional_game_dir(
+                    &game_dir(&instance_root),
+                    &instance_path,
+                    |_| true,
+                )
+                .await?;
                 Ok(())
             }
         };
@@ -244,7 +249,7 @@ fn read_archive_meta(path: &Path) -> Result<ArchiveMeta, Translation> {
         .ok_or(Translation::InstanceImportMmcZipMissingConfig)?;
     let pack_text = read_text(&format!("{prefix}mmc-pack.json"));
 
-    let meta = parse_mmc_meta(&cfg_text, pack_text.as_deref())
+    let mut meta = parse_mmc_meta(&cfg_text, pack_text.as_deref())
         .ok_or(Translation::InstanceImportMmcZipMalformed)?;
 
     let icon_entry = meta
@@ -255,6 +260,8 @@ fn read_archive_meta(path: &Path) -> Result<ArchiveMeta, Translation> {
             let names: Vec<String> = zip.file_names().map(str::to_string).collect();
             find_icon_entry(&names, &prefix, key)
         });
+
+    meta.settings.skip_missing_java_path();
 
     Ok(ArchiveMeta {
         prefix,
