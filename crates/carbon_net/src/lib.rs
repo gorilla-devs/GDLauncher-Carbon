@@ -197,6 +197,8 @@ pub trait IntoDownloadable {
 #[derive(Debug, Clone)]
 pub struct Downloadable {
     pub url: String,
+    /// Ordered fallback URLs after `url`. Empty preserves single-URL behavior.
+    pub mirrors: Vec<String>,
     pub path: PathBuf,
     pub checksum: Option<Checksum>,
     pub size: Option<u64>,
@@ -212,10 +214,19 @@ impl Downloadable {
     pub fn new(url: impl Into<String>, path: impl AsRef<Path>) -> Self {
         Self {
             url: url.into(),
+            mirrors: Vec::new(),
             path: path.as_ref().into(),
             checksum: None,
             size: None,
         }
+    }
+
+    /// Add ordered fallback candidates. Each is tried at most once after the
+    /// primary URL's bounded resume repair; middleware retries remain bounded by
+    /// DownloadOptions. Integrity and destination ownership span all candidates.
+    pub fn with_mirrors(mut self, mirrors: Vec<String>) -> Self {
+        self.mirrors = mirrors;
+        self
     }
 
     pub fn with_checksum(mut self, checksum: Option<Checksum>) -> Self {
@@ -1027,7 +1038,7 @@ fn count_valid(
 }
 
 async fn download_file(
-    downloadable: Downloadable,
+    mut downloadable: Downloadable,
     options: DownloadOptions,
     client: ClientWithMiddleware,
     total_downloaded_size: &AtomicU64,
@@ -1039,101 +1050,124 @@ async fn download_file(
     let file_added_to_total = AtomicU64::new(0);
     let progress = options.progress_sender.as_ref();
     let owned = owned_partial(&downloadable, &options).await?;
+    let candidates: Vec<_> = std::iter::once(downloadable.url.clone())
+        .chain(downloadable.mirrors.iter().cloned())
+        .collect();
     let result = async {
-        for attempt in 0..2 {
-            check_cancel(&options)?;
-            let (part, mut file, headers, mut hasher, resumed) = prepare_download(
-                &downloadable,
-                &owned.path,
-                attempt != 0,
-                total_downloaded_size,
-                &file_processed_bytes,
-                current_files_count,
-                total_files_size,
-                total_files_count,
-                progress,
-                &options,
-            )
-            .await?;
-            let complete = resumed
-                && downloadable.checksum.as_ref().is_some_and(|checksum| {
-                    let expected = match checksum {
-                        Checksum::Sha1(s)
-                        | Checksum::Sha256(s)
-                        | Checksum::Sha512(s)
-                        | Checksum::Md5(s) => s,
-                    };
-                    downloadable
-                        .size
-                        .is_none_or(|size| size == file_processed_bytes.load(Ordering::SeqCst))
-                        && hex::encode(hasher.as_ref().unwrap().clone().finalize())
-                            .eq_ignore_ascii_case(expected)
-                });
-            let outcome = if complete {
-                if downloadable.size.is_none() {
-                    let size = file_processed_bytes.load(Ordering::SeqCst);
-                    file_added_to_total.fetch_add(size, Ordering::SeqCst);
-                    total_files_size.fetch_add(size, Ordering::SeqCst);
-                }
-                Ok(())
-            } else {
-                _download_file(
-                    &downloadable.url,
-                    headers,
-                    &part,
-                    &mut file,
-                    &mut hasher,
+        for (candidate, url) in candidates.iter().enumerate() {
+            downloadable.url = url.clone();
+            for attempt in 0..2 {
+                check_cancel(&options)?;
+                let (part, mut file, headers, mut hasher, resumed) = prepare_download(
                     &downloadable,
-                    options.clone(),
-                    client.clone(),
+                    &owned.path,
+                    candidate != 0 || attempt != 0,
                     total_downloaded_size,
                     &file_processed_bytes,
-                    &file_added_to_total,
                     current_files_count,
                     total_files_size,
                     total_files_count,
+                    progress,
+                    &options,
                 )
-                .await
-            };
-            // Tokio writes can have outstanding blocking IO even after write_all resolves.
-            // Await it on EVERY outcome and close the OS handle before publication/cleanup.
-            let flush = file.flush().await;
-            drop(file.into_std().await);
-            let outcome = outcome.and_then(|()| flush.map_err(DownloadError::from));
-            match outcome {
-                Ok(()) => {
-                    publish_owned(&part, &downloadable, &options).await?;
-                    current_files_count.fetch_add(1, Ordering::SeqCst);
-                    if let Some(sender) = progress {
-                        let _ = sender.send(Progress::sized(
-                            total_files_count,
-                            current_files_count.load(Ordering::SeqCst),
-                            total_files_size.load(Ordering::SeqCst),
-                            total_downloaded_size.load(Ordering::SeqCst),
-                        ));
+                .await?;
+                let complete = resumed
+                    && downloadable.checksum.as_ref().is_some_and(|checksum| {
+                        let expected = match checksum {
+                            Checksum::Sha1(s)
+                            | Checksum::Sha256(s)
+                            | Checksum::Sha512(s)
+                            | Checksum::Md5(s) => s,
+                        };
+                        downloadable
+                            .size
+                            .is_none_or(|size| size == file_processed_bytes.load(Ordering::SeqCst))
+                            && hex::encode(hasher.as_ref().unwrap().clone().finalize())
+                                .eq_ignore_ascii_case(expected)
+                    });
+                let outcome = if complete {
+                    if downloadable.size.is_none() {
+                        let size = file_processed_bytes.load(Ordering::SeqCst);
+                        file_added_to_total.fetch_add(size, Ordering::SeqCst);
+                        total_files_size.fetch_add(size, Ordering::SeqCst);
                     }
-                    return Ok(());
-                }
-                Err(
-                    DownloadError::ChecksumMismatch { .. }
-                    | DownloadError::SizeMismatch { .. }
-                    | DownloadError::RestartPartial,
-                ) if resumed && attempt == 0 && !options.cancel_token.is_cancelled() => {
-                    total_downloaded_size.fetch_sub(
-                        file_processed_bytes.swap(0, Ordering::SeqCst),
-                        Ordering::SeqCst,
-                    );
-                    total_files_size.fetch_sub(
-                        file_added_to_total.swap(0, Ordering::SeqCst),
-                        Ordering::SeqCst,
-                    );
-                }
-                Err(error) => {
-                    return Err(error);
+                    Ok(())
+                } else {
+                    _download_file(
+                        &downloadable.url,
+                        headers,
+                        &part,
+                        &mut file,
+                        &mut hasher,
+                        &downloadable,
+                        options.clone(),
+                        client.clone(),
+                        total_downloaded_size,
+                        &file_processed_bytes,
+                        &file_added_to_total,
+                        current_files_count,
+                        total_files_size,
+                        total_files_count,
+                    )
+                    .await
+                };
+                // Tokio writes can have outstanding blocking IO even after write_all resolves.
+                // Await it on EVERY outcome and close the OS handle before publication/cleanup.
+                let flush = file.flush().await;
+                drop(file.into_std().await);
+                // A local flush failure must stop admission even if the HTTP
+                // transfer also failed. It is not evidence of a mirror outage.
+                let outcome = match flush {
+                    Ok(()) => outcome,
+                    Err(error) => Err(DownloadError::from(error)),
+                };
+                match outcome {
+                    Ok(()) => {
+                        publish_owned(&part, &downloadable, &options).await?;
+                        current_files_count.fetch_add(1, Ordering::SeqCst);
+                        if let Some(sender) = progress {
+                            let _ = sender.send(Progress::sized(
+                                total_files_count,
+                                current_files_count.load(Ordering::SeqCst),
+                                total_files_size.load(Ordering::SeqCst),
+                                total_downloaded_size.load(Ordering::SeqCst),
+                            ));
+                        }
+                        return Ok(());
+                    }
+                    Err(
+                        DownloadError::ChecksumMismatch { .. }
+                        | DownloadError::SizeMismatch { .. }
+                        | DownloadError::RestartPartial,
+                    ) if resumed && attempt == 0 && !options.cancel_token.is_cancelled() => {
+                        total_downloaded_size.fetch_sub(
+                            file_processed_bytes.swap(0, Ordering::SeqCst),
+                            Ordering::SeqCst,
+                        );
+                        total_files_size.fetch_sub(
+                            file_added_to_total.swap(0, Ordering::SeqCst),
+                            Ordering::SeqCst,
+                        );
+                    }
+                    Err(error) if mirror_failure(&error) && candidate + 1 < candidates.len() => {
+                        check_cancel(&options)?;
+                        total_downloaded_size.fetch_sub(
+                            file_processed_bytes.swap(0, Ordering::SeqCst),
+                            Ordering::SeqCst,
+                        );
+                        total_files_size.fetch_sub(
+                            file_added_to_total.swap(0, Ordering::SeqCst),
+                            Ordering::SeqCst,
+                        );
+                        // All entered IO is closed above. The next candidate opens
+                        // this same owned inode with truncation and fresh URL headers.
+                        break;
+                    }
+                    Err(error) => return Err(error),
                 }
             }
         }
-        unreachable!("bounded resume retry returns on its last attempt")
+        unreachable!("last candidate returns success or its error")
     }
     .await;
     // Includes early cancellation, preparation, transfer, and final publication.
@@ -1144,6 +1178,19 @@ async fn download_file(
     }
 }
 
+fn mirror_failure(error: &DownloadError) -> bool {
+    matches!(
+        error,
+        DownloadError::NetworkError(_)
+            | DownloadError::NetworkError2(_)
+            | DownloadError::GenericDownload(_)
+            | DownloadError::Non200StatusCode(..)
+            | DownloadError::ChecksumMismatch { .. }
+            | DownloadError::SizeMismatch { .. }
+            | DownloadError::InvalidRange
+            | DownloadError::RestartPartial
+    )
+}
 #[instrument(skip(options, client, hasher, total_downloaded_size, current_count))]
 async fn _download_file(
     url: &str,
@@ -1700,6 +1747,7 @@ mod tests {
         let file_path1 = temp_dir.path().join("test1.txt");
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path.clone(),
             checksum: Some(Checksum::Sha256(
@@ -1709,6 +1757,7 @@ mod tests {
         };
 
         let downloadable1 = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test1.txt", mock_url),
             path: file_path1.clone(),
             checksum: Some(Checksum::Sha256(
@@ -1748,6 +1797,7 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path,
             checksum: None,
@@ -1800,6 +1850,7 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path,
             checksum: None,
@@ -1850,6 +1901,7 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
 
         let downloadable1 = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path.clone(),
             checksum: Some(Checksum::Sha256(
@@ -1859,6 +1911,7 @@ mod tests {
         };
 
         let downloadable2 = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path.clone(),
             checksum: Some(Checksum::Sha256(
@@ -2000,6 +2053,7 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path.clone(),
             checksum: Some(Checksum::Sha256(
@@ -2046,6 +2100,7 @@ mod tests {
         }
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path.clone(),
             checksum: Some(Checksum::Sha256(
@@ -2105,6 +2160,7 @@ mod tests {
         let (progress_tx, mut progress_rx) = watch::channel(Progress::default());
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path.clone(),
             checksum: Some(Checksum::Sha256(
@@ -2183,6 +2239,7 @@ mod tests {
         let file_path3 = temp_dir.path().join("test3.txt");
 
         let downloadable1 = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test1.txt", mock_url),
             path: file_path1.clone(),
             checksum: Some(Checksum::Sha1(
@@ -2192,6 +2249,7 @@ mod tests {
         };
 
         let downloadable2 = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test2.txt", mock_url),
             path: file_path2.clone(),
             checksum: Some(Checksum::Sha256(
@@ -2201,6 +2259,7 @@ mod tests {
         };
 
         let downloadable3 = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test3.txt", mock_url),
             path: file_path3.clone(),
             checksum: Some(Checksum::Md5(
@@ -2249,6 +2308,7 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path,
             checksum: None,
@@ -2290,6 +2350,7 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/original.txt", mock_url),
             path: file_path.clone(),
             checksum: None,
@@ -2331,6 +2392,7 @@ mod tests {
         let file_path = temp_dir.path().join("large_file.bin");
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/large_file.bin", mock_url),
             path: file_path.clone(),
             checksum: None,
@@ -2375,6 +2437,7 @@ mod tests {
         let file_path2 = temp_dir.path().join("test2.txt");
 
         let downloadable1 = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test1.txt", mock_url),
             path: file_path1.clone(),
             checksum: None,
@@ -2382,6 +2445,7 @@ mod tests {
         };
 
         let downloadable2 = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test2.txt", mock_url),
             path: file_path2.clone(),
             checksum: None,
@@ -2480,6 +2544,7 @@ mod tests {
         let file_path2 = temp_dir.path().join("unknown.txt");
 
         let downloadable1 = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/known.txt", mock_url),
             path: file_path1.clone(),
             checksum: None,
@@ -2487,6 +2552,7 @@ mod tests {
         };
 
         let downloadable2 = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/unknown.txt", mock_url),
             path: file_path2.clone(),
             checksum: None,
@@ -2560,6 +2626,7 @@ mod tests {
         }
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path.clone(),
             checksum: None,
@@ -2627,6 +2694,7 @@ mod tests {
         }
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path.clone(),
             checksum: None,
@@ -2669,6 +2737,7 @@ mod tests {
         let file_path = temp_dir.path().join("test.txt");
 
         let downloadable = Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}/test.txt", mock_url),
             path: file_path,
             checksum: None,
@@ -2720,3 +2789,6 @@ mod tests {
 
 #[cfg(test)]
 mod task06_tests;
+
+#[cfg(test)]
+mod task09_tests;

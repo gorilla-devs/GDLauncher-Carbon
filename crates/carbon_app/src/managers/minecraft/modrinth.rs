@@ -102,11 +102,9 @@ pub fn secure_path_join<P1: AsRef<Path>, P2: AsRef<Path>>(
 /// retry could get past.
 pub const MAX_EXTRACTED_OVERRIDE_BYTES: u64 = 16 * 1024 * 1024 * 1024;
 
-/// Ceiling on a single archive entry read fully into memory (rather than
-/// streamed to disk) so it can be hashed. Far below
-/// [`MAX_EXTRACTED_OVERRIDE_BYTES`] because this path only matches small
-/// unresolved files: anything larger is not a candidate anyway, and the bound is
-/// what keeps a bomb from being allocated in full just to hash it.
+/// Per-entry work budget for installed-origin discovery. Installation's bundled
+/// fallback has a separate streaming archive-wide budget; this is not a file-size
+/// restriction on supported modpacks.
 pub const MAX_HASHED_ENTRY_BYTES: u64 = 64 * 1024 * 1024;
 
 /// True if a zip entry's Unix mode indicates it's a symlink (`S_IFLNK`). Pass
@@ -221,6 +219,29 @@ pub async fn prepare_modpack_from_mrpack(
     packinfo: Option<&PackInfo>,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
+    let _ = app;
+    prepare_mrpack(
+        mrpack_path,
+        instance_path,
+        skip_overlays,
+        packinfo,
+        progress_percentage_sender,
+        MAX_EXTRACTED_OVERRIDE_BYTES,
+        #[cfg(test)]
+        None,
+    )
+    .await
+}
+
+async fn prepare_mrpack(
+    mrpack_path: &Path,
+    instance_path: &InstancePath,
+    skip_overlays: bool,
+    packinfo: Option<&PackInfo>,
+    progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
+    extraction_budget: u64,
+    #[cfg(test)] extraction_progress_observer: Option<Box<dyn Fn() + Send>>,
+) -> anyhow::Result<ModpackInfo> {
     let file_path_clone = mrpack_path.to_path_buf();
     let (mut archive, index) = spawn_blocking(move || {
         let file = std::fs::File::open(file_path_clone)?;
@@ -270,8 +291,6 @@ pub async fn prepare_modpack_from_mrpack(
             .into_iter()
             .enumerate()
             .map(|(i, file)| {
-                let _app = app.clone();
-
                 let data_path = instance_path.get_data_path();
 
                 let existing_path = packinfo
@@ -290,15 +309,7 @@ pub async fn prepare_modpack_from_mrpack(
 
                 let target_path = secure_path_join(&data_path, &file.path)?;
 
-                // Modrinth manifest carries the sha512 of every file — verify
-                // it on download to defend against MITM / CDN poisoning.
-                let checksum = if !file.hashes.sha512.is_empty() {
-                    Some(carbon_net::Checksum::Sha512(file.hashes.sha512.clone()))
-                } else if !file.hashes.sha1.is_empty() {
-                    Some(carbon_net::Checksum::Sha1(file.hashes.sha1.clone()))
-                } else {
-                    None
-                };
+                let checksum = Some(required_checksum(&file)?);
 
                 let downloadable = Downloadable::new(
                     file.downloads
@@ -308,7 +319,8 @@ pub async fn prepare_modpack_from_mrpack(
                     target_path,
                 )
                 .with_size(file.file_size as u64)
-                .with_checksum(checksum);
+                .with_checksum(checksum)
+                .with_mirrors(file.downloads.iter().skip(1).cloned().collect());
 
                 progress_percentage_sender
                     .send(ProgressState::AcquiringPackMetadata(i as u64, files_len))?;
@@ -320,59 +332,79 @@ pub async fn prepare_modpack_from_mrpack(
 
     if !skip_overlays {
         let data_path = instance_path.get_data_path();
-        let overrides_folder_name = "overrides";
+
         spawn_blocking(move || {
-            let total_archive_files = archive.len() as u64;
+            // Work counts archive entries inspected across both ordered passes,
+            // including ignored entries. Use one coordinate and denominator so
+            // archive order cannot make the client pass move progress backward.
+            let entries_per_pass = archive.len() as u64;
+            let total_extraction_work = entries_per_pass * 2;
+            let report_progress = |completed| -> anyhow::Result<()> {
+                progress_percentage_sender.send(ProgressState::ExtractingPackOverrides(
+                    completed,
+                    total_extraction_work,
+                ))?;
+                // Per-call observation keeps tests deterministic without global
+                // hooks, sleeps, or changing the production watch channel.
+                #[cfg(test)]
+                if let Some(observe) = &extraction_progress_observer {
+                    observe();
+                }
+                Ok(())
+            };
             // Cumulative across the whole pass, not per entry: without this, many
             // entries each just under a per-entry cap could still add up to an
             // unbounded amount written to disk.
             let mut extracted_bytes: u64 = 0;
-            for i in 0..archive.len() {
-                let mut file = archive.by_index(i)?;
-                if !(file.name().starts_with(&overrides_folder_name)) {
-                    continue;
-                }
-
-                let out_path = match file.enclosed_name() {
-                    Some(path) => match path.strip_prefix(overrides_folder_name) {
-                        Ok(stripped) => secure_path_join(Path::new(&data_path), stripped)?,
-                        // The name begins with the prefix string but is not inside the
-                        // overrides directory (e.g. "overrides-extra/..."); skip it instead
-                        // of panicking on the non-matching path component.
-                        Err(_) => continue,
-                    },
-                    None => continue,
-                };
-
-                if file.name().ends_with('/') {
-                    continue;
-                } else if is_symlink_mode(file.unix_mode()) {
-                    // A symlink entry materialized as a regular file would end up
-                    // containing the link's target path text instead of real data.
-                    tracing::warn!(
-                        "Skipping modrinth override entry `{}`: symlinks are not extracted",
-                        file.name()
-                    );
-                    continue;
-                } else {
-                    if let Some(parent) = out_path.parent() {
-                        if !parent.exists() {
-                            std::fs::create_dir_all(parent)?;
-                        }
+            for (pass, overrides_folder_name) in
+                ["overrides", "client-overrides"].into_iter().enumerate()
+            {
+                for i in 0..archive.len() {
+                    let mut file = archive.by_index(i)?;
+                    if !(file.name().starts_with(overrides_folder_name)) {
+                        continue;
                     }
-                    let mut out_file = std::fs::File::create(&out_path)?;
 
-                    let remaining_budget =
-                        MAX_EXTRACTED_OVERRIDE_BYTES.saturating_sub(extracted_bytes);
-                    extracted_bytes += copy_bounded(&mut file, &mut out_file, remaining_budget)?;
+                    let out_path = match file.enclosed_name() {
+                        Some(path) => match path.strip_prefix(overrides_folder_name) {
+                            Ok(stripped) => secure_path_join(Path::new(&data_path), stripped)?,
+                            // The name begins with the prefix string but is not inside the
+                            // overrides directory (e.g. "overrides-extra/..."); skip it instead
+                            // of panicking on the non-matching path component.
+                            Err(_) => continue,
+                        },
+                        None => continue,
+                    };
+
+                    if file.name().ends_with('/') {
+                        continue;
+                    } else if is_symlink_mode(file.unix_mode()) {
+                        // A symlink entry materialized as a regular file would end up
+                        // containing the link's target path text instead of real data.
+                        tracing::warn!(
+                            "Skipping modrinth override entry `{}`: symlinks are not extracted",
+                            file.name()
+                        );
+                        continue;
+                    } else {
+                        if let Some(parent) = out_path.parent() {
+                            if !parent.exists() {
+                                std::fs::create_dir_all(parent)?;
+                            }
+                        }
+                        let mut out_file = std::fs::File::create(&out_path)?;
+
+                        let remaining_budget = extraction_budget.saturating_sub(extracted_bytes);
+                        extracted_bytes +=
+                            copy_bounded(&mut file, &mut out_file, remaining_budget)?;
+                    }
+
+                    report_progress(pass as u64 * entries_per_pass + i as u64 + 1)?;
                 }
-
-                progress_percentage_sender.send(ProgressState::ExtractingPackOverrides(
-                    i as u64,
-                    total_archive_files,
-                ))?;
             }
-
+            // Account for an ignored tail or an archive with no eligible files.
+            // Errors above never reach this successful completion update.
+            report_progress(total_extraction_work)?;
             Ok::<(), anyhow::Error>(())
         })
         .await??;
@@ -384,6 +416,35 @@ pub async fn prepare_modpack_from_mrpack(
     })
 }
 
+/// Required MRPack members must carry a supported, usable digest. Reject every
+/// populated malformed supported field rather than silently downgrade integrity.
+fn required_checksum(
+    file: &carbon_platforms::modrinth::version::ModrinthFile,
+) -> anyhow::Result<carbon_net::Checksum> {
+    for (name, value, length) in [
+        ("SHA512", &file.hashes.sha512, 128),
+        ("SHA1", &file.hashes.sha1, 40),
+    ] {
+        if !value.is_empty()
+            && (value.len() != length || !value.bytes().all(|b| b.is_ascii_hexdigit()))
+        {
+            anyhow::bail!(
+                "MRPack file `{}` has malformed {name}: expected {length} hexadecimal characters",
+                file.path
+            );
+        }
+    }
+    if !file.hashes.sha512.is_empty() {
+        Ok(carbon_net::Checksum::Sha512(file.hashes.sha512.clone()))
+    } else if !file.hashes.sha1.is_empty() {
+        Ok(carbon_net::Checksum::Sha1(file.hashes.sha1.clone()))
+    } else {
+        anyhow::bail!(
+            "MRPack required file `{}` has no usable SHA512 or SHA1 digest",
+            file.path
+        )
+    }
+}
 #[cfg(test)]
 mod test {
     use super::*;
@@ -445,3 +506,6 @@ mod test {
         );
     }
 }
+
+#[cfg(test)]
+mod task09_tests;

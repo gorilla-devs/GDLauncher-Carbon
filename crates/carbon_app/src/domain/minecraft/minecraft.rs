@@ -49,6 +49,7 @@ pub fn libraries_into_vec_downloadable(
             };
 
             files.push(carbon_net::Downloadable {
+                mirrors: Vec::new(),
                 url: maven_url.to_string(),
                 path: PathBuf::from(base_path).join(maven_path),
                 checksum,
@@ -110,6 +111,7 @@ pub fn library_into_lib_downloadable(
         if let Some(url) = artifact.url {
             let checksum = Some(carbon_net::Checksum::Sha1(artifact.sha1));
             return Some(carbon_net::Downloadable {
+                mirrors: Vec::new(),
                 url,
                 path: PathBuf::from(base_path).join(artifact.path),
                 checksum,
@@ -123,6 +125,7 @@ pub fn library_into_lib_downloadable(
             .and_then(|checksums| checksums.first())
             .map(|sha1| carbon_net::Checksum::Sha1(sha1.clone()));
         return Some(carbon_net::Downloadable {
+            mirrors: Vec::new(),
             url: format!("{}{}", base_url, library.name.path()),
             path: base_path.join(library.name.path()),
             checksum,
@@ -160,6 +163,7 @@ pub fn library_into_natives_downloadable(
     let checksum = Some(carbon_net::Checksum::Sha1(mapping_class.clone().sha1));
 
     Some(carbon_net::Downloadable {
+        mirrors: Vec::new(),
         url,
         path: PathBuf::from(base_path).join(mapping_class.clone().path),
         checksum,

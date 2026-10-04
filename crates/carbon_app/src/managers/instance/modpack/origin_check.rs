@@ -396,64 +396,68 @@ async fn parse_mrpack_coverage(
         let mut total_hashed_bytes: u64 = 0;
         let mut complete = true;
 
-        for i in 0..archive.len() {
-            let mut entry = archive.by_index(i)?;
+        for layer in ["overrides", "client-overrides"] {
+            for i in 0..archive.len() {
+                let mut entry = archive.by_index(i)?;
 
-            let Some(enclosed) = entry.enclosed_name() else {
-                continue;
-            };
+                let Some(enclosed) = entry.enclosed_name() else {
+                    continue;
+                };
 
-            let stripped = enclosed
-                .strip_prefix("overrides")
-                .or_else(|_| enclosed.strip_prefix("client-overrides"));
-            let Ok(stripped) = stripped else {
-                continue;
-            };
+                let stripped = enclosed.strip_prefix(layer);
+                let Ok(stripped) = stripped else {
+                    continue;
+                };
 
-            if entry.name().ends_with('/') {
-                continue;
-            }
-            if is_symlink_mode(entry.unix_mode()) {
-                continue;
-            }
-            // Defense in depth on top of `enclosed_name` — mirrors the same
-            // double guard `prepare_modpack_from_mrpack` applies before
-            // joining an override path onto a real directory. Nothing is
-            // joined onto a real path here, so any root works as the probe.
-            if secure_path_join(Path::new("/"), stripped).is_err() {
-                continue;
-            }
-
-            let Some(key) = packinfo_key_from_relative(stripped) else {
-                continue;
-            };
-
-            // Stall guard, checked before spending any work on this entry:
-            // once the archive-wide total is already at/over budget, every
-            // remaining entry is skipped rather than hashed — see
-            // `MAX_TOTAL_HASHED_BYTES`'s own doc for why this is a separate
-            // concern from the per-entry `entry_budget` above.
-            if total_hashed_bytes >= total_budget {
-                complete = false;
-                tracing::warn!(
-                    "origin check: skipping override entry {} — archive-wide hashed byte cap \
-                     ({total_budget} bytes) already reached",
-                    enclosed.display()
-                );
-                continue;
-            }
-
-            match hash_bounded(&mut entry, entry_budget) {
-                Ok((copied, hash)) => {
-                    total_hashed_bytes += copied;
-                    override_hashes.insert(key, hash);
+                if entry.name().ends_with('/') {
+                    continue;
                 }
-                Err(e) => {
+                if is_symlink_mode(entry.unix_mode()) {
+                    continue;
+                }
+                // Defense in depth on top of `enclosed_name` — mirrors the same
+                // double guard `prepare_modpack_from_mrpack` applies before
+                // joining an override path onto a real directory. Nothing is
+                // joined onto a real path here, so any root works as the probe.
+                if secure_path_join(Path::new("/"), stripped).is_err() {
+                    continue;
+                }
+
+                let Some(key) = packinfo_key_from_relative(stripped) else {
+                    continue;
+                };
+
+                // This eligible entry replaces an earlier layer even when its hash
+                // cannot be checked. Never retain evidence for the shadowed bytes.
+                override_hashes.remove(&key);
+
+                // Stall guard, checked before spending any work on this entry:
+                // once the archive-wide total is already at/over budget, every
+                // remaining entry is skipped rather than hashed — see
+                // `MAX_TOTAL_HASHED_BYTES`'s own doc for why this is a separate
+                // concern from the per-entry `entry_budget` above.
+                if total_hashed_bytes >= total_budget {
                     complete = false;
                     tracing::warn!(
-                        "origin check: skipping oversized override entry {}: {e}",
+                        "origin check: skipping override entry {} — archive-wide hashed byte cap \
+                     ({total_budget} bytes) already reached",
                         enclosed.display()
                     );
+                    continue;
+                }
+
+                match hash_bounded(&mut entry, entry_budget) {
+                    Ok((copied, hash)) => {
+                        total_hashed_bytes += copied;
+                        override_hashes.insert(key, hash);
+                    }
+                    Err(e) => {
+                        complete = false;
+                        tracing::warn!(
+                            "origin check: skipping oversized override entry {}: {e}",
+                            enclosed.display()
+                        );
+                    }
                 }
             }
         }
@@ -463,7 +467,6 @@ async fn parse_mrpack_coverage(
     .await
     .context("archive parsing task panicked")?
 }
-
 /// Downloads (or reuses an already-correct cached copy of) `file` to `dest`
 /// via `carbon_net::download_multiple`, the same download primitive the rest
 /// of the launcher uses for game/mod/modpack files — **not**
@@ -1671,5 +1674,115 @@ mod tests {
             results.get("/config/retired.cfg"),
             Some(OriginVerdict::ShippedIn { .. })
         ));
+    }
+}
+
+#[cfg(test)]
+mod task09_tests {
+    use super::*;
+    use std::io::Write;
+    #[tokio::test]
+    async fn task09_effective_origin_ignores_archive_order_and_invalidates_shadowed_hash() {
+        for reverse in [false, true] {
+            for (entry_budget, total_budget) in [(100, 100), (4, 100), (100, 3)] {
+                let dir = tempfile::tempdir().unwrap();
+                let path = dir.path().join("pack.mrpack");
+                let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+                let opts = zip::write::FileOptions::<()>::default();
+                zip.start_file("modrinth.index.json", opts).unwrap();
+                zip.write_all(br#"{"formatVersion":1,"game":"minecraft","versionId":"v1","name":"Test","files":[],"dependencies":{}}"#).unwrap();
+                let mut entries = vec![
+                    ("overrides/keep", "a"),
+                    ("overrides/shared", "bb"),
+                    ("client-overrides/shared", "client"),
+                ];
+                if reverse {
+                    entries.reverse();
+                }
+                for (name, bytes) in entries {
+                    zip.start_file(name, opts).unwrap();
+                    zip.write_all(bytes.as_bytes()).unwrap();
+                }
+                zip.finish().unwrap();
+                let (index, hashes, complete) =
+                    parse_mrpack_coverage(&path, entry_budget, total_budget)
+                        .await
+                        .unwrap();
+                if entry_budget == 100 && total_budget == 100 {
+                    assert!(complete);
+                    assert_eq!(
+                        hashes["/shared"].as_slice(),
+                        Sha512::digest(b"client").as_slice(),
+                        "client wins even in reversed enumeration"
+                    );
+                } else {
+                    assert!(!complete);
+                    assert!(
+                        !hashes.contains_key("/shared"),
+                        "unhashed winning client must invalidate common evidence"
+                    );
+                }
+                // Unrelated checked effective content remains useful on incomplete coverage.
+                assert!(hashes.contains_key("/keep"));
+                let old = HashMap::from([
+                    ("/shared".to_owned(), Sha512::digest(b"bb").into()),
+                    ("/keep".to_owned(), Sha512::digest(b"a").into()),
+                ]);
+                assert_eq!(
+                    match_against_index(&old, &index, &hashes),
+                    HashSet::from(["/keep".to_owned()])
+                );
+                if complete {
+                    let current =
+                        HashMap::from([("/shared".to_owned(), Sha512::digest(b"client").into())]);
+                    assert!(match_against_index(&current, &index, &hashes).contains("/shared"));
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod task09_read_failure {
+    use super::*;
+    use std::io::{Seek, SeekFrom, Write};
+    #[tokio::test]
+    async fn task09_client_crc_failure_removes_shadowed_origin_evidence() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("pack.mrpack");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+        let opts = zip::write::FileOptions::<()>::default()
+            .compression_method(zip::CompressionMethod::Stored);
+        zip.start_file("modrinth.index.json", opts).unwrap();
+        zip.write_all(br#"{"formatVersion":1,"game":"minecraft","versionId":"v1","name":"Test","files":[],"dependencies":{}}"#).unwrap();
+        for (name, bytes) in [
+            ("overrides/keep", "keep"),
+            ("overrides/shared", "common"),
+            ("client-overrides/shared", "client"),
+        ] {
+            zip.start_file(name, opts).unwrap();
+            zip.write_all(bytes.as_bytes()).unwrap();
+        }
+        zip.finish().unwrap();
+        let offset = zip::ZipArchive::new(std::fs::File::open(&path).unwrap())
+            .unwrap()
+            .by_name("client-overrides/shared")
+            .unwrap()
+            .data_start();
+        let mut file = std::fs::OpenOptions::new().write(true).open(&path).unwrap();
+        file.seek(SeekFrom::Start(offset)).unwrap();
+        file.write_all(b"b").unwrap();
+        drop(file);
+        let (index, hashes, complete) = parse_mrpack_coverage(&path, 100, 100).await.unwrap();
+        assert!(!complete);
+        assert!(!hashes.contains_key("/shared"));
+        let untracked = HashMap::from([
+            ("/keep".to_owned(), Sha512::digest(b"keep").into()),
+            ("/shared".to_owned(), Sha512::digest(b"common").into()),
+        ]);
+        assert_eq!(
+            match_against_index(&untracked, &index, &hashes),
+            HashSet::from(["/keep".to_owned()])
+        );
     }
 }

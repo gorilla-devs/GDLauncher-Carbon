@@ -16,8 +16,7 @@ use tokio::sync::watch;
 use tracing::{debug, trace, warn};
 
 use super::modrinth::{
-    MAX_EXTRACTED_OVERRIDE_BYTES, MAX_HASHED_ENTRY_BYTES, copy_bounded, is_symlink_mode,
-    secure_path_join,
+    MAX_EXTRACTED_OVERRIDE_BYTES, copy_bounded, is_symlink_mode, secure_path_join,
 };
 
 use crate::domain::instance::info::{ModLoader, ModLoaderType, StandardVersion};
@@ -325,70 +324,12 @@ pub async fn prepare_modpack_from_gdlpack(
             let unresolved = unresolved_platform_files.clone();
 
             move || -> anyhow::Result<Vec<bool>> {
-                let file = std::fs::File::open(&gdlpack_path)?;
-                let mut archive = zip::ZipArchive::new(file)?;
-
-                let override_prefix = format!("{}/", overrides_dir);
-                let client_override_prefix = client_overrides
-                    .as_ref()
-                    .map(|d| format!("{}/", d))
-                    .unwrap_or_default();
-
-                let mut results = Vec::with_capacity(unresolved.len());
-
-                for hashes in &unresolved {
-                    let mut found = false;
-
-                    // Scan override files for matching SHA512
-                    for i in 0..archive.len() {
-                        let mut entry = match archive.by_index(i) {
-                            Ok(e) => e,
-                            Err(_) => continue,
-                        };
-                        let entry_name = entry.name().to_string();
-
-                        // Check if it's an override file
-                        let is_override = entry_name.starts_with(&override_prefix)
-                            || (!client_override_prefix.is_empty()
-                                && entry_name.starts_with(&client_override_prefix));
-
-                        if !is_override || entry.is_dir() {
-                            continue;
-                        }
-
-                        // Read file and compute SHA512. Bounded per-entry (not
-                        // cumulative -- `contents` is dropped at the end of each
-                        // iteration, so there is nothing to accumulate): a
-                        // decompression bomb masquerading as an override must not
-                        // be read into memory without limit just to hash it, and an
-                        // entry over the limit can never legitimately be the small
-                        // unresolved file we are matching against anyway.
-                        let mut contents = Vec::new();
-                        if copy_bounded(&mut entry, &mut contents, MAX_HASHED_ENTRY_BYTES).is_err()
-                        {
-                            continue;
-                        }
-
-                        use sha2::{Digest, Sha512};
-                        let hash = Sha512::digest(&contents);
-                        let hash_hex = hex::encode(hash);
-
-                        // `hash_hex` is lowercase by construction; `hashes.sha512`
-                        // is whatever the gdlpack manifest declared.
-                        if hash_hex.eq_ignore_ascii_case(&hashes.sha512) {
-                            found = true;
-                            trace!(
-                                "Found unresolved platform file in overrides: {} (SHA512: {})",
-                                entry_name, hashes.sha512
-                            );
-                            break;
-                        }
-                    }
-
-                    results.push(found);
-                }
-
-                Ok(results)
+                find_bundled_files(
+                    &gdlpack_path,
+                    &overrides_dir,
+                    client_overrides.as_deref(),
+                    &unresolved,
+                )
             }
         })
         .await??;
@@ -600,3 +541,88 @@ mod tests {
         assert!(download_checksum("", &manifest_hashes("", "")).is_none());
     }
 }
+
+// Streaming work is bounded across the whole fallback scan, independent of
+// installed-origin discovery's smaller per-entry policy.
+const MAX_BUNDLED_SCAN_BYTES: u64 = MAX_EXTRACTED_OVERRIDE_BYTES;
+
+fn find_bundled_files(
+    gdlpack_path: &Path,
+    overrides_dir: &str,
+    client_overrides: Option<&str>,
+    unresolved: &[FileHashes],
+) -> anyhow::Result<Vec<bool>> {
+    find_bundled_files_with_budget(
+        gdlpack_path,
+        overrides_dir,
+        client_overrides,
+        unresolved,
+        MAX_BUNDLED_SCAN_BYTES,
+    )
+}
+
+fn find_bundled_files_with_budget(
+    gdlpack_path: &Path,
+    overrides_dir: &str,
+    client_overrides: Option<&str>,
+    unresolved: &[FileHashes],
+    mut remaining: u64,
+) -> anyhow::Result<Vec<bool>> {
+    use sha2::{Digest, Sha512};
+    if unresolved.is_empty() {
+        return Ok(Vec::new());
+    }
+    let file = std::fs::File::open(gdlpack_path).context("Opening bundled fallback archive")?;
+    let mut archive = zip::ZipArchive::new(file).context("Decoding bundled fallback archive")?;
+    let mut found = vec![false; unresolved.len()];
+    let common = format!("{overrides_dir}/");
+    let client = client_overrides.map(|p| format!("{p}/"));
+    let mut buffer = [0u8; 64 * 1024];
+    for i in 0..archive.len() {
+        let mut entry = archive
+            .by_index(i)
+            .context("Decoding bundled fallback entry")?;
+        let name = entry.name().to_string();
+        let relative = name
+            .strip_prefix(&common)
+            .or_else(|| client.as_ref().and_then(|p| name.strip_prefix(p)));
+        let Some(relative) = relative else { continue };
+        if relative.is_empty()
+            || entry.is_dir()
+            || is_symlink_mode(entry.unix_mode())
+            || entry.enclosed_name().is_none()
+            || secure_path_join(Path::new("/"), relative).is_err()
+        {
+            continue;
+        }
+        let mut digest = Sha512::new();
+        loop {
+            let limit = buffer
+                .len()
+                .min(remaining.saturating_add(1).min(usize::MAX as u64) as usize);
+            let read = entry
+                .read(&mut buffer[..limit])
+                .with_context(|| format!("Reading bundled fallback entry `{name}`"))?;
+            if read == 0 {
+                break;
+            }
+            if read as u64 > remaining {
+                anyhow::bail!(
+                    "Bundled fallback scan work budget exceeded while hashing `{name}`; required content has not been exhaustively checked"
+                );
+            }
+            remaining -= read as u64;
+            digest.update(&buffer[..read]);
+        }
+        let hash = hex::encode(digest.finalize());
+        for (matched, expected) in found.iter_mut().zip(unresolved) {
+            *matched |= hash.eq_ignore_ascii_case(&expected.sha512);
+        }
+        if found.iter().all(|f| *f) {
+            break;
+        }
+    }
+    Ok(found)
+}
+#[cfg(test)]
+mod task09_tests;
