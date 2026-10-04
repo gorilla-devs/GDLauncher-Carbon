@@ -330,7 +330,7 @@ When exporting an instance to `.gdlpack`, the **Bundle Addons** toggle in the ex
 - **Bundle off (manifest-only).** Each mod GDLauncher can resolve via CurseForge or Modrinth becomes a `platform` entry in `entries`. The actual JAR is *not* included in the archive. The recipient's launcher re-downloads from the platform on import. Mods GDLauncher can't resolve (e.g. JARs you dropped in by hand) are bundled in `overrides/mods/` as a fallback. Result: small archive, recipient needs internet at install time.
 - **Bundle on (self-contained).** No `platform` entries are emitted; every mod is copied into `overrides/mods/`. Result: larger archive (often hundreds of MB to several GB), installable offline once the Minecraft assets are cached.
 
-Resource packs and shader packs behave the same way: resolvable ones become `platform` entries with bundle off, everything is bundled directly with bundle on.
+Resource packs and shader packs are always bundled, in `overrides/resourcepacks/` and `overrides/shaderpacks/`, whichever way the toggle is set. A `platform` entry has no destination folder and importers put every one of them in `mods/`, so only mods are linked.
 
 ## Side-by-side: the three formats
 

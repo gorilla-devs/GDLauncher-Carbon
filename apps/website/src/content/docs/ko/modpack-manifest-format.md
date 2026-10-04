@@ -330,7 +330,7 @@ mypack.gdlpack/
 - **번들 OFF (매니페스트 전용).** GDLauncher가 CurseForge나 Modrinth로 해결할 수 있는 각 모드는 `entries`의 `platform` 엔트리가 됨. 실제 JAR은 아카이브에 *포함되지 않음*. 수신자의 런처가 임포트 시 플랫폼에서 재다운로드. GDLauncher가 해결할 수 없는 모드(수동으로 떨군 JAR 등)는 폴백으로 `overrides/mods/`에 번들됨. 결과: 작은 아카이브, 수신자는 설치 시 인터넷 필요.
 - **번들 ON (자기 완결).** `platform` 엔트리는 출력되지 않고 모든 모드가 `overrides/mods/`로 복사. 결과: 큰 아카이브 (수백 MB~수 GB), Minecraft 에셋이 캐시되어 있으면 오프라인 설치 가능.
 
-리소스 팩과 셰이더 팩도 같은 식으로 동작: 번들 OFF면 해결 가능한 건 `platform` 엔트리, 번들 ON이면 모두 직접 번들.
+리소스 팩과 셰이더 팩은 토글과 관계없이 항상 `overrides/resourcepacks/`와 `overrides/shaderpacks/`에 번들됩니다. `platform` 엔트리에는 대상 폴더가 없고 임포터가 모두 `mods/`에 넣기 때문에 링크되는 건 모드뿐입니다.
 
 ## 횡 비교: 세 포맷
 

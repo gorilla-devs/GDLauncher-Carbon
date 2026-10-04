@@ -330,7 +330,7 @@ Beim Export einer Instanz nach `.gdlpack` entscheidet der **Bundle Addons**-Scha
 - **Bundle aus (nur Manifest).** Jeder Mod, den GDLauncher über CurseForge oder Modrinth auflösen kann, wird zu einem `platform`-Eintrag in `entries`. Die eigentliche JAR ist *nicht* im Archiv. Der Launcher des Empfängers lädt sie beim Import von der Plattform neu. Mods, die GDLauncher nicht auflösen kann (z. B. von Hand abgelegte JARs), werden als Fallback in `overrides/mods/` gebündelt. Ergebnis: kleines Archiv, der Empfänger braucht beim Installieren Internet.
 - **Bundle an (eigenständig).** Es werden keine `platform`-Einträge erzeugt; jeder Mod wird in `overrides/mods/` kopiert. Ergebnis: größeres Archiv (oft hunderte MB bis mehrere GB), offline installierbar, sobald die Minecraft-Assets im Cache sind.
 
-Resource Packs und Shader Packs verhalten sich identisch: Auflösbare werden bei Bundle aus zu `platform`-Einträgen, bei Bundle an wird alles direkt gebündelt.
+Resource Packs und Shader Packs werden immer gebündelt, in `overrides/resourcepacks/` und `overrides/shaderpacks/`, egal wie der Schalter steht. Ein `platform`-Eintrag hat keinen Zielordner und Importer legen jeden davon in `mods/` ab, deshalb werden nur Mods verlinkt.
 
 ## Nebeneinander: die drei Formate
 

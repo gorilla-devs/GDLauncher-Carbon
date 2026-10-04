@@ -128,6 +128,10 @@ pub enum InstanceShareError {
     QuotaExceeded,
     #[error("Instance is too large to share")]
     InstanceTooLarge,
+    /// The disk holding GDLauncher's data filled up while the share's archive
+    /// was being written. Never sent by the share service.
+    #[error("Not enough free disk space to prepare the share")]
+    NotEnoughDiskSpace,
     #[error("Maximum downloads exceeded")]
     MaxDownloadsExceeded,
     #[error("Upload timed out")]
@@ -166,6 +170,7 @@ impl crate::error::FeErrorCode for InstanceShareError {
             Self::ShareNotFound => "SHARE_NOT_FOUND",
             Self::QuotaExceeded => "QUOTA_EXCEEDED",
             Self::InstanceTooLarge => "INSTANCE_TOO_LARGE",
+            Self::NotEnoughDiskSpace => "NOT_ENOUGH_DISK_SPACE",
             Self::MaxDownloadsExceeded => "MAX_DOWNLOADS_EXCEEDED",
             Self::UploadTimeout => "UPLOAD_TIMEOUT",
             Self::UserNotVerified => "USER_NOT_VERIFIED",

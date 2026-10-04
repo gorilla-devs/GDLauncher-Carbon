@@ -330,7 +330,7 @@ C'est informatif ; le launcher ne s'en sert pas pour télécharger (le tableau `
 - **Bundle off (manifest seul).** Chaque mod que GDLauncher peut résoudre via CurseForge ou Modrinth devient une entrée `platform` dans `entries`. Le JAR réel n'est *pas* inclus dans l'archive. Le launcher du destinataire le retélécharge depuis la plateforme à l'import. Les mods que GDLauncher ne peut pas résoudre (ex. des JARs déposés à la main) sont bundlés dans `overrides/mods/` en fallback. Résultat : archive petite, le destinataire a besoin d'internet à l'installation.
 - **Bundle on (autonome).** Aucune entrée `platform` n'est émise ; chaque mod est copié dans `overrides/mods/`. Résultat : archive plus grande (souvent des centaines de Mo à plusieurs Go), installable hors-ligne une fois les assets Minecraft en cache.
 
-Les resource packs et shader packs se comportent pareil : les résolvables deviennent des entrées `platform` avec bundle off, tout est bundlé directement avec bundle on.
+Les resource packs et shader packs sont toujours bundlés, dans `overrides/resourcepacks/` et `overrides/shaderpacks/`, quelle que soit la position du toggle. Une entrée `platform` n'a pas de dossier de destination et les importeurs les placent toutes dans `mods/`, donc seuls les mods sont liés.
 
 ## Côte à côte : les trois formats
 

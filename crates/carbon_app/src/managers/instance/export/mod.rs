@@ -3,7 +3,7 @@ use std::{
     fs::{self, File},
     io::{self, Read, Write},
     path::{Path, PathBuf},
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use itertools::Itertools;
@@ -38,6 +38,9 @@ use super::InvalidInstanceIdError;
 mod curseforge_archive;
 pub mod gdlauncher_archive;
 mod modrinth_archive;
+
+#[cfg(test)]
+mod task12_tests;
 
 async fn verify_linked_export_files(files: &[(PathBuf, Vec<u8>)]) -> anyhow::Result<()> {
     for (path, sha512) in files {
@@ -92,6 +95,60 @@ async fn verify_linked_export_files(
         "{} kept changing while the instance was being exported. Close any program that is changing it, then try the export again.",
         linked_mod_name(&files[stale[0]].0)
     )
+}
+
+/// Wait for authoritative export settlement while forwarding share progress.
+async fn wait_for_share_export(
+    app: &crate::managers::App,
+    vtask_id: VisualTaskId,
+    tx: &mpsc::Sender<ShareInstanceProgress>,
+    first_phase_weight: f32,
+    cancel_token: &CancellationToken,
+) -> anyhow::Result<()> {
+    use crate::managers::vtask::TaskOutcome;
+
+    tokio::select! {
+        biased;
+        _ = cancel_token.cancelled() => {
+            tracing::info!("ShareInstance: cancelled during phase 1 (export)");
+            anyhow::bail!("Share cancelled");
+        }
+        result = async {
+            loop {
+                match app.task_manager().get_task_outcome(vtask_id).await {
+                    TaskOutcome::Running(task) => {
+                        if let Progress::Known(progress) = task.progress {
+                            let normalized_progress = (progress * first_phase_weight) as i32;
+                            let _ = tx.send(ShareInstanceProgress::Progress(normalized_progress)).await;
+                        }
+                    }
+                    TaskOutcome::Succeeded => return Ok(()),
+                    TaskOutcome::Failed(task) => {
+                        if let Progress::Failed(err) = task.progress {
+                            return Err(share_export_error(&err));
+                        }
+                        anyhow::bail!("Export task failed");
+                    }
+                    TaskOutcome::Dismissed => anyhow::bail!("Export task was dismissed"),
+                    TaskOutcome::Unavailable => anyhow::bail!("Export task outcome is unavailable"),
+                }
+                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            }
+        } => result,
+    }
+}
+
+/// The error a share reports for its failed export. A share that is too large
+/// or a disk that filled up keep their own messages so the share window can
+/// say what to do; anything else is reported as the export's failure.
+fn share_export_error(error: &anyhow::Error) -> anyhow::Error {
+    if let Some(too_large) = error.downcast_ref::<InstanceTooLargeError>() {
+        return too_large.clone().into();
+    }
+    if is_disk_full(error) {
+        return InstanceShareError::NotEnoughDiskSpace.into();
+    }
+    anyhow::anyhow!("Export task failed: {error}")
 }
 
 /// Extract basic metadata from a GDLPack zip file
@@ -352,6 +409,8 @@ impl ManagerRef<'_, InstanceExportManager> {
                     save_path,
                     self_contained_addons_bundling,
                     filter,
+                    Some(version),
+                    None,
                     None,
                 )
                 .await
@@ -401,41 +460,6 @@ impl ManagerRef<'_, InstanceExportManager> {
         let (tx, rx) = tokio::sync::mpsc::channel(1);
 
         let handle = tokio::spawn(async move {
-            // Measure the instance once up front: this drives both the
-            // pre-flight gate below and the per-folder breakdown shown when a
-            // share is rejected for being too large.
-            let (uncompressed_total, largest_folders) = {
-                let filter_for_size = filter.clone();
-                let (total, breakdown) = tokio::task::spawn_blocking(move || {
-                    compute_share_breakdown(&basepath, &filter_for_size)
-                })
-                .await?;
-                (
-                    total,
-                    breakdown
-                        .into_iter()
-                        .take(SHARE_BREAKDOWN_TOP_N)
-                        .collect::<Vec<_>>(),
-                )
-            };
-
-            // Pre-flight: fast-fail only when the uncompressed size is so far
-            // over the cap that no amount of DEFLATE could bring it under,
-            // avoiding a pointless multi-gigabyte export. Borderline instances
-            // pass through and are re-checked against the real archive size
-            // after export, so a share that would actually fit is never
-            // wrongly rejected here.
-            if uncompressed_total > MAX_SHARE_SIZE_BYTES * SHARE_PREFLIGHT_MARGIN {
-                // This branch returns, so the later exact-size check can't also run; move
-                // `largest_folders` instead of cloning it.
-                return Err(InstanceTooLargeError {
-                    total_bytes: uncompressed_total,
-                    limit_bytes: MAX_SHARE_SIZE_BYTES,
-                    largest_folders,
-                }
-                .into());
-            }
-
             let phases_count = 4;
             let mut current_phase = 0;
 
@@ -457,43 +481,15 @@ impl ManagerRef<'_, InstanceExportManager> {
                 initial_tmpfile.clone(),
                 false,
                 filter,
+                None,
                 Some(cancel_token.clone()),
+                // Stops writing, and fails with the folders to trim, as soon as
+                // the archive would pass the share limit.
+                Some(MAX_SHARE_SIZE_BYTES),
             )
             .await?;
 
-            // Wait for export task to complete while reporting progress
-            loop {
-                if cancel_token.is_cancelled() {
-                    tracing::info!("ShareInstance: cancelled during phase 1 (export)");
-                    anyhow::bail!("Share cancelled");
-                }
-                let vtask = app.task_manager().get_task(vtask_id).await;
-                if let Some(vtask) = vtask {
-                    match &vtask.progress {
-                        Progress::Known(progress) => {
-                            // Scale progress to phase weight (0-25%)
-                            let normalized_progress = (progress * first_phase_weight) as i32;
-                            let _ = tx
-                                .send(ShareInstanceProgress::Progress(normalized_progress))
-                                .await;
-                        }
-                        Progress::Failed(err) => {
-                            anyhow::bail!("Export task failed: {err}");
-                        }
-                        _ => {}
-                    }
-
-                    // Check if task is complete
-                    if vtask.progress == Progress::Known(1.0) {
-                        break;
-                    }
-                } else {
-                    // Task no longer exists, assume it's done
-                    break;
-                }
-
-                tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
-            }
+            wait_for_share_export(&app, vtask_id, &tx, first_phase_weight, &cancel_token).await?;
 
             // Update total progress after first phase
             total_progress += first_phase_weight;
@@ -526,19 +522,15 @@ impl ManagerRef<'_, InstanceExportManager> {
             // Second phase: Calculate the checksum
             current_phase += 1;
 
+            // The export already refused to grow the archive past the limit;
+            // check the finished file again before checksum, authentication
+            // or upload anyway.
             let content_length = tokio::fs::metadata(&initial_tmpfile).await?.len();
-
-            // Exact check now that the archive exists: reject if the real
-            // (compressed) size is over the cap. This catches borderline
-            // instances that passed the permissive pre-flight, before the
-            // checksum + upload. enderium enforces the same cap as a final
-            // safety net. The breakdown stays in uncompressed on-disk sizes —
-            // that's what the user sees and can trim.
             if content_length > MAX_SHARE_SIZE_BYTES {
                 return Err(InstanceTooLargeError {
-                    total_bytes: uncompressed_total,
+                    total_bytes: content_length,
                     limit_bytes: MAX_SHARE_SIZE_BYTES,
-                    largest_folders,
+                    largest_folders: Vec::new(),
                 }
                 .into());
             }
@@ -789,22 +781,11 @@ enum ZipMode<'a, W: io::Write + io::Seek, T: FileOptionExtension + Clone> {
     ),
 }
 
-/// Maximum size of a shared instance archive. Mirrors enderium's
-/// `MAX_CONTENT_LENGTH` (crates/enderium-app/src/routes/v1/instance_share.rs),
-/// which stays authoritative. The share task checks against it twice: a
-/// permissive pre-flight on the uncompressed size (fast-fails obviously huge
-/// instances before the expensive export) and an exact check on the real
-/// archive size once it's built (catches borderline cases without ever wrongly
-/// blocking a share that would compress under the cap).
+/// Maximum compressed size of a completed shared instance archive. Mirrors
+/// enderium's authoritative `MAX_CONTENT_LENGTH`. The share export stops
+/// writing as soon as its archive would grow past it; uncompressed on-disk
+/// sizes are trimming diagnostics and do not decide whether an archive fits.
 pub const MAX_SHARE_SIZE_BYTES: u64 = 512 * 1024 * 1024;
-
-/// Pre-flight multiplier applied to `MAX_SHARE_SIZE_BYTES`. The pre-flight
-/// measures uncompressed bytes, so we only fast-fail when the instance is so
-/// far over the cap that DEFLATE could not bring it under — the dominant share
-/// contents (resource/shader packs, jars) barely compress, so realistically
-/// nothing exceeds ~2x uncompressed yet fits once zipped. Anything below this
-/// is exported and re-checked against the real archive size.
-const SHARE_PREFLIGHT_MARGIN: u64 = 2;
 
 /// How many of the largest top-level entries to surface when a share is
 /// rejected for being too large.
@@ -819,6 +800,109 @@ const SHARE_BREAKDOWN_TOP_N: usize = 5;
 /// and are already covered by the `saves` exclusion.
 const SHARE_EXCLUDED_FOLDERS: &[&str] = &["Distant_Horizons_server_data"];
 
+/// Why an [`ArchiveSink`] stopped taking bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ArchiveStop {
+    /// The archive would have grown past this many bytes.
+    Limit(u64),
+    /// The export was cancelled.
+    Cancelled,
+}
+
+impl ArchiveStop {
+    fn io_error(self) -> io::Error {
+        match self {
+            Self::Limit(limit) => {
+                io::Error::other(format!("the archive would be larger than {limit} bytes"))
+            }
+            Self::Cancelled => io::Error::other("Export cancelled"),
+        }
+    }
+
+    /// The error an export reports once its archive stopped for this reason.
+    /// `bundled` is what the archive bundles, so a too-large share names only
+    /// folders that count towards its size (linked mods are left out).
+    fn into_error(self, base_path: &Path, bundled: &ExportEntry) -> anyhow::Error {
+        match self {
+            Self::Limit(limit) => InstanceTooLargeError::measure(base_path, bundled, limit).into(),
+            Self::Cancelled => anyhow::anyhow!("Export cancelled"),
+        }
+    }
+}
+
+/// The file an export writes its archive to. A share passes its size limit
+/// and cancel token, so an archive that cannot fit, or that the user
+/// cancelled, stops at its next write instead of compressing the rest of the
+/// instance into temp first. Once stopped it refuses every later write.
+struct ArchiveSink<W> {
+    inner: W,
+    position: u64,
+    limit: Option<u64>,
+    cancel: Option<CancellationToken>,
+    stopped: Arc<OnceLock<ArchiveStop>>,
+}
+
+impl<W> ArchiveSink<W> {
+    /// Returns the sink and the handle that tells why it stopped, which stays
+    /// readable after the zip writer that owns the sink is gone.
+    fn new(
+        inner: W,
+        limit: Option<u64>,
+        cancel: Option<CancellationToken>,
+    ) -> (Self, Arc<OnceLock<ArchiveStop>>) {
+        let stopped = Arc::new(OnceLock::new());
+        let sink = Self {
+            inner,
+            position: 0,
+            limit,
+            cancel,
+            stopped: stopped.clone(),
+        };
+        (sink, stopped)
+    }
+
+    fn stop(&self, reason: ArchiveStop) -> io::Error {
+        let _ = self.stopped.set(reason);
+        self.stopped.get().copied().unwrap_or(reason).io_error()
+    }
+}
+
+impl<W: Write> Write for ArchiveSink<W> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        if let Some(stop) = self.stopped.get() {
+            return Err(stop.io_error());
+        }
+        if self
+            .cancel
+            .as_ref()
+            .is_some_and(CancellationToken::is_cancelled)
+        {
+            return Err(self.stop(ArchiveStop::Cancelled));
+        }
+        // The zip writer only seeks back to fill in headers it already wrote,
+        // so the archive ends up exactly as long as its furthest write.
+        if let Some(limit) = self.limit
+            && self.position.saturating_add(buf.len() as u64) > limit
+        {
+            return Err(self.stop(ArchiveStop::Limit(limit)));
+        }
+        let written = self.inner.write(buf)?;
+        self.position += written as u64;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl<W: io::Seek> io::Seek for ArchiveSink<W> {
+    fn seek(&mut self, pos: io::SeekFrom) -> io::Result<u64> {
+        self.position = self.inner.seek(pos)?;
+        Ok(self.position)
+    }
+}
+
 /// Size of a single top-level entry (folder or file) included in a share.
 #[derive(Debug, Clone)]
 pub struct ShareFolderSize {
@@ -826,15 +910,42 @@ pub struct ShareFolderSize {
     pub bytes: u64,
 }
 
-/// Returned when an instance's included files exceed `MAX_SHARE_SIZE_BYTES`.
-/// Carries a breakdown of the largest entries so the UI can tell the user
-/// which folders are responsible.
-#[derive(Debug, thiserror::Error)]
-#[error("instance is too large to share: {total_bytes} bytes exceeds the {limit_bytes} byte limit")]
+/// Returned when a share's archive would grow past `MAX_SHARE_SIZE_BYTES`.
+/// The total and folder breakdown describe the uncompressed bytes the archive
+/// bundles (linked mods are downloaded by the recipient and do not count), so
+/// the user knows what to trim.
+#[derive(Debug, Clone, thiserror::Error)]
+#[error(
+    "instance archive exceeds the {limit_bytes} byte share limit ({total_bytes} uncompressed bytes)"
+)]
 pub struct InstanceTooLargeError {
     pub total_bytes: u64,
     pub limit_bytes: u64,
     pub largest_folders: Vec<ShareFolderSize>,
+}
+
+impl InstanceTooLargeError {
+    /// Measures what `bundled` includes under `base_path`, largest first.
+    fn measure(base_path: &Path, bundled: &ExportEntry, limit_bytes: u64) -> Self {
+        let (total_bytes, breakdown) = compute_share_breakdown(base_path, bundled);
+        Self {
+            total_bytes,
+            limit_bytes,
+            largest_folders: breakdown.into_iter().take(SHARE_BREAKDOWN_TOP_N).collect(),
+        }
+    }
+}
+
+/// Whether `error` comes from a disk (or disk quota) that ran out of space.
+fn is_disk_full(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause.downcast_ref::<io::Error>().is_some_and(|error| {
+            matches!(
+                error.kind(),
+                io::ErrorKind::StorageFull | io::ErrorKind::QuotaExceeded
+            )
+        })
+    })
 }
 
 /// Build the set of top-level instance entries to include in a share. Skips
@@ -869,13 +980,15 @@ fn build_share_filter(basepath: &Path, include_saves: bool) -> anyhow::Result<Ex
 
 /// Sum the on-disk size of every regular file a share would include, grouped by
 /// top-level entry and sorted largest-first. Mirrors `zip_excluding`'s
-/// inclusion rules: only entries present in `filter` are counted and symlinks
-/// are skipped (so we never follow a link out of the instance or double-count).
+/// inclusion rules: only entries present in `filter` are counted, a nested
+/// filter counts only the children it names (so mods the export links instead
+/// of bundling are left out), and symlinks are skipped (so we never follow a
+/// link out of the instance or double-count).
 ///
-/// Unreadable entries count as zero — under-counting defers to enderium's
-/// authoritative check rather than risking a wrong "too large" rejection.
+/// The result only explains a refused share, so unreadable entries simply
+/// count as zero.
 fn compute_share_breakdown(base_path: &Path, filter: &ExportEntry) -> (u64, Vec<ShareFolderSize>) {
-    fn entry_size(path: &Path) -> u64 {
+    fn entry_size(path: &Path, filter: Option<&ExportEntry>) -> u64 {
         let Ok(meta) = fs::symlink_metadata(path) else {
             return 0;
         };
@@ -886,7 +999,18 @@ fn compute_share_breakdown(base_path: &Path, filter: &ExportEntry) -> (u64, Vec<
             let Ok(read) = fs::read_dir(path) else {
                 return 0;
             };
-            read.flatten().map(|e| entry_size(&e.path())).sum()
+            read.flatten()
+                .filter_map(|entry| {
+                    let subfilter = match filter {
+                        None => None,
+                        Some(filter) => filter
+                            .0
+                            .get(&*entry.file_name().to_string_lossy())?
+                            .as_ref(),
+                    };
+                    Some(entry_size(&entry.path(), subfilter))
+                })
+                .sum()
         } else {
             meta.len()
         }
@@ -894,9 +1018,9 @@ fn compute_share_breakdown(base_path: &Path, filter: &ExportEntry) -> (u64, Vec<
 
     let mut folders: Vec<ShareFolderSize> = filter
         .0
-        .keys()
-        .filter_map(|name| {
-            let bytes = entry_size(&base_path.join(name));
+        .iter()
+        .filter_map(|(name, subfilter)| {
+            let bytes = entry_size(&base_path.join(name), subfilter.as_ref());
             (bytes > 0).then(|| ShareFolderSize {
                 name: name.clone(),
                 bytes,
@@ -949,6 +1073,43 @@ mod share_breakdown_tests {
         assert_eq!(folders[1].bytes, 100);
     }
 
+    #[test]
+    fn counts_only_what_a_nested_filter_keeps() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        std::fs::create_dir_all(base.join("mods").join("sub")).unwrap();
+        std::fs::write(base.join("mods").join("linked.jar"), vec![0u8; 5000]).unwrap();
+        std::fs::write(base.join("mods").join("bundled.jar"), vec![0u8; 300]).unwrap();
+        std::fs::write(
+            base.join("mods").join("sub").join("kept.txt"),
+            vec![0u8; 20],
+        )
+        .unwrap();
+        std::fs::write(base.join("mods").join("sub").join("left.txt"), vec![0u8; 7]).unwrap();
+        std::fs::create_dir(base.join("config")).unwrap();
+        std::fs::write(base.join("config").join("a.toml"), vec![0u8; 40]).unwrap();
+        // How the export leaves a linked mod out of what it bundles.
+        let filter = ExportEntry(HashMap::from([
+            (
+                "mods".to_string(),
+                Some(ExportEntry(HashMap::from([
+                    ("bundled.jar".to_string(), None),
+                    ("sub".to_string(), Some(filter_of(&["kept.txt"]))),
+                ]))),
+            ),
+            ("config".to_string(), None),
+        ]));
+
+        let (total, folders) = compute_share_breakdown(base, &filter);
+
+        assert_eq!(total, 360);
+        let folders = folders
+            .iter()
+            .map(|folder| (folder.name.as_str(), folder.bytes))
+            .collect::<Vec<_>>();
+        assert_eq!(folders, [("mods", 320), ("config", 40)]);
+    }
+
     #[cfg(unix)]
     #[test]
     fn skips_symlinks() {
@@ -989,6 +1150,12 @@ mod share_breakdown_tests {
         assert!(!f.0.contains_key("Distant_Horizons_server_data"));
     }
 }
+
+/// Files at least this large are written with ZIP64 sizes. ZIP's 32-bit size
+/// fields end just under 4 GiB and DEFLATE can grow incompressible bytes a
+/// little, so the switch leaves some headroom. Smaller files keep the plain
+/// headers every reader understands.
+const ZIP64_FILE_SIZE: u64 = u32::MAX as u64 - (u32::MAX as u64 >> 8);
 
 fn zip_excluding<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
     mut mode: ZipMode<W, T>,
@@ -1051,9 +1218,12 @@ fn zip_excluding<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
                         **size += entry.metadata()?.len();
                     }
                     ZipMode::Create(zip, options, notify) => {
-                        zip.start_file(pathstr, options.clone())?;
-                        let mut file = File::open(entry.path())?;
                         let total_size = entry.metadata()?.len();
+                        zip.start_file(
+                            pathstr,
+                            options.clone().large_file(total_size >= ZIP64_FILE_SIZE),
+                        )?;
+                        let mut file = File::open(entry.path())?;
 
                         // Adaptive buffer: use file size or cap at 1MB
                         let buffer_size = std::cmp::min(total_size as usize, 1024 * 1024); // 1MB max

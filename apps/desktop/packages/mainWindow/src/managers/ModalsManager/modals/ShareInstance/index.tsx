@@ -53,6 +53,7 @@ const PERMANENT_SHARE_ERROR_CODES = new Set([
 type ShareErrorKey =
   | "instances:_trn_share_errors.quota_exceeded"
   | "instances:_trn_share_errors.instance_too_large"
+  | "instances:_trn_share_errors.not_enough_disk_space"
   | "instances:_trn_share_errors.too_many_shares"
   | "instances:_trn_share_errors.not_verified"
   | "instances:_trn_share_errors.network_error"
@@ -70,6 +71,8 @@ const getShareErrorKey = (code: string | null): ShareErrorKey => {
       return "instances:_trn_share_errors.quota_exceeded"
     case "INSTANCE_TOO_LARGE":
       return "instances:_trn_share_errors.instance_too_large"
+    case "NOT_ENOUGH_DISK_SPACE":
+      return "instances:_trn_share_errors.not_enough_disk_space"
     case "TOO_MANY_ACTIVE_SHARES":
       return "instances:_trn_share_errors.too_many_shares"
     case "USER_NOT_VERIFIED":

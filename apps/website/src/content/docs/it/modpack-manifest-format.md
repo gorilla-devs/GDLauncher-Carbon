@@ -330,7 +330,7 @@ Quando esporti un'istanza in `.gdlpack`, il toggle **Bundle Addons** nel wizard 
 - **Bundle off (solo manifest).** Ogni Mod che GDLauncher riesce a risolvere via CurseForge o Modrinth diventa un'entry `platform` in `entries`. Il JAR vero e proprio non viene incluso nell'archivio. Il launcher del destinatario riscarica dalla piattaforma all'import. Le Mod che GDLauncher non riesce a risolvere (es. JAR che hai lasciato cadere a mano) sono incluse in `overrides/mods/` come fallback. Risultato: archivio piccolo, il destinatario ha bisogno di internet al momento dell'install.
 - **Bundle on (autonomo).** Nessuna entry `platform` viene emessa; ogni Mod viene copiata in `overrides/mods/`. Risultato: archivio più grande (spesso centinaia di MB o diversi GB), installabile offline una volta che gli asset Minecraft sono in cache.
 
-I Resource Pack e gli Shader si comportano allo stesso modo: quelli risolvibili diventano entry `platform` con bundle off, tutto viene incluso direttamente con bundle on.
+I Resource Pack e gli Shader vengono sempre inclusi, in `overrides/resourcepacks/` e `overrides/shaderpacks/`, qualunque sia la posizione del toggle. Un'entry `platform` non ha una cartella di destinazione e gli importer le mettono tutte in `mods/`, quindi vengono collegate solo le Mod.
 
 ## Affiancati: i tre formati
 

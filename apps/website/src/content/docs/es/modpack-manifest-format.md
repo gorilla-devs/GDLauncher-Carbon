@@ -330,7 +330,7 @@ Al exportar una instancia a `.gdlpack`, el toggle **Bundle Addons** en el asiste
 - **Bundle apagado (sólo manifest).** Cada mod que GDLauncher puede resolver vía CurseForge o Modrinth se vuelve una entrada `platform` en `entries`. El JAR real *no* se incluye en el archivo. El launcher del destinatario lo redescarga desde la plataforma al importar. Los mods que GDLauncher no puede resolver (ej. JARs que pusiste a mano) se empaquetan en `overrides/mods/` como fallback. Resultado: archivo pequeño, el destinatario necesita internet al instalar.
 - **Bundle encendido (autocontenido).** No se emite ninguna entrada `platform`; cada mod se copia a `overrides/mods/`. Resultado: archivo más grande (a menudo cientos de MB a varios GB), instalable sin conexión una vez los assets de Minecraft están en caché.
 
-Los resource packs y shader packs se comportan igual: los resolubles se vuelven entradas `platform` con bundle apagado, todo se empaqueta directamente con bundle encendido.
+Los resource packs y shader packs se empaquetan siempre, en `overrides/resourcepacks/` y `overrides/shaderpacks/`, sea cual sea la posición del interruptor. Una entrada `platform` no tiene carpeta de destino y los importadores colocan todas en `mods/`, así que solo se enlazan los mods.
 
 ## Lado a lado: los tres formatos
 

@@ -28,17 +28,23 @@ use tracing::trace;
 /// Export an instance to the GDLPack format (.gdlpack)
 ///
 /// The GDLPack format is a minimal, hash-based modpack distribution format that:
-/// - Uses hashes to resolve files from CurseForge and Modrinth at import time
-/// - Derives file path, addon type, size, and metadata from platform APIs
+/// - Uses hashes to resolve mods from CurseForge and Modrinth at import time
+/// - Keeps other addons in overrides with their original destinations
 /// - Embeds icon for offline display
 /// - Supports optional files and overrides
+///
+/// `cancel_token` and `archive_limit` stop the archive at its next write once
+/// the token is cancelled or the archive would grow past the limit; the
+/// latter fails the task with an [`super::InstanceTooLargeError`].
 pub async fn export_gdlauncher(
     app: Arc<AppInner>,
     instance_id: InstanceId,
     save_path: PathBuf,
     self_contained_addons_bundling: bool,
     mut filter: ExportEntry,
+    pack_version: Option<String>,
     cancel_token: Option<CancellationToken>,
+    archive_limit: Option<u64>,
 ) -> anyhow::Result<VisualTaskId> {
     let instance_manager = app.instance_manager();
     let instances = instance_manager.instances.read().await;
@@ -128,8 +134,9 @@ pub async fn export_gdlauncher(
                 vtask
                     .edit(|data| data.state = TaskState::Indeterminate)
                     .await;
-                // Process tracked addon folders (mods, resourcepacks, shaders, etc.)
-                for addon_folder in &["mods", "resourcepacks", "shaderpacks"] {
+                // V1 platform links have no destination: imports resolve them into
+                // mods. Other addon kinds must retain their paths in overrides.
+                for addon_folder in &["mods"] {
                     let folder_filter = filter.0.get_mut(*addon_folder);
                     if let Some(folder_filter) = folder_filter {
                         // Build filter if not specified
@@ -278,7 +285,7 @@ pub async fn export_gdlauncher(
             let manifest = Manifest {
                 format_version: 1,
                 name: instance_name,
-                version: None,
+                version: pack_version,
                 summary: None,
                 author: None,
                 created_at: Utc::now(),
@@ -303,36 +310,53 @@ pub async fn export_gdlauncher(
 
             let send_path = tmpfile.to_path_buf();
             let (notify_tx, mut notify_rx) = watch::channel::<(u64, u64)>((0, 0));
+            let archive_cancel = cancel_token.clone();
 
-            let ziptask = tokio::task::spawn_blocking(move || {
-                let mut zip = zip::ZipWriter::new(File::create(&send_path)?);
-                let options = zip::write::FileOptions::<()>::default();
+            let mut ziptask = tokio::task::spawn_blocking(move || {
+                let (sink, stopped) = super::ArchiveSink::new(
+                    File::create(&send_path)?,
+                    archive_limit,
+                    archive_cancel,
+                );
+                let written = (|| {
+                    let mut zip = zip::ZipWriter::new(sink);
+                    let options = zip::write::FileOptions::<()>::default();
 
-                // Write GDLPack manifest
-                zip.start_file("gdlpack.json", options)?;
-                zip.write_all(&serde_json::to_vec_pretty(&manifest)?)?;
+                    // Write GDLPack manifest
+                    zip.start_file("gdlpack.json", options)?;
+                    zip.write_all(&serde_json::to_vec_pretty(&manifest)?)?;
 
-                // Write icon if present
-                if let (Some((icon_bytes, _)), Some(icon_path)) = (&icon_data, &icon_archive_path) {
-                    zip.start_file(icon_path, options)?;
-                    zip.write_all(icon_bytes)?;
+                    // Write icon if present
+                    if let (Some((icon_bytes, _)), Some(icon_path)) =
+                        (&icon_data, &icon_archive_path)
+                    {
+                        zip.start_file(icon_path, options)?;
+                        zip.write_all(icon_bytes)?;
+                    }
+
+                    // Write overrides
+                    super::zip_excluding(
+                        ZipMode::Create(&mut zip, options, notify_tx),
+                        &basepath,
+                        "overrides",
+                        &filter,
+                    )?;
+
+                    zip.finish()?;
+                    Ok::<_, anyhow::Error>(())
+                })();
+                if let Err(error) = written {
+                    return Err(match stopped.get() {
+                        Some(stop) => stop.into_error(&basepath, &filter),
+                        None => error,
+                    });
                 }
-
-                // Write overrides
-                super::zip_excluding(
-                    ZipMode::Create(&mut zip, options, notify_tx),
-                    &basepath,
-                    "overrides",
-                    &filter,
-                )?;
-
-                zip.finish()?;
                 trace!("finished writing `{}`", send_path.to_string_lossy());
-                Ok::<_, anyhow::Error>(())
+                Ok(())
             });
 
             tokio::select! {
-                r = ziptask => r??,
+                r = &mut ziptask => r??,
                 _ = async {
                     let mut counter = 0u32;
 
@@ -352,7 +376,11 @@ pub async fn export_gdlauncher(
                         None => futures::future::pending().await,
                     }
                 } => {
-                    tracing::info!("ShareInstance: export cancelled, aborting zip task");
+                    tracing::info!("ShareInstance: export cancelled, stopping zip task");
+                    // The archive refuses its next write once cancelled, so this
+                    // returns promptly; waiting keeps a cancelled share from
+                    // compressing on in the background while a retry starts.
+                    let _ = ziptask.await;
                     anyhow::bail!("Export cancelled");
                 },
             }
@@ -360,6 +388,11 @@ pub async fn export_gdlauncher(
             // If the destination directory was removed (e.g. share was cancelled),
             // skip the move — the caller no longer needs the file.
             if save_path.parent().map_or(true, |p| p.exists()) {
+                #[cfg(test)]
+                app.instance_manager()
+                    .test_hooks
+                    .pause("task12_gdl_export_before_publish", instance_id)
+                    .await;
                 let manager = app.instance_manager();
                 let _ownership = manager.lock_instance(instance_id).await;
                 super::verify_linked_export_files(&linked_files).await?;

@@ -330,7 +330,7 @@ mypack.gdlpack/
 - **バンドル OFF (マニフェストのみ)。** GDLauncher が CurseForge / Modrinth で解決できる各 Mod は `entries` の `platform` エントリに。実際の JAR はアーカイブに *含まれません*。受け手のランチャーがインポート時にプラットフォームから再ダウンロード。GDLauncher が解決できない Mod (手動で投げ込んだ JAR など) はフォールバックとして `overrides/mods/` にバンドルされます。結果: 小さなアーカイブ、受け手はインストール時にネット必須。
 - **バンドル ON (自己完結)。** `platform` エントリは出力されず、全 Mod が `overrides/mods/` にコピー。結果: 大きなアーカイブ (数百 MB から数 GB)、Minecraft アセットがキャッシュ済みならオフラインでインストール可能。
 
-リソースパックとシェーダーパックも同じ振る舞い: バンドル OFF なら解決可能なものは `platform` エントリ、バンドル ON なら全て直接バンドル。
+リソースパックとシェーダーパックはトグルに関係なく常に `overrides/resourcepacks/` と `overrides/shaderpacks/` にバンドルされます。`platform` エントリには保存先フォルダーがなく、インポート時はすべて `mods/` に置かれるため、リンクされるのは Mod だけです。
 
 ## 横並び比較: 3 形式
 
