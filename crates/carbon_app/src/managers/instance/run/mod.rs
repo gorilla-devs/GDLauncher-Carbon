@@ -58,7 +58,7 @@ use tracing::{debug, info, trace, warn};
 
 mod java;
 mod minecraft;
-mod modpack;
+pub(super) mod modpack;
 
 #[derive(thiserror::Error, Debug)]
 #[error(
@@ -88,7 +88,7 @@ impl crate::error::FeErrorCode for InsufficientMemoryError {
 
 #[derive(Debug)]
 pub struct PersistenceManager {
-    instance_download_lock: Semaphore,
+    pub(super) instance_download_lock: Semaphore,
     loader_install_lock: Semaphore,
     java_check_lock: Mutex<()>,
 }
@@ -171,36 +171,77 @@ impl ManagerRef<'_, InstanceManager> {
             .admit(format!("instance {instance_id} preparation/session"))?;
         #[cfg(test)]
         self.test_hooks.pause("runtime_admitted", instance_id).await;
+        let operation = self.lock_instance(instance_id).await;
+        self.prepare_game_admitted(
+            instance_id,
+            launch_account,
+            callback_task,
+            deep_check,
+            operation,
+            runtime_activity,
+            None,
+        )
+        .await
+    }
+
+    pub(super) async fn prepare_game_admitted(
+        self,
+        instance_id: InstanceId,
+        launch_account: Option<FullAccount>,
+        callback_task: Option<InstanceCallback>,
+        deep_check: bool,
+        operation: super::InstanceOperationGuard,
+        runtime_activity: crate::managers::runtime_lifecycle::RuntimeActivity,
+        setup_request: Option<super::modpack::session::Request>,
+    ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
+        // Own the admitted producer before its first await: a request may disappear while
+        // an atomic session publication is still running on the blocking pool. Keep its
+        // existing gate and lifecycle activity until setup settles and the worker owns it.
+        let app = self.app.clone();
+        tokio::spawn(async move {
+            app.instance_manager()
+                .prepare_game_owned(
+                    instance_id,
+                    launch_account,
+                    callback_task,
+                    deep_check,
+                    operation,
+                    runtime_activity,
+                    setup_request,
+                )
+                .await
+        })
+        .await
+        .context("admitted preparation producer failed")?
+    }
+
+    async fn prepare_game_owned(
+        self,
+        instance_id: InstanceId,
+        launch_account: Option<FullAccount>,
+        callback_task: Option<InstanceCallback>,
+        deep_check: bool,
+        operation: super::InstanceOperationGuard,
+        runtime_activity: crate::managers::runtime_lifecycle::RuntimeActivity,
+        setup_request: Option<super::modpack::session::Request>,
+    ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
+        use super::modpack::session::Session;
+        if operation.instance_id() != instance_id {
+            bail!("foreign instance gate");
+        }
         let initial_time = Utc::now();
 
-        let mut instances = self.instances.write().await;
-        let instance = instances
-            .get_mut(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?;
-
-        let InstanceType::Valid(data) = &mut instance.type_ else {
-            return Err(anyhow!("Instance {instance_id} is not in a valid state"));
+        let (mut config, instance_shortpath) = {
+            let instances = self.instances.read().await;
+            let instance = instances
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?;
+            let data = instance.data()?;
+            if !matches!(data.state, LaunchState::Inactive { .. }) {
+                bail!("cannot prepare an instance that is queued, preparing, running or deleting");
+            }
+            (data.config.clone(), instance.shortpath.clone())
         };
-
-        match &data.state {
-            LaunchState::Inactive { .. } => {}
-            LaunchState::Deleting => {
-                bail!("cannot prepare an instance that is being deleted");
-            }
-            LaunchState::Queued(task_id) | LaunchState::Preparing(task_id) => {
-                // dismiss the existing task if its a failure, return if its still in progress.
-                let r = self.app.task_manager().dismiss_task(*task_id).await;
-
-                if let Err(e) = r {
-                    if e.is::<NonFailedDismissError>() {
-                        bail!("cannot prepare an instance that is already being prepared");
-                    }
-                }
-            }
-            LaunchState::Running(_) => {
-                bail!("cannot prepare an instance that is already running");
-            }
-        }
 
         let auto_manage_java_system_profiles = self
             .app
@@ -208,8 +249,6 @@ impl ManagerRef<'_, InstanceManager> {
             .get_settings()
             .await?
             .auto_manage_java_system_profiles;
-
-        let mut config = data.config.clone();
 
         let (xms_memory, xmx_memory) = match config.game_configuration.memory {
             Some(memory) => memory,
@@ -295,7 +334,7 @@ impl ManagerRef<'_, InstanceManager> {
         let runtime_path = self.app.settings_manager().runtime_path.clone();
         let instance_path = runtime_path
             .get_instances()
-            .get_instance_path(&instance.shortpath);
+            .get_instance_path(&instance_shortpath);
 
         tracing::debug!("instance path: {:?}", instance_path);
 
@@ -317,7 +356,180 @@ impl ManagerRef<'_, InstanceManager> {
 
         let id = self.app.task_manager().spawn_task(&task).await;
 
-        data.state = LaunchState::Queued(id);
+        self.instances
+            .write()
+            .await
+            .get_mut(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?
+            .data_mut()?
+            .state = LaunchState::Queued(id);
+        let setup_result: anyhow::Result<_> = async {
+            let root = instance_path.get_root();
+            // A replacement a crash left half-published is the pending setup.
+            super::modpack::session::settle_replacement(&root).await?;
+            if let Some(request) = setup_request {
+                use super::modpack::session::{self as setups, Producer, Kind};
+                let setups::Request { producer, kind, files, options, reset, replaces } = request;
+                let setup = root.join(".setup");
+                // The pending setup this request retires, and whether its
+                // payload goes once it is retired (see below).
+                let mut retiring = None;
+                if setup.try_exists()? {
+                    if !reset { bail!("setup is already pending"); }
+                    retiring = Some(if producer == Producer::Repair {
+                        // A Repair replaces whatever setup is pending, which
+                        // `repair_modpack_owned` identified under this same gate
+                        // as the one the user chose to discard.
+                        let replaced = replaces.as_ref().context("pending setup changed before repair")?;
+                        let current = match Session::load(&root).await {
+                            Ok(Some(previous)) => previous.operation,
+                            _ => "legacy".to_owned(),
+                        };
+                        if current != replaced.label { bail!("pending setup changed before repair"); }
+                        // Most keep only their records; one that may have changed
+                        // installed content keeps everything until a later setup
+                        // finishes (see `Replaced::keep_payload`, `prune_retired`).
+                        (replaced.label.clone(), !replaced.keep_payload, false)
+                    } else {
+                        // Only a version or loader change replaces a fully installed pack
+                        // that is not this instance's own record: a copied one, or one
+                        // 2.0.40 left without a record (see `update_instance_owned`).
+                        let version_change = producer == Producer::Settings;
+                        match Session::load(&root).await? {
+                            None if version_change && setups::legacy_pack_applied(&root).await? => ("legacy".to_owned(), false, true),
+                            None => bail!("unbound setup cannot be reset"),
+                            Some(previous) => {
+                                let copied_pack = version_change && previous.copied_pack_installed(&root, instance_id).await?;
+                                // `update_instance_owned` made any other record it may
+                                // replace this instance's own first.
+                                if !copied_pack && previous.binds_to(instance_id) { bail!("foreign setup cannot be reset"); }
+                                // A setup that only waits for its game version install holds
+                                // nothing to protect, and `config` may already carry the
+                                // replacing request's new version.
+                                let replaceable = copied_pack || previous.supersedable(&root, instance_id).await?;
+                                if !replaceable {
+                                    if let Some(reason) = previous.cancel_reason(&config) { bail!("{reason}"); }
+                                }
+                                (previous.operation.clone(), false, replaceable && previous.pack_installed(&root).await?)
+                            }
+                        }
+                    });
+                } else if replaces.is_some() {
+                    bail!("pending setup changed before repair");
+                }
+                // The replacement is written in full beside the pending setup,
+                // which is retired only then (see `begin_replacement`).
+                let next = setups::begin_replacement(&root).await?;
+                let built: anyhow::Result<_> = async {
+                    let mut session = Session::new(&config, producer, kind, options)?;
+                    session.instance_id = Some(instance_id.0);
+                    session.requested_pack = files.iter().find(|(name, _)| name == "change-pack-version.json")
+                        .map(|(_, bytes)| String::from_utf8(bytes.clone())).transpose()?;
+                    // A repair that replaces an interrupted setup continues it.
+                    session.replaces_interrupted = replaces.filter(|replaced| replaced.interrupted).map(|replaced| replaced.label);
+                    if session.producer == Producer::Settings && session.kind == Kind::VersionOnly {
+                        session.bind_preparation(self.app.task_manager().generation(), id, &config)?;
+                    }
+                    for (name, bytes) in files {
+                        setups::atomic_bytes(&next.join(name), bytes, true).await?;
+                    }
+                    // No accepted old operation remains; stale tmp is retained as
+                    // evidence instead of being silently mistaken for this target.
+                    // A retired setup takes its own (see `retire_replaced`).
+                    if retiring.is_none() {
+                        setups::keep_stale_target(&root, &next).await?;
+                    }
+                    // Last: a replacement with its record is complete. Durably,
+                    // before the pending setup is retired: a crash after that
+                    // must find it complete (see `settle_replacement`).
+                    setups::atomic_json(&next.join(setups::RECORD), &session, true).await?;
+                    setups::sync_dir(&next).await?;
+                    session.owner()
+                }.await;
+                let owner = match built {
+                    Ok(owner) => owner,
+                    Err(error) => {
+                        setups::discard_replacement(&root, &next).await;
+                        return Err(error);
+                    }
+                };
+                // Retain evidence while replacing the setup. Recovery batches
+                // live independently of this directory.
+                let retired = match retiring {
+                    Some((label, trim, installed_pack)) => match setups::retire_replaced(&root, &label).await {
+                        Ok(retired) => Some((retired, trim, installed_pack)),
+                        Err(error) => {
+                            setups::discard_replacement(&root, &next).await;
+                            return Err(error);
+                        }
+                    },
+                    None => None,
+                };
+                #[cfg(test)]
+                self.test_hooks.pause("setup_replacement_retired", instance_id).await;
+                if let Err(error) = setups::publish_replacement(&root, &next).await {
+                    // Never leave no setup where one that may have changed
+                    // installed files was: put the retired one back, or, when
+                    // that fails too, keep the complete replacement, which
+                    // `settle_replacement` publishes before the instance's
+                    // setup is read again (a scan, Play, or the Repair dialog).
+                    let restored = match retired {
+                        Some((retired, ..)) => match retired.restore(&root).await {
+                            Ok(()) => true,
+                            Err(restore) => {
+                                // Back in place unless its own rename failed.
+                                let back = root.join(".setup").try_exists().unwrap_or(false);
+                                tracing::error!(?restore, back, "replaced setup could not be fully put back");
+                                back
+                            }
+                        },
+                        None => true,
+                    };
+                    if !restored {
+                        return Err(error.context("Repair couldn't take the unfinished setup's place yet, so it continues the next time you press Play"));
+                    }
+                    setups::discard_replacement(&root, &next).await;
+                    return Err(error);
+                }
+                Ok(Some(session.owner()?))
+            } else {
+                match Session::load(&root).await? {
+                    Some(session) => {
+                        if session.instance_id.is_none() { return Ok(None); }
+                        let owner = session.owner()?;
+                        if owner.instance_id != instance_id.0 {
+                            if session.copied_to == Some(instance_id.0) { return Ok(None); }
+                            bail!("foreign pending setup has no copy provenance; original inputs retained");
+                        }
+                        Ok(Some(owner))
+                    }
+                    // A 2.0.40 setup without a record: adopt the shapes that provably
+                    // never reached pack apply. Apply evidence stays unowned, and
+                    // process_modpack refuses it with a way out.
+                    None => match Session::adopt_legacy(&root, instance_id, &config).await? {
+                        Some(adopted) => Ok(Some(adopted.owner()?)),
+                        None => Ok(None),
+                    },
+                }
+            }
+        }.await;
+        let mut session_owner = match setup_result {
+            Ok(owner) => owner,
+            Err(error) => {
+                let message = format!("{error:#}");
+                task.fail(error).await;
+                self.instances
+                    .write()
+                    .await
+                    .get_mut(&instance_id)
+                    .ok_or(InvalidInstanceIdError(instance_id))?
+                    .data_mut()?
+                    .state = LaunchState::Inactive {
+                    failed_task: Some(id),
+                };
+                return Err(anyhow!(message));
+            }
+        };
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -325,11 +537,6 @@ impl ManagerRef<'_, InstanceManager> {
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
 
         let app = self.app.clone();
-        let instance_shortpath = instance.shortpath.clone();
-
-        drop(data);
-        drop(instance);
-        drop(instances);
 
         // Capture datetime once to ensure log entry and file name match exactly
         let now = Local::now();
@@ -429,6 +636,10 @@ impl ManagerRef<'_, InstanceManager> {
             }
         }
 
+        #[cfg(test)]
+        self.test_hooks
+            .pause("producer_before_handoff", instance_id)
+            .await;
         let installation_task = tokio::spawn(async move {
             let _runtime_activity = runtime_activity;
             let mut game_activity = None;
@@ -448,21 +659,13 @@ impl ManagerRef<'_, InstanceManager> {
                 .await
                 .expect("Semaphore should not be closed");
 
-            // Now that we have the lock, transition from Queued to Preparing
-            {
-                let instance_manager_ref = app.instance_manager();
-                let mut instances = instance_manager_ref.instances.write().await;
-                if let Some(instance) = instances.get_mut(&instance_id) {
-                    if let InstanceType::Valid(data) = &mut instance.type_ {
-                        data.state = LaunchState::Preparing(id);
-                    }
-                }
-            }
-            app.invalidate(GET_GROUPS, None);
-            app.invalidate(GET_ALL_INSTANCES, None);
-            app.invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
-
             let try_result: anyhow::Result<_> = async {
+                app.instance_manager()
+                    .change_launch_state(instance_id, id, LaunchState::Preparing(id))
+                    .await?;
+                if let Some(owner) = &session_owner {
+                    Session::require(&instance_root, owner).await?;
+                }
                 let mut downloads = Vec::new();
 
                 let (t_subtasks, modpack_version, repair_options, oracle_disk_scan) =
@@ -474,6 +677,7 @@ impl ManagerRef<'_, InstanceManager> {
                         instance_shortpath.clone(),
                         &task,
                         callback_task.is_some(),
+                        &mut session_owner,
                     )
                     .await?;
                 modpack::process_modpack_staging(
@@ -483,6 +687,7 @@ impl ManagerRef<'_, InstanceManager> {
                     &t_subtasks,
                     repair_options,
                     oracle_disk_scan,
+                    session_owner.as_ref(),
                 )
                 .await?;
 
@@ -535,8 +740,17 @@ impl ManagerRef<'_, InstanceManager> {
                 .await?;
 
                 // If the setup path exists, let's delete it because installation is now complete
-                if setup_path.exists() {
-                    tokio::fs::remove_dir_all(setup_path).await?;
+                if setup_path.try_exists()? {
+                    let manager = app.instance_manager();
+                    let _operation = manager.lock_instance(instance_id).await;
+                    let owner = session_owner
+                        .as_ref()
+                        .context("unbound setup cannot be disposed")?;
+                    let session = Session::require(&instance_root, owner).await?;
+                    if session.phase != Phase::Committed {
+                        bail!("uncommitted setup cannot be disposed");
+                    }
+                    tokio::fs::remove_dir_all(&setup_path).await?;
                 }
 
                 match launch_account {
@@ -629,6 +843,7 @@ impl ManagerRef<'_, InstanceManager> {
                             .instance_manager()
                             .change_launch_state(
                                 instance_id,
+                                id,
                                 LaunchState::Inactive { failed_task: None },
                             )
                             .await;
@@ -652,6 +867,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .instance_manager()
                         .change_launch_state(
                             instance_id,
+                            id,
                             LaunchState::Inactive {
                                 failed_task: Some(id),
                             },
@@ -686,6 +902,7 @@ impl ManagerRef<'_, InstanceManager> {
                             .instance_manager()
                             .change_launch_state(
                                 instance_id,
+                                id,
                                 LaunchState::Inactive {
                                     failed_task: Some(id),
                                 },
@@ -734,6 +951,7 @@ impl ManagerRef<'_, InstanceManager> {
                             .instance_manager()
                             .change_launch_state(
                                 instance_id,
+                                id,
                                 LaunchState::Inactive {
                                     failed_task: Some(id),
                                 },
@@ -746,7 +964,9 @@ impl ManagerRef<'_, InstanceManager> {
                         .instance_manager()
                         .change_launch_state(
                             instance_id,
+                            id,
                             LaunchState::Running(RunningInstance {
+                                task_id: Some(id),
                                 process_id,
                                 kill_tx: Some(kill_tx),
                                 // This core owns the process and stops it
@@ -775,6 +995,7 @@ impl ManagerRef<'_, InstanceManager> {
                             .instance_manager()
                             .change_launch_state(
                                 instance_id,
+                                id,
                                 LaunchState::Inactive {
                                     failed_task: Some(id),
                                 },
@@ -929,6 +1150,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .instance_manager()
                         .change_launch_state(
                             instance_id,
+                            id,
                             LaunchState::Inactive { failed_task: None },
                         )
                         .await;
@@ -1023,25 +1245,40 @@ impl ManagerRef<'_, InstanceManager> {
             }
         });
 
+        // The worker now owns the same activity; release the gate before its long run.
+        drop(operation);
+        #[cfg(test)]
+        self.test_hooks
+            .pause("producer_handed_off", instance_id)
+            .await;
         Ok((installation_task, id))
     }
 
     async fn change_launch_state(
         self,
         instance_id: InstanceId,
+        expected_task: VisualTaskId,
         state: LaunchState,
     ) -> anyhow::Result<()> {
-        let mut instances = self.instances.write().await;
-        let instance = instances
-            .get_mut(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?;
-
         let action_to_take = self
             .app
             .settings_manager()
             .get_settings()
             .await?
             .launcher_action_on_game_launch;
+        let _operation = self.lock_instance(instance_id).await;
+        let mut instances = self.instances.write().await;
+        let instance = instances
+            .get_mut(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+        let owned = match &instance.data()?.state {
+            LaunchState::Queued(task) | LaunchState::Preparing(task) => *task == expected_task,
+            LaunchState::Running(running) => running.task_id == Some(expected_task),
+            _ => false,
+        };
+        if !owned {
+            bail!("stale worker cannot change current instance state");
+        }
 
         match &state {
             LaunchState::Inactive { .. } => {
@@ -1517,6 +1754,7 @@ impl Debug for LaunchState {
 }
 
 pub struct RunningInstance {
+    task_id: Option<VisualTaskId>,
     process_id: u32,
     /// `None` when the game was adopted: there is no spawning task to signal,
     /// so stopping goes through the pid instead (`kill_instance`).
@@ -1591,6 +1829,7 @@ impl RunningInstance {
         now: DateTime<Utc>,
     ) -> Self {
         Self {
+            task_id: None,
             process_id,
             kill_tx: None,
             process_start_time: Some(process_start_time),
@@ -1753,6 +1992,45 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn task08_stale_task_cannot_clear_replacement_owner() -> anyhow::Result<()> {
+        let app = crate::setup_managers_for_test().await;
+        let id = InstanceId(222);
+        app.instance_manager.instances.write().await.insert(
+            id,
+            Instance {
+                shortpath: "synthetic-state-only".into(),
+                type_: InstanceType::Valid(instance_data_with_state(LaunchState::Preparing(
+                    VisualTaskId(2),
+                ))),
+            },
+        );
+        assert!(
+            app.instance_manager()
+                .change_launch_state(
+                    id,
+                    VisualTaskId(1),
+                    LaunchState::Inactive { failed_task: None }
+                )
+                .await
+                .is_err()
+        );
+        assert!(matches!(
+            app.instance_manager.instances.read().await[&id]
+                .data()?
+                .state,
+            LaunchState::Preparing(VisualTaskId(2))
+        ));
+        app.instance_manager()
+            .change_launch_state(
+                id,
+                VisualTaskId(2),
+                LaunchState::Inactive { failed_task: None },
+            )
+            .await?;
+        Ok(())
+    }
+
     // --- shutdown_running ---------------------------------------------
 
     #[tokio::test]
@@ -1767,6 +2045,7 @@ mod tests {
                 shortpath: "test-instance".to_string(),
                 type_: InstanceType::Valid(instance_data_with_state(LaunchState::Running(
                     RunningInstance {
+                        task_id: None,
                         process_id: 4242,
                         kill_tx: Some(kill_tx),
                         process_start_time: None,
@@ -1965,6 +2244,7 @@ mod tests {
         // through the adopted path — that would double-count every interval.
         let (kill_tx, _kill_rx) = mpsc::channel::<()>(1);
         let owned = RunningInstance {
+            task_id: None,
             process_id: 4242,
             kill_tx: Some(kill_tx),
             process_start_time: None,

@@ -1,3 +1,4 @@
+import { rpcRoute } from "./helpers/operationObserver.js"
 import fs from "node:fs"
 import path from "node:path"
 import { expect, test } from "./fixtures/index.js"

@@ -15,6 +15,7 @@
   "_trn_unpair_instance": "Dissocier l'instance",
   "_trn_notification": "Notification",
   "_trn_confirm_instance_deletion": "Confirmer la suppression de l'instance",
+  "_trn_repair_modpack": "Réparer le modpack",
   "_trn_confirm_reinstall": "Réinstaller le modpack",
   "_trn_confirm_batch_instance_deletion": "Supprimer les instances",
   "_trn_confirm_batch_server_deletion": "Supprimer les serveurs",

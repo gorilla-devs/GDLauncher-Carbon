@@ -129,9 +129,18 @@ pub(super) fn mount() -> RouterBuilder<App> {
                         cleanup_selections: args.cleanup_selections,
                         cleanup_batch: None,
                     },
+                    args.expected_pending,
                 )
                 .await
                 .map(FETaskId::from)
+        }
+
+        query GET_PENDING_SETUP[app, id: FEInstanceId] {
+            app.instance_manager().pending_setup(id.into()).await
+        }
+
+        mutation CANCEL_PENDING_SETUP[app, args: CancelPendingSetup] {
+            app.instance_manager().cancel_pending_setup(args.instance.into(), args.expected_operation).await
         }
 
         query GET_REPAIR_PREVIEW[app, args: RepairPreviewArgs] {
@@ -1207,6 +1216,11 @@ struct RepairModpack {
     #[serde(default)]
     cleanup_selections: Vec<manager::modpack::CleanupSelection>,
     re_enable_disabled: bool,
+    /// The pending setup the dialog showed, which the repair discards
+    /// (`PendingSetupStatus::discard_token`): its operation, `legacy`, or
+    /// null when none was pending. The repair is refused when the pending
+    /// setup no longer matches it.
+    expected_pending: Option<String>,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -3055,4 +3069,10 @@ impl From<RegenerateShareCodeResponse> for FERegenerateShareCodeResponse {
             new_share_code: value.new_share_code,
         }
     }
+}
+
+#[derive(specta::Type, serde::Deserialize, Debug)]
+pub struct CancelPendingSetup {
+    pub instance: FEInstanceId,
+    pub expected_operation: String,
 }

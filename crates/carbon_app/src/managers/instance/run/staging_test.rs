@@ -39,6 +39,7 @@ async fn bound_cleanup(
         root,
         insensitive,
         options.cleanup_selections.first().map(|s| &s.context),
+        None,
     )
     .await
 }
@@ -1866,6 +1867,24 @@ async fn fsync_dir_succeeds_on_a_real_directory() {
         .expect("fsyncing a real, existing directory must not error");
 }
 
+/// A VirtualBox shared folder answers every folder sync with EINVAL and some
+/// network mounts with ENOTSUP: `fsync_dir` leaves those entries to the
+/// system, so a setup (a game version changed in Settings among them) still
+/// runs where 2.0.40 ran it. A real error still fails.
+#[cfg(unix)]
+#[tokio::test]
+async fn fsync_dir_is_done_where_the_volume_does_not_sync_folders() {
+    use crate::util::durable::test_hooks::FolderSyncs;
+    let tmp = tempfile::tempdir().unwrap();
+    for refusal in [libc::EINVAL, libc::ENOTSUP] {
+        let syncs = FolderSyncs::failing_with(tmp.path(), refusal);
+        super::fsync_dir(tmp.path()).await.unwrap();
+        assert_eq!(syncs.synced(), [tmp.path()], "errno {refusal}");
+    }
+    let _syncs = FolderSyncs::failing_with(tmp.path(), libc::EIO);
+    assert!(super::fsync_dir(tmp.path()).await.is_err());
+}
+
 #[tokio::test]
 async fn apply_started_marker_is_durably_creatable_and_discoverable() {
     // The exact sequence `process_modpack_staging` runs right before
@@ -2547,6 +2566,7 @@ async fn task03_cleanup_context_change_preserves_selected_file() {
         &root,
         false,
         Some(&context),
+        None,
     )
     .await;
     assert!(report.removed.is_empty());
@@ -2798,6 +2818,7 @@ async fn round1_apply(
         },
         root,
         Some(options),
+        None,
     )
     .await?;
     let mut report = super::CleanupReport::default();
@@ -2808,6 +2829,8 @@ async fn round1_apply(
         target,
         Some(options),
         &mut report.notes,
+        None,
+        &Default::default(),
     )
     .await?;
     Ok(super::render_cleanup_audit(&actual, &report))
@@ -3330,6 +3353,7 @@ async fn task03_r1_resume_keeps_full_case_ownership_for_other_entries() {
             },
             &root,
             Some(&options),
+            None,
         )
         .await
         .unwrap();
@@ -3583,6 +3607,370 @@ async fn cross_volume_recovery_payloads_are_copied_into_recovery() {
     assert_eq!(report.removed, [retired], "{:?}", report.notes);
     assert!(!live_path(&root, retired).exists());
     assert_eq!(std::fs::read(&payload).unwrap(), b"stale");
+}
+
+/// Records a pack setup owned by instance 7 whose complete target is the
+/// staged tree, the way preparation binds it. Returns the owner.
+async fn bind_setup(root: &std::path::Path, staging: &std::path::Path) -> super::Owner {
+    let config = crate::managers::instance::schema::parse_instance_config(
+        r#"{"_version":"1","name":"Synthetic","game_configuration":{"version":{"release":"1.20.1","modloaders":[]}}}"#,
+    )
+    .unwrap();
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let mut session =
+        super::Session::new(&config, super::Producer::Change, super::Kind::Pack, None).unwrap();
+    session.instance_id = Some(7);
+    session
+        .bind_target(root, staging, &target, Vec::new())
+        .await
+        .unwrap();
+    session.create(root).await.unwrap();
+    session.owner().unwrap()
+}
+
+/// Replaces the record the way another setup would: a new file renamed over
+/// the old one. Its modification time is moved 2 s past the old record's, so
+/// the stamp changes even where it has no file identity (Windows) and both
+/// writes land in one timestamp tick at the same length.
+fn write_record(root: &std::path::Path, session: &super::Session) {
+    let record = root.join(".setup").join(super::session::RECORD);
+    let before = std::fs::metadata(&record).unwrap().modified().unwrap();
+    let private = root.join(".setup").join("record.tmp");
+    std::fs::write(&private, serde_json::to_vec_pretty(session).unwrap()).unwrap();
+    std::fs::OpenOptions::new()
+        .write(true)
+        .open(&private)
+        .unwrap()
+        .set_modified(before + std::time::Duration::from_secs(2))
+        .unwrap();
+    std::fs::rename(private, record).unwrap();
+}
+
+fn foreign(session: &super::Session) -> super::Session {
+    let mut foreign = session.clone();
+    foreign.operation = uuid::Uuid::new_v4().to_string();
+    foreign
+}
+
+/// An update over `n` files: a quarter each Keep, Create, Replace and Delete,
+/// plus a pack-shipped-disabled Replace and a repair ReEnable.
+async fn mixed_update(
+    root: &std::path::Path,
+    staging: &std::path::Path,
+    n: usize,
+) -> Vec<PlanEntry> {
+    let mut entries = Vec::new();
+    for i in 0..n {
+        let path = format!("/config/f{i:04}.txt");
+        let (action, reason) = match i % 4 {
+            0 => {
+                write_live(root, &path, b"same").await;
+                write_staged(staging, &path, b"same").await;
+                (PlanAction::Keep, PlanReason::Unchanged)
+            }
+            1 => {
+                write_staged(staging, &path, b"created").await;
+                (PlanAction::Create, PlanReason::PackUpdate)
+            }
+            2 => {
+                write_live(root, &path, b"old").await;
+                write_staged(staging, &path, b"new").await;
+                (PlanAction::Replace, PlanReason::PackUpdate)
+            }
+            _ => {
+                write_live(root, &path, b"dropped").await;
+                (PlanAction::Delete, PlanReason::PackDropped)
+            }
+        };
+        entries.push(PlanEntry {
+            path,
+            action,
+            reason,
+        });
+    }
+    write_live(root, "/mods/shipped.jar", b"old enabled").await;
+    write_staged(staging, "/mods/shipped.jar.disabled", b"new disabled").await;
+    write_disabled(root, "/mods/reenabled.jar", b"damaged").await;
+    write_staged(staging, "/mods/reenabled.jar", b"pack bytes").await;
+    entries.push(PlanEntry {
+        path: "/mods/reenabled.jar".into(),
+        action: PlanAction::ReEnable,
+        reason: PlanReason::ReEnabled,
+    });
+    entries.push(PlanEntry {
+        path: "/mods/shipped.jar".into(),
+        action: PlanAction::Replace,
+        reason: PlanReason::PackUpdate,
+    });
+    entries.sort_by(|a, b| a.path.cmp(&b.path));
+    entries
+}
+
+/// Large packs stalled on "Applying staged patches": the whole setup record
+/// (target, binding hash, sources) was re-read and re-validated before every
+/// file, so the apply was quadratic in the pack size.
+#[tokio::test]
+async fn apply_checks_setup_ownership_once_whatever_the_pack_size() {
+    let mut loads = Vec::new();
+    for n in [50, 500] {
+        let (_tmp, root, staging) = scaffold();
+        let entries = mixed_update(&root, &staging, n).await;
+        let owner = bind_setup(&root, &staging).await;
+        let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        let before = super::session::load_count::of(&root);
+        let mut notes = Vec::new();
+        let outcomes = super::execute_bound_plan(
+            &entries,
+            &root,
+            &staging,
+            &target,
+            None,
+            &mut notes,
+            Some(&owner),
+            &Default::default(),
+        )
+        .await
+        .unwrap();
+        loads.push(super::session::load_count::of(&root) - before);
+
+        assert_eq!(outcomes, entries, "{notes:?}");
+        for entry in &entries {
+            let live = live_path(&root, &entry.path);
+            match entry.action {
+                PlanAction::Keep => assert_eq!(std::fs::read(&live).unwrap(), b"same"),
+                PlanAction::Create => assert_eq!(std::fs::read(&live).unwrap(), b"created"),
+                PlanAction::Delete => assert!(!live.exists()),
+                PlanAction::Replace if entry.path == "/mods/shipped.jar" => {
+                    assert!(!live.exists());
+                    assert_eq!(
+                        std::fs::read(disabled_path(&root, &entry.path)).unwrap(),
+                        b"new disabled"
+                    );
+                }
+                PlanAction::Replace => assert_eq!(std::fs::read(&live).unwrap(), b"new"),
+                PlanAction::ReEnable => {
+                    assert_eq!(std::fs::read(&live).unwrap(), b"pack bytes");
+                    assert!(!disabled_path(&root, &entry.path).exists());
+                }
+                PlanAction::ReplaceDisabled => unreachable!(),
+            }
+        }
+    }
+    assert_eq!(loads[0], loads[1], "session loads grew with the pack size");
+    assert!(loads[0] <= 2, "{} session loads for one apply", loads[0]);
+}
+
+/// The single check is not a blind spot: a setup record replaced from outside
+/// the app mid-apply still stops the apply before its next change, while a
+/// rewrite of the same setup is re-validated and the apply carries on.
+#[tokio::test]
+async fn apply_stops_before_the_next_change_when_another_setup_replaces_the_record() {
+    for replaced_by_foreign in [true, false] {
+        let (_tmp, root, staging) = scaffold();
+        for path in ["/config/a.txt", "/config/b.txt", "/config/c.txt"] {
+            write_staged(&staging, path, b"created").await;
+        }
+        let owner = bind_setup(&root, &staging).await;
+        let session = super::Session::require(&root, &owner).await.unwrap();
+        let rewritten = if replaced_by_foreign {
+            foreign(&session)
+        } else {
+            session
+        };
+        let writer_root = root.clone();
+        hook("publish", live_path(&root, "/config/a.txt"), move || {
+            write_record(&writer_root, &rewritten)
+        });
+        let entries: Vec<_> = ["/config/a.txt", "/config/b.txt", "/config/c.txt"]
+            .into_iter()
+            .map(|path| PlanEntry {
+                path: path.into(),
+                action: PlanAction::Create,
+                reason: PlanReason::PackUpdate,
+            })
+            .collect();
+        let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        let before = super::session::load_count::of(&root);
+        let result = super::execute_bound_plan(
+            &entries,
+            &root,
+            &staging,
+            &target,
+            None,
+            &mut Vec::new(),
+            Some(&owner),
+            &Default::default(),
+        )
+        .await;
+        assert_eq!(super::session::load_count::of(&root) - before, 2);
+        assert!(live_path(&root, "/config/a.txt").exists());
+        if replaced_by_foreign {
+            let error = format!("{:#}", result.unwrap_err());
+            assert!(error.contains("preserved for recovery"), "{error}");
+            assert!(!live_path(&root, "/config/b.txt").exists());
+            assert!(!live_path(&root, "/config/c.txt").exists());
+        } else {
+            result.unwrap();
+            assert!(live_path(&root, "/config/c.txt").exists());
+        }
+    }
+}
+
+/// `count` untracked files ticked for removal in one recovery batch.
+async fn many_cleanup_selections(root: &std::path::Path, count: usize) -> super::RepairMarkerFile {
+    let mut options = cleanup_options(root, "/config/retired-000.cfg").await;
+    let template = options.cleanup_selections[0].clone();
+    for i in 1..count {
+        let path = format!("/config/retired-{i:03}.cfg");
+        write_live(root, &path, b"retired").await;
+        options
+            .cleanup_selections
+            .push(crate::managers::instance::modpack::CleanupSelection {
+                path,
+                ..template.clone()
+            });
+    }
+    options
+}
+
+/// A pack that ships a world (a CurseForge world addon, or `saves` in its
+/// overrides) stages it under `/saves`. Its setup must still load and verify.
+#[tokio::test]
+async fn setup_with_a_staged_world_loads_and_verifies() {
+    let (_tmp, root, staging) = scaffold();
+    write_staged(&staging, "/mods/a.jar", b"mod").await;
+    write_staged(&staging, "/saves/FPS Test/level.dat", b"world").await;
+    let owner = bind_setup(&root, &staging).await;
+    let session = super::Session::require(&root, &owner).await.unwrap();
+    assert_eq!(
+        session.target.as_ref().unwrap().sources["/saves/FPS Test/level.dat"],
+        "/saves/FPS Test/level.dat"
+    );
+    session
+        .verify_sources(&staging, &root.join("instance"))
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn cleanup_checks_setup_ownership_once_for_all_selections() {
+    let (_tmp, root, staging) = scaffold();
+    write_staged(&staging, "/config/current.cfg", b"current").await;
+    let owner = bind_setup(&root, &staging).await;
+    write_live(&root, "/config/retired-000.cfg", b"retired").await;
+    let options = many_cleanup_selections(&root, 100).await;
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let before = super::session::load_count::of(&root);
+    let report = super::apply_bound_cleanup(
+        &options,
+        None,
+        &target,
+        &root,
+        false,
+        Some(&options.cleanup_selections[0].context),
+        Some(&owner),
+    )
+    .await;
+    assert_eq!(super::session::load_count::of(&root) - before, 1);
+    assert_eq!(report.removed.len(), 100, "{:?}", report.notes);
+    for selection in &options.cleanup_selections {
+        assert!(!live_path(&root, &selection.path).exists());
+    }
+}
+
+#[tokio::test]
+async fn cleanup_preserves_every_selected_file_when_another_setup_owns_the_instance() {
+    let (_tmp, root, staging) = scaffold();
+    write_staged(&staging, "/config/current.cfg", b"current").await;
+    let owner = bind_setup(&root, &staging).await;
+    write_live(&root, "/config/retired-000.cfg", b"retired").await;
+    let options = many_cleanup_selections(&root, 100).await;
+    let session = super::Session::require(&root, &owner).await.unwrap();
+    write_record(&root, &foreign(&session));
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let report = super::apply_bound_cleanup(
+        &options,
+        None,
+        &target,
+        &root,
+        false,
+        Some(&options.cleanup_selections[0].context),
+        Some(&owner),
+    )
+    .await;
+    assert!(report.removed.is_empty());
+    assert!(
+        report
+            .notes
+            .iter()
+            .any(|note| note.starts_with("Cleanup preserved: setup ownership changed")),
+        "{:?}",
+        report.notes
+    );
+    for selection in &options.cleanup_selections {
+        assert_eq!(
+            std::fs::read(live_path(&root, &selection.path)).unwrap(),
+            b"retired"
+        );
+    }
+    let batch = root
+        .join(".repair-recovery")
+        .join(options.cleanup_batch.as_ref().unwrap());
+    assert_eq!(std::fs::read_dir(batch).unwrap().count(), 0);
+}
+
+/// Run with `cargo test --release -p carbon_app -- --ignored
+/// apply_of_a_5000_file_update`. An update where little changed pays for
+/// every path of the pack, so the loop itself must stay linear.
+#[tokio::test]
+#[ignore = "timing benchmark; run in release"]
+async fn apply_of_a_5000_file_update_finishes_quickly() {
+    let (_tmp, root, staging) = scaffold();
+    let mut entries = Vec::new();
+    for i in 0..5000 {
+        let path = format!("/config/f{i:04}.txt");
+        write_staged(&staging, &path, b"same").await;
+        let changed = i % 100 == 0;
+        write_live(&root, &path, if changed { b"edit" } else { b"same" }).await;
+        entries.push(PlanEntry {
+            path,
+            action: if changed {
+                PlanAction::Replace
+            } else {
+                PlanAction::Keep
+            },
+            reason: PlanReason::PackUpdate,
+        });
+    }
+    let owner = bind_setup(&root, &staging).await;
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let started = std::time::Instant::now();
+    super::execute_bound_plan(
+        &entries,
+        &root,
+        &staging,
+        &target,
+        None,
+        &mut Vec::new(),
+        Some(&owner),
+        &Default::default(),
+    )
+    .await
+    .unwrap();
+    let elapsed = started.elapsed();
+    assert!(elapsed < std::time::Duration::from_secs(2), "{elapsed:?}");
 }
 
 fn names(dir: impl AsRef<std::path::Path>) -> Vec<String> {
@@ -4014,6 +4402,289 @@ async fn replacements_resume_after_a_failure_between_link_and_rename() {
     }
 }
 
+/// An `md5` the way the planner and the audit record it.
+fn md5_of(bytes: &[u8]) -> [u8; 16] {
+    use md5::Digest as _;
+    md5::Md5::digest(bytes).into()
+}
+
+/// A repair or update linked a file, was interrupted, and the file was then
+/// edited in place, which edits the staged original too. The resumed
+/// replacement finds no pack copy left to publish: the edit is kept and the
+/// audit says so instead of "already present", with a way to get the pack's
+/// version back.
+#[tokio::test]
+async fn a_replacement_whose_linked_source_was_edited_in_place_keeps_the_edit() {
+    const PATH: &str = "/config/x.json";
+    const PACK: &[u8] = b"pack bytes";
+    const EDITED: &[u8] = b"edited in place";
+    for action in [PlanAction::Replace, PlanAction::ReplaceDisabled] {
+        let (_tmp, root, staging) = scaffold();
+        write_staged(&staging, PATH, PACK).await;
+        let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+            .await
+            .unwrap();
+        let destination = if action == PlanAction::Replace {
+            live_path(&root, PATH)
+        } else {
+            disabled_path(&root, PATH)
+        };
+        std::fs::create_dir_all(destination.parent().unwrap()).unwrap();
+        std::fs::hard_link(staged_path(&staging, PATH), &destination).unwrap();
+        std::fs::write(&destination, EDITED).unwrap();
+        assert_eq!(std::fs::read(staged_path(&staging, PATH)).unwrap(), EDITED);
+        let entries = vec![PlanEntry {
+            path: PATH.into(),
+            action: action.clone(),
+            reason: PlanReason::RepairOverwrote {
+                original: md5_of(PACK),
+                current: md5_of(EDITED),
+            },
+        }];
+
+        let mut notes = Vec::new();
+        let outcomes = super::execute_bound_plan(
+            &entries,
+            &root,
+            &staging,
+            &target,
+            None,
+            &mut notes,
+            None,
+            &Default::default(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            outcomes[0].reason,
+            PlanReason::ModifiedByUser {
+                original: md5_of(PACK),
+                current: md5_of(EDITED),
+            },
+            "{action:?}"
+        );
+        assert_eq!(outcomes[0].action, PlanAction::Keep);
+        assert_eq!(std::fs::read(&destination).unwrap(), EDITED);
+        assert!(same_file::is_same_file(&destination, staged_path(&staging, PATH)).unwrap());
+        assert_eq!(names(root.join("instance/config")).len(), 1);
+        assert_eq!(notes.len(), 1);
+        assert!(
+            notes[0].starts_with("/config/x.json was changed while this setup was interrupted")
+                && notes[0].ends_with("Use Repair Modpack to restore it."),
+            "{notes:?}"
+        );
+        let audit = super::render_cleanup_audit(
+            &outcomes,
+            &super::CleanupReport {
+                removed: Vec::new(),
+                notes,
+            },
+        );
+        assert!(
+            audit.contains("/config/x.json: modified by user"),
+            "{audit}"
+        );
+        assert!(!audit.contains("already present"), "{audit}");
+    }
+}
+
+/// A resumed apply never publishes a staged source that changed after the
+/// apply started, whatever the plan wants from it. A Create keeps the file
+/// absent, a replacement keeps the live file, and both say how to restore
+/// the pack's version. The staged originals stay untouched.
+#[tokio::test]
+async fn changed_staged_sources_are_never_published() {
+    const CREATE: &str = "/config/created.json";
+    const REPLACE: &str = "/config/replaced.json";
+    const DISABLED: &str = "/mods/off.jar";
+    let (_tmp, root, staging) = scaffold();
+    write_staged(&staging, CREATE, b"edited create").await;
+    write_staged(&staging, REPLACE, b"edited replace").await;
+    write_staged(&staging, DISABLED, b"edited disabled").await;
+    write_live(&root, REPLACE, b"old replace").await;
+    write_disabled(&root, DISABLED, b"old disabled").await;
+    let target = packinfo(&[(CREATE, 1), (REPLACE, 2), (DISABLED, 3)]);
+    let entries = vec![
+        PlanEntry {
+            path: CREATE.into(),
+            action: PlanAction::Create,
+            reason: PlanReason::RepairRestored,
+        },
+        PlanEntry {
+            path: REPLACE.into(),
+            action: PlanAction::Replace,
+            reason: PlanReason::PackUpdate,
+        },
+        PlanEntry {
+            path: DISABLED.into(),
+            action: PlanAction::ReplaceDisabled,
+            reason: PlanReason::PackUpdate,
+        },
+    ];
+    let sources = super::session::SourceCheck {
+        published: Vec::new(),
+        changed: [CREATE, REPLACE, DISABLED]
+            .into_iter()
+            .map(String::from)
+            .collect(),
+    };
+
+    let mut notes = Vec::new();
+    let outcomes = super::execute_bound_plan(
+        &entries, &root, &staging, &target, None, &mut notes, None, &sources,
+    )
+    .await
+    .unwrap();
+
+    assert_eq!(
+        outcomes
+            .iter()
+            .map(|e| (e.path.as_str(), e.action.clone(), e.reason.clone()))
+            .collect::<Vec<_>>(),
+        [
+            (CREATE, PlanAction::Keep, PlanReason::DeletedByUser),
+            (
+                REPLACE,
+                PlanAction::Keep,
+                PlanReason::ModifiedByUser {
+                    original: [2; 16],
+                    current: md5_of(b"old replace"),
+                },
+            ),
+            (
+                DISABLED,
+                PlanAction::Keep,
+                PlanReason::ModifiedByUser {
+                    original: [3; 16],
+                    current: md5_of(b"old disabled"),
+                },
+            ),
+        ]
+    );
+    assert!(!live_path(&root, CREATE).exists());
+    assert_eq!(
+        std::fs::read(live_path(&root, REPLACE)).unwrap(),
+        b"old replace"
+    );
+    assert_eq!(
+        std::fs::read(disabled_path(&root, DISABLED)).unwrap(),
+        b"old disabled"
+    );
+    for (path, bytes) in [
+        (CREATE, b"edited create" as &[u8]),
+        (REPLACE, b"edited replace"),
+        (DISABLED, b"edited disabled"),
+    ] {
+        assert_eq!(std::fs::read(staged_path(&staging, path)).unwrap(), bytes);
+    }
+    assert_eq!(notes.len(), 3, "{notes:?}");
+    for path in [CREATE, REPLACE, DISABLED] {
+        assert!(notes.iter().any(|note| note.starts_with(path)), "{notes:?}");
+    }
+}
+
+/// A representation change (here a replacement the pack ships disabled)
+/// whose staged source changed after the apply started keeps both live
+/// files as they are instead of failing every retry.
+#[tokio::test]
+async fn a_representation_change_from_a_changed_source_is_preserved() {
+    const PATH: &str = "/mods/b.jar";
+    let (_tmp, root, staging) = scaffold();
+    write_live(&root, PATH, b"old bare").await;
+    write_staged(&staging, "/mods/b.jar.disabled", b"edited").await;
+    let mut target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    target.files.get_mut(PATH).unwrap().sha512 = sha2::Sha512::digest(b"pack bytes").into();
+    let entries = vec![PlanEntry {
+        path: PATH.into(),
+        action: PlanAction::Replace,
+        reason: PlanReason::PackUpdate,
+    }];
+
+    // The second pass resumes the completed, conflicted transition record.
+    for attempt in 0..2 {
+        let mut notes = Vec::new();
+        let outcomes = super::execute_bound_plan(
+            &entries,
+            &root,
+            &staging,
+            &target,
+            None,
+            &mut notes,
+            None,
+            &Default::default(),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(outcomes[0].action, PlanAction::Keep);
+        assert_eq!(std::fs::read(live_path(&root, PATH)).unwrap(), b"old bare");
+        assert!(!disabled_path(&root, PATH).exists());
+        assert_eq!(
+            std::fs::read(staged_path(&staging, "/mods/b.jar.disabled")).unwrap(),
+            b"edited"
+        );
+        // A resumed apply keeps the plain note and its way out.
+        assert_eq!(
+            notes,
+            [super::source_changed_note(PATH)],
+            "attempt {attempt}"
+        );
+    }
+}
+
+/// Files an interrupted earlier attempt linked get their folders synced by
+/// the attempt that finishes, even when it has nothing left to publish
+/// there: committing deletes their staged names.
+#[cfg(not(windows))]
+#[tokio::test]
+async fn folders_an_earlier_attempt_linked_into_are_synced_before_applied() {
+    const EARLIER: &str = "/config/earlier/a.json";
+    let (_tmp, root, staging) = scaffold();
+    write_staged(&staging, EARLIER, b"a").await;
+    let live = live_path(&root, EARLIER);
+    std::fs::create_dir_all(live.parent().unwrap()).unwrap();
+    std::fs::hard_link(staged_path(&staging, EARLIER), &live).unwrap();
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let entries = vec![PlanEntry {
+        path: EARLIER.into(),
+        action: PlanAction::Keep,
+        reason: PlanReason::PreservedExisting,
+    }];
+    let sources = super::session::SourceCheck {
+        published: vec![live.clone()],
+        changed: BTreeSet::new(),
+    };
+
+    super::execute_bound_plan(
+        &entries,
+        &root,
+        &staging,
+        &target,
+        None,
+        &mut Vec::new(),
+        None,
+        &sources,
+    )
+    .await
+    .unwrap();
+
+    let data = root.join("instance");
+    let expected: HashMap<PathBuf, usize> = [
+        data.join("config/earlier"),
+        data.join("config"),
+        data.clone(),
+    ]
+    .into_iter()
+    .map(|folder| (folder, 1))
+    .collect();
+    assert_eq!(syncs_under(&data), expected);
+}
+
 /// A crash between a replacement's link and its rename leaves the private
 /// name behind. It sits next to its destination, is hidden on Unix and never
 /// looks like a mod or a disabled mod, and every attempt picks a new one.
@@ -4183,4 +4854,190 @@ async fn fresh_install_of_3000_files_applies_about_as_fast_as_renaming() {
         linked < renamed * 10 + std::time::Duration::from_millis(500),
         "renamed in {renamed:?}, linked in {linked:?}"
     );
+}
+
+/// A download of `relative` (under `current`) that carries a checksum, as
+/// every CurseForge and Modrinth pack file does.
+fn checked_download(current: &std::path::Path, relative: &str) -> carbon_net::Downloadable {
+    carbon_net::Downloadable::new("https://pack.invalid/file", current.join(relative))
+        .with_checksum(Some(carbon_net::Checksum::Sha1("0".repeat(40))))
+}
+
+fn write_file(path: &std::path::Path, bytes: &[u8]) {
+    std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+    std::fs::write(path, bytes).unwrap();
+}
+
+/// A retry finds what an interrupted attempt already downloaded in place, and
+/// that attempt's folder goes: only its checksummed downloads are kept, never
+/// its overrides or a file this attempt already holds.
+#[tokio::test]
+async fn reuse_moves_earlier_downloads_and_removes_their_folders() {
+    let tmp = tempfile::tempdir().unwrap();
+    let setup = tmp.path().join(".setup");
+    let earlier = setup.join("preparing-earlier");
+    let older = setup.join("preparing-older");
+    let current = setup.join("preparing-current");
+    write_file(&earlier.join("instance/mods/a.jar"), b"downloaded");
+    write_file(&earlier.join("instance/mods/unchecked.jar"), b"unchecked");
+    write_file(
+        &earlier.join("instance/config/override.json"),
+        b"old override",
+    );
+    write_file(
+        &earlier.join("instance/mods/extracted.jar"),
+        b"earlier copy",
+    );
+    write_file(&older.join("instance/mods/b.jar"), b"older download");
+    // This attempt extracted its own copy already.
+    write_file(
+        &current.join("instance/mods/extracted.jar"),
+        b"this attempt's",
+    );
+    let downloads = vec![
+        checked_download(&current, "instance/mods/a.jar"),
+        checked_download(&current, "instance/mods/b.jar"),
+        checked_download(&current, "instance/mods/extracted.jar"),
+        checked_download(&current, "instance/mods/missing.jar"),
+        carbon_net::Downloadable::new(
+            "https://pack.invalid/file",
+            current.join("instance/mods/unchecked.jar"),
+        ),
+    ];
+
+    let reused = super::reuse_earlier_downloads(&setup, &current, &downloads).await;
+
+    assert_eq!(reused, 2);
+    assert_eq!(
+        std::fs::read(current.join("instance/mods/a.jar")).unwrap(),
+        b"downloaded"
+    );
+    assert_eq!(
+        std::fs::read(current.join("instance/mods/b.jar")).unwrap(),
+        b"older download"
+    );
+    assert_eq!(
+        std::fs::read(current.join("instance/mods/extracted.jar")).unwrap(),
+        b"this attempt's"
+    );
+    assert!(!current.join("instance/mods/unchecked.jar").exists());
+    assert!(!current.join("instance/config/override.json").exists());
+    assert!(!earlier.exists() && !older.exists());
+
+    // Nothing to reuse still clears what earlier attempts left.
+    let stale = setup.join("preparing-stale");
+    write_file(&stale.join("instance/config/override.json"), b"stale");
+    assert_eq!(
+        super::reuse_earlier_downloads(&setup, &current, &[]).await,
+        0
+    );
+    assert!(!stale.exists());
+    assert!(current.join("instance/mods/a.jar").is_file());
+}
+
+/// A staging beside an unfinished attempt (2.0.40's, or the one a
+/// re-preparation replaces) lends its downloads by link and stays as it was.
+#[tokio::test]
+async fn reuse_links_from_staging_and_leaves_it_untouched() {
+    let tmp = tempfile::tempdir().unwrap();
+    let setup = tmp.path().join(".setup");
+    let staging = setup.join("staging");
+    let current = setup.join("preparing-current");
+    write_file(&staging.join("instance/mods/a.jar"), b"staged");
+    std::fs::create_dir_all(current.join("instance")).unwrap();
+    let downloads = vec![checked_download(&current, "instance/mods/a.jar")];
+
+    assert_eq!(
+        super::reuse_earlier_downloads(&setup, &current, &downloads).await,
+        1
+    );
+    assert_eq!(
+        std::fs::read(current.join("instance/mods/a.jar")).unwrap(),
+        b"staged"
+    );
+    assert_eq!(
+        std::fs::read(staging.join("instance/mods/a.jar")).unwrap(),
+        b"staged"
+    );
+    assert!(staging.is_dir());
+}
+
+/// A folder in an earlier attempt that is a link is never followed, so a
+/// reuse can't move a file from outside the setup.
+#[cfg(unix)]
+#[tokio::test]
+async fn reuse_never_follows_a_link_out_of_the_setup() {
+    let tmp = tempfile::tempdir().unwrap();
+    let setup = tmp.path().join(".setup");
+    let outside = tmp.path().join("outside");
+    let earlier = setup.join("preparing-earlier");
+    let current = setup.join("preparing-current");
+    write_file(&outside.join("mods/a.jar"), b"not the launcher's");
+    std::fs::create_dir_all(&earlier).unwrap();
+    std::os::unix::fs::symlink(&outside, earlier.join("instance")).unwrap();
+    std::fs::create_dir_all(current.join("instance")).unwrap();
+    let downloads = vec![checked_download(&current, "instance/mods/a.jar")];
+
+    assert_eq!(
+        super::reuse_earlier_downloads(&setup, &current, &downloads).await,
+        0
+    );
+    assert_eq!(
+        std::fs::read(outside.join("mods/a.jar")).unwrap(),
+        b"not the launcher's"
+    );
+    assert!(!current.join("instance/mods/a.jar").exists());
+}
+
+/// A file a pack ships both enabled and as its `.disabled` twin keeps only
+/// the bare spelling, whether it was staged or skipped as already installed.
+/// A `.disabled` name whose bare form ends in `.disabled` too is a different
+/// file and stays.
+#[tokio::test]
+async fn shadowed_disabled_twins_are_dropped_from_the_preparation() {
+    let tmp = tempfile::tempdir().unwrap();
+    let staged = tmp.path().join("instance");
+    for name in [
+        "mods/both.jar",
+        "mods/both.jar.disabled",
+        "mods/skipped.jar.disabled",
+        "mods/only.jar.disabled",
+        "mods/odd.jar.disabled",
+        "mods/odd.jar.disabled.disabled",
+    ] {
+        write_file(&staged.join(name), name.as_bytes());
+    }
+    let mut files: Vec<String> = [
+        // Skipped: already installed with the pack's bytes.
+        "/mods/skipped.jar",
+        "/mods/both.jar",
+        "/mods/both.jar.disabled",
+        "/mods/skipped.jar.disabled",
+        "/mods/only.jar.disabled",
+        "/mods/odd.jar.disabled",
+        "/mods/odd.jar.disabled.disabled",
+    ]
+    .iter()
+    .map(|name| name.to_string())
+    .collect();
+
+    super::drop_shadowed_disabled_twins(&staged, &mut files)
+        .await
+        .unwrap();
+
+    assert_eq!(
+        files,
+        [
+            "/mods/skipped.jar",
+            "/mods/both.jar",
+            "/mods/only.jar.disabled",
+            "/mods/odd.jar.disabled",
+            "/mods/odd.jar.disabled.disabled",
+        ]
+    );
+    assert!(staged.join("mods/both.jar").is_file());
+    assert!(!staged.join("mods/both.jar.disabled").exists());
+    assert!(!staged.join("mods/skipped.jar.disabled").exists());
+    assert!(staged.join("mods/only.jar.disabled").is_file());
+    assert!(staged.join("mods/odd.jar.disabled.disabled").is_file());
 }

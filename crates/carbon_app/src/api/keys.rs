@@ -101,6 +101,8 @@ keys! {
         CHANGE_MODPACK                              = "changeModpack";
         REPAIR_MODPACK                              = "repairModpack";
         GET_REPAIR_PREVIEW                          = "getRepairPreview";
+        GET_PENDING_SETUP                          = "getPendingSetup";
+        CANCEL_PENDING_SETUP                       = "cancelPendingSetup";
         CHECK_PACK_ORIGIN                           = "checkPackOrigin";
         LOAD_ICON_URL                               = "loadIconUrl";
         DELETE_GROUP                                = "deleteGroup";

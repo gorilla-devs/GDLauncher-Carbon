@@ -1318,6 +1318,239 @@ pub(crate) mod tests {
         (instance_id, row, path)
     }
 
+    /// A failed or cancelled version-only install keeps its setup until that
+    /// version installs. Addons can still be added, toggled and removed
+    /// beside it, in either phase, as in 2.0.40; pack setups, apply markers
+    /// and a queued or running preparation still hold them.
+    #[tokio::test]
+    async fn versiononly_pending_install_keeps_addon_edits() {
+        use crate::domain::vtask::VisualTaskId;
+        use crate::managers::instance::modpack::session::{Kind, Phase, Producer, RECORD, Session};
+        use crate::managers::instance::run::LaunchState;
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, path) =
+            addon_fixture(&app, "versiononly-addons", AddonType::Mods, "a.jar", b"a").await;
+        let shortpath = app.instance_manager().instances.read().await[&id]
+            .shortpath
+            .clone();
+        let root = app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath)
+            .get_root();
+        let record = root.join(".setup").join(RECORD);
+        let created = Session::load(&root).await.unwrap().unwrap();
+        assert_eq!(
+            (created.producer, created.kind, created.phase),
+            (Producer::Create, Kind::VersionOnly, Phase::Reserved)
+        );
+        let write = |session: &Session| {
+            std::fs::write(&record, serde_json::to_vec(session).unwrap()).unwrap()
+        };
+        let disabled = path.with_file_name("a.jar.disabled");
+        let set_state = |state| {
+            let app = app.clone();
+            async move {
+                app.instance_manager()
+                    .instances
+                    .write()
+                    .await
+                    .get_mut(&id)
+                    .unwrap()
+                    .data_mut()
+                    .unwrap()
+                    .state = state;
+            }
+        };
+
+        // A failed first install, and a version change that failed before or
+        // after staging.
+        for (producer, phase) in [
+            (Producer::Create, Phase::Committed),
+            (Producer::Settings, Phase::Reserved),
+            (Producer::Settings, Phase::Committed),
+        ] {
+            let mut pending = created.clone();
+            pending.producer = producer;
+            pending.phase = phase;
+            write(&pending);
+            // The gate an install passes before it downloads anything.
+            app.instance_manager()
+                .ensure_modpack_not_locked(id)
+                .await
+                .unwrap_or_else(|error| panic!("{producer:?} {phase:?}: {error:#}"));
+            app.instance_manager()
+                .enable_mod(id, row.id.clone(), false)
+                .await
+                .unwrap_or_else(|error| panic!("{producer:?} {phase:?}: {error:#}"));
+            assert!(
+                disabled.exists() && !path.exists(),
+                "{producer:?} {phase:?}"
+            );
+            app.instance_manager()
+                .enable_mod(id, row.id.clone(), true)
+                .await
+                .unwrap_or_else(|error| panic!("{producer:?} {phase:?}: {error:#}"));
+            assert!(
+                path.exists() && !disabled.exists(),
+                "{producer:?} {phase:?}"
+            );
+        }
+
+        // A completed import that keeps its platform link, imported locked and
+        // unlocked since, whose first install failed or was cancelled: Play
+        // never downloads its pack request, so addon edits stay allowed, as in
+        // 2.0.40.
+        let link = info::Modpack::Modrinth(info::ModrinthModpack {
+            project_id: "linked".into(),
+            version_id: "A".into(),
+        });
+        let set_modpack = |modpack: Option<info::ModpackInfo>| {
+            let app = app.clone();
+            async move {
+                app.instance_manager()
+                    .instances
+                    .write()
+                    .await
+                    .get_mut(&id)
+                    .unwrap()
+                    .data_mut()
+                    .unwrap()
+                    .config
+                    .modpack = modpack;
+            }
+        };
+        set_modpack(Some(info::ModpackInfo {
+            modpack: link.clone(),
+            locked: false,
+        }))
+        .await;
+        let mut imported = created.clone();
+        imported.producer = Producer::Import;
+        imported.kind = Kind::ImportedComplete;
+        imported.phase = Phase::Committed;
+        let mut installed =
+            crate::managers::instance::schema::parse_instance_config(&created.installed_config)
+                .unwrap();
+        installed.modpack = Some(info::ModpackInfo {
+            modpack: link.clone(),
+            locked: true,
+        });
+        imported.installed_config =
+            crate::managers::instance::schema::make_instance_config(installed).unwrap();
+        imported.requested_pack = Some("linked A".into());
+        write(&imported);
+        let request = root.join(".setup/change-pack-version.json");
+        std::fs::write(&request, b"linked A").unwrap();
+        app.instance_manager()
+            .enable_mod(id, row.id.clone(), false)
+            .await
+            .unwrap();
+        assert!(disabled.exists() && !path.exists());
+        app.instance_manager()
+            .enable_mod(id, row.id.clone(), true)
+            .await
+            .unwrap();
+        assert!(path.exists() && !disabled.exists());
+        // A request that is not the record's own is one Play refuses.
+        std::fs::write(&request, b"linked B").unwrap();
+        let error = app
+            .instance_manager()
+            .enable_mod(id, row.id.clone(), false)
+            .await
+            .expect_err("a changed pack request");
+        assert!(error.to_string().contains("Press Play"), "{error}");
+        std::fs::remove_file(&request).unwrap();
+        app.instance_manager()
+            .enable_mod(id, row.id.clone(), false)
+            .await
+            .expect_err("a missing pack request");
+        assert!(path.exists() && !disabled.exists());
+        // So is a setup for another pack, and a locked pack keeps its lock.
+        std::fs::write(&request, b"linked A").unwrap();
+        set_modpack(Some(info::ModpackInfo {
+            modpack: info::Modpack::Modrinth(info::ModrinthModpack {
+                project_id: "linked".into(),
+                version_id: "B".into(),
+            }),
+            locked: false,
+        }))
+        .await;
+        app.instance_manager()
+            .enable_mod(id, row.id.clone(), false)
+            .await
+            .expect_err("another pack");
+        set_modpack(Some(info::ModpackInfo {
+            modpack: link,
+            locked: true,
+        }))
+        .await;
+        let error = app
+            .instance_manager()
+            .enable_mod(id, row.id.clone(), false)
+            .await
+            .expect_err("a locked pack");
+        assert_eq!(error.to_string(), "Modpack is locked");
+        assert!(path.exists() && !disabled.exists());
+        set_modpack(None).await;
+        std::fs::remove_file(&request).unwrap();
+
+        let mut committed = created.clone();
+        committed.producer = Producer::Settings;
+        committed.phase = Phase::Committed;
+        let refused = |what: String| {
+            let app = app.clone();
+            let id_ = row.id.clone();
+            let path = path.clone();
+            async move {
+                let error = app
+                    .instance_manager()
+                    .enable_mod(id, id_, false)
+                    .await
+                    .expect_err(&what);
+                assert!(path.exists(), "{what}");
+                error.to_string()
+            }
+        };
+        // A pack setup.
+        let mut pack = committed.clone();
+        pack.kind = Kind::Pack;
+        write(&pack);
+        let message = refused("pack setup".into()).await;
+        assert!(message.contains("Press Play"), "{message}");
+        // Apply or pack markers beside a version-only setup.
+        write(&committed);
+        for marker in [
+            "change-pack-version.json",
+            "repair",
+            "apply-started",
+            "representation-transitions",
+            "staging-packinfo.json",
+        ] {
+            let marker_path = root.join(".setup").join(marker);
+            std::fs::write(&marker_path, b"").unwrap();
+            refused(marker.into()).await;
+            std::fs::remove_file(marker_path).unwrap();
+        }
+        // A queued or running preparation.
+        for state in [
+            LaunchState::Queued(VisualTaskId(900)),
+            LaunchState::Preparing(VisualTaskId(900)),
+        ] {
+            let name = format!("{state:?}");
+            set_state(state).await;
+            refused(name).await;
+        }
+        set_state(LaunchState::Inactive { failed_task: None }).await;
+
+        app.instance_manager()
+            .delete_mod(id, row.id.clone())
+            .await
+            .unwrap();
+        assert!(!path.exists() && !disabled.exists());
+    }
+
     #[tokio::test]
     async fn task05_delete_missing_world_preserves_literal_disabled_save() {
         let app = crate::setup_managers_for_test().await;

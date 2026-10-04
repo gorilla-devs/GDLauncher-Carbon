@@ -6,6 +6,7 @@
 //! actually on disk right now. Callers combine their output with `old`/
 //! `target` packinfos in [`apply_plan::plan`](super::apply_plan::plan).
 
+use anyhow::Context;
 use futures::{StreamExt, TryStreamExt};
 use std::collections::{BTreeSet, HashMap, HashSet};
 use std::path::{Path, PathBuf};
@@ -14,8 +15,6 @@ use std::time::SystemTime;
 
 use md5::Md5;
 use sha2::{Digest, Sha512};
-
-use crate::util::NormalizedWalkdir;
 
 use super::apply_plan;
 use super::packinfo::{FileHashes, PackInfo};
@@ -138,10 +137,15 @@ pub(crate) fn resolves_into_saves(data: &Path, path: &Path) -> bool {
     let Ok(saves) = std::fs::canonicalize(data.join("saves")) else {
         return false;
     };
+    resolves_into(&saves, path)
+}
+
+/// [`resolves_into_saves`] against an already resolved saves root.
+fn resolves_into(saves: &Path, path: &Path) -> bool {
     let mut candidate = Some(path);
     while let Some(current) = candidate {
         if let Ok(resolved) = std::fs::canonicalize(current) {
-            return resolved.starts_with(&saves);
+            return resolved.starts_with(saves);
         }
         candidate = current.parent();
     }
@@ -155,9 +159,13 @@ pub(crate) fn protect_resolved_saves(
     data: &Path,
     old: Option<&PackInfo>,
 ) {
+    // One plan is one moment: the saves root is resolved once for all of it.
+    let Ok(saves) = std::fs::canonicalize(data.join("saves")) else {
+        return;
+    };
     for entry in entries {
         let live = data.join(entry.path.trim_start_matches('/'));
-        if resolves_into_saves(data, &live)
+        if resolves_into(&saves, &live)
             && (live.exists()
                 || disabled_sibling(&live).exists()
                 || old.is_some_and(|record| record.files.contains_key(&entry.path)))
@@ -181,20 +189,56 @@ fn disabled_sibling(path: &Path) -> PathBuf {
     disabled
 }
 
+/// Why a link on a path the pack tracks cannot be read, with the way out:
+/// its target is usually on a drive that is not plugged in, or was moved.
+const UNAVAILABLE_LINK: &str = "is a link to a file or folder that cannot be found. Reconnect \
+     the drive or folder it points to, or remove the link, then try again.";
+
 /// Opens `path` and md5-hashes it, or `Ok(None)` if it doesn't exist —
 /// including when an intermediate directory component is missing.
 pub(crate) async fn probe_md5(path: &Path) -> anyhow::Result<Option<[u8; 16]>> {
     let mut file = match tokio::fs::File::open(path).await {
         Ok(file) => file,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(e.into()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+            // A dangling entry (including an ancestor link) is not verified
+            // absence. Keep required-path failures visible to the fresh scan.
+            let mut candidate = Some(path);
+            while let Some(entry) = candidate {
+                match tokio::fs::symlink_metadata(entry).await {
+                    Ok(metadata) if metadata.file_type().is_symlink() => {
+                        if let Err(error) = tokio::fs::metadata(entry).await {
+                            return Err(anyhow::Error::new(error)
+                                .context(format!("{} {UNAVAILABLE_LINK}", entry.display())));
+                        }
+                        break;
+                    }
+                    Ok(_) if entry == path => {
+                        return Err(anyhow::Error::new(e)
+                            .context(format!("Could not open {}", path.display())));
+                    }
+                    Ok(_) => break,
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                        candidate = entry.parent();
+                    }
+                    Err(error) => {
+                        return Err(anyhow::Error::new(error)
+                            .context(format!("Could not open {}", entry.display())));
+                    }
+                }
+            }
+            return Ok(None);
+        }
+        Err(e) => {
+            return Err(anyhow::Error::new(e).context(format!("Could not open {}", path.display())));
+        }
     };
 
     let mut md5 = Md5::new();
     carbon_scheduler::buffered_digest(&mut file, |chunk| {
         md5.update(&chunk);
     })
-    .await?;
+    .await
+    .with_context(|| format!("Could not read {}", path.display()))?;
 
     Ok(Some(md5.finalize().into()))
 }
@@ -224,64 +268,251 @@ pub(crate) async fn probe_md5(path: &Path) -> anyhow::Result<Option<[u8; 16]>> {
 /// free, without opening and hashing a save that can be many gigabytes,
 /// which would defeat the entire point of this function producing a
 /// `DiskScan` a repair can reuse in the first place.
-pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<(PackInfo, DiskScan)> {
-    let mut futures = Vec::new();
-    // `(key, from_disabled)` for every `/saves`/`.install_audit` file the
-    // walk finds — real, on-disk paths whose existence is free to record
-    // (the walk already visited them) but that must never be opened, hashed,
-    // or included in the returned `PackInfo` — see this function's own doc.
-    let mut unhashed_presence: Vec<(String, bool)> = Vec::new();
+/// A failed optional oracle observation. UTF-8 paths remain attributable until
+/// the full old/target universe is known; invalid names cannot match a manifest.
+#[derive(Debug)]
+pub struct OracleDiagnostic {
+    pub path: Option<String>,
+    pub message: String,
+}
 
-    let mut walker = NormalizedWalkdir::new(data_path)?;
-    while let Some(entry) = walker.next()? {
-        if entry.is_dir {
+pub fn validate_oracle_diagnostics(
+    diagnostics: &[OracleDiagnostic],
+    universe: &BTreeSet<String>,
+    insensitive: bool,
+) -> anyhow::Result<()> {
+    for diagnostic in diagnostics {
+        let Some(path) = &diagnostic.path else {
             continue;
-        }
-
-        let relative_path = entry.relative_path;
-        if apply_plan::is_saves_path(relative_path)
-            || resolves_into_saves(data_path, &entry.entry.path())
-            || relative_path.starts_with("/.install_audit")
-        {
-            let mut key = relative_path.to_string();
-            let from_disabled = key.ends_with(".disabled");
-            if from_disabled {
-                key.truncate(key.len() - ".disabled".len());
-            }
-            unhashed_presence.push((key, from_disabled));
-            continue;
-        }
-
-        let path = entry.entry.path();
-        let mut key = relative_path.to_string();
-
-        futures.push(async move {
-            let from_disabled = key.ends_with(".disabled");
-            if from_disabled {
-                key.truncate(key.len() - ".disabled".len());
-            }
-
-            let mut file = tokio::fs::File::open(path).await?;
-            let mut sha512 = Sha512::new();
-            let mut md5 = Md5::new();
-
-            carbon_scheduler::buffered_digest(&mut file, |chunk| {
-                sha512.update(&chunk);
-                md5.update(&chunk);
+        };
+        let normalize = |p: &str| {
+            let p = if insensitive {
+                p.to_lowercase()
+            } else {
+                p.to_owned()
+            };
+            p.strip_suffix(".disabled")
+                .unwrap_or(&p)
+                .trim_end_matches('/')
+                .to_owned()
+        };
+        let path = normalize(path);
+        if path.is_empty()
+            || universe.iter().any(|key| {
+                let key = normalize(key);
+                key == path
+                    || key.starts_with(&(path.clone() + "/"))
+                    || path.starts_with(&(key + "/"))
             })
-            .await?;
+        {
+            anyhow::bail!(
+                "Could not read {} in the instance folder: {}",
+                diagnostic.path.as_deref().unwrap_or("/"),
+                diagnostic.message
+            );
+        }
+    }
+    Ok(())
+}
 
-            let sha512 = sha512.finalize().into();
-            let md5 = md5.finalize().into();
+pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<(PackInfo, DiskScan)> {
+    let (info, scan, _) = scan_repair_oracle(data_path).await?;
+    Ok((info, scan))
+}
 
-            Ok::<_, anyhow::Error>((key, FileHashes { sha512, md5 }, from_disabled))
-        });
+/// A folder the repair walk is inside, to spot a folder link that leads back
+/// into it.
+#[derive(Clone)]
+struct WalkedFolder {
+    path: PathBuf,
+    /// Where it really is. None on a volume that cannot report final paths
+    /// (some Windows RAM disks and virtual drives); such a folder is compared
+    /// by file identity instead.
+    resolved: Option<PathBuf>,
+}
+
+impl WalkedFolder {
+    fn new(path: &Path) -> Self {
+        let resolved = match resolve_folder(path) {
+            Ok(resolved) => Some(resolved),
+            Err(error) => {
+                tracing::debug!(path = %path.display(), "repair oracle: folder path not resolved: {error}");
+                None
+            }
+        };
+        Self {
+            path: path.to_owned(),
+            resolved,
+        }
     }
 
-    let results = futures::stream::iter(futures)
+    fn is(&self, other: &Self) -> bool {
+        match (&self.resolved, &other.resolved) {
+            (Some(resolved), Some(other)) => resolved == other,
+            _ => same_file::is_same_file(&self.path, &other.path).unwrap_or(false),
+        }
+    }
+}
+
+fn resolve_folder(path: &Path) -> std::io::Result<PathBuf> {
+    #[cfg(test)]
+    if unresolvable::contains(path) {
+        return Err(std::io::ErrorKind::Unsupported.into());
+    }
+    std::fs::canonicalize(path)
+}
+
+/// Folders whose final path the test volume "cannot report".
+#[cfg(test)]
+mod unresolvable {
+    use std::collections::HashSet;
+    use std::path::{Path, PathBuf};
+    use std::sync::{LazyLock, Mutex};
+
+    static PATHS: LazyLock<Mutex<HashSet<PathBuf>>> = LazyLock::new(Default::default);
+
+    pub(super) fn add(path: &Path) {
+        PATHS.lock().unwrap().insert(path.to_owned());
+    }
+
+    pub(super) fn contains(path: &Path) -> bool {
+        PATHS.lock().unwrap().contains(path)
+    }
+}
+
+pub async fn scan_repair_oracle(
+    data_path: &Path,
+) -> anyhow::Result<(PackInfo, DiskScan, Vec<OracleDiagnostic>)> {
+    let mut diagnostics = Vec::new();
+    let mut futures = Vec::new();
+    let mut unhashed_presence: Vec<(String, bool)> = Vec::new();
+    let mut pending = vec![(
+        data_path.to_owned(),
+        std::fs::read_dir(data_path)?,
+        vec![WalkedFolder::new(data_path)],
+    )];
+    while let Some((directory, reader, ancestors)) = pending.pop() {
+        for entry in reader {
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) => {
+                    let relative = directory.strip_prefix(data_path)?;
+                    diagnostics.push(OracleDiagnostic {
+                        path: relative
+                            .to_str()
+                            .map(|p| format!("/{}", p.replace('\\', "/"))),
+                        message: error.to_string(),
+                    });
+                    continue;
+                }
+            };
+            let path = entry.path();
+            let relative = path.strip_prefix(data_path)?;
+            let Some(relative) = relative.to_str() else {
+                diagnostics.push(OracleDiagnostic {
+                    path: None,
+                    message: format!("non UTF-8 path: {relative:?}"),
+                });
+                continue;
+            };
+            let relative_path = format!("/{}", relative.replace('\\', "/"));
+            let metadata = match std::fs::metadata(&path) {
+                Ok(metadata) => metadata,
+                Err(error) => {
+                    let link = error.kind() == std::io::ErrorKind::NotFound
+                        && std::fs::symlink_metadata(&path)
+                            .is_ok_and(|metadata| metadata.file_type().is_symlink());
+                    diagnostics.push(OracleDiagnostic {
+                        path: Some(relative_path),
+                        message: if link {
+                            format!("it {UNAVAILABLE_LINK}")
+                        } else {
+                            error.to_string()
+                        },
+                    });
+                    continue;
+                }
+            };
+            if metadata.is_dir() {
+                let folder = WalkedFolder::new(&path);
+                let result = if ancestors.iter().any(|ancestor| ancestor.is(&folder)) {
+                    Err(std::io::Error::other("directory link cycle"))
+                } else {
+                    std::fs::read_dir(&path).map(|reader| {
+                        let mut next = ancestors.clone();
+                        next.push(folder);
+                        (path.clone(), reader, next)
+                    })
+                };
+                match result {
+                    Ok(next) => pending.push(next),
+                    Err(error) => diagnostics.push(OracleDiagnostic {
+                        path: Some(relative_path),
+                        message: error.to_string(),
+                    }),
+                }
+                continue;
+            }
+            if !metadata.is_file() {
+                diagnostics.push(OracleDiagnostic {
+                    path: Some(relative_path),
+                    message: "not a regular file".into(),
+                });
+                continue;
+            }
+            let from_disabled = relative_path.ends_with(".disabled");
+            let key = relative_path
+                .strip_suffix(".disabled")
+                .unwrap_or(&relative_path)
+                .to_owned();
+            if apply_plan::is_saves_path(&relative_path)
+                || resolves_into_saves(data_path, &path)
+                || relative_path.starts_with("/.install_audit")
+            {
+                unhashed_presence.push((key, from_disabled));
+                continue;
+            }
+            futures.push(async move {
+                let result = async {
+                    let mut file = tokio::fs::File::open(path).await?;
+                    let mut sha512 = Sha512::new();
+                    let mut md5 = Md5::new();
+                    carbon_scheduler::buffered_digest(&mut file, |chunk| {
+                        sha512.update(&chunk);
+                        md5.update(&chunk);
+                    })
+                    .await?;
+                    Ok::<_, anyhow::Error>((
+                        key,
+                        FileHashes {
+                            sha512: sha512.finalize().into(),
+                            md5: md5.finalize().into(),
+                        },
+                        from_disabled,
+                    ))
+                }
+                .await;
+                (relative_path, result)
+            });
+        }
+    }
+    let mut results = Vec::new();
+    for (path, result) in futures::stream::iter(futures)
         .buffer_unordered(8)
-        .try_collect::<Vec<_>>()
-        .await?;
+        .collect::<Vec<_>>()
+        .await
+    {
+        match result {
+            Ok(value) => results.push(value),
+            Err(error) => diagnostics.push(OracleDiagnostic {
+                path: Some(path),
+                message: error.to_string(),
+            }),
+        }
+    }
+    for diagnostic in &diagnostics {
+        tracing::warn!(path = ?diagnostic.path, "repair oracle: {}", diagnostic.message);
+    }
 
     // Enabled-wins, order-independent: a `.disabled`-sourced insertion never
     // overwrites an already-present entry unless that entry itself came from
@@ -361,6 +592,7 @@ pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<(Pack
             states,
             coexisting_disabled_twin_md5,
         },
+        diagnostics,
     ))
 }
 
@@ -374,6 +606,169 @@ mod tests {
 
     fn md5_of(bytes: &[u8]) -> [u8; 16] {
         Md5::digest(bytes).into()
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn task08_oracle_continues_after_unrelated_dangling_link() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("logs")).unwrap();
+        std::fs::create_dir_all(dir.path().join("mods")).unwrap();
+        std::fs::write(dir.path().join("mods/required.jar"), b"tracked").unwrap();
+        std::os::unix::fs::symlink("absent", dir.path().join("logs/old-output")).unwrap();
+        let (info, _) = scan_instance_as_packinfo(dir.path()).await.unwrap();
+        assert_eq!(info.files["/mods/required.jar"].md5, md5_of(b"tracked"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn task08_oracle_continues_after_unrelated_non_utf8_name() {
+        use std::os::unix::ffi::OsStringExt;
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("logs")).unwrap();
+        std::fs::write(dir.path().join("tracked"), b"tracked").unwrap();
+        match std::fs::write(
+            dir.path()
+                .join("logs")
+                .join(std::ffi::OsString::from_vec(vec![255])),
+            b"log",
+        ) {
+            Ok(()) => {}
+            // APFS and HFS+ store names as UTF-8 and refuse other bytes with
+            // EILSEQ, so such a name cannot exist there to be skipped.
+            #[cfg(target_vendor = "apple")]
+            Err(error) if error.raw_os_error() == Some(libc::EILSEQ) => return,
+            Err(error) => panic!("creating the non-UTF-8 name failed: {error}"),
+        }
+        let (info, _) = scan_instance_as_packinfo(dir.path()).await.unwrap();
+        assert_eq!(info.files["/tracked"].md5, md5_of(b"tracked"));
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn task08_required_oracle_faults_and_normal_links_remain_visible() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("mods")).unwrap();
+        std::fs::create_dir(dir.path().join("logs")).unwrap();
+        std::fs::write(dir.path().join("mods/good.jar"), b"good").unwrap();
+        std::os::unix::fs::symlink("good.jar", dir.path().join("mods/alias.jar")).unwrap();
+        std::os::unix::fs::symlink("absent", dir.path().join("mods/required.jar.disabled"))
+            .unwrap();
+        std::os::unix::fs::symlink("absent", dir.path().join("logs/unrelated")).unwrap();
+        let (info, _, diagnostics) = scan_repair_oracle(dir.path()).await.unwrap();
+        assert_eq!(info.files["/mods/alias.jar"].md5, md5_of(b"good"));
+        assert_eq!(diagnostics.len(), 2);
+        assert!(
+            validate_oracle_diagnostics(&diagnostics, &universe(&["/mods/good.jar"]), false)
+                .is_ok()
+        );
+        assert!(
+            validate_oracle_diagnostics(&diagnostics, &universe(&["/mods/required.jar"]), false)
+                .is_err()
+        );
+        assert!(
+            validate_oracle_diagnostics(&diagnostics, &universe(&["/MODS/REQUIRED.JAR"]), true)
+                .is_err()
+        );
+        assert!(
+            scan_repair_oracle(&dir.path().join("missing-root"))
+                .await
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn task08_oracle_ancestor_and_unattributable_root_faults_refuse() {
+        let fault = |path: &str| OracleDiagnostic {
+            path: Some(path.into()),
+            message: "permission denied".into(),
+        };
+        assert!(
+            validate_oracle_diagnostics(&[fault("/mods")], &universe(&["/mods/a.jar"]), false)
+                .is_err()
+        );
+        assert!(validate_oracle_diagnostics(&[fault("/")], &universe(&[]), false).is_err());
+        assert!(
+            validate_oracle_diagnostics(&[fault("/logs")], &universe(&["/mods/a.jar"]), false)
+                .is_ok()
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn task08_fresh_required_dangling_path_is_error_not_verified_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("mods")).unwrap();
+        std::os::unix::fs::symlink("absent", dir.path().join("mods/required.jar")).unwrap();
+        let error = scan_disk_state(dir.path(), &universe(&["/mods/required.jar"]))
+            .await
+            .err()
+            .expect("a dangling tracked link is not verified absence");
+        let link = dir.path().join("mods/required.jar");
+        assert!(
+            error.to_string().contains(&link.display().to_string()),
+            "{error:#}"
+        );
+    }
+
+    /// A tracked folder linked to a drive that is not plugged in fails an
+    /// update, the repair preview and Repair with the link's name and the
+    /// way out, not a bare "No such file or directory".
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_dangling_link_on_a_tracked_path_names_the_link_and_the_way_out() {
+        let dir = tempfile::tempdir().unwrap();
+        let link = dir.path().join("resourcepacks");
+        std::os::unix::fs::symlink(dir.path().join("unplugged"), &link).unwrap();
+        let tracked = universe(&["/resourcepacks/pack.zip"]);
+        let error = scan_disk_state(dir.path(), &tracked)
+            .await
+            .err()
+            .expect("a dangling tracked folder link is not verified absence");
+        let message = error.to_string();
+        assert!(message.contains(&link.display().to_string()), "{error:#}");
+        assert!(message.contains("cannot be found"), "{error:#}");
+        assert!(message.contains("Reconnect the drive"), "{error:#}");
+        assert!(message.contains("remove the link"), "{error:#}");
+
+        let (_, _, diagnostics) = scan_repair_oracle(dir.path()).await.unwrap();
+        let message = validate_oracle_diagnostics(&diagnostics, &tracked, false)
+            .unwrap_err()
+            .to_string();
+        assert!(message.contains("/resourcepacks"), "{message}");
+        assert!(message.contains("Reconnect the drive"), "{message}");
+        assert!(message.contains("remove the link"), "{message}");
+    }
+
+    /// Some Windows volumes (RAM disks, drives the Mount Manager does not
+    /// map) cannot report a folder's final path. The repair scan still reads
+    /// every file there, and still stops at a folder link that leads back
+    /// into a folder it is in.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn the_repair_scan_works_where_folder_paths_cannot_be_resolved() {
+        for root_resolves in [false, true] {
+            let dir = tempfile::tempdir().unwrap();
+            let data = dir.path().join("instance");
+            std::fs::create_dir_all(data.join("mods/nested")).unwrap();
+            std::fs::write(data.join("mods/a.jar"), b"a").unwrap();
+            std::fs::write(data.join("mods/nested/b.jar"), b"b").unwrap();
+            std::os::unix::fs::symlink(&data, data.join("mods/loop")).unwrap();
+            if !root_resolves {
+                unresolvable::add(&data);
+            }
+            for folder in ["mods", "mods/nested", "mods/loop"] {
+                unresolvable::add(&data.join(folder));
+            }
+            let (info, scan, diagnostics) = scan_repair_oracle(&data).await.unwrap();
+            assert_eq!(info.files.len(), 2, "{root_resolves}");
+            assert_eq!(info.files["/mods/a.jar"].md5, md5_of(b"a"));
+            assert_eq!(info.files["/mods/nested/b.jar"].md5, md5_of(b"b"));
+            assert_eq!(scan.states.len(), 2, "{root_resolves}");
+            assert_eq!(diagnostics.len(), 1, "{root_resolves}");
+            assert_eq!(diagnostics[0].path.as_deref(), Some("/mods/loop"));
+            assert_eq!(diagnostics[0].message, "directory link cycle");
+        }
     }
 
     // --- scan_disk_state --------------------------------------------------

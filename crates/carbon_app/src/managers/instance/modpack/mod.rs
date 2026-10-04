@@ -31,6 +31,7 @@ pub mod apply_plan;
 pub mod disk_scan;
 pub mod origin_check;
 pub mod packinfo;
+pub(crate) mod session;
 
 impl ManagerRef<'_, InstanceManager> {
     pub async fn check_curseforge_modpack_updates(
@@ -148,6 +149,11 @@ impl ManagerRef<'_, InstanceManager> {
     ) -> anyhow::Result<VisualTaskId> {
         use super::run::LaunchState;
 
+        let runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit(format!("instance {instance_id} setup producer"))?;
+        let operation = self.lock_instance(instance_id).await;
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -186,9 +192,19 @@ impl ManagerRef<'_, InstanceManager> {
 
         self.run_prepare_with_setup_cleanup(
             instance_id,
-            &instance_path,
-            &setup_path,
-            &[("change-pack-version.json", pack_version_text.into_bytes())],
+            operation,
+            runtime_activity,
+            session::Request {
+                producer: session::Producer::Change,
+                kind: session::Kind::Pack,
+                files: vec![(
+                    "change-pack-version.json".into(),
+                    pack_version_text.into_bytes(),
+                )],
+                options: None,
+                reset: false,
+                replaces: None,
+            },
         )
         .await
     }
@@ -201,6 +217,16 @@ impl ManagerRef<'_, InstanceManager> {
     /// writes), so a missing *or* damaged file is restored, not just a
     /// missing one.
     ///
+    /// A pending setup, whatever it is (a failed install, update or repair,
+    /// one a duplicate copied, one 2.0.40 left, or one whose record can't be
+    /// read), is retired to `.setup-cancelled-<operation|legacy>-<uuid>` and
+    /// replaced, as long as it is still the one `expected_pending` names (see
+    /// [`PendingSetupStatus::discard_token`]): a dialog that went stale never
+    /// discards a setup accepted after it opened. The repair installs the
+    /// configured pack, or the pack an interrupted apply was installing (see
+    /// [`session::Session::repair_target`]), from a fresh download with a
+    /// deep check, planned against the root `packinfo.json`, which stays.
+    ///
     /// Refuses to run if the instance is currently launching or running —
     /// wiping `.setup` mid-install would corrupt the in-flight task.
     pub async fn repair_modpack(
@@ -210,6 +236,11 @@ impl ManagerRef<'_, InstanceManager> {
     ) -> anyhow::Result<VisualTaskId> {
         use super::run::LaunchState;
 
+        let runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit(format!("instance {instance_id} setup producer"))?;
+        let operation = self.lock_instance(instance_id).await;
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -254,6 +285,36 @@ impl ManagerRef<'_, InstanceManager> {
 
         drop(instances);
 
+        #[cfg(test)]
+        self.test_hooks
+            .pause("repair_prechecked", instance_id)
+            .await;
+
+        // The setup this repair replaces must still be the one the user chose
+        // to discard: never one accepted after the dialog opened.
+        let (status, pending) = self.inspect_pending_setup(instance_id).await?;
+        if status.discard_token != expected_pending {
+            bail!(
+                "This instance's unfinished install or update changed after Repair was opened, so nothing was changed. Open Repair again to see what it will do."
+            );
+        }
+        let target = pending
+            .as_ref()
+            .and_then(|pending| pending.target.clone())
+            .unwrap_or_else(|| modpack.clone());
+        let replaces = pending.map(|pending| session::Replaced {
+            label: pending.label,
+            interrupted: pending.interrupted,
+            keep_payload: pending.keep_payload,
+        });
+        // Cleanup selections come from a preview of the installed record,
+        // which is withheld when that record may not describe the files.
+        if status.preview_withheld && !options.cleanup_selections.is_empty() {
+            bail!(
+                "Files can't be selected for removal while an unfinished install or update is replaced. Repair without selecting files, then open Repair again to remove them."
+            );
+        }
+
         let context = PackProofContext::from(&modpack);
         let origin = self.origin_checks.read().await.get(&instance_id).cloned();
         validate_cleanup_selections(&options.cleanup_selections, &context, origin.as_ref())?;
@@ -274,82 +335,303 @@ impl ManagerRef<'_, InstanceManager> {
             }
         };
 
-        let setup_path = instance_path.get_root().join(".setup");
-
-        // Drop any leftover state from the previous (failed) install attempt
-        // so the launch path treats this as a fresh modpack install rather
-        // than trying to resume.
-        if setup_path.exists() {
-            tokio::fs::remove_dir_all(&setup_path).await?;
-        }
-
         let repair_marker_text = serde_json::to_string(&options)?;
-        let pack_version_text = serde_json::to_string(&PackVersionFile::from(modpack))?;
+        let pack_version_text = serde_json::to_string(&PackVersionFile::from(target))?;
 
         self.run_prepare_with_setup_cleanup(
             instance_id,
-            &instance_path,
-            &setup_path,
-            &[
-                ("repair", repair_marker_text.into_bytes()),
-                ("change-pack-version.json", pack_version_text.into_bytes()),
-            ],
+            operation,
+            runtime_activity,
+            session::Request {
+                producer: session::Producer::Repair,
+                kind: session::Kind::Pack,
+                files: vec![
+                    ("repair".into(), repair_marker_text.into_bytes()),
+                    (
+                        "change-pack-version.json".into(),
+                        pack_version_text.into_bytes(),
+                    ),
+                ],
+                options: Some(options),
+                reset: true,
+                replaces,
+            },
         )
         .await
     }
 
-    /// Writes `files` (each a `.setup`-relative filename paired with its
-    /// content) under `setup_path`, then attempts to apply them by calling
-    /// [`prepare_game`](super::InstanceManager::prepare_game). Shared by
-    /// [`change_modpack`](Self::change_modpack) and
-    /// [`repair_modpack`](Self::repair_modpack) — both start a fresh modpack
-    /// install this way, once their own precondition on `.setup` (bail if
-    /// present, or wipe it) has already been handled by the caller.
-    ///
-    /// Also clears any leftover `tmp-packinfo.json` at the instance root
-    /// before writing: it lives outside `.setup`, so a caller wiping (or
-    /// never having) `.setup` never touches it, and a crashed previous
-    /// session can leave one behind that is now stale relative to what is
-    /// about to be staged.
-    ///
-    /// On refusal from `prepare_game`, removes `setup_path` entirely rather
-    /// than leaving the files just written behind — a leftover
-    /// `.setup/change-pack-version.json` (or `.setup/repair`) would
-    /// otherwise apply itself on the next launch.
     async fn run_prepare_with_setup_cleanup(
         self,
         instance_id: InstanceId,
-        instance_path: &InstancePath,
-        setup_path: &Path,
-        files: &[(&str, Vec<u8>)],
+        operation: super::InstanceOperationGuard,
+        runtime_activity: crate::managers::runtime_lifecycle::RuntimeActivity,
+        request: session::Request,
     ) -> anyhow::Result<VisualTaskId> {
-        let _ = tokio::fs::remove_file(instance_path.get_root().join("tmp-packinfo.json")).await;
+        self.prepare_game_admitted(
+            instance_id,
+            None,
+            None,
+            true,
+            operation,
+            runtime_activity,
+            Some(request),
+        )
+        .await
+        .map(|result| result.1)
+    }
 
-        tokio::fs::create_dir_all(setup_path).await?;
+    pub async fn pending_setup(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<PendingSetupStatus> {
+        let _operation = self.lock_instance(instance_id).await;
+        self.pending_setup_owned(instance_id).await
+    }
 
-        let runtime_path = self.app.settings_manager().runtime_path.clone();
+    async fn pending_setup_owned(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<PendingSetupStatus> {
+        Ok(self.inspect_pending_setup(instance_id).await?.0)
+    }
 
-        let result = async {
-            for (name, content) in files {
-                runtime_path
-                    .get_temp()
-                    .write_file_atomic(setup_path.join(name), content)
-                    .await?;
+    /// The pending setup's status, and what a Repair does with it (`None`
+    /// when nothing is pending). Requires the instance gate.
+    async fn inspect_pending_setup(
+        self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<(PendingSetupStatus, Option<PendingRepair>)> {
+        let (shortpath, current) = self.current_config(instance_id).await?;
+        let root = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath)
+            .get_root();
+        let configured = current.modpack.as_ref().map(|p| &p.modpack);
+        let inactive = {
+            let instances = self.instances.read().await;
+            matches!(
+                instances
+                    .get(&instance_id)
+                    .ok_or(InvalidInstanceIdError(instance_id))?
+                    .data()?
+                    .state,
+                super::run::LaunchState::Inactive { .. }
+            )
+        };
+        // A replacement a crash left half-published is the pending setup.
+        // Only while Inactive: a running preparation owns its own setup.
+        if inactive {
+            if let Err(error) = session::settle_replacement(&root).await {
+                tracing::warn!(?error, "unfinished setup replacement left as is");
             }
-
-            self.app
-                .instance_manager()
-                .prepare_game(instance_id, None, None, true)
-                .await
-                .map(|r| r.1)
         }
-        .await;
-
-        if result.is_err() {
-            let _ = tokio::fs::remove_dir_all(setup_path).await;
+        let mut status = PendingSetupStatus {
+            pending: root.join(".setup").try_exists()?,
+            operation: None,
+            installed_version: configured.map(|p| PackProofContext::from(p).version_id),
+            pending_version: None,
+            can_cancel: false,
+            reason: None,
+            repair_version: configured.map(|p| PackProofContext::from(p).version_id),
+            preview_withheld: false,
+            can_resume: false,
+            busy: !inactive,
+            discard_token: None,
+        };
+        if !status.pending {
+            return Ok((status, None));
         }
+        let mut loaded = match session::Session::load(&root).await {
+            // A 2.0.40 setup without a record that provably never reached
+            // apply gets its session here, so the dialog can offer Cancel. Only
+            // while Inactive: a running preparation owns its own adoption.
+            Ok(None) if inactive => {
+                session::Session::adopt_legacy(&root, instance_id, &current).await
+            }
+            other => other,
+        };
+        // A pack request that is not this instance's own (copied by a
+        // duplicate, or kept from an earlier registration of the folder) and
+        // whose archive hadn't arrived yet becomes this instance's own here,
+        // as Play would make it, so it can be cancelled back to the
+        // instance's own installed version like the source's can.
+        if let Ok(Some(saved)) = &loaded {
+            if inactive
+                && saved.kind == session::Kind::Pack
+                && matches!(
+                    saved.copy_qualification(&root, instance_id).await,
+                    Ok(Some(true))
+                )
+            {
+                loaded = saved.qualify_copy(&root, instance_id).await.map(Some);
+            }
+        }
+        // What Repair does with it: retire it, whatever it is, and install the
+        // configured pack, or the pack an interrupted apply was installing.
+        let mut repair = match &loaded {
+            Ok(Some(session)) => {
+                let mut interrupted = session.interrupted(&root);
+                // Only a damaged request of a repair that continues an
+                // interrupted setup fails here; Play refuses it as well.
+                let target = session.repair_target().unwrap_or_else(|error| {
+                    tracing::debug!(?error, "repairing the configured pack instead");
+                    interrupted = true;
+                    None
+                });
+                PendingRepair {
+                    label: session.operation.clone(),
+                    target,
+                    interrupted,
+                    keep_payload: session.changed_files(&root)
+                        && session.producer != session::Producer::Repair,
+                }
+            }
+            // Without a readable record, the configured pack: 2.0.40 wrote an
+            // update's pack there before applying it.
+            _ => {
+                let changed_files = session::unrecorded_interrupted(&root, &current);
+                PendingRepair {
+                    label: "legacy".into(),
+                    target: None,
+                    interrupted: changed_files,
+                    keep_payload: changed_files,
+                }
+            }
+        };
+        // The preview plans the configured pack over its installed record.
+        repair.interrupted |= repair
+            .target
+            .as_ref()
+            .is_some_and(|target| Some(target) != configured);
+        status.repair_version = repair
+            .target
+            .as_ref()
+            .or(configured)
+            .map(|p| PackProofContext::from(p).version_id);
+        status.preview_withheld = repair.interrupted;
+        match loaded {
+            Ok(Some(session)) if session.owned_by(instance_id) => {
+                status.operation = Some(session.operation.clone());
+                status.can_resume = inactive;
+                // Display only; `Session::load` already proved both parse.
+                let version = |config: &str| {
+                    super::schema::parse_instance_config(config)
+                        .ok()
+                        .and_then(|config| config.modpack)
+                        .map(|p| PackProofContext::from(&p.modpack).version_id)
+                };
+                status.installed_version = version(&session.installed_config);
+                if let Some(pending) = &session.pending_config {
+                    status.pending_version = version(pending);
+                } else if let Ok(text) = tokio::fs::read_to_string(root.join(".setup/change-pack-version.json")).await {
+                    if let Ok(pack) = serde_json::from_str::<PackVersionFile>(&text) { status.pending_version = Some(PackProofContext::from(&Modpack::from(pack)).version_id); }
+                }
+                status.reason = session.cancel_reason(&current);
+                if !inactive { status.reason = Some("Wait for the current operation to finish before cancelling.".into()); }
+                if root.join(".setup/apply-started").try_exists()? || root.join(".setup/representation-transitions").try_exists()? {
+                    status.reason = Some("Apply may have started. Resume the pending setup to finish safely.".into());
+                }
+                status.can_cancel = status.reason.is_none();
+            }
+            Ok(None) if !inactive => status.reason = Some("Wait for the current operation to finish before cancelling.".into()),
+            // Play resumes these from the original archive or as a completed install.
+            Ok(None) if session::legacy_resumed_by_play(&root).unwrap_or(false) => {
+                status.can_resume = true;
+                status.reason = Some("An earlier launcher version didn't finish this modpack's install or update. Press Play to finish it.".into());
+            }
+            Ok(None) => status.reason = Some("An earlier launcher version was interrupted while applying this setup's files, so it can't be cancelled safely. Its files have been kept.".into()),
+            Ok(Some(session)) => {
+                // A record that is not this instance's own: copied by a
+                // duplicate, written before the instance had an id, or kept
+                // from an earlier registration of the folder (see
+                // `Session::binds_to`). Play continues it under this
+                // instance's identity when it qualifies or still has its
+                // original archive.
+                let continues = matches!(session.copy_qualification(&root, instance_id).await, Ok(Some(true)))
+                    || session.binds_to(instance_id) && session::has_original_archive(&root.join(".setup"));
+                let copied = session.copied_to == Some(instance_id.0);
+                status.can_resume = continues && inactive;
+                status.reason = Some(match (continues, copied) {
+                    (true, true) => "This instance was copied while its setup was unfinished. Press Play to finish it for this copy.".into(),
+                    (true, false) => "This instance's setup hasn't finished. Press Play to finish it.".into(),
+                    (false, _) => super::mods::uncontinued_setup_refusal(&current, super::mods::PendingChange::Play, copied),
+                });
+            }
+            Err(error) => status.reason = Some(format!("Setup evidence cannot be verified: {error:#}")),
+        }
+        status.discard_token = Some(status.operation.clone().unwrap_or_else(|| "legacy".into()));
+        Ok((status, Some(repair)))
+    }
 
-        result
+    pub async fn cancel_pending_setup(
+        self,
+        instance_id: InstanceId,
+        expected_operation: String,
+    ) -> anyhow::Result<()> {
+        let _runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit(format!("instance {instance_id} cancel setup"))?;
+        let _operation = self.lock_instance(instance_id).await;
+        let status = self.pending_setup_owned(instance_id).await?;
+        if status.operation.as_deref() != Some(&expected_operation) {
+            bail!("pending operation changed; refresh its status before cancelling");
+        }
+        if !status.can_cancel {
+            bail!(
+                "{}",
+                status
+                    .reason
+                    .unwrap_or_else(|| "pending setup cannot be safely cancelled".into())
+            );
+        }
+        let (shortpath, _) = self.current_config(instance_id).await?;
+        let root = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath)
+            .get_root();
+        let owner = session::Owner {
+            instance_id: instance_id.0,
+            operation: expected_operation,
+        };
+        let session = session::Session::require(&root, &owner).await?;
+        let temporary = root.join("tmp-packinfo.json");
+        if temporary.try_exists()? {
+            let target = session
+                .target
+                .as_ref()
+                .context("unbound temporary record prevents cancellation")?;
+            let info = packinfo::parse_packinfo(&tokio::fs::read_to_string(&temporary).await?)?;
+            if session::binding(&info, session.original_options.as_ref())?.0 != target.digest {
+                bail!("temporary record belongs to a different target; preserve setup");
+            }
+            tokio::fs::rename(&temporary, root.join(".setup/cancelled-target.json")).await?;
+        }
+        // Rename retains evidence and atomically restores the ordinary no-setup
+        // installed-version launch path, without downloading or rewriting config.
+        let retained = session::retire(&root, &owner.operation).await?;
+        // A cancellable setup never changed installed content, so its
+        // downloads are evidence of nothing; its records stay.
+        if let Err(error) = session::trim_retired(&retained).await {
+            tracing::warn!(?error, "cancelled setup payload kept");
+        }
+        self.app.invalidate(
+            crate::api::keys::instance::GET_PENDING_SETUP,
+            Some(instance_id.0.into()),
+        );
+        self.app
+            .invalidate(crate::api::keys::instance::GET_REPAIR_PREVIEW, None);
+        self.app.invalidate(
+            crate::api::keys::instance::INSTANCE_DETAILS,
+            Some(instance_id.0.into()),
+        );
+        Ok(())
     }
 
     /// Computes what [`repair_modpack`](Self::repair_modpack) would do,
@@ -382,6 +664,21 @@ impl ManagerRef<'_, InstanceManager> {
     /// obtainable"), so the plan is never blocked on a real staging
     /// directory that (for a preview) was never populated.
     pub async fn repair_preview(self, instance_id: InstanceId) -> anyhow::Result<RepairPreview> {
+        let _operation = self.lock_instance(instance_id).await;
+        // A pending setup that may have changed installed files, or whose
+        // repair installs another pack, would make the recorded pack's plan
+        // describe something Repair won't do. Every other one is replaced by
+        // exactly this plan.
+        if self
+            .pending_setup_owned(instance_id)
+            .await?
+            .preview_withheld
+        {
+            bail!(
+                "This modpack's last install or update stopped while changing its files, so what Repair will change can't be listed. Repair reinstalls the modpack from a fresh download; your worlds are kept."
+            );
+        }
+
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -495,6 +792,55 @@ impl ManagerRef<'_, InstanceManager> {
             duplicates,
         })
     }
+}
+
+#[derive(specta::Type, Serialize, Debug, Clone)]
+pub struct PendingSetupStatus {
+    pub pending: bool,
+    pub operation: Option<String>,
+    /// The pack version the pending setup started from and the one it
+    /// installs, by platform id. The dialog names versions by
+    /// `repair_version` instead; these identify the setup for diagnostics
+    /// and tests.
+    pub installed_version: Option<String>,
+    pub pending_version: Option<String>,
+    pub can_cancel: bool,
+    /// Why it can't be cancelled; the refusal `cancel_pending_setup` gives.
+    pub reason: Option<String>,
+    /// The pack version Repair installs: the configured one, or the one a
+    /// pending setup that stopped while applying was installing.
+    pub repair_version: Option<String>,
+    /// The pending setup may have changed installed files (or Repair installs
+    /// another pack than the configured one), so the repair preview, which
+    /// plans the configured pack over its installed record, is withheld.
+    pub preview_withheld: bool,
+    /// Play continues the pending setup, so the dialog offers to resume it.
+    pub can_resume: bool,
+    /// The instance is being prepared, launched, run or deleted, so Repair
+    /// (and Cancel or Resume) must wait until it stops.
+    pub busy: bool,
+    /// What a Repair confirmed against this status sends back unchanged as
+    /// `expected_pending`: the pending operation this instance owns, `legacy`
+    /// for any other pending setup, or nothing when none is pending. The
+    /// repair is refused when the pending setup no longer matches it.
+    pub discard_token: Option<String>,
+}
+
+/// What a Repair does with a pending setup (see
+/// [`ManagerRef::repair_modpack`](ManagerRef::repair_modpack)).
+#[derive(Debug, Clone)]
+struct PendingRepair {
+    /// Its retired label: its operation, or `legacy` without a readable record.
+    label: String,
+    /// The pack Repair installs instead of the configured one.
+    target: Option<Modpack>,
+    /// It may have changed installed content, or continues a setup that may
+    /// have (see [`session::Session::interrupted`]), or Repair installs
+    /// another pack than the configured one.
+    interrupted: bool,
+    /// Its payload stays once it is retired (see
+    /// [`session::Replaced::keep_payload`]).
+    keep_payload: bool,
 }
 
 /// Identity of the installed pack whose preview was reviewed.
@@ -629,6 +975,19 @@ pub struct RepairMarkerFile {
 /// own pack-tracked-path check; this only proves the path is syntactically
 /// safe to resolve and would never touch `/saves`.
 pub fn normalize_cleanup_path(path: &str) -> Option<String> {
+    let normalized = normalize_pack_path(path)?;
+    if apply_plan::is_saves_path(&normalized) {
+        return None;
+    }
+
+    Some(normalized)
+}
+
+/// [`normalize_cleanup_path`] without the `/saves` refusal, for paths a pack
+/// itself ships: a CurseForge world addon or a pack's `saves` overrides stage
+/// a world the apply creates (the planner still never changes an existing
+/// save).
+pub fn normalize_pack_path(path: &str) -> Option<String> {
     if !path.starts_with('/') {
         return None;
     }
@@ -645,12 +1004,7 @@ pub fn normalize_cleanup_path(path: &str) -> Option<String> {
         return None;
     }
 
-    let normalized = format!("/{}", parts.join("/"));
-    if apply_plan::is_saves_path(&normalized) {
-        return None;
-    }
-
-    Some(normalized)
+    Some(format!("/{}", parts.join("/")))
 }
 
 #[derive(Serialize, Deserialize)]
@@ -1243,8 +1597,8 @@ mod tests {
     use super::packinfo::{self, FileHashes, PackInfo};
     use super::{
         AddonType, DuplicateCandidate, RepairCounts, RepairMarkerFile, UntrackedLabel,
-        group_duplicates, normalize_cleanup_path, tally_counts, untracked_files_for_preview,
-        walk_untracked_files,
+        group_duplicates, normalize_cleanup_path, normalize_pack_path, tally_counts,
+        untracked_files_for_preview, walk_untracked_files,
     };
     use carbon_rt_path::InstancePath;
     use std::collections::HashMap;
@@ -1312,6 +1666,17 @@ mod tests {
         // Must be rejected at the component-validity stage, before ever
         // getting far enough to ask "is the normalized key under /saves?".
         assert_eq!(normalize_cleanup_path("/./saves/world/level.dat"), None);
+    }
+
+    #[test]
+    fn pack_paths_keep_saves_and_still_refuse_traversal() {
+        assert_eq!(
+            normalize_pack_path("/saves/world/level.dat"),
+            Some("/saves/world/level.dat".to_string())
+        );
+        assert_eq!(normalize_pack_path("/saves/../mods/a.jar"), None);
+        assert_eq!(normalize_pack_path("//etc/passwd"), None);
+        assert_eq!(normalize_pack_path("/"), None);
     }
 
     // --- RepairMarkerFile -----------------------------------------------
@@ -1779,6 +2144,11 @@ mod tests {
     // binding requirement on this task — that the preview is read-only: it
     // must detect corruption without ever executing a plan entry against
     // the real file.
+    //
+    // A new instance's first install is still pending in both fixtures. It
+    // never touched installed files, so Repair would replace it with exactly
+    // the plan shown: the preview is withheld only while a pending setup may
+    // have changed files (see `PendingSetupStatus::preview_withheld`).
 
     #[tokio::test]
     async fn repair_preview_detects_corruption_without_touching_the_file() {
@@ -1837,6 +2207,13 @@ mod tests {
             .await
             .unwrap();
 
+        let status = app
+            .instance_manager()
+            .pending_setup(instance_id)
+            .await
+            .unwrap();
+        assert!(status.pending && !status.preview_withheld);
+
         let preview = app
             .instance_manager()
             .repair_preview(instance_id)
@@ -1891,6 +2268,13 @@ mod tests {
             )
             .await
             .unwrap();
+
+        let status = app
+            .instance_manager()
+            .pending_setup(instance_id)
+            .await
+            .unwrap();
+        assert!(status.pending && !status.preview_withheld);
 
         let preview = app
             .instance_manager()

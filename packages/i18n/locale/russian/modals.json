@@ -15,6 +15,7 @@
   "_trn_unpair_instance": "Отвязать экземпляр",
   "_trn_notification": "Уведомление",
   "_trn_confirm_instance_deletion": "Подтверждение удаления экземпляра",
+  "_trn_repair_modpack": "Восстановить модпак",
   "_trn_confirm_reinstall": "Переустановка модпака",
   "_trn_confirm_batch_instance_deletion": "Удаление выбранных экземпляров",
   "_trn_confirm_batch_server_deletion": "Удаление выбранных серверов",

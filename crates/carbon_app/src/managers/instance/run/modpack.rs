@@ -11,6 +11,7 @@ use crate::managers::AppInner;
 use crate::managers::instance::log::{
     GameLog, LogEntry, LogEntrySourceKind, format_message_as_log4j_event,
 };
+use crate::managers::instance::modpack::session::{self, Kind, Owner, Phase, Producer, Session};
 use crate::managers::instance::modpack::{
     PackVersionFile, RepairMarkerFile, apply_plan, disk_scan, normalize_cleanup_path, packinfo,
     walk_untracked_files,
@@ -161,13 +162,14 @@ pub async fn process_modpack(
     instance_shortpath: String,
     task: &VisualTask,
     has_callback_task: bool,
+    session_owner: &mut Option<Owner>,
 ) -> anyhow::Result<(
     TSubtasks,
     Option<StandardVersion>,
     Option<RepairMarkerFile>,
     Option<disk_scan::DiskScan>,
 )> {
-    let original_modpack = config.modpack.clone();
+    let installed_snapshot = config.clone();
     let mut version: Option<StandardVersion> = None;
 
     let runtime_path = app.settings_manager().runtime_path.clone();
@@ -179,9 +181,130 @@ pub async fn process_modpack(
     let setup_path = instance_root.join(".setup");
     let is_setup = setup_path.is_dir();
     let is_modpack_complete = setup_path.join("modpack-complete").exists();
-    let staging_packinfo_path = setup_path.join("staging-packinfo.json");
 
-    let staging_dir = setup_path.join("staging");
+    let mut setup_session = Session::load(&instance_root).await?;
+    // A record that is not this instance's own (written before it had an id,
+    // copied, or kept from an earlier registration of the folder; see
+    // `Session::binds_to`) from a non-pack producer has explicit kind
+    // provenance. It needs no inferred content target and never runs pack
+    // apply. A pack request (or repair) copied before its archive arrived is
+    // the same: nothing was staged, so the instance downloads the pack for
+    // itself.
+    if let Some(saved) = setup_session.as_ref() {
+        let qualification = saved
+            .copy_qualification(&instance_root, instance_id)
+            .await?;
+        if qualification == Some(false) {
+            // Apply evidence beside it: it may have changed files.
+            bail!(
+                "{}",
+                super::super::mods::uncontinued_setup_refusal(
+                    &config,
+                    super::super::mods::PendingChange::Play,
+                    saved.copied_to == Some(instance_id.0),
+                )
+            );
+        }
+        if qualification == Some(true) {
+            setup_session = Some(saved.qualify_copy(&instance_root, instance_id).await?);
+        }
+    }
+    let copied_session = setup_session
+        .as_ref()
+        .filter(|session| session.binds_to(instance_id))
+        .cloned();
+    if copied_session.is_some() {
+        setup_session = None;
+    }
+    if let Some(session) = &setup_session {
+        let owner = session.owner()?;
+        if owner.instance_id != instance_id.0 {
+            bail!(
+                "foreign setup remains preserved; reconstruct its original inputs before adoption"
+            );
+        }
+        if let Some(expected) = session_owner.as_ref() {
+            session.check_owner(expected)?;
+        }
+        *session_owner = Some(owner);
+        if let Some(pending) = &session.pending_config {
+            if let Some(GameVersion::Standard(resolved)) =
+                super::super::schema::parse_instance_config(pending)?
+                    .game_configuration
+                    .version
+            {
+                version = Some(resolved);
+            }
+        }
+    }
+    let reconstruct = is_setup && setup_session.is_none();
+    // Unknown markerless state never reuses residual staging. Only original
+    // archives can qualify it, including older consumed-disabled overrides.
+    // Preparation has already adopted every untouched 2.0.40 shape under the
+    // instance gate (Session::adopt_legacy); what reaches here has no record.
+    if reconstruct && !session::has_original_archive(&setup_path) {
+        if session::complete_without_staging(&instance_root)? {
+            let requested_pack = match tokio::fs::read_to_string(
+                setup_path.join("change-pack-version.json"),
+            )
+            .await
+            {
+                Ok(text) => Some(text),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+                Err(error) => return Err(error.into()),
+            };
+            let adopted = Session::legacy_complete(&config, instance_id, requested_pack)?;
+            adopted.create(&instance_root).await?;
+            *session_owner = Some(adopted.owner()?);
+            setup_session = Some(adopted);
+        } else if let Some(copied) = &copied_session {
+            bail!(
+                "{}",
+                super::super::mods::uncontinued_setup_refusal(
+                    &config,
+                    super::super::mods::PendingChange::Play,
+                    copied.copied_to == Some(instance_id.0),
+                )
+            );
+        } else if config.modpack.is_some() {
+            // Play never resumes a setup that may have applied part of a
+            // pack: regenerating its target from consumed staging can delete
+            // files. Repair replaces it from a fresh archive instead.
+            bail!(
+                "This modpack's last install or update was interrupted part-way through applying its files, so it can't be resumed safely. Use Repair on this instance to reinstall the modpack; your worlds are kept."
+            );
+        } else {
+            bail!(
+                "This instance's last install was interrupted part-way through applying files, so it can't be resumed safely. To install it again, delete the hidden .setup folder inside the instance folder, then press Play."
+            );
+        }
+    }
+    let transition_sources = reconstruction_source_requirements(
+        &instance_root,
+        setup_session.as_ref(),
+        copied_session.as_ref(),
+    )
+    .await?;
+    // A previously saved reconstructed session may predate acquisition of
+    // originals needed by an unadopted transition. Resume that qualification;
+    // never demote an Applying/Applied operation to pre-apply authority.
+    let needs_originals = setup_session.as_ref().is_some_and(|session| {
+        session.producer == Producer::Reconstructed
+            && session.phase == Phase::Resolved
+            && session.target.as_ref().is_some_and(|target| {
+                transition_sources
+                    .iter()
+                    .any(|path| !target.sources.contains_key(path))
+            })
+    });
+    let resolved = setup_session.as_ref().is_some_and(|session| {
+        session.kind != Kind::Pack || session.target.is_some() && !needs_originals
+    });
+    let staging_dir = if !resolved && is_setup {
+        setup_path.join(format!("preparing-{}", uuid::Uuid::new_v4()))
+    } else {
+        setup_path.join("staging")
+    };
 
     let packinfo_path = instance_root.join("packinfo.json");
     let tmp_packinfo_path = instance_root.join("tmp-packinfo.json");
@@ -189,13 +312,34 @@ pub async fn process_modpack(
     // Absent marker (including a `.setup` left behind by an older build that
     // never wrote one) means an ordinary version change.
     let repair_marker_path = setup_path.join("repair");
-    let repair_options: Option<RepairMarkerFile> =
+    let mut repair_options: Option<RepairMarkerFile> =
         match tokio::fs::read_to_string(&repair_marker_path).await {
             Ok(s) => Some(serde_json::from_str(&s).context("while parsing repair marker json")?),
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
             Err(e) => return Err(e.into()),
         };
 
+    let requested_pack =
+        match tokio::fs::read_to_string(setup_path.join("change-pack-version.json")).await {
+            Ok(text) => Some(text),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+            Err(error) => return Err(error.into()),
+        };
+    if let Some(session) = &setup_session {
+        if session.original_options != repair_options {
+            bail!("repair options changed after setup admission");
+        }
+        if session.requested_pack != requested_pack {
+            bail!("requested pack changed after setup admission");
+        }
+        repair_options = session.original_options.clone();
+    }
+
+    if let Some(copied) = &copied_session {
+        if copied.original_options != repair_options || copied.requested_pack != requested_pack {
+            bail!("copied setup options/target differ from their original admission");
+        }
+    }
     // Named for what it's used for below (skip-optimisation oracle for the
     // platform prep fns), not merely what it holds. A repair judges "needs
     // download" against what is actually on disk right now, not against the
@@ -205,10 +349,12 @@ pub async fn process_modpack(
     // The download oracle avoids fetching already-verified bytes. Staging
     // always performs a fresh bounded old/target scan before planning;
     // the earlier oracle never authorizes a later live-file mutation.
+    let mut oracle_diagnostics = Vec::new();
     let (skip_oracle, oracle_disk_scan) = match &repair_options {
         Some(_) => {
-            let (packinfo, disk_scan) =
-                disk_scan::scan_instance_as_packinfo(&instance_path.get_data_path()).await?;
+            let (packinfo, disk_scan, diagnostics) =
+                disk_scan::scan_repair_oracle(&instance_path.get_data_path()).await?;
+            oracle_diagnostics = diagnostics;
             (Some(packinfo), Some(disk_scan))
         }
         None => (
@@ -222,16 +368,26 @@ pub async fn process_modpack(
         ),
     };
 
-    let t_modpack = match is_setup && !is_modpack_complete {
-        true => Some((
-            task.subtask(Translation::InstanceTaskLaunchRequestModpack),
-            task.subtask(Translation::InstanceTaskLaunchDownloadModpack),
-            task.subtask(Translation::InstanceTaskLaunchDownloadModpackFiles),
-            task.subtask(Translation::InstanceTaskLaunchExtractModpackFiles),
-            task.subtask(Translation::InstanceTaskLaunchRequestAddonMetadata),
-        )),
-        false => None,
-    };
+    // Only transition members need independent pristine acquisition. Keep
+    // all unrelated descriptor skips and the complete original oracle intact.
+    let preparation_oracle = skip_oracle.as_ref().map(|oracle| {
+        let mut oracle = oracle.clone();
+        for path in &transition_sources {
+            oracle.files.remove(path);
+        }
+        oracle
+    });
+    let t_modpack =
+        match is_setup && (!is_modpack_complete || reconstruct || needs_originals) && !resolved {
+            true => Some((
+                task.subtask(Translation::InstanceTaskLaunchRequestModpack),
+                task.subtask(Translation::InstanceTaskLaunchDownloadModpack),
+                task.subtask(Translation::InstanceTaskLaunchDownloadModpackFiles),
+                task.subtask(Translation::InstanceTaskLaunchExtractModpackFiles),
+                task.subtask(Translation::InstanceTaskLaunchRequestAddonMetadata),
+            )),
+            false => None,
+        };
 
     let t_apply_staging = task.subtask(Translation::InstanceTaskLaunchApplyStagedPatches);
 
@@ -301,6 +457,16 @@ pub async fn process_modpack(
     )) = t_modpack
     {
         let mut modpack_downloads = Vec::new();
+        if ["curseforge", "modrinth", "gdlpack"]
+            .iter()
+            .filter(|name| setup_path.join(name).is_file())
+            .count()
+            > 1
+        {
+            bail!(
+                "multiple original pack archives make setup provenance ambiguous; all inputs retained"
+            );
+        }
 
         let cffile_path = setup_path.join("curseforge");
         let mrfile_path = setup_path.join("modrinth");
@@ -309,7 +475,10 @@ pub async fn process_modpack(
         // Is this required? Can we not extract them twice? Extraction should be idempotent.
         // TODO: look into this
         let skip_overrides_path = setup_path.join("modpack-skip-overrides");
-        let skip_overrides = skip_overrides_path.is_dir();
+        // Private pristine reconstruction, never residual staging: every
+        // attempt extracts the overrides afresh. Only downloads an earlier
+        // attempt finished are reused, by hash (`reuse_earlier_downloads`).
+        let skip_overrides = false;
 
         // Whether `process_modpack_staging` has ever started consuming
         // `.setup/staging` for the record currently on disk — written right
@@ -326,7 +495,7 @@ pub async fn process_modpack(
         // `execute_plan` has actually started is the only thing that tells
         // us staging might no longer be safe to re-walk.
         let apply_started_path = setup_path.join("apply-started");
-        let apply_started = apply_started_path.exists();
+        let apply_started = false; // full target comes from original inputs below
 
         let modpack = match tokio::fs::read_to_string(&change_version_path).await {
             Ok(text) => Some(Modpack::from(serde_json::from_str::<PackVersionFile>(
@@ -342,6 +511,11 @@ pub async fn process_modpack(
         }
 
         t_request.start_opaque();
+        #[cfg(test)]
+        app.instance_manager
+            .test_hooks
+            .pause("setup_pack_request", instance_id)
+            .await;
 
         // If a cf, mr, or gdlpack file is provided, we don't need to do anything.
         // In case a modpack (from a change-pack-version.json file) is provided,
@@ -458,6 +632,32 @@ pub async fn process_modpack(
             }
         };
 
+        let archive_name = match file {
+            Some(Modplatform::Curseforge) => Some("curseforge"),
+            Some(Modplatform::Modrinth) => Some("modrinth"),
+            Some(Modplatform::GDLPack) => Some("gdlpack"),
+            None => None,
+        };
+        // Taken before the proof's hash, so a write during it shows too.
+        let archive_stamp = match archive_name {
+            Some(name) => file_stamp(&setup_path.join(name)).await,
+            None => None,
+        };
+        let archive_proof = match archive_name {
+            Some(name) => Some(session::Archive {
+                name: name.into(),
+                sha512: hex::encode(
+                    crate::managers::instance::modpack::origin_check::hash_file_sha512(
+                        &setup_path.join(name),
+                    )
+                    .await?,
+                ),
+            }),
+            None => bail!(
+                "pack setup has no original archive; refusing to infer a version-only install"
+            ),
+        };
+
         // Temporarily create a staging directory and download the modpack files there
         tokio::fs::create_dir_all(&staging_dir.join("instance")).await?;
         let instance_prep_path = InstancePath::new(staging_dir.clone());
@@ -499,7 +699,7 @@ pub async fn process_modpack(
                     &cffile_path,
                     &instance_prep_path,
                     skip_overrides,
-                    skip_oracle.as_ref(),
+                    preparation_oracle.as_ref(),
                     t_addon_metadata,
                     modpack_progress_tx,
                 )
@@ -567,7 +767,7 @@ pub async fn process_modpack(
                     &mrfile_path,
                     &instance_prep_path,
                     skip_overrides,
-                    skip_oracle.as_ref(),
+                    preparation_oracle.as_ref(),
                     modpack_progress_tx,
                 )
                 .await?;
@@ -638,7 +838,7 @@ pub async fn process_modpack(
                     &gdlpack_path,
                     &instance_prep_path,
                     skip_overrides,
-                    skip_oracle.as_ref(),
+                    preparation_oracle.as_ref(),
                     modpack_progress_tx,
                 )
                 .await?;
@@ -688,13 +888,20 @@ pub async fn process_modpack(
             .await?
             .concurrent_downloads;
 
+        #[cfg(test)]
+        if !modpack_downloads.is_empty() {
+            app.instance_manager
+                .test_hooks
+                .pause("setup_original_acquisition", instance_id)
+                .await;
+        }
         // Actually downloads the modpack files
         carbon_net::download_multiple(
             &modpack_downloads[..],
             DownloadOptions::builder()
                 .concurrency(concurrency as usize)
                 .progress_sender(progress_watch_tx)
-                .deep_check(deep_check)
+                .deep_check(deep_check || reused > 0)
                 .build(),
         )
         .await
@@ -713,20 +920,10 @@ pub async fn process_modpack(
                 locked: config.modpack.map(|m| m.locked).unwrap_or(true),
             });
 
-            if config.modpack.is_some() {
-                app.instance_manager().get_modpack_info(instance_id).await?;
-            }
-
             config.game_configuration.version = Some(GameVersion::Standard(StandardVersion {
                 release: v.release.clone(),
                 modloaders: v.modloaders.clone(),
             }));
-
-            app.instance_manager()
-                .publish_modpack_config(instance_id, config, original_modpack)
-                .await?;
-
-            app.invalidate(GET_MODPACK_INFO, Some(instance_id.0.into()));
         }
 
         // Only generate staging-packinfo if we actually processed a modpack
@@ -748,9 +945,7 @@ pub async fn process_modpack(
                 }
                 files.push(entry.relative_path.to_string());
             }
-
-            let snapshot = serde_json::to_string_pretty(&files)?;
-            tokio::fs::write(staging_packinfo_path, snapshot).await?;
+            drop_shadowed_disabled_twins(&staging_dir.join("instance"), &mut files).await?;
 
             t_generating_packinfo.start_opaque();
 
@@ -776,12 +971,139 @@ pub async fn process_modpack(
                 packinfo.files.insert(skipped.clone(), hashes.clone());
             }
 
-            let packinfo_str = packinfo::make_packinfo(packinfo)?;
-            tokio::fs::write(tmp_packinfo_path, packinfo_str).await?;
+            let mut session = match setup_session.take() {
+                Some(session) => session,
+                None => {
+                    let mut session = Session::new(
+                        &installed_snapshot,
+                        Producer::Reconstructed,
+                        Kind::Pack,
+                        repair_options.clone(),
+                    )?;
+                    // Legacy configured metadata may already be pending. Such
+                    // adoption never grants cancellation back to an inferred A.
+                    session.instance_id = Some(instance_id.0);
+                    session.requested_pack = requested_pack.clone();
+                    if let Some(copied) = &copied_session {
+                        session.adopted_from = copied.owner().ok();
+                        session.installed_config = copied.installed_config.clone();
+                    }
+                    session
+                }
+            };
+            if let Some(proof) = &archive_proof {
+                // The proof was hashed earlier in this same preparation. An
+                // archive nothing wrote since still holds those bytes; any
+                // other is read again in full.
+                let archive = setup_path.join(&proof.name);
+                if archive_stamp.is_none() || file_stamp(&archive).await != archive_stamp {
+                    let actual = hex::encode(
+                        crate::managers::instance::modpack::origin_check::hash_file_sha512(
+                            &archive,
+                        )
+                        .await?,
+                    );
+                    if actual != proof.sha512 {
+                        bail!("original archive changed during reconstruction");
+                    }
+                }
+                if session
+                    .archive
+                    .as_ref()
+                    .is_some_and(|old| old.name != proof.name || old.sha512 != proof.sha512)
+                {
+                    bail!("original archive changed after admission");
+                }
+            }
+            if let Some(copied) = &copied_session {
+                if let Some(original) = &copied.archive {
+                    if archive_proof.as_ref().is_none_or(|proof| {
+                        proof.name != original.name || proof.sha512 != original.sha512
+                    }) {
+                        bail!("copied original archive no longer matches source provenance");
+                    }
+                }
+                if let Some(original) = &copied.target {
+                    if session::binding(&packinfo, repair_options.as_ref())?.0 != original.digest {
+                        bail!("reconstructed copy differs from complete original target");
+                    }
+                }
+            }
+            if let Some(original) = &session.target {
+                if session::binding(&packinfo, repair_options.as_ref())?.0 != original.digest {
+                    bail!("reconstructed inputs differ from admitted complete target");
+                }
+            }
+            session.archive = archive_proof;
+            session.pending_config =
+                Some(super::super::schema::make_instance_config(config.clone())?);
+            session
+                .bind_target(
+                    &instance_root,
+                    &staging_dir,
+                    &packinfo,
+                    skipped_mods.clone(),
+                )
+                .await?;
+            let owner = session.owner()?;
+            let live_staging = setup_path.join("staging");
+            // Folders of fresh downloads, which a scanner may still hold on
+            // Windows: renamed with a short wait for it (see rename_dir).
+            if live_staging.try_exists()? {
+                publish::rename_dir(
+                    &live_staging,
+                    &setup_path.join(format!("prior-staging-{}", uuid::Uuid::new_v4())),
+                )
+                .await?;
+            }
+            publish::rename_dir(&staging_dir, &live_staging).await?;
+            #[cfg(test)]
+            app.instance_manager
+                .test_hooks
+                .pause("setup_staging_saved", instance_id)
+                .await;
+            if let Some(copied) = &copied_session {
+                let saved = Session::load(&instance_root)
+                    .await?
+                    .context("copy/private provenance disappeared")?;
+                if saved.operation != copied.operation || saved.instance_id != copied.instance_id {
+                    bail!("copy/private provenance changed during qualification");
+                }
+                session::atomic_json(&setup_path.join(session::RECORD), &session, false).await?;
+            } else if Session::load(&instance_root).await?.is_some() {
+                session.save(&instance_root, &owner).await?;
+            } else {
+                session.create(&instance_root).await?;
+            }
+            #[cfg(test)]
+            app.instance_manager
+                .test_hooks
+                .pause("setup_session_saved", instance_id)
+                .await;
+            adopt_legacy_transitions(&app, &instance_root, &session).await?;
+            *session_owner = Some(owner);
+            finish_preparation_records(&app, instance_id, &instance_root, &session).await?;
+            setup_session = Some(session);
 
             t_generating_packinfo.complete_opaque();
         } else {
             t_generating_packinfo.complete_opaque();
+        }
+
+        if !oracle_diagnostics.is_empty() {
+            let mut universe = BTreeSet::new();
+            // The oracle is not the old record: include declared paths even if
+            // this scan could not open them.
+            for record in [&packinfo_path, &tmp_packinfo_path] {
+                match tokio::fs::read_to_string(record).await {
+                    Ok(text) => universe.extend(packinfo::parse_packinfo(&text)?.files.into_keys()),
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(error.into()),
+                }
+            }
+            let insensitive =
+                disk_scan::probe_case_insensitive(&instance_path.get_data_path()).await;
+            disk_scan::validate_oracle_diagnostics(&oracle_diagnostics, &universe, insensitive)?;
         }
 
         trace!("marking modpack initialization as complete");
@@ -827,25 +1149,11 @@ pub async fn process_modpack(
     ))
 }
 
-/// Applies the staged files for a modpack version change or repair,
-/// reconciling them against the instance's live data.
-///
-/// Not atomic at the filesystem level — planning, [`execute_plan`], the
-/// audit write, promoting `tmp-packinfo.json` to `packinfo.json`, and
-/// removing `staging_dir` are all separate operations, any of which can be
-/// cut off by a crash — but every step here, together with the
-/// `apply_started`-gated guard in [`process_modpack`]
-/// (`tmp_packinfo_must_be_regenerated`) that stops a resumed pass from
-/// re-deriving `tmp-packinfo.json` by re-walking a partially-consumed
-/// `staging_dir`, is ordered to maintain one invariant: **at every
-/// interruption point, either the pre-existing `packinfo.json`, the
-/// untouched `tmp-packinfo.json` written before this function's
-/// [`execute_plan`] call ever runs, or the newly-promoted `packinfo.json`
-/// fully describes the target state.** A resumed run only ever has to pick
-/// which of those it landed on (the `tmp_packinfo_path.exists()` branch
-/// below, itself only trusted once `.setup/apply-started` confirms
-/// `execute_plan` really did run before) — never reconstruct one from a
-/// filesystem walk that may itself be mid-consumption.
+/// Apply an admitted complete target, retain original sources through audit and
+/// promotion (where the volume has hard links; see [`publish_staged`]), then
+/// merge pending metadata into the current configuration. The
+/// durable Applied phase permits recovery across the promotion/config gap;
+/// neither a missing marker nor a packinfo file alone proves completion.
 pub async fn process_modpack_staging(
     app: Arc<AppInner>,
     instance_id: InstanceId,
@@ -853,6 +1161,7 @@ pub async fn process_modpack_staging(
     t_subtasks: &TSubtasks,
     repair_options: Option<RepairMarkerFile>,
     oracle_disk_scan: Option<disk_scan::DiskScan>,
+    session_owner: Option<&Owner>,
 ) -> anyhow::Result<()> {
     let runtime_path = app.settings_manager().runtime_path.clone();
     let instance_path = runtime_path
@@ -862,59 +1171,65 @@ pub async fn process_modpack_staging(
     let instance_root = instance_path.get_root();
     let setup_path = instance_root.join(".setup");
     let is_first_run = setup_path.is_dir();
+    if !is_first_run {
+        return Ok(());
+    }
+    let manager = app.instance_manager();
+    let operation = manager.lock_instance(instance_id).await;
+    let (current_shortpath, _) = manager.current_config(instance_id).await?;
+    if current_shortpath != instance_shortpath {
+        bail!("instance root changed during preparation");
+    }
+    let owner = session_owner.context("setup is not admitted for apply")?;
+    let mut session = Session::require(&instance_root, owner).await?;
+    if session.original_options != repair_options {
+        bail!("setup original options changed");
+    }
+    if session.kind != Kind::Pack {
+        session.phase = Phase::Committed;
+        session.save(&instance_root, owner).await?;
+        return Ok(());
+    }
+    if matches!(session.phase, Phase::Applied | Phase::Committed) {
+        finish_session_commit(&app, &operation, &instance_root, &mut session).await?;
+        return Ok(());
+    }
+    // The one full read of the staged pack per apply, before anything below
+    // publishes or records it. It is the first step of applying, and can take
+    // a while for a large pack, so the progress shows it.
+    t_subtasks.t_apply_staging.start_opaque();
+    let sources = session
+        .verify_sources(&setup_path.join("staging"), &instance_root.join("instance"))
+        .await?;
+    finish_preparation_records(&app, instance_id, &instance_root, &session).await?;
+    adopt_legacy_transitions(&app, &instance_root, &session).await?;
+    session::plain_directory(&setup_path.join("staging"))?;
+    let bound = session
+        .target
+        .as_ref()
+        .context("complete target has not been resolved")?;
+    let bound_target = packinfo::parse_packinfo(&bound.packinfo)?;
+    let bound_digest = bound.digest.clone();
 
     let staging_dir = setup_path.join("staging");
 
     if staging_dir.exists() {
         let staging_packinfo = setup_path.join("staging-packinfo.json");
 
-        // Check if staging-packinfo.json exists - if not, this was a version/modloader-only change
-        // and we should skip staging entirely to avoid deleting existing mods
-        if !staging_packinfo.exists() {
-            trace!(
-                "No staging-packinfo.json found, skipping staging (version/modloader-only change)"
-            );
-            tokio::fs::remove_dir_all(&staging_dir).await?;
-            tokio::fs::write(setup_path.join("modpack-complete"), "").await?;
-            t_subtasks.t_apply_staging.complete_opaque();
-            return Ok(());
+        if !staging_packinfo.try_exists()? {
+            bail!("owned pack staging inventory is missing; preserve original inputs");
         }
-
-        t_subtasks.t_apply_staging.start_opaque();
 
         let packinfo_path = instance_root.join("packinfo.json");
         let tmp_packinfo_path = instance_root.join("tmp-packinfo.json");
         let apply_started_path = setup_path.join("apply-started");
 
-        // `tmp_packinfo_path` missing is ambiguous on its own: it means
-        // either "never written yet this session" (staging is unconsumed —
-        // see `tmp_packinfo_must_be_regenerated`'s doc, that state is handled
-        // by `process_modpack` regenerating it before this function is even
-        // reached, so this branch is never entered for it) or "already
-        // promoted" (renamed to `packinfo_path`, below). `staging_apply_already_promoted`
-        // is what disambiguates them — see its own doc.
-        if !tmp_packinfo_path.exists() {
-            if !staging_apply_already_promoted(apply_started_path.exists(), packinfo_path.exists())
-            {
-                bail!(
-                    "instance {instance_id} has a staged modpack apply (staging-packinfo.json \
-                     present) with no tmp-packinfo.json, but the apply-started/packinfo.json \
-                     state doesn't prove a completed, promoted apply — cannot determine the \
-                     target record"
-                );
-            }
-
-            finish_promoted_staging(&staging_dir, &setup_path).await?;
-            t_subtasks.t_apply_staging.complete_opaque();
-
-            // Trigger caching now that modpack installation is complete
-            app.meta_cache_manager()
-                .watch_and_prioritize(Some(
-                    crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
-                ))
-                .await;
-
-            return Ok(());
+        if !tmp_packinfo_path.try_exists()? {
+            tokio::fs::write(
+                &tmp_packinfo_path,
+                &session.target.as_ref().unwrap().packinfo,
+            )
+            .await?;
         }
 
         let old_packinfo = match tokio::fs::read_to_string(&packinfo_path).await {
@@ -924,6 +1239,9 @@ pub async fn process_modpack_staging(
         };
         let target_packinfo =
             packinfo::parse_packinfo(&tokio::fs::read_to_string(&tmp_packinfo_path).await?)?;
+        if session::binding(&target_packinfo, repair_options.as_ref())?.0 != bound_digest {
+            bail!("temporary target differs from admitted complete target");
+        }
 
         // Staged set: files physically present under .setup/staging/instance,
         // as packinfo-style keys.
@@ -981,7 +1299,7 @@ pub async fn process_modpack_staging(
             None => apply_plan::ApplyMode::VersionChange,
         };
 
-        let mut entries = plan_staging(
+        let planned = plan_staging(
             apply_plan::PlanInputs {
                 old: old_packinfo.as_ref(),
                 target: &target_packinfo,
@@ -993,14 +1311,33 @@ pub async fn process_modpack_staging(
             },
             &instance_root,
             repair_options.as_ref(),
+            Some(owner),
         )
-        .await?;
+        .await;
+        let mut entries = match planned {
+            Ok(entries) => entries,
+            Err(error) => {
+                return Err(unstaged_plan_error(&instance_root, &mut session, owner, error).await);
+            }
+        };
+
+        if entries
+            .iter()
+            .any(|entry| entry.reason == apply_plan::PlanReason::DisabledReplaceResumed)
+        {
+            bail!(
+                "legacy disabled replacement needs pristine archive reconstruction; matching live hashes are not ownership"
+            );
+        }
 
         disk_scan::protect_resolved_saves(
             &mut entries,
             &instance_root.join("instance"),
             old_packinfo.as_ref(),
         );
+
+        session.phase = Phase::Applying;
+        session.save(&instance_root, owner).await?;
 
         // Preserve the existing durable apply boundary for retries. New
         // publication retains sources and owned representation outcomes where
@@ -1021,6 +1358,8 @@ pub async fn process_modpack_staging(
             &target_packinfo,
             repair_options.as_ref(),
             &mut representation_notes,
+            Some(owner),
+            &sources,
         )
         .await?;
 
@@ -1045,6 +1384,7 @@ pub async fn process_modpack_staging(
                     &instance_root,
                     fs_case_insensitive,
                     cleanup_context.as_ref(),
+                    Some(owner),
                 )
                 .await
             }
@@ -1065,27 +1405,23 @@ pub async fn process_modpack_staging(
 
         let audit_file = audit_dir.join("audit.txt");
         let audit_txt = render_cleanup_audit(&entries, &user_removed);
-        tokio::fs::write(audit_file, audit_txt).await?;
+        // Sync through the writing handle: Windows FlushFileBuffers requires
+        // a write-capable handle.
+        let mut audit_handle = File::create(&audit_file).await?;
+        audit_handle.write_all(audit_txt.as_bytes()).await?;
+        audit_handle.sync_all().await?;
+        session::sync_dir(&audit_dir).await?;
+        session::sync_dir(&instance_root).await?;
 
-        // Promote before removing staging, not after: once this rename
-        // lands, `packinfo_path` fully describes the target state on its
-        // own, so a crash between the two leaves the "tmp-packinfo.json
-        // missing, `.setup/apply-started` present, packinfo.json present"
-        // branch above (`staging_apply_already_promoted`) to finish the
-        // leftover `staging_dir` cleanup on the next resume. The reverse
-        // order would leave a window where a crash between the two calls
-        // loses `staging_dir`'s remaining contents while `tmp_packinfo_path`
-        // is still unpromoted — at that point neither file fully describes
-        // the target state, and a resumed `process_modpack` would rebuild
-        // `tmp-packinfo.json` by walking a `staging_dir` that no longer has
-        // anything left to walk.
-        tokio::fs::rename(&tmp_packinfo_path, &packinfo_path).await?;
-
-        trace!("Cleaning up staging directory");
-        finish_promoted_staging(&staging_dir, &setup_path).await?;
+        // Durable Applied precedes either publication. A restart verifies the
+        // exact bound target and repeats the current-field config merge.
+        session.phase = Phase::Applied;
+        session.save(&instance_root, owner).await?;
+        finish_session_commit(&app, &operation, &instance_root, &mut session).await?;
         trace!("Staging complete");
         t_subtasks.t_apply_staging.complete_opaque();
 
+        drop(operation);
         // Trigger caching now that modpack installation is complete
         app.meta_cache_manager()
             .watch_and_prioritize(Some(
@@ -1097,6 +1433,155 @@ pub async fn process_modpack_staging(
     Ok(())
 }
 
+// Resolved itself owns the complete target and verified source inventory.
+// Publishing the two derived records is restartable at either await boundary;
+// stale/truncated records are retained, never used as target authority.
+async fn finish_preparation_records(
+    app: &Arc<AppInner>,
+    id: InstanceId,
+    root: &Path,
+    session: &Session,
+) -> anyhow::Result<()> {
+    if session.phase != Phase::Resolved {
+        return Ok(());
+    }
+    let owner = session.owner()?;
+    let saved = Session::require(root, &owner).await?;
+    if saved.phase != Phase::Resolved {
+        bail!("setup phase changed during preparation publication");
+    }
+    saved.verify_sources(&root.join(".setup/staging")).await?;
+    let target = saved
+        .target
+        .as_ref()
+        .context("resolved setup lacks complete target")?;
+    let mut inventory: Vec<_> = target
+        .sources
+        .values()
+        .cloned()
+        .chain(target.skipped.iter().cloned())
+        .collect();
+    inventory.sort();
+    inventory.dedup();
+    for (name, path, bytes) in [
+        (
+            "setup_inventory_saved",
+            root.join(".setup/staging-packinfo.json"),
+            serde_json::to_vec_pretty(&inventory)?,
+        ),
+        (
+            "setup_target_saved",
+            root.join("tmp-packinfo.json"),
+            target.packinfo.as_bytes().to_vec(),
+        ),
+    ] {
+        Session::require(root, &owner).await?;
+        let same = match tokio::fs::symlink_metadata(&path).await {
+            Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
+                tokio::fs::read(&path).await? == bytes
+            }
+            Ok(_) => bail!(
+                "preparation record is not a plain file; preserved: {}",
+                path.display()
+            ),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => false,
+            Err(error) => return Err(error.into()),
+        };
+        if !same {
+            replace_preparation_record(&path, root, bytes).await?;
+        }
+        #[cfg(test)]
+        app.instance_manager.test_hooks.pause(name, id).await;
+    }
+    Ok(())
+}
+
+// Original legacy/current preparation records are evidence, even when their
+// contents are truncated or stale. Preserve exact bytes before publishing the
+// independently reconstructed and session-bound complete replacement.
+async fn replace_preparation_record(
+    path: &Path,
+    root: &Path,
+    bytes: Vec<u8>,
+) -> anyhow::Result<()> {
+    let setup = root.join(".setup");
+    match tokio::fs::symlink_metadata(path).await {
+        Ok(metadata) => {
+            if !metadata.is_file() || metadata.file_type().is_symlink() {
+                bail!(
+                    "preparation record is not a plain file; preserved: {}",
+                    path.display()
+                );
+            }
+            let prior = setup.join(format!(
+                "prior-record-{}-{}",
+                path.file_name()
+                    .context("record has no filename")?
+                    .to_string_lossy(),
+                uuid::Uuid::new_v4()
+            ));
+            session::atomic_bytes(&prior, tokio::fs::read(path).await?, true).await?;
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+        Err(error) => return Err(error.into()),
+    }
+    // tmp-packinfo.json sits in the instance folder itself, which may be a
+    // link to another drive; only the setup's own folders must be plain.
+    if path.parent() == Some(root) {
+        session::atomic_bytes_in_root(path, bytes, false).await
+    } else {
+        session::atomic_bytes(path, bytes, false).await
+    }
+}
+
+async fn finish_session_commit(
+    app: &Arc<AppInner>,
+    operation: &super::super::InstanceOperationGuard,
+    root: &Path,
+    session: &mut Session,
+) -> anyhow::Result<()> {
+    let owner = session.owner()?;
+    Session::require(root, &owner).await?;
+    let target = session
+        .target
+        .as_ref()
+        .context("applied session has no complete target")?;
+    let tmp = root.join("tmp-packinfo.json");
+    let promoted = root.join("packinfo.json");
+    if tmp.try_exists()? {
+        let info = packinfo::parse_packinfo(&tokio::fs::read_to_string(&tmp).await?)?;
+        if session::binding(&info, session.original_options.as_ref())?.0 != target.digest {
+            bail!("pending promotion does not match setup target");
+        }
+        tokio::fs::rename(&tmp, &promoted).await?;
+        session::sync_dir(root).await?;
+        #[cfg(test)]
+        app.instance_manager
+            .test_hooks
+            .pause("pack_promoted", operation.instance_id())
+            .await;
+    }
+    let info = packinfo::parse_packinfo(&tokio::fs::read_to_string(&promoted).await?)?;
+    if session::binding(&info, session.original_options.as_ref())?.0 != target.digest {
+        bail!("installed record is not this session's promoted target");
+    }
+    let prepared = super::super::schema::parse_instance_config(
+        session
+            .pending_config
+            .as_ref()
+            .context("pending configuration missing")?,
+    )?;
+    let original = super::super::schema::parse_instance_config(&session.installed_config)?.modpack;
+    app.instance_manager()
+        .publish_modpack_config_owned(operation, prepared, original)
+        .await?;
+    session.phase = Phase::Committed;
+    session.save(root, &owner).await?;
+    finish_promoted_staging(&root.join(".setup/staging"), &root.join(".setup")).await?;
+    app.invalidate(GET_MODPACK_INFO, Some(owner.instance_id.into()));
+    Ok(())
+}
+
 async fn scan_for_apply(
     data: &Path,
     universe: &BTreeSet<String>,
@@ -1104,6 +1589,230 @@ async fn scan_for_apply(
 ) -> anyhow::Result<disk_scan::DiskScan> {
     drop(oracle);
     disk_scan::scan_disk_state(data, universe).await
+}
+
+/// The apply's answer to a plan that needs a staged copy of a file the
+/// preparation never staged. Preparation skips a file that is already in
+/// place with the pack's bytes, and the apply judges the files again: one
+/// that went missing or changed in between (antivirus, or a Repair that was
+/// interrupted and retried later) has nothing to be restored from.
+///
+/// Before the apply started nothing changed, so the setup goes back to be
+/// prepared again (see [`Session::release_target`]) and the next Play
+/// downloads that file. Once it started, the setup can't be prepared again
+/// over files it may have changed, so the error names its way out instead.
+async fn unstaged_plan_error(
+    root: &Path,
+    session: &mut Session,
+    owner: &Owner,
+    error: anyhow::Error,
+) -> anyhow::Error {
+    let Some(apply_plan::PlanError::MissingStagedSource { path }) =
+        error.downcast_ref::<apply_plan::PlanError>()
+    else {
+        return error;
+    };
+    let file = path.trim_start_matches('/').to_owned();
+    if session.phase == Phase::Resolved {
+        match session.release_target(root, owner).await {
+            Ok(()) => {
+                return error.context(format!(
+                    "{file} was changed or removed after this modpack's files were checked, so they have to be checked again. Nothing in the instance was changed. Press Play to try again; the files already downloaded are reused."
+                ));
+            }
+            Err(release) => {
+                tracing::warn!(?release, "setup could not be prepared again");
+            }
+        }
+    }
+    let way_out = session.staged_way_out();
+    error.context(format!(
+        "The modpack file {file} has no downloaded copy to install, so this setup can't be finished. {way_out}"
+    ))
+}
+
+/// Size and modification time of `path`, to tell whether anything wrote it
+/// since. None when either is unavailable, which callers treat as changed.
+async fn file_stamp(path: &Path) -> Option<(u64, std::time::SystemTime)> {
+    let metadata = tokio::fs::symlink_metadata(path).await.ok()?;
+    Some((metadata.len(), metadata.modified().ok()?))
+}
+
+/// A pack can ship a file both enabled and as its `.disabled` twin, say a
+/// mod it downloads plus an override of the same name that is disabled. Both
+/// stand for one target path. The bare file is the one installed, as before
+/// (the apply prefers it, see [`resolve_staged`]), so the twin is removed
+/// from this attempt's own preparation and the target records the bare
+/// file's hashes. A bare file that preparation skipped because it is already
+/// installed counts the same, so an update ends where a fresh install does.
+async fn drop_shadowed_disabled_twins(
+    staged: &Path,
+    files: &mut Vec<String>,
+) -> anyhow::Result<()> {
+    let present: HashSet<String> = files.iter().cloned().collect();
+    // Mirrors `packinfo::scan_dir`'s key: one `.disabled` is stripped, so only
+    // a bare spelling collides with its twin.
+    let shadowed: Vec<String> = files
+        .iter()
+        .filter(|file| {
+            file.strip_suffix(".disabled")
+                .is_some_and(|bare| !bare.ends_with(".disabled") && present.contains(bare))
+        })
+        .cloned()
+        .collect();
+    if shadowed.is_empty() {
+        return Ok(());
+    }
+    files.retain(|file| !shadowed.contains(file));
+    for twin in shadowed {
+        tracing::warn!(
+            "{twin}: the modpack also ships this file enabled, so the enabled copy is installed"
+        );
+        match tokio::fs::remove_file(staged.join(twin.trim_start_matches('/'))).await {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
+}
+
+/// Puts the files earlier, unfinished attempts of this setup downloaded
+/// where `current`, this attempt's preparation, downloads them, then removes
+/// those attempts' folders: a retry downloads only what is still missing, and
+/// `.setup` holds at most one partial download. Best effort: a file that
+/// can't be reused is downloaded again.
+///
+/// An earlier attempt's `preparing-*` folder is never installed from (the
+/// finished one is renamed to `staging` first), so its files are moved. A
+/// `staging` beside an unfinished attempt (one 2.0.40 left, or the staging a
+/// re-preparation replaces) is only hard-linked from and stays as it was.
+/// Only downloads that carry a checksum are reused, and the caller makes the
+/// download hash every file already in place, so a reused file is kept only
+/// when its bytes are the pack's. Overrides are never reused: this attempt
+/// has extracted its own. Returns how many files were reused.
+async fn reuse_earlier_downloads(
+    setup: &Path,
+    current: &Path,
+    downloads: &[Downloadable],
+) -> usize {
+    let wanted: Vec<PathBuf> = downloads
+        .iter()
+        .filter(|download| download.checksum.is_some())
+        .filter_map(|download| download.path.strip_prefix(current).ok())
+        .filter(|relative| {
+            relative
+                .components()
+                .all(|component| matches!(component, std::path::Component::Normal(_)))
+        })
+        .map(Path::to_path_buf)
+        .collect();
+    let setup = setup.to_owned();
+    let current = current.to_owned();
+    match tokio::task::spawn_blocking(move || {
+        reuse_earlier_downloads_blocking(&setup, &current, &wanted)
+    })
+    .await
+    {
+        Ok(Ok(reused)) => reused,
+        Ok(Err(error)) => {
+            tracing::warn!(?error, "earlier downloads not reused");
+            0
+        }
+        Err(error) => {
+            tracing::warn!(?error, "earlier downloads not reused");
+            0
+        }
+    }
+}
+
+fn reuse_earlier_downloads_blocking(
+    setup: &Path,
+    current: &Path,
+    wanted: &[PathBuf],
+) -> io::Result<usize> {
+    let plain_dir =
+        |path: &Path| std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.is_dir());
+    let mut earlier = Vec::new();
+    for entry in std::fs::read_dir(setup)? {
+        let path = entry?.path();
+        let named = path
+            .file_name()
+            .is_some_and(|name| name.to_string_lossy().starts_with("preparing-"));
+        if named && path != current && plain_dir(&path) {
+            let modified = std::fs::symlink_metadata(&path)
+                .and_then(|metadata| metadata.modified())
+                .ok();
+            earlier.push((modified, path));
+        }
+    }
+    // The newest attempt got furthest.
+    earlier.sort_by(|a, b| b.0.cmp(&a.0));
+    let staging = Some(setup.join("staging")).filter(|staging| plain_dir(staging));
+    // Every folder on the way must be a plain one too, so a link can never
+    // lead a move outside the setup.
+    let plain_file_beneath = |root: &Path, relative: &Path| {
+        let mut path = root.to_path_buf();
+        let mut components = relative.components().peekable();
+        while let Some(component) = components.next() {
+            path.push(component);
+            let Ok(metadata) = std::fs::symlink_metadata(&path) else {
+                return false;
+            };
+            let last = components.peek().is_none();
+            if (last && !metadata.is_file()) || (!last && !metadata.is_dir()) {
+                return false;
+            }
+        }
+        true
+    };
+    let mut reused = 0;
+    for relative in wanted {
+        let destination = current.join(relative);
+        match std::fs::symlink_metadata(&destination) {
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            // Extracted by this attempt, or reused already.
+            _ => continue,
+        }
+        let mut place = |source: PathBuf, link: bool| {
+            let placed = destination
+                .parent()
+                .map_or(Ok(()), std::fs::create_dir_all)
+                .and_then(|()| {
+                    if link {
+                        std::fs::hard_link(&source, &destination)
+                    } else {
+                        std::fs::rename(&source, &destination)
+                    }
+                });
+            match placed {
+                Ok(()) => {
+                    reused += 1;
+                    true
+                }
+                Err(error) => {
+                    tracing::debug!(?error, source = %source.display(), "earlier download not reused");
+                    false
+                }
+            }
+        };
+        let moved = earlier.iter().any(|(_, folder)| {
+            plain_file_beneath(folder, relative) && place(folder.join(relative), false)
+        });
+        if !moved {
+            if let Some(staging) = &staging {
+                if plain_file_beneath(staging, relative) {
+                    place(staging.join(relative), true);
+                }
+            }
+        }
+    }
+    for (_, folder) in &earlier {
+        if let Err(error) = std::fs::remove_dir_all(folder) {
+            tracing::warn!(?error, path = %folder.display(), "earlier preparation kept");
+        }
+    }
+    Ok(reused)
 }
 
 /// Finishes the leftover cleanup of a staging pass whose apply already fully
@@ -1154,7 +1863,9 @@ async fn fsync_dir(dir: &Path) -> anyhow::Result<()> {
         staging_test::run_hook("sync-directory", dir);
         staging_test::io_fault("sync-directory", dir)?;
     }
-    File::open(dir).await?.sync_all().await?;
+    // A volume that does not sync folders (a VirtualBox shared folder, some
+    // network mounts) leaves the entries to the system.
+    crate::util::durable::sync_dir_async(dir).await?;
     Ok(())
 }
 
@@ -1177,6 +1888,29 @@ async fn sync_recovery_payload(payload: &Path) -> anyhow::Result<()> {
     options.write(true);
     options.open(payload).await?.sync_all().await?;
     Ok(())
+}
+
+/// A staged file that no longer holds the bytes it is published as. After an
+/// interrupted apply that linked it into the instance, an edit made in place
+/// there changes it too.
+#[derive(Debug)]
+struct StagedSourceChanged(PathBuf);
+
+impl std::fmt::Display for StagedSourceChanged {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "staged content changed before publication: {:?}", self.0)
+    }
+}
+
+impl std::error::Error for StagedSourceChanged {}
+
+/// The audit note for a pack file whose staged copy changed after the apply
+/// started: what happened, and how to get the pack's version back.
+fn source_changed_note(path: &str) -> String {
+    format!(
+        "{path} was changed while this setup was interrupted, so the modpack's copy of it could \
+         not be installed. Use Repair Modpack to restore it."
+    )
 }
 
 /// Copy to a private, complete destination-volume file, verify it against
@@ -1233,7 +1967,7 @@ async fn copy_staged(
         }
         let actual: [u8; 64] = digest.finalize().into();
         if expected.is_some_and(|hash| hash != actual) {
-            bail!("staged content changed before publication: {source:?}");
+            return Err(StagedSourceChanged(source).into());
         }
         private
             .as_file()
@@ -1629,6 +2363,38 @@ impl Publications {
     }
 }
 
+/// One folder of the publication barrier: [`fsync_dir`], except on Apple
+/// platforms. There std's `sync_all` is F_FULLFSYNC, a flush of the whole
+/// drive cache on every call, so each folder gets a plain fsync instead and
+/// [`Publications::finish`] flushes each drive once at the end, as SQLite
+/// does.
+#[cfg(not(target_vendor = "apple"))]
+async fn sync_linked_folder(dir: &Path) -> anyhow::Result<()> {
+    fsync_dir(dir).await
+}
+
+#[cfg(target_vendor = "apple")]
+async fn sync_linked_folder(dir: &Path) -> anyhow::Result<()> {
+    #[cfg(test)]
+    {
+        staging_test::record_sync(dir);
+        staging_test::run_hook("sync-directory", dir);
+        staging_test::io_fault("sync-directory", dir)?;
+    }
+    let dir = dir.to_owned();
+    tokio::task::spawn_blocking(move || -> io::Result<()> {
+        use std::os::fd::AsRawFd;
+        let folder = std::fs::File::open(&dir)?;
+        // SAFETY: `folder` owns the descriptor and outlives the call.
+        if unsafe { libc::fsync(folder.as_raw_fd()) } == -1 {
+            return Err(io::Error::last_os_error());
+        }
+        Ok(())
+    })
+    .await??;
+    Ok(())
+}
+
 // This records one representation change in the existing setup. It is not
 // setup admission or a session identifier. Task8 binds this consumer to its
 // sole versioned session; target/options binding already rejects re-use by
@@ -1637,6 +2403,7 @@ impl Publications {
 #[serde(deny_unknown_fields)]
 struct RepresentationTransition {
     schema_version: u32,
+    owner: Option<Owner>,
     target_digest: String,
     options_digest: String,
     recovery_batch: String,
@@ -1653,16 +2420,7 @@ fn transition_binding(
     target: &packinfo::PackInfo,
     options: Option<&RepairMarkerFile>,
 ) -> anyhow::Result<(String, String)> {
-    use sha2::Digest;
-    let ordered: std::collections::BTreeMap<_, _> = target
-        .files
-        .iter()
-        .map(|(path, hashes)| (path, (hex::encode(hashes.sha512), hex::encode(hashes.md5))))
-        .collect();
-    Ok((
-        hex::encode(sha2::Sha512::digest(serde_json::to_vec(&ordered)?)),
-        hex::encode(sha2::Sha512::digest(serde_json::to_vec(&options)?)),
-    ))
+    session::binding(target, options)
 }
 
 /// Names a path's representation record and its recovery entries (both the
@@ -1706,6 +2464,7 @@ fn validate_transition(
     record: &RepresentationTransition,
     binding: &(String, String),
     target: &packinfo::PackInfo,
+    owner: Option<&Owner>,
 ) -> anyhow::Result<()> {
     use apply_plan::PlanAction;
     let mut batch_components = Path::new(&record.recovery_batch).components();
@@ -1714,7 +2473,10 @@ fn validate_transition(
         Some(std::path::Component::Normal(_))
     ) && batch_components.next().is_none();
     if !valid_batch
-        || record.schema_version != 1
+        || match owner {
+            Some(owner) => record.schema_version != 2 || record.owner.as_ref() != Some(owner),
+            None => record.schema_version != 1 || record.owner.is_some(),
+        }
         || record.target_digest != binding.0
         || record.options_digest != binding.1
         || normalize_cleanup_path(&record.entry.path).as_ref() != Some(&record.entry.path)
@@ -1732,6 +2494,151 @@ fn validate_transition(
             })
     {
         bail!("representation transition does not match authoritative target/original options");
+    }
+    Ok(())
+}
+
+// This pass requests original inputs only; it grants no apply authority.
+// Complete target/options/archive/manifest validation still follows extraction.
+async fn reconstruction_source_requirements(
+    root: &Path,
+    current: Option<&Session>,
+    copied: Option<&Session>,
+) -> anyhow::Result<BTreeSet<String>> {
+    let mut paths = BTreeSet::new();
+    let directory = root.join(".setup/representation-transitions");
+    if !directory.try_exists()? {
+        return Ok(paths);
+    }
+    check_plain_directory(&directory)?;
+    let mut files = tokio::fs::read_dir(&directory).await?;
+    while let Some(file) = files.next_entry().await? {
+        if file.path().extension().is_none_or(|ext| ext != "json") {
+            continue;
+        }
+        let record = read_transition(&file.path()).await?;
+        if normalize_cleanup_path(&record.entry.path).as_ref() != Some(&record.entry.path)
+            || file.path() != transition_path(root, &record.entry.path)
+        {
+            bail!("transition source requirement has invalid path provenance");
+        }
+        let known_owner = record.owner.as_ref().is_some_and(|owner| {
+            current.and_then(|s| s.owner().ok()).as_ref() == Some(owner)
+                || current.and_then(|s| s.adopted_from.as_ref()) == Some(owner)
+                || copied.and_then(|s| s.owner().ok()).as_ref() == Some(owner)
+        });
+        if !(record.schema_version == 1
+            && record.owner.is_none()
+            && current.is_none_or(|s| s.producer == Producer::Reconstructed)
+            || record.schema_version == 2 && known_owner)
+        {
+            bail!("transition source requirement has foreign ownership; preserved");
+        }
+        paths.insert(record.entry.path);
+    }
+    Ok(paths)
+}
+
+/// Adopt only after full original-input reconstruction. Both the mutable
+/// intent and immutable retained manifest carry the new owner. An interrupted
+/// two-file adoption is recognized by comparing the same original contents;
+/// no live mutation runs until all entries are settled.
+async fn adopt_legacy_transitions(
+    app: &Arc<AppInner>,
+    root: &Path,
+    session: &Session,
+) -> anyhow::Result<()> {
+    let directory = root.join(".setup/representation-transitions");
+    if !directory.try_exists()? {
+        return Ok(());
+    }
+    check_plain_directory(&directory)?;
+    let bound = session
+        .target
+        .as_ref()
+        .context("transition adoption lacks full target")?;
+    let target = packinfo::parse_packinfo(&bound.packinfo)?;
+    let binding = transition_binding(&target, session.original_options.as_ref())?;
+    let owner = session.owner()?;
+    let mut entries = tokio::fs::read_dir(&directory).await?;
+    while let Some(file) = entries.next_entry().await? {
+        if file.path().extension().is_none_or(|ext| ext != "json") {
+            continue;
+        }
+        let mut record = read_transition(&file.path()).await?;
+        if record.schema_version == 2 && record.owner.as_ref() == Some(&owner) {
+            validate_transition(&record, &binding, &target, Some(&owner))?;
+            continue;
+        }
+        if session.producer != Producer::Reconstructed {
+            bail!("unowned legacy transition in current setup; retain original inputs");
+        }
+        let archive = session
+            .archive
+            .as_ref()
+            .context("legacy adoption requires original archive provenance")?;
+        let hash = crate::managers::instance::modpack::origin_check::hash_file_sha512(
+            &root.join(".setup").join(&archive.name),
+        )
+        .await?;
+        if hex::encode(hash) != archive.sha512 {
+            bail!("legacy original archive changed");
+        }
+        if record.schema_version == 2 {
+            let previous = session
+                .adopted_from
+                .as_ref()
+                .context("foreign representation owner has no qualified copy provenance")?;
+            validate_transition(&record, &binding, &target, Some(previous))?;
+        } else {
+            validate_transition(&record, &binding, &target, None)?;
+        }
+        if file.path() != transition_path(root, &record.entry.path) {
+            bail!("legacy transition filename mismatch");
+        }
+        let spelling = bound
+            .sources
+            .get(&record.entry.path)
+            .context("legacy transition has no reconstructed original source")?;
+        if record.disabled != spelling.ends_with(".disabled")
+            && record.entry.action != apply_plan::PlanAction::ReEnable
+        {
+            bail!("legacy transition differs from original source representation");
+        }
+        let manifest = transition_batch(root, &record)
+            .join(transition_key(&record.entry.path))
+            .join("entry.json");
+        let mut initial = record.clone();
+        initial.published = false;
+        initial.completed = false;
+        initial.conflict = false;
+        let mut adopted_initial = initial.clone();
+        adopted_initial.schema_version = 2;
+        adopted_initial.owner = Some(owner.clone());
+        if manifest.try_exists()? {
+            let saved = read_transition(&manifest).await?;
+            if saved != initial && saved != adopted_initial {
+                bail!("legacy immutable recovery manifest does not match its intent");
+            }
+            write_transition(&manifest, &adopted_initial, false).await?;
+            #[cfg(test)]
+            app.instance_manager
+                .test_hooks
+                .pause(
+                    "setup_transition_manifest_saved",
+                    InstanceId(owner.instance_id),
+                )
+                .await;
+        } else if transition_batch(root, &record)
+            .join(transition_key(&record.entry.path))
+            .join("payload")
+            .try_exists()?
+        {
+            bail!("legacy recovery payload has no manifest; retained for recovery");
+        }
+        record.schema_version = 2;
+        record.owner = Some(owner.clone());
+        write_transition(&file.path(), &record, false).await?;
     }
     Ok(())
 }
@@ -1798,7 +2705,11 @@ async fn plan_staging(
     inputs: apply_plan::PlanInputs<'_>,
     root: &Path,
     options: Option<&RepairMarkerFile>,
+    owner: Option<&Owner>,
 ) -> anyhow::Result<Vec<apply_plan::PlanEntry>> {
+    if let Some(owner) = owner {
+        Session::require(root, owner).await?;
+    }
     let directory = root.join(".setup/representation-transitions");
     if !directory.try_exists()? {
         return Ok(apply_plan::plan(inputs)?);
@@ -1815,7 +2726,7 @@ async fn plan_staging(
         let record = read_transition(&file.path()).await.with_context(|| {
             format!("preserved representation record: {}", file.path().display())
         })?;
-        validate_transition(&record, &binding, inputs.target).with_context(|| {
+        validate_transition(&record, &binding, inputs.target, owner).with_context(|| {
             format!("preserved representation record: {}", file.path().display())
         })?;
         if file.path() != transition_path(root, &record.entry.path) {
@@ -1842,7 +2753,10 @@ async fn execute_representation(
     target: &packinfo::PackInfo,
     binding: &(String, String),
     notes: &mut Vec<String>,
+    owner: Option<&Owner>,
 ) -> anyhow::Result<()> {
+    // `owner` binds the transition records. execute_bound_plan has already
+    // checked that it still owns the setup.
     use apply_plan::{PlanAction, PlanReason};
     let path = transition_path(root, &entry.path);
     let bare = root.join("instance").join(
@@ -1854,7 +2768,7 @@ async fn execute_representation(
     let twin = disabled_sibling(&bare);
     let mut record = if path.try_exists()? {
         let record = read_transition(&path).await?;
-        validate_transition(&record, &binding, target)?;
+        validate_transition(&record, &binding, target, owner)?;
         if record.entry.path != entry.path {
             bail!("representation path mismatch");
         }
@@ -1867,7 +2781,8 @@ async fn execute_representation(
             (&bare, &twin)
         };
         let record = RepresentationTransition {
-            schema_version: 1,
+            schema_version: if owner.is_some() { 2 } else { 1 },
+            owner: owner.cloned(),
             target_digest: binding.0,
             options_digest: binding.1,
             recovery_batch: crate::managers::instance::modpack::create_cleanup_batch(root)?,
@@ -1879,7 +2794,12 @@ async fn execute_representation(
             completed: false,
             conflict: false,
         };
-        validate_transition(&record, &transition_binding(target, options)?, target)?;
+        validate_transition(
+            &record,
+            &transition_binding(target, options)?,
+            target,
+            owner,
+        )?;
         ensure_plain_directory(path.parent().unwrap()).await?;
         fsync_dir(&root.join(".setup")).await?;
         write_transition(&path, &record, true).await?;
@@ -1900,6 +2820,7 @@ async fn execute_representation(
     let payload = recovery_entry.join("payload");
     let expected_hex = Some(hex::encode(expected));
     let current = representation_hash(dest).await?;
+    let mut source_changed = false;
     if record.completed {
         // Never collect another live occupant after completion. The payload
         // remains the original file, including later writes through open handles.
@@ -1961,7 +2882,19 @@ async fn execute_representation(
                     .or_else(|| (!record.disabled).then(|| other.clone()))
                     .ok_or_else(|| missing_staged_error(&entry.path))?;
                 tokio::fs::create_dir_all(dest.parent().unwrap()).await?;
-                publish_staged_copy(&source, dest, Some(expected), false).await?;
+                match publish_staged_copy(&source, dest, Some(expected), false).await {
+                    Ok(_) => {}
+                    // The source no longer holds the pack's bytes: an earlier
+                    // attempt linked it into the instance and it was edited
+                    // there in place. Both live files stay as they are.
+                    Err(error) if error.is::<StagedSourceChanged>() => {
+                        tracing::warn!("{error:#}");
+                        source_changed = true;
+                        record.conflict = true;
+                        record.completed = true;
+                    }
+                    Err(error) => return Err(error),
+                }
             }
         }
         if !record.completed {
@@ -2013,7 +2946,9 @@ async fn execute_representation(
         entry.action = PlanAction::Keep;
         entry.reason = PlanReason::PreservedExisting;
         let location = payload.strip_prefix(root).unwrap_or(&payload).display();
-        let note = if payload.try_exists()? {
+        let note = if source_changed {
+            source_changed_note(&entry.path)
+        } else if payload.try_exists()? {
             format!(
                 "Representation conflict preserved for {}; recovery: {location}",
                 entry.path
@@ -2039,12 +2974,26 @@ async fn execute_plan(
     staging: &Path,
     target: &packinfo::PackInfo,
 ) -> anyhow::Result<Vec<apply_plan::PlanEntry>> {
-    execute_bound_plan(entries, root, staging, target, None, &mut Vec::new()).await
+    execute_bound_plan(
+        entries,
+        root,
+        staging,
+        target,
+        None,
+        &mut Vec::new(),
+        None,
+        &Default::default(),
+    )
+    .await
 }
 
 /// Carries out every [`apply_plan::PlanEntry`] against the real filesystem.
 /// Executes fresh decisions and resumes owned representation transitions;
 /// publication collisions and preserved conflicts become actual audit outcomes.
+/// `sources` is what the pre-apply source check found: files an interrupted
+/// earlier attempt already linked, and staged sources that must not be
+/// published because they changed since.
+#[allow(clippy::too_many_arguments)]
 async fn execute_bound_plan(
     entries: &[apply_plan::PlanEntry],
     instance_root: &Path,
@@ -2052,14 +3001,33 @@ async fn execute_bound_plan(
     target: &packinfo::PackInfo,
     options: Option<&RepairMarkerFile>,
     notes: &mut Vec<String>,
+    owner: Option<&Owner>,
+    sources: &session::SourceCheck,
 ) -> anyhow::Result<Vec<apply_plan::PlanEntry>> {
+    #[cfg(not(test))]
+    if owner.is_none() {
+        bail!("live apply requires an admitted setup owner");
+    }
     use apply_plan::{PlanAction, PlanReason};
+    // One full ownership check per apply, not one per file: the caller holds
+    // the instance gate for the whole apply. Before each change a stat of the
+    // record stands in for reloading it.
+    let mut ownership = match owner {
+        Some(owner) => Some(session::OwnershipWatch::begin(instance_root, owner).await?),
+        None => None,
+    };
     // What every representation record binds to: the whole target, so once
     // per apply rather than once per entry.
     let binding = transition_binding(target, options)?;
     let data_path = instance_root.join("instance");
     let mut outcomes = entries.to_vec();
     let mut publications = Publications::new(data_path.clone());
+    // The attempt that linked or moved these may have stopped before its
+    // barrier. Whatever this one plans for them, their staged names go at
+    // commit.
+    for published in &sources.published {
+        publications.published(published);
+    }
     for entry in &mut outcomes {
         // `strip_prefix` rather than `[1..]`: char-boundary-safe (an empty
         // key or one starting with a multibyte character would panic on a
@@ -2100,15 +3068,34 @@ async fn execute_bound_plan(
             entry.reason = PlanReason::InSaveFolder;
         }
         if entry.action != PlanAction::Keep
+            && let Some(ownership) = &mut ownership
+        {
+            ownership.check().await?;
+        }
+        if entry.action != PlanAction::Keep
             && (transition_path(instance_root, &entry.path).try_exists()?
                 || entry.action == PlanAction::ReEnable
                 || entry.action == PlanAction::Replace
                     && resolve_staged(&staged).is_some_and(|(_, disabled)| disabled))
         {
-            execute_representation(entry, instance_root, &staged, target, options, notes).await?;
+            execute_representation(
+                entry,
+                instance_root,
+                &staged,
+                target,
+                &binding,
+                notes,
+                owner,
+            )
+            .await?;
             continue;
         }
-        let expected = target.files.get(&entry.path).map(|h| h.sha512);
+        let pack = target.files.get(&entry.path);
+        let expected = pack.map(|h| h.sha512);
+        let pack_md5 = pack.map(|h| h.md5).unwrap_or_default();
+        // A staged source that changed since the apply started is never
+        // published, whichever action needs it.
+        let changed = sources.changed.contains(&entry.path);
         match entry.action {
             PlanAction::Keep => {}
             PlanAction::Delete => {
@@ -2121,13 +3108,21 @@ async fn execute_bound_plan(
                     !is_disabled,
                     "disabled Replace uses durable representation intent"
                 );
-                publish_staged_copy(
-                    &source,
-                    &live,
-                    Some(expected.context("missing target hash for staged publication")?),
-                    false,
-                )
-                .await?;
+                let publication = if changed {
+                    Publication::SourceChanged
+                } else {
+                    publish_staged(
+                        &source,
+                        &live,
+                        expected.context("missing target hash for staged publication")?,
+                        false,
+                        &mut publications.routes,
+                    )
+                    .await?
+                };
+                publications
+                    .record(entry, publication, &live, pack_md5, notes)
+                    .await?;
             }
             PlanAction::Create => {
                 let (source, is_disabled) =
@@ -2140,34 +3135,46 @@ async fn execute_bound_plan(
                 // destination itself. No-clobber publication closes the
                 // destination race after this twin check.
                 let other = if is_disabled { &live } else { &twin };
-                if other.try_exists()?
-                    || !publish_staged_copy(
+                let publication = if other.try_exists()? {
+                    Publication::Kept
+                } else if changed {
+                    Publication::SourceChanged
+                } else {
+                    publish_staged(
                         &source,
                         dest,
-                        Some(expected.context("missing target hash for staged publication")?),
+                        expected.context("missing target hash for staged publication")?,
                         true,
                         &mut publications.routes,
                     )
                     .await?
-                {
-                    entry.action = PlanAction::Keep;
-                    entry.reason = if other == &twin && twin.exists() {
-                        PlanReason::DisabledByUser
-                    } else {
-                        PlanReason::PreservedExisting
-                    };
+                };
+                let kept = publication == Publication::Kept;
+                publications
+                    .record(entry, publication, dest, pack_md5, notes)
+                    .await?;
+                if kept && other == &twin && twin.exists() {
+                    entry.reason = PlanReason::DisabledByUser;
                 }
             }
             PlanAction::ReplaceDisabled => {
                 let (source, _) =
                     resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
-                publish_staged_copy(
-                    &source,
-                    &twin,
-                    Some(expected.context("missing target hash for staged publication")?),
-                    false,
-                )
-                .await?;
+                let publication = if changed {
+                    Publication::SourceChanged
+                } else {
+                    publish_staged(
+                        &source,
+                        &twin,
+                        expected.context("missing target hash for staged publication")?,
+                        false,
+                        &mut publications.routes,
+                    )
+                    .await?
+                };
+                publications
+                    .record(entry, publication, &twin, pack_md5, notes)
+                    .await?;
             }
             PlanAction::ReEnable => unreachable!("ReEnable uses durable representation intent"),
         }
@@ -2250,6 +3257,7 @@ async fn apply_bound_cleanup(
     root: &Path,
     insensitive: bool,
     context: Option<&crate::managers::instance::modpack::PackProofContext>,
+    owner: Option<&Owner>,
 ) -> CleanupReport {
     use crate::managers::instance::modpack::origin_check::hash_file_sha512;
     let mut report = CleanupReport::default();
@@ -2304,11 +3312,51 @@ async fn apply_bound_cleanup(
         .notes
         .push(format!("Cleanup recovery: .repair-recovery/{batch_name}/"));
     let data = root.join("instance");
-    let Ok(canonical_data) = tokio::fs::canonicalize(&data).await else {
-        return report;
+    // Containment is checked on resolved paths; without one nothing is moved.
+    let canonical_data = match tokio::fs::canonicalize(&data).await {
+        Ok(canonical) => canonical,
+        Err(error) => {
+            tracing::warn!(
+                "skipping repair cleanup: could not resolve the instance data folder {}: {error}",
+                data.display()
+            );
+            report.notes.push(format!(
+                "Cleanup skipped: the instance data folder path could not be resolved: {error}"
+            ));
+            return report;
+        }
     };
     let deletable = walk_untracked_files(&data, old, target, insensitive).await;
+    #[cfg(not(test))]
+    if owner.is_none() {
+        report
+            .notes
+            .push("Cleanup preserved: no admitted setup owner".into());
+        return report;
+    }
+    // Checked in full once; before each selection a stat of the record
+    // stands in for reloading it, as in execute_bound_plan.
+    let mut ownership = match owner {
+        Some(owner) => match session::OwnershipWatch::begin(root, owner).await {
+            Ok(watch) => Some(watch),
+            Err(error) => {
+                report.notes.push(format!(
+                    "Cleanup preserved: setup ownership changed: {error:#}"
+                ));
+                return report;
+            }
+        },
+        None => None,
+    };
     for selection in &options.cleanup_selections {
+        if let Some(ownership) = &mut ownership
+            && let Err(error) = ownership.check().await
+        {
+            report.notes.push(format!(
+                "Cleanup preserved: setup ownership changed: {error:#}"
+            ));
+            break;
+        }
         let key = &selection.path;
         let mut expected = [0u8; 64];
         if normalize_cleanup_path(key).as_ref() != Some(key)

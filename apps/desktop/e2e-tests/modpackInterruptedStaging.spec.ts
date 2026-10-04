@@ -54,9 +54,22 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
  * not equally reachable from a test.
  *
  * The **download** phase is seconds wide for a 28 MiB pack, so test 1 simply
- * waits for `.setup/staging` to start filling and `SIGKILL`s the core. That is
- * a genuine crash — no cleanup, no graceful shutdown — and it produces the
- * interrupted state rather than imitating it.
+ * waits for the download directory to start filling and `SIGKILL`s the core.
+ * That is a genuine crash — no cleanup, no graceful shutdown — and it produces
+ * the interrupted state rather than imitating it.
+ *
+ * The download directory is **not** `.setup/staging`. `process_modpack`
+ * downloads and extracts into a private `.setup/preparing-<uuid>/` and only
+ * renames the finished tree to `.setup/staging` once every file is in and the
+ * setup record is bound (`run/modpack.rs`, `staging_dir` and the
+ * `live_staging` rename). So `.setup/staging` never fills gradually: it
+ * appears complete, and on a version change that reuses most of its mods it
+ * is applied and swept a few hundred milliseconds later. Polling it once a
+ * second missed that window outright ("never began filling", received 0),
+ * and when it did catch it the crash landed *after* the download, so the
+ * test no longer interrupted what its title says. Test 1 therefore polls
+ * `preparing-*` every 100 ms, and asserts after the crash that a
+ * `preparing-*` survived and `staging/` never appeared.
  *
  * The **apply** phase is one md5 pass plus a handful of renames. Racing it
  * would be flaky, and `retries: 0` (`playwright.config.ts`) turns flaky into a
@@ -125,12 +138,53 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
  *      misclassification set comes back empty.
  */
 
-/** How long the staging directory is given to start filling before the test
+/** How long the download directory is given to start filling before the test
  *  gives up on having anything to interrupt. */
 const STAGING_FILL_TIMEOUT = 120_000
 
-/** How long the resumed change is given to complete after the relaunch: a
- *  full re-download of a 28 MiB pack plus the apply. */
+/** The `.setup/preparing-<uuid>` directories a pack is downloaded into before
+ *  being renamed to `.setup/staging` (see the module doc comment). */
+async function listPreparingDirs(setupDir: string): Promise<string[]> {
+  try {
+    return (await fs.promises.readdir(setupDir)).filter((n) =>
+      n.startsWith("preparing-")
+    )
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return []
+    throw err
+  }
+}
+
+/** Regular files downloaded or extracted so far under every
+ *  `preparing-*` /instance. Counts without reading, since files are still
+ *  being written, and treats a directory vanishing mid-walk (the rename to
+ *  `staging/`) as empty: a throw would end `expect.poll` on the spot. */
+async function countPreparingFiles(setupDir: string): Promise<number> {
+  const walk = async (dir: string): Promise<number> => {
+    const entries = await fs.promises
+      .readdir(dir, { withFileTypes: true })
+      .catch((err: NodeJS.ErrnoException) => {
+        if (err.code === "ENOENT") return null
+        throw err
+      })
+    if (!entries) return 0
+    let count = 0
+    for (const entry of entries) {
+      if (entry.isDirectory()) count += await walk(path.join(dir, entry.name))
+      else if (entry.isFile()) count += 1
+    }
+    return count
+  }
+  let total = 0
+  for (const name of await listPreparingDirs(setupDir)) {
+    total += await walk(path.join(setupDir, name, "instance"))
+  }
+  return total
+}
+
+/** How long the resumed change is given to complete after the relaunch: the
+ *  downloads the crash cut short (the files it finished are reused from its
+ *  `preparing-*`), plus the apply. Sized for a full 28 MiB re-download. */
 const RESUME_TIMEOUT = 300_000
 
 test.describe("modpack interrupted staging", () => {
@@ -186,14 +240,19 @@ test.describe("modpack interrupted staging", () => {
         await page.click(byTestId(TEST_IDS.instanceSettingsChangeVersion))
         await pickModpackVersionAndConfirm(page, MODPACK_MR_V_NEW)
 
-        // Wait for the staging tree to start filling. Seconds wide for this
-        // pack, unlike the apply window — see the module doc comment.
+        // Wait for the download directory to start filling. Seconds wide for
+        // this pack, unlike the apply window, but only a couple of seconds on
+        // a version change that reuses most mods — hence the 100 ms interval.
+        // See the module doc comment for why this is `preparing-*`, not
+        // `staging/`.
         await expect
-          .poll(async () => (await snapshotTree(stagingDir)).size, {
+          .poll(() => countPreparingFiles(setupDir), {
             timeout: STAGING_FILL_TIMEOUT,
+            intervals: [100],
             message:
-              "the staging directory never began filling, so there was nothing " +
-              "to interrupt — the version change may have failed outright"
+              "the download directory (`.setup/preparing-*`) never began " +
+              "filling, so there was nothing to interrupt — the version change " +
+              "may have failed outright"
           })
           .toBeGreaterThan(2)
 
@@ -216,6 +275,18 @@ test.describe("modpack interrupted staging", () => {
         expect(
           fs.existsSync(path.join(setupDir, "modpack-complete")),
           "the pipeline reported itself complete despite being killed mid-download"
+        ).toBe(false)
+        // The crash really landed in the download, not after it: the private
+        // download directory is still there and was never promoted.
+        expect(
+          (await listPreparingDirs(setupDir)).length,
+          "no `.setup/preparing-*` survived the crash, so it landed after the " +
+            "download had finished — this run did not interrupt a download"
+        ).toBeGreaterThan(0)
+        expect(
+          fs.existsSync(stagingDir),
+          "`.setup/staging` existed when the core was killed, so the download " +
+            "had already finished — this run did not interrupt a download"
         ).toBe(false)
         expect(
           (await readInstanceConfig(root)).modpack?.modrinthVersionId,

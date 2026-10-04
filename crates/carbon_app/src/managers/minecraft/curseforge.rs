@@ -103,6 +103,99 @@ pub async fn download_modpack_zip(
     Ok(())
 }
 
+type PreparationMetadata = (
+    daedalus::minecraft::VersionManifest,
+    HashMap<i32, curseforge::ClassId>,
+    HashMap<i32, File>,
+);
+
+async fn preparation_metadata(
+    app: &App,
+    manifest: &curseforge::manifest::Manifest,
+    _zip_path: &Path,
+) -> anyhow::Result<PreparationMetadata> {
+    #[cfg(test)]
+    if let Some(value) = preparation_fixture::get(_zip_path) {
+        return Ok((
+            serde_json::from_value(value["minecraft"].clone())?,
+            serde_json::from_value(value["classes"].clone())?,
+            serde_json::from_value(value["files"].clone())?,
+        ));
+    }
+    let mc_manifest = app.minecraft_manager().get_minecraft_manifest().await?;
+    let cf_manager = &app.modplatforms_manager().curseforge;
+    let addons = cf_manager
+        .get_mods(ModsParameters {
+            body: ModsParametersBody {
+                mod_ids: manifest
+                    .files
+                    .iter()
+                    .map(|file| file.project_id)
+                    .collect::<Vec<_>>(),
+            },
+        })
+        .await?
+        .data
+        .into_iter()
+        .map(|addon| {
+            (
+                addon.id,
+                addon.class_id.unwrap_or(curseforge::ClassId::Mods),
+            )
+        })
+        .collect::<HashMap<_, _>>();
+
+    let manifest_files = manifest
+        .files
+        .iter()
+        .map(|file| file.file_id)
+        .collect::<Vec<_>>();
+
+    let all_addons = if manifest_files.len() > 0 {
+        // curseforge returns 400 bad response if file_ids is empty
+        app.modplatforms_manager()
+            .curseforge
+            .get_files(curseforge::filters::FilesParameters {
+                body: curseforge::filters::FilesParametersBody {
+                    file_ids: manifest_files,
+                },
+            })
+            .await?
+            .data
+            .into_iter()
+            .map(|file| (file.id, file))
+            .collect::<HashMap<_, _>>()
+    } else {
+        HashMap::new()
+    };
+
+    Ok((mc_manifest, addons, all_addons))
+}
+
+#[cfg(test)]
+pub(crate) mod preparation_fixture {
+    use std::{
+        collections::HashMap,
+        path::{Path, PathBuf},
+        sync::{LazyLock, Mutex},
+    };
+    static VALUES: LazyLock<Mutex<HashMap<PathBuf, serde_json::Value>>> =
+        LazyLock::new(|| Mutex::new(HashMap::new()));
+    pub(crate) struct Guard(PathBuf);
+    impl Drop for Guard {
+        fn drop(&mut self) {
+            VALUES.lock().unwrap().remove(&self.0);
+        }
+    }
+    pub(crate) fn set(path: PathBuf, value: serde_json::Value) -> Guard {
+        VALUES.lock().unwrap().insert(path.clone(), value);
+        Guard(path)
+    }
+    pub(super) fn get(path: &Path) -> Option<serde_json::Value> {
+        VALUES.lock().unwrap().get(path).cloned()
+    }
+}
+
 /// Given the path to an addon zip file, prepares the list of downloadables and the manifest
 /// for the modpack.
 #[tracing::instrument(skip(app, packinfo, t_addon_metadata, progress_percentage_sender))]
@@ -130,61 +223,11 @@ pub async fn prepare_modpack_from_zip(
     })
     .await??;
 
-    let mc_manifest = Arc::new(app.minecraft_manager().get_minecraft_manifest().await?);
-
+    let (mc_manifest, addons, all_addons) = preparation_metadata(app, &manifest, zip_path).await?;
+    let mc_manifest = Arc::new(mc_manifest);
     let mc_version = manifest.minecraft.version.clone();
-
     let downloadables = {
         let mut downloadables = Vec::new();
-
-        let cf_manager = &app.modplatforms_manager().curseforge;
-        let addons = Arc::new(
-            cf_manager
-                .get_mods(ModsParameters {
-                    body: ModsParametersBody {
-                        mod_ids: manifest
-                            .files
-                            .iter()
-                            .map(|file| file.project_id)
-                            .collect::<Vec<_>>(),
-                    },
-                })
-                .await?
-                .data
-                .into_iter()
-                .map(|addon| {
-                    (
-                        addon.id,
-                        addon.class_id.unwrap_or(curseforge::ClassId::Mods),
-                    )
-                })
-                .collect::<HashMap<_, _>>(),
-        );
-
-        let manifest_files = manifest
-            .files
-            .iter()
-            .map(|file| file.file_id)
-            .collect::<Vec<_>>();
-
-        let all_addons = if manifest_files.len() > 0 {
-            // curseforge returns 400 bad response if file_ids is empty
-            app.modplatforms_manager()
-                .curseforge
-                .get_files(curseforge::filters::FilesParameters {
-                    body: curseforge::filters::FilesParametersBody {
-                        file_ids: manifest_files,
-                    },
-                })
-                .await?
-                .data
-                .into_iter()
-                .map(|file| (file.id, file))
-                .collect::<HashMap<_, _>>()
-        } else {
-            HashMap::new()
-        };
-
         for file in &manifest.files {
             let mod_id = file.project_id;
             let file_id = file.file_id;

@@ -13,6 +13,7 @@ import type { Procedures } from "@gd/core_module"
 import { toast } from "@gd/ui"
 import { i18n } from "@gd/i18n"
 import { dispatchBannedEvent } from "./bannedEventBridge"
+import { errorToastCopyAction } from "./errorToastCopyAction"
 import { NETWORK_ERROR_RE, THROTTLE_ERROR_RE } from "./errorClassification"
 import {
   dispatchMemoryWarningEvent,
@@ -26,6 +27,15 @@ import {
   recoveredServerRefusalKey,
   type RecoveredServerRefusal
 } from "./recoveredServer"
+import {
+  parseRspcErrorPayload,
+  presentedGlobally,
+  type GloballyPresentedCode,
+  type ParsedRspcError,
+  type RspcErrorCause
+} from "./rspcErrorText"
+
+export { extractErrorDisplay } from "./rspcErrorText"
 
 // ---------------------------------------------------------------------------
 // Procedure type utilities
@@ -131,133 +141,75 @@ function showDedupedErrorToast(display: string, source: "query" | "mutation") {
   // The full technical error is what users need when reporting a bug, but a
   // friendly network/throttle toast hides it behind a generic message. Offer a
   // one-click copy of the raw `display` regardless of how the toast is worded.
-  const copyAction = {
-    label: i18n.t("general:_trn_copy") || "Copy",
-    onClick: () => {
-      navigator.clipboard
-        .writeText(display)
-        .then(() =>
-          toast.success(
-            i18n.t("general:_trn_general_copied_to_clipboard") ||
-              "Copied to clipboard"
-          )
-        )
-        .catch(() => {})
-    }
-  }
-
   toast.error(message, {
-    action: copyAction,
+    action: errorToastCopyAction(display),
     ...(description && { description })
   })
-}
-
-// ---------------------------------------------------------------------------
-// rspc error parsing
-//
-// rspc wraps errors as {code, message} where message is a JSON string
-// containing {cause, backtrace}. `parseRspcErrorPayload` is the one place
-// that shape gets parsed; both the global toast handler below and any UI
-// that needs the same clean text (via `extractErrorDisplay`) route through
-// it so they can never drift out of sync with each other.
-// ---------------------------------------------------------------------------
-
-interface RspcErrorCause {
-  display: string
-  code?: string
-  data?: unknown
-}
-
-interface ParsedRspcError {
-  code?: number
-  message?: string
-  cause?: RspcErrorCause[]
-  /** Set only when the payload parsed to valid JSON that isn't the expected
-   *  `{cause}`/`{message}` shape (e.g. the bare literal `"null"`, a number,
-   *  a string). Carries the untouched raw text so callers still have
-   *  something to show instead of crashing on the missing fields. */
-  display?: string
-}
-
-function parseRspcErrorPayload(raw: string): ParsedRspcError | undefined {
-  let parsed: ParsedRspcError
-  try {
-    parsed = JSON.parse(raw) as ParsedRspcError
-  } catch {
-    return undefined
-  }
-
-  if (parsed == null || typeof parsed !== "object") {
-    return { display: raw }
-  }
-
-  // rspc wraps errors as {code, message} where message is a JSON string containing {cause, backtrace}
-  if (parsed.message && !parsed.cause) {
-    try {
-      const inner = JSON.parse(parsed.message) as { cause?: RspcErrorCause[] }
-      if (inner.cause) {
-        parsed = inner
-      }
-    } catch {
-      // message wasn't JSON, keep parsed as-is
-    }
-  }
-
-  return parsed
-}
-
-/** Extracts a short, human-readable message from an rspc error (or any
- *  thrown value): the first cause's `display` when the rspc {cause,
- *  backtrace} payload parses, else the parsed payload's own `message`, else
- *  its raw fallback `display` text, else the error's `message`, else its
- *  stringified form. Callers that render an error inline (rather than
- *  relying on the global toast below) should use this instead of
- *  `error.message` — the raw rspc error message can carry a full backend
- *  backtrace. */
-export function extractErrorDisplay(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error)
-  const parsed = parseRspcErrorPayload(message)
-  return (
-    parsed?.cause?.[0]?.display ?? parsed?.message ?? parsed?.display ?? message
-  )
 }
 
 // ---------------------------------------------------------------------------
 // Global error handler shared by every query and mutation cache entry
 // ---------------------------------------------------------------------------
 
+// How this handler presents each coded cause in GLOBALLY_PRESENTED. Keyed by
+// that table, so a code is presented here exactly when a mutation's own
+// failure toast (mutationErrorToast.ts) stays quiet for it.
+const globalPresenters: Record<
+  GloballyPresentedCode,
+  (
+    cause: RspcErrorCause,
+    parsed: ParsedRspcError,
+    source: "query" | "mutation"
+  ) => void
+> = {
+  ACCOUNT_BANNED: () => dispatchBannedEvent(),
+  INSUFFICIENT_MEMORY: (cause) =>
+    dispatchMemoryWarningEvent(cause.data as InsufficientMemoryData),
+  EULA_NOT_ACCEPTED: (cause) =>
+    dispatchServerEulaEvent(cause.data as ServerEulaData),
+  // A server's record from an earlier session refused the action: say so in
+  // the user's language and send them to the server page, which has the way
+  // out. `|| display` covers a kind this build does not know, and i18n not
+  // being ready yet.
+  SERVER_RECOVERED_PROCESS: (cause, parsed, source) => {
+    const key = recoveredServerRefusalKey(cause.data)
+    const pid = (cause.data as RecoveredServerRefusal | undefined)?.pid
+    const display =
+      (key && i18n.t(key, { pid })) ||
+      cause.display ||
+      parsed.cause?.[0]?.display
+    if (display) showDedupedErrorToast(display, source)
+  }
+}
+
 // Exported for unit testing (see rspcClient.test.ts) — not meant to be
 // called from application code, which reaches this only through the
-// QueryCache/MutationCache `onError` wiring below.
-export function handleGlobalError(error: Error, source: "query" | "mutation") {
+// QueryCache/MutationCache `onError` wiring below. `localToast` is set for a
+// mutation that shows its own failure toast (see mutationErrorToast.ts): the
+// plain cause is then left to that toast, and only the codes this handler
+// presents itself are handled here.
+export function handleGlobalError(
+  error: Error,
+  source: "query" | "mutation",
+  localToast = false
+) {
   console.error("RSPC error:", error)
 
   const parsed = parseRspcErrorPayload(error.message)
   if (!parsed) {
-    showDedupedErrorToast(error.message, source)
+    if (!localToast) showDedupedErrorToast(error.message, source)
     return
   }
 
+  // A coded cause is presented only through `globalPresenters`; any other
+  // code is left to the caller.
   const errorCause = parsed.cause?.find((c) => c.code)
-  const errorCode = errorCause?.code
-  const hasCustomCode = !!errorCode
-
-  if (errorCode === "ACCOUNT_BANNED") {
-    dispatchBannedEvent()
+  if (presentedGlobally(errorCause)) {
+    globalPresenters[errorCause.code](errorCause, parsed, source)
     return
   }
 
-  if (errorCode === "INSUFFICIENT_MEMORY" && errorCause?.data) {
-    dispatchMemoryWarningEvent(errorCause.data as InsufficientMemoryData)
-    return
-  }
-
-  if (errorCode === "EULA_NOT_ACCEPTED" && errorCause?.data) {
-    dispatchServerEulaEvent(errorCause.data as ServerEulaData)
-    return
-  }
-
-  if (hasCustomCode) {
+  if (errorCause || localToast) {
     return
   }
 
@@ -279,7 +231,12 @@ export const queryClient = new QueryClient({
     onError: (error) => handleGlobalError(error, "query")
   }),
   mutationCache: new MutationCache({
-    onError: (error) => handleGlobalError(error, "mutation")
+    onError: (error, _variables, _result, mutation) =>
+      handleGlobalError(
+        error,
+        "mutation",
+        mutation.meta?.localErrorToast === true
+      )
   }),
   defaultOptions: {
     queries: {

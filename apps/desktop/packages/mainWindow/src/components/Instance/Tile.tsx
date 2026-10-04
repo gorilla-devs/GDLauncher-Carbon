@@ -284,7 +284,7 @@ const Tile = (props: Props) => {
               </ContextMenuItem>
               <ContextMenuSeparator />
               <ContextMenuSub>
-                <ContextMenuSubTrigger>
+                <ContextMenuSubTrigger data-testid="instance-context-more">
                   {t("instances:_trn_more_options")}
                 </ContextMenuSubTrigger>
                 <ContextMenuPortal>
@@ -330,6 +330,7 @@ const Tile = (props: Props) => {
                     )}
                     <ContextMenuItem
                       class="flex items-center gap-2"
+                      data-testid="instance-context-repair"
                       onClick={() => {
                         modalsContext?.openModal(
                           { name: "repairModpack" },

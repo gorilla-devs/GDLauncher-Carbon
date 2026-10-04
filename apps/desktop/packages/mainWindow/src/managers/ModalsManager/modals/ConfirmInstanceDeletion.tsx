@@ -1,7 +1,11 @@
 import { rspc, queryClient } from "@/utils/rspcClient"
+import {
+  LOCAL_ERROR_TOAST,
+  toastMutationError
+} from "@/utils/mutationErrorToast"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, toast } from "@gd/ui"
+import { Button } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
 
@@ -28,10 +32,9 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
 
       navigator.navigate("/library")
     },
+    meta: LOCAL_ERROR_TOAST,
     onError: (error) => {
-      toast.error(t("notifications:_trn_cannot_delete_instance"), {
-        description: error.message
-      })
+      toastMutationError(t("notifications:_trn_cannot_delete_instance"), error)
     }
   }))
 
@@ -43,10 +46,9 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
       })
       navigator.navigate("/library?mode=servers")
     },
+    meta: LOCAL_ERROR_TOAST,
     onError: (error) => {
-      toast.error(t("notifications:_trn_cannot_delete_instance"), {
-        description: error.message
-      })
+      toastMutationError(t("notifications:_trn_cannot_delete_server"), error)
     }
   }))
 

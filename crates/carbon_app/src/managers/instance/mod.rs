@@ -564,6 +564,20 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     }
                 }
 
+                // A setup replacement a crash interrupted takes effect (or
+                // goes) before anything reads this instance's setup.
+                // Replacements are written under the instance gate, which
+                // this scan holds for a known instance, so none is being
+                // written.
+                if tokio::fs::symlink_metadata(&path)
+                    .await
+                    .is_ok_and(|metadata| metadata.is_dir())
+                {
+                    if let Err(error) = modpack::session::settle_replacement(&path).await {
+                        tracing::warn!(?error, "unfinished setup replacement left as is");
+                    }
+                }
+
                 let Some(mut instance) = self
                     .scan_instance(shortpath.clone(), path.clone(), cached.as_ref())
                     .await?
@@ -2139,6 +2153,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         F: FnOnce(PathBuf) -> I,
         I: Future<Output = anyhow::Result<()>>,
     {
+        let _runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit("create/import instance setup")?;
         trace!("Creating instance");
 
         let tmpdir = self
@@ -2218,6 +2236,39 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         trace!("Running extended instance initializer");
         initializer(tmpdir.to_path_buf()).await?;
         trace!("Finished extended instance initializer");
+        // Only this private producer knows that an empty setup really means a
+        // version-only install. A scanner or copied root cannot infer it.
+        let imported_complete = setup_path.join("modpack-complete").try_exists()?;
+        let archive = ["curseforge", "modrinth", "gdlpack"]
+            .iter()
+            .any(|name| setup_path.join(name).is_file());
+        let kind = if imported_complete {
+            modpack::session::Kind::ImportedComplete
+        } else if archive || info.modpack.is_some() {
+            modpack::session::Kind::Pack
+        } else {
+            modpack::session::Kind::VersionOnly
+        };
+        let mut setup_session = modpack::session::Session::new(
+            &info,
+            if imported_complete || archive {
+                modpack::session::Producer::Import
+            } else {
+                modpack::session::Producer::Create
+            },
+            kind,
+            None,
+        )?;
+        setup_session.requested_pack =
+            match tokio::fs::read_to_string(setup_path.join("change-pack-version.json")).await {
+                Ok(text) => Some(text),
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
+                Err(error) => return Err(error.into()),
+            };
+        if imported_complete {
+            setup_session.phase = modpack::session::Phase::Committed;
+        }
+        setup_session.create(&tmpdir).await?;
 
         tokio::fs::create_dir_all(
             self.app
@@ -2244,6 +2295,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let id = self
             .add_instance(name.clone(), shortpath.clone(), group)
             .await?;
+
+        // Registration may survive a crash before this write. Such an unbound
+        // record remains recoverable; scanners never grant it the current ID.
+        setup_session.bind_private(&path, id).await?;
 
         trace!("Adding instance to instances list");
 
@@ -2281,6 +2336,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self,
         update: domain::InstanceSettingsUpdate,
     ) -> anyhow::Result<Option<VisualTaskId>> {
+        let runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit(format!("instance {} settings", update.instance_id))?;
         let _instance_guard = self.lock_instance(update.instance_id).await;
 
         // Snapshot only after taking ownership; disk writes never hold the map.
@@ -2295,6 +2354,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 bail!("cannot update an instance that is being deleted");
             }
 
+            let changes_root_or_version = update
+                .name
+                .as_ref()
+                .is_some_and(|name| name != &data.config.name)
+                || update.version.is_some()
+                || update.modloader.is_some();
+            if changes_root_or_version && !matches!(data.state, LaunchState::Inactive { .. }) {
+                bail!(
+                    "cannot rename or reinstall while this instance is queued, preparing or running"
+                );
+            }
             let path = self
                 .app
                 .settings_manager()
@@ -2311,6 +2381,96 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             )
             // Read guard released here - other instances can now operate
         };
+
+        // A new version or loader choice replaces a pending setup that only
+        // waits for its game version install (an unfinished or failed
+        // version-only install of a new, edited or imported instance,
+        // including one 2.0.40 left without a record, or a pack whose files
+        // are fully installed, whether this instance installed it, the
+        // instance a duplicate copied it from did, or 2.0.40 did and left no
+        // record): it holds nothing the new choice could lose, as in 2.0.40.
+        // Checked before instance.json is written, so a refusal changes
+        // nothing.
+        const WAITS_FOR_SETUP: &str = "This instance has an unfinished install or update. Press Play to finish it before changing the game version or loader.";
+        let changes_version = update.version.is_some() || update.modloader.is_some();
+        if changes_version {
+            // A replacement whose publication failed (see
+            // `settle_replacement`) is the pending setup: publish it first,
+            // under the gate, so the check below sees it. One that still
+            // can't be published is waited for like any pending setup.
+            modpack::session::settle_replacement(&path)
+                .await
+                .context(WAITS_FOR_SETUP)?;
+        }
+        let mut supersede = false;
+        if changes_version && path.join(".setup").try_exists()? {
+            let mut pending =
+                modpack::session::Session::load_or_adopt_legacy(&path, update.instance_id, &config)
+                    .await
+                    .with_context(|| {
+                        mods::unreadable_setup_refusal(&config, mods::PendingChange::GameVersion)
+                    })?;
+            if let Some(found) = &mut pending {
+                // A content-free record that is not this instance's own (a
+                // duplicate copied it, it was written before the instance had
+                // an id, or the folder kept it from an earlier registration,
+                // such as before a database reset) becomes this instance's
+                // own first, as Play would make it, so the instance is not
+                // stuck repeating an install that failed before.
+                if found.binds_to(update.instance_id)
+                    && found
+                        .supersedable_once_continued(&path, update.instance_id)
+                        .await
+                        .unwrap_or_else(|error| {
+                            tracing::warn!(?error, "copied setup cannot be verified");
+                            false
+                        })
+                {
+                    match found.qualify_copy(&path, update.instance_id).await {
+                        Ok(qualified) => *found = qualified,
+                        Err(error) => {
+                            tracing::warn!(?error, "copied setup cannot be continued")
+                        }
+                    }
+                }
+                supersede = found
+                    .supersedable(&path, update.instance_id)
+                    .await
+                    .unwrap_or_else(|error| {
+                        tracing::warn!(?error, "pending setup cannot be verified");
+                        false
+                    })
+                    || found
+                        .copied_pack_installed(&path, update.instance_id)
+                        .await
+                        .unwrap_or_else(|error| {
+                            tracing::warn!(?error, "copied pack setup cannot be verified");
+                            false
+                        });
+            } else {
+                supersede = modpack::session::legacy_pack_applied(&path)
+                    .await
+                    .unwrap_or_else(|error| {
+                        tracing::warn!(?error, "legacy pack setup cannot be verified");
+                        false
+                    });
+            }
+            if !supersede {
+                let refusal = mods::pending_setup_refusal(
+                    &path,
+                    update.instance_id,
+                    &config,
+                    pending.as_ref(),
+                    mods::PendingChange::GameVersion,
+                )
+                .await
+                .unwrap_or_else(|error| {
+                    tracing::warn!(?error, "pending setup cannot be described");
+                    WAITS_FOR_SETUP.into()
+                });
+                bail!("{refusal}");
+            }
+        }
 
         #[cfg(test)]
         self.test_hooks.pause("settings", update.instance_id).await;
@@ -2509,14 +2669,25 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .invalidate(INSTANCE_DETAILS, Some(update.instance_id.0.into()));
 
         if need_reinstall {
-            let setup = path.join(".setup");
-            tokio::fs::create_dir_all(&setup)
-                .await
-                .context("writing incomplete instance marker")?;
-
-            drop(_instance_guard);
+            let request = modpack::session::Request {
+                producer: modpack::session::Producer::Settings,
+                kind: modpack::session::Kind::VersionOnly,
+                files: Vec::new(),
+                options: None,
+                // Preparation retires the superseded setup under this same gate.
+                reset: supersede,
+                replaces: None,
+            };
             let (_handle, task_id) = self
-                .prepare_game(InstanceId(*update.instance_id), None, None, true)
+                .prepare_game_admitted(
+                    update.instance_id,
+                    None,
+                    None,
+                    true,
+                    _instance_guard,
+                    runtime_activity,
+                    Some(request),
+                )
                 .await?;
             return Ok(Some(task_id));
         }
@@ -2532,7 +2703,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         prepared: info::Instance,
         original_modpack: Option<info::ModpackInfo>,
     ) -> anyhow::Result<()> {
-        let _operation = self.lock_instance(instance_id).await;
+        let operation = self.lock_instance(instance_id).await;
+        self.publish_modpack_config_owned(&operation, prepared, original_modpack)
+            .await
+    }
+
+    async fn publish_modpack_config_owned(
+        self,
+        operation: &InstanceOperationGuard,
+        prepared: info::Instance,
+        original_modpack: Option<info::ModpackInfo>,
+    ) -> anyhow::Result<()> {
+        let instance_id = operation.instance_id();
         let (shortpath, mut config) = self.current_config(instance_id).await?;
         let current_identity = config.modpack.as_ref().map(|pack| &pack.modpack);
         let original_identity = original_modpack.as_ref().map(|pack| &pack.modpack);
@@ -2814,6 +2996,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         instance_id: InstanceId,
         name: String,
     ) -> anyhow::Result<InstanceId> {
+        let _runtime_activity = self
+            .app
+            .runtime_lifecycle
+            .admit(format!("duplicate instance {instance_id}"))?;
         let _operation = self.lock_instance(instance_id).await;
         // First snapshot what we need from `instances` under a read lock and
         // release it before the long fs copy. Holding `instances` across the
@@ -2825,6 +3011,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 .get(&instance_id)
                 .ok_or(InvalidInstanceIdError(instance_id))?;
             let data = instance.data()?;
+            if matches!(
+                data.state,
+                LaunchState::Queued(_) | LaunchState::Preparing(_)
+            ) {
+                bail!("wait for active setup before duplicating the instance");
+            }
+
             if matches!(data.state, LaunchState::Deleting) {
                 bail!("cannot duplicate an instance that is being deleted");
             }
@@ -2907,6 +3100,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 GroupId(group_id),
             )
             .await?;
+
+        if let Some(mut session) = modpack::session::Session::load(&new_path).await? {
+            // This is provenance of the copy, not authority to run it. The
+            // source owner remains until original-input qualification finishes.
+            session.copied_to = Some(id.0);
+            modpack::session::atomic_json(
+                &new_path.join(".setup").join(modpack::session::RECORD),
+                &session,
+                false,
+            )
+            .await?;
+        }
 
         // Only now reacquire the write lock to insert the new entry.
         let mut instances = self.instances.write().await;

@@ -15,6 +15,7 @@
   "_trn_unpair_instance": "インスタンスの紐付け解除",
   "_trn_notification": "通知",
   "_trn_confirm_instance_deletion": "インスタンス削除の確認",
+  "_trn_repair_modpack": "Modパックを修復",
   "_trn_confirm_reinstall": "Modパックを再インストール",
   "_trn_confirm_batch_instance_deletion": "インスタンスを削除",
   "_trn_confirm_batch_server_deletion": "サーバーを削除",

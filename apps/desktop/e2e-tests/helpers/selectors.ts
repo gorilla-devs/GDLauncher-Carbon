@@ -60,6 +60,11 @@ export const TEST_IDS = Object.freeze({
   instanceTile: "instance-tile",
   instancePlay: "instance-play",
   instanceContextDelete: "instance-context-delete",
+  /** The tile context menu's "More options" submenu trigger
+   *  (components/Instance/Tile.tsx); hover it to mount the entries below. */
+  instanceContextMore: "instance-context-more",
+  /** Repair, inside the tile's "More options" submenu. */
+  instanceContextRepair: "instance-context-repair",
   confirmInstanceDeletion: "confirm-instance-deletion",
   // Generic close (X) rendered by ModalLayout's header — present on every
   // modal that doesn't opt out with `noHeader`. Used here to dismiss the
@@ -269,6 +274,17 @@ export const TEST_IDS = Object.freeze({
    *  opened (`instanceMenuTrigger`) before this resolves. */
   instanceMenuRepair: "instance-menu-repair",
   repairModpackConfirm: "repair-modpack-confirm",
+  /** The Repair dialog's block for an unfinished install or update
+   *  (`RepairModpack/index.tsx`), shown instead of nothing pending. */
+  repairPendingSetup: "repair-pending-setup",
+  /** The Repair dialog's note that Repair waits while the instance is
+   *  launching, running or being deleted (`RepairModpack/index.tsx`), shown
+   *  with Confirm disabled when nothing is pending. On a plain `<p>`. */
+  repairBusy: "repair-busy",
+  /** "Cancel it and keep the installed version" in that block, shown only
+   *  for a change that never started applying (`can_cancel`). On a `@gd/ui`
+   *  `Button`. */
+  repairCancelPending: "repair-cancel-pending",
   /** The repair preview's counts block (`RepairModpack/index.tsx`) — one
    *  `<div>` per non-zero `RepairCounts` bucket (modified/deleted/unchanged/
    *  disabled-kept/re-enabled), each holding the translated, `{{count}}`-

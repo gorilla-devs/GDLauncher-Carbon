@@ -130,6 +130,57 @@ const RepairModpack = (props: ModalProps) => {
     }
   }
 
+  // An unfinished install or update never blocks Repair: Confirm discards
+  // it (the core keeps it as `.setup-cancelled-*`) and reinstalls the pack.
+  // The core only discards the setup this status showed (`expected_pending`).
+  const pendingSetup = rspc.createQuery(() => ({
+    queryKey: ["instance.getPendingSetup", instanceId()],
+    enabled: !isServer(),
+    refetchInterval: 2000
+  }))
+  const pending = () => !isServer() && !!pendingSetup.data?.pending
+  // The instance is being installed, launched, run or deleted: the core
+  // refuses Repair (and Cancel or Resume) until it stops, so the dialog says
+  // so and offers nothing to click.
+  const busy = () => !isServer() && !!pendingSetup.data?.busy
+  // An install or update still running: nothing to discard or preview yet.
+  const installing = () => pending() && busy()
+  // The setup may have changed installed files, so the installed record
+  // can't predict what Repair changes: no preview, no file selection.
+  const previewWithheld = () =>
+    !isServer() && !!pendingSetup.data?.preview_withheld
+  const cancelPending = rspc.createMutation(() => ({
+    mutationKey: ["instance.cancelPendingSetup"],
+    onSuccess: () => {
+      toast.success(t("instances:_trn_repair_pending_cancelled"))
+      modalsContext?.closeModal()
+    },
+    meta: LOCAL_ERROR_TOAST,
+    onError: (error) => {
+      toastMutationError(
+        t("instances:_trn_repair_pending_cancel_failed"),
+        error
+      )
+      void pendingSetup.refetch()
+    }
+  }))
+  // Play's own preparation (with a deep check), without launching.
+  const resumeSetup = rspc.createMutation(() => ({
+    mutationKey: ["instance.prepareInstance"],
+    onSuccess: () => {
+      toast.success(t("instances:_trn_repair_pending_resumed"))
+      modalsContext?.closeModal()
+    },
+    meta: LOCAL_ERROR_TOAST,
+    onError: (error) => {
+      toastMutationError(
+        t("instances:_trn_repair_pending_resume_failed"),
+        error
+      )
+      void pendingSetup.refetch()
+    }
+  }))
+
   // Keyed on the instance alone: the backend returns both
   // `re_enable_disabled` outcomes (`with_re_enable`/`without_re_enable`) in
   // one response, computed over a single disk scan — see `RepairPreview`'s
@@ -138,7 +189,11 @@ const RepairModpack = (props: ModalProps) => {
   // already-fetched variants (`selectedVariant` below), never a refetch.
   const preview = rspc.createQuery(() => ({
     queryKey: ["instance.getRepairPreview", { instance: instanceId() }],
-    enabled: !isServer(),
+    enabled:
+      !isServer() &&
+      pendingSetup.isSuccess &&
+      !pendingSetup.data?.preview_withheld &&
+      !installing(),
     // Keeps the previous response visible (as `isPlaceholderData`) during a
     // background refetch — e.g. right after a `checkPackOrigin` run
     // completes and invalidates this query to surface fresh untracked-file
@@ -168,6 +223,91 @@ const RepairModpack = (props: ModalProps) => {
   const isModrinthPack = createMemo(
     () => instanceDetails.data?.modpack?.modpack.type === "modrinth"
   )
+  // The configured pack's version name, shown for the version Repair
+  // installs when that is the configured one.
+  const modpackInfo = rspc.createQuery(() => ({
+    queryKey: ["instance.getModpackInfo", instanceId()],
+    enabled: pending()
+  }))
+  // Set when Repair installs another version than the configured one: the
+  // one an interrupted change was installing. Named by its platform, as the
+  // configured one is (a Modrinth version number, a CurseForge file's
+  // display name).
+  const repairTarget = createMemo(() => {
+    const version = pendingSetup.data?.repair_version ?? null
+    const pack = instanceDetails.data?.modpack?.modpack
+    if (!pending() || version === null || !pack) return null
+    if (pack.type === "modrinth") {
+      return version === pack.value.version_id
+        ? null
+        : { type: "modrinth" as const, version }
+    }
+    const fileId = Number(version)
+    if (version === String(pack.value.file_id)) return null
+    return {
+      type: "curseforge" as const,
+      modId: pack.value.project_id,
+      fileId:
+        /^[1-9]\d*$/.test(version) && Number.isSafeInteger(fileId) ? fileId : 0
+    }
+  })
+  const modrinthTarget = rspc.createQuery(() => {
+    const target = repairTarget()
+    return {
+      queryKey: [
+        "modplatforms.modrinth.getVersion",
+        target?.type === "modrinth" ? target.version : ""
+      ],
+      enabled: target?.type === "modrinth"
+    }
+  })
+  const curseforgeTarget = rspc.createQuery(() => {
+    const target = repairTarget()
+    const file =
+      target?.type === "curseforge"
+        ? { modId: target.modId, fileId: target.fileId }
+        : { modId: 0, fileId: 0 }
+    return {
+      queryKey: ["modplatforms.curseforge.getModFile", file],
+      enabled: target?.type === "curseforge" && target.fileId > 0
+    }
+  })
+  // What the pending block names the version Repair installs by, never a
+  // raw platform id: without a name, a sentence that needs none is shown.
+  const repairVersionName = (): string | undefined => {
+    const target = repairTarget()
+    if (target === null) return modpackInfo.data?.version_name || undefined
+    if (target.type === "modrinth") {
+      const version = modrinthTarget.data
+      return version?.id === target.version
+        ? version.version_number || undefined
+        : undefined
+    }
+    const file = curseforgeTarget.data?.data
+    return file?.id === target.fileId
+      ? file.displayName || undefined
+      : undefined
+  }
+  // The text is rendered as text, so a version name like "Farmer's Pack
+  // 1.2/Forge" is passed through unescaped instead of as &#39; and &#x2F;.
+  const pendingText = () => {
+    const version = repairVersionName()
+    const other = repairTarget() !== null
+    const options = { version, interpolation: { escapeValue: false } }
+    if (!previewWithheld()) {
+      return version
+        ? t("instances:_trn_repair_pending_discard", options)
+        : t("instances:_trn_repair_pending_discard_unnamed")
+    }
+    if (other) {
+      return version
+        ? t("instances:_trn_repair_pending_withheld_target", options)
+        : t("instances:_trn_repair_pending_withheld_target_unnamed")
+    }
+    return version
+      ? t("instances:_trn_repair_pending_withheld", options)
+      : t("instances:_trn_repair_pending_withheld_unnamed")
+  }
 
   const checkOriginMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.checkPackOrigin"],
@@ -232,10 +372,9 @@ const RepairModpack = (props: ModalProps) => {
     onSuccess: () => {
       toast.success(t("instances:_trn_repair_started"))
     },
+    meta: LOCAL_ERROR_TOAST,
     onError: (error) => {
-      toast.error(t("instances:_trn_repair_failed"), {
-        description: error.message
-      })
+      toastMutationError(t("instances:_trn_repair_failed"), error)
     }
   }))
 
@@ -244,10 +383,9 @@ const RepairModpack = (props: ModalProps) => {
     onSuccess: () => {
       toast.success(t("instances:_trn_repair_started"))
     },
+    meta: LOCAL_ERROR_TOAST,
     onError: (error) => {
-      toast.error(t("instances:_trn_repair_failed"), {
-        description: error.message
-      })
+      toastMutationError(t("instances:_trn_repair_failed"), error)
     }
   }))
 
@@ -285,11 +423,16 @@ const RepairModpack = (props: ModalProps) => {
           )}
         </p>
 
+        {/* Without a preview (withheld, or hidden while an install or
+            update runs) there is no re-enable option or file list below to
+            point at. */}
         <p class="text-lightSlate-300 m-0 text-sm leading-relaxed">
           {t(
             isServer()
               ? "instances:_trn_repair_replaced_server"
-              : "instances:_trn_repair_replaced_instance"
+              : previewWithheld() || installing()
+                ? "instances:_trn_repair_replaced_instance_withheld"
+                : "instances:_trn_repair_replaced_instance"
           )}
         </p>
 
@@ -297,11 +440,90 @@ const RepairModpack = (props: ModalProps) => {
           {t(
             isServer()
               ? "instances:_trn_repair_kept_server"
-              : "instances:_trn_repair_kept_instance"
+              : installing()
+                ? "instances:_trn_repair_kept_instance_busy"
+                : previewWithheld()
+                  ? "instances:_trn_repair_kept_instance_withheld"
+                  : "instances:_trn_repair_kept_instance"
           )}
         </p>
 
-        <Show when={!isServer()}>
+        <Show when={pending()}>
+          <div class="flex flex-col gap-3" data-testid="repair-pending-setup">
+            <p class="text-lightSlate-50 m-0 font-bold">
+              {t(
+                busy()
+                  ? "instances:_trn_repair_pending_busy_title"
+                  : "instances:_trn_repair_pending_title"
+              )}
+            </p>
+            <p class="text-lightSlate-300 m-0 text-sm leading-relaxed">
+              {busy() ? t("instances:_trn_repair_pending_busy") : pendingText()}
+            </p>
+            <Show
+              when={
+                !busy() &&
+                (pendingSetup.data?.can_resume || pendingSetup.data?.can_cancel)
+              }
+            >
+              <p class="text-lightSlate-300 m-0 text-sm leading-relaxed">
+                {t(
+                  pendingSetup.data?.can_cancel
+                    ? "instances:_trn_repair_pending_alternatives"
+                    : "instances:_trn_repair_pending_resume_hint"
+                )}
+              </p>
+              <div class="flex flex-wrap gap-2">
+                <Show when={pendingSetup.data?.can_resume}>
+                  <Button
+                    type="secondary"
+                    data-testid="repair-resume-setup"
+                    disabled={resumeSetup.isPending || cancelPending.isPending}
+                    loading={resumeSetup.isPending}
+                    onClick={() => {
+                      if (!pendingSetup.data?.can_resume) return
+                      resumeSetup.mutate(instanceId())
+                    }}
+                  >
+                    {t("instances:_trn_repair_pending_resume")}
+                  </Button>
+                </Show>
+                <Show when={pendingSetup.data?.can_cancel}>
+                  <Button
+                    type="secondary"
+                    data-testid="repair-cancel-pending"
+                    disabled={cancelPending.isPending || resumeSetup.isPending}
+                    loading={cancelPending.isPending}
+                    onClick={() => {
+                      const operation = pendingSetup.data?.operation
+                      if (operation && pendingSetup.data?.can_cancel) {
+                        cancelPending.mutate({
+                          instance: instanceId(),
+                          expected_operation: operation
+                        })
+                      }
+                    }}
+                  >
+                    {t("instances:_trn_repair_pending_cancel")}
+                  </Button>
+                </Show>
+              </div>
+            </Show>
+          </div>
+        </Show>
+        <Show when={!isServer() && pendingSetup.isError}>
+          <p class="m-0 text-red-400">
+            {t("instances:_trn_repair_pending_status_failed")}
+          </p>
+        </Show>
+        <Show
+          when={
+            !isServer() &&
+            pendingSetup.isSuccess &&
+            !previewWithheld() &&
+            !installing()
+          }
+        >
           <div class="border-darkSlate-600 flex flex-col gap-4 border-0 border-t border-solid pt-4">
             <Show
               when={!preview.isLoading}
@@ -513,6 +735,15 @@ const RepairModpack = (props: ModalProps) => {
           </div>
         </Show>
 
+        <Show when={busy() && !pending()}>
+          <p
+            class="text-lightSlate-300 m-0 text-sm leading-relaxed"
+            data-testid="repair-busy"
+          >
+            {t("instances:_trn_repair_busy")}
+          </p>
+        </Show>
+
         <div class="flex w-full justify-between">
           <Button
             onClick={() => {
@@ -525,24 +756,38 @@ const RepairModpack = (props: ModalProps) => {
           <Button
             type="secondary"
             data-testid="repair-modpack-confirm"
-            disabled={!isServer() && preview.isLoading}
+            disabled={
+              !isServer() &&
+              (!pendingSetup.isSuccess ||
+                pendingSetup.data?.pending ||
+                preview.isLoading ||
+                preview.isError)
+            }
             onClick={() => {
               modalsContext?.closeModal()
               navigateAwayIfInsideDetail()
               if (isServer()) {
                 repairServerMutation.mutate(props?.data?.id)
-              } else {
+              } else if (status) {
+                // Without a preview nothing was shown to select or re-enable.
+                const withheld = status.preview_withheld
                 repairInstanceMutation.mutate({
                   instance: instanceId(),
                   cleanup_paths: [],
-                  cleanup_selections: [...ticked().values()],
-                  re_enable_disabled: reEnable()
+                  cleanup_selections: withheld ? [] : [...ticked().values()],
+                  re_enable_disabled: withheld ? false : reEnable(),
+                  // Sent back as the core gave it.
+                  expected_pending: status.discard_token ?? null
                 })
               }
             }}
           >
             <div class="i-hugeicons:refresh" />
-            {t("instances:_trn_repair_confirm")}
+            {t(
+              pending() && !busy()
+                ? "instances:_trn_repair_confirm_discard"
+                : "instances:_trn_repair_confirm"
+            )}
           </Button>
         </div>
       </div>

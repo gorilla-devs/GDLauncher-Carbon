@@ -1,4 +1,8 @@
 import { rspc, queryClient } from "@/utils/rspcClient"
+import {
+  LOCAL_ERROR_TOAST,
+  toastMutationError
+} from "@/utils/mutationErrorToast"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Button, Spinner, toast } from "@gd/ui"
@@ -25,10 +29,9 @@ const ConfirmBatchServerDeletion = (props: ModalProps) => {
         queryKey: ["server.getServerDetails", serverId]
       })
     },
+    meta: LOCAL_ERROR_TOAST,
     onError: (error) => {
-      toast.error(t("notifications:_trn_cannot_delete_server"), {
-        description: error.message
-      })
+      toastMutationError(t("notifications:_trn_cannot_delete_server"), error)
     }
   }))
 
