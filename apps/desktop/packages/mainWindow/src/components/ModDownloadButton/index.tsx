@@ -241,12 +241,17 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const handleDownload = async () => {
     if (!props.addon) return
 
-    // Server install path — fire-and-forget, no task tracking
+    // Server installs use the same retained task progression as instance installs.
     const serverId = props.selectedServerId
     if (serverId) {
       setLoading(true)
       try {
-        await handleServerInstall(serverId)
+        const acceptedTask = await handleServerInstall(serverId)
+        if (acceptedTask === undefined)
+          throw new Error("Server install returned no task")
+        setPendingInstall(true)
+        setLastProgress(null)
+        setTaskId(acceptedTask)
         toast.success(
           t("notifications:_trn_addon_downloading_to_server", {
             title:
@@ -256,7 +261,6 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
         )
       } catch {
         // Error surfaced via global MutationCache.onError
-      } finally {
         setLoading(false)
         setProgress(null)
       }

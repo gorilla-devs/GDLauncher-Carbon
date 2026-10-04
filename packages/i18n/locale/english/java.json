@@ -58,6 +58,7 @@
   "_trn_migration_errored": "Runtime path migration failed. State might be corrupted. Click <0>here</0> for more info on how to proceed.",
   "_trn_migration_stopped": "The move stopped before it finished. Nothing was lost. Click <0>here</0> for more info on how to proceed.",
   "_trn_scanning_files": "Scanning files...",
+  "_trn_checking_runtime_path": "Checking your data folder before moving it...",
   "_trn_copying_file": "Copying {{file}}",
   "_trn_removing_file": "Removing {{file}}",
   "_trn_removing_partial_copy": "Removing the unfinished copy: {{file}}",

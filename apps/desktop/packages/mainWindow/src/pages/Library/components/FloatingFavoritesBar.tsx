@@ -40,10 +40,16 @@ import {
 import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent"
 import useSearchContext from "@/components/SearchInputContext"
 import GdlFeatureContextMenuItem from "@/components/GdlFeatureContextMenuItem"
+import { recoveredServerAction } from "@/utils/recoveredServer"
+import { useRecoveredServerAction } from "@/pages/Library/Server/useRecoveredServerAction"
 import { useDragContext } from "../DragContext"
 import { LibraryMode } from "../types"
 import DefaultImg from "/assets/images/default-instance-img.png"
-import type { ValidListInstance, ListServer } from "@gd/core_module/bindings"
+import type {
+  FEServerState,
+  ValidListInstance,
+  ListServer
+} from "@gd/core_module/bindings"
 
 /** Icon + text hint centered over the library grid area */
 function UnfavoriteHint() {
@@ -381,6 +387,21 @@ interface DockAvatarProps {
   libraryMode: LibraryMode
 }
 
+/**
+ * The translated name of every server status shown in the dock's tooltip,
+ * so none shows the core's raw English status.
+ */
+const serverStatusKeys = {
+  running: "instances:_trn_server_status_running",
+  starting: "instances:_trn_server_status_starting",
+  stopping: "instances:_trn_server_status_stopping",
+  stopped: "instances:_trn_server_status_stopped",
+  installing: "instances:_trn_server_status_installing",
+  deleting: "instances:_trn_server_status_deleting",
+  recoveredRunning: "instances:_trn_server_status_recovered_running",
+  recoveredUnverified: "instances:_trn_server_status_recovered_unverified"
+} as const satisfies Record<FEServerState["status"], string>
+
 function DockAvatar(props: DockAvatarProps) {
   const [t] = useTransContext()
   const navigate = useGDNavigate()
@@ -446,6 +467,21 @@ function DockAvatar(props: DockAvatarProps) {
 
   const serverStatus = () => server()?.state.status
   const isServerRunning = () => serverStatus() === "running"
+  // Left behind by an earlier session: its JVM still runs, or a record of
+  // it cannot be verified. The dock's main action does what the server's
+  // tile does: Stop, or the dialog that confirms a Force stop or clearing
+  // the record.
+  const isServerRecoveredRunning = () => serverStatus() === "recoveredRunning"
+  const isServerRecoveredUnverified = () =>
+    serverStatus() === "recoveredUnverified"
+  const recoveredAction = () => recoveredServerAction(server()?.state)
+  const recovered = useRecoveredServerAction()
+  const serverStatusLabel = () => {
+    const status = serverStatus()
+    return status && Object.hasOwn(serverStatusKeys, status)
+      ? t(serverStatusKeys[status])
+      : status
+  }
 
   // --- Unified accessors ---
   const itemName = () => (isServerMode() ? server()?.name : instance()?.name)
@@ -668,11 +704,24 @@ function DockAvatar(props: DockAvatarProps) {
                 disabled={isBusy() || isDeleting() || isInvalid()}
               >
                 <div
-                  class={`${isRunning() ? "i-hugeicons:stop" : "i-hugeicons:play"} h-4 w-4`}
+                  class="h-4 w-4"
+                  classList={{
+                    "i-hugeicons:stop":
+                      isRunning() || isServerRecoveredRunning(),
+                    "i-hugeicons:eraser": isServerRecoveredUnverified(),
+                    "i-hugeicons:play":
+                      !isRunning() &&
+                      !isServerRecoveredRunning() &&
+                      !isServerRecoveredUnverified()
+                  }}
                 />
-                {isRunning()
-                  ? t("instances:_trn_stop")
-                  : t("instances:_trn_action_play")}
+                {recoveredAction() === "clearRecord"
+                  ? t("instances:_trn_server_action_clear_record")
+                  : recoveredAction() === "forceStop"
+                    ? t("instances:_trn_server_action_force_stop")
+                    : isRunning() || recoveredAction() === "stop"
+                      ? t("instances:_trn_stop")
+                      : t("instances:_trn_action_play")}
               </ContextMenuItem>
               <Show when={!isServerMode()}>
                 <ContextMenuItem
@@ -808,6 +857,8 @@ function DockAvatar(props: DockAvatarProps) {
                   classList={{
                     "opacity-50": isDeleting(),
                     "ring-2 ring-green-500": isRunning(),
+                    "ring-2 ring-yellow-400": isServerRecoveredRunning(),
+                    "ring-2 ring-orange-400": isServerRecoveredUnverified(),
                     "scale-110": isMenuOpen(),
                     "opacity-0 pointer-events-none": isBeingDragged()
                   }}
@@ -841,6 +892,12 @@ function DockAvatar(props: DockAvatarProps) {
                       <div class="h-3 w-3 rounded-full bg-green-500 animate-pulse shadow-lg shadow-green-500/50" />
                     </div>
                   </Show>
+                  {/* Running from an earlier session: the colour its page uses */}
+                  <Show when={isServerRecoveredRunning()}>
+                    <div class="absolute -top-0.5 -right-0.5">
+                      <div class="h-3 w-3 rounded-full bg-yellow-400 shadow-lg shadow-yellow-400/50" />
+                    </div>
+                  </Show>
 
                   {/* Launching / busy spinner overlay */}
                   <Show when={isBusy() && !isDeleting()}>
@@ -859,14 +916,31 @@ function DockAvatar(props: DockAvatarProps) {
                         !isInvalid() &&
                         !props.isDragActive,
                       "!opacity-100":
-                        isMenuOpen() && !isBusy() && !isDeleting(),
-                      "bg-red-500/80": isRunning(),
-                      "bg-primary-500/80": !isRunning()
+                        isMenuOpen() &&
+                        !isBusy() &&
+                        !isDeleting() &&
+                        !isInvalid(),
+                      "bg-red-500/80":
+                        isRunning() || isServerRecoveredRunning(),
+                      "bg-orange-500/80": isServerRecoveredUnverified(),
+                      "bg-primary-500/80":
+                        !isRunning() &&
+                        !isServerRecoveredRunning() &&
+                        !isServerRecoveredUnverified()
                     }}
                     onClick={(e) => handlePlay(e)}
                   >
                     <div
-                      class={`${isRunning() ? "i-hugeicons:stop" : "i-hugeicons:play"} text-white h-5 w-5`}
+                      class="text-white h-5 w-5"
+                      classList={{
+                        "i-hugeicons:stop":
+                          isRunning() || isServerRecoveredRunning(),
+                        "i-hugeicons:eraser": isServerRecoveredUnverified(),
+                        "i-hugeicons:play":
+                          !isRunning() &&
+                          !isServerRecoveredRunning() &&
+                          !isServerRecoveredUnverified()
+                      }}
                     />
                   </div>
                 </div>
@@ -884,7 +958,9 @@ function DockAvatar(props: DockAvatarProps) {
                         <span>·</span>
                         <span>:{server()?.port}</span>
                       </div>
-                      <div class="capitalize">{serverStatus()}</div>
+                      <div data-testid="dock-server-status">
+                        {serverStatusLabel()}
+                      </div>
                     </div>
                   }
                 >

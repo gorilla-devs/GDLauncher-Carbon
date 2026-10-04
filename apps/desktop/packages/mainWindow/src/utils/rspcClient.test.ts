@@ -12,7 +12,8 @@ vi.mock("@gd/ui", () => ({
 
 vi.mock("@gd/i18n", () => ({
   i18n: {
-    t: (key: string) => key
+    t: (key: string, options?: { pid?: number | null }) =>
+      options?.pid != null ? `${key} ${options.pid}` : key
   }
 }))
 
@@ -64,6 +65,52 @@ describe("handleGlobalError", () => {
       "Download failed",
       expect.anything()
     )
+  })
+})
+
+describe("handleGlobalError for a server's record from an earlier session", () => {
+  beforeEach(() => {
+    toastError.mockClear()
+  })
+  const refusal = (data: unknown, display = "English refusal") =>
+    new Error(
+      JSON.stringify({
+        cause: [
+          { display: "Cannot delete the server" },
+          { display, code: "SERVER_RECOVERED_PROCESS", data }
+        ],
+        backtrace: ""
+      })
+    )
+
+  it("toasts the translated refusal with its PID instead of the English text", () => {
+    handleGlobalError(
+      refusal({ kind: "running", pid: 31337, graceful_stop: true }),
+      "mutation"
+    )
+    expect(toastError).toHaveBeenCalledTimes(1)
+    expect(toastError.mock.calls[0][0]).toBe(
+      "instances:_trn_server_recovered_refusal_running 31337"
+    )
+  })
+
+  it("names Force stop and the in-game /stop where the server cannot save and stop", () => {
+    handleGlobalError(
+      refusal({ kind: "running", pid: 31339, graceful_stop: false }),
+      "mutation"
+    )
+    expect(toastError).toHaveBeenCalledTimes(1)
+    expect(toastError.mock.calls[0][0]).toBe(
+      "instances:_trn_server_recovered_refusal_running_force 31339"
+    )
+  })
+
+  it("falls back to the core's text for a kind this build does not know", () => {
+    handleGlobalError(
+      refusal({ kind: "later", pid: 1 }, "Unknown refusal kind 31338"),
+      "mutation"
+    )
+    expect(toastError.mock.calls[0][0]).toBe("Unknown refusal kind 31338")
   })
 })
 

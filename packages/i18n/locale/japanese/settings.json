@@ -55,6 +55,7 @@
   "_trn_enable_metrics_title": "匿名メトリクスと実験的機能を有効化",
   "_trn_enable_metrics_text": "匿名メトリクスと、機能フラグによる実験的な機能の有効/無効を選択します。",
   "_trn_restart_app": "アプリを再起動",
+  "_trn_restart_failed": "GDLauncher を再起動できませんでした。一度閉じてから、もう一度開いてください。",
   "_trn_reset_all_data": "全データをリセット",
   "_trn_check_for_updates": "アップデートを確認",
   "_trn_custom_commands_title": "カスタムコマンド",

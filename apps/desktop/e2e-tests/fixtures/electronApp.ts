@@ -287,6 +287,29 @@ export async function waitForPidExit(
 }
 
 /**
+ * The launcher window that shows `page`, for closing it the way the window
+ * manager's X does and for reading whether it is shown.
+ *
+ * Never `BrowserWindow.getAllWindows()[0]`: ow-electron keeps hidden 1x1
+ * windows of its own (the Overwolf consent window for about 10 s after start
+ * outside the EU, and on Windows its package manager's for the whole
+ * session), and Electron lists the newest window first. On CI that closed
+ * the consent window instead of the launcher.
+ */
+export async function launcherWindow(app: ElectronApplication, page: Page) {
+  const handle = await app.browserWindow(page)
+  return {
+    /** Rejections are swallowed: the app may already be exiting. */
+    close: () => handle.evaluate((w) => w.close()).catch(() => {}),
+    /** False once the window is gone. */
+    visible: () =>
+      handle
+        .evaluate((w) => !w.isDestroyed() && w.isVisible())
+        .catch(() => false)
+  }
+}
+
+/**
  * Closes `app` and returns only once the core module it spawned has actually
  * exited.
  *
@@ -360,9 +383,7 @@ export async function quitLauncherMidGame(
   }
 
   // The window-manager's X, as the main process sees it.
-  await current.app.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows()[0]?.close()
-  })
+  await (await launcherWindow(current.app, current.page)).close()
 
   const confirm = current.page.locator(
     byTestId(TEST_IDS.windowCloseWarningQuit)

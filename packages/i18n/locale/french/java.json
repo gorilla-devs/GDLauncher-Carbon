@@ -58,6 +58,7 @@
   "_trn_migration_errored": "La migration du chemin d'exécution a échoué. L'état pourrait être corrompu. Cliquez <0>ici</0> pour plus d'informations sur la marche à suivre.",
   "_trn_migration_stopped": "Le déplacement s’est arrêté avant la fin. Rien n’a été perdu. Cliquez <0>ici</0> pour plus d'informations sur la marche à suivre.",
   "_trn_scanning_files": "Analyse des fichiers...",
+  "_trn_checking_runtime_path": "Vérification de votre dossier de données avant le déplacement...",
   "_trn_copying_file": "Copie de {{file}}",
   "_trn_removing_file": "Suppression de {{file}}",
   "_trn_removing_partial_copy": "Suppression de la copie inachevée : {{file}}",

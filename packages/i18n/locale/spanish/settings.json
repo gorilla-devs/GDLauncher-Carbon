@@ -55,6 +55,7 @@
   "_trn_enable_metrics_title": "Habilitar métricas anónimas y características experimentales",
   "_trn_enable_metrics_text": "Selecciona si deseas habilitar métricas anónimas y características experimentales a través de indicadores de características.",
   "_trn_restart_app": "Reiniciar aplicación",
+  "_trn_restart_failed": "GDLauncher no pudo reiniciarse. Ciérralo y vuelve a abrirlo.",
   "_trn_reset_all_data": "Restablecer todos los datos",
   "_trn_check_for_updates": "Buscar actualizaciones",
   "_trn_custom_commands_title": "Comandos personalizados",

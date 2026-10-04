@@ -116,6 +116,11 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ServerEulaAcceptance")),
     title: t("modals:_trn_server_eula_acceptance")
   },
+  recoveredServerProcess: {
+    component: lazy(() => import("./modals/RecoveredServerProcess")),
+    // The dialog sets its own title for the action it confirms.
+    title: t("modals:_trn_server_clear_record_title")
+  },
   confirmBatchFolderDeletion: {
     component: lazy(() => import("./modals/ConfirmBatchFolderDeletion")),
     title: t("modals:_trn_confirm_batch_folder_deletion")

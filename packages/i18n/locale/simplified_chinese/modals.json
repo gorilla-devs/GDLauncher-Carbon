@@ -19,6 +19,8 @@
   "_trn_confirm_batch_instance_deletion": "删除实例",
   "_trn_confirm_batch_server_deletion": "删除服务器",
   "_trn_server_eula_acceptance": "接受 Minecraft EULA",
+  "_trn_server_force_stop_title": "强制停止服务器",
+  "_trn_server_clear_record_title": "清除进程记录",
   "_trn_confirm_change_runtime_path": "确认更改运行时路径",
   "_trn_why_are_ads_needed": "为什么需要广告？",
   "_trn_mods_updater": "模组更新器",

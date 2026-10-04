@@ -16,6 +16,7 @@ import { checkForUpdates } from "./utils/updater"
 import { windowCloseWarningAcquireLock } from "./managers/ModalsManager/modals/WindowCloseWarning"
 import { ACCOUNT_BANNED_EVENT } from "./utils/bannedEventBridge"
 import { showRuntimeMoveNotice } from "./utils/runtimeMoveNotice"
+import ShutdownPrompt from "./components/ShutdownPrompt"
 
 interface Props {
   createInvalidateQuery: () => void
@@ -135,6 +136,9 @@ const App = (props: Props) => {
       <div class="z-10 flex h-auto w-screen">
         <main class="max-w-screen relative grow">{props.children}</main>
       </div>
+      {/* While mounted, main asks here when a quit, restart or update does
+          not finish, instead of in a native dialog. */}
+      <ShutdownPrompt />
     </div>
   )
 }

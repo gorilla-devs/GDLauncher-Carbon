@@ -7,7 +7,8 @@ import {
   SelectValue,
   Input,
   Skeleton,
-  Switch
+  Switch,
+  toast
 } from "@gd/ui"
 import { wideLogoUrl } from "@/utils/logos"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -33,6 +34,13 @@ const General = () => {
   const routeData = useSettingsGeneralData()
   const [t] = useTransContext()
   const modalsContext = useModal()
+  const { restarting, restart } = createRestart(
+    () => window.relaunch(),
+    (error) => {
+      console.error("Restart failed", error)
+      toast.error(t("settings:_trn_restart_failed"))
+    }
+  )
 
   const [settings, setSettings] = createStore<FESettings>(
     // @ts-ignore
@@ -569,9 +577,10 @@ const General = () => {
                 </Button>
                 <Button
                   type="secondary"
-                  onClick={() => {
-                    window.relaunch()
-                  }}
+                  // A restart that does not finish asks first; it only fails
+                  // if even stopping it at once did not work.
+                  disabled={restarting()}
+                  onClick={restart}
                 >
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:arrow-reload-horizontal h-5 w-5" />

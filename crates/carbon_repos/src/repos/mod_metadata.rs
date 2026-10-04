@@ -106,6 +106,8 @@ pub struct MrExportEnrichRow {
 
 queries! {
     // --- ModMetadata ----------------------------------------------------------
+    fn get_metadata_by_id(id: &str) -> Option<ModMetadataRow> =
+        "SELECT id, lastUpdatedAt, murmur2, sha512, sha1, name, modid, version, description, authors, modloaders FROM ModMetadata WHERE id = :id";
     fn find_metadata_by_hashes(sha512: &[u8], murmur2: i32) -> Option<ModMetadataRow> =
         "SELECT id, lastUpdatedAt, murmur2, sha512, sha1, name, modid, version, description, authors, modloaders
          FROM ModMetadata WHERE sha512 = :sha512 AND murmur2 = :murmur2";

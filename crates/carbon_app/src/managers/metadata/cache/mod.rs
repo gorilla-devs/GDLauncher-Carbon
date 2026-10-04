@@ -5,7 +5,7 @@ use crate::domain::instance::InstanceId;
 use crate::managers::App;
 use crate::managers::ManagerRef;
 use crate::managers::vtask::VisualTask;
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::mod_file_cache as mfcdb;
 use carbon_repos::repos::mod_metadata as metarepo;
@@ -1435,146 +1435,129 @@ impl ManagerRef<'_, MetaCacheManager> {
         Ok(meta_id)
     }
 
+    /// Prepare hash-deduplicated metadata while bytes are still privately staged.
+    /// No server owner row or shared provider identity is changed here.
+    pub(crate) async fn prepare_server_addon_metadata(
+        self,
+        staged: &Path,
+        selected_filename: &str,
+    ) -> anyhow::Result<String> {
+        let folder = staged
+            .parent()
+            .context("Staged addon has no parent")?
+            .to_path_buf();
+        let filename = staged
+            .file_name()
+            .and_then(|name| name.to_str())
+            .context("Invalid staged addon filename")?;
+        let result = self
+            .hash_and_parse_mod_file(&folder, filename, true)
+            .await?;
+        self.ensure_mod_metadata(&result, selected_filename).await
+    }
+
     /// Cache a mod file for a server. Hashes, parses metadata, and upserts into server_mod_file_cache.
-    async fn cache_server_mod_file_unchecked(
+    pub(crate) async fn refresh_server_addon(
         self,
         server_id: i32,
-        mods_dir_path: &PathBuf,
-        mod_filename: String,
+        folder: &PathBuf,
+        filename: String,
+        location: String,
         enabled: bool,
         addon_type: String,
     ) -> anyhow::Result<String> {
+        // Caller holds the stable server operation gate through local publication.
         let result = self
-            .hash_and_parse_mod_file(mods_dir_path, &mod_filename, enabled)
+            .hash_and_parse_mod_file(folder, &filename, enabled)
             .await?;
-        let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
-
-        let filename_owned = mod_filename.to_string();
-        let filesize = result.content_len as i32;
-        let addon_type_owned = addon_type.clone();
-        let meta_id_owned = meta_id.clone();
-        mfcdb::upsert_server_mod_file_cache(
+        let meta_id = self.ensure_mod_metadata(&result, &filename).await?;
+        mfcdb::upsert_server_mod_file_cache_at_location(
             &self.app.db,
             server_id,
-            filename_owned,
-            filesize,
+            filename,
+            location,
+            result.content_len as i32,
             enabled,
-            addon_type_owned,
-            meta_id_owned,
+            addon_type,
+            meta_id.clone(),
             DbDateTime(Utc::now().fixed_offset()),
         )
         .await?;
-
         Ok(meta_id)
     }
 
-    /// Cache all mod files for a server. Scans filesystem, hashes new/changed files,
-    /// and stores results in server_mod_file_cache.
     pub async fn cache_server_local(
         self,
         server_id: i32,
         server_shortpath: &str,
     ) -> anyhow::Result<()> {
-        let runtime_path = &self.app.settings_manager().runtime_path;
-        let server_path = runtime_path.get_servers().get_server_path(server_shortpath);
-
-        // Get existing cache entries
+        let _activity = self.app.runtime_lifecycle.admit("server addon scan")?;
+        let lock = self
+            .app
+            .server_manager()
+            .get_op_lock(crate::domain::server::ServerId(server_id));
+        let _guard = lock.lock().await;
+        let current = carbon_repos::repos::server::get_server(&self.app.db, server_id)
+            .await?
+            .ok_or_else(|| anyhow::anyhow!("Server disappeared"))?;
+        if current.shortpath != server_shortpath {
+            anyhow::bail!("Server root changed during scan");
+        }
+        let server_path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_servers()
+            .get_server_path(server_shortpath);
+        let data = server_path.get_data_path();
+        let world = crate::managers::server::world::selected(&data)?;
+        let datapack_relative = format!("{world}/datapacks");
         let cached = mfcdb::get_server_mod_files_by_server(&self.app.db, server_id).await?;
-
-        let cached_map: HashMap<String, (i32, bool)> = cached
-            .iter()
-            .map(|c| (c.filename.clone(), (c.filesize, c.enabled)))
-            .collect();
-
-        // Scan filesystem
-        let mut disk_files: Vec<(String, String, bool)> = Vec::new(); // (base_filename, addon_type, enabled)
-
-        let mods_path = server_path.get_mods_path();
-        if mods_path.exists() {
-            let mut entries = tokio::fs::read_dir(&mods_path).await?;
-            while let Some(entry) = entries.next_entry().await? {
-                let filename = entry.file_name().to_string_lossy().to_string();
-                if addon_has_extension(&filename, "jar") {
-                    let enabled = !filename.ends_with(".disabled");
-                    let base_filename = filename.trim_end_matches(".disabled").to_string();
-                    disk_files.push((base_filename, "mods".to_string(), enabled));
-                }
-            }
-        }
-
-        let datapacks_path = server_path.get_datapacks_path();
-        if datapacks_path.exists() {
-            let mut entries = tokio::fs::read_dir(&datapacks_path).await?;
-            while let Some(entry) = entries.next_entry().await? {
-                let filename = entry.file_name().to_string_lossy().to_string();
-                if addon_has_extension(&filename, "zip") {
-                    let enabled = !filename.ends_with(".disabled");
-                    let base_filename = filename.trim_end_matches(".disabled").to_string();
-                    disk_files.push((base_filename, "datapacks".to_string(), enabled));
-                }
-            }
-        }
-
-        let disk_filenames: HashSet<String> =
-            disk_files.iter().map(|(f, _, _)| f.clone()).collect();
-
-        // Delete stale cache entries (files no longer on disk)
-        let stale: Vec<_> = cached
-            .iter()
-            .filter(|c| !disk_filenames.contains(&c.filename))
-            .collect();
-
-        for entry in &stale {
-            let entry_id = entry.id.clone();
-            let _ = mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &entry_id).await;
-        }
-
-        // Cache new/changed files
-        for (base_filename, addon_type, enabled) in &disk_files {
-            // Check if already cached with same size
-            if let Some((cached_size, cached_enabled)) = cached_map.get(base_filename) {
-                // Get current file size
-                let dir = if addon_type == "mods" {
-                    &mods_path
-                } else {
-                    &datapacks_path
-                };
-                let actual_filename = if *enabled {
-                    base_filename.clone()
-                } else {
-                    format!("{}.disabled", base_filename)
-                };
-                let file_size = tokio::fs::metadata(dir.join(&actual_filename))
-                    .await
-                    .map(|m| m.len() as i32)
-                    .unwrap_or(0);
-
-                if *cached_size == file_size && *cached_enabled == *enabled {
-                    continue; // Skip unchanged file
-                }
-            }
-
-            let dir = if addon_type == "mods" {
-                mods_path.clone()
-            } else {
-                datapacks_path.clone()
+        let mut seen = HashSet::new();
+        for (relative, kind, extension) in [
+            ("mods", "mods", "jar"),
+            (datapack_relative.as_str(), "datapacks", "zip"),
+        ] {
+            let folder = crate::managers::server::world::checked_join(&data, relative)?;
+            let mut entries = match tokio::fs::read_dir(&folder).await {
+                Ok(entries) => entries,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => return Err(error.into()),
             };
-
-            if let Err(e) = self
-                .cache_server_mod_file_unchecked(
-                    server_id,
-                    &dir,
-                    base_filename.clone(),
-                    *enabled,
-                    addon_type.clone(),
-                )
-                .await
-            {
-                warn!("Failed to cache server addon '{}': {}", base_filename, e);
+            while let Some(entry) = entries.next_entry().await? {
+                if !entry.file_type().await?.is_file() {
+                    continue;
+                }
+                let filename = entry.file_name().to_string_lossy().to_string();
+                if !addon_has_extension(&filename, extension) {
+                    continue;
+                }
+                let enabled = !filename.ends_with(".disabled");
+                let base = filename
+                    .strip_suffix(".disabled")
+                    .unwrap_or(&filename)
+                    .to_owned();
+                let location = format!("{relative}/{base}");
+                if !seen.insert(location.clone()) {
+                    anyhow::bail!("Ambiguous enabled and disabled server addon: {location}");
+                }
+                if crate::managers::server::world::selected(&data)? != world {
+                    anyhow::bail!("Active world changed during scan");
+                }
+                self.refresh_server_addon(server_id, &folder, base, location, enabled, kind.into())
+                    .await?;
             }
         }
-
-        info!("Completed local caching for server {}", server_id);
+        if crate::managers::server::world::selected(&data)? != world {
+            anyhow::bail!("Active world changed during scan");
+        }
+        for entry in cached {
+            let active = entry.location.starts_with("mods/")
+                || entry.location.starts_with(&format!("{datapack_relative}/"));
+            if active && !seen.contains(&entry.location) {
+                mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &entry.id).await?;
+            }
+        }
         Ok(())
     }
 

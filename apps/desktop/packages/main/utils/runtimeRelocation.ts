@@ -12,6 +12,7 @@ import {
   type RuntimePathContext,
   type RuntimeTargetRefusal
 } from "./runtimePathGuard"
+import type { RuntimeBlocker } from "./coreShutdown"
 
 export const MIGRATION_MARKER = ".gdl_migration_in_progress"
 
@@ -337,11 +338,60 @@ export function runtimeTargetRefusal(
   return error instanceof RuntimeTargetError ? error.reason : "invalid"
 }
 
-type Entry = { relative: string; directory: boolean }
-export async function inventoryRuntimeTree(root: string): Promise<Entry[]> {
+/**
+ * The data folder a marker says it was copied from, or null when it does not say:
+ * 2.0.40 wrote empty markers, and a marker may be unreadable or not ours. The path is
+ * only compared as a string, never opened.
+ */
+async function markedSource(marker: string): Promise<string | null> {
+  try {
+    const handle = await fs.open(
+      marker,
+      fss.constants.O_RDONLY |
+        (fss.constants.O_NOFOLLOW ?? 0) |
+        (fss.constants.O_NONBLOCK ?? 0)
+    )
+    try {
+      const st = await handle.stat()
+      if (!st.isFile() || st.size > 64 * 1024) return null
+      const recorded = JSON.parse(await handle.readFile("utf8"))?.source
+      return typeof recorded === "string" && path.isAbsolute(recorded)
+        ? recorded
+        : null
+    } finally {
+      await handle.close()
+    }
+  } catch {
+    return null
+  }
+}
+
+interface Entry {
+  relative: string
+  directory: boolean
+}
+export async function inventoryRuntimeTree(
+  root: string,
+  signal?: AbortSignal,
+  options: {
+    /**
+     * `root` is the data folder in use. The pointer already names it, so a
+     * marker file at its root is stale: 2.0.40 let users switch into a folder
+     * an interrupted move had marked. It is left out of the inventory, so it
+     * is neither copied nor deleted, instead of refusing the move.
+     */
+    liveSource?: boolean
+  } = {}
+): Promise<Entry[]> {
+  const marker = await statOrMissing(path.join(root, MIGRATION_MARKER))
+  // Only a plain file, as both 2.0.40 and this version write it, is skipped.
+  const staleMarker = !!options.liveSource && !!marker?.isFile()
+  if (marker && !staleMarker)
+    throw new Error(`Incomplete migration in source: ${root}`)
   const result: Entry[] = []
   const unsupported: string[] = []
   async function visit(relative: string) {
+    signal?.throwIfAborted()
     const full = path.join(root, relative)
     // The data folder itself may be reached through a link or junction, as the
     // core does. Only what is inside it has to be real.
@@ -850,12 +900,28 @@ export interface RuntimeRelocationOptions {
   pointer: string
   switchOnly?: boolean
   context?: RuntimeDestinationContext
+  /**
+   * Asks the core, without stopping or freezing anything, whether something
+   * would refuse the move, so a refusal comes before the slow folder scan.
+   */
+  checkCore?: () => Promise<void>
   // Must atomically freeze core admission, acknowledge shutdown, then observe actual exit.
   // It refuses while any game, server, install or adopted process is live: deleting the
   // copied originals relies on no launcher writer being left.
   stopCore: () => Promise<void>
+  /**
+   * Lets the user's quit or window close end the move while nothing has
+   * changed: the scan before the core is stopped watches `signal`, and
+   * `commit()` runs right before `stopCore`.
+   */
+  interruptible?: { signal: AbortSignal; commit(): void }
+  /**
+   * "check" is the scan before the core is stopped: closing the app then
+   * ends the move with nothing moved. From "scan" on the core is stopping or
+   * stopped and the move runs to its end.
+   */
   progress?: (value: {
-    action: "scan" | "copy" | "remove"
+    action: "check" | "scan" | "copy" | "remove"
     currentName: string
     current: number
     total: number
@@ -880,9 +946,17 @@ export async function relocateRuntime(
         "Destination is populated; confirm switching to it instead"
       )
   }
+  const signal = options.interruptible?.signal
   await check()
-  await inventoryRuntimeTree(source)
-  if (options.switchOnly) await inventoryRuntimeTree(target)
+  // Refuse while something runs before making the user wait for the scan.
+  await options.checkCore?.()
+  signal?.throwIfAborted()
+  progress?.({ action: "check", currentName: "", current: 0, total: 0 })
+  await inventoryRuntimeTree(source, signal, { liveSource: true })
+  if (options.switchOnly) await inventoryRuntimeTree(target, signal)
+  // Last point where closing the app leaves everything as it was.
+  options.interruptible?.commit()
+  progress?.({ action: "scan", currentName: "", current: 0, total: 0 })
   await stopCore()
   await check()
   if (options.switchOnly)

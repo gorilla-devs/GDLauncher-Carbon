@@ -1018,7 +1018,7 @@ async fn task04_runtime_prepare_admission_serializes_with_relocation() -> anyhow
         _ = &mut admitted => panic!("prepare should be paused before taking instance locks"),
         _ = pause.entered.notified() => {},
     }
-    assert!(app.runtime_lifecycle.begin_relocation("move").is_err());
+    assert!(app.runtime_lifecycle.begin_relocation("busy").is_err());
     pause.release.notify_one();
     assert!(admitted.await.is_err()); // absent synthetic instance, no child or download
     app.runtime_lifecycle.begin_relocation("move")?;
@@ -1058,15 +1058,28 @@ async fn task04_runtime_server_entry_points_obey_same_freeze() -> anyhow::Result
     Ok(())
 }
 
+/// A legacy marker whose PID a process other than Java holds now names a
+/// reused PID, as the instance scan and 2.0.40 both concluded: it is not a
+/// relocation owner in this session or, through a kept copy, after a
+/// restart. It used to refuse every move for as long as that unrelated
+/// process ran.
 #[tokio::test]
-async fn task04_runtime_reconciliation_survives_legacy_pid_cleanup_and_restart()
+async fn task04_runtime_reconciliation_retires_a_legacy_marker_on_a_reused_pid_across_restart()
 -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (_, root) = fixture(&app, "legacy-owner").await?;
     // The test runner is an existing benign non-Java process; never signal it.
-    tokio::fs::write(root.join(PID_FILE_NAME), std::process::id().to_string()).await?;
+    let pid = std::process::id();
+    tokio::fs::write(root.join(PID_FILE_NAME), pid.to_string()).await?;
     app.instance_manager().scan_instances().await?;
-    assert!(app.runtime_lifecycle.begin_relocation("one").is_err());
+    assert!(
+        !app.runtime_lifecycle
+            .relocation_blockers("one")
+            .iter()
+            .any(|blocker| blocker.pid == Some(pid)),
+        "{:?}",
+        app.runtime_lifecycle.relocation_blockers("one")
+    );
     let restarted = crate::managers::runtime_lifecycle::RuntimeLifecycle::with_runtime_path(
         &app.settings_manager().runtime_path.to_path_buf(),
     );

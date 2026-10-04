@@ -28,6 +28,12 @@ export interface BaseTileProps {
   isWaiting: boolean // Queued/indeterminate (no progress yet)
   isRunning: boolean
   isBusy: boolean // Starting/stopping (server only, false for instance)
+  /**
+   * Server only: left behind by an earlier session. Its border glows in the
+   * colour its page's badge uses (yellow: still running, orange: an
+   * unverified record) instead of the green of a run this launcher owns.
+   */
+  glowTone?: "yellow" | "orange"
   isDeleting: boolean
   isInvalid?: boolean // Instance only
 
@@ -182,11 +188,20 @@ const BaseTile = (props: BaseTileProps) => {
               class="absolute left-0 top-0 h-full w-full transition-[opacity,background] duration-300 ease-spring"
               classList={{
                 "opacity-0 bg-transparent":
-                  !isLoadingOrWaiting() && !props.isRunning && !props.isBusy,
+                  !isLoadingOrWaiting() &&
+                  !props.isRunning &&
+                  !props.isBusy &&
+                  !props.glowTone,
                 "opacity-100":
-                  isLoadingOrWaiting() || props.isRunning || props.isBusy,
-                "bg-green-400": props.isRunning,
-                "bg-yellow-400": props.isBusy && !props.isRunning,
+                  isLoadingOrWaiting() ||
+                  props.isRunning ||
+                  props.isBusy ||
+                  !!props.glowTone,
+                "bg-green-400": props.isRunning && !props.glowTone,
+                "bg-yellow-400":
+                  (props.isBusy && !props.isRunning) ||
+                  props.glowTone === "yellow",
+                "bg-orange-400": props.glowTone === "orange" && !props.isBusy,
                 "instance-tile-spinning": isLoadingOrWaiting()
               }}
             />

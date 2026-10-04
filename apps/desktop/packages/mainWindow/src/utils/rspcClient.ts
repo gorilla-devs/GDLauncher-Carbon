@@ -22,6 +22,10 @@ import {
   dispatchServerEulaEvent,
   type ServerEulaData
 } from "./serverEulaBridge"
+import {
+  recoveredServerRefusalKey,
+  type RecoveredServerRefusal
+} from "./recoveredServer"
 
 // ---------------------------------------------------------------------------
 // Procedure type utilities

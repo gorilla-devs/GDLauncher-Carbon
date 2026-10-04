@@ -173,6 +173,7 @@ export type Procedures = {
         { key: "server.arrangeServerLibrary", input: never, result: null } | 
         { key: "server.banIp", input: BanIpRequest, result: null } | 
         { key: "server.banPlayer", input: BanPlayerRequest, result: null } | 
+        { key: "server.clearServerMarker", input: FEServerId, result: null } | 
         { key: "server.createFolderFromServers", input: CreateFolderFromServers, result: FEServerGroupId } | 
         { key: "server.createServer", input: CreateServer, result: FEServerId } | 
         { key: "server.createServerFromModpack", input: CreateServerFromModpack, result: FEServerId } | 
@@ -195,6 +196,7 @@ export type Procedures = {
         { key: "server.setFavorite", input: SetServerFavorite, result: null } | 
         { key: "server.setServerIcon", input: SetServerIcon, result: null } | 
         { key: "server.startServer", input: FEServerId, result: null } | 
+        { key: "server.stopRecoveredServer", input: FEServerId, result: null } | 
         { key: "server.stopServer", input: FEServerId, result: null } | 
         { key: "server.unbanIp", input: UnbanIpRequest, result: null } | 
         { key: "server.unbanPlayer", input: RemovePlayerRequest, result: null } | 
@@ -351,7 +353,7 @@ export type FEUnifiedCategoryIcon = { type: "url"; value: string } | { type: "em
 
 export type CreateFolderFromInstances = { instances: FEInstanceId[]; targetInstanceId?: FEInstanceId | null }
 
-export type FEServerState = { status: "stopped"; failed_task: number | null } | { status: "installing"; task_id: number } | { status: "starting" } | { status: "running"; uptime_seconds: number; process_id: number } | { status: "stopping" } | { status: "deleting" }
+export type FEServerState = { status: "stopped"; failed_task: number | null } | { status: "installing"; task_id: number } | { status: "starting" } | { status: "running"; uptime_seconds: number; process_id: number } | { status: "stopping" } | { status: "deleting" } | { status: "recoveredRunning"; process_id: number; graceful_stop: boolean } | { status: "recoveredUnverified"; process_id: number | null }
 
 export type MRFESearchFacet = { Category: string } | { Version: string } | { License: string } | { ProjectType: string }
 
@@ -547,7 +549,7 @@ export type FERequestDeletionStatus = "success" | { failed: FERequestDeletionFai
 
 export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"
 
-export type BanIpRequest = { serverId: FEServerId; ip: string; reason: string | null }
+export type FEDuplicateGroup = { modid: string; files: FEDuplicateSide[] }
 
 export type CFFEModLinks = { websiteUrl: string | null; wikiUrl: string | null; issuesUrl: string | null; sourceUrl: string | null }
 
@@ -626,7 +628,7 @@ export type Set<T> = { Set: T }
 
 export type CurseForgeModMetadata = { project_id: number; file_id: number; name: string; version: string; urlslug: string; summary: string; authors: string; has_image: boolean }
 
-export type XboxError = "noAccount" | "xboxServicesBanned" | "adultVerificationRequired" | "childAccount" | { unknown: number }
+export type FullImportScanStatus = { session: string | null; error: string | null; scanning: boolean; status: ImportScanStatus }
 
 export type FESharedMod = { name: string; curseforgeProjectId: number | null; curseforgeFileId: number | null; curseforgeSlug: string | null; modrinthProjectId: string | null; modrinthVersionId: string | null; modrinthSlug: string | null }
 
@@ -910,7 +912,7 @@ export type ExploreEntryType = { File: { size: number } } | "Directory"
 
 export type GameLogEntry = { id: GameLogId; instance_id: FEInstanceId; active: boolean; timestamp: string; file_size: number | null }
 
-export type BanPlayerRequest = { serverId: FEServerId; username: string; reason: string | null }
+export type FEManagedJavaSetupArgs = { os: FEManagedJavaOs; arch: FEManagedJavaArch; vendor: FEVendor; id: string }
 
 export type FERequestDeletionFailed = { cooldown: number | null; message: string | null }
 
@@ -919,5 +921,6 @@ export type FECurseforgeSearchSortField = "featured" | "popularity" | "totalDown
 export type PackProofContext = { platform: string; project_id: string; version_id: string }
 export type CleanupSelection = { path: string; sha512: string; context: PackProofContext; proven: boolean }
 
-export type ShaderLoaderVerification = { instance_id: number; mc_version: string; modloaders: string[]; filename: string; sha1: string; size: number };
-export type ShaderLoaderInstall = { task_id: number; verification: ShaderLoaderVerification };
+export type FEChangeDisplayNameStatus = { status: "success" } | { status: "failed"; value: number | null }
+
+export type LegacyDatapack = { filename: string; sha512: string; selectedWorld: string }

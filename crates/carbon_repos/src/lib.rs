@@ -72,6 +72,19 @@ pub fn get_migrations() -> (MigrationSet, i32) {
         historical_migration!("20260325000000_add_server_icon_revision"),
         historical_migration!("20260328000000_add_server_modloader_and_addons"),
         historical_migration!("20260410000000_add_server_modpack_info"),
+        // Downgrade cannot represent same-named addons in distinct worlds.
+        // Keep this boundary explicit rather than discarding ownership on downgrade.
+        MigrationDef {
+            name: "20261004000000_server_addon_location",
+            up_sql: include_str!(
+                "../prisma/migrations/20261004000000_server_addon_location/migration.sql"
+            ),
+            down_sql: Some(include_str!(
+                "../prisma/migrations/20261004000000_server_addon_location/down.sql"
+            )),
+            kind: MigrationKind::Breaking,
+            data_down: "full",
+        },
         // new-migration:anchor — the tool inserts new MigrationDef entries directly above this line
     ];
     let count = migrations.len() as i32;

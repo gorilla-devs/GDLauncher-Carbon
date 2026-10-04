@@ -55,6 +55,7 @@
   "_trn_enable_metrics_title": "Activer les mesures anonymes et les fonctionnalités expérimentales",
   "_trn_enable_metrics_text": "Choisissez d'activer ou non les mesures anonymes et les fonctionnalités expérimentales via les indicateurs de fonctionnalités.",
   "_trn_restart_app": "Redémarrer l'application",
+  "_trn_restart_failed": "GDLauncher n’a pas pu redémarrer. Fermez-le et rouvrez-le.",
   "_trn_reset_all_data": "Réinitialiser toutes les données",
   "_trn_check_for_updates": "Vérifier les mises à jour",
   "_trn_custom_commands_title": "Commandes personnalisées",

@@ -45,9 +45,24 @@ import {
   validateRuntimeDestination,
   type RuntimePathValidation
 } from "./utils/runtimeRelocation"
-import { stopCoreForRelocation } from "./utils/coreShutdown"
+import {
+  recordRuntimeMoveNotice,
+  takeRuntimeMoveNotice,
+  dismissRuntimeMoveNotice
+} from "./utils/runtimeMoveNotice"
+import {
+  ShutdownBlockedError,
+  ShutdownRefusedError,
+  cancelCoreShutdown,
+  checkRelocation,
+  forceTerminateCore,
+  relocationLeaseHeld,
+  stopCoreForRelocation,
+  stopCoreForShutdown
+} from "./utils/coreShutdown"
 import {
   runtimeOperationActive,
+  whenRuntimeOperationIdle,
   withRuntimeOperation
 } from "./utils/runtimeOperation"
 import {
@@ -1064,16 +1079,26 @@ async function createWindow(): Promise<BrowserWindow> {
 }
 
 // Handlers
+// Restart shares ordinary shutdown/game-survival when a READY owned core
+// exists; if it does not finish, the user decides (utils/shutdownFlow).
 ipcMain.handle("relaunch", async () =>
   withRuntimeOperation(async () => {
     console.log("relaunching app...")
 
-    await killCoreProcess()
+    if ((await ownedShutdown("restart")) === "kept")
+      return { status: "kept" as const }
 
     app.relaunch()
     app.exit()
+    return { status: "relaunching" as const }
   })
 )
+/** Keep GDLauncher open on a reset or restore: nothing was changed. */
+const keptBeforeDatabaseChange = () =>
+  new Error(
+    "GDLauncher was kept open, so the database was not changed. Close what is still running and try again."
+  )
+
 
 ipcMain.handle("deleteDbAndRestart", async () =>
   withRuntimeOperation(async () => {
@@ -1313,18 +1338,38 @@ ipcMain.handle(
   }
 )
 
-ipcMain.handle("validateRuntimePath", async (_, newPath: string | null) => {
-  if (!newPath) return "invalid"
-  try {
-    return await validateRuntimeDestination(
-      newPath,
-      CURRENT_RUNTIME_PATH,
-      runtimeDestinationContext()
-    )
-  } catch {
-    return "invalid"
+ipcMain.handle("takeRuntimeMoveNotice", async () =>
+  CURRENT_RUNTIME_PATH
+    ? takeRuntimeMoveNotice(app.getPath("userData"), CURRENT_RUNTIME_PATH)
+    : null
+)
+
+// The user acknowledged the notice; until then every start shows it again.
+ipcMain.handle("dismissRuntimeMoveNotice", async () =>
+  dismissRuntimeMoveNotice(app.getPath("userData"))
+)
+
+ipcMain.handle(
+  "validateRuntimePath",
+  async (_, newPath: string | null): Promise<RuntimePathValidation> => {
+    if (!newPath) return "invalid"
+    try {
+      return await validateRuntimeDestination(
+        newPath,
+        CURRENT_RUNTIME_PATH,
+        runtimeDestinationContext()
+      )
+    } catch (error) {
+      // An unfinished move gets its own answer so Settings can name the way out.
+      // Only a partial copy of the folder in use is safe to call deletable.
+      if (error instanceof IncompleteMigrationError)
+        return error.fromSource
+          ? "incomplete_migration"
+          : "other_incomplete_migration"
+      return "invalid"
+    }
   }
-})
+)
 
 ipcMain.handle("getCoreModule", async () => {
   // we can assume this promise never rejects
@@ -1394,6 +1439,8 @@ app.whenReady().then(async () => {
     }
   })
 
+  // During a quit that is still finishing, the hidden window comes back
+  // with its prompt instead of a second window being created.
   app.on("activate", () => {
     if (!win || win.isDestroyed()) {
       createWindow()
@@ -1432,46 +1479,68 @@ app.whenReady().then(async () => {
     }
   )
 
-  initAutoUpdater(e2eUpdateFeed?.value)
+  initAutoUpdater(e2eUpdateFeed?.value, () => ownedShutdown("update"))
 })
 
-app.on("window-all-closed", async () => {
-  if (runtimeOperationActive()) return
-  if (isSpawningWindow) {
-    return
-  }
-
-  try {
-    const _coreModule = await coreModule
-    if (_coreModule.type === "success") {
-      _coreModule.result.kill()
-    }
-  } catch {
-    // No op
-  }
-
+/**
+ * Shows the launcher window again: the one hidden while a quit finishes, or
+ * a new one if there is none. A second launch or a Dock click during a quit
+ * that is still running shows that quit's prompt instead of a new window.
+ */
+function revealWindow() {
   if (win && !win.isDestroyed()) {
-    win.close()
-    win.destroy()
-  }
+    if (win.isMinimized()) win.restore()
+    win.show()
+    win.focus()
+  } else void createWindow()
+  shutdownFlow?.reveal()
+}
+function hideWindow() {
+  if (win && !win.isDestroyed()) win.hide()
+}
 
-  win = null
+let shutdownInFlight: Promise<ShutdownOutcome> | undefined
+let shutdownFlow: ShutdownFlow | undefined
+let shutdownApproved = false
+async function prepareOwnedShutdown(purpose: "quit" | "update"): Promise<void> {
+  if (shutdownApproved) return
+  if (shutdownInFlight) return shutdownInFlight
+  shutdownInFlight = (async () => {
+    const core = await coreModule
+    if (core.type === "success")
+      await stopCoreForShutdown(
+        { ...core.result, process: coreProcessHandle },
+        purpose
+      )
+    shutdownApproved = true
+  })()
+  shutdownFlow = flow
+  shutdownInFlight = run
+  const done = () => {
+    if (shutdownInFlight !== run) return
+    shutdownInFlight = undefined
+    shutdownFlow = undefined
+  }
+  void run.then(done, done)
+  return run
+}
+app.on("window-all-closed", () => {
+  if (runtimeOperationActive() || isSpawningWindow) return
   app.quit()
 })
-
-app.on("before-quit", async (event) => {
-  if (runtimeOperationActive()) {
-    event.preventDefault()
-    return
-  }
-  try {
-    const _coreModule = await coreModule
-    if (_coreModule.type === "success") {
-      _coreModule.result.kill()
-    }
-  } catch {
-    // No op
-  }
+app.on("before-quit", (event) => {
+  if (shutdownApproved) return
+  event.preventDefault()
+  if (runtimeOperationActive() || shutdownInFlight) return
+  void prepareOwnedShutdown("quit")
+    .then(() => app.quit())
+    .catch(async (error) => {
+      await dialog.showMessageBox({
+        type: "error",
+        title: "Shutdown incomplete",
+        message: String(error)
+      })
+    })
 })
 
 app.on("render-process-gone", (event, webContents, detailed) => {
@@ -1479,6 +1548,10 @@ app.on("render-process-gone", (event, webContents, detailed) => {
   webContents.reload()
 })
 
+// macOS delivers a link here, Windows and Linux through 'second-instance'.
+// During a quit that is still finishing, the link shows that quit's prompt
+// as 'second-instance' does, instead of reaching a hidden window or a new one
+// the quit then closes.
 app.on("open-url", (event, url) => {
   console.log("Protocol URL received:", url)
 

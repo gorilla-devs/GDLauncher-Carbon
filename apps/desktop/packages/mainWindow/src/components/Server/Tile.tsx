@@ -24,6 +24,8 @@ import { useModal } from "@/managers/ModalsManager"
 import { getModloaderIcon } from "@/utils/sidebar"
 import { getServerImageUrl } from "@/utils/instances"
 import { BaseTile } from "../BaseTile"
+import { recoveredServerAction } from "@/utils/recoveredServer"
+import { useRecoveredServerAction } from "@/pages/Library/Server/useRecoveredServerAction"
 
 export const [clickedServerId, setClickedServerId] = createSignal<
   string | undefined
@@ -87,8 +89,15 @@ const ServerTile = (props: Props) => {
   }))
 
   const statusKey = () => props.server.state.status
-  const isRunning = () => statusKey() === "running"
-  const isBusy = () => statusKey() === "starting" || statusKey() === "stopping"
+  // Left behind by an earlier session: still running, or unverified.
+  const recoveredAction = () => recoveredServerAction(props.server.state)
+  const recovered = useRecoveredServerAction()
+  const isRunning = () =>
+    statusKey() === "running" || statusKey() === "recoveredRunning"
+  const isBusy = () =>
+    statusKey() === "starting" ||
+    statusKey() === "stopping" ||
+    recovered.isPending()
   const isDeleting = () => statusKey() === "deleting"
   const isInstalling = () => statusKey() === "installing"
 
@@ -175,7 +184,9 @@ const ServerTile = (props: Props) => {
   const handlePlayStop = (e: MouseEvent) => {
     e.stopPropagation()
     if (isBusy() || isDeleting() || isInstalling()) return
-    if (isRunning()) {
+    if (recoveredAction()) {
+      recovered.run(props.server)
+    } else if (isRunning()) {
       stopServerMutation.mutate(props.server.id)
     } else {
       startServerMutation.mutate(props.server.id)
@@ -236,6 +247,28 @@ const ServerTile = (props: Props) => {
               </ContextMenuItem>
               <ContextMenuSeparator />
               <Switch>
+                <Match when={recoveredAction() === "clearRecord"}>
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={() => recovered.run(props.server)}
+                    disabled={isBusy()}
+                  >
+                    <div class="i-hugeicons:eraser h-4 w-4" />
+                    {t("instances:_trn_server_action_clear_record")}
+                  </ContextMenuItem>
+                </Match>
+                <Match when={recoveredAction()}>
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={() => recovered.run(props.server)}
+                    disabled={isBusy()}
+                  >
+                    <div class="i-hugeicons:stop h-4 w-4" />
+                    {recoveredAction() === "forceStop"
+                      ? t("instances:_trn_server_action_force_stop")
+                      : t("instances:_trn_server_stop")}
+                  </ContextMenuItem>
+                </Match>
                 <Match when={!isRunning()}>
                   <ContextMenuItem
                     class="flex items-center gap-2"
@@ -357,6 +390,13 @@ const ServerTile = (props: Props) => {
           isWaiting={isInstalling() && !isLoading()}
           isRunning={isRunning()}
           isBusy={isBusy()}
+          glowTone={
+            statusKey() === "recoveredRunning"
+              ? "yellow"
+              : statusKey() === "recoveredUnverified"
+                ? "orange"
+                : undefined
+          }
           isDeleting={isDeleting()}
           failError={failError()}
           onDismissError={handleDismissError}
@@ -386,16 +426,22 @@ const ServerTile = (props: Props) => {
               <div
                 class="text-lightSlate-50 h-5 w-5 shrink-0"
                 classList={{
-                  "i-hugeicons:stop": isRunning(),
-                  "i-hugeicons:play": !isRunning() && !isBusy(),
+                  "i-hugeicons:stop": isRunning() && !isBusy(),
+                  "i-hugeicons:eraser":
+                    recoveredAction() === "clearRecord" && !isBusy(),
+                  "i-hugeicons:play":
+                    !isRunning() && !isBusy() && !recoveredAction(),
                   "i-hugeicons:loading-03 animate-spin": isBusy()
                 }}
               />
               <Show when={props.size >= 2}>
                 <span class="text-lightSlate-50 text-base font-semibold">
                   <Switch>
-                    <Match when={isRunning()}>STOP</Match>
                     <Match when={isBusy()}>...</Match>
+                    <Match when={recoveredAction() === "clearRecord"}>
+                      {t("instances:_trn_server_action_clear_record")}
+                    </Match>
+                    <Match when={isRunning()}>STOP</Match>
                     <Match when={true}>START</Match>
                   </Switch>
                 </span>

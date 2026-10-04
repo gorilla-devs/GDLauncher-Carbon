@@ -41,7 +41,7 @@ fn extract_fe_error(
 ) -> (Option<String>, Option<serde_json::Value>) {
     use crate::managers::account::gdl_account::{AvatarUploadError, InstanceShareError};
     use crate::managers::instance::run::InsufficientMemoryError;
-    use crate::managers::server::EulaNotAcceptedError;
+    use crate::managers::server::{EulaNotAcceptedError, RecoveredServerError};
 
     macro_rules! try_downcast {
         ($entry:expr, $($ty:ty),+ $(,)?) => {
@@ -58,7 +58,8 @@ fn extract_fe_error(
         InstanceShareError,
         AvatarUploadError,
         InsufficientMemoryError,
-        EulaNotAcceptedError
+        EulaNotAcceptedError,
+        RecoveredServerError
     );
 
     (None, None)

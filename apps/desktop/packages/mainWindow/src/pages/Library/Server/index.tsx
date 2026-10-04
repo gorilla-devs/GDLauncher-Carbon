@@ -13,6 +13,11 @@ import DetailPageLayout, {
 } from "@/pages/Library/shared/DetailPageLayout"
 import { useEntityGoneGuard } from "@/pages/Library/shared/useEntityGoneGuard"
 import { isConsoleFullScreen } from "./Tabs/ConsoleTab"
+import { useRecoveredServerAction } from "./useRecoveredServerAction"
+import {
+  recoveredServerAction,
+  recoveredServerPid
+} from "@/utils/recoveredServer"
 
 interface ServerTab {
   id: string
@@ -190,6 +195,8 @@ const Server = (props: { children?: any }) => {
               {/* Status badge */}
               <div
                 class="flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-medium"
+                data-testid="server-status-badge"
+                data-status={details()?.state?.status}
                 classList={{
                   "bg-green-900/30 text-green-400": isRunning(),
                   "bg-yellow-900/30 text-yellow-400": isStarting(),
@@ -211,6 +218,12 @@ const Server = (props: { children?: any }) => {
                 <Switch>
                   <Match when={isRunning()}>
                     <Trans key="instances:_trn_server_status_running" />
+                  </Match>
+                  <Match when={isRecoveredRunning()}>
+                    <Trans key="instances:_trn_server_status_recovered_running" />
+                  </Match>
+                  <Match when={isRecoveredUnverified()}>
+                    <Trans key="instances:_trn_server_status_recovered_unverified" />
                   </Match>
                   <Match when={isStarting()}>
                     <Trans key="instances:_trn_server_status_starting" />
@@ -311,9 +324,17 @@ const Server = (props: { children?: any }) => {
             onClick={handleStartStop}
           >
             <Switch>
-              <Match when={isRunning()}>
+              <Match when={isRunning() || recoveredAction() === "stop"}>
                 <div class="i-hugeicons:stop text-xl" />
                 <Trans key="instances:_trn_server_action_stop" />
+              </Match>
+              <Match when={recoveredAction() === "forceStop"}>
+                <div class="i-hugeicons:stop text-xl" />
+                <Trans key="instances:_trn_server_action_force_stop" />
+              </Match>
+              <Match when={recoveredAction() === "clearRecord"}>
+                <div class="i-hugeicons:eraser text-xl" />
+                <Trans key="instances:_trn_server_action_clear_record" />
               </Match>
               <Match when={isStarting()}>
                 <Trans key="instances:_trn_server_action_starting" />
@@ -346,8 +367,11 @@ const Server = (props: { children?: any }) => {
               onClick={handleStartStop}
             >
               <Switch>
-                <Match when={isRunning()}>
+                <Match when={showStop()}>
                   <div class="i-hugeicons:stop text-xl" />
+                </Match>
+                <Match when={isRecoveredUnverified()}>
+                  <div class="i-hugeicons:eraser text-xl" />
                 </Match>
                 <Match when={true}>
                   <div class="i-hugeicons:play text-xl" />

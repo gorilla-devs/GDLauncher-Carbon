@@ -705,6 +705,7 @@ pub async fn launch_minecraft(
     instance_path: InstancePath,
     assets_dir: super::assets::AssetsDir,
     wrapper_command: Option<String>,
+    ownership: &mut crate::managers::runtime_lifecycle::RuntimeActivity,
 ) -> anyhow::Result<Child> {
     // Mojang/Forge/Fabric version manifests embed the live MS access token as
     // `--accessToken <token>` (and `--session token:<token>:<uuid>` for legacy
@@ -805,13 +806,15 @@ pub async fn launch_minecraft(
     // Deliberately no `kill_on_drop(true)` here: dropping the handle must not
     // end the user's game. A game outlives the launcher session that started
     // it, and the pidfile written immediately after this spawn is how the
-    // next core finds it again. A local server is the opposite — launcher-
-    // hosted infrastructure — and keeps `kill_on_drop` in
-    // `LocalServerProvider::start`.
+    // next core finds it again. Local servers instead have an explicit bounded
+    // captured-generation stop/escalation supervisor.
 
     let child = command_exec.args(command_args);
 
-    Ok(child.spawn()?)
+    Ok(ownership.spawn(
+        crate::managers::runtime_lifecycle::ActivityPolicy::Game,
+        || child.spawn(),
+    )?)
 }
 
 pub async fn extract_natives(

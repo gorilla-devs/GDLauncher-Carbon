@@ -63,7 +63,10 @@ function applyUpdateFeedOverride(feedUrl: string): void {
   log.info("[updater] Feed URL overridden:", feedUrl)
 }
 
-export default function initAutoUpdater(updateFeedOverride?: string | null) {
+export default function initAutoUpdater(
+  updateFeedOverride?: string | null,
+  prepareShutdown?: () => Promise<"stopped" | "forced" | "kept">
+) {
   log.transports.file.level = "info"
   autoUpdater.logger = log
 
@@ -146,6 +149,8 @@ export default function initAutoUpdater(updateFeedOverride?: string | null) {
 
   ipcMain.handle("installUpdate", async () => {
     assertRuntimeOperationAvailable()
+    if (!prepareShutdown) throw new Error("Owned core shutdown is unavailable")
+    await prepareShutdown()
     autoUpdater.quitAndInstall(true, true)
   })
 

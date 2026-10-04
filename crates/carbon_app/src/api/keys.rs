@@ -223,6 +223,8 @@ keys! {
         START_SERVER                                = "startServer";
         STOP_SERVER                                 = "stopServer";
         KILL_SERVER                                 = "killServer";
+        STOP_RECOVERED_SERVER                       = "stopRecoveredServer";
+        CLEAR_SERVER_MARKER                         = "clearServerMarker";
         SEND_CONSOLE_COMMAND                        = "sendConsoleCommand";
         GET_SERVER_DETAILS                          = "getServerDetails";
         GET_SERVER_METRICS                          = "getServerMetrics";
@@ -249,6 +251,8 @@ keys! {
         GET_BANNED_IPS                              = "getBannedIps";
         BAN_IP                                      = "banIp";
         UNBAN_IP                                    = "unbanIp";
+        GET_LEGACY_DATAPACKS = "getLegacyDatapacks";
+        RECOVER_LEGACY_DATAPACK = "recoverLegacyDatapack";
         GET_SERVER_ADDONS                           = "getServerAddons";
         ENABLE_SERVER_ADDON                         = "enableServerAddon";
         DELETE_SERVER_ADDON                         = "deleteServerAddon";

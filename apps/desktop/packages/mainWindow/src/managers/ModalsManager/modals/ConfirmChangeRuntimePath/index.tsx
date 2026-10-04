@@ -2,10 +2,132 @@ import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { Button, Progress } from "@gd/ui"
 import { Trans } from "@gd/i18n"
-import { Match, Show, Switch, createResource, createSignal } from "solid-js"
+import {
+  For,
+  Match,
+  Show,
+  Switch,
+  createResource,
+  createSignal
+} from "solid-js"
 import { Portal } from "solid-js/web"
 import { RTprogress, RTsetProgress } from "@/utils/runtimePathProgress"
 import { isChangingRuntimePath, setIsChangingRuntimePath } from "./state"
+
+const blockerLabel = {
+  game: "java:_trn_runtime_relocation_busy.game",
+  server: "java:_trn_runtime_relocation_busy.server",
+  install: "java:_trn_runtime_relocation_busy.install",
+  deletion: "java:_trn_runtime_relocation_busy.deletion",
+  task: "java:_trn_runtime_relocation_busy.task",
+  unconfirmed: "java:_trn_runtime_relocation_busy.unconfirmed",
+  previousGame: "java:_trn_runtime_relocation_busy.previous_game",
+  previousProcess: "java:_trn_runtime_relocation_busy.previous_process",
+  unreadableRecord: "java:_trn_runtime_relocation_busy.unreadable_record",
+  startupCheckPending:
+    "java:_trn_runtime_relocation_busy.startup_check_pending",
+  startupCheckFailed: "java:_trn_runtime_relocation_busy.startup_check_failed",
+  shutdown: "java:_trn_runtime_relocation_busy.shutdown",
+  relocation: "java:_trn_runtime_relocation_busy.relocation"
+} as const satisfies Record<RuntimeBlocker["kind"], string>
+// A kind this build does not know yet still gets a plain label.
+const labelFor = (kind: string) =>
+  Object.hasOwn(blockerLabel, kind)
+    ? blockerLabel[kind as RuntimeBlocker["kind"]]
+    : blockerLabel.task
+/**
+ * Running work that the plain "close Minecraft, stop your servers and let
+ * downloads finish" body covers. Any other row gets the "here is what to do"
+ * body; every label says what to do about it, so a mixed list keeps each step.
+ */
+const closable = new Set<string>([
+  "game",
+  "server",
+  "install",
+  "deletion",
+  "task",
+  "previousGame"
+])
+/**
+ * Only restarting GDLauncher clears these; Try again never will. A failed
+ * startup check never holds up a quit or restart, so the restart goes
+ * through. An unreadable record is not listed: Try again reads its file
+ * again, so deleting it, or a lock on it lifting, clears it without a
+ * restart, and so does a launch of its instance once the game exits. An
+ * unconfirmed task is not listed either: it can still settle on its own,
+ * and restarting with one left ends unresolved.
+ */
+const restartOnly = new Set<string>(["startupCheckFailed"])
+/**
+ * For running work the name is an internal owner ("game 3", a function
+ * name), so only its label is shown. The other kinds, and any kind this build
+ * does not know, name a folder, a process or an error the user can act on.
+ */
+const hiddenName = new Set<string>([
+  "game",
+  "server",
+  "install",
+  "deletion",
+  "task",
+  "unconfirmed",
+  "startupCheckPending",
+  "shutdown",
+  "relocation"
+])
+const fileName = (path: string) => path.split(/[\\/]/).at(-1) ?? ""
+/**
+ * A launch of the instance replaces its marker and the game's exit removes
+ * it, so that file has a way out that needs no file manager.
+ */
+const isInstanceMarker = (path: string) =>
+  fileName(path) === ".gdl_instance.pid"
+/**
+ * A server's folder (`<runtime>/servers/<name>`) and its marker. The server
+ * page can stop a server left running by an earlier session, letting it save
+ * where the system allows, or clear its record, so those rows point there
+ * before Task Manager or a reboot.
+ */
+const isServerFolder = (path: string) =>
+  path.split(/[\\/]/).filter(Boolean).at(-2) === "servers"
+const isServerMarker = (path: string) => fileName(path) === ".gdl_server.pid"
+/** Finder and most Linux file managers hide dot files; Explorer does not. */
+const hiddenByFileManager = (path: string) =>
+  fileName(path).startsWith(".") && !navigator.platform.startsWith("Win")
+/**
+ * Everything else here is not selectable (index.html), but a path is
+ * something to copy into a file manager or a support request.
+ */
+const selectable = { "user-select": "text", cursor: "text" } as const
+/** One row per label and detail: two servers are one "a server is running". */
+function blockerRows(blockers: RuntimeBlocker[]) {
+  const rows = new Map<
+    string,
+    {
+      kind: string
+      detail: string
+      pid: number | undefined
+      program: string | undefined
+    }
+  >()
+  for (const blocker of blockers) {
+    const detail = hiddenName.has(blocker.kind) ? "" : blocker.name
+    // What Task Manager and Activity Monitor list a leftover process by.
+    const pid = typeof blocker.pid === "number" ? blocker.pid : undefined
+    // The program holding that PID now, so the user can tell whether it is
+    // Java before ending anything.
+    const program =
+      pid !== undefined &&
+      typeof blocker.program === "string" &&
+      blocker.program.trim()
+        ? blocker.program.trim()
+        : undefined
+    rows.set(
+      `${labelFor(blocker.kind)}\n${detail}\n${pid ?? ""}\n${program ?? ""}`,
+      { kind: blocker.kind, detail, pid, program }
+    )
+  }
+  return [...rows.values()]
+}
 
 const ConfirmChangeRuntimePath = (props: ModalProps) => {
   const modalsContext = useModal()
@@ -20,7 +142,8 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
 
   const progressValue = () => {
     const p = RTprogress()
-    if (!p || p.action === "scan" || p.total === 0) return 0
+    if (!p || p.action === "scan" || p.action === "check" || p.total === 0)
+      return 0
     return (p.current * 100) / p.total
   }
 
@@ -112,11 +235,191 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
           <div
             class="z-9999 fixed inset-0 flex flex-col items-center justify-center bg-opacity-65 p-8 backdrop-blur-sm"
             classList={{
-              "bg-black": !migrationError(),
-              "bg-red-900": !!migrationError()
+              "bg-black": !migrationError() || !!busy(),
+              "bg-red-900": !!migrationError() && !busy()
             }}
           >
             <Switch>
+              <Match when={migrationError() ? busy() : undefined}>
+                {(blockers) => (
+                  <div class="max-w-2xl text-center">
+                    <div class="text-2xl">
+                      <Trans key="java:_trn_runtime_relocation_busy.title" />
+                    </div>
+                    <p class="mt-4 text-base">
+                      <Switch
+                        fallback={
+                          <Trans key="java:_trn_runtime_relocation_busy.body_steps" />
+                        }
+                      >
+                        <Match when={blockers().length === 0}>
+                          <Trans key="java:_trn_runtime_relocation_busy.not_started" />
+                        </Match>
+                        <Match
+                          when={blockers().every((b) => closable.has(b.kind))}
+                        >
+                          <Trans key="java:_trn_runtime_relocation_busy.body" />
+                        </Match>
+                      </Switch>
+                    </p>
+                    <Show when={blockers().length > 0}>
+                      <ul class="bg-darkSlate-900 mt-4 flex flex-col gap-2 rounded-md p-4 text-left">
+                        <For each={blockerRows(blockers())}>
+                          {(row) => (
+                            <li>
+                              <Trans key={labelFor(row.kind)} />
+                              <Show when={row.detail}>
+                                <div
+                                  class="text-lightSlate-400 break-all text-xs"
+                                  style={selectable}
+                                >
+                                  {row.detail}
+                                </div>
+                              </Show>
+                              <Show when={row.pid !== undefined}>
+                                <div
+                                  class="text-lightSlate-400 text-xs"
+                                  data-testid="relocation-pid"
+                                >
+                                  <Show
+                                    when={row.program}
+                                    fallback={
+                                      <Trans
+                                        key="java:_trn_runtime_relocation_busy.pid"
+                                        options={{ pid: row.pid }}
+                                      />
+                                    }
+                                  >
+                                    {(program) => (
+                                      <Trans
+                                        key="java:_trn_runtime_relocation_busy.pid_program"
+                                        options={{
+                                          pid: row.pid,
+                                          program: program(),
+                                          // Rendered as text; escaping would show "&amp;" for "&".
+                                          interpolation: { escapeValue: false }
+                                        }}
+                                      />
+                                    )}
+                                  </Show>
+                                </div>
+                              </Show>
+                              <Show
+                                when={
+                                  row.kind === "previousProcess" &&
+                                  isServerFolder(row.detail)
+                                }
+                              >
+                                <div
+                                  class="text-lightSlate-400 mt-1 text-xs"
+                                  data-testid="relocation-server-hint"
+                                >
+                                  <Trans key="java:_trn_runtime_relocation_busy.previous_server" />
+                                </div>
+                              </Show>
+                              <Show
+                                when={
+                                  row.kind === "unreadableRecord" && row.detail
+                                }
+                              >
+                                {(file) => (
+                                  <>
+                                    <Show when={isInstanceMarker(file())}>
+                                      <div class="text-lightSlate-400 mt-1 text-xs">
+                                        <Trans key="java:_trn_runtime_relocation_busy.unreadable_instance_marker" />
+                                      </div>
+                                    </Show>
+                                    <Show when={isServerMarker(file())}>
+                                      <div
+                                        class="text-lightSlate-400 mt-1 text-xs"
+                                        data-testid="relocation-server-hint"
+                                      >
+                                        <Trans key="java:_trn_runtime_relocation_busy.unreadable_server_marker" />
+                                      </div>
+                                    </Show>
+                                    <Show when={hiddenByFileManager(file())}>
+                                      <div class="text-lightSlate-400 mt-1 text-xs">
+                                        <Trans key="java:_trn_runtime_relocation_busy.hidden_file" />
+                                      </div>
+                                    </Show>
+                                    <Button
+                                      class="mt-2"
+                                      size="small"
+                                      type="secondary"
+                                      onClick={() => window.openFolder(file())}
+                                    >
+                                      <Trans key="java:_trn_runtime_relocation_busy.show_file" />
+                                    </Button>
+                                  </>
+                                )}
+                              </Show>
+                            </li>
+                          )}
+                        </For>
+                      </ul>
+                    </Show>
+                    <Show when={restartFailed()}>
+                      <p class="text-yellow-300 mt-4 text-base">
+                        <Trans key="java:_trn_runtime_relocation_busy.restart_failed" />
+                      </p>
+                    </Show>
+                    <div class="mt-6 flex justify-center gap-4">
+                      <Button
+                        type="secondary"
+                        disabled={isChangingRuntimePath()}
+                        onClick={() => {
+                          setMigrationError(undefined)
+                          setBusy(undefined)
+                          setRestartFailed(false)
+                          modalsContext?.closeModal()
+                        }}
+                      >
+                        <Trans key="general:_trn_dismiss" />
+                      </Button>
+                      <Show
+                        when={blockers().some((b) => restartOnly.has(b.kind))}
+                      >
+                        <Button
+                          disabled={isChangingRuntimePath()}
+                          onClick={async () => {
+                            if (isChangingRuntimePath()) return
+                            setIsChangingRuntimePath(true)
+                            setRestartFailed(false)
+                            try {
+                              await window.relaunch()
+                            } catch (error) {
+                              // Nothing was moved, so the calm view stays and
+                              // says so; the raw reason is for the logs only.
+                              console.error(
+                                "Restart from the move refusal failed",
+                                error
+                              )
+                              setRestartFailed(true)
+                            } finally {
+                              setIsChangingRuntimePath(false)
+                            }
+                          }}
+                        >
+                          <Trans key="java:_trn_runtime_relocation_busy.restart" />
+                        </Button>
+                      </Show>
+                      <Show
+                        when={
+                          blockers().length === 0 ||
+                          !blockers().every((b) => restartOnly.has(b.kind))
+                        }
+                      >
+                        <Button
+                          disabled={isChangingRuntimePath()}
+                          onClick={() => attemptRelocation(false)}
+                        >
+                          <Trans key="java:_trn_runtime_relocation_busy.try_again" />
+                        </Button>
+                      </Show>
+                    </div>
+                  </div>
+                )}
+              </Match>
               <Match when={migrationError()}>
                 <div class="max-w-2xl text-center">
                   <div class="text-2xl">
@@ -161,12 +464,23 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                   <div class="i-hugeicons:loading-03 ml-2 animate-spin" />
                 </div>
 
-                <div class="text-yellow-300 mt-6 max-w-2xl text-center font-bold">
-                  <Trans key="java:_trn_do_not_close_app_or_pc_title" />
-                </div>
-                <div class="text-lightSlate-200 mt-2 max-w-2xl text-center text-sm">
-                  <Trans key="java:_trn_do_not_close_app_or_pc_body" />
-                </div>
+                {/* Until the core is asked to stop nothing is moved, and closing the
+                    app ends the move there (main/index.ts quitUnlessKeptAlive). */}
+                <Show
+                  when={RTprogress() && RTprogress()!.action !== "check"}
+                  fallback={
+                    <div class="text-lightSlate-200 mt-6 max-w-2xl text-center text-sm">
+                      <Trans key="java:_trn_checking_runtime_path" />
+                    </div>
+                  }
+                >
+                  <div class="text-yellow-300 mt-6 max-w-2xl text-center font-bold">
+                    <Trans key="java:_trn_do_not_close_app_or_pc_title" />
+                  </div>
+                  <div class="text-lightSlate-200 mt-2 max-w-2xl text-center text-sm">
+                    <Trans key="java:_trn_do_not_close_app_or_pc_body" />
+                  </div>
+                </Show>
 
                 <div class="text-lightSlate-400 mt-8 w-full max-w-2xl">
                   <div class="text-center text-sm">
@@ -212,7 +526,13 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                     </Switch>
                   </div>
 
-                  <Show when={RTprogress() && RTprogress()!.action !== "scan"}>
+                  <Show
+                    when={
+                      RTprogress() &&
+                      RTprogress()!.action !== "scan" &&
+                      RTprogress()!.action !== "check"
+                    }
+                  >
                     <div class="mt-2 text-center text-xs">
                       {RTprogress()!.current} / {RTprogress()!.total}
                     </div>

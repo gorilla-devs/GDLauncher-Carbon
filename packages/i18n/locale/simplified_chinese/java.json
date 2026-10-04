@@ -58,6 +58,7 @@
   "_trn_migration_errored": "运行时路径迁移失败。状态可能已损坏。点击<0>这里</0>了解如何继续的更多信息。",
   "_trn_migration_stopped": "迁移在完成前停止了。没有丢失任何数据。点击<0>这里</0>了解如何继续的更多信息。",
   "_trn_scanning_files": "正在扫描文件...",
+  "_trn_checking_runtime_path": "正在移动前检查您的数据文件夹...",
   "_trn_copying_file": "正在复制 {{file}}",
   "_trn_removing_file": "正在移除 {{file}}",
   "_trn_removing_partial_copy": "正在移除未完成的副本：{{file}}",

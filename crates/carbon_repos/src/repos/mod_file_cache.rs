@@ -34,6 +34,11 @@ pub struct ModFileCacheRow {
 
 #[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
 pub struct ServerModFileCacheRow {
+    pub source_platform: Option<String>,
+    pub source_project_id: Option<String>,
+    pub source_version_id: Option<String>,
+    pub source_sha512: Option<Vec<u8>>,
+    pub location: String,
     pub id: String,
     pub last_updated_at: DateTime<FixedOffset>,
     pub server_id: i32,
@@ -101,6 +106,14 @@ pub struct ModFullRow {
 /// presence — unlike the instance list).
 #[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
 pub struct ServerAddonFullRow {
+    pub source_platform: Option<String>,
+    pub source_project_id: Option<String>,
+    pub source_version_id: Option<String>,
+    pub source_sha512: Option<Vec<u8>>,
+    pub location: String,
+    pub sha512: Vec<u8>,
+    pub cf_file_id: Option<i32>,
+    pub mr_version_id: Option<String>,
     pub id: String,
     pub filename: String,
     pub enabled: bool,
@@ -260,10 +273,10 @@ queries! {
 
     // --- ServerModFileCache: plain reads/writes ------------------------------
     fn get_server_mod_file_cache_by_id(id: &str) -> Option<ServerModFileCacheRow> =
-        "SELECT id, lastUpdatedAt, serverId, filename, filesize, enabled, addonType, metadataId
+        "SELECT sourcePlatform, sourceProjectId, sourceVersionId, sourceSha512, location, id, lastUpdatedAt, serverId, filename, filesize, enabled, addonType, metadataId
          FROM ServerModFileCache WHERE id = :id";
     fn get_server_mod_files_by_server(server_id: i32) -> Vec<ServerModFileCacheRow> =
-        "SELECT id, lastUpdatedAt, serverId, filename, filesize, enabled, addonType, metadataId
+        "SELECT sourcePlatform, sourceProjectId, sourceVersionId, sourceSha512, location, id, lastUpdatedAt, serverId, filename, filesize, enabled, addonType, metadataId
          FROM ServerModFileCache WHERE serverId = :server_id";
     fn update_server_mod_file_enabled(id: &str, enabled: bool, updated_at: DbDateTime) -> usize =
         "UPDATE ServerModFileCache SET enabled = :enabled, lastUpdatedAt = :updated_at WHERE id = :id";
@@ -298,14 +311,21 @@ queries! {
          LEFT JOIN ModrinthModImageCache ri ON ri.metadataId = m.id
          WHERE f.instanceId = :instance_id";
 
+    fn publish_server_source(server_id: i32, addon_type: &str, location: &str, platform: &str, project: &str, version: &str, sha512: &[u8], updated_at: DbDateTime) -> usize =
+        "UPDATE ServerModFileCache SET sourcePlatform=:platform, sourceProjectId=:project, sourceVersionId=:version, sourceSha512=:sha512, lastUpdatedAt=:updated_at
+         WHERE serverId=:server_id AND addonType=:addon_type AND location=:location
+           AND EXISTS (SELECT 1 FROM ModMetadata m WHERE m.id=ServerModFileCache.metadataId AND m.sha512=:sha512)";
+
     // --- server addon list (thin flat tree) ----------------------------------
     fn get_server_mods_full(server_id: i32) -> Vec<ServerAddonFullRow> =
-        "SELECT f.id AS id, f.filename AS filename, f.enabled AS enabled,
+        "SELECT f.sourcePlatform AS sourcePlatform, f.sourceProjectId AS sourceProjectId, f.sourceVersionId AS sourceVersionId, f.sourceSha512 AS sourceSha512, m.sha512 AS sha512,
+                CASE WHEN f.sourcePlatform='cf' AND f.sourceSha512=m.sha512 THEN CAST(f.sourceVersionId AS INTEGER) WHEN f.sourcePlatform IS NULL THEN c.fileId ELSE NULL END AS cfFileId,
+                CASE WHEN f.sourcePlatform='mr' AND f.sourceSha512=m.sha512 THEN f.sourceVersionId WHEN f.sourcePlatform IS NULL THEN r.versionId ELSE NULL END AS mrVersionId, f.location AS location, f.id AS id, f.filename AS filename, f.enabled AS enabled,
                 f.addonType AS addonType, f.filesize AS filesize,
                 m.name AS metaName,
                 (li.metadataId IS NOT NULL) AS hasLocalImage,
-                c.projectId AS cfProjectId, (ci.metadataId IS NOT NULL) AS hasCfImage,
-                r.projectId AS mrProjectId, (ri.metadataId IS NOT NULL) AS hasMrImage
+                CASE WHEN f.sourcePlatform='cf' AND f.sourceSha512=m.sha512 THEN CAST(f.sourceProjectId AS INTEGER) WHEN f.sourcePlatform IS NULL THEN c.projectId ELSE NULL END AS cfProjectId, (ci.metadataId IS NOT NULL) AS hasCfImage,
+                CASE WHEN f.sourcePlatform='mr' AND f.sourceSha512=m.sha512 THEN f.sourceProjectId WHEN f.sourcePlatform IS NULL THEN r.projectId ELSE NULL END AS mrProjectId, (ri.metadataId IS NOT NULL) AS hasMrImage
          FROM ServerModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN LocalModImageCache li ON li.metadataId = m.id
@@ -571,11 +591,15 @@ const UPSERT_MOD_FILE_CACHE_CHECK: crate::registry::QueryCheck = crate::registry
 
 /// SQL executed by `upsert_server_mod_file_cache`.
 const UPSERT_SERVER_MOD_FILE_CACHE_SQL: &str =
-    "INSERT INTO ServerModFileCache (id, serverId, filename, filesize, enabled, addonType, metadataId, lastUpdatedAt)
-     VALUES (:id, :server_id, :filename, :filesize, :enabled, :addon_type, :metadata_id, :updated_at)
-     ON CONFLICT(serverId, filename) DO UPDATE SET
+    "INSERT INTO ServerModFileCache (location, id, serverId, filename, filesize, enabled, addonType, metadataId, lastUpdatedAt)
+     VALUES (:location, :id, :server_id, :filename, :filesize, :enabled, :addon_type, :metadata_id, :updated_at)
+     ON CONFLICT(serverId, addonType, location) DO UPDATE SET
        filesize = excluded.filesize,
        enabled = excluded.enabled,
+       sourcePlatform = CASE WHEN sourceSha512=(SELECT sha512 FROM ModMetadata WHERE id=excluded.metadataId) THEN sourcePlatform ELSE NULL END,
+       sourceProjectId = CASE WHEN sourceSha512=(SELECT sha512 FROM ModMetadata WHERE id=excluded.metadataId) THEN sourceProjectId ELSE NULL END,
+       sourceVersionId = CASE WHEN sourceSha512=(SELECT sha512 FROM ModMetadata WHERE id=excluded.metadataId) THEN sourceVersionId ELSE NULL END,
+       sourceSha512 = CASE WHEN sourceSha512=(SELECT sha512 FROM ModMetadata WHERE id=excluded.metadataId) THEN sourceSha512 ELSE NULL END,
        metadataId = excluded.metadataId,
        addonType = excluded.addonType,
        lastUpdatedAt = excluded.lastUpdatedAt";
@@ -592,18 +616,26 @@ pub fn upsert_server_mod_file_cache_conn(
     metadata_id: &str,
     updated_at: DbDateTime,
 ) -> Result<usize, rusqlite::Error> {
-    let id = uuid::Uuid::new_v4().to_string();
-    let mut st = conn.prepare_cached(UPSERT_SERVER_MOD_FILE_CACHE_SQL)?;
-    st.execute(rusqlite::named_params! {
-        ":id": id,
-        ":server_id": server_id,
-        ":filename": filename,
-        ":filesize": filesize,
-        ":enabled": enabled,
-        ":addon_type": addon_type,
-        ":metadata_id": metadata_id,
-        ":updated_at": updated_at,
-    })
+    let location = format!(
+        "{}/{}",
+        if addon_type == "mods" {
+            "mods"
+        } else {
+            "world/datapacks"
+        },
+        filename
+    );
+    upsert_server_mod_file_cache_at_location_conn(
+        conn,
+        server_id,
+        filename,
+        &location,
+        filesize,
+        enabled,
+        addon_type,
+        metadata_id,
+        updated_at,
+    )
 }
 
 /// Pool-routing wrapper for [`upsert_server_mod_file_cache_conn`].
@@ -633,11 +665,67 @@ pub async fn upsert_server_mod_file_cache(
     .await
 }
 
+pub fn upsert_server_mod_file_cache_at_location_conn(
+    conn: &impl crate::db_exec::WriteAccess,
+    server_id: i32,
+    filename: &str,
+    location: &str,
+    filesize: i32,
+    enabled: bool,
+    addon_type: &str,
+    metadata_id: &str,
+    updated_at: DbDateTime,
+) -> Result<usize, rusqlite::Error> {
+    let id = uuid::Uuid::new_v4().to_string();
+    let mut st = conn.prepare_cached(UPSERT_SERVER_MOD_FILE_CACHE_SQL)?;
+    st.execute(rusqlite::named_params! {
+        ":location": location,
+        ":id": id,
+        ":server_id": server_id,
+        ":filename": filename,
+        ":filesize": filesize,
+        ":enabled": enabled,
+        ":addon_type": addon_type,
+        ":metadata_id": metadata_id,
+        ":updated_at": updated_at,
+    })
+}
+
+/// Pool-routing wrapper for [`upsert_server_mod_file_cache_at_location_conn`].
+#[allow(clippy::too_many_arguments)]
+pub async fn upsert_server_mod_file_cache_at_location(
+    db: &Db,
+    server_id: i32,
+    filename: String,
+    location: String,
+    filesize: i32,
+    enabled: bool,
+    addon_type: String,
+    metadata_id: String,
+    updated_at: DbDateTime,
+) -> DbResult<usize> {
+    db.write(move |conn| {
+        Ok(upsert_server_mod_file_cache_at_location_conn(
+            &conn,
+            server_id,
+            &filename,
+            &location,
+            filesize,
+            enabled,
+            &addon_type,
+            &metadata_id,
+            updated_at,
+        )?)
+    })
+    .await
+}
+
 const UPSERT_SERVER_MOD_FILE_CACHE_CHECK: crate::registry::QueryCheck =
     crate::registry::QueryCheck {
         name: "upsert_server_mod_file_cache",
         sql: UPSERT_SERVER_MOD_FILE_CACHE_SQL,
         params: &[
+            ":location",
             ":id",
             ":server_id",
             ":filename",

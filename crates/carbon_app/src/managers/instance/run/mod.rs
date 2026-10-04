@@ -602,11 +602,13 @@ impl ManagerRef<'_, InstanceManager> {
                             instance_path.clone(),
                             assets_dir,
                             wrapper_command,
+                            game_activity.as_mut().expect("game ownership"),
                         )
                         .await;
                         if let Ok(child) = &launched {
                             if let Some(ownership) = &game_activity {
                                 ownership.record_child_pid(child.id())?;
+                                _runtime_activity.follow_spawned_game(ownership)?;
                             }
                         } else if let Some(ownership) = game_activity.take() {
                             ownership.finish();
@@ -803,7 +805,7 @@ impl ManagerRef<'_, InstanceManager> {
                         _ = child.wait() => {
                             tracing::debug!("Instance waited");
                         },
-                        _ = kill_rx.recv() => {
+                        Some(()) = kill_rx.recv() => {
                             tracing::debug!("Instance killed");
                             if let Err(e) = child.kill().await {
                                 tracing::warn!(
@@ -821,6 +823,7 @@ impl ManagerRef<'_, InstanceManager> {
                         }
                     }
 
+                    _runtime_activity.settling();
                     tracing::debug!("Instance exited");
 
                     let r = app
@@ -832,6 +835,7 @@ impl ManagerRef<'_, InstanceManager> {
                         tracing::error!({ error = ?e }, "error updating instance playtime");
                     }
 
+                    _runtime_activity.settling();
                     if let Ok(exitcode) = child.wait().await {
                         if let Some(ownership) = game_activity.take() {
                             ownership.finish();

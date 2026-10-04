@@ -127,6 +127,21 @@ pub enum FEServerState {
     },
     Stopping,
     Deleting,
+    /// The server's JVM from an earlier session still runs. Its console is
+    /// unavailable; `stopRecoveredServer` stops it.
+    RecoveredRunning {
+        process_id: u32,
+        /// macOS and Linux ask it to save and stop. On Windows it can only
+        /// be ended at once, losing what changed since its last autosave,
+        /// so the launcher has the user confirm that first.
+        graceful_stop: bool,
+    },
+    /// An earlier session left a record of a server process that cannot be
+    /// verified. `clearServerMarker` removes it once the user confirms that
+    /// no server from this folder is running.
+    RecoveredUnverified {
+        process_id: Option<u32>,
+    },
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -445,6 +460,15 @@ fn convert_state(state: &domain::ServerState) -> FEServerState {
         },
         domain::ServerState::Stopping => FEServerState::Stopping,
         domain::ServerState::Deleting => FEServerState::Deleting,
+        domain::ServerState::RecoveredRunning { process_id } => FEServerState::RecoveredRunning {
+            process_id: *process_id,
+            graceful_stop: cfg!(unix),
+        },
+        domain::ServerState::RecoveredUnverified { process_id } => {
+            FEServerState::RecoveredUnverified {
+                process_id: *process_id,
+            }
+        }
     }
 }
 
@@ -608,6 +632,18 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation KILL_SERVER[app, id: FEServerId] {
             app.server_manager()
                 .kill_server(id.into())
+                .await
+        }
+
+        mutation STOP_RECOVERED_SERVER[app, id: FEServerId] {
+            app.server_manager()
+                .stop_recovered_server(id.into())
+                .await
+        }
+
+        mutation CLEAR_SERVER_MARKER[app, id: FEServerId] {
+            app.server_manager()
+                .clear_server_marker(id.into())
                 .await
         }
 
@@ -901,6 +937,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.server_manager()
                 .send_console_if_running(id, format!("pardon-ip {}", req.ip)).await;
             Ok(())
+        }
+
+        query GET_LEGACY_DATAPACKS[app, id: FEServerId] {
+            app.server_manager().legacy_datapacks(id.into()).await
+        }
+        mutation RECOVER_LEGACY_DATAPACK[app, req: (FEServerId, crate::managers::server::world::LegacyDatapack)] {
+            app.server_manager().recover_legacy_datapack(req.0.into(), req.1).await
         }
 
         // Server Addons

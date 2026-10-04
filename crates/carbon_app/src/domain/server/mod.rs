@@ -44,6 +44,36 @@ pub enum ServerState {
     },
     Stopping,
     Deleting,
+    /// The server's JVM from an earlier session of the launcher still runs:
+    /// its marker names a live Java process with the identity recorded when
+    /// it started. This core has no console or exit signal for it; the user
+    /// can stop it, and nothing else may change its files meanwhile.
+    RecoveredRunning {
+        process_id: u32,
+    },
+    /// An earlier session left a marker that cannot be verified: it cannot
+    /// be read, or it names a live process that may or may not be this
+    /// server. Kept until the process is gone or the user clears it.
+    RecoveredUnverified {
+        process_id: Option<u32>,
+    },
+}
+
+impl ServerState {
+    /// Stopped, or holding only a marker from an earlier session: the
+    /// states a marker check may move between. Not "safe to touch the
+    /// files": a recovered server's JVM may still run, so every caller
+    /// checks the marker next (`refuse_unowned_marker`, `check_marker`).
+    pub fn is_stopped_or_recovered(&self) -> bool {
+        matches!(self, Self::Stopped { .. }) || self.is_recovered()
+    }
+    /// Holding a marker from an earlier session this core has not resolved.
+    pub fn is_recovered(&self) -> bool {
+        matches!(
+            self,
+            Self::RecoveredRunning { .. } | Self::RecoveredUnverified { .. }
+        )
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize, specta::Type)]

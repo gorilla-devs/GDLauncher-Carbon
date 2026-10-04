@@ -187,7 +187,7 @@ fn server_upsert_conflict_preserves_id_and_freshness() {
         "a.jar",
         20,
         false,
-        "datapacks",
+        "mods",
         "m",
         ts(2000),
     )
@@ -198,8 +198,49 @@ fn server_upsert_conflict_preserves_id_and_freshness() {
     assert_eq!(row.id, id);
     assert_eq!(row.filesize, 20);
     assert_eq!(row.enabled, false);
-    assert_eq!(row.addon_type, "datapacks");
+    assert_eq!(row.addon_type, "mods");
     assert_eq!(row.last_updated_at, ts(2000).0);
+    assert_eq!(row.location, "mods/a.jar");
+    mfc::upsert_server_mod_file_cache_conn(
+        &wg(&mut conn),
+        3,
+        "a.jar",
+        30,
+        true,
+        "datapacks",
+        "m",
+        ts(3000),
+    )
+    .unwrap();
+    mfc::upsert_server_mod_file_cache_at_location_conn(
+        &wg(&mut conn),
+        3,
+        "a.jar",
+        "B/datapacks/a.jar",
+        40,
+        true,
+        "datapacks",
+        "m",
+        ts(4000),
+    )
+    .unwrap();
+    let rows = mfc::get_server_mod_files_by_server_conn(&wg(&mut conn), 3).unwrap();
+    assert_eq!(rows.len(), 3);
+    let original = rows.iter().find(|row| row.id == id).unwrap();
+    assert_eq!(original.location, "mods/a.jar");
+    assert_eq!(original.filesize, 20);
+    assert!(!original.enabled);
+    assert_eq!(original.last_updated_at, ts(2000).0);
+    assert!(
+        rows.iter()
+            .any(|row| row.location == "world/datapacks/a.jar"
+                && row.id != id
+                && row.filesize == 30)
+    );
+    assert!(
+        rows.iter()
+            .any(|row| row.location == "B/datapacks/a.jar" && row.id != id && row.filesize == 40)
+    );
 }
 
 // --- update / delete --------------------------------------------------------

@@ -7,16 +7,11 @@
 //! `TerminateProcess`, or simply the user closing the launcher) leaves the
 //! next startup able to find that JVM again.
 //!
-//! Finding it is shared; what to do about it is not. A local server is
-//! infrastructure the launcher hosts, so `ServerManager` kills a server JVM
-//! it finds still running. A game is the user's session, so
-//! `InstanceManager` adopts it instead, showing the instance as running with
-//! a working Stop. Everything up to and including "is this pid still a live
-//! java process this launcher actually spawned" is the same either way, and
-//! is security-relevant — a wrong call either leaks a running JVM forever or
-//! acts on an unrelated process that reused the pid — so it lives here once,
-//! parameterized by the pidfile name each caller uses (`.gdl_server.pid` /
-//! `.gdl_instance.pid`).
+//! Instance recovery uses the identity classification below for adoption.
+//! Server recovery retains live or ambiguous ownership without signalling;
+//! ServerManager retires only confirmed-absent markers. Save completion for a
+//! recovered server is unknown and requires operator recovery. RuntimeLifecycle
+//! adds a conservative still-present-PID blocker until stable identity support.
 //!
 //! A pid alone is not a stable identity: the OS recycles pid numbers, and a
 //! long-lived core (or a reboot) can easily outlive the JVM it recorded, so
@@ -143,9 +138,9 @@ pub enum PidReconcileAction {
     /// matches the one recorded when this launcher spawned it (within
     /// tolerance): a JVM left over from a session this core did not shut
     /// down through its own launch task. Acting on it is the caller's
-    /// decision and differs by kind — `ServerManager` kills it,
-    /// `InstanceManager` adopts it (see this module's own doc comment for
-    /// why they differ).
+    /// decision: `InstanceManager` may adopt it. `ServerManager` shows a
+    /// recovered server as running from a previous session and signals it
+    /// only when the user clicks Stop, after verifying it again.
     StillRunning,
 }
 
@@ -545,6 +540,29 @@ mod tests {
         system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(dead_pid)]));
 
         assert_eq!(live_proc(&system, dead_pid), None);
+    }
+
+    /// The name comes from the snapshot that observed the process, and only
+    /// with a process that was observed.
+    #[test]
+    fn observe_process_named_names_only_an_observed_process() {
+        let own_pid = std::process::id();
+        let (observed, name) = observe_process_named(own_pid);
+        assert!(matches!(observed, ProcessObservation::Present { .. }));
+        let mut system = System::new();
+        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(own_pid)]));
+        let expected = system
+            .process(Pid::from_u32(own_pid))
+            .unwrap()
+            .name()
+            .to_string_lossy()
+            .into_owned();
+        assert_eq!(name.as_deref(), Some(expected.as_str()));
+        assert_eq!(observe_process(own_pid), observed);
+
+        let (observed, name) = observe_process_named(u32::MAX - 100);
+        assert!(!matches!(observed, ProcessObservation::Present { .. }));
+        assert_eq!(name, None);
     }
 
     #[test]

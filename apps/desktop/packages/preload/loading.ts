@@ -95,6 +95,7 @@ function useLoading() {
                 Restart
               </button>
             </div>
+            <div id="restart-error" role="alert" style="margin-top: 8px; color: rgb(var(--red-400));"></div>
           </div>
 
           <!-- Step 2: Check for Updates -->
@@ -350,9 +351,14 @@ function useLoading() {
         }
       })
 
-      restartBtn.addEventListener("click", () => {
-        ipcRenderer.invoke("relaunch")
-      })
+      restartBtn.addEventListener(
+        "click",
+        restartClick(
+          restartBtn,
+          document.querySelector<HTMLElement>("#restart-error")!,
+          () => ipcRenderer.invoke("relaunch")
+        )
+      )
 
       discordBtn.addEventListener("click", () => {
         ipcRenderer.invoke("openExternalLink", "https://discord.gdlauncher.com")

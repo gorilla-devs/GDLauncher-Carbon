@@ -439,6 +439,7 @@ dependencies = [
  "display-info",
  "dotenvy",
  "dunce",
+ "encoding_rs",
  "flowtest",
  "fs_extra",
  "futures",

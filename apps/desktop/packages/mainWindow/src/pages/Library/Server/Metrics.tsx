@@ -6,6 +6,12 @@ import { createEffect, createSignal, onCleanup, Show } from "solid-js"
 interface MetricsProps {
   serverId: number
   isRunning: boolean
+  /**
+   * Running from an earlier session of the launcher, which kept no handle
+   * on it: there is nothing to start, so the hint says why there are no
+   * metrics instead.
+   */
+  isRecovered?: boolean
   xmx: number
 }
 
@@ -69,8 +75,18 @@ const Metrics = (props: MetricsProps) => {
       <Show
         when={props.isRunning}
         fallback={
-          <div class="flex items-center justify-center py-8 text-sm text-lightSlate-700">
-            <Trans key="instances:_trn_server_metrics_start_hint" />
+          <div
+            class="flex items-center justify-center py-8 text-center text-sm text-lightSlate-700"
+            data-testid="server-metrics-hint"
+          >
+            <Show
+              when={props.isRecovered}
+              fallback={
+                <Trans key="instances:_trn_server_metrics_start_hint" />
+              }
+            >
+              <Trans key="instances:_trn_server_metrics_recovered_hint" />
+            </Show>
           </div>
         }
       >

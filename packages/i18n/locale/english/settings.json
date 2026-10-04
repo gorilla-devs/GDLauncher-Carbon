@@ -55,6 +55,7 @@
   "_trn_enable_metrics_title": "Enable Anonymous Metrics & Experimental Features",
   "_trn_enable_metrics_text": "Select whether or not to enable anonymous metrics and experimental features through feature flags.",
   "_trn_restart_app": "Restart App",
+  "_trn_restart_failed": "GDLauncher could not restart. Close it and open it again.",
   "_trn_reset_all_data": "Reset All Data",
   "_trn_check_for_updates": "Check for Updates",
   "_trn_custom_commands_title": "Custom Commands",

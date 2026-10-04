@@ -149,9 +149,9 @@ pub fn main() {
 ///
 /// This does NOT observe Windows' `TerminateProcess` — that is how
 /// Electron actually kills the core on Windows, and it is not a catchable
-/// signal on that platform. Orphaned server JVMs from that path are instead
-/// cleaned up on the next launch by the pidfile check in
-/// `ServerManager::load_servers`.
+/// signal on that platform. The authenticated handshake must settle ownership
+/// before Electron terminates the core. After an unclean exit, server pidfile
+/// recovery retains live/ambiguous owners without automatically killing them.
 #[cfg(unix)]
 async fn wait_for_termination_signal() {
     use tokio::signal::unix::{SignalKind, signal};
@@ -331,27 +331,37 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     // Ctrl+C while running `pnpm watch:core`, or Electron's normal-quit
     // path).
     //
-    // Servers only, deliberately. A local server is infrastructure the
-    // launcher hosts, so it stops with the launcher; a *game* is the user's
-    // session, and closing the launcher mid-game does not end it. A game
-    // that outlives this process is recorded in its instance's pidfile and
-    // picked back up by the next startup's reconciliation
-    // (`InstanceManager::scan_instances`).
-    //
-    // `shutdown_running` bounds itself to ~3s, so this task always resolves
-    // and exits well inside the ~5s Electron waits before force killing the
-    // core.
+    // The signal path consumes the same request-owned freeze/drain/commit as
+    // authenticated shutdown. Unsettled participants retain the core and evidence.
+    // Each signal is its own request, so a later signal takes the place of an
+    // attempt that ended unresolved, as the launcher's 'Quit now' does
+    // before it escalates to SIGKILL.
     tokio::spawn(async move {
-        wait_for_termination_signal().await;
-        info!("Termination signal received, shutting down running servers before exit");
-        if !app2.runtime_lifecycle.relocation_shutdown() {
-            app2.server_manager().shutdown_running().await;
+        loop {
+            wait_for_termination_signal().await;
+            if app2.runtime_lifecycle.shutdown_committed() {
+                logger::flush_and_exit(0);
+            }
+            let request = format!("core-termination-signal-{}", uuid::Uuid::new_v4());
+            let purpose = managers::runtime_lifecycle::ShutdownPurpose::Quit;
+            match app2.runtime_lifecycle.begin_shutdown(request, purpose) {
+                Ok(true) => {
+                    let result = app2.server_manager().shutdown_running().await;
+                    match app2.runtime_lifecycle.settle_shutdown(request, result) {
+                        Ok(status) => {
+                            tracing::error!("Shutdown unresolved; core retained: {:?}", status)
+                        }
+                        Err(error) => {
+                            tracing::error!("Shutdown unresolved; core retained: {error:#}")
+                        }
+                    }
+                }
+                Ok(false) => tracing::error!(
+                    "Shutdown is still owned by the previous request; retry authenticated status"
+                ),
+                Err(error) => tracing::error!("Shutdown refused; core retained: {error:#}"),
+            }
         }
-        // Through `flush_and_exit` rather than a bare `std::process::exit`
-        // so the `info!` line just above reaches disk before the process
-        // dies, the same reasoning as the fatal-DB-error exit in
-        // `managers/mod.rs`.
-        logger::flush_and_exit(0);
     });
 
     // As soon as the server is ready, notify via stdout

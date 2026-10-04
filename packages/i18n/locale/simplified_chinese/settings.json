@@ -55,6 +55,7 @@
   "_trn_enable_metrics_title": "启用匿名指标和实验性功能",
   "_trn_enable_metrics_text": "选择是否通过功能标志启用匿名指标和实验性功能。",
   "_trn_restart_app": "重启应用",
+  "_trn_restart_failed": "GDLauncher 无法重新启动。请关闭后重新打开。",
   "_trn_reset_all_data": "重置所有数据",
   "_trn_check_for_updates": "检查更新",
   "_trn_custom_commands_title": "自定义命令",

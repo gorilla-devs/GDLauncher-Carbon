@@ -19,6 +19,8 @@
   "_trn_confirm_batch_instance_deletion": "Удаление выбранных экземпляров",
   "_trn_confirm_batch_server_deletion": "Удаление выбранных серверов",
   "_trn_server_eula_acceptance": "Принять EULA Minecraft",
+  "_trn_server_force_stop_title": "Принудительная остановка сервера",
+  "_trn_server_clear_record_title": "Удаление записи о процессе",
   "_trn_confirm_change_runtime_path": "Подтверждение смены RuntimePath",
   "_trn_why_are_ads_needed": "Зачем нужна реклама?",
   "_trn_mods_updater": "Обновление модов",

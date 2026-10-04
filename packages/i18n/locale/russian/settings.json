@@ -55,6 +55,7 @@
   "_trn_enable_metrics_title": "Анонимные метрики и экспериментальные функции",
   "_trn_enable_metrics_text": "Включите или отключите анонимные метрики и экспериментальные функции (feature flags).",
   "_trn_restart_app": "Перезапустить приложение",
+  "_trn_restart_failed": "Не удалось перезапустить GDLauncher. Закройте его и откройте снова.",
   "_trn_reset_all_data": "Сбросить все данные лаунчера",
   "_trn_check_for_updates": "Проверить обновления",
   "_trn_custom_commands_title": "Пользовательские команды",

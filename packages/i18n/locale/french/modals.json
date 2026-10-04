@@ -19,6 +19,8 @@
   "_trn_confirm_batch_instance_deletion": "Supprimer les instances",
   "_trn_confirm_batch_server_deletion": "Supprimer les serveurs",
   "_trn_server_eula_acceptance": "Accepter l'EULA Minecraft",
+  "_trn_server_force_stop_title": "Forcer l'arrêt du serveur",
+  "_trn_server_clear_record_title": "Effacer l'enregistrement du processus",
   "_trn_confirm_change_runtime_path": "Confirmer le changement du RuntimePath",
   "_trn_why_are_ads_needed": "Pourquoi les publicités sont-elles nécessaires ?",
   "_trn_mods_updater": "Mise à jour des mods",

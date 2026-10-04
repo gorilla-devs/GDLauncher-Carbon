@@ -428,10 +428,15 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     }
 
     pub async fn scan_instances(self) -> anyhow::Result<()> {
-        let _runtime_activity = self
+        let runtime_activity = self
             .app
             .runtime_lifecycle
             .admit("instance ownership rescan")?;
+        // A quit, restart or update cancels this. The scan then stops before
+        // its next step or instance folder instead of making the quit wait
+        // for a large library on a slow disk: every folder it started is
+        // finished, and the next start scans them all again.
+        let closing = runtime_activity.cancellation();
         let ownership = self
             .app
             .runtime_lifecycle
@@ -464,7 +469,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // session that ended without stopping it, most often because the user
         // closed the launcher. Each one found is applied to its instance as
         // it is inserted below, so the map is never briefly wrong about it.
-        let adopted = if ownership_reconciled {
+        let adopted = if ownership_reconciled && !closing.is_cancelled() {
             self.reconcile_running_instances().await
         } else {
             // Preserve unknown pid evidence; best-effort cleanup must not make
@@ -494,8 +499,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // processes exiting — there is no `child.wait()` behind them — so
         // they need the liveness poller started for them.
         let mut adopted_ids: Vec<InstanceId> = Vec::new();
+        let mut interrupted = false;
 
         while let Some(dir) = stream.next_entry().await? {
+            if closing.is_cancelled() {
+                interrupted = true;
+                break;
+            }
             let path = dir.path();
 
             let shortpath = path
@@ -618,6 +628,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                 game.start_time,
                                 Utc::now(),
                             ));
+                            self.app
+                                .runtime_lifecycle
+                                .adopted_game_published(game.pid, game.verified_start_time);
                             adopted_ids.push(instance_id);
                         }
                     }
@@ -687,6 +700,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         if !adopted_ids.is_empty() {
             self.watch_adopted_instances(adopted_ids);
+        }
+        if interrupted {
+            // Only a move of the runtime folder needs every folder checked.
+            // It is refused, naming this, until GDLauncher starts again.
+            tracing::info!(
+                "Instance scan stopped after {scanned_count} folder(s): GDLauncher is closing"
+            );
+            self.app
+                .runtime_lifecycle
+                .reconciliation_finished(Err(anyhow!(
+                    "The instance scan stopped early because GDLauncher began closing"
+                )));
         }
 
         Ok(())

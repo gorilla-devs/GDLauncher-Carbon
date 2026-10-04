@@ -73,6 +73,171 @@ pub fn parse_properties(content: &str) -> BTreeMap<String, String> {
     props
 }
 
+/// `server.properties` bytes as text the way the server decodes them: UTF-8,
+/// else ISO-8859-1, which Minecraft before 1.20 always uses and later versions
+/// fall back to. `true` with the text when it was ISO-8859-1.
+pub fn decode(bytes: Vec<u8>) -> (String, bool) {
+    match String::from_utf8(bytes) {
+        Ok(text) => (text, false),
+        Err(error) => (
+            error.into_bytes().into_iter().map(char::from).collect(),
+            true,
+        ),
+    }
+}
+
+/// `text` in the encoding [`decode`] found. A character ISO-8859-1 cannot hold
+/// is written as the `\uXXXX` escape the server reads back as that character.
+fn encode(text: &str, latin1: bool) -> Vec<u8> {
+    if !latin1 {
+        return text.as_bytes().to_vec();
+    }
+    let mut bytes = Vec::with_capacity(text.len());
+    for c in text.chars() {
+        match u8::try_from(u32::from(c)) {
+            Ok(byte) => bytes.push(byte),
+            Err(_) => {
+                let mut units = [0u16; 2];
+                for unit in c.encode_utf16(&mut units) {
+                    bytes.extend(format!("\\u{unit:04X}").into_bytes());
+                }
+            }
+        }
+    }
+    bytes
+}
+
+const JAVA_WHITESPACE: [char; 3] = [' ', '\t', '\x0c'];
+
+/// The properties in `content` as `java.util.Properties.load` reads them,
+/// which is how the server reads `server.properties`: `#` and `!` comments,
+/// `=`, `:` or whitespace between key and value, lines continued by a
+/// trailing `\`, and `\` escapes. The server saves a world named `World #2`
+/// as `level-name=World \#2`, and older versions save `Größe` as
+/// `Gr\u00F6\u00DFe`. [`parse_properties`] keeps the text as it is written,
+/// for the Properties tab.
+pub fn java_properties(content: &str) -> BTreeMap<String, String> {
+    let content = content.replace("\r\n", "\n");
+    let mut lines = content.split(['\n', '\r']);
+    let mut props = BTreeMap::new();
+    while let Some(line) = lines.next() {
+        let line = line.trim_start_matches(JAVA_WHITESPACE);
+        if line.is_empty() || line.starts_with(['#', '!']) {
+            continue;
+        }
+        let mut logical = line.to_owned();
+        while logical.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1 {
+            logical.pop();
+            match lines.next() {
+                Some(next) => logical.push_str(next.trim_start_matches(JAVA_WHITESPACE)),
+                None => break,
+            }
+        }
+        let (key, value) = split_java_line(&logical);
+        props.insert(java_unescape(key), java_unescape(value));
+    }
+    props
+}
+
+/// The key and the value of one logical properties line, still escaped.
+fn split_java_line(line: &str) -> (&str, &str) {
+    let mut escaped = false;
+    let mut separator = None;
+    for (index, c) in line.char_indices() {
+        if !escaped && (c == '=' || c == ':' || JAVA_WHITESPACE.contains(&c)) {
+            separator = Some((index, c));
+            break;
+        }
+        escaped = c == '\\' && !escaped;
+    }
+    let Some((index, c)) = separator else {
+        return (line, "");
+    };
+    let key = &line[..index];
+    let mut rest = &line[index + c.len_utf8()..];
+    let mut has_separator = c == '=' || c == ':';
+    loop {
+        rest = rest.trim_start_matches(JAVA_WHITESPACE);
+        match rest.strip_prefix(['=', ':']) {
+            Some(after) if !has_separator => {
+                has_separator = true;
+                rest = after;
+            }
+            _ => return (key, rest),
+        }
+    }
+}
+
+/// `\uXXXX`, `\t`, `\n`, `\r`, `\f` and `\` before any other character, as
+/// `Properties.load` decodes them. A malformed `\u`, which the server refuses
+/// to load, is read as `u` and what follows.
+fn java_unescape(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut units: Vec<u16> = Vec::new();
+    let mut chars = text.chars();
+    // A character outside the BMP is two escapes, one per UTF-16 unit.
+    let flush = |units: &mut Vec<u16>, out: &mut String| {
+        out.extend(
+            char::decode_utf16(units.drain(..)).map(|c| c.unwrap_or(char::REPLACEMENT_CHARACTER)),
+        );
+    };
+    while let Some(c) = chars.next() {
+        if c != '\\' {
+            flush(&mut units, &mut out);
+            out.push(c);
+            continue;
+        }
+        let Some(next) = chars.next() else {
+            break;
+        };
+        if next == 'u' {
+            let hex: String = chars.clone().take(4).collect();
+            if hex.len() == 4 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+                if let Ok(unit) = u16::from_str_radix(&hex, 16) {
+                    chars.nth(3);
+                    units.push(unit);
+                    continue;
+                }
+            }
+        }
+        flush(&mut units, &mut out);
+        out.push(match next {
+            't' => '\t',
+            'n' => '\n',
+            'r' => '\r',
+            'f' => '\x0c',
+            other => other,
+        });
+    }
+    flush(&mut units, &mut out);
+    out
+}
+
+/// What the server reads as `value` when GDLauncher writes `key=value` (see
+/// [`update_properties`]), or `None` when a `\` in it is not one of the
+/// escapes the server writes itself (`\#`, `\!`, `\=`, `\:`, `\ `,
+/// `\\`, `\uXXXX`): the server would drop it, so `worlds\survival` would
+/// name `worldssurvival`.
+pub fn written_value(value: &str) -> Option<String> {
+    let mut rest = value;
+    while let Some(index) = rest.find('\\') {
+        let after = &rest[index + 1..];
+        let escape = after.chars().next();
+        let known = match escape {
+            Some('#' | '!' | '=' | ':' | ' ' | '\\') => true,
+            Some('u') => after
+                .get(1..5)
+                .is_some_and(|hex| hex.chars().all(|c| c.is_ascii_hexdigit())),
+            _ => false,
+        };
+        if !known {
+            return None;
+        }
+        rest = &after[escape.map_or(0, char::len_utf8)..];
+    }
+    java_properties(&format!("k={value}")).remove("k")
+}
+
 /// Update specific properties in an existing server.properties file. Any key
 /// or value containing `\n`/`\r` is dropped rather than written — the API
 /// boundary is expected to reject these before they ever reach here, so a
@@ -256,5 +421,222 @@ mod tests {
             Some("A perfectly normal MOTD")
         );
         assert_eq!(props.get("max-players").map(String::as_str), Some("10"));
+    }
+}
+
+/// Finalize pack properties before publishing the effective port to the DB.
+///
+/// A `server-port` the server cannot use (blank, not a number, out of range:
+/// a pack's placeholder, or a hand edit) is set to `fallback_port`, the port
+/// GDLauncher shows for the server, rather than failing the install at its
+/// last step; the server would otherwise listen on its default port while
+/// GDLauncher showed another. A file that is not UTF-8 is read and written as
+/// ISO-8859-1, as the server reads it.
+pub async fn finalize_pack_properties(
+    path: &Path,
+    requested_port: Option<i32>,
+    fallback_port: i32,
+    game_version: &str,
+    repair: bool,
+) -> Result<i32> {
+    if !path.exists() {
+        write_properties(
+            path,
+            &generate_properties(fallback_port, "A Minecraft Server", 20, true, game_version),
+        )
+        .await?;
+    }
+    let bytes = tokio::fs::read(path)
+        .await
+        .context("Failed to read server.properties")?;
+    let (current, latin1) = decode(bytes);
+    let set_port = |port: i32| {
+        let updates = BTreeMap::from([("server-port".into(), port.to_string())]);
+        let content = encode(&update_properties(&current, &updates), latin1);
+        async move {
+            tokio::fs::write(path, content)
+                .await
+                .context("Failed to write server.properties")
+        }
+    };
+    if let Some(port) = requested_port.filter(|_| !repair) {
+        super::resolve_server_port(Some(port))?;
+        set_port(port).await?;
+        return Ok(port);
+    }
+    match parse_properties(&current).get("server-port") {
+        None => Ok(fallback_port),
+        Some(value) => match super::validate_server_port_patch(value) {
+            Ok(port) => Ok(port),
+            Err(error) => {
+                warn!(
+                    "server.properties has an unusable server-port ({error}); setting it to {fallback_port}"
+                );
+                set_port(fallback_port).await?;
+                Ok(fallback_port)
+            }
+        },
+    }
+}
+
+#[cfg(test)]
+mod task07_port_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task07_pack_port_preserves_unspecified_explicit_and_repair_intent() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("server.properties");
+        std::fs::write(
+            &path,
+            "#operator\nserver-port=25577\nlevel-name=AdventureMap\n",
+        )
+        .unwrap();
+        assert_eq!(
+            finalize_pack_properties(&path, None, 25565, "1.21", false)
+                .await
+                .unwrap(),
+            25577
+        );
+        assert_eq!(
+            finalize_pack_properties(&path, Some(25588), 25588, "1.21", false)
+                .await
+                .unwrap(),
+            25588
+        );
+        assert_eq!(
+            read_properties(&path).await.unwrap()["server-port"],
+            "25588"
+        );
+        assert_eq!(
+            finalize_pack_properties(&path, Some(25599), 25599, "1.21", true)
+                .await
+                .unwrap(),
+            25588
+        );
+        assert_eq!(
+            read_properties(&path).await.unwrap()["level-name"],
+            "AdventureMap"
+        );
+        std::fs::remove_file(&path).unwrap();
+        assert_eq!(
+            finalize_pack_properties(&path, None, 25565, "1.21", false)
+                .await
+                .unwrap(),
+            25565
+        );
+    }
+}
+
+#[cfg(test)]
+mod java_properties_tests {
+    use super::*;
+
+    /// The server saves `server.properties` with `Properties.store`, which
+    /// escapes `#`, `!`, `=`, `:` and a leading space in values, and before
+    /// 1.20 every non-ASCII character as `\uXXXX`. GDLauncher reads the world
+    /// name the way the server does, so it finds the same folder.
+    #[test]
+    fn values_are_read_as_the_server_reads_them() {
+        let content = "#Minecraft server properties\r\n\
+             ! a comment too\n\
+             level-name=World \\#2\n\
+             motd=Hardcore\\!\n\
+             a\\=b=c\\=d\n\
+             accented=Gr\\u00F6\\u00DFe\n\
+             emoji=\\uD83D\\uDE00\n\
+             colon:value\n\
+             spaced   value with spaces \n\
+             leading=\\ space\n\
+             continued=first \\\n    second\n\
+             trailing=ends\\\\\n\
+             malformed=\\uZZ\n\
+             empty=\n";
+        let props = java_properties(content);
+        assert_eq!(props["level-name"], "World #2");
+        assert_eq!(props["motd"], "Hardcore!");
+        assert_eq!(props["a=b"], "c=d");
+        assert_eq!(props["accented"], "Größe");
+        assert_eq!(props["emoji"], "\u{1F600}");
+        assert_eq!(props["colon"], "value");
+        assert_eq!(props["spaced"], "value with spaces ");
+        assert_eq!(props["leading"], " space");
+        assert_eq!(props["continued"], "first second");
+        assert_eq!(props["trailing"], "ends\\");
+        assert_eq!(props["malformed"], "uZZ");
+        assert_eq!(props["empty"], "");
+        assert!(!props.keys().any(|key| key.contains("comment")));
+        // The Properties tab keeps showing what is written.
+        assert_eq!(parse_properties(content)["level-name"], "World \\#2");
+        assert_eq!(written_value("World \\#3").unwrap(), "World #3");
+        assert_eq!(written_value("Gr\\u00F6\\\\x").unwrap(), "Gr\u{F6}\\x");
+        assert_eq!(written_value("Plain").unwrap(), "Plain");
+        assert_eq!(written_value("worlds\\survival"), None);
+        assert_eq!(written_value("bad\\u12"), None);
+        assert_eq!(written_value("trailing\\"), None);
+    }
+
+    #[test]
+    fn a_file_that_is_not_utf8_is_read_as_latin1() {
+        let (text, latin1) = decode(b"level-name=Gr\xF6\xDFe\n".to_vec());
+        assert!(latin1);
+        assert_eq!(java_properties(&text)["level-name"], "Größe");
+        assert_eq!(encode(&text, true), b"level-name=Gr\xF6\xDFe\n");
+        assert_eq!(encode("\u{1F600}", true), b"\\uD83D\\uDE00");
+        let (text, latin1) = decode("level-name=Größe\n".as_bytes().to_vec());
+        assert!(!latin1);
+        assert_eq!(java_properties(&text)["level-name"], "Größe");
+    }
+
+    /// A blank, placeholder or out-of-range `server-port` (in a pack's own
+    /// file, or edited by hand since the server last ran) is set to the port
+    /// GDLauncher shows instead of failing the install or Repair at its last
+    /// step, and a file that is not UTF-8 keeps its encoding.
+    #[tokio::test]
+    async fn an_unusable_port_is_set_to_the_fallback_instead_of_failing() {
+        for (value, repair) in [
+            ("", false),
+            ("", true),
+            ("25565 # default", false),
+            ("abc", true),
+            ("70000", false),
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let path = root.path().join("server.properties");
+            std::fs::write(&path, format!("motd=Hi\nserver-port={value}\n")).unwrap();
+            assert_eq!(
+                finalize_pack_properties(&path, None, 25570, "1.21", repair)
+                    .await
+                    .unwrap(),
+                25570,
+                "{value:?} repair={repair}"
+            );
+            let props = read_properties(&path).await.unwrap();
+            assert_eq!(props["server-port"], "25570", "{value:?}");
+            assert_eq!(props["motd"], "Hi");
+        }
+
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("server.properties");
+        std::fs::write(&path, b"motd=Gr\xF6\xDFe\nserver-port=\n").unwrap();
+        assert_eq!(
+            finalize_pack_properties(&path, None, 25570, "1.21", false)
+                .await
+                .unwrap(),
+            25570
+        );
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            b"motd=Gr\xF6\xDFe\nserver-port=25570\n"
+        );
+        assert_eq!(
+            finalize_pack_properties(&path, Some(25580), 25580, "1.21", false)
+                .await
+                .unwrap(),
+            25580
+        );
+        assert_eq!(
+            std::fs::read(&path).unwrap(),
+            b"motd=Gr\xF6\xDFe\nserver-port=25580\n"
+        );
     }
 }

@@ -6,13 +6,76 @@ use carbon_rt_path::ServerPath;
 use std::path::{Path, PathBuf};
 use tokio::sync::{mpsc, watch};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ServerHandle {
+    pub generation: uuid::Uuid,
+    pub log_drained: Option<ExitSignal>,
+    pub marker_root: Option<PathBuf>,
+    pub runtime_activity: std::sync::Arc<
+        std::sync::Mutex<Option<crate::managers::runtime_lifecycle::RuntimeActivity>>,
+    >,
     pub process_id: u32,
     pub kill_tx: mpsc::Sender<()>,
     pub stdin_tx: mpsc::Sender<String>,
     /// Resolves once the server process has exited, gracefully or after a kill.
     pub exited: ExitSignal,
+}
+
+impl ServerHandle {
+    pub fn finish_publication(&self) {
+        if let Some(activity) = self.runtime_activity.lock().unwrap().take() {
+            activity.finish();
+        }
+    }
+}
+
+/// How long [`drain`] waits for the exit of a server it killed to be
+/// confirmed. That confirmation also waits for the server's output to close
+/// (`local::POST_EXIT_OUTPUT_GRACE`), which must stay shorter than this.
+pub(crate) const FORCED_EXIT_CONFIRM: std::time::Duration = std::time::Duration::from_secs(5);
+
+/// Bounded channels and confirmed completion; disappearance is never success.
+///
+/// A run whose exit is already confirmed is drained: its supervisor closes
+/// the stdin and kill channels once it has published the exit, which can be
+/// before the exit watcher clears the handle. Closed channels are an error
+/// only while the exit is still unconfirmed.
+pub async fn drain(
+    handle: &ServerHandle,
+    force: bool,
+    graceful: std::time::Duration,
+) -> Result<()> {
+    let enqueue = std::time::Duration::from_secs(1);
+    let mut exited = handle.exited.clone();
+    if exited.is_confirmed() {
+        return Ok(());
+    }
+    if !force {
+        let sent = tokio::time::timeout(enqueue, handle.stdin_tx.send("stop".into())).await;
+        if matches!(sent, Ok(Ok(()))) {
+            match tokio::time::timeout(graceful, exited.wait_confirmed()).await {
+                Ok(result) => return result,
+                Err(_) => tracing::warn!(
+                    "Server graceful stop timed out; escalating captured generation {}",
+                    handle.generation
+                ),
+            }
+        } else if exited.is_confirmed() {
+            return Ok(());
+        }
+    }
+    match tokio::time::timeout(enqueue, handle.kill_tx.send(())).await {
+        Ok(Ok(())) => {}
+        _ if exited.is_confirmed() => return Ok(()),
+        Err(_) => anyhow::bail!("Server kill enqueue timed out; exit Unknown"),
+        Ok(Err(_)) => anyhow::bail!("Server kill channel closed; exit Unknown"),
+    }
+    tokio::time::timeout(FORCED_EXIT_CONFIRM, exited.wait_confirmed())
+        .await
+        .map_err(|_| {
+            anyhow::anyhow!("Server forced exit unconfirmed; files and ownership retained")
+        })??;
+    Ok(())
 }
 
 /// "The server process has exited", readable by any number of waiters.
@@ -36,20 +99,20 @@ impl ExitSignal {
             .map_err(|_| anyhow::anyhow!("Server supervisor disappeared without confirmed exit"))
     }
 
-    /// Resolves once the process has exited, immediately if it already had.
-    pub async fn wait(&mut self) {
-        // `wait_for` inspects the current value before it waits, so an exit
-        // that landed first still resolves this. Its only error is every
-        // sender having been dropped, which happens when the supervising task
-        // finishes — after it published the exit — so that means the same
-        // thing.
-        let _ = self.0.wait_for(|exited| *exited).await;
+    /// Compatibility alias; sender loss remains an explicit error.
+    pub async fn wait(&mut self) -> anyhow::Result<()> {
+        self.wait_confirmed().await
+    }
+
+    /// Whether the exit has already been confirmed, without waiting.
+    pub fn is_confirmed(&self) -> bool {
+        *self.0.borrow()
     }
 }
 
 /// Creates an [`ExitSignal`] and the sender that resolves it. The sender
-/// belongs to whatever supervises the process; dropping it resolves every
-/// waiter, so it must outlive the process it reports on.
+/// belongs to the supervisor. Dropping it without true wakes waiters with an
+/// error; only a true value confirms the child's exit (a successful wait).
 pub fn exit_signal() -> (watch::Sender<bool>, ExitSignal) {
     let (tx, rx) = watch::channel(false);
     (tx, ExitSignal(rx))
@@ -233,5 +296,93 @@ mod tests {
         // `write_pid_file` is best-effort and must never block a launch.
         let bogus_root = std::path::Path::new("/nonexistent/gdl-test-pidfile-root");
         write_pid_file(bogus_root, 123, 1000).await;
+    }
+}
+
+#[cfg(test)]
+mod task07_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task07_stop_sender_loss_is_unknown_and_escalation_is_captured() {
+        let (kill_tx, mut kill_rx) = mpsc::channel(1);
+        let (stdin_tx, mut stdin_rx) = mpsc::channel(1);
+        let (exit_tx, exited) = exit_signal();
+        let handle = ServerHandle {
+            generation: uuid::Uuid::new_v4(),
+            runtime_activity: Default::default(),
+            log_drained: None,
+            marker_root: None,
+            process_id: 42,
+            kill_tx,
+            stdin_tx,
+            exited,
+        };
+        let result = async {
+            assert_eq!(stdin_rx.recv().await.as_deref(), Some("stop"));
+            kill_rx.recv().await.unwrap();
+            exit_tx.send(true).unwrap();
+        };
+        let (drained, ()) = tokio::join!(
+            drain(&handle, false, std::time::Duration::from_millis(1)),
+            result
+        );
+        drained.unwrap();
+        let (tx, signal) = exit_signal();
+        drop(tx);
+        let mut unknown = handle.clone();
+        unknown.exited = signal;
+        assert!(
+            drain(&unknown, false, std::time::Duration::from_millis(1))
+                .await
+                .is_err()
+        );
+    }
+
+    fn handle_with_closed_channels(exited: ExitSignal) -> ServerHandle {
+        let (kill_tx, kill_rx) = mpsc::channel(1);
+        let (stdin_tx, stdin_rx) = mpsc::channel(1);
+        drop((kill_rx, stdin_rx));
+        ServerHandle {
+            generation: uuid::Uuid::new_v4(),
+            runtime_activity: Default::default(),
+            log_drained: None,
+            marker_root: None,
+            process_id: 42,
+            kill_tx,
+            stdin_tx,
+            exited,
+        }
+    }
+
+    #[tokio::test]
+    async fn drain_after_a_published_exit_is_ok_even_with_closed_channels() {
+        // The supervisor closes stdin and kill once it has published the
+        // exit. A Stop, Kill or quit landing before the watcher clears the
+        // handle must not report "kill channel closed; exit Unknown".
+        let (exit_tx, exited) = exit_signal();
+        exit_tx.send(true).unwrap();
+        drop(exit_tx);
+        let handle = handle_with_closed_channels(exited);
+        for force in [false, true] {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(1),
+                drain(&handle, force, std::time::Duration::from_secs(30)),
+            )
+            .await
+            .expect("an exit already confirmed needs no waiting")
+            .unwrap();
+        }
+
+        // Closed channels without a confirmed exit stay Unknown.
+        let (exit_tx, exited) = exit_signal();
+        drop(exit_tx);
+        let error = drain(
+            &handle_with_closed_channels(exited),
+            false,
+            std::time::Duration::from_secs(30),
+        )
+        .await
+        .unwrap_err();
+        assert!(error.to_string().contains("exit Unknown"), "{error:#}");
     }
 }

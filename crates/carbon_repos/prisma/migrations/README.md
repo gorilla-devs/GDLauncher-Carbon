@@ -30,6 +30,22 @@ edit locally, before it ships. If that test fails on a migration you did not
 believe you were touching, you (or a formatter/linter) edited a shipped
 `migration.sql` — revert the change; write a new migration instead.
 
+## Down scripts must succeed on users' data
+
+An older build that opens a database a newer build migrated runs the stored
+`down.sql` of every breaking migration it does not know. That text is copied
+into the database's `_migrations` table when the migration first applies and
+is never refreshed, so once a release ships a migration its `down.sql` is as
+frozen as its `migration.sql` (the checksum covers only `migration.sql`, so
+nothing catches an edit; it just never reaches existing databases).
+
+A down that fails rolls back and leaves the user on the fatal "database
+downgrade failed" screen, so write it to succeed on any data the newer build
+can create. Rows of cache tables (`ModFileCache`, `ServerModFileCache`, the
+CurseForge and Modrinth caches) that the older schema cannot hold are deleted,
+never refused with `RAISE(ABORT)`: the older build rebuilds them by rescanning.
+Foreign keys are off while a down runs, so delete dependent rows explicitly.
+
 ## Adding a migration
 
 Do not create a directory here by hand. Use the generator:

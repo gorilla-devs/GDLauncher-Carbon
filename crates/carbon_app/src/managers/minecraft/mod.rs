@@ -434,6 +434,8 @@ mod tests {
         .await
         .unwrap();
 
+        let mut test_ownership = app.runtime_lifecycle.admit("test game").unwrap();
+        test_ownership.external_child().unwrap();
         let mut child = launch_minecraft(
             java_component,
             full_account,
@@ -447,6 +449,7 @@ mod tests {
             instance_path,
             assets_dir,
             None,
+            &mut test_ownership,
         )
         .await
         .unwrap();

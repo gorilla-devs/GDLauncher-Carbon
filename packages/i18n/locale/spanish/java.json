@@ -58,6 +58,7 @@
   "_trn_migration_errored": "Error en la migración de la ruta de tiempo de ejecución. El estado podría estar corrupto. Haz clic <0>aquí</0> para más información sobre cómo proceder.",
   "_trn_migration_stopped": "El traslado se detuvo antes de terminar. No se ha perdido nada. Haz clic <0>aquí</0> para más información sobre cómo proceder.",
   "_trn_scanning_files": "Analizando archivos...",
+  "_trn_checking_runtime_path": "Comprobando tu carpeta de datos antes de moverla...",
   "_trn_copying_file": "Copiando {{file}}",
   "_trn_removing_file": "Eliminando {{file}}",
   "_trn_removing_partial_copy": "Eliminando la copia sin terminar: {{file}}",

@@ -12,7 +12,7 @@ use tracing::{info, warn};
 /// data. These paths are NEVER written to during install or reinstall — we
 /// will not destroy a user's world even if a malformed modpack tries to ship
 /// one.
-fn is_save_path(rel: &str) -> bool {
+pub(super) fn is_save_path(rel: &str) -> bool {
     // Accept both / and \ from zip entry names.
     let normalized = rel.replace('\\', "/");
     let first = normalized.split('/').next().unwrap_or("");
@@ -350,43 +350,45 @@ pub async fn process_modrinth_server_pack(
     // world/save path. A well-formed mrpack should never list save data, but
     // we don't trust the input — the cost of being wrong here is a destroyed
     // user world.
-    let server_files: Vec<_> = index
-        .files
-        .iter()
-        .filter(|file| {
-            if is_save_path(&file.path) {
-                warn!(
-                    "Skipping save-path entry from mrpack index: {} (would overwrite user data)",
-                    file.path
-                );
-                return false;
-            }
-            file.env.as_ref().map_or(true, |env| {
-                !matches!(env.server, ModrinthEnvironmentSupport::Unsupported)
-            })
-        })
-        .collect();
-
+    // One walk serves the index and the overrides (see `SaveProtection::read`).
+    let protection = {
+        let data_path = data_path.clone();
+        tokio::task::spawn_blocking(move || super::world::SaveProtection::read(&data_path))
+            .await??
+    };
+    let mut server_files = Vec::new();
+    let mut destinations =
+        super::world::Destinations::new(&data_path, super::world::filesystem_resolves);
+    for file in &index.files {
+        if file
+            .env
+            .as_ref()
+            .is_some_and(|env| matches!(env.server, ModrinthEnvironmentSupport::Unsupported))
+        {
+            continue;
+        }
+        if let Some(destination) =
+            pack_destination(&protection, &mut destinations, &file.path, false)?
+        {
+            server_files.push((file, destination));
+        }
+    }
+    let mut skipped_links = destinations.into_skipped_links();
     info!(
         "Filtered {} server-compatible files out of {} total",
         server_files.len(),
         index.files.len()
     );
-
-    // --- Download modpack files concurrently (subtask already created upfront) ---
     let mut downloadables = Vec::with_capacity(server_files.len());
-    for modpack_file in &server_files {
+    for (modpack_file, file_path) in &server_files {
         let download_url = modpack_file
             .downloads
             .first()
             .context("Modpack file has no download URLs")?;
-
-        let file_path = secure_path_join(&data_path, &modpack_file.path)?;
         if let Some(parent) = file_path.parent() {
             tokio::fs::create_dir_all(parent).await?;
         }
-
-        downloadables.push(mrpack_downloadable(modpack_file, download_url, &file_path));
+        downloadables.push(mrpack_downloadable(modpack_file, download_url, file_path));
     }
 
     let concurrency = app
@@ -431,82 +433,19 @@ pub async fn process_modrinth_server_pack(
 
     let mrpack_path_clone = mrpack_path.clone();
     let data_path_clone = data_path.clone();
-    tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-        let file = std::fs::File::open(&mrpack_path_clone)?;
-        let mut archive = zip::ZipArchive::new(file)?;
-
-        for i in 0..archive.len() {
-            let mut entry = archive.by_index(i)?;
-            let name = entry.name().to_string();
-
-            // Extract from both overrides/ and server-overrides/
-            let strip_prefix = if name.starts_with("server-overrides/") {
-                Some("server-overrides/")
-            } else if name.starts_with("overrides/") {
-                Some("overrides/")
-            } else {
-                None
-            };
-
-            if let Some(prefix) = strip_prefix {
-                let relative = &name[prefix.len()..];
-                if relative.is_empty() {
-                    continue;
-                }
-
-                // Same hard refusal as the CF extractor: never write into
-                // world/save paths from a modpack override.
-                if is_save_path(relative) {
-                    tracing::warn!(
-                        "Skipping save-path entry from mrpack overrides: {} (would overwrite user data)",
-                        relative
-                    );
-                    continue;
-                }
-
-                let out_path = match secure_path_join(&data_path_clone, relative) {
-                    Ok(p) => p,
-                    Err(e) => {
-                        tracing::warn!(
-                            "Skipping mrpack override entry with unsafe path `{}`: {}",
-                            relative,
-                            e
-                        );
-                        continue;
-                    }
-                };
-
-                // A pack's own eula.txt is never written, on a fresh install or a
-                // reinstall: only the app's own EULA-accept flow may write
-                // "eula=true", so a pack cannot pre-accept the EULA on the
-                // operator's behalf by shipping a pre-filled file.
-                if !entry.is_dir() && relative.eq_ignore_ascii_case("eula.txt") {
-                    continue;
-                }
-
-                if !entry.is_dir()
-                    && is_preserved_config_file(relative)
-                    && out_path.exists()
-                {
-                    continue;
-                }
-
-                if entry.is_dir() {
-                    std::fs::create_dir_all(&out_path)?;
-                } else {
-                    if let Some(parent) = out_path.parent() {
-                        std::fs::create_dir_all(parent)?;
-                    }
-                    let mut outfile = std::fs::File::create(&out_path)?;
-                    std::io::copy(&mut entry, &mut outfile)?;
-                }
-            }
-        }
-
-        Ok(())
-    })
-    .await?
-    .context("Failed to extract overrides from mrpack")?;
+    skipped_links.extend(
+        tokio::task::spawn_blocking(move || {
+            extract_mrpack_overrides_protected(
+                &mrpack_path_clone,
+                &data_path_clone,
+                &protection,
+                super::world::filesystem_resolves,
+            )
+        })
+        .await?
+        .context("Failed to extract overrides from mrpack")?,
+    );
+    warn_skipped_links(task, skipped_links);
     t_extract.complete_opaque();
 
     // Extract game version and modloader from index dependencies
@@ -542,8 +481,192 @@ pub async fn process_modrinth_server_pack(
     })
 }
 
-/// Extract a ZIP file into a target directory, handling single-root-folder layouts.
-fn extract_zip_to_dir(zip_path: &Path, target_dir: &Path) -> anyhow::Result<()> {
+/// Where a pack entry goes, or `None` when it must not be written: a world or
+/// a folder the save check could not open (see
+/// [`super::world::SaveProtection`]), the operator's own files, `eula.txt`,
+/// or a path through a link, one the filesystem cannot place or a name this
+/// OS cannot store (`:` on Windows). The last are skipped with a warning, as
+/// 2.0.40 skipped unsafe paths, so one odd entry does not fail a whole
+/// install; a link is also recorded in `destinations` to tell the user (see
+/// [`warn_skipped_links`]). A path that leaves the server folder is an
+/// error; the caller decides whether that fails the install.
+fn pack_destination(
+    protection: &super::world::SaveProtection,
+    destinations: &mut super::world::Destinations<'_>,
+    raw: &str,
+    is_dir: bool,
+) -> anyhow::Result<Option<std::path::PathBuf>> {
+    let data = destinations.data();
+    super::world::contained_relative(data, raw)?;
+    let (relative, path) = match destinations.effective(raw) {
+        Ok(found) => found,
+        Err(error) => {
+            warn!("Skipping server pack entry `{raw}`: {error:#}");
+            if let Some(through) = error.downcast_ref::<super::world::ThroughLink>() {
+                // A world, or an operator file the pack would not replace
+                // anyway, is no news.
+                let link = &through.link;
+                if !protection.protects_effective(link)
+                    && !is_preserved_config_file(&link.to_ascii_lowercase())
+                {
+                    destinations.skip_link(link.clone());
+                }
+            }
+            return Ok(None);
+        }
+    };
+    // Lowercase identifies a canonical operator name only. Preserve it only
+    // when filesystem lookup resolves that name to this same checked path
+    // (or cannot tell); an unrelated case-distinct Linux file keeps its own
+    // destination.
+    let canonical = relative.to_ascii_lowercase();
+    let operator_file = !is_dir
+        && is_preserved_config_file(&canonical)
+        && path.try_exists()?
+        && destinations
+            .effective(&canonical)
+            .map_or(true, |(_, canonical)| canonical == path);
+    if protection.protects_effective(&relative)
+        || (!is_dir && relative.eq_ignore_ascii_case("eula.txt"))
+        || operator_file
+    {
+        return Ok(None);
+    }
+    Ok(Some(path))
+}
+
+/// Tells the user, after the install, which links in the server folder pack
+/// files were not written through: GDLauncher does not write through links
+/// (see [`super::world::Destinations::effective`]), and Repair does not
+/// delete these (a `config/` shared with another server).
+fn warn_skipped_links(task: &VisualTask, links: std::collections::BTreeSet<String>) {
+    for folder in links {
+        task.warn(crate::domain::vtask::TaskWarning::PackFilesSkippedAtLink { path: folder });
+    }
+}
+
+/// [`pack_destination`] of one entry, as a test asks for it.
+#[cfg(test)]
+fn pack_destination_with(
+    protection: &super::world::SaveProtection,
+    data: &Path,
+    raw: &str,
+    is_dir: bool,
+    lookup: super::world::ComponentLookup,
+) -> anyhow::Result<Option<std::path::PathBuf>> {
+    let mut destinations = super::world::Destinations::new(data, lookup);
+    pack_destination(protection, &mut destinations, raw, is_dir)
+}
+#[cfg(test)]
+fn pack_in(
+    protection: &super::world::SaveProtection,
+    data: &Path,
+    raw: &str,
+    is_dir: bool,
+) -> anyhow::Result<Option<std::path::PathBuf>> {
+    pack_destination_with(
+        protection,
+        data,
+        raw,
+        is_dir,
+        super::world::filesystem_resolves,
+    )
+}
+
+#[cfg(test)]
+fn extract_mrpack_overrides(
+    mrpack_path: &Path,
+    data_path: &Path,
+) -> anyhow::Result<std::collections::BTreeSet<String>> {
+    extract_mrpack_overrides_with(mrpack_path, data_path, super::world::filesystem_resolves)
+}
+#[cfg(test)]
+fn extract_mrpack_overrides_with(
+    mrpack_path: &Path,
+    data_path: &Path,
+    lookup: super::world::ComponentLookup,
+) -> anyhow::Result<std::collections::BTreeSet<String>> {
+    let protection = super::world::SaveProtection::read(data_path)?;
+    extract_mrpack_overrides_protected(mrpack_path, data_path, &protection, lookup)
+}
+/// Extracts an mrpack's overrides. Returns the links pack files were not
+/// written through (see [`pack_destination`]).
+fn extract_mrpack_overrides_protected(
+    mrpack_path: &Path,
+    data_path: &Path,
+    protection: &super::world::SaveProtection,
+    lookup: super::world::ComponentLookup,
+) -> anyhow::Result<std::collections::BTreeSet<String>> {
+    let mut destinations = super::world::Destinations::new(data_path, lookup);
+    let file = std::fs::File::open(mrpack_path)?;
+    let mut archive = zip::ZipArchive::new(file)?;
+
+    for i in 0..archive.len() {
+        let mut entry = archive.by_index(i)?;
+        let name = entry.name().to_string();
+
+        // Extract from both overrides/ and server-overrides/
+        let strip_prefix = if name.starts_with("server-overrides/") {
+            Some("server-overrides/")
+        } else if name.starts_with("overrides/") {
+            Some("overrides/")
+        } else {
+            None
+        };
+
+        if let Some(prefix) = strip_prefix {
+            let relative = &name[prefix.len()..];
+            if relative.is_empty() {
+                continue;
+            }
+
+            let out_path = match pack_destination(
+                protection,
+                &mut destinations,
+                relative,
+                entry.is_dir(),
+            ) {
+                Ok(Some(out_path)) => out_path,
+                Ok(None) => continue,
+                Err(error) => {
+                    warn!(
+                        "Skipping mrpack override entry with unsafe path `{relative}`: {error:#}"
+                    );
+                    continue;
+                }
+            };
+
+            if entry.is_dir() {
+                std::fs::create_dir_all(&out_path)?;
+            } else {
+                if let Some(parent) = out_path.parent() {
+                    std::fs::create_dir_all(parent)?;
+                }
+                let mut outfile = std::fs::File::create(&out_path)?;
+                std::io::copy(&mut entry, &mut outfile)?;
+            }
+        }
+    }
+
+    Ok(destinations.into_skipped_links())
+}
+
+/// Extract a ZIP file into a target directory, handling single-root-folder
+/// layouts. Returns the links pack files were not written through (see
+/// [`pack_destination`]).
+fn extract_zip_to_dir(
+    zip_path: &Path,
+    target_dir: &Path,
+) -> anyhow::Result<std::collections::BTreeSet<String>> {
+    extract_zip_to_dir_with(zip_path, target_dir, super::world::filesystem_resolves)
+}
+fn extract_zip_to_dir_with(
+    zip_path: &Path,
+    target_dir: &Path,
+    lookup: super::world::ComponentLookup,
+) -> anyhow::Result<std::collections::BTreeSet<String>> {
+    let protection = super::world::SaveProtection::read(target_dir)?;
+    let mut destinations = super::world::Destinations::new(target_dir, lookup);
     let file = std::fs::File::open(zip_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
 
@@ -551,7 +674,10 @@ fn extract_zip_to_dir(zip_path: &Path, target_dir: &Path) -> anyhow::Result<()> 
     let mut root_dirs = std::collections::HashSet::new();
     for i in 0..archive.len() {
         let entry = archive.by_index(i)?;
-        let name = entry.name();
+        let name = match super::world::normalized_relative(target_dir, entry.name()) {
+            Ok(name) => name,
+            Err(_) => continue,
+        };
         if let Some(first_component) = name.split('/').next() {
             if !first_component.is_empty() {
                 root_dirs.insert(first_component.to_string());
@@ -564,10 +690,14 @@ fn extract_zip_to_dir(zip_path: &Path, target_dir: &Path) -> anyhow::Result<()> 
         let has_subfiles = (0..archive.len()).any(|i| {
             archive
                 .by_index(i)
-                .map(|e| e.name().starts_with(&format!("{}/", root)) && !e.is_dir())
+                .map(|e| {
+                    super::world::normalized_relative(target_dir, e.name())
+                        .is_ok_and(|name| name.starts_with(&format!("{}/", root)))
+                        && !e.is_dir()
+                })
                 .unwrap_or(false)
         });
-        if has_subfiles {
+        if has_subfiles && !protection.protects(&root) {
             Some(format!("{}/", root))
         } else {
             None
@@ -578,7 +708,10 @@ fn extract_zip_to_dir(zip_path: &Path, target_dir: &Path) -> anyhow::Result<()> 
 
     for i in 0..archive.len() {
         let mut entry = archive.by_index(i)?;
-        let name = entry.name().to_string();
+        let name = match super::world::normalized_relative(target_dir, entry.name()) {
+            Ok(name) => name,
+            Err(_) => continue,
+        };
 
         let relative = if let Some(ref prefix) = strip_root {
             if let Some(stripped) = name.strip_prefix(prefix.as_str()) {
@@ -594,42 +727,15 @@ fn extract_zip_to_dir(zip_path: &Path, target_dir: &Path) -> anyhow::Result<()> 
             continue;
         }
 
-        // Hard refuse to write into world/save paths under any circumstances.
-        // Even a fresh install loses nothing — modpack-bundled worlds are
-        // niche and the risk to user data on reinstall isn't worth it.
-        if is_save_path(&relative) {
-            warn!(
-                "Skipping save-path entry from server pack: {} (would overwrite user data)",
-                relative
-            );
-            continue;
-        }
-
-        let out_path = match secure_path_join(target_dir, &relative) {
-            Ok(p) => p,
-            Err(e) => {
-                warn!(
-                    "Skipping server pack entry with unsafe path `{}`: {}",
-                    relative, e
-                );
-                continue;
-            }
-        };
-
-        // A pack's own eula.txt is never written, on a fresh install or a
-        // reinstall: only the app's own EULA-accept flow may write
-        // "eula=true", so a pack cannot pre-accept the EULA on the operator's
-        // behalf by shipping a pre-filled file. Unlike the other preserved
-        // config files below, this applies even when no local file exists yet.
-        if !entry.is_dir() && relative.eq_ignore_ascii_case("eula.txt") {
-            continue;
-        }
-
-        // Don't clobber user-customized config files if they already exist
-        // (server.properties, op/whitelist/banned lists, icon).
-        if !entry.is_dir() && is_preserved_config_file(&relative) && out_path.exists() {
-            continue;
-        }
+        let out_path =
+            match pack_destination(&protection, &mut destinations, &relative, entry.is_dir()) {
+                Ok(Some(out_path)) => out_path,
+                Ok(None) => continue,
+                Err(error) => {
+                    warn!("Skipping server pack entry with unsafe path `{relative}`: {error:#}");
+                    continue;
+                }
+            };
 
         if entry.is_dir() {
             std::fs::create_dir_all(&out_path)?;
@@ -642,7 +748,7 @@ fn extract_zip_to_dir(zip_path: &Path, target_dir: &Path) -> anyhow::Result<()> 
         }
     }
 
-    Ok(())
+    Ok(destinations.into_skipped_links())
 }
 
 /// Detect game version from CurseForge file metadata.
@@ -1061,6 +1167,582 @@ mod task06_tests {
         assert_eq!(d.size, Some(4));
         assert!(
             matches!(d.checksum, Some(carbon_net::Checksum::Sha512(hash)) if hash == file.hashes.sha512)
+        );
+    }
+}
+
+#[cfg(test)]
+mod task07_save_tests {
+    use super::*;
+    use std::io::Write;
+    #[test]
+    fn task07_custom_and_metadata_worlds_survive_pack_extraction() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path().join("server");
+        std::fs::create_dir(&data).unwrap();
+        std::fs::write(
+            data.join("server.properties"),
+            "level-name=AdventureMap\nserver-port=25577\n",
+        )
+        .unwrap();
+        for world in ["AdventureMap", "ArchivedMap", "world", "DIM-1"] {
+            std::fs::create_dir(data.join(world)).unwrap();
+            std::fs::write(data.join(world).join("level.dat"), "PROGRESSED").unwrap();
+        }
+        let zip_path = root.path().join("pack.zip");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
+        for name in [
+            "AdventureMap/level.dat",
+            "ArchivedMap/level.dat",
+            "world/level.dat",
+            "DIM-1/level.dat",
+            "server.properties",
+            "config/test.txt",
+            "dimension-config/test.txt",
+        ] {
+            zip.start_file(name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(b"BUNDLED").unwrap();
+        }
+        zip.finish().unwrap();
+        extract_zip_to_dir(&zip_path, &data).unwrap();
+        let mrpack_path = root.path().join("pack.mrpack");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&mrpack_path).unwrap());
+        for name in [
+            "overrides/AdventureMap/level.dat",
+            "server-overrides/AdventureMap/level.dat",
+            "server-overrides/ArchivedMap/level.dat",
+            "server-overrides/world/level.dat",
+            "server-overrides/server.properties",
+            "server-overrides/config/test.txt",
+        ] {
+            zip.start_file(name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(b"BUNDLED").unwrap();
+        }
+        zip.finish().unwrap();
+        extract_mrpack_overrides(&mrpack_path, &data).unwrap();
+        for world in ["AdventureMap", "ArchivedMap", "world", "DIM-1"] {
+            assert_eq!(
+                std::fs::read_to_string(data.join(world).join("level.dat")).unwrap(),
+                "PROGRESSED",
+                "{world}"
+            );
+        }
+        assert_eq!(
+            std::fs::read_to_string(data.join("config/test.txt")).unwrap(),
+            "BUNDLED"
+        );
+        assert_eq!(
+            std::fs::read_to_string(data.join("dimension-config/test.txt")).unwrap(),
+            "BUNDLED"
+        );
+        assert_eq!(
+            std::fs::read_to_string(data.join("server.properties")).unwrap(),
+            "level-name=AdventureMap\nserver-port=25577\n"
+        );
+    }
+}
+
+#[cfg(test)]
+mod odd_entry_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn archive(path: &Path, prefix: &str, names: &[&str]) {
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
+        for name in names {
+            zip.start_file(
+                format!("{prefix}{name}"),
+                zip::write::SimpleFileOptions::default(),
+            )
+            .unwrap();
+            zip.write_all(b"BUNDLED").unwrap();
+        }
+        zip.finish().unwrap();
+    }
+
+    /// A path the filesystem resolves to no entry it lists (as Windows does
+    /// for a name ending in a dot), here only for `ghost`.
+    fn ghost_resolves(parent: &Path, component: &str, entries: &[String]) -> anyhow::Result<bool> {
+        Ok(component == "ghost"
+            || super::super::world::filesystem_resolves(parent, component, entries)?)
+    }
+
+    /// One odd entry (a path that leaves the server folder, one through a
+    /// folder linked elsewhere, a name the filesystem cannot place) is
+    /// skipped with a warning, as 2.0.40 skipped unsafe paths, and the rest
+    /// of the pack is still installed; on a Repair the pack's mods were
+    /// already deleted, so failing here left the server without them.
+    #[test]
+    fn odd_entries_are_skipped_and_the_rest_installed() {
+        for mr in [false, true] {
+            let root = tempfile::tempdir().unwrap();
+            let data = root.path().join("data");
+            std::fs::create_dir_all(&data).unwrap();
+            let shared = root.path().join("shared-config");
+            std::fs::create_dir_all(&shared).unwrap();
+            std::fs::write(shared.join("shared.toml"), b"OPERATOR").unwrap();
+            super::super::world::link_folder(&shared, &data.join("config"));
+            let names = [
+                "../escape.txt",
+                "ghost/a.txt",
+                "config/shared.toml",
+                "config/other.toml",
+                "kubejs/startup.js",
+                "mods/pack.jar",
+            ];
+            let zip = root.path().join("pack.zip");
+            archive(&zip, if mr { "overrides/" } else { "" }, &names);
+            let skipped_links = if mr {
+                extract_mrpack_overrides_with(&zip, &data, ghost_resolves).unwrap()
+            } else {
+                extract_zip_to_dir_with(&zip, &data, ghost_resolves).unwrap()
+            };
+            assert_eq!(
+                skipped_links.into_iter().collect::<Vec<_>>(),
+                vec!["config"],
+                "mr={mr}: the link is told once"
+            );
+            for written in ["kubejs/startup.js", "mods/pack.jar"] {
+                assert_eq!(
+                    std::fs::read(data.join(written)).unwrap(),
+                    b"BUNDLED",
+                    "mr={mr} {written}"
+                );
+            }
+            assert!(!root.path().join("escape.txt").exists());
+            assert!(!data.join("ghost").exists());
+            assert_eq!(
+                std::fs::read(shared.join("shared.toml")).unwrap(),
+                b"OPERATOR",
+                "nothing is written through a link"
+            );
+            assert!(!shared.join("other.toml").exists());
+        }
+    }
+
+    /// The links pack files were not written through reach the user once the
+    /// install has succeeded.
+    #[tokio::test]
+    async fn skipped_links_are_reported_when_the_install_succeeds() {
+        let app = crate::setup_managers_for_test().await;
+        let task = VisualTask::new(Translation::ServerTaskInstallFromModpack {
+            server_name: "Server".into(),
+        });
+        task.require_explicit_completion();
+        app.task_manager().spawn_task(&task).await;
+        warn_skipped_links(&task, ["config".to_owned()].into());
+        task.complete();
+        drop(task);
+        let warnings = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+            loop {
+                let warnings = app.task_manager().get_task_warnings().await;
+                if !warnings.is_empty() {
+                    break warnings;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert_eq!(
+            warnings[0].warnings,
+            vec![crate::domain::vtask::TaskWarning::PackFilesSkippedAtLink {
+                path: "config".into()
+            }]
+        );
+    }
+
+    /// Pack files aimed at a linked world are refused like those aimed at any
+    /// world, which needs no telling; only a link the pack had files for that
+    /// are missing now is told.
+    #[test]
+    fn a_linked_world_is_not_reported_as_skipped() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path().join("data");
+        std::fs::create_dir_all(&data).unwrap();
+        let world = root.path().join("elsewhere");
+        std::fs::create_dir_all(&world).unwrap();
+        std::fs::write(data.join("server.properties"), "level-name=survival\n").unwrap();
+        super::super::world::link_folder(&world, &data.join("survival"));
+        let zip = root.path().join("pack.zip");
+        archive(&zip, "", &["survival/level.dat", "mods/pack.jar"]);
+        let skipped_links = extract_zip_to_dir(&zip, &data).unwrap();
+        assert!(skipped_links.is_empty(), "{skipped_links:?}");
+        assert!(!world.join("level.dat").exists());
+        assert!(data.join("mods/pack.jar").is_file());
+    }
+
+    /// One extraction of a pack that spells a folder two ways keeps each
+    /// file in the folder its entry names on a case-sensitive volume, in any
+    /// order.
+    #[test]
+    fn a_case_sensitive_volume_keeps_case_distinct_folders_apart() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path().join("data");
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::create_dir(data.join("Probe")).unwrap();
+        let insensitive = data.join("probe").exists();
+        std::fs::remove_dir(data.join("Probe")).unwrap();
+        if insensitive {
+            return; // Only a case-sensitive volume has two such folders.
+        }
+        for mr in [false, true] {
+            let zip = root.path().join("pack.zip");
+            archive(
+                &zip,
+                if mr { "overrides/" } else { "" },
+                &[
+                    "Config/x.toml",
+                    "Config/y.toml",
+                    "config/z.toml",
+                    "config/w.toml",
+                ],
+            );
+            if mr {
+                extract_mrpack_overrides(&zip, &data).unwrap();
+            } else {
+                extract_zip_to_dir(&zip, &data).unwrap();
+            }
+            for written in [
+                "Config/x.toml",
+                "Config/y.toml",
+                "config/z.toml",
+                "config/w.toml",
+            ] {
+                assert!(data.join(written).is_file(), "mr={mr} {written}");
+            }
+            assert!(!data.join("Config/w.toml").exists(), "mr={mr}");
+            std::fs::remove_dir_all(data.join("Config")).unwrap();
+            std::fs::remove_dir_all(data.join("config")).unwrap();
+        }
+    }
+
+    /// A pack file with `:` in its name is written as 2.0.40 wrote it outside
+    /// Windows, where it is an ordinary character. Windows reads it as a
+    /// stream, so skips it instead of failing the whole install; only a path
+    /// that leaves the server folder is an error for the caller.
+    #[test]
+    fn a_colon_in_a_pack_path_does_not_fail_the_install() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path();
+        let protection = super::super::world::SaveProtection::read(data).unwrap();
+        let destination = pack_in(&protection, data, "mods/foo:bar.jar", false).unwrap();
+        if cfg!(windows) {
+            assert_eq!(destination, None);
+        } else {
+            assert_eq!(destination, Some(data.join("mods").join("foo:bar.jar")));
+        }
+        assert!(pack_in(&protection, data, "../escape.jar", false).is_err());
+    }
+}
+
+#[cfg(test)]
+mod task07r1_alias_tests {
+    use super::*;
+    use std::io::Write;
+    #[test]
+    fn task07r1_r1_effective_save_config_eula_aliases_are_preserved() {
+        for mr in [false, true] {
+            for prefix in ["./", "config/../", "Wrapper/config/../"] {
+                let root = tempfile::tempdir().unwrap();
+                let data = root.path().join("data");
+                std::fs::create_dir_all(data.join("AdventureMap")).unwrap();
+                std::fs::write(data.join("AdventureMap/level.dat"), "PROGRESSED").unwrap();
+                std::fs::write(
+                    data.join("server.properties"),
+                    "level-name=AdventureMap\nserver-port=25577\n",
+                )
+                .unwrap();
+                let zip = root.path().join("pack.zip");
+                let mut writer = zip::ZipWriter::new(std::fs::File::create(&zip).unwrap());
+                let outer = if mr { "server-overrides/" } else { "" };
+                let effective_prefix = if mr && prefix.starts_with("Wrapper") {
+                    "config/../"
+                } else {
+                    prefix
+                };
+                for (path, bytes) in [
+                    ("AdventureMap/level.dat", "BUNDLED"),
+                    ("server.properties", "level-name=world"),
+                    ("eula.txt", "eula=true"),
+                ] {
+                    writer
+                        .start_file(
+                            format!("{outer}{effective_prefix}{path}"),
+                            zip::write::SimpleFileOptions::default(),
+                        )
+                        .unwrap();
+                    writer.write_all(bytes.as_bytes()).unwrap();
+                }
+                let control = if !mr && prefix.starts_with("Wrapper") {
+                    "Wrapper/config/control.txt"
+                } else {
+                    "config/control.txt"
+                };
+                writer
+                    .start_file(
+                        format!("{outer}{control}"),
+                        zip::write::SimpleFileOptions::default(),
+                    )
+                    .unwrap();
+                writer.write_all(b"ordinary").unwrap();
+                writer.finish().unwrap();
+                if mr {
+                    extract_mrpack_overrides(&zip, &data).unwrap();
+                } else {
+                    extract_zip_to_dir(&zip, &data).unwrap();
+                }
+                assert_eq!(
+                    std::fs::read_to_string(data.join("AdventureMap/level.dat")).unwrap(),
+                    "PROGRESSED",
+                    "mr={mr} prefix={prefix}"
+                );
+                assert_eq!(
+                    std::fs::read_to_string(data.join("server.properties")).unwrap(),
+                    "level-name=AdventureMap\nserver-port=25577\n"
+                );
+                assert!(!data.join("eula.txt").exists());
+                assert_eq!(
+                    std::fs::read_to_string(data.join("config/control.txt")).unwrap(),
+                    "ordinary"
+                );
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+#[test]
+fn task07r1_r1_index_destinations_share_effective_save_and_operator_policy() {
+    let root = tempfile::tempdir().unwrap();
+    std::fs::create_dir(root.path().join("AdventureMap")).unwrap();
+    std::fs::write(
+        root.path().join("server.properties"),
+        "level-name=AdventureMap",
+    )
+    .unwrap();
+    let protection = super::world::SaveProtection::read(root.path()).unwrap();
+    for raw in [
+        "./AdventureMap/level.dat",
+        "config/../AdventureMap/level.dat",
+        "./server.properties",
+        "config/../server.properties",
+        "./eula.txt",
+        "config/../eula.txt",
+    ] {
+        assert!(
+            pack_in(&protection, root.path(), raw, false)
+                .unwrap()
+                .is_none(),
+            "index raw alias {raw}"
+        );
+    }
+    assert_eq!(
+        pack_in(
+            &protection,
+            root.path(),
+            "config/../config/options.txt",
+            false
+        )
+        .unwrap(),
+        Some(root.path().join("config/options.txt"))
+    );
+    assert!(pack_in(&protection, root.path(), "../escape", false).is_err());
+}
+
+#[cfg(all(test, target_os = "linux"))]
+mod task07r2_operator_tests {
+    use super::*;
+    use std::io::Write;
+
+    const OPERATOR_FILES: [&str; 7] = [
+        "server.properties",
+        "whitelist.json",
+        "ops.json",
+        "banned-players.json",
+        "banned-ips.json",
+        "usercache.json",
+        "icon.png",
+    ];
+    const ORIGINAL: &[u8] = b"level-name=world\nserver-port=25577\n";
+    const BUNDLED: &[u8] = b"level-name=world\nserver-port=25599\n";
+
+    fn insensitive_lookup(
+        _parent: &Path,
+        component: &str,
+        entries: &[String],
+    ) -> anyhow::Result<bool> {
+        // Inject only component lookup. The same production resolver and archive
+        // writers still select and mutate real temporary files on Linux.
+        Ok(entries
+            .iter()
+            .any(|entry| entry.eq_ignore_ascii_case(component)))
+    }
+    fn policy(insensitive: bool) -> super::super::world::ComponentLookup {
+        if insensitive {
+            insensitive_lookup
+        } else {
+            super::super::world::filesystem_resolves
+        }
+    }
+
+    #[test]
+    fn task07r2_operator_case_equivalence_preserves_real_cf_mr_archive_destinations() {
+        for mr in [false, true] {
+            for insensitive in [true, false] {
+                for disk_upper in [true, false] {
+                    for archive_upper in [false, true] {
+                        for canonical in OPERATOR_FILES {
+                            let root = tempfile::tempdir().unwrap();
+                            let data = root.path().join("data");
+                            std::fs::create_dir(&data).unwrap();
+                            let disk = if disk_upper {
+                                canonical.to_uppercase()
+                            } else {
+                                canonical.into()
+                            };
+                            let archive_name = if archive_upper {
+                                canonical.to_uppercase()
+                            } else {
+                                canonical.into()
+                            };
+                            std::fs::write(data.join(&disk), ORIGINAL).unwrap();
+                            let zip = root.path().join("pack.zip");
+                            let mut writer =
+                                zip::ZipWriter::new(std::fs::File::create(&zip).unwrap());
+                            let prefix = if mr { "server-overrides/" } else { "" };
+                            for (name, bytes) in [
+                                (&*archive_name, BUNDLED),
+                                ("config/ordinary.txt", b"ordinary"),
+                                ("EULA.TXT", b"eula=true"),
+                            ] {
+                                writer
+                                    .start_file(
+                                        format!("{prefix}{name}"),
+                                        zip::write::SimpleFileOptions::default(),
+                                    )
+                                    .unwrap();
+                                writer.write_all(bytes).unwrap();
+                            }
+                            writer.finish().unwrap();
+                            if mr {
+                                extract_mrpack_overrides_with(&zip, &data, policy(insensitive))
+                                    .unwrap();
+                            } else {
+                                extract_zip_to_dir_with(&zip, &data, policy(insensitive)).unwrap();
+                            }
+                            let expected = if !insensitive && disk_upper && archive_upper {
+                                BUNDLED
+                            } else {
+                                ORIGINAL
+                            };
+                            assert_eq!(
+                                std::fs::read(data.join(&disk)).unwrap(),
+                                expected,
+                                "operator preservation mr={mr} insensitive={insensitive} disk={disk} archive={archive_name}"
+                            );
+                            if !insensitive && disk_upper != archive_upper {
+                                assert_eq!(
+                                    std::fs::read(data.join(&archive_name)).unwrap(),
+                                    BUNDLED,
+                                    "distinct Linux destination stays writable"
+                                );
+                            }
+                            assert_eq!(
+                                std::fs::read(data.join("config/ordinary.txt")).unwrap(),
+                                b"ordinary"
+                            );
+                            assert!(!data.join("EULA.TXT").exists());
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn task07r2_index_operator_policy_uses_canonical_destination_equivalence() {
+        for insensitive in [true, false] {
+            for disk_upper in [true, false] {
+                for archive_upper in [false, true] {
+                    for canonical in OPERATOR_FILES {
+                        let root = tempfile::tempdir().unwrap();
+                        let disk = if disk_upper {
+                            canonical.to_uppercase()
+                        } else {
+                            canonical.into()
+                        };
+                        let archive_name = if archive_upper {
+                            canonical.to_uppercase()
+                        } else {
+                            canonical.into()
+                        };
+                        std::fs::write(root.path().join(&disk), ORIGINAL).unwrap();
+                        let protection =
+                            super::super::world::SaveProtection::read(root.path()).unwrap();
+                        let result = pack_destination_with(
+                            &protection,
+                            root.path(),
+                            &archive_name,
+                            false,
+                            policy(insensitive),
+                        )
+                        .unwrap();
+                        let protected = insensitive || (!disk_upper && !archive_upper);
+                        assert_eq!(
+                            result.is_none(),
+                            protected,
+                            "index insensitive={insensitive} disk={disk} archive={archive_name}"
+                        );
+                        if let Some(path) = result {
+                            assert_eq!(path, root.path().join(&archive_name));
+                        }
+                        assert_eq!(std::fs::read(root.path().join(&disk)).unwrap(), ORIGINAL);
+                        assert!(
+                            pack_destination_with(
+                                &protection,
+                                root.path(),
+                                "EULA.TXT",
+                                false,
+                                policy(insensitive)
+                            )
+                            .unwrap()
+                            .is_none()
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn task07r2_native_case_distinct_files_remain_independent() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("server.properties"), ORIGINAL).unwrap();
+        std::fs::write(
+            root.path().join("SERVER.PROPERTIES"),
+            b"unrelated uppercase content",
+        )
+        .unwrap();
+        let protection = super::super::world::SaveProtection::read(root.path()).unwrap();
+        assert!(
+            pack_in(&protection, root.path(), "server.properties", false)
+                .unwrap()
+                .is_none()
+        );
+        let destination = pack_in(&protection, root.path(), "SERVER.PROPERTIES", false)
+            .unwrap()
+            .unwrap();
+        std::fs::write(destination, BUNDLED).unwrap();
+        assert_eq!(
+            std::fs::read(root.path().join("server.properties")).unwrap(),
+            ORIGINAL
+        );
+        assert_eq!(
+            std::fs::read(root.path().join("SERVER.PROPERTIES")).unwrap(),
+            BUNDLED
         );
     }
 }

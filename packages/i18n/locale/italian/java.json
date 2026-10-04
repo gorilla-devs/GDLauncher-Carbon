@@ -58,6 +58,7 @@
   "_trn_migration_errored": "La migrazione del percorso runtime non è riuscita. Lo stato potrebbe essere corrotto. Fai clic <0>qui</0> per ulteriori informazioni su come procedere.",
   "_trn_migration_stopped": "Lo spostamento si è interrotto prima di finire. Non è andato perso nulla. Fai clic <0>qui</0> per ulteriori informazioni su come procedere.",
   "_trn_scanning_files": "Scansione dei file...",
+  "_trn_checking_runtime_path": "Controllo della cartella dei dati prima dello spostamento...",
   "_trn_copying_file": "Copia di {{file}}",
   "_trn_removing_file": "Rimozione di {{file}}",
   "_trn_removing_partial_copy": "Rimozione della copia non completata: {{file}}",

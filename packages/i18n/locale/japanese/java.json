@@ -58,6 +58,7 @@
   "_trn_migration_errored": "ランタイムパスの移行に失敗しました。状態が破損している可能性があります。対処方法は<0>こちら</0>。",
   "_trn_migration_stopped": "移動は完了する前に止まりました。データは失われていません。対処方法は<0>こちら</0>。",
   "_trn_scanning_files": "ファイルをスキャン中...",
+  "_trn_checking_runtime_path": "移動の前にデータフォルダーを確認中...",
   "_trn_copying_file": "{{file}} をコピー中",
   "_trn_removing_file": "{{file}} を削除中",
   "_trn_removing_partial_copy": "途中までのコピーを削除中: {{file}}",

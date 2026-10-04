@@ -1,4 +1,5 @@
-import { Show, createMemo } from "solid-js"
+import { rspc } from "@/utils/rspcClient"
+import { For, Show, createMemo } from "solid-js"
 import { ContextMenuItem, ContextMenuSeparator } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
 import { useParams } from "@solidjs/router"
@@ -15,6 +16,16 @@ const ServerAddons = () => {
   let tableInstance: any = null
 
   const addonData = useServerAddonData()
+  const legacy = rspc.createQuery(() => ({
+    queryKey: ["server.getLegacyDatapacks", Number(params.id)]
+  }))
+  const recover = rspc.createMutation(() => ({
+    mutationKey: "server.recoverLegacyDatapack",
+    onSuccess: () => {
+      void legacy.refetch()
+      void addonData.allAddons.refetch()
+    }
+  }))
 
   const addonMutations = useServerAddonMutations(
     addonData.allAddons.refetch,
@@ -67,120 +78,143 @@ const ServerAddons = () => {
   })
 
   return (
-    <AddonsPageLayout
-      isLoading={addonData.allAddons.isLoading}
-      filteredAddons={addonData.filteredAddons}
-      filterProps={{
-        searchQuery: addonData.searchQuery,
-        setSearchQuery: addonData.setSearchQuery,
-        enabledAddonTypes: addonData.enabledAddonTypes,
-        setEnabledAddonTypes: addonData.setEnabledAddonTypes,
-        addonTypes: () =>
-          ["mods", "datapacks"].filter((t) =>
-            addonData.addonsStore.some((a) => a.addonType === t)
-          ),
-        onAddAddons: () => addonMutations.gotoSearchPage(),
-        onOpenFolder: addonMutations.handleOpenFolder
-      }}
-      columns={columns}
-      tableState={addonData}
-      onTableReady={(t) => {
-        tableInstance = t
-      }}
-      scrollContainerId="main-container-server-details"
-      onAddAddons={() => addonMutations.gotoSearchPage()}
-      contextMenuContent={({ selectedAddons, selectionCount }) => (
-        <Show
-          when={selectionCount() === 1}
-          fallback={
-            <>
-              <ContextMenuItem disabled>
-                {t("content:_trn_selected_count", {
-                  count: selectionCount()
-                })}
-              </ContextMenuItem>
-              <ContextMenuSeparator />
-              <Show when={selectedAddons().some((a) => !a.enabled)}>
-                <ContextMenuItem
-                  onSelect={() => {
-                    selectedAddons()
-                      .filter((a) => !a.enabled)
-                      .forEach((a) => addonMutations.handleToggleMod(a))
-                  }}
-                >
-                  <div class="i-hugeicons:toggle-off mr-2" />
-                  {t("content:_trn_enable_all")}
+    <>
+      <For each={legacy.data}>
+        {(candidate) => (
+          <div class="p-3 text-sm">
+            {t("instances:_trn_server_legacy_datapack", {
+              filename: candidate.filename,
+              interpolation: { escapeValue: false }
+            })}
+            <button
+              class="ml-2 underline"
+              disabled={recover.isPending}
+              onClick={() => recover.mutate([Number(params.id), candidate])}
+            >
+              {t("instances:_trn_server_legacy_datapack_move", {
+                world: candidate.selectedWorld,
+                interpolation: { escapeValue: false }
+              })}
+            </button>
+          </div>
+        )}
+      </For>
+      <AddonsPageLayout
+        isLoading={addonData.allAddons.isLoading}
+        filteredAddons={addonData.filteredAddons}
+        filterProps={{
+          searchQuery: addonData.searchQuery,
+          setSearchQuery: addonData.setSearchQuery,
+          enabledAddonTypes: addonData.enabledAddonTypes,
+          setEnabledAddonTypes: addonData.setEnabledAddonTypes,
+          addonTypes: () =>
+            ["mods", "datapacks"].filter((t) =>
+              addonData.addonsStore.some((a) => a.addonType === t)
+            ),
+          onAddAddons: () => addonMutations.gotoSearchPage(),
+          onOpenFolder: addonMutations.handleOpenFolder
+        }}
+        columns={columns}
+        tableState={addonData}
+        onTableReady={(t) => {
+          tableInstance = t
+        }}
+        scrollContainerId="main-container-server-details"
+        onAddAddons={() => addonMutations.gotoSearchPage()}
+        contextMenuContent={({ selectedAddons, selectionCount }) => (
+          <Show
+            when={selectionCount() === 1}
+            fallback={
+              <>
+                <ContextMenuItem disabled>
+                  {t("content:_trn_selected_count", {
+                    count: selectionCount()
+                  })}
                 </ContextMenuItem>
-              </Show>
-              <Show when={selectedAddons().some((a) => a.enabled)}>
-                <ContextMenuItem
-                  onSelect={() => {
-                    selectedAddons()
-                      .filter((a) => a.enabled)
-                      .forEach((a) => addonMutations.handleToggleMod(a))
-                  }}
-                >
-                  <div class="i-hugeicons:toggle-off mr-2" />
-                  {t("content:_trn_disable_all")}
-                </ContextMenuItem>
-              </Show>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                onSelect={() =>
-                  addonMutations.handleDeleteSelected(selectedAddons())
-                }
-                class="text-red-400 focus:text-red-400"
-              >
-                <div class="i-hugeicons:delete-02 mr-2" />
-                {t("content:_trn_delete_selected")}
-              </ContextMenuItem>
-            </>
-          }
-        >
-          <Show when={selectedAddons()[0]}>
-            {(addon) => {
-              const displayName = () => addon().displayName || addon().filename
-              return (
-                <>
+                <ContextMenuSeparator />
+                <Show when={selectedAddons().some((a) => !a.enabled)}>
                   <ContextMenuItem
                     onSelect={() => {
-                      window.navigator.clipboard.writeText(displayName())
+                      selectedAddons()
+                        .filter((a) => !a.enabled)
+                        .forEach((a) => addonMutations.handleToggleMod(a))
                     }}
                   >
-                    <div class="i-hugeicons:clipboard mr-2" />
-                    {t("content:_trn_copy_name")}
+                    <div class="i-hugeicons:toggle-off mr-2" />
+                    {t("content:_trn_enable_all")}
                   </ContextMenuItem>
-                  <ContextMenuSeparator />
+                </Show>
+                <Show when={selectedAddons().some((a) => a.enabled)}>
                   <ContextMenuItem
-                    onSelect={() => addonMutations.handleToggleMod(addon())}
+                    onSelect={() => {
+                      selectedAddons()
+                        .filter((a) => a.enabled)
+                        .forEach((a) => addonMutations.handleToggleMod(a))
+                    }}
                   >
                     <div class="i-hugeicons:toggle-off mr-2" />
-                    {addon().enabled
-                      ? t("content:_trn_disable_mod")
-                      : t("content:_trn_enable_mod")}
+                    {t("content:_trn_disable_all")}
                   </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    onSelect={() => addonMutations.handleOpenFolder()}
-                  >
-                    <div class="i-hugeicons:folder-open mr-2" />
-                    {t("instances:_trn_open_folder")}
-                  </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem
-                    onSelect={() => addonMutations.handleDeleteMod(addon())}
-                    class="text-red-400 focus:text-red-300"
-                  >
-                    <div class="i-hugeicons:delete-02 mr-2" />
-                    {t("content:_trn_delete_mod")}
-                  </ContextMenuItem>
-                </>
-              )
-            }}
+                </Show>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  onSelect={() =>
+                    addonMutations.handleDeleteSelected(selectedAddons())
+                  }
+                  class="text-red-400 focus:text-red-400"
+                >
+                  <div class="i-hugeicons:delete-02 mr-2" />
+                  {t("content:_trn_delete_selected")}
+                </ContextMenuItem>
+              </>
+            }
+          >
+            <Show when={selectedAddons()[0]}>
+              {(addon) => {
+                const displayName = () =>
+                  addon().displayName || addon().filename
+                return (
+                  <>
+                    <ContextMenuItem
+                      onSelect={() => {
+                        window.navigator.clipboard.writeText(displayName())
+                      }}
+                    >
+                      <div class="i-hugeicons:clipboard mr-2" />
+                      {t("content:_trn_copy_name")}
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      onSelect={() => addonMutations.handleToggleMod(addon())}
+                    >
+                      <div class="i-hugeicons:toggle-off mr-2" />
+                      {addon().enabled
+                        ? t("content:_trn_disable_mod")
+                        : t("content:_trn_enable_mod")}
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      onSelect={() => addonMutations.handleOpenFolder()}
+                    >
+                      <div class="i-hugeicons:folder-open mr-2" />
+                      {t("instances:_trn_open_folder")}
+                    </ContextMenuItem>
+                    <ContextMenuSeparator />
+                    <ContextMenuItem
+                      onSelect={() => addonMutations.handleDeleteMod(addon())}
+                      class="text-red-400 focus:text-red-300"
+                    >
+                      <div class="i-hugeicons:delete-02 mr-2" />
+                      {t("content:_trn_delete_mod")}
+                    </ContextMenuItem>
+                  </>
+                )
+              }}
+            </Show>
           </Show>
-        </Show>
-      )}
-    />
+        )}
+      />
+    </>
   )
 }
 

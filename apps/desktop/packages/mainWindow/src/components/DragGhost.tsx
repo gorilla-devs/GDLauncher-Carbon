@@ -318,7 +318,9 @@ const ServerGhost = (props: ServerGhostProps) => {
     starting: "bg-yellow-500",
     running: "bg-green-500",
     stopping: "bg-yellow-500",
-    deleting: "bg-red-500"
+    deleting: "bg-red-500",
+    recoveredRunning: "bg-yellow-500",
+    recoveredUnverified: "bg-orange-500"
   }
 
   const getScatterTransform = (index: number) => {

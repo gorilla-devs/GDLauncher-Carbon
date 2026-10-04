@@ -19,6 +19,8 @@
   "_trn_confirm_batch_instance_deletion": "Eliminar instancias",
   "_trn_confirm_batch_server_deletion": "Eliminar servidores",
   "_trn_server_eula_acceptance": "Aceptar EULA de Minecraft",
+  "_trn_server_force_stop_title": "Forzar la detención del servidor",
+  "_trn_server_clear_record_title": "Borrar el registro del proceso",
   "_trn_confirm_change_runtime_path": "Confirmar cambio de ruta de tiempo de ejecución",
   "_trn_why_are_ads_needed": "¿Por qué son necesarios los anuncios?",
   "_trn_mods_updater": "Actualizador de mods",

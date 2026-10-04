@@ -87,6 +87,7 @@ async function fixture() {
   await fs.writeFile(path.join(source, "save"), "old save")
   await fs.writeFile(pointer, source)
   const stop = vi.fn(async () => {}),
+    check = vi.fn(async (_core: unknown) => {}),
     relaunch = vi.fn()
   const dialog = { showMessageBox: vi.fn(async () => ({ response: 0 })) }
   const globals = {
@@ -102,11 +103,14 @@ async function fixture() {
     dismissRuntimeMoveNotice,
     IncompleteMigrationError,
     withRuntimeOperation,
+    interruptibleUntilCommitted,
+    relocationLeaseHeld,
     runtimeDestinationContext: () => ({}),
     overrideCLIDataPath: undefined,
     overrideEnvDataPath: undefined,
     coreModule: Promise.resolve({ type: "success", result: {} }),
     coreProcessHandle: {},
+    checkRelocation: check,
     stopCoreForRelocation: stop,
     fs,
     fss,
@@ -129,6 +133,7 @@ async function fixture() {
     target,
     pointer,
     stop,
+    check,
     relaunch,
     dialog,
     globals,
@@ -851,6 +856,237 @@ it("explicit runtime overrides reject before core shutdown", async () => {
   })
   await expect(move(null, f.target)).rejects.toThrow(/explicit runtime/)
   expect(f.stop).not.toHaveBeenCalled()
+})
+
+describe("a move refused by the core", () => {
+  const blockers = [
+    { kind: "game", name: "game 3" },
+    { kind: "server", name: "server 7 run" }
+  ]
+  it("is dismissible, lists the blockers and leaves the pointer and both folders untouched", async () => {
+    const f = await fixture()
+    f.stop.mockRejectedValue(
+      new ShutdownRefusedError("Core relocation refused", blockers as any)
+    )
+    const move = callback("changeRuntimePath", f.globals)
+    await expect(move(null, f.target)).resolves.toEqual({
+      type: "failed",
+      recovery: "none",
+      message: expect.stringMatching(/refused/),
+      incompleteTarget: false,
+      refused: { blockers }
+    })
+    expect(f.stop).toHaveBeenCalledOnce()
+    expect(await fs.readFile(f.pointer, "utf8")).toBe(f.source)
+    expect(await fs.readdir(f.target)).toEqual([])
+    expect(await fs.readFile(path.join(f.source, "save"), "utf8")).toBe(
+      "old save"
+    )
+    expect(f.relaunch).not.toHaveBeenCalled()
+  })
+  it("a lease released before commit is dismissible without a blocker list", async () => {
+    const f = await fixture()
+    f.stop.mockRejectedValue(
+      new ShutdownRefusedError("Core runtime differs from the selected source")
+    )
+    const move = callback("changeRuntimePath", f.globals)
+    await expect(move(null, f.target)).resolves.toMatchObject({
+      type: "failed",
+      recovery: "none",
+      refused: { blockers: [] }
+    })
+    expect(await fs.readFile(f.pointer, "utf8")).toBe(f.source)
+  })
+  it("an unverified stop still keeps the move protected", async () => {
+    const f = await fixture()
+    f.stop.mockRejectedValue(new Error("core unreachable"))
+    const move = callback("changeRuntimePath", f.globals)
+    const result = await move(null, f.target)
+    expect(result).toMatchObject({
+      type: "failed",
+      recovery: "shutdown_unresolved"
+    })
+    expect(result.refused).toBeUndefined()
+  })
+  it("is refused before the data folder is scanned and before the core is stopped", async () => {
+    const f = await fixture()
+    f.check.mockRejectedValue(
+      new ShutdownRefusedError("Core relocation refused", blockers as any)
+    )
+    const lstat = vi.spyOn(fs, "lstat")
+    const move = callback("changeRuntimePath", f.globals)
+    await expect(move(null, f.target)).resolves.toEqual({
+      type: "failed",
+      recovery: "none",
+      message: expect.stringMatching(/refused/),
+      incompleteTarget: false,
+      refused: { blockers }
+    })
+    // The whole-folder scan is an lstat of every entry, starting at the root.
+    expect(lstat.mock.calls.map(([entry]) => String(entry))).not.toContain(
+      path.join(f.source, "save")
+    )
+    expect(f.stop).not.toHaveBeenCalled()
+    expect(await fs.readFile(f.pointer, "utf8")).toBe(f.source)
+  })
+  it("checks the core first, scans while nothing is stopped, then commits and stops it", async () => {
+    const f = await fixture()
+    const steps: string[] = []
+    f.check.mockImplementation(async () => {
+      steps.push("check core")
+    })
+    f.stop.mockImplementation(async () => {
+      steps.push("stop core")
+    })
+    await relocateRuntime({
+      source: f.source,
+      target: f.target,
+      pointer: f.pointer,
+      checkCore: () => f.check(undefined),
+      stopCore: f.stop,
+      progress: (p) => {
+        if (steps.at(-1) !== p.action) steps.push(p.action)
+      }
+    })
+    // From "scan" on, closing the app no longer ends the move, so the UI
+    // shows its do-not-close warning before the core is asked to stop.
+    expect(steps.slice(0, 4)).toEqual([
+      "check core",
+      "check",
+      "scan",
+      "stop core"
+    ])
+  })
+  it("a check that fails otherwise ends the move while the core runs on, so it stays dismissible", async () => {
+    const f = await fixture()
+    f.check.mockRejectedValue(new Error("Relocation requires a live core"))
+    const move = callback("changeRuntimePath", f.globals)
+    const result = await move(null, f.target)
+    expect(result).toMatchObject({ type: "failed", recovery: "none" })
+    expect(result.refused).toBeUndefined()
+    expect(f.stop).not.toHaveBeenCalled()
+  })
+  it("a core found gone by the check before the scan asks for a restart", async () => {
+    const f = await fixture()
+    f.check.mockRejectedValue(new Error("Relocation requires a live core"))
+    const move = callback("changeRuntimePath", {
+      ...f.globals,
+      coreProcessHandle: { exitCode: 1, signalCode: null }
+    })
+    await expect(move(null, f.target)).resolves.toMatchObject({
+      type: "failed",
+      recovery: "restart"
+    })
+    expect(f.stop).not.toHaveBeenCalled()
+  })
+  it("a core that already exited asks for a restart even when it refused", async () => {
+    const f = await fixture()
+    f.stop.mockRejectedValue(new ShutdownRefusedError("refused", []))
+    const move = callback("changeRuntimePath", {
+      ...f.globals,
+      coreProcessHandle: { exitCode: 1, signalCode: null }
+    })
+    await expect(move(null, f.target)).resolves.toMatchObject({
+      type: "failed",
+      recovery: "restart"
+    })
+  })
+})
+
+describe("closing the app while a move only checks the data folder", () => {
+  const closed = () =>
+    new Error("GDLauncher was closed before the move started")
+  it("ends the move mid-scan before the core is stopped, leaving everything as it was", async () => {
+    const f = await fixture()
+    await fs.mkdir(path.join(f.source, "instances"))
+    await fs.writeFile(path.join(f.source, "instances", "world"), "world")
+    const lstat = fs.lstat.bind(fs)
+    const visited: string[] = []
+    vi.spyOn(fs, "lstat").mockImplementation((async (
+      entry: any,
+      ...rest: any[]
+    ) => {
+      if (String(entry).startsWith(f.source)) {
+        visited.push(String(entry))
+        // The user closes the window once the scan has started.
+        if (visited.length === 2)
+          expect(interruptRuntimeOperation(closed())).toBe(true)
+      }
+      return (lstat as any)(entry, ...rest)
+    }) as any)
+    const move = callback("changeRuntimePath", f.globals)
+    const result = await move(null, f.target)
+    expect(result).toEqual({
+      type: "failed",
+      recovery: "none",
+      message: expect.stringMatching(/closed before the move started/),
+      incompleteTarget: false,
+      refused: { blockers: [] }
+    })
+    // The scan stopped at the next entry instead of walking the whole folder.
+    expect(visited.length).toBeLessThan(4)
+    expect(f.stop).not.toHaveBeenCalled()
+    expect(f.relaunch).not.toHaveBeenCalled()
+    expect(await fs.readFile(f.pointer, "utf8")).toBe(f.source)
+    expect(await fs.readdir(f.target)).toEqual([])
+    expect(runtimeOperationActive()).toBe(false)
+  })
+  it("ends the move when the close comes while the core is being asked", async () => {
+    const f = await fixture()
+    f.check.mockImplementation(async () => {
+      interruptRuntimeOperation(closed())
+    })
+    const move = callback("changeRuntimePath", f.globals)
+    await expect(move(null, f.target)).resolves.toMatchObject({
+      type: "failed",
+      recovery: "none",
+      refused: { blockers: [] }
+    })
+    expect(f.stop).not.toHaveBeenCalled()
+  })
+  it("does not claim nothing is held when an earlier attempt may still hold a lease", async () => {
+    const f = await fixture()
+    f.check.mockImplementation(async () => {
+      interruptRuntimeOperation(closed())
+    })
+    const move = callback("changeRuntimePath", {
+      ...f.globals,
+      relocationLeaseHeld: () => true
+    })
+    const result = await move(null, f.target)
+    expect(result).toMatchObject({ type: "failed", recovery: "none" })
+    // Without `refused` the renderer keeps an earlier attempt's protection.
+    expect(result.refused).toBeUndefined()
+    expect(f.stop).not.toHaveBeenCalled()
+  })
+  it("cannot end a move once the core is asked to stop; it runs to its end", async () => {
+    const f = await fixture()
+    f.stop.mockImplementation(async () => {
+      expect(interruptRuntimeOperation(closed())).toBe(false)
+    })
+    await f.move(null, f.target)
+    expect(f.relaunch).toHaveBeenCalledOnce()
+    expect(await fs.readFile(f.pointer, "utf8")).toBe(f.target)
+  })
+  it("runs a deferred quit once the operation ends, and at once when none runs", async () => {
+    const order: string[] = []
+    whenRuntimeOperationIdle(() => order.push("idle now"))
+    expect(order).toEqual(["idle now"])
+    expect(interruptRuntimeOperation(closed())).toBe(false)
+    let release!: () => void
+    const pending = withRuntimeOperation(async () => {
+      const quit = () => order.push("quit")
+      whenRuntimeOperationIdle(quit)
+      whenRuntimeOperationIdle(quit)
+      await new Promise<void>((resolve) => (release = resolve))
+      order.push("operation end")
+    })
+    release()
+    await pending
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    // Once, and only after the operation.
+    expect(order).toEqual(["idle now", "operation end", "quit"])
+  })
 })
 
 it.each(["relaunch", "deleteDbAndRestart", "restoreDbSnapshotAndRestart"])(
