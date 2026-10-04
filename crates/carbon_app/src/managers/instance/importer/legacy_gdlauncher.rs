@@ -231,9 +231,6 @@ impl InstanceImporter for LegacyGDLauncherImporter {
             async move {
                 let path = instance_path.join("instance");
 
-                tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete"))
-                    .await?;
-
                 trace!("Copying files from legacy instance");
                 // create copy-filter function in file utils for all importers
                 carbon_rt_path::copy_dir_filter(&instance.path, &path, |path| {
@@ -251,6 +248,9 @@ impl InstanceImporter for LegacyGDLauncherImporter {
                     }
                 })
                 .await?;
+
+                tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete"))
+                    .await?;
 
                 Ok(())
             }

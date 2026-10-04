@@ -349,17 +349,14 @@ pub async fn copy_game_dir<F>(from: &Path, instance_path: &Path, filter: F) -> a
 where
     F: for<'a> Fn(&'a Path) -> bool,
 {
-    tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete")).await?;
-
-    if !from.is_dir() {
+    if from.is_dir() {
+        let to = instance_path.join("instance");
+        trace!("Copying game files from {from:?} to {to:?}");
+        carbon_rt_path::copy_dir_filter(from, &to, filter).await?;
+    } else {
         trace!("Game directory {from:?} does not exist, importing an empty instance");
-        return Ok(());
     }
-
-    let to = instance_path.join("instance");
-    trace!("Copying game files from {from:?} to {to:?}");
-    carbon_rt_path::copy_dir_filter(from, &to, filter).await?;
-
+    tokio::fs::create_dir_all(instance_path.join(".setup").join("modpack-complete")).await?;
     Ok(())
 }
 
@@ -990,5 +987,54 @@ mod test {
         // `json_i64` parses numeric strings, so the positive form does too.
         assert_eq!(json_positive_u32(&value, "stringy"), Some(2048));
         assert_eq!(positive_u32(None), None);
+    }
+}
+
+#[cfg(test)]
+mod task06_tests {
+    use super::*;
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn task06_copy_marker_follows_included_success() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        let source = root.path().join("source");
+        let world = source.join("saves/world");
+        std::fs::create_dir_all(&world).unwrap();
+        std::fs::write(world.join("level.dat"), b"world").unwrap();
+        struct Restore(PathBuf);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                std::fs::set_permissions(&self.0, std::fs::Permissions::from_mode(0o700)).unwrap();
+            }
+        }
+        let restore = Restore(world.clone());
+        std::fs::set_permissions(&world, std::fs::Permissions::from_mode(0)).unwrap();
+        assert!(std::fs::read_dir(&world).is_err());
+        let destination = root.path().join("failed");
+        assert!(
+            copy_game_dir(&source, &destination, |_| true)
+                .await
+                .is_err()
+        );
+        assert!(
+            !destination.join(".setup/modpack-complete").exists(),
+            "failed copy cannot have a completion marker"
+        );
+        drop(restore);
+        let destination = root.path().join("success");
+        copy_game_dir(&source, &destination, |_| true)
+            .await
+            .unwrap();
+        assert!(destination.join(".setup/modpack-complete").is_dir());
+        assert_eq!(
+            std::fs::read(destination.join("instance/saves/world/level.dat")).unwrap(),
+            b"world"
+        );
+        let destination = root.path().join("empty");
+        copy_game_dir(&root.path().join("missing"), &destination, |_| true)
+            .await
+            .unwrap();
+        assert!(destination.join(".setup/modpack-complete").is_dir());
     }
 }

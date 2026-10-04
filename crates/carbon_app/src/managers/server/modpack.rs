@@ -386,10 +386,7 @@ pub async fn process_modrinth_server_pack(
             tokio::fs::create_dir_all(parent).await?;
         }
 
-        downloadables.push(carbon_net::Downloadable::new(
-            download_url.as_str(),
-            &file_path,
-        ));
+        downloadables.push(mrpack_downloadable(modpack_file, download_url, &file_path));
     }
 
     let concurrency = app
@@ -1037,5 +1034,33 @@ mod tests {
         // Nested files are not matched — caller passes top-level relative paths
         assert!(!is_preserved_config_file("config/server.properties"));
         assert!(!is_preserved_config_file("mods/foo.jar"));
+    }
+}
+
+fn mrpack_downloadable(
+    file: &carbon_platforms::modrinth::version::ModrinthFile,
+    url: &str,
+    path: &Path,
+) -> carbon_net::Downloadable {
+    carbon_net::Downloadable::new(url, path)
+        .with_size(u64::from(file.file_size))
+        .with_checksum(Some(carbon_net::Checksum::Sha512(
+            file.hashes.sha512.clone(),
+        )))
+}
+#[cfg(test)]
+mod task06_tests {
+    use super::*;
+    #[test]
+    fn task06_mrpack_descriptor_keeps_integrity() {
+        let file: carbon_platforms::modrinth::version::ModrinthFile = serde_json::from_value(serde_json::json!({
+            "path": "mods/fixture.jar", "hashes": {"sha1": "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3", "sha512": "ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff"},
+            "downloads": ["https://fixture.invalid/artifact"], "fileSize": 4
+        })).unwrap();
+        let d = mrpack_downloadable(&file, &file.downloads[0], Path::new("mods/fixture.jar"));
+        assert_eq!(d.size, Some(4));
+        assert!(
+            matches!(d.checksum, Some(carbon_net::Checksum::Sha512(hash)) if hash == file.hashes.sha512)
+        );
     }
 }

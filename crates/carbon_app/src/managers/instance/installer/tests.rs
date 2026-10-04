@@ -1216,3 +1216,547 @@ async fn task05_round1_world_copy_accepts_distinct_archive_root() {
     );
     assert!(!old.with_file_name("NewRelease").exists());
 }
+
+#[tokio::test]
+async fn task06_installer_abort_awaits_owned_file_work() {
+    let installer =
+        Arc::new(cf("fixture.jar", b"test", curseforge::ClassId::Mods).into_installer());
+    let directory = tempfile::tempdir().unwrap();
+    let path = directory.path().join("private-io");
+    let worker_path = path.clone();
+    let (arrive, arrived) = tokio::sync::oneshot::channel();
+    let (release, released) = tokio::sync::oneshot::channel();
+    installer
+        .abort_handle
+        .lock()
+        .await
+        .spawn(move |cancel| async move {
+            cancel.cancelled().await;
+            // Explicit barrier represents already-owned work that must settle before rollback.
+            arrive.send(()).unwrap();
+            released.await.unwrap();
+            tokio::fs::write(worker_path, b"settled").await.unwrap();
+        });
+    let owner = installer.clone();
+    let mut abort = tokio::spawn(async move {
+        owner.abort(None).await.unwrap();
+    });
+    arrived.await.unwrap();
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), &mut abort)
+            .await
+            .is_err(),
+        "abort cannot acknowledge before owned IO settles"
+    );
+    release.send(()).unwrap();
+    abort.await.unwrap();
+    assert_eq!(std::fs::read(path).unwrap(), b"settled");
+    assert!(installer.abort_handle.lock().await.aborted);
+    // Repeat callers also observe the same settled completion without an AbortHandle race.
+    installer.abort(None).await.unwrap();
+}
+
+#[tokio::test]
+async fn task06_installer_missing_ack_does_not_certify_settlement() {
+    let (sender, receiver) = watch::channel(false);
+    drop(sender);
+    assert!(wait_install_completion(Some(receiver)).await.is_err());
+}
+
+#[tokio::test]
+async fn task06_installer_abort_settles_admission_before_return() {
+    let installer =
+        Arc::new(cf("fixture.jar", b"test", curseforge::ClassId::Mods).into_installer());
+    let admission = installer.admission.lock().await;
+    let owner = installer.clone();
+    let mut abort = tokio::spawn(async move {
+        owner.abort(None).await.unwrap();
+    });
+    assert!(
+        tokio::time::timeout(Duration::from_millis(100), &mut abort)
+            .await
+            .is_err()
+    );
+    assert!(installer.abort_handle.lock().await.aborted);
+    drop(admission);
+    abort.await.unwrap();
+}
+
+mod round1_graph {
+    use super::*;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::sync::{Notify, Semaphore, oneshot};
+    #[derive(Clone, Copy)]
+    enum Satisfaction {
+        Missing,
+        Present,
+        Error,
+    }
+    struct Spec {
+        name: &'static str,
+        rollbacks: Option<Arc<std::sync::atomic::AtomicUsize>>,
+        rollback_hook: Option<Arc<Hook>>,
+        child: Option<Arc<Spec>>,
+        dependency_error: bool,
+        satisfaction: Satisfaction,
+        url: Option<String>,
+        hook: Option<Arc<Hook>>,
+    }
+    struct Hook {
+        entered: Notify,
+        release: Semaphore,
+    }
+    struct Resource(Arc<Spec>);
+    #[async_trait::async_trait]
+    impl ResourceInstaller for Resource {
+        fn id(&self) -> String {
+            self.0.name.into()
+        }
+        fn display_name(&self) -> String {
+            self.id()
+        }
+        async fn downloadable(&self, path: &InstancePath) -> Option<Downloadable> {
+            self.0.url.as_ref().map(|url| {
+                Downloadable::new(url, self.get_install_path(path))
+                    .with_size(4)
+                    .with_checksum(Some(Checksum::Sha1(
+                        "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3".into(),
+                    )))
+            })
+        }
+        fn get_install_path(&self, path: &InstancePath) -> PathBuf {
+            path.get_mods_path().join(format!("{}.jar", self.0.name))
+        }
+        async fn post_process(&self, _: &InstancePath, _: &std::path::Path) -> anyhow::Result<()> {
+            Ok(())
+        }
+        fn dependencies(
+            &self,
+            _: &Arc<AppInner>,
+            _: InstanceId,
+            _: &InstanceData,
+            _: ModChannel,
+        ) -> DependencyIterator {
+            let mut entries: Vec<ResourceInstallerGetter> = Vec::new();
+            if let Some(child) = self.0.child.clone() {
+                entries.push(Box::new(move || {
+                    Box::pin(async move {
+                        Some(Ok(Box::new(Resource(child)) as BoxedResourceInstaller))
+                    })
+                }));
+            }
+            if self.0.dependency_error {
+                let hook = self.0.hook.clone();
+                entries.push(Box::new(move || {
+                    Box::pin(async move {
+                        if let Some(hook) = hook {
+                            hook.entered.notify_one();
+                            hook.release.acquire().await.unwrap().forget();
+                        }
+                        Some(Err(anyhow::anyhow!("fixture required dependency failed")))
+                    })
+                }));
+            }
+            DependencyIterator::new(entries.into_iter())
+        }
+        async fn is_already_installed(
+            &self,
+            _: &Arc<AppInner>,
+            _: InstanceId,
+        ) -> anyhow::Result<bool> {
+            if !self.0.dependency_error {
+                if let Some(hook) = &self.0.hook {
+                    hook.entered.notify_one();
+                    hook.release.acquire().await.unwrap().forget();
+                }
+            }
+            match self.0.satisfaction {
+                Satisfaction::Missing => Ok(false),
+                Satisfaction::Present => Ok(true),
+                Satisfaction::Error => bail!("fixture post-dependency satisfaction error"),
+            }
+        }
+        async fn rollback(&self, _: &mut InstanceData) -> anyhow::Result<()> {
+            if let Some(count) = &self.0.rollbacks {
+                count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            }
+            if let Some(hook) = &self.0.rollback_hook {
+                hook.entered.notify_one();
+                hook.release.acquire().await.unwrap().forget();
+            }
+            Ok(())
+        }
+    }
+    async fn held() -> (
+        String,
+        oneshot::Receiver<()>,
+        oneshot::Sender<()>,
+        Arc<std::sync::atomic::AtomicBool>,
+        tokio::task::JoinHandle<()>,
+    ) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/graph", listener.local_addr().unwrap());
+        let (accepted, arrived) = oneshot::channel();
+        let (release, released) = oneshot::channel();
+        let closed = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let seen = closed.clone();
+        let fixture = tokio::spawn(async move {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                request.push(socket.read_u8().await.unwrap());
+            }
+            assert!(request.starts_with(b"GET /graph HTTP/1.1\r\n"));
+            accepted.send(()).unwrap();
+            let mut byte = [0];
+            tokio::select! {
+                result=socket.read(&mut byte) => { assert_eq!(result.unwrap(),0); seen.store(true,std::sync::atomic::Ordering::SeqCst); }
+                _=released => { let _=socket.write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\ntest").await; }
+            }
+        });
+        (url, arrived, release, closed, fixture)
+    }
+    async fn run(mode: &str) {
+        let app = crate::setup_managers_for_test().await;
+        let (id, _, _) = crate::managers::instance::mods::tests::addon_fixture(
+            &app,
+            &format!("round1-{mode}"),
+            instance::AddonType::Mods,
+            "existing.jar",
+            b"existing",
+        )
+        .await;
+        let path = publication::current_path(&app, id).await.unwrap();
+        let final_c = path.get_mods_path().join("c.jar");
+        let (url, arrived, release, closed, fixture) = held().await;
+        let hook = Arc::new(Hook {
+            entered: Notify::new(),
+            release: Semaphore::new(0),
+        });
+        let rollbacks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let cleanup = Arc::new(Hook {
+            entered: Notify::new(),
+            release: Semaphore::new(0),
+        });
+        let c = Arc::new(Spec {
+            name: "c",
+            rollbacks: None,
+            rollback_hook: None,
+            child: None,
+            dependency_error: false,
+            satisfaction: Satisfaction::Missing,
+            url: Some(url),
+            hook: None,
+        });
+        let b = Arc::new(Spec {
+            name: "b",
+            rollbacks: Some(rollbacks.clone()),
+            rollback_hook: if mode.starts_with("cleanup-") {
+                Some(cleanup.clone())
+            } else {
+                None
+            },
+            child: Some(c),
+            dependency_error: false,
+            satisfaction: if mode == "mid-error" {
+                Satisfaction::Error
+            } else if mode == "satisfied-mid" {
+                Satisfaction::Present
+            } else {
+                Satisfaction::Missing
+            },
+            url: None,
+            hook: if mode == "mid-error" {
+                Some(hook.clone())
+            } else {
+                None
+            },
+        });
+        let a = Arc::new(Spec {
+            name: "a",
+            rollbacks: None,
+            rollback_hook: None,
+            child: Some(b),
+            dependency_error: mode == "dependency-error",
+            satisfaction: if mode == "post-error" || mode.starts_with("cleanup-") {
+                Satisfaction::Error
+            } else if mode == "dependency-error" {
+                Satisfaction::Present
+            } else {
+                Satisfaction::Missing
+            },
+            url: None,
+            hook: if mode == "mid-error" {
+                None
+            } else {
+                Some(hook.clone())
+            },
+        });
+        let installer = Arc::new(Installer::new(Box::new(Resource(a))));
+        let parent = Arc::new(Mutex::new(VisualTask::new(
+            Translation::InstanceTaskInstallMod {
+                mod_name: "fixture".into(),
+                instance_name: "fixture".into(),
+            },
+        )));
+        let worker = installer.clone();
+        let app_clone = app.clone();
+        let admission = tokio::spawn(async move {
+            worker
+                .install_inner(
+                    &app_clone,
+                    id,
+                    &path,
+                    &parent,
+                    &Arc::new(Mutex::new(Vec::new())),
+                    true,
+                    None,
+                )
+                .await
+        });
+        tokio::time::timeout(Duration::from_secs(10), arrived)
+            .await
+            .unwrap()
+            .unwrap();
+        hook.entered.notified().await;
+        if mode == "finished-mid" {
+            let handle = {
+                let context = installer.rollback_context.lock().await;
+                let context = context.as_ref().unwrap();
+                let deps = context.processed_deps.lock().await;
+                let state = deps[0].abort_handle.lock().await;
+                state.handle.as_ref().unwrap().clone()
+            };
+            tokio::time::timeout(Duration::from_secs(15), async {
+                while !handle.is_finished() {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+        }
+        let middle = installer.ownership.children.lock().unwrap()[0].clone();
+        let leaf = middle.children.lock().unwrap()[0].clone();
+        if mode == "satisfied-mid" {
+            assert!(
+                middle.owner.lock().await.completion.is_none(),
+                "satisfied ancestor must exercise the no-worker route"
+            );
+        }
+        if mode == "drop-admission" {
+            admission.abort();
+            assert!(admission.await.unwrap_err().is_cancelled());
+            let error = installer.abort(None).await.unwrap_err();
+            assert!(format!("{error:#}").contains("settlement unknown"));
+            assert!(
+                *leaf
+                    .owner
+                    .lock()
+                    .await
+                    .completion
+                    .as_ref()
+                    .unwrap()
+                    .borrow()
+            );
+            assert!(leaf.cancel.is_cancelled());
+            fixture.await.unwrap();
+            assert!(closed.load(std::sync::atomic::Ordering::SeqCst));
+            assert!(!final_c.exists());
+            assert_eq!(
+                rollbacks.load(std::sync::atomic::Ordering::SeqCst),
+                0,
+                "Unknown must forbid parent rollback"
+            );
+            return;
+        }
+        hook.release.add_permits(1);
+        if mode.starts_with("cleanup-") {
+            cleanup.entered.notified().await;
+            let owner = installer.clone();
+            let mut abort = tokio::spawn(async move { owner.abort(None).await });
+            assert!(
+                tokio::time::timeout(Duration::from_millis(100), &mut abort)
+                    .await
+                    .is_err(),
+                "abort must wait for the admitted error cleanup"
+            );
+            if mode == "cleanup-drop" {
+                admission.abort();
+                assert!(admission.await.unwrap_err().is_cancelled());
+                cleanup.release.add_permits(2);
+                let outcome = abort.await.unwrap();
+                assert!(
+                    outcome.is_err(),
+                    "dropped error cleanup must remain Unknown, not certified complete"
+                );
+                assert!(format!("{:#}", outcome.unwrap_err()).contains("settlement unknown"));
+                assert_eq!(
+                    rollbacks.load(std::sync::atomic::Ordering::SeqCst),
+                    1,
+                    "uncertainty must forbid a second parent rollback"
+                );
+            } else {
+                cleanup.release.add_permits(2);
+                let error = admission.await.unwrap().unwrap_err();
+                assert!(
+                    format!("{error:#}").contains("fixture post-dependency satisfaction error")
+                );
+                abort.await.unwrap().unwrap();
+            }
+            assert!(
+                *leaf
+                    .owner
+                    .lock()
+                    .await
+                    .completion
+                    .as_ref()
+                    .unwrap()
+                    .borrow()
+            );
+            fixture.await.unwrap();
+            assert!(closed.load(std::sync::atomic::Ordering::SeqCst));
+            assert!(!final_c.exists());
+            return;
+        }
+        let result = tokio::time::timeout(Duration::from_secs(15), admission)
+            .await
+            .unwrap()
+            .unwrap();
+        let should_error = matches!(mode, "post-error" | "mid-error" | "dependency-error");
+        if should_error {
+            let error = format!("{:#}", result.as_ref().unwrap_err());
+            let expected = if mode == "dependency-error" {
+                "fixture required dependency failed"
+            } else {
+                "fixture post-dependency satisfaction error"
+            };
+            assert!(
+                error.contains(expected),
+                "original admission error must survive settlement: {error}"
+            );
+        }
+        if mode == "missing-ack" {
+            result.unwrap();
+            leaf.owner.lock().await.handle.as_ref().unwrap().abort();
+            let error = installer.abort(None).await.unwrap_err();
+            assert!(format!("{error:#}").contains("without acknowledging IO settlement"));
+            fixture.await.unwrap();
+            assert!(closed.load(std::sync::atomic::Ordering::SeqCst));
+            assert!(!final_c.exists());
+            assert_eq!(
+                rollbacks.load(std::sync::atomic::Ordering::SeqCst),
+                0,
+                "Unknown must forbid parent rollback"
+            );
+            return;
+        }
+        if mode == "success" {
+            result.unwrap();
+            release.send(()).unwrap();
+            fixture.await.unwrap();
+            wait_install_completion(leaf.owner.lock().await.completion.clone())
+                .await
+                .unwrap();
+            wait_install_completion(middle.owner.lock().await.completion.clone())
+                .await
+                .unwrap();
+            wait_install_completion(installer.abort_handle.lock().await.completion.clone())
+                .await
+                .unwrap();
+            assert!(!leaf.cancel.is_cancelled());
+            assert_eq!(std::fs::read(&final_c).unwrap(), b"test");
+            return;
+        }
+        if !should_error {
+            result.as_ref().unwrap();
+            installer.abort(None).await.unwrap();
+        }
+        assert!(
+            *leaf
+                .owner
+                .lock()
+                .await
+                .completion
+                .as_ref()
+                .unwrap()
+                .borrow(),
+            "parent must observe actual leaf worker ACK"
+        );
+        assert!(leaf.cancel.is_cancelled());
+        // Socket closure is observed before fixture release; it is a concrete transport
+        // consequence of actual descendant cancellation, not an injected graph ACK.
+        let stopped = tokio::time::timeout(Duration::from_millis(300), async {
+            while !closed.load(std::sync::atomic::Ordering::SeqCst) {
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .is_ok();
+        let _ = release.send(());
+        fixture.await.unwrap();
+        if !stopped {
+            let _ = tokio::time::timeout(Duration::from_secs(5), async {
+                while !final_c.exists() {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+            })
+            .await;
+        }
+        assert_eq!(
+            result.is_err(),
+            should_error,
+            "required dependency error must not become satisfied success"
+        );
+        assert!(
+            stopped,
+            "{mode}: parent returned without cancelling its admitted descendant"
+        );
+        assert!(
+            !final_c.exists(),
+            "descendant published after parent settlement"
+        );
+    }
+    // These run multi-threaded: the metadata cache hashes through
+    // carbon_scheduler::cpu_block, whose WaitFuture calls block_in_place when
+    // dropped mid-hash, and that panics while a current_thread runtime shuts down.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn task06_round1_graph_dropped_error_cleanup_remains_unknown() {
+        run("cleanup-drop").await;
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn task06_round1_graph_concurrent_abort_waits_for_error_cleanup() {
+        run("cleanup-complete").await;
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn task06_round1_graph_missing_worker_ack_forbids_rollback() {
+        run("missing-ack").await;
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn task06_round1_graph_dropped_admission_reports_unknown() {
+        run("drop-admission").await;
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn task06_round1_graph_required_dependency_success() {
+        run("success").await;
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn task06_round1_graph_finished_middle_settles_leaf() {
+        run("finished-mid").await;
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn task06_round1_graph_satisfied_middle_settles_leaf() {
+        run("satisfied-mid").await;
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn task06_round1_graph_post_dependency_error_settles_leaf() {
+        run("post-error").await;
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn task06_round1_graph_failed_child_admission_retains_leaf() {
+        run("mid-error").await;
+    }
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn task06_round1_graph_dependency_error_is_not_satisfied_success() {
+        run("dependency-error").await;
+    }
+}

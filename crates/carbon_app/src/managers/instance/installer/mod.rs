@@ -37,7 +37,11 @@ use carbon_repos::repos::mod_file_cache as mfcdb;
 use carbon_rt_path::InstancePath;
 use futures::future::Future;
 use std::{ops::Deref, path::PathBuf, pin::Pin, sync::Arc, time::Duration};
-use tokio::{sync::Mutex, task::AbortHandle};
+use tokio::{
+    sync::{Mutex, watch},
+    task::AbortHandle,
+};
+use tokio_util::sync::CancellationToken;
 
 type BoxedResourceInstaller = Box<dyn ResourceInstaller + Send>;
 type ResourceInstallerGetter = Box<
@@ -172,37 +176,32 @@ pub struct InstallResult {
     pub dependency_tasks: Vec<VisualTaskId>,
 }
 
+#[derive(Clone)]
 struct InstallerRollbackContext {
+    ownership: Arc<InstallOwnership>,
     inner: Arc<Mutex<BoxedResourceInstaller>>,
-    processed_deps: Arc<Mutex<Vec<Installer>>>,
+    processed_deps: Arc<Mutex<Vec<Arc<Installer>>>>,
     instance_id: InstanceId,
     app: Arc<AppInner>,
 }
 
 impl InstallerRollbackContext {
-    pub async fn rollback(&self, inciting_error: Option<&anyhow::Error>) {
-        let instance_manager = self.app.instance_manager();
-        let mut instances = instance_manager.instances.write().await;
-        let instance = instances
-            .get_mut(&self.instance_id)
-            .expect("rollback should be called only when operating on a valid instance");
-
-        let data = instance
-            .data_mut()
-            .expect("rollback should be called only when operating on a valid instance");
-
-        let parent_name = {
-            let lock = self.inner.lock().await;
-            lock.display_name()
-        };
-
+    pub async fn rollback(&self, inciting_error: Option<&anyhow::Error>) -> anyhow::Result<()> {
+        // Never wait for this error handler's own ACK. Ownership settlement is
+        // recursive even when an ancestor completed its worker or had no worker.
+        self.ownership.settle_children().await?;
+        let parent_name = self.inner.lock().await.display_name();
         let processed_deps = self.processed_deps.lock().await;
-
+        let instance_manager = self.app.instance_manager();
+        let _operation = instance_manager.lock_instance(self.instance_id).await;
+        let mut instances = instance_manager.instances.write().await;
+        let Some(instance) = instances.get_mut(&self.instance_id) else {
+            return Ok(());
+        };
+        let Ok(data) = instance.data_mut() else {
+            return Ok(());
+        };
         for dep in processed_deps.iter() {
-            let abort_handle = dep.abort_handle.lock().await;
-            if let Some(handle) = &abort_handle.handle {
-                handle.abort();
-            }
             let lock = dep.inner.lock().await;
             match lock.rollback(data).await {
                 Ok(_) => {}
@@ -216,6 +215,7 @@ impl InstallerRollbackContext {
                 }
             }
         }
+        Ok(())
     }
 }
 
@@ -226,11 +226,128 @@ pub struct Installer {
     inner: Arc<Mutex<BoxedResourceInstaller>>,
     rollback_context: Arc<Mutex<Option<InstallerRollbackContext>>>,
     abort_handle: Arc<Mutex<InstallerAbortHandle>>,
+    admission: Arc<Mutex<()>>,
+    ownership: Arc<InstallOwnership>,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum AdmissionPhase {
+    New,
+    Running,
+    Complete,
+    Unknown,
+}
+
+// Live-work ownership is independent of Task10's completed-artifact bookkeeping.
+// A node is registered before any recursive work and outlives its own worker ACK.
+struct InstallOwnership {
+    owner: Arc<Mutex<InstallerAbortHandle>>,
+    admission: Arc<Mutex<()>>,
+    phase: std::sync::Mutex<AdmissionPhase>,
+    cancel: CancellationToken,
+    children: std::sync::Mutex<Vec<Arc<InstallOwnership>>>,
+}
+struct AdmissionRecord {
+    node: Arc<InstallOwnership>,
+    finished: bool,
+}
+impl AdmissionRecord {
+    fn begin(node: Arc<InstallOwnership>) -> Self {
+        *node.phase.lock().unwrap() = AdmissionPhase::Running;
+        Self {
+            node,
+            finished: false,
+        }
+    }
+    fn finish(mut self) {
+        *self.node.phase.lock().unwrap() = AdmissionPhase::Complete;
+        self.finished = true;
+    }
+}
+impl Drop for AdmissionRecord {
+    fn drop(&mut self) {
+        if !self.finished {
+            *self.node.phase.lock().unwrap() = AdmissionPhase::Unknown;
+            self.node.cancel.cancel();
+        }
+    }
+}
+impl InstallOwnership {
+    #[async_recursion::async_recursion]
+    async fn settle(&self) -> anyhow::Result<()> {
+        self.cancel.cancel();
+        self.owner.lock().await.request_cancel();
+        let admission = self.admission.lock().await;
+        let unknown = *self.phase.lock().unwrap() == AdmissionPhase::Unknown;
+        let completion = self.owner.lock().await.completion.clone();
+        drop(admission);
+        let own = wait_install_completion(completion).await;
+        // Drain all known children even when our own completion is uncertain.
+        let children = self.settle_children().await;
+        if unknown {
+            bail!("Installer admission ended without an acknowledgment; settlement unknown");
+        }
+        own?;
+        children
+    }
+    async fn settle_children(&self) -> anyhow::Result<()> {
+        let children = self.children.lock().unwrap().clone();
+        for child in &children {
+            child.cancel.cancel();
+        }
+        let mut failure = None;
+        for child in children {
+            if let Err(error) = child.settle().await {
+                if failure.is_none() {
+                    failure = Some(error);
+                }
+            }
+        }
+        match failure {
+            Some(error) => Err(error),
+            None => Ok(()),
+        }
+    }
 }
 
 struct InstallerAbortHandle {
     pub handle: Option<AbortHandle>,
     pub aborted: bool,
+    cancel: CancellationToken,
+    completion: Option<watch::Receiver<bool>>,
+}
+
+impl InstallerAbortHandle {
+    fn spawn<F>(&mut self, work: impl FnOnce(CancellationToken) -> F + Send + 'static)
+    where
+        F: Future<Output = ()> + Send + 'static,
+    {
+        let cancel = self.cancel.clone();
+        let (completed, completion) = watch::channel(false);
+        self.completion = Some(completion);
+        let task = tokio::spawn(async move {
+            work(cancel).await;
+            // Acknowledgment is emitted after the entire owned operation returns.
+            // Panic/abort closes the channel without authorizing filesystem rollback.
+            let _ = completed.send(true);
+        });
+        self.handle = Some(task.abort_handle());
+    }
+    fn request_cancel(&mut self) -> Option<watch::Receiver<bool>> {
+        self.aborted = true;
+        self.cancel.cancel();
+        self.completion.clone()
+    }
+}
+
+async fn wait_install_completion(completion: Option<watch::Receiver<bool>>) -> anyhow::Result<()> {
+    if let Some(mut completion) = completion {
+        completion
+            .wait_for(|finished| *finished)
+            .await
+            .context("Installer exited without acknowledging IO settlement")?;
+    }
+    Ok(())
 }
 
 impl Deref for Installer {
@@ -246,38 +363,49 @@ pub trait IntoInstaller: Sized {
 
 impl Installer {
     pub fn new(resource_installer: BoxedResourceInstaller) -> Self {
+        Self::with_cancel(resource_installer, CancellationToken::new())
+    }
+
+    fn with_cancel(resource_installer: BoxedResourceInstaller, cancel: CancellationToken) -> Self {
+        let abort_handle = Arc::new(Mutex::new(InstallerAbortHandle {
+            handle: None,
+            aborted: false,
+            cancel: cancel.clone(),
+            completion: None,
+        }));
+        let admission = Arc::new(Mutex::new(()));
+        let ownership = Arc::new(InstallOwnership {
+            owner: abort_handle.clone(),
+            admission: admission.clone(),
+            phase: std::sync::Mutex::new(AdmissionPhase::New),
+            cancel,
+            children: std::sync::Mutex::new(Vec::new()),
+        });
         Self {
             required_enabled: None,
             #[cfg(test)]
             download_fixture: None,
             inner: Arc::new(Mutex::new(resource_installer)),
             rollback_context: Arc::new(Mutex::new(None)),
-            abort_handle: Arc::new(Mutex::new(InstallerAbortHandle {
-                handle: None,
-                aborted: false,
-            })),
+            admission,
+            abort_handle,
+            ownership,
         }
     }
 
-    pub async fn abort(&self, inciting_error: Option<&anyhow::Error>) {
-        {
-            let mut abort_handle = self.abort_handle.lock().await;
-            if let Some(handle) = &abort_handle.handle {
-                if !handle.is_finished() {
-                    handle.abort();
-                }
-            }
-            abort_handle.aborted = true;
-        }
-
-        self.rollback(inciting_error).await;
+    /// Ok proves admission and every admitted descendant worker settled. Unknown
+    /// admission or a missing worker ACK returns Err and forbids filesystem rollback.
+    pub async fn abort(&self, inciting_error: Option<&anyhow::Error>) -> anyhow::Result<()> {
+        self.ownership.settle().await?;
+        self.rollback(inciting_error).await
     }
 
-    async fn rollback(&self, inciting_error: Option<&anyhow::Error>) {
-        let lock = self.rollback_context.lock().await;
-        if let Some(context) = &*lock {
-            context.rollback(inciting_error).await;
+    async fn rollback(&self, inciting_error: Option<&anyhow::Error>) -> anyhow::Result<()> {
+        let context = self.rollback_context.lock().await.clone();
+        if let Some(context) = context {
+            context.rollback(inciting_error).await?;
         }
+        Ok(())
     }
 
     pub async fn install(
@@ -424,6 +552,59 @@ impl Installer {
         install_deps: bool,
         replacement: Option<publication::ReplacementPlan>,
     ) -> anyhow::Result<()> {
+        let admission = self.admission.lock().await;
+        if self.ownership.cancel.is_cancelled() {
+            bail!("Addon installation cancelled");
+        }
+        let record = AdmissionRecord::begin(self.ownership.clone());
+        let result = self
+            .admit_inner(
+                app,
+                instance_id,
+                instance_path,
+                parent_task,
+                visited_ids,
+                install_deps,
+                replacement,
+            )
+            .await;
+        let result = match result {
+            Ok(()) => Ok(()),
+            Err(error) => {
+                self.ownership.cancel.cancel();
+                // Admission errors occur before our own worker is spawned. Retain
+                // this node's admission guard through its error cleanup, but never
+                // wait for our own admission/ACK. Children do not need this guard.
+                // A dropped cleanup must remain Unknown to a concurrent abort.
+                let error = match self.ownership.settle_children().await {
+                    Err(settlement) => {
+                        error.context(format!("Installer settlement is uncertain: {settlement:#}"))
+                    }
+                    Ok(()) => match self.rollback(Some(&error)).await {
+                        Ok(()) => error,
+                        Err(rollback) => {
+                            error.context(format!("Installer rollback failed: {rollback:#}"))
+                        }
+                    },
+                };
+                Err(error)
+            }
+        };
+        record.finish();
+        drop(admission);
+        result
+    }
+
+    async fn admit_inner(
+        &self,
+        app: &Arc<AppInner>,
+        instance_id: InstanceId,
+        instance_path: &InstancePath,
+        parent_task: &Arc<Mutex<VisualTask>>,
+        visited_ids: &Arc<Mutex<Vec<String>>>,
+        install_deps: bool,
+        replacement: Option<publication::ReplacementPlan>,
+    ) -> anyhow::Result<()> {
         {
             let mut lock = visited_ids.lock().await;
             let installer_id = self.inner.lock().await.id();
@@ -436,8 +617,16 @@ impl Installer {
             }
         }
 
+        let processed_deps = Arc::new(Mutex::new(Vec::new()));
+        *self.rollback_context.lock().await = Some(InstallerRollbackContext {
+            ownership: self.ownership.clone(),
+            inner: self.inner.clone(),
+            processed_deps: processed_deps.clone(),
+            instance_id,
+            app: app.clone(),
+        });
         if install_deps {
-            let (dep_error, processed_deps) = {
+            let dep_error = {
                 let lock = self.inner.lock().await;
                 let installer_name = lock.display_name();
                 let dep_iter = {
@@ -451,10 +640,13 @@ impl Installer {
                     lock.dependencies(app, instance_id, instance_data, ModChannel::Stable)
                 };
 
-                let mut processed_deps = Vec::new();
                 let mut dep_error = None;
 
                 for dep in dep_iter {
+                    if self.ownership.cancel.is_cancelled() {
+                        dep_error = Some(anyhow::anyhow!("Addon installation cancelled"));
+                        break;
+                    }
                     let dep_result = dep().await;
                     let Some(dep_result) = dep_result else {
                         continue;
@@ -470,7 +662,18 @@ impl Installer {
                         }
                         Ok(dep) => {
                             let dep_name = dep.display_name();
-                            let dep = Installer::new(dep);
+                            let dep = Arc::new(Installer::with_cancel(
+                                dep,
+                                self.ownership.cancel.child_token(),
+                            ));
+                            // Register BOTH live-work and rollback identity before child admission,
+                            // including a child whose own admission later returns an error.
+                            self.ownership
+                                .children
+                                .lock()
+                                .unwrap()
+                                .push(dep.ownership.clone());
+                            processed_deps.lock().await.push(dep.clone());
                             let install_future = dep.install_inner(
                                 app,
                                 instance_id,
@@ -489,16 +692,18 @@ impl Installer {
                                     )));
                                     break;
                                 }
-                                Ok(()) => {
-                                    processed_deps.push(dep);
-                                }
+                                Ok(()) => {}
                             }
                         }
                     }
                 }
 
-                (dep_error, processed_deps)
+                dep_error
             };
+
+            if let Some(dep_error) = dep_error {
+                return Err(dep_error);
+            }
 
             if replacement.is_none()
                 && self.required_enabled.is_none()
@@ -510,21 +715,6 @@ impl Installer {
                     .await?
             {
                 return Ok(());
-            }
-
-            let mut lock = self.rollback_context.lock().await;
-            *lock = Some(InstallerRollbackContext {
-                inner: Arc::clone(&self.inner),
-                processed_deps: Arc::new(Mutex::new(processed_deps)),
-                instance_id,
-                app: Arc::clone(app),
-            });
-
-            drop(lock);
-
-            if let Some(dep_error) = dep_error {
-                self.rollback(Some(&dep_error)).await;
-                return Err(dep_error);
             }
         }
 
@@ -547,11 +737,14 @@ impl Installer {
 
         {
             let mut abort_handle = self.abort_handle.lock().await;
-            if !abort_handle.aborted {
-                let task_handle = tokio::spawn(async move {
+            if abort_handle.aborted || self.ownership.cancel.is_cancelled() {
+                bail!("Addon installation cancelled");
+            }
+            {
+                abort_handle.spawn(move |cancel| async move {
                     let _activity = activity;
-                    // Persist private staging on interruption/error: carbon_net worker drainage
-                    // belongs to Task6, so dropping this worker must not delete a live download.
+                    // Preserve failed private staging for recovery. Explicit cancellation
+                    // settles download and publication IO before rollback can inspect it.
                     let staging = tempfile::Builder::new()
                         .prefix(".addon-install-")
                         .tempdir_in(
@@ -562,6 +755,9 @@ impl Installer {
                                 .to_path(),
                         );
                     let r = (|| async {
+                        if cancel.is_cancelled() {
+                            bail!("Addon installation cancelled");
+                        }
                         let staging = staging?.keep();
                         let mut downloadable = {
                             let lock = inner.lock().await;
@@ -613,7 +809,10 @@ impl Installer {
                             if acquire {
                                 carbon_net::download_multiple(
                                     &[downloadable.clone()],
-                                    DownloadOptions::builder().concurrency(1).build(),
+                                    DownloadOptions::builder()
+                                        .concurrency(1)
+                                        .cancel_token(cancel.clone())
+                                        .build(),
                                 )
                                 .await
                                 .with_context(|| {
@@ -625,6 +824,9 @@ impl Installer {
                             }
 
                             {
+                                if cancel.is_cancelled() {
+                                    bail!("Addon installation cancelled");
+                                }
                                 let lock = inner.lock().await;
                                 publication::verify_acquired(&downloadable.path, downloadable)
                                     .await?;
@@ -685,6 +887,9 @@ impl Installer {
                             tokio::fs::remove_dir(&staging).await?;
                         }
 
+                        if cancel.is_cancelled() {
+                            bail!("Addon installation cancelled");
+                        }
                         // ensure the task stays alive until the mod is cached
                         app_clone
                             .meta_cache_manager()
@@ -707,21 +912,18 @@ impl Installer {
                         Err(e) => {
                             tracing::error!({ error = ?e }, "Error installing dependency");
 
-                            let rollback_lock = rollback_context.lock().await;
-
-                            if let Some(rollback_lock) = rollback_lock.as_ref() {
-                                rollback_lock.rollback(Some(&e)).await;
-                            } else {
-                                tracing::error!("Invalid rollback context in spawned task");
-                            }
-
+                            let context = rollback_context.lock().await.clone();
+                            let error = if let Some(context) = context {
+                                match context.rollback(Some(&e)).await {
+                                    Ok(()) => e,
+                                    Err(settlement) => e.context(format!("Installer descendant settlement/rollback failed: {settlement:#}")),
+                                }
+                            } else { e.context("Missing installer rollback ownership") };
                             let parent_task = parent_task.lock().await;
-                            parent_task.clone().fail(e).await
+                            parent_task.clone().fail(error).await
                         }
                     }
                 });
-
-                abort_handle.handle = Some(task_handle.abort_handle());
             }
         }
         Ok(())

@@ -77,16 +77,9 @@ impl LogParser {
 
     /// Bytes currently buffered and not yet resolved into a [`ParsedItem`].
     ///
-    /// Not needed to interpret `Ok` results -- those already say what
-    /// happened. It exists for callers that want to tell apart the two
-    /// shapes `Err` can take from [`Self::parse_next`]: most error paths
-    /// (e.g. a complete-but-unparseable `<log4j:Event>`) still advance the
-    /// buffer past the bad bytes before returning, so `buffered_len` drops;
-    /// a few (invalid UTF-8 or an unparseable XML entity in plain text
-    /// preceding any recognised tag) leave the buffer untouched, so
-    /// `buffered_len` stays the same and the identical error would recur on
-    /// an immediate retry -- a caller comparing this before and after can
-    /// tell the difference and only retry the former.
+    /// Complete bad events and definitely invalid plaintext advance the buffer
+    /// before returning an error. Genuinely partial XML or UTF-8 is retained and
+    /// reported as `Partial`. This length lets callers verify recovery progress.
     pub fn buffered_len(&self) -> usize {
         self.buffer.len()
     }
@@ -239,11 +232,8 @@ impl LogParser {
 
     /// Attempts to parse the next item from the buffer.
     ///
-    /// `Err` does not always mean the same thing about buffer progress: see
-    /// [`Self::buffered_len`] for how to tell a consumed-bad-event error
-    /// (safe to call again right away) from one that left the buffer
-    /// untouched (would just recur -- wait for more data instead, exactly
-    /// like `Ok(Some(ParsedItem::Partial(_)))`).
+    /// Complete malformed events and definite invalid plaintext are consumed;
+    /// incomplete event syntax and trailing UTF-8 code points remain buffered.
     pub fn parse_next(&mut self) -> Result<Option<ParsedItem>, ParserError> {
         if self.buffer.is_empty() {
             return Ok(None);
@@ -272,8 +262,7 @@ impl LogParser {
 
             match reader.read_event_into(&mut test_buf) {
                 Ok(Event::Text(e)) => {
-                    let text = e.unescape().map_err(|e| ParserError::XmlError(e.into()))?;
-                    if text.chars().all(|c| c.is_ascii_whitespace()) {
+                    if e.as_ref().iter().all(u8::is_ascii_whitespace) {
                         let consumed = reader.buffer_position();
                         if consumed > 0 {
                             self.buffer.drain(..consumed as usize);
@@ -337,12 +326,7 @@ impl LogParser {
 
                     if is_potential_log4j_start(slice) {
                         if slice_start > 0 {
-                            let text = String::from_utf8(self.buffer[..slice_start].to_vec())?;
-                            self.buffer = self.buffer[slice_start..].to_vec();
-                            if !text.chars().all(|c| c.is_ascii_whitespace()) {
-                                return Ok(Some(ParsedItem::PlainText(text)));
-                            }
-                            continue;
+                            return self.take_plaintext(slice_start, false);
                         }
                         return Ok(Some(ParsedItem::Partial(self.buffer.clone())));
                     }
@@ -352,13 +336,37 @@ impl LogParser {
                 }
             }
 
-            // No potential log4j events found, return all as plain text
-            let text = String::from_utf8(self.buffer.clone())?;
-            self.buffer.clear();
-            if text.chars().all(|c| c.is_ascii_whitespace()) {
-                Ok(None)
-            } else {
-                Ok(Some(ParsedItem::PlainText(text)))
+            self.take_plaintext(self.buffer.len(), true)
+        }
+    }
+
+    // Preserve a possibly split trailing UTF-8 code point. Definite malformed
+    // plaintext is consumed up to (and never including) the next event boundary.
+    fn take_plaintext(
+        &mut self,
+        length: usize,
+        may_be_partial: bool,
+    ) -> Result<Option<ParsedItem>, ParserError> {
+        match String::from_utf8(self.buffer[..length].to_vec()) {
+            Ok(text) => {
+                self.buffer.drain(..length);
+                if text.chars().all(|c| c.is_ascii_whitespace()) {
+                    self.parse_next()
+                } else {
+                    Ok(Some(ParsedItem::PlainText(text)))
+                }
+            }
+            Err(error) if may_be_partial && error.utf8_error().error_len().is_none() => {
+                let valid = error.utf8_error().valid_up_to();
+                if valid > 0 {
+                    self.take_plaintext(valid, false)
+                } else {
+                    Ok(Some(ParsedItem::Partial(self.buffer.clone())))
+                }
+            }
+            Err(error) => {
+                self.buffer.drain(..length);
+                Err(error.into())
             }
         }
     }
@@ -388,4 +396,47 @@ fn is_potential_log4j_start(buffer: &[u8]) -> bool {
     let target_lower: Vec<u8> = target.iter().map(|&c| c.to_ascii_lowercase()).collect();
 
     target_lower.starts_with(&buffer_lower) || buffer_lower.starts_with(&target_lower)
+}
+
+#[cfg(test)]
+mod task06_tests {
+    use super::*;
+    const EVENT: &[u8] = br#"<log4j:Event logger="test" timestamp="1" level="INFO" thread="main"><log4j:Message><![CDATA[A & B]]></log4j:Message></log4j:Event>"#;
+    #[test]
+    fn task06_literal_ampersand_then_event() {
+        let mut p = LogParser::new();
+        for text in ["A & B\n", "ordinary\n", "&amp;\n"] {
+            p.feed(text.as_bytes());
+            assert_eq!(
+                p.parse_next().unwrap(),
+                Some(ParsedItem::PlainText(text.into()))
+            );
+        }
+        p.feed(EVENT);
+        assert!(
+            matches!(p.parse_next().unwrap(), Some(ParsedItem::LogEntry(e)) if e.message == "A & B")
+        );
+        assert_eq!(p.buffered_len(), 0);
+    }
+    #[test]
+    fn task06_partial_utf8_and_invalid_prefix() {
+        let mut p = LogParser::new();
+        p.feed(&[0xe2, 0x82]);
+        assert!(matches!(
+            p.parse_next().unwrap(),
+            Some(ParsedItem::Partial(_))
+        ));
+        p.feed(&[0xac]);
+        assert_eq!(
+            p.parse_next().unwrap(),
+            Some(ParsedItem::PlainText("€".into()))
+        );
+        p.feed(&[0xff, b'\n']);
+        p.feed(EVENT);
+        assert!(p.parse_next().is_err());
+        assert!(matches!(
+            p.parse_next().unwrap(),
+            Some(ParsedItem::LogEntry(_))
+        ));
+    }
 }
