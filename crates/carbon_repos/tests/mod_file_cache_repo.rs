@@ -108,7 +108,7 @@ fn upsert_inserts_then_conflict_preserves_id_and_refreshes_freshness() {
     assert_eq!(row.enabled, true);
     assert_eq!(row.last_updated_at, ts(1000).0);
 
-    // Conflict on (instanceId, filename): row keeps its id, other cols + freshness update.
+    // Conflict on (instanceId, addonType, filename): row keeps its id, other cols + freshness update.
     insert_metadata(&conn, "meta-2", 222, b"s512b", b"s1b", None, None);
     mfc::upsert_mod_file_cache_conn(
         &wg(&mut conn),
@@ -116,7 +116,7 @@ fn upsert_inserts_then_conflict_preserves_id_and_refreshes_freshness() {
         "a.jar",
         200,
         false,
-        "shaders",
+        "mods",
         "meta-2",
         ts(5000),
     )
@@ -128,7 +128,7 @@ fn upsert_inserts_then_conflict_preserves_id_and_refreshes_freshness() {
     assert_eq!(row.id, original_id, "id must survive the conflict");
     assert_eq!(row.filesize, 200);
     assert_eq!(row.enabled, false);
-    assert_eq!(row.addon_type, "shaders");
+    assert_eq!(row.addon_type, "mods");
     assert_eq!(row.metadata_id, "meta-2");
     assert_eq!(
         row.last_updated_at,
@@ -646,7 +646,9 @@ fn exists_by_project_matches_only_installed() {
 fn update_ids_and_platform_ids() {
     let (_d, mut conn) = migrated_db();
     insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
-    insert_cf(&conn, "m", 10, 20, "n", "s", 2, "", 1);
+    // Beta on CurseForge, Stable (insert_mr's fixed 2) on Modrinth, so the
+    // two cached channels cannot be read crossed.
+    insert_cf(&conn, "m", 10, 20, "n", "s", 1, "", 1);
     insert_mr(&conn, "m", "mp", "mv", "t", "s", "f", 1);
     mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 1, "a.jar", 1, true, "mods", "m", ts(1))
         .unwrap();
@@ -668,6 +670,9 @@ fn update_ids_and_platform_ids() {
         .unwrap();
     assert_eq!(both.cf_project_id, Some(10));
     assert_eq!(both.mr_version_id.as_deref(), Some("mv"));
+    // The resolver's channel floor reads the cached installed channels.
+    assert_eq!(both.cf_release_type, Some(1));
+    assert_eq!(both.mr_release_type, Some(2));
 }
 
 #[test]
@@ -1208,4 +1213,48 @@ fn export_joins_are_scoped_to_the_requested_instance() {
     let rows = mfc::get_instance_cf_export_files_conn(&wg(&mut conn), 1).unwrap();
     assert_eq!(rows.len(), 1);
     assert_eq!(rows[0].filename, "mine.jar");
+}
+
+#[test]
+fn task11_instance_owned_kind_preserves_rows_and_ids() {
+    let (_dir, mut conn) = migrated_db();
+    insert_metadata(&conn, "res", 1, b"res", b"res", None, None);
+    insert_metadata(&conn, "data", 2, b"data", b"data", None, None);
+    for (kind, meta) in [("resourcepacks", "res"), ("datapacks", "data")] {
+        mfc::upsert_mod_file_cache_conn(
+            &wg(&mut conn),
+            1,
+            "shared.zip",
+            3,
+            true,
+            kind,
+            meta,
+            ts(1000),
+        )
+        .unwrap();
+    }
+    let rows = mfc::get_mod_files_by_instance_conn(&wg(&mut conn), 1).unwrap();
+    assert_eq!(
+        rows.len(),
+        2,
+        "same basename in separate owned folders must not collide"
+    );
+    for before in rows {
+        mfc::upsert_mod_file_cache_conn(
+            &wg(&mut conn),
+            1,
+            &before.filename,
+            4,
+            false,
+            &before.addon_type,
+            &before.metadata_id,
+            ts(2000),
+        )
+        .unwrap();
+        let after = mfc::get_mod_file_cache_by_id_conn(&wg(&mut conn), &before.id)
+            .unwrap()
+            .unwrap();
+        assert_eq!(after.addon_type, before.addon_type);
+        assert!(!after.enabled);
+    }
 }

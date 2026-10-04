@@ -68,6 +68,7 @@ pub async fn export_curseforge(
     let handle = tokio::spawn(async move {
         let try_result: anyhow::Result<_> = async {
             let mut mods = Vec::new();
+            let mut linked_files = Vec::new();
 
             let t_create_bundle = vtask.subtask(Translation::InstanceExportCreatingBundle);
 
@@ -96,27 +97,31 @@ pub async fn export_curseforge(
 
                     let mods_filter = mods_filter.as_mut().map(|v| &mut v.0).unwrap();
 
+                    // Re-read every mod before linking it: a same-size
+                    // replacement must not ship as the old CurseForge file.
                     app.meta_cache_manager()
-                        .override_caching_and_wait(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), true, false)
+                        .override_caching_verified_and_wait(
+                            crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
+                            crate::managers::metadata::cache::VerifyScope::MODS,
+                            true,
+                            false,
+                        )
                         .await?;
 
                     let instance_id_val = *instance_id;
                     let cached =
                         mfcdb::get_instance_cf_export_files(&app.db, instance_id_val).await?;
 
-                    let mods2 = cached.into_iter().filter_map(|row| {
-                        let (Some(project_id), Some(file_id)) = (row.cf_project_id, row.cf_file_id)
-                        else {
-                            return None;
-                        };
-
-                        match mods_filter.remove(&row.filename) {
-                            Some(_) => Some((project_id, file_id)),
-                            None => None,
+                    for row in cached {
+                        let (Some(project_id), Some(file_id)) = (row.cf_project_id, row.cf_file_id) else { continue; };
+                        if mods_filter.contains_key(&row.filename) {
+                            let path = basepath.join("mods").join(&row.filename);
+                            super::verify_linked_mod(&path, &row.sha512, row.file_stamp.as_deref()).await?;
+                            linked_files.push((path, row.sha512));
+                            mods_filter.remove(&row.filename);
+                            mods.push((project_id, file_id));
                         }
-                    });
-
-                    mods.extend(mods2);
+                    }
                 }
             }
 
@@ -221,6 +226,7 @@ pub async fn export_curseforge(
                 } => {},
             }
 
+            super::verify_linked_export_files(&app, instance_id, &linked_files).await?;
             tmpfile.try_rename_or_move(save_path).await?;
 
             t_create_bundle.complete_items();

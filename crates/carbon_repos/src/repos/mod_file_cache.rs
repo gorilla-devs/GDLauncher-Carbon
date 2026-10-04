@@ -22,6 +22,7 @@ use chrono::{DateTime, FixedOffset};
 
 #[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
 pub struct ModFileCacheRow {
+    pub file_stamp: Option<String>,
     pub id: String,
     pub last_updated_at: DateTime<FixedOffset>,
     pub instance_id: i32,
@@ -34,6 +35,10 @@ pub struct ModFileCacheRow {
 
 #[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
 pub struct ServerModFileCacheRow {
+    /// Parser-qualified observation of the file this row was hashed from.
+    /// NULL for rows written before scans recorded it, or after a publication
+    /// replaced the bytes; the next scan then re-establishes it.
+    pub file_stamp: Option<String>,
     pub source_platform: Option<String>,
     pub source_project_id: Option<String>,
     pub source_version_id: Option<String>,
@@ -162,6 +167,14 @@ pub struct RefreshMetaRow {
     pub sha512: Vec<u8>,
 }
 
+#[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
+pub struct RefreshContextRow {
+    pub metadata_id: String,
+    pub murmur2: i32,
+    pub sha512: Vec<u8>,
+    pub addon_type: String,
+}
+
 /// A CurseForge file+logo needing an icon (re)download.
 #[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
 pub struct CfLogoRefreshRow {
@@ -207,8 +220,12 @@ pub struct ModMrIdsRow {
 pub struct ModUpdateIdsRow {
     pub cf_project_id: Option<i32>,
     pub cf_file_id: Option<i32>,
+    /// The installed file's cached `ModChannel` id, which the update badge also reads.
+    pub cf_release_type: Option<i32>,
     pub mr_project_id: Option<String>,
     pub mr_version_id: Option<String>,
+    /// The installed version's cached `ModChannel` id, which the update badge also reads.
+    pub mr_release_type: Option<i32>,
 }
 
 /// A metadata `modid`, for shader-loader detection.
@@ -235,30 +252,43 @@ pub struct InstanceModExportRow {
 /// A file's CurseForge project/file ids for the CurseForge archive export.
 #[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
 pub struct CfExportRow {
+    pub sha512: Vec<u8>,
     pub filename: String,
     pub cf_project_id: Option<i32>,
     pub cf_file_id: Option<i32>,
+    /// The row's file stamp: before linking the mod, the export reads it
+    /// again only when this no longer matches the file.
+    pub file_stamp: Option<String>,
 }
 
 /// A file's hashes + Modrinth file url for the Modrinth archive export.
 #[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
 pub struct MrExportRow {
+    pub mr_sha512: Option<String>,
     pub filename: String,
     pub filesize: i32,
     pub sha512: Vec<u8>,
     pub sha1: Vec<u8>,
     pub mr_file_url: Option<String>,
+    /// The row's file stamp: before linking the mod, the export reads it
+    /// again only when this no longer matches the file.
+    pub file_stamp: Option<String>,
 }
 
 /// A file's hashes + platform presence for the GDLauncher archive export.
 #[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
 pub struct GdlExportRow {
+    pub addon_type: String,
+    pub enabled: bool,
     pub filename: String,
     pub sha512: Vec<u8>,
     pub sha1: Vec<u8>,
     pub murmur2: i32,
     pub cf_project_id: Option<i32>,
     pub mr_project_id: Option<String>,
+    /// The row's file stamp: before linking the mod, the export reads it
+    /// again only when this no longer matches the file.
+    pub file_stamp: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -268,14 +298,21 @@ pub struct GdlExportRow {
 queries! {
     // --- ModFileCache: plain reads/writes ------------------------------------
     fn get_mod_file_cache_by_id(id: &str) -> Option<ModFileCacheRow> =
-        "SELECT id, lastUpdatedAt, instanceId, filename, filesize, enabled, addonType, metadataId
+        "SELECT fileStamp, id, lastUpdatedAt, instanceId, filename, filesize, enabled, addonType, metadataId
          FROM ModFileCache WHERE id = :id";
     fn get_mod_file_cache_by_instance_filename(instance_id: i32, filename: &str) -> Option<ModFileCacheRow> =
-        "SELECT id, lastUpdatedAt, instanceId, filename, filesize, enabled, addonType, metadataId
-         FROM ModFileCache WHERE instanceId = :instance_id AND filename = :filename";
+        "SELECT fileStamp, id, lastUpdatedAt, instanceId, filename, filesize, enabled, addonType, metadataId
+         FROM ModFileCache WHERE instanceId = :instance_id AND filename = :filename
+         AND (SELECT count(*) FROM ModFileCache WHERE instanceId = :instance_id AND filename = :filename) = 1";
+    fn get_mod_file_cache_by_instance_kind_filename(instance_id: i32, addon_type: &str, filename: &str) -> Option<ModFileCacheRow> =
+        "SELECT fileStamp, id, lastUpdatedAt, instanceId, filename, filesize, enabled, addonType, metadataId
+         FROM ModFileCache WHERE instanceId = :instance_id AND addonType = :addon_type AND filename = :filename";
     fn get_mod_files_by_instance(instance_id: i32) -> Vec<ModFileCacheRow> =
-        "SELECT id, lastUpdatedAt, instanceId, filename, filesize, enabled, addonType, metadataId
+        "SELECT fileStamp, id, lastUpdatedAt, instanceId, filename, filesize, enabled, addonType, metadataId
          FROM ModFileCache WHERE instanceId = :instance_id";
+    fn update_mod_file_stamp(instance_id: i32, addon_type: &str, filename: &str, metadata_id: &str, stamp: Option<&str>, updated_at: DbDateTime) -> usize =
+        "UPDATE ModFileCache SET fileStamp = :stamp, lastUpdatedAt = :updated_at
+         WHERE instanceId = :instance_id AND addonType = :addon_type AND filename = :filename AND metadataId = :metadata_id";
     fn update_mod_file_enabled(id: &str, enabled: bool, updated_at: DbDateTime) -> usize =
         "UPDATE ModFileCache SET enabled = :enabled, lastUpdatedAt = :updated_at WHERE id = :id";
     // Caller must hold the instance gate and prove an actual rollback restored
@@ -293,11 +330,17 @@ queries! {
 
     // --- ServerModFileCache: plain reads/writes ------------------------------
     fn get_server_mod_file_cache_by_id(id: &str) -> Option<ServerModFileCacheRow> =
-        "SELECT sourcePlatform, sourceProjectId, sourceVersionId, sourceSha512, location, id, lastUpdatedAt, serverId, filename, filesize, enabled, addonType, metadataId
+        "SELECT fileStamp, sourcePlatform, sourceProjectId, sourceVersionId, sourceSha512, location, id, lastUpdatedAt, serverId, filename, filesize, enabled, addonType, metadataId
          FROM ServerModFileCache WHERE id = :id";
     fn get_server_mod_files_by_server(server_id: i32) -> Vec<ServerModFileCacheRow> =
-        "SELECT sourcePlatform, sourceProjectId, sourceVersionId, sourceSha512, location, id, lastUpdatedAt, serverId, filename, filesize, enabled, addonType, metadataId
+        "SELECT fileStamp, sourcePlatform, sourceProjectId, sourceVersionId, sourceSha512, location, id, lastUpdatedAt, serverId, filename, filesize, enabled, addonType, metadataId
          FROM ServerModFileCache WHERE serverId = :server_id";
+    fn get_server_mod_file_cache_by_location(server_id: i32, addon_type: &str, location: &str) -> Option<ServerModFileCacheRow> =
+        "SELECT fileStamp, sourcePlatform, sourceProjectId, sourceVersionId, sourceSha512, location, id, lastUpdatedAt, serverId, filename, filesize, enabled, addonType, metadataId
+         FROM ServerModFileCache WHERE serverId = :server_id AND addonType = :addon_type AND location = :location";
+    fn update_server_mod_file_stamp(server_id: i32, addon_type: &str, location: &str, metadata_id: &str, stamp: Option<&str>, updated_at: DbDateTime) -> usize =
+        "UPDATE ServerModFileCache SET fileStamp = :stamp, lastUpdatedAt = :updated_at
+         WHERE serverId = :server_id AND addonType = :addon_type AND location = :location AND metadataId = :metadata_id";
     fn update_server_mod_file_enabled(id: &str, enabled: bool, updated_at: DbDateTime) -> usize =
         "UPDATE ServerModFileCache SET enabled = :enabled, lastUpdatedAt = :updated_at WHERE id = :id";
     fn delete_server_mod_file_cache_by_id(id: &str) -> usize =
@@ -409,6 +452,21 @@ queries! {
          WHERE f.serverId = :server_id
            AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff)";
 
+    fn instance_mods_needing_mr_context(instance_id: i32, context: &str, cutoff: DbDateTime) -> Vec<RefreshContextRow> =
+        "SELECT DISTINCT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512, f.addonType AS addonType
+         FROM ModFileCache f JOIN ModMetadata m ON m.id=f.metadataId
+         LEFT JOIN ModrinthModCache r ON r.metadataId=m.id
+         LEFT JOIN ModrinthUpdateCache u ON u.metadataId=m.id AND u.context=:context || ':' || f.addonType
+         WHERE f.instanceId=:instance_id AND f.addonType <> 'worlds'
+         AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff OR u.metadataId IS NULL OR u.cachedAt <= :cutoff)";
+    fn server_mods_needing_mr_context(server_id: i32, context: &str, cutoff: DbDateTime) -> Vec<RefreshContextRow> =
+        "SELECT DISTINCT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512, f.addonType AS addonType
+         FROM ServerModFileCache f JOIN ModMetadata m ON m.id=f.metadataId
+         LEFT JOIN ModrinthModCache r ON r.metadataId=m.id
+         LEFT JOIN ModrinthUpdateCache u ON u.metadataId=m.id AND u.context=:context || ':' || f.addonType
+         WHERE f.serverId=:server_id AND f.addonType <> 'worlds'
+         AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff OR u.metadataId IS NULL OR u.cachedAt <= :cutoff)";
+
     // --- stale CurseForge logos (upToDate = 0) --------------------------------
     fn instance_mods_stale_cf_logo(instance_id: i32) -> Vec<CfLogoRefreshRow> =
         "SELECT f.filename AS filename, c.projectId AS projectId, c.fileId AS fileId,
@@ -475,8 +533,8 @@ queries! {
          LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
          WHERE f.id = :id";
     fn get_instance_mod_update_ids(id: &str) -> Option<ModUpdateIdsRow> =
-        "SELECT c.projectId AS cfProjectId, c.fileId AS cfFileId,
-                r.projectId AS mrProjectId, r.versionId AS mrVersionId
+        "SELECT c.projectId AS cfProjectId, c.fileId AS cfFileId, c.releaseType AS cfReleaseType,
+                r.projectId AS mrProjectId, r.versionId AS mrVersionId, r.releaseType AS mrReleaseType
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id
@@ -501,21 +559,23 @@ queries! {
          LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
          WHERE f.instanceId = :instance_id AND f.addonType = 'mods'";
     fn get_instance_cf_export_files(instance_id: i32) -> Vec<CfExportRow> =
-        "SELECT f.filename AS filename, c.projectId AS cfProjectId, c.fileId AS cfFileId
+        "SELECT f.filename AS filename, m.sha512 AS sha512, c.projectId AS cfProjectId, c.fileId AS cfFileId,
+                f.fileStamp AS fileStamp
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id
-         WHERE f.instanceId = :instance_id";
+         WHERE f.instanceId = :instance_id AND f.addonType = 'mods' AND f.enabled = 1";
     fn get_instance_mr_export_files(instance_id: i32) -> Vec<MrExportRow> =
         "SELECT f.filename AS filename, f.filesize AS filesize,
-                m.sha512 AS sha512, m.sha1 AS sha1, r.fileUrl AS mrFileUrl
+                m.sha512 AS sha512, m.sha1 AS sha1, r.sha512 AS mrSha512, r.fileUrl AS mrFileUrl,
+                f.fileStamp AS fileStamp
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN ModrinthModCache r ON r.metadataId = m.id
-         WHERE f.instanceId = :instance_id";
+         WHERE f.instanceId = :instance_id AND f.addonType = 'mods' AND f.enabled = 1";
     fn get_instance_gdl_export_files(instance_id: i32) -> Vec<GdlExportRow> =
-        "SELECT f.filename AS filename, m.sha512 AS sha512, m.sha1 AS sha1, m.murmur2 AS murmur2,
-                c.projectId AS cfProjectId, r.projectId AS mrProjectId
+        "SELECT f.filename AS filename, f.addonType AS addonType, f.enabled AS enabled, m.sha512 AS sha512, m.sha1 AS sha1, m.murmur2 AS murmur2,
+                c.projectId AS cfProjectId, r.projectId AS mrProjectId, f.fileStamp AS fileStamp
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id
@@ -532,7 +592,8 @@ queries! {
 const UPSERT_MOD_FILE_CACHE_SQL: &str =
     "INSERT INTO ModFileCache (id, instanceId, filename, filesize, enabled, addonType, metadataId, lastUpdatedAt)
      VALUES (:id, :instance_id, :filename, :filesize, :enabled, :addon_type, :metadata_id, :updated_at)
-     ON CONFLICT(instanceId, filename) DO UPDATE SET
+     ON CONFLICT(instanceId, addonType, filename) DO UPDATE SET
+       fileStamp = NULL,
        filesize = excluded.filesize,
        enabled = excluded.enabled,
        metadataId = excluded.metadataId,
@@ -617,6 +678,7 @@ const UPSERT_SERVER_MOD_FILE_CACHE_SQL: &str =
     "INSERT INTO ServerModFileCache (location, id, serverId, filename, filesize, enabled, addonType, metadataId, lastUpdatedAt)
      VALUES (:location, :id, :server_id, :filename, :filesize, :enabled, :addon_type, :metadata_id, :updated_at)
      ON CONFLICT(serverId, addonType, location) DO UPDATE SET
+       fileStamp = NULL,
        filesize = excluded.filesize,
        enabled = excluded.enabled,
        sourcePlatform = CASE WHEN sourceSha512=(SELECT sha512 FROM ModMetadata WHERE id=excluded.metadataId) THEN sourcePlatform ELSE NULL END,

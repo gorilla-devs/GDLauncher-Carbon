@@ -1111,10 +1111,12 @@ pub async fn process_modpack(
         tracing::info!("queueing metadata caching for running instance");
         t_fill_cache.start_opaque();
 
+        // Files this setup wrote carry new stamps, so an ordinary pass picks
+        // them up without re-reading every unchanged addon.
         app.meta_cache_manager()
             .queue_caching(
                 crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
-                true,
+                false,
             )
             .await;
 

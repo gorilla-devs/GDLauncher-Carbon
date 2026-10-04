@@ -39,6 +39,61 @@ mod curseforge_archive;
 pub mod gdlauncher_archive;
 mod modrinth_archive;
 
+async fn verify_linked_export_files(files: &[(PathBuf, Vec<u8>)]) -> anyhow::Result<()> {
+    for (path, sha512) in files {
+        crate::managers::metadata::cache::verify_file_hash(path, sha512).await?;
+    }
+    Ok(stamp)
+}
+
+/// The final byte guard before an export is published: every linked mod is
+/// read again so a file replaced during the export never ships as its old
+/// platform file.
+///
+/// Files are read without the instance gate, so Play, toggles and settings
+/// never wait on an export. The gate is then held only to confirm, from each
+/// file's stamp, that nothing changed since it was read; a file that did is
+/// read again with the gate released.
+async fn verify_linked_export_files(
+    app: &crate::managers::App,
+    instance_id: InstanceId,
+    files: &[(PathBuf, Vec<u8>)],
+) -> anyhow::Result<()> {
+    let mut stamps = vec![None; files.len()];
+    let mut stale = (0..files.len()).collect::<Vec<_>>();
+    for _ in 0..3 {
+        for &index in &stale {
+            let (path, sha512) = &files[index];
+            #[cfg(test)]
+            app.instance_manager()
+                .test_hooks
+                .pause("export_final_read", instance_id)
+                .await;
+            stamps[index] = read_linked_mod(path, sha512, LinkedRead::FinalCheck).await?;
+        }
+        #[cfg(test)]
+        app.instance_manager()
+            .test_hooks
+            .pause("export_final_check", instance_id)
+            .await;
+        let _ownership = app.instance_manager().lock_instance(instance_id).await;
+        stale.clear();
+        for (index, (path, _)) in files.iter().enumerate() {
+            let current = crate::managers::metadata::cache::current_file_stamp(path).await;
+            if current.is_none() || current != stamps[index] {
+                stale.push(index);
+            }
+        }
+        if stale.is_empty() {
+            return Ok(());
+        }
+    }
+    anyhow::bail!(
+        "{} kept changing while the instance was being exported. Close any program that is changing it, then try the export again.",
+        linked_mod_name(&files[stale[0]].0)
+    )
+}
+
 /// Extract basic metadata from a GDLPack zip file
 /// Returns ShareMetadata with basic pack info (no mods list since they're hash-based)
 fn extract_gdlpack_metadata(zip_path: &Path) -> anyhow::Result<ShareMetadata> {
@@ -1065,4 +1120,685 @@ fn zip_excluding<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
     }
 
     result
+}
+
+#[cfg(test)]
+mod task11_tests {
+    use super::*;
+    use crate::domain::instance::AddonType;
+    use carbon_repos::dbtypes::DbDateTime;
+    #[tokio::test]
+    async fn task11_linked_export_rechecks_mutation_before_publication() {
+        for (mutate, self_contained, mismatched_hash) in [
+            (false, false, false),
+            (true, false, false),
+            (false, true, false),
+            (false, false, true),
+        ] {
+            let app = crate::setup_managers_for_test().await;
+            let (id, _, path) = super::super::mods::tests::addon_fixture(
+                &app,
+                "task11-export",
+                AddonType::Mods,
+                "mod.jar",
+                b"first bytes",
+            )
+            .await;
+            app.meta_cache_manager()
+                .override_caching_and_wait(
+                    crate::managers::metadata::cache::CacheEntityId::Instance(id),
+                    false,
+                    false,
+                )
+                .await
+                .unwrap();
+            let row = mfcdb::get_mod_files_by_instance(&app.db, *id)
+                .await
+                .unwrap()
+                .remove(0);
+            let meta = metarepo::get_metadata_by_id(&app.db, &row.metadata_id)
+                .await
+                .unwrap()
+                .unwrap();
+            let now = DbDateTime(chrono::Utc::now().fixed_offset());
+            metarepo::upsert_mr_mod_cache(
+                &app.db,
+                if mismatched_hash {
+                    "00".repeat(64)
+                } else {
+                    hex::encode(&meta.sha512)
+                },
+                "project".into(),
+                "version".into(),
+                "title".into(),
+                "1".into(),
+                "slug".into(),
+                "desc".into(),
+                "".into(),
+                2,
+                "".into(),
+                "mod.jar".into(),
+                "https://fixture.invalid/never-requested.jar".into(),
+                now,
+                row.metadata_id.clone(),
+            )
+            .await
+            .unwrap();
+            let context = crate::managers::metadata::cache::modrinth::target_compatibility(
+                &app,
+                crate::managers::metadata::cache::CacheEntityId::Instance(id),
+            )
+            .await
+            .unwrap();
+            metarepo::upsert_mr_update_context(
+                &app.db,
+                &row.metadata_id,
+                &context.key("mods"),
+                "",
+                now,
+            )
+            .await
+            .unwrap();
+            let barrier = app
+                .instance_manager()
+                .test_hooks
+                .arm("task11_export_before_publish", id);
+            let output = path
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join("export.mrpack");
+            let (_, worker) = modrinth_archive::export_modrinth(
+                app.clone(),
+                id,
+                output.clone(),
+                self_contained,
+                ExportEntry([("mods".into(), None)].into_iter().collect()),
+                Some("1".into()),
+            )
+            .await
+            .unwrap();
+            tokio::time::timeout(
+                std::time::Duration::from_secs(10),
+                barrier.entered.notified(),
+            )
+            .await
+            .unwrap();
+            if mutate {
+                let stamp = std::fs::metadata(&path).unwrap().modified().unwrap();
+                std::fs::write(&path, b"other bytes").unwrap();
+                std::fs::File::options()
+                    .write(true)
+                    .open(&path)
+                    .unwrap()
+                    .set_times(std::fs::FileTimes::new().set_modified(stamp))
+                    .unwrap();
+            }
+            barrier.release.notify_one();
+            worker.await.unwrap();
+            assert_eq!(
+                output.exists(),
+                !mutate,
+                "a changed linked source must not publish the old provider artifact"
+            );
+            if !mutate {
+                let mut archive =
+                    zip::ZipArchive::new(std::fs::File::open(&output).unwrap()).unwrap();
+                let manifest: serde_json::Value =
+                    serde_json::from_reader(archive.by_name("modrinth.index.json").unwrap())
+                        .unwrap();
+                let use_override = self_contained || mismatched_hash;
+                assert_eq!(
+                    manifest["files"].as_array().unwrap().len(),
+                    usize::from(!use_override)
+                );
+                if use_override {
+                    let mut bytes = Vec::new();
+                    std::io::Read::read_to_end(
+                        &mut archive.by_name("overrides/mods/mod.jar").unwrap(),
+                        &mut bytes,
+                    )
+                    .unwrap();
+                    assert_eq!(bytes, b"first bytes");
+                } else {
+                    assert!(archive.by_name("overrides/mods/mod.jar").is_err());
+                }
+            }
+        }
+    }
+}
+
+/// What an export links after the addon pass it starts with: the pass re-reads
+/// every mod, so a replaced file never ships as its old platform file, and
+/// files the export does not depend on never fail it.
+#[cfg(test)]
+mod linked_export_scan_tests {
+    use super::*;
+    use crate::domain::instance::AddonType;
+    use crate::managers::metadata::cache::CacheEntityId;
+    use carbon_repos::dbtypes::DbDateTime;
+
+    const OLD_URL: &str = "https://fixture.invalid/old.jar";
+
+    /// An instance whose `mod.jar` (b"first bytes") is linked to a Modrinth
+    /// file, as after installing it from Modrinth.
+    async fn linked_instance(app: &crate::managers::App, name: &str) -> (InstanceId, PathBuf) {
+        let (id, _, path) = super::super::mods::tests::addon_fixture(
+            app,
+            name,
+            AddonType::Mods,
+            "mod.jar",
+            b"first bytes",
+        )
+        .await;
+        app.meta_cache_manager()
+            .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        let row = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|row| row.filename == "mod.jar")
+            .unwrap();
+        let meta = metarepo::get_metadata_by_id(&app.db, &row.metadata_id)
+            .await
+            .unwrap()
+            .unwrap();
+        let now = DbDateTime(chrono::Utc::now().fixed_offset());
+        metarepo::upsert_mr_mod_cache(
+            &app.db,
+            hex::encode(&meta.sha512),
+            "project".into(),
+            "version".into(),
+            "title".into(),
+            "1".into(),
+            "slug".into(),
+            "desc".into(),
+            "".into(),
+            2,
+            "".into(),
+            "mod.jar".into(),
+            OLD_URL.into(),
+            now.clone(),
+            row.metadata_id.clone(),
+        )
+        .await
+        .unwrap();
+        let context = crate::managers::metadata::cache::modrinth::target_compatibility(
+            app,
+            CacheEntityId::Instance(id),
+        )
+        .await
+        .unwrap();
+        metarepo::upsert_mr_update_context(
+            &app.db,
+            &row.metadata_id,
+            &context.key("mods"),
+            "",
+            now,
+        )
+        .await
+        .unwrap();
+        (id, path)
+    }
+
+    /// Replace a file's bytes keeping its size and modification time, as some
+    /// copy and sync tools do.
+    fn replace_preserving_time(path: &Path, bytes: &[u8]) {
+        let modified = std::fs::metadata(path).unwrap().modified().unwrap();
+        std::fs::write(path, bytes).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(modified))
+            .unwrap();
+    }
+
+    /// Run a Modrinth export and return the archive, or the task's error.
+    async fn export(
+        app: &crate::managers::App,
+        id: InstanceId,
+        path: &Path,
+        filter: ExportEntry,
+    ) -> Result<zip::ZipArchive<File>, String> {
+        let output = path
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("export.mrpack");
+        let (task, worker) = modrinth_archive::export_modrinth(
+            app.clone(),
+            id,
+            output.clone(),
+            false,
+            filter,
+            Some("1".into()),
+        )
+        .await
+        .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(20), worker)
+            .await
+            .expect("the export settles")
+            .unwrap();
+        match app.task_manager().get_task_outcome(task).await {
+            crate::managers::vtask::TaskOutcome::Failed(task) => {
+                assert!(!output.exists(), "a failed export publishes nothing");
+                Err(format!("{:?}", task.progress))
+            }
+            _ => Ok(zip::ZipArchive::new(File::open(&output).unwrap()).unwrap()),
+        }
+    }
+
+    fn manifest_urls(archive: &mut zip::ZipArchive<File>) -> Vec<String> {
+        let manifest: serde_json::Value =
+            serde_json::from_reader(archive.by_name("modrinth.index.json").unwrap()).unwrap();
+        manifest["files"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|file| file["downloads"].as_array().unwrap().clone())
+            .map(|url| url.as_str().unwrap().to_owned())
+            .collect()
+    }
+
+    fn override_bytes(archive: &mut zip::ZipArchive<File>, name: &str) -> Option<Vec<u8>> {
+        let mut entry = archive.by_name(name).ok()?;
+        let mut bytes = Vec::new();
+        std::io::Read::read_to_end(&mut entry, &mut bytes).unwrap();
+        Some(bytes)
+    }
+
+    fn all_mods() -> ExportEntry {
+        ExportEntry([("mods".into(), None)].into_iter().collect())
+    }
+
+    #[tokio::test]
+    async fn unchanged_linked_mod_ships_as_its_platform_file() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = linked_instance(&app, "export-linked-control").await;
+        let mut archive = export(&app, id, &path, all_mods()).await.unwrap();
+        assert_eq!(manifest_urls(&mut archive), vec![OLD_URL.to_owned()]);
+        assert_eq!(override_bytes(&mut archive, "overrides/mods/mod.jar"), None);
+    }
+
+    /// An export reads a linked mod twice: in its addon pass, which confirms
+    /// the mod's bytes and stamp, and in the final re-read once the archive is
+    /// written. The check before linking only compares the stamp.
+    #[tokio::test]
+    async fn an_export_reads_an_unchanged_linked_mod_twice() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = linked_instance(&app, "export-two-reads").await;
+        let before = crate::managers::metadata::cache::whole_file_reads(&path);
+        let mut archive = export(&app, id, &path, all_mods()).await.unwrap();
+        assert_eq!(manifest_urls(&mut archive), vec![OLD_URL.to_owned()]);
+        assert_eq!(
+            crate::managers::metadata::cache::whole_file_reads(&path) - before,
+            2
+        );
+    }
+
+    /// The check before linking reads a mod only when its stamp no longer
+    /// matches its row: new bytes then stop the export before the archive is
+    /// written, and a missing mod is named as missing.
+    #[tokio::test]
+    async fn the_check_before_linking_reads_only_mods_whose_stamp_changed() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = linked_instance(&app, "export-prelink").await;
+        let row = mfcdb::get_instance_mr_export_files(&app.db, *id)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|row| row.filename == "mod.jar")
+            .unwrap();
+        let reads = || crate::managers::metadata::cache::whole_file_reads(&path);
+
+        let before = reads();
+        verify_linked_mod(&path, &row.sha512, row.file_stamp.as_deref())
+            .await
+            .unwrap();
+        assert_eq!(reads(), before, "an unchanged stamp is not read");
+
+        verify_linked_mod(&path, &row.sha512, None).await.unwrap();
+        assert_eq!(reads(), before + 1, "a row without a stamp is read");
+
+        let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+        std::fs::write(&path, b"other bytes").unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_times(
+                std::fs::FileTimes::new()
+                    .set_modified(modified + std::time::Duration::from_secs(5)),
+            )
+            .unwrap();
+        let error = verify_linked_mod(&path, &row.sha512, row.file_stamp.as_deref())
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "mods/mod.jar changed while the instance was being exported. Try the export again."
+        );
+
+        std::fs::remove_file(&path).unwrap();
+        let error = verify_linked_mod(&path, &row.sha512, row.file_stamp.as_deref())
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "mods/mod.jar is missing or links to a file that no longer exists. Restore it, or untick it in the export's file list, then try again."
+        );
+    }
+
+    /// GPT-0084: a same-size replacement that keeps the old modification time
+    /// is re-read at export and ships as its own bytes, not the old file.
+    #[tokio::test]
+    async fn same_size_time_preserving_replacement_does_not_keep_its_old_link() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = linked_instance(&app, "export-replaced").await;
+        replace_preserving_time(&path, b"other bytes");
+        // Even when nothing a stamp observes changed (Windows keeps size,
+        // modification and creation time), the export reads the bytes.
+        crate::managers::metadata::cache::restamp_for_test(&app, id, "mods", "mod.jar", &path)
+            .await;
+        let mut archive = export(&app, id, &path, all_mods()).await.unwrap();
+        assert!(manifest_urls(&mut archive).is_empty());
+        assert_eq!(
+            override_bytes(&mut archive, "overrides/mods/mod.jar").as_deref(),
+            Some(&b"other bytes"[..])
+        );
+    }
+
+    /// The file is replaced while the export's pass is reading it. Where the
+    /// pass sees the change (Unix change time) it re-reads the new bytes;
+    /// where nothing observable changes (Windows keeps size, modification and
+    /// creation time), the export's final re-read of every linked file stops
+    /// it. Either way the old platform file is never shipped for new bytes.
+    #[tokio::test]
+    async fn replacement_during_the_export_read_never_ships_the_old_link() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = linked_instance(&app, "export-replaced-mid-read").await;
+        app.meta_cache_manager()
+            .mutate_before_recheck(&path, b"other bytes".to_vec());
+        match export(&app, id, &path, all_mods()).await {
+            Ok(mut archive) => {
+                assert!(
+                    manifest_urls(&mut archive).is_empty(),
+                    "new bytes must not ship as the old platform file"
+                );
+                assert_eq!(
+                    override_bytes(&mut archive, "overrides/mods/mod.jar").as_deref(),
+                    Some(&b"other bytes"[..])
+                );
+            }
+            Err(error) => {
+                assert!(
+                    !cfg!(unix),
+                    "the change time shows the replacement on Unix: {error}"
+                );
+            }
+        }
+        assert_eq!(std::fs::read(&path).unwrap(), b"other bytes");
+    }
+
+    /// Files the export does not link or include never fail it: a broken
+    /// `*.jar` link, an unreadable jar the user left out, and a file where the
+    /// resource packs folder should be.
+    #[tokio::test]
+    async fn unrelated_unreadable_files_do_not_fail_the_export() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = linked_instance(&app, "export-bad-files").await;
+        let mods = path.parent().unwrap().to_owned();
+        let root = mods.parent().unwrap().to_owned();
+        std::fs::create_dir_all(root.join("resourcepacks")).unwrap();
+        std::fs::write(root.join("resourcepacks/pack.zip"), b"pack").unwrap();
+        app.meta_cache_manager()
+            .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        std::fs::remove_dir_all(root.join("resourcepacks")).unwrap();
+        std::fs::write(root.join("resourcepacks"), b"a file where a folder belongs").unwrap();
+        let locked = mods.join("locked.jar");
+        std::fs::write(&locked, b"never readable").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::os::unix::fs::symlink("missing-target.jar", mods.join("broken.jar")).unwrap();
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        }
+        let filter = ExportEntry(
+            [
+                (
+                    "mods".to_owned(),
+                    Some(ExportEntry(
+                        [
+                            ("mod.jar".to_owned(), None),
+                            ("broken.jar".to_owned(), None),
+                        ]
+                        .into_iter()
+                        .collect(),
+                    )),
+                ),
+                ("resourcepacks".to_owned(), None),
+            ]
+            .into_iter()
+            .collect(),
+        );
+        let result = export(&app, id, &path, filter).await;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o644)).unwrap();
+        }
+        let mut archive = result.expect("unrelated unreadable files must not fail the export");
+        assert_eq!(manifest_urls(&mut archive), vec![OLD_URL.to_owned()]);
+        for name in ["overrides/mods/broken.jar", "overrides/mods/locked.jar"] {
+            assert_eq!(override_bytes(&mut archive, name), None, "{name}");
+        }
+        assert_eq!(
+            override_bytes(&mut archive, "overrides/resourcepacks").as_deref(),
+            Some(&b"a file where a folder belongs"[..])
+        );
+        let rows = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap();
+        assert!(rows.iter().all(|row| row.filename != "broken.jar"));
+        assert!(
+            rows.iter().any(|row| row.filename == "pack.zip"),
+            "rows of a folder that cannot be listed are kept"
+        );
+    }
+
+    /// Start a Modrinth export of every mod without waiting for it.
+    async fn start_export(
+        app: &crate::managers::App,
+        id: InstanceId,
+        path: &Path,
+    ) -> (VisualTaskId, tokio::task::JoinHandle<()>, PathBuf) {
+        let output = path
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("export.mrpack");
+        let (task, worker) = modrinth_archive::export_modrinth(
+            app.clone(),
+            id,
+            output.clone(),
+            false,
+            all_mods(),
+            Some("1".into()),
+        )
+        .await
+        .unwrap();
+        (task, worker, output)
+    }
+
+    /// The text the export window shows for a failed export: the second cause
+    /// if there is one, else the first (exportFailureMessage.ts).
+    async fn shown_failure(app: &crate::managers::App, task: VisualTaskId) -> Option<String> {
+        let crate::managers::vtask::TaskOutcome::Failed(task) =
+            app.task_manager().get_task_outcome(task).await
+        else {
+            return None;
+        };
+        let crate::domain::vtask::Progress::Failed(error) = task.progress else {
+            return None;
+        };
+        let error = serde_json::to_value(crate::error::FeError::from_anyhow(&error)).unwrap();
+        let causes = error["cause"].as_array().unwrap().clone();
+        causes
+            .get(1)
+            .or(causes.first())
+            .map(|cause| cause["display"].as_str().unwrap().to_owned())
+    }
+
+    /// The final re-read of every linked mod runs with the instance gate free:
+    /// Play, toggles and settings saves never wait for it.
+    #[tokio::test]
+    async fn the_final_reread_leaves_the_instance_gate_free() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = linked_instance(&app, "export-final-gate").await;
+        let pause = app
+            .instance_manager()
+            .test_hooks
+            .arm("export_final_read", id);
+        let (task, worker, output) = start_export(&app, id, &path).await;
+        tokio::time::timeout(std::time::Duration::from_secs(20), pause.entered.notified())
+            .await
+            .expect("the export reaches its final re-read");
+        let manager = app.instance_manager();
+        let gate = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            manager.lock_instance(id),
+        )
+        .await
+        .expect("the instance gate is free while linked mods are re-read");
+        drop(gate);
+        pause.release.notify_one();
+        tokio::time::timeout(std::time::Duration::from_secs(20), worker)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(shown_failure(&app, task).await, None);
+        let mut archive = zip::ZipArchive::new(File::open(&output).unwrap()).unwrap();
+        assert_eq!(manifest_urls(&mut archive), vec![OLD_URL.to_owned()]);
+    }
+
+    /// A linked mod that changes after its final re-read and before the gate
+    /// confirms it is read again: new bytes stop the export with a message
+    /// naming the file; a touch alone (same bytes) lets it finish.
+    #[tokio::test]
+    async fn a_mod_changed_after_its_final_reread_is_read_again() {
+        for replace in [false, true] {
+            let app = crate::setup_managers_for_test().await;
+            let (id, path) = linked_instance(&app, &format!("export-final-check-{replace}")).await;
+            let pause = app
+                .instance_manager()
+                .test_hooks
+                .arm("export_final_check", id);
+            let (task, worker, output) = start_export(&app, id, &path).await;
+            tokio::time::timeout(std::time::Duration::from_secs(20), pause.entered.notified())
+                .await
+                .expect("the export reaches its gated check");
+            let bytes = if replace {
+                &b"other bytes"[..]
+            } else {
+                &b"first bytes"[..]
+            };
+            // Rewriting moves the change time (Unix); move the modification
+            // time too so the change is visible on every platform.
+            let modified = std::fs::metadata(&path).unwrap().modified().unwrap();
+            std::fs::write(&path, bytes).unwrap();
+            std::fs::File::options()
+                .write(true)
+                .open(&path)
+                .unwrap()
+                .set_times(
+                    std::fs::FileTimes::new()
+                        .set_modified(modified + std::time::Duration::from_secs(5)),
+                )
+                .unwrap();
+            pause.release.notify_one();
+            tokio::time::timeout(std::time::Duration::from_secs(20), worker)
+                .await
+                .unwrap()
+                .unwrap();
+            if replace {
+                assert_eq!(
+                    shown_failure(&app, task).await.as_deref(),
+                    Some(
+                        "mods/mod.jar changed while the instance was being exported. Try the export again."
+                    )
+                );
+                assert!(!output.exists(), "a failed export publishes nothing");
+            } else {
+                assert_eq!(shown_failure(&app, task).await, None);
+                let mut archive = zip::ZipArchive::new(File::open(&output).unwrap()).unwrap();
+                assert_eq!(manifest_urls(&mut archive), vec![OLD_URL.to_owned()]);
+            }
+        }
+    }
+
+    /// A linked mod that cannot be read fails the export with one sentence
+    /// that names it and says how to get past it; the export window shows
+    /// that sentence, not the bare OS error.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn an_unreadable_linked_mod_is_named_in_the_export_window() {
+        use std::os::unix::fs::PermissionsExt;
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = linked_instance(&app, "export-unreadable-linked").await;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o000)).unwrap();
+        if std::fs::read(&path).is_ok() {
+            // Permission bits do not stop root.
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+            return;
+        }
+        let (task, worker, output) = start_export(&app, id, &path).await;
+        let finished = tokio::time::timeout(std::time::Duration::from_secs(20), worker).await;
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        finished.unwrap().unwrap();
+        let shown = shown_failure(&app, task).await.expect("the export fails");
+        assert!(
+            shown.starts_with("Could not read mods/mod.jar ("),
+            "names the file: {shown}"
+        );
+        assert!(
+            shown.ends_with(
+                "Close any program that is using it, or untick it in the export's file list, then try again."
+            ),
+            "says how to get past it: {shown}"
+        );
+        assert!(!output.exists());
+    }
+
+    /// A linked mod that is a link into a shared folder that was later moved
+    /// or unmounted fails every export the same way. The message says it is
+    /// missing and how to get past it, not that it moved during the export,
+    /// which a retry would never fix.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_linked_mod_that_is_a_broken_link_is_named_as_missing() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = linked_instance(&app, "export-broken-link").await;
+        std::fs::remove_file(&path).unwrap();
+        std::os::unix::fs::symlink(path.with_file_name("moved-away.jar"), &path).unwrap();
+        let (task, worker, output) = start_export(&app, id, &path).await;
+        tokio::time::timeout(std::time::Duration::from_secs(20), worker)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            shown_failure(&app, task).await.as_deref(),
+            Some(
+                "mods/mod.jar is missing or links to a file that no longer exists. Restore it, or untick it in the export's file list, then try again."
+            )
+        );
+        assert!(!output.exists());
+    }
 }

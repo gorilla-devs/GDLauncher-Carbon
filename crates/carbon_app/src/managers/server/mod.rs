@@ -3125,14 +3125,27 @@ impl ManagerRef<'_, ServerManager> {
             .get_servers()
             .get_server_path(&db_server.shortpath)
             .get_data_path();
-        let active_world = world::selected(&data)?;
+        // Like the addon scan, a level-name that cannot be used still lists the
+        // mods; only the world's datapacks are left out until it is fixed.
+        let active_world = match world::selected(&data) {
+            Ok(world) => Some(world),
+            Err(error) => {
+                tracing::warn!(
+                    ?error,
+                    "Server {}: cannot use its level-name; listing mods only",
+                    id.0
+                );
+                None
+            }
+        };
         let mut addons: Vec<ServerAddon> = cached_mods
             .into_iter()
             .filter(|entry| {
                 (entry.addon_type == "mods" && entry.location == format!("mods/{}", entry.filename))
-                    || (entry.addon_type == "datapacks"
-                        && entry.location
-                            == format!("{}/datapacks/{}", active_world, entry.filename))
+                    || active_world.as_ref().is_some_and(|world| {
+                        entry.addon_type == "datapacks"
+                            && entry.location == format!("{world}/datapacks/{}", entry.filename)
+                    })
             })
             .map(|entry| {
                 let display_name = entry.meta_name.clone().unwrap_or_else(|| {

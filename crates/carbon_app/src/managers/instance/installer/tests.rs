@@ -88,6 +88,18 @@ async fn task05_replace_modrinth_checks_real_artifact_and_kind() {
     )
     .await
     .unwrap();
+    // A separate kind no longer overwrites this disabled mod's owner row.
+    assert!(resource.is_already_installed(&app, id).await.unwrap());
+    assert_eq!(
+        mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .len(),
+        2
+    );
+    mfcdb::delete_mod_file_cache_by_id(&app.db, &row.id)
+        .await
+        .unwrap();
     assert!(!resource.is_already_installed(&app, id).await.unwrap());
 }
 
@@ -2231,6 +2243,205 @@ mod round1_graph {
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn task06_round1_graph_dependency_error_is_not_satisfied_success() {
         run("dependency-error").await;
+    }
+
+    /// Answers every request with the fixture artifact (`test`).
+    pub(super) async fn serve_artifacts() -> String {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let base = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                tokio::spawn(async move {
+                    let mut request = Vec::new();
+                    while !request.ends_with(b"\r\n\r\n") {
+                        match socket.read_u8().await {
+                            Ok(byte) => request.push(byte),
+                            Err(_) => return,
+                        }
+                    }
+                    let _ = socket
+                        .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 4\r\nConnection: close\r\n\r\ntest")
+                        .await;
+                });
+            }
+        });
+        base
+    }
+
+    /// An addon requiring three more in a chain, all downloaded and published.
+    const CHAIN: [&str; 4] = ["root-addon", "dep-one", "dep-two", "dep-three"];
+
+    fn chain(base: &str, rollbacks: &Arc<std::sync::atomic::AtomicUsize>) -> Arc<Spec> {
+        let mut child = None;
+        for name in CHAIN.into_iter().rev() {
+            child = Some(Arc::new(Spec {
+                name,
+                rollbacks: Some(rollbacks.clone()),
+                rollback_hook: None,
+                child,
+                dependency_error: false,
+                satisfaction: Satisfaction::Missing,
+                url: Some(format!("{base}/{name}")),
+                hook: None,
+            }));
+        }
+        child.unwrap()
+    }
+
+    /// Install the chain and wait until its task settles.
+    async fn install_chain(
+        app: &Arc<AppInner>,
+        id: InstanceId,
+        rollbacks: &Arc<std::sync::atomic::AtomicUsize>,
+    ) -> crate::managers::vtask::TaskOutcome {
+        let base = serve_artifacts().await;
+        let installer = Installer::new(Box::new(Resource(chain(&base, rollbacks))));
+        let task = installer.install(app, id, true, None).await.unwrap();
+        tokio::time::timeout(
+            Duration::from_secs(30),
+            wait_install_completion(installer.abort_handle.lock().await.completion.clone()),
+        )
+        .await
+        .expect("the install settles")
+        .unwrap();
+        for _ in 0..200 {
+            let outcome = app.task_manager().get_task_outcome(task).await;
+            if !matches!(outcome, crate::managers::vtask::TaskOutcome::Running(_)) {
+                return outcome;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        panic!("the install task never settled");
+    }
+
+    fn assert_chain_published(
+        mods: &std::path::Path,
+        outcome: &crate::managers::vtask::TaskOutcome,
+        rollbacks: &std::sync::atomic::AtomicUsize,
+    ) {
+        match outcome {
+            crate::managers::vtask::TaskOutcome::Succeeded => {}
+            crate::managers::vtask::TaskOutcome::Failed(task) => {
+                panic!("the install failed: {task:?}")
+            }
+            _ => panic!("the install did not succeed"),
+        }
+        assert_eq!(rollbacks.load(std::sync::atomic::Ordering::SeqCst), 0);
+        for name in CHAIN {
+            assert_eq!(
+                std::fs::read(mods.join(format!("{name}.jar"))).unwrap(),
+                b"test"
+            );
+        }
+    }
+
+    /// Each member's finalization pass trusts unchanged addons on their
+    /// stamps, and hashes what it must with the instance gate released.
+    #[tokio::test]
+    async fn dependency_chain_reads_no_existing_addon_and_leaves_play_free() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, _, first) = crate::managers::instance::mods::tests::addon_fixture(
+            &app,
+            "graph-large-instance",
+            instance::AddonType::Mods,
+            "existing-0.jar",
+            b"existing 0",
+        )
+        .await;
+        let mods = first.parent().unwrap().to_owned();
+        let mut existing = vec![first];
+        for i in 1..200 {
+            let path = mods.join(format!("existing-{i}.jar"));
+            std::fs::write(&path, format!("existing {i}")).unwrap();
+            existing.push(path);
+        }
+        let mcm = app.meta_cache_manager();
+        mcm.override_caching_and_wait(
+            crate::managers::metadata::cache::CacheEntityId::Instance(id),
+            false,
+            false,
+        )
+        .await
+        .unwrap();
+        // A file the user dropped in that no scan has read yet: the first
+        // finalization pass hashes it, and stops there until released.
+        let dropped = mods.join("dropped.jar");
+        std::fs::write(&dropped, b"dropped by the user").unwrap();
+        let pause = mcm.arm_scan_pause(&dropped, "hash");
+        mcm.clear_scan_observations();
+
+        let rollbacks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let install = {
+            let app = app.clone();
+            let rollbacks = rollbacks.clone();
+            tokio::spawn(async move { install_chain(&app, id, &rollbacks).await })
+        };
+        tokio::time::timeout(Duration::from_secs(20), pause.entered.notified())
+            .await
+            .expect("a finalization pass reaches the unread file");
+        // Play's preparation starts by taking this gate.
+        let gate = tokio::time::timeout(
+            Duration::from_secs(1),
+            app.instance_manager().lock_instance(id),
+        )
+        .await
+        .expect("Play gets the instance gate while the pass hashes");
+        drop(gate);
+        pause.release.notify_one();
+
+        let outcome = install.await.unwrap();
+        assert_chain_published(&mods, &outcome, &rollbacks);
+        for path in &existing {
+            assert_eq!(
+                mcm.scan_observations(path, "hash"),
+                0,
+                "{} was already cached and must not be read again",
+                path.display()
+            );
+        }
+    }
+
+    /// One unrelated file the launcher cannot read never rolls back an install.
+    #[tokio::test]
+    async fn dependency_chain_commits_despite_unrelated_unreadable_files() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, _, first) = crate::managers::instance::mods::tests::addon_fixture(
+            &app,
+            "graph-bad-files",
+            instance::AddonType::Mods,
+            "existing.jar",
+            b"existing",
+        )
+        .await;
+        let mods = first.parent().unwrap().to_owned();
+        let root = mods.parent().unwrap().to_owned();
+        std::fs::write(root.join("resourcepacks"), b"a file where a folder belongs").unwrap();
+        let locked = mods.join("locked.jar");
+        std::fs::write(&locked, b"never readable").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::os::unix::fs::symlink("missing-target.jar", mods.join("broken.jar")).unwrap();
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        }
+        let rollbacks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let outcome = install_chain(&app, id, &rollbacks).await;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o644)).unwrap();
+        }
+        assert_chain_published(&mods, &outcome, &rollbacks);
+        let rows = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap();
+        for name in CHAIN {
+            assert!(
+                rows.iter().any(|row| row.filename == format!("{name}.jar")),
+                "{name} is cached"
+            );
+        }
+        assert!(rows.iter().all(|row| row.filename != "broken.jar"));
     }
 }
 

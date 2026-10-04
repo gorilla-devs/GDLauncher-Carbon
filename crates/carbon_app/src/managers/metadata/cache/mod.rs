@@ -51,7 +51,10 @@ use tracing::warn;
 use uuid::Uuid;
 
 pub mod curseforge;
+pub(crate) mod eligibility;
 pub mod modrinth;
+#[cfg(test)]
+mod scan_tests;
 
 /// Throttle Modrinth requests originating from the metadata-cache loop.
 /// Modrinth's public limit is 300 req/min (sliding window, reset via
@@ -132,9 +135,29 @@ struct ModFileParseResult {
     content_len: usize,
     meta: Option<super::mods::ModFileMetadata>,
     image_data: Option<Vec<u8>>,
+    file_stamp: Option<String>,
+}
+
+#[cfg(test)]
+#[derive(Default)]
+struct ScanTestState {
+    fail_after: HashMap<(PathBuf, &'static str), usize>,
+    observations: HashMap<(PathBuf, &'static str), usize>,
+    mutate_before_recheck: HashMap<PathBuf, Vec<u8>>,
+    pauses: HashMap<(PathBuf, &'static str), Arc<ScanPause>>,
+}
+
+/// A one-shot stop in a scan, armed by a test for one path and stage.
+#[cfg(test)]
+#[derive(Default)]
+pub(crate) struct ScanPause {
+    pub(crate) entered: tokio::sync::Notify,
+    pub(crate) release: tokio::sync::Notify,
 }
 
 pub struct MetaCacheManager {
+    #[cfg(test)]
+    scan_test_state: std::sync::Mutex<ScanTestState>,
     //waiting_instances: RwLock<HashSet<InstanceId>>,
     //scanned_instances: Mutex<HashSet<InstanceId>>,
     ignored_remote_cf_hashes: RwLock<HashSet<u32>>,
@@ -164,6 +187,8 @@ pub struct MetaCacheManager {
 impl MetaCacheManager {
     pub fn new() -> Self {
         Self {
+            #[cfg(test)]
+            scan_test_state: std::sync::Mutex::new(ScanTestState::default()),
             //waiting_instances: RwLock::new(HashSet::new()),
             //scanned_instances: Mutex::new(HashSet::new()),
             ignored_remote_cf_hashes: RwLock::new(HashSet::new()),
@@ -182,6 +207,108 @@ impl MetaCacheManager {
             modrinth_throttle: ModrinthCacheThrottle::new(210, std::time::Duration::from_secs(60)),
             metadata_hash_locks: dashmap::DashMap::new(),
         }
+    }
+
+    #[cfg(test)]
+    fn scan_test_boundary(&self, path: &Path, stage: &'static str) -> std::io::Result<()> {
+        let mut state = self.scan_test_state.lock().unwrap();
+        let key = (path.to_owned(), stage);
+        let count = state.observations.entry(key.clone()).or_default();
+        *count += 1;
+        let count = *count;
+        if state
+            .fail_after
+            .get(&key)
+            .is_some_and(|after| count >= *after)
+        {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                format!("injected {stage} observation failure"),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Stop the scan at `stage` for `path` once, if a test armed it.
+    #[cfg(test)]
+    async fn scan_test_pause(&self, path: &Path, stage: &'static str) {
+        let pause = self
+            .scan_test_state
+            .lock()
+            .unwrap()
+            .pauses
+            .remove(&(path.to_owned(), stage));
+        if let Some(pause) = pause {
+            pause.entered.notify_one();
+            pause.release.notified().await;
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn arm_scan_pause(&self, path: &Path, stage: &'static str) -> Arc<ScanPause> {
+        let pause = Arc::new(ScanPause::default());
+        self.scan_test_state
+            .lock()
+            .unwrap()
+            .pauses
+            .insert((path.to_owned(), stage), pause.clone());
+        pause
+    }
+
+    #[cfg(test)]
+    pub(crate) fn scan_observations(&self, path: &Path, stage: &'static str) -> usize {
+        self.scan_test_state
+            .lock()
+            .unwrap()
+            .observations
+            .get(&(path.to_owned(), stage))
+            .copied()
+            .unwrap_or(0)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn clear_scan_observations(&self) {
+        self.scan_test_state.lock().unwrap().observations.clear();
+    }
+
+    #[cfg(test)]
+    pub(crate) fn mutate_before_recheck(&self, path: &Path, bytes: Vec<u8>) {
+        self.scan_test_state
+            .lock()
+            .unwrap()
+            .mutate_before_recheck
+            .insert(path.to_owned(), bytes);
+    }
+
+    async fn scan_folder_metadata(&self, path: &Path) -> std::io::Result<std::fs::Metadata> {
+        #[cfg(test)]
+        self.scan_test_boundary(path, "folder-stat")?;
+        tokio::fs::metadata(path).await
+    }
+
+    async fn scan_read_dir(&self, path: &Path) -> std::io::Result<tokio::fs::ReadDir> {
+        #[cfg(test)]
+        self.scan_test_boundary(path, "read-dir")?;
+        tokio::fs::read_dir(path).await
+    }
+
+    async fn scan_next_entry(
+        &self,
+        entries: &mut tokio::fs::ReadDir,
+        path: &Path,
+    ) -> std::io::Result<Option<tokio::fs::DirEntry>> {
+        #[cfg(test)]
+        self.scan_test_boundary(path, "iterate")?;
+        entries.next_entry().await
+    }
+
+    async fn scan_entry_metadata(
+        &self,
+        entry: &tokio::fs::DirEntry,
+    ) -> std::io::Result<std::fs::Metadata> {
+        #[cfg(test)]
+        self.scan_test_boundary(&entry.path(), "entry-stat")?;
+        entry.metadata().await
     }
 
     /// Get the entity IDs that are currently being cached
@@ -307,10 +434,51 @@ impl<F: FnOnce(anyhow::Result<()>) + Send + Sync> CompletionSender for F {
     }
 }
 
+/// Addon folders whose bytes a local pass re-reads even when the stored stamp
+/// still matches. Every other file is trusted on its parser-qualified stamp, so
+/// a pass costs one `stat` per unchanged addon instead of a full read.
+///
+/// Exports ask for [`VerifyScope::MODS`], the only folder they link to a
+/// platform file, so a same-size replacement with a preserved timestamp can
+/// never ship as the old platform file. Installs ask for nothing: publication
+/// already hashed the file it wrote.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct VerifyScope(u8);
+
+impl VerifyScope {
+    pub const NONE: Self = Self(0);
+    pub const MODS: Self = Self(1);
+    pub const ALL: Self = Self(0b1111);
+
+    fn bit(kind: crate::domain::instance::AddonType) -> u8 {
+        use crate::domain::instance::AddonType;
+        match kind {
+            AddonType::Mods => 1,
+            AddonType::ResourcePacks => 1 << 1,
+            AddonType::Shaders => 1 << 2,
+            AddonType::DataPacks => 1 << 3,
+            // Worlds are directories with name-derived identities.
+            AddonType::Worlds => 0,
+        }
+    }
+
+    pub fn contains(self, kind: crate::domain::instance::AddonType) -> bool {
+        self.0 & Self::bit(kind) != 0
+    }
+
+    pub fn union(self, other: Self) -> Self {
+        Self(self.0 | other.0)
+    }
+}
+
 struct CacheTargets {
-    backend_override: Option<CacheTarget>,
+    backend_override: VecDeque<CacheTarget>,
     priority: Option<CacheTarget>,
     waiting: VecDeque<CacheEntityId>,
+    /// Requested byte verification per entity, OR-ed across coalesced requests
+    /// and cleared when a pass that observed them completes.
+    verify: HashMap<CacheEntityId, VerifyScope>,
+    generations: HashMap<CacheEntityId, u64>,
 }
 
 struct CacheTarget {
@@ -322,67 +490,94 @@ struct CacheTargetInfo {
     entity_id: CacheEntityId,
     is_override: bool,
     is_priority: bool,
+    verify: VerifyScope,
+    generation: u64,
 }
 
 impl CacheTargets {
     fn new() -> Self {
         Self {
-            backend_override: None,
+            backend_override: VecDeque::new(),
             priority: None,
             waiting: VecDeque::new(),
+            verify: HashMap::new(),
+            generations: HashMap::new(),
         }
+    }
+
+    fn verify_scope(&self, entity_id: CacheEntityId) -> VerifyScope {
+        self.verify.get(&entity_id).copied().unwrap_or_default()
     }
 
     fn target(&self) -> Option<CacheTargetInfo> {
-        match self {
-            Self {
-                backend_override: Some(CacheTarget { entity_id, .. }),
-                priority,
-                waiting: _,
-            } => Some(CacheTargetInfo {
-                entity_id: *entity_id,
+        if let Some(target) = self.backend_override.front() {
+            Some(CacheTargetInfo {
+                entity_id: target.entity_id,
                 is_override: true,
-                is_priority: priority.as_ref().is_some_and(|v| *entity_id == v.entity_id),
-            }),
-            Self {
-                backend_override: None,
-                priority: Some(CacheTarget { entity_id, .. }),
-                waiting: _,
-            } => Some(CacheTargetInfo {
-                entity_id: *entity_id,
+                verify: self.verify_scope(target.entity_id),
+                generation: self
+                    .generations
+                    .get(&target.entity_id)
+                    .copied()
+                    .unwrap_or(0),
+                is_priority: self
+                    .priority
+                    .as_ref()
+                    .is_some_and(|p| p.entity_id == target.entity_id),
+            })
+        } else if let Some(target) = &self.priority {
+            Some(CacheTargetInfo {
+                entity_id: target.entity_id,
                 is_override: false,
                 is_priority: true,
-            }),
-            Self {
-                backend_override: None,
-                priority: None,
-                waiting,
-            } => waiting.front().map(|entity_id| CacheTargetInfo {
-                entity_id: *entity_id,
+                verify: self.verify_scope(target.entity_id),
+                generation: self
+                    .generations
+                    .get(&target.entity_id)
+                    .copied()
+                    .unwrap_or(0),
+            })
+        } else {
+            self.waiting.front().map(|&entity_id| CacheTargetInfo {
+                entity_id,
                 is_override: false,
                 is_priority: false,
-            }),
+                verify: self.verify_scope(entity_id),
+                generation: self.generations.get(&entity_id).copied().unwrap_or(0),
+            })
         }
     }
 
+    fn release_pass(
+        &mut self,
+        entity_id: CacheEntityId,
+        generation: u64,
+        r: anyhow::Result<()>,
+    ) -> bool {
+        if self.generations.get(&entity_id).copied().unwrap_or(0) != generation {
+            return true; // Re-run the live request; this pass did not observe it.
+        }
+        self.release_target(entity_id, r)
+    }
+
     fn release_target(&mut self, entity_id: CacheEntityId, r: anyhow::Result<()>) -> bool {
+        self.verify.remove(&entity_id);
         let mut changed = false;
 
-        let check_target_callback = |target: &mut CacheTarget| {
-            if target.entity_id == entity_id {
-                if let Some(callback) = target.callback.take() {
-                    callback.complete(
-                        r.as_ref()
-                            .map(|_| ())
-                            .map_err(|_| anyhow!("error caching mods for entity")),
-                    );
-                }
+        let check_target_callback =
+            |target: &mut CacheTarget| {
+                if target.entity_id == entity_id {
+                    if let Some(callback) = target.callback.take() {
+                        callback.complete(r.as_ref().map(|_| ()).map_err(|error| {
+                            anyhow!("error caching mods for {entity_id}: {error:#}")
+                        }));
+                    }
 
-                true
-            } else {
-                false
-            }
-        };
+                    true
+                } else {
+                    false
+                }
+            };
 
         let release_target = |target_option: &mut Option<CacheTarget>| {
             if let Some(target) = target_option {
@@ -396,7 +591,15 @@ impl CacheTargets {
             false
         };
 
-        changed |= release_target(&mut self.backend_override);
+        if let Some(index) = self
+            .backend_override
+            .iter()
+            .position(|t| t.entity_id == entity_id)
+        {
+            let mut target = self.backend_override.remove(index).unwrap();
+            check_target_callback(&mut target);
+            changed = true;
+        }
         changed |= release_target(&mut self.priority);
 
         let mut i = 0;
@@ -414,6 +617,7 @@ impl CacheTargets {
 
     // TODO: ensure this immediately cancels the target if running
     fn revoke_target(&mut self, entity_id: CacheEntityId) -> bool {
+        self.verify.remove(&entity_id);
         let mut changed = false;
 
         let mut revoke_option = |target_option: &mut Option<CacheTarget>| {
@@ -429,8 +633,17 @@ impl CacheTargets {
             }
         };
 
-        revoke_option(&mut self.backend_override);
         revoke_option(&mut self.priority);
+        if let Some(index) = self
+            .backend_override
+            .iter()
+            .position(|t| t.entity_id == entity_id)
+        {
+            if let Some(callback) = self.backend_override.remove(index).unwrap().callback {
+                callback.complete(Err(anyhow!("This cache target was revoked")));
+            }
+            changed = true;
+        }
 
         let mut i = 0;
         while i < self.waiting.len() {
@@ -453,25 +666,33 @@ impl CacheTargets {
         }
     }
 
-    fn cancel_override(&mut self) {
-        if let Some(old) = self.backend_override.take() {
-            if let Some(callback) = old.callback {
-                callback.complete(Err(anyhow!("Backend override was canceled")));
-            }
-        }
-    }
-
     fn set_priority(&mut self, target: CacheTarget) {
         self.cancel_priority();
         self.priority = Some(target);
     }
 
+    /// Queue an explicit pass that also re-reads the bytes of `verify`'s
+    /// folders. Scopes of coalesced requests are OR-ed, so every waiter's pass
+    /// covers what it asked for.
+    fn set_override_verified(&mut self, target: CacheTarget, verify: VerifyScope) {
+        if verify != VerifyScope::NONE {
+            let scope = self.verify.entry(target.entity_id).or_default();
+            *scope = scope.union(verify);
+        }
+        self.set_override(target);
+    }
+
     fn set_override(&mut self, target: CacheTarget) {
+        *self.generations.entry(target.entity_id).or_default() += 1;
         // Coalesce overrides for the same entity. Otherwise a second waiter
         // (e.g. dependency mod + parent mod racing to wait on the same
         // instance's cache pass) would cancel the first one's callback,
         // failing the in-flight install with "Backend override was canceled".
-        if let Some(existing) = self.backend_override.as_mut() {
+        if let Some(existing) = self
+            .backend_override
+            .iter_mut()
+            .find(|t| t.entity_id == target.entity_id)
+        {
             if existing.entity_id == target.entity_id {
                 let prior = existing.callback.take();
                 let new = target.callback;
@@ -490,8 +711,7 @@ impl CacheTargets {
                 return;
             }
         }
-        self.cancel_override();
-        self.backend_override = Some(target);
+        self.backend_override.push_back(target);
     }
 
     fn get_queue_position(&self, entity_id: CacheEntityId) -> Option<usize> {
@@ -511,6 +731,8 @@ struct LoopWatcher<T: LoopValue> {
 trait LoopValue: Send + Sync {
     type Token: Clone + Copy;
     type Value;
+    /// Queue completion dequeues and notifies; image completion retains pending work.
+    const RESELECT_AFTER_COMPLETION: bool;
 
     fn token(&self) -> Self::Token;
 
@@ -519,17 +741,30 @@ trait LoopValue: Send + Sync {
 }
 
 impl LoopValue for CacheTargets {
-    type Token = Option<CacheEntityId>;
+    type Token = Option<(CacheEntityId, bool, VerifyScope, u64)>;
     type Value = CacheTargetInfo;
+    const RESELECT_AFTER_COMPLETION: bool = true;
 
     fn token(&self) -> Self::Token {
-        self.target().map(|target| target.entity_id)
+        self.target().map(|target| {
+            (
+                target.entity_id,
+                target.is_override,
+                target.verify,
+                target.generation,
+            )
+        })
     }
 
     fn loop_cmp(&self, token: Self::Token) -> Option<(Self::Value, bool)> {
         self.target().map(|target| {
-            let entity_id = target.entity_id;
-            (target, token == Some(entity_id))
+            let identity = (
+                target.entity_id,
+                target.is_override,
+                target.verify,
+                target.generation,
+            );
+            (target, token == Some(identity))
         })
     }
 }
@@ -537,6 +772,7 @@ impl LoopValue for CacheTargets {
 impl LoopValue for Option<CacheEntityId> {
     type Token = Self;
     type Value = CacheEntityId;
+    const RESELECT_AFTER_COMPLETION: bool = false;
 
     fn token(&self) -> Self::Token {
         *self
@@ -599,7 +835,9 @@ impl<T: LoopValue> LoopWatcher<T> {
                 f2 = f(n) => {
                     self.watcher.send_modify(f2).await;
 
-                    if next.is_none() {
+                    // Queue consumers must reselect live ownership/generation. Image
+                    // consumers must retain same-entity work observed during this pass.
+                    if T::RESELECT_AFTER_COMPLETION || next.is_none() {
                         next = self.next().await.map(val);
                     }
                 }
@@ -702,6 +940,8 @@ fn cache_modplatform<C: ModplatformCacher>(
                 entity_id,
                 is_priority,
                 is_override,
+                verify: _,
+                generation,
             }| async move {
                 let mut pause = app.meta_cache_manager().pause_caching.subscribe();
                 let r = loop {
@@ -763,7 +1003,8 @@ fn cache_modplatform<C: ModplatformCacher>(
                     };
 
                     tokio::select! {
-                        _ = wait_for_pause => {
+                        biased;
+                        _ = wait_for_pause, if !is_override => {
                             info!("Remote {} mod caching paused for {entity_id} - waiting for unpause", C::NAME);
 
                             // wait for unpause
@@ -782,7 +1023,7 @@ fn cache_modplatform<C: ModplatformCacher>(
                     };
                 };
 
-                move |targets: &mut CacheTargets| targets.release_target(entity_id, r)
+                move |targets: &mut CacheTargets| targets.release_pass(entity_id, generation, r)
             },
         );
 
@@ -866,13 +1107,31 @@ impl ManagerRef<'_, MetaCacheManager> {
             .await;
     }
 
+    /// Run a local pass for `entity_id` ahead of background work and wait for
+    /// it (and the requested platform passes). Unchanged addons are trusted on
+    /// their stamp; see [`Self::override_caching_verified_and_wait`] for a pass
+    /// that re-reads bytes.
     pub async fn override_caching_and_wait(
         self,
         entity_id: CacheEntityId,
         curseforge: bool,
         modrinth: bool,
     ) -> anyhow::Result<()> {
-        tracing::info!("Overriding caching and waiting for {entity_id}");
+        self.override_caching_verified_and_wait(entity_id, VerifyScope::NONE, curseforge, modrinth)
+            .await
+    }
+
+    /// Like [`Self::override_caching_and_wait`], but the local pass also
+    /// re-reads every addon in `verify`'s folders and re-hashes any whose bytes
+    /// no longer match their row, even when size and timestamps are unchanged.
+    pub async fn override_caching_verified_and_wait(
+        self,
+        entity_id: CacheEntityId,
+        verify: VerifyScope,
+        curseforge: bool,
+        modrinth: bool,
+    ) -> anyhow::Result<()> {
+        tracing::info!("Overriding caching and waiting for {entity_id} (verify {verify:?})");
 
         let app = self.app.clone();
 
@@ -887,60 +1146,63 @@ impl ManagerRef<'_, MetaCacheManager> {
 
         self.local_targets
             .send_modify_always(move |targets| {
-                targets.set_override(CacheTarget {
-                    entity_id,
-                    callback: Some(Box::new(move |r: anyhow::Result<()>| match r {
-                        Ok(()) => {
-                            let _ = local_tx.send(Ok(()));
+                targets.set_override_verified(
+                    CacheTarget {
+                        entity_id,
+                        callback: Some(Box::new(move |r: anyhow::Result<()>| match r {
+                            Ok(()) => {
+                                let _ = local_tx.send(Ok(()));
 
-                            tokio::spawn(async move {
-                                let mcm = app.meta_cache_manager();
+                                tokio::spawn(async move {
+                                    let mcm = app.meta_cache_manager();
 
-                                let cf = cf_tx.map(|tx| {
-                                    mcm.curseforge_targets.send_modify_always(move |targets| {
-                                        targets.set_override(CacheTarget {
-                                            entity_id,
-                                            callback: Some(Box::new(
-                                                move |r: anyhow::Result<()>| {
-                                                    let _ = tx.send(r);
-                                                },
-                                            )),
+                                    let cf = cf_tx.map(|tx| {
+                                        mcm.curseforge_targets.send_modify_always(move |targets| {
+                                            targets.set_override(CacheTarget {
+                                                entity_id,
+                                                callback: Some(Box::new(
+                                                    move |r: anyhow::Result<()>| {
+                                                        let _ = tx.send(r);
+                                                    },
+                                                )),
+                                            })
                                         })
-                                    })
-                                });
+                                    });
 
-                                let mr = mr_tx.map(|tx| {
-                                    mcm.modrinth_targets.send_modify_always(move |targets| {
-                                        targets.set_override(CacheTarget {
-                                            entity_id,
-                                            callback: Some(Box::new(
-                                                move |r: anyhow::Result<()>| {
-                                                    let _ = tx.send(r);
-                                                },
-                                            )),
+                                    let mr = mr_tx.map(|tx| {
+                                        mcm.modrinth_targets.send_modify_always(move |targets| {
+                                            targets.set_override(CacheTarget {
+                                                entity_id,
+                                                callback: Some(Box::new(
+                                                    move |r: anyhow::Result<()>| {
+                                                        let _ = tx.send(r);
+                                                    },
+                                                )),
+                                            })
                                         })
-                                    })
-                                });
+                                    });
 
-                                join!(
-                                    async {
-                                        if let Some(cf) = cf {
-                                            cf.await;
+                                    join!(
+                                        async {
+                                            if let Some(cf) = cf {
+                                                cf.await;
+                                            }
+                                        },
+                                        async {
+                                            if let Some(mr) = mr {
+                                                mr.await;
+                                            }
                                         }
-                                    },
-                                    async {
-                                        if let Some(mr) = mr {
-                                            mr.await;
-                                        }
-                                    }
-                                );
-                            });
-                        }
-                        e @ Err(_) => {
-                            let _ = local_tx.send(e);
-                        }
-                    })),
-                });
+                                    );
+                                });
+                            }
+                            e @ Err(_) => {
+                                let _ = local_tx.send(e);
+                            }
+                        })),
+                    },
+                    verify,
+                );
             })
             .await;
 
@@ -973,12 +1235,16 @@ impl ManagerRef<'_, MetaCacheManager> {
         }
     }
 
-    pub async fn queue_caching(self, entity_id: CacheEntityId, _force: bool) {
-        // TODO: make track scanned instances for _force
+    pub async fn queue_caching(self, entity_id: CacheEntityId, force: bool) {
         info!("Queuing mod caching for {}", entity_id);
 
         self.local_targets
             .send_modify_always(|targets| {
+                if force {
+                    // Re-read every addon's bytes on this pass.
+                    let scope = targets.verify.entry(entity_id).or_default();
+                    *scope = scope.union(VerifyScope::ALL);
+                }
                 targets.waiting.push_back(entity_id);
             })
             .await;
@@ -1100,13 +1366,21 @@ impl ManagerRef<'_, MetaCacheManager> {
             path.set_extension(format!("{prev_ext}.disabled"));
         }
 
-        let mut file = tokio::fs::File::open(path).await?;
+        let mut file = tokio::fs::File::open(&path).await?;
+        let initial_stamp = observed_file_stamp(&file.metadata().await?);
 
+        #[cfg(test)]
+        {
+            self.scan_test_boundary(&path, "hash")?;
+            self.scan_test_pause(&path, "hash").await;
+        }
         let mut sha512 = Sha512::new();
         let mut sha1 = Sha1::new();
         let mut murmur_len = 0;
         let mut content_len = 0;
 
+        #[cfg(test)]
+        note_whole_file_read(&path);
         carbon_scheduler::buffered_digest(&mut file, |chunk| {
             sha512.update(&chunk);
             sha1.update(&chunk);
@@ -1124,6 +1398,11 @@ impl ManagerRef<'_, MetaCacheManager> {
         file.seek(SeekFrom::Start(0)).await?;
         let mut file = file.into_std().await;
 
+        #[cfg(test)]
+        {
+            self.scan_test_boundary(&path, "parse")?;
+            self.scan_test_pause(&path, "parse").await;
+        }
         let (file, meta, image_data) = tokio::task::spawn_blocking(|| {
             let meta = super::mods::parse_metadata(&mut file);
 
@@ -1132,17 +1411,23 @@ impl ManagerRef<'_, MetaCacheManager> {
                 .map(|m| m.as_ref().map(|m| m.logo_file.as_ref()))
             {
                 Ok(Some(Some(logo_file))) => {
-                    let mut zip = zip::ZipArchive::new(&mut file).unwrap();
-                    let r = match zip.by_name(&logo_file) {
-                        Ok(mut file) => {
-                            let mut image = Vec::with_capacity(file.size() as usize);
-                            file.read_to_end(&mut image)?;
-                            Some(image)
-                        }
-                        _ => None,
-                    };
-
-                    r
+                    // A damaged icon entry only costs the icon, not the addon.
+                    match zip::ZipArchive::new(&mut file) {
+                        Ok(mut zip) => match zip.by_name(&logo_file) {
+                            Ok(mut file) => {
+                                let mut image = Vec::with_capacity(file.size() as usize);
+                                match file.read_to_end(&mut image) {
+                                    Ok(_) => Some(image),
+                                    Err(error) => {
+                                        debug!(?error, "could not read the icon of {}", logo_file);
+                                        None
+                                    }
+                                }
+                            }
+                            _ => None,
+                        },
+                        Err(_) => None,
+                    }
                 }
                 _ => None,
             };
@@ -1151,13 +1436,22 @@ impl ManagerRef<'_, MetaCacheManager> {
         })
         .await??;
 
-        let mut file = tokio::fs::File::from_std(file);
-        file.seek(SeekFrom::Start(0)).await?;
+        // The murmur2 seed needs the first read's length, so the file is read
+        // twice. The second read opens the path again and also re-hashes it:
+        // equal SHA-512s show the path still holds the bytes the first read
+        // hashed and the metadata was parsed from, even where a stamp cannot
+        // tell (Windows has no change time). No third read is needed.
+        drop(file);
+        let mut file = tokio::fs::File::open(&path).await?;
         let mut murmur2 = Murmur2Digest::new(murmur_len as u32);
+        let mut recheck = Sha512::new();
 
         let mut workbuf = Vec::<u8>::with_capacity(carbon_scheduler::BUFSIZE);
 
+        #[cfg(test)]
+        note_whole_file_read(&path);
         carbon_scheduler::buffered_digest(&mut file, |chunk| {
+            recheck.update(&chunk);
             workbuf.splice(.., chunk.iter().map(|&b| b));
             workbuf.retain(|&x| x != 9 && x != 10 && x != 13 && x != 32);
             murmur2.update(&workbuf[..]);
@@ -1165,8 +1459,14 @@ impl ManagerRef<'_, MetaCacheManager> {
         .await?;
 
         let murmur2 = murmur2.finalize();
+        let recheck: [u8; 64] = recheck.finalize().into();
 
         drop(file);
+        if recheck != sha512
+            || observed_file_stamp(&tokio::fs::metadata(&path).await?) != initial_stamp
+        {
+            anyhow::bail!("Addon changed while being scanned; retry the operation");
+        }
 
         let meta = match meta {
             Ok(meta) => meta,
@@ -1181,6 +1481,7 @@ impl ManagerRef<'_, MetaCacheManager> {
             sha1,
             murmur2,
             content_len,
+            file_stamp: Some(initial_stamp),
             meta,
             image_data,
         })
@@ -1219,6 +1520,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                 logo_file: None,
             }),
             image_data: None,
+            file_stamp: None,
         })
     }
 
@@ -1247,7 +1549,33 @@ impl ManagerRef<'_, MetaCacheManager> {
         let dbmeta = metarepo::find_metadata_by_hashes(&self.app.db, &sha512, murmur2).await?;
 
         let meta_id = match dbmeta {
-            Some(meta) => meta.id,
+            Some(meta) => {
+                // Heal only the known parser attribution bug, based on actual
+                // current bytes. Keep hashes, IDs, images and remote references.
+                if result.meta.as_ref().is_some_and(|m| {
+                    m.modloaders
+                        .contains(&crate::domain::instance::info::ModLoaderType::Neoforge)
+                }) {
+                    let loaders = result
+                        .meta
+                        .as_ref()
+                        .unwrap()
+                        .modloaders
+                        .iter()
+                        .map(ToString::to_string)
+                        .join(",");
+                    if meta.modloaders != loaders {
+                        metarepo::update_local_modloaders(
+                            &self.app.db,
+                            &meta.id,
+                            &loaders,
+                            DbDateTime(Utc::now().fixed_offset()),
+                        )
+                        .await?;
+                    }
+                }
+                meta.id
+            }
             None => {
                 let meta_id = Uuid::new_v4().to_string();
 
@@ -1260,6 +1588,9 @@ impl ManagerRef<'_, MetaCacheManager> {
                             .acquire()
                             .await
                             .expect("the image scale semaphore is never closed");
+                        #[cfg(test)]
+                        self.scan_test_pause(Path::new(mod_filename), "icon-scale")
+                            .await;
 
                         let image_data = image_data.clone();
                         let logo = carbon_scheduler::cpu_block(move || {
@@ -1376,7 +1707,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
     /// Cache a mod file for an instance. Hashes, parses metadata, and upserts into mod_file_cache.
     /// Refresh only an already-published artifact under the caller's instance
-    /// ownership. The scanner uses the same gate around its whole local snapshot.
+    /// ownership. The scanner takes the same gate for its snapshot and commit.
     pub(crate) async fn refresh_published_addon(
         self,
         ownership: &crate::managers::instance::InstanceOperationGuard,
@@ -1393,6 +1724,173 @@ impl ManagerRef<'_, MetaCacheManager> {
             addon_type,
         )
         .await
+    }
+
+    /// Re-read a cached addon once and compare it with its row's metadata.
+    ///
+    /// Only rows stamped by this parser revision for their current metadata
+    /// qualify. The opened handle's stamp before the read must equal the path's
+    /// stamp after it, as in [`Self::hash_and_parse_mod_file`]. A replacement
+    /// that also keeps every stamp field between those two checks (possible on
+    /// Windows, which has no change time) is caught by the exporters' final
+    /// re-read of every linked file.
+    async fn verify_cached_bytes(
+        self,
+        stored: Option<&str>,
+        metadata_id: &str,
+        path: &Path,
+    ) -> anyhow::Result<ByteCheck> {
+        let Some(stored) = stored else {
+            return Ok(ByteCheck::Different);
+        };
+        let Some(metadata) = metarepo::get_metadata_by_id(&self.app.db, metadata_id).await? else {
+            return Ok(ByteCheck::Different);
+        };
+        if metadata.sha512.len() != 64
+            || metadata.sha1.len() != 20
+            || stored.split_once('|').map(|v| v.0)
+                != qualified_file_stamp(&metadata, "")
+                    .split_once('|')
+                    .map(|v| v.0)
+        {
+            return Ok(ByteCheck::Different);
+        }
+        let mut file = tokio::fs::File::open(path)
+            .await
+            .with_context(|| format!("Could not open addon {}", path.display()))?;
+        let before = observed_file_stamp(&file.metadata().await?);
+        #[cfg(test)]
+        {
+            self.scan_test_boundary(path, "hash")?;
+            self.scan_test_pause(path, "hash").await;
+            note_whole_file_read(path);
+        }
+        let mut digest = Sha512::new();
+        carbon_scheduler::buffered_digest(&mut file, |bytes| digest.update(bytes))
+            .await
+            .with_context(|| format!("Could not read addon {}", path.display()))?;
+        drop(file);
+        let current_hash = digest.finalize().to_vec();
+        #[cfg(test)]
+        {
+            let replacement = self
+                .scan_test_state
+                .lock()
+                .unwrap()
+                .mutate_before_recheck
+                .remove(path);
+            if let Some(bytes) = replacement {
+                let modified = std::fs::metadata(path)?.modified()?;
+                tokio::fs::write(path, bytes).await?;
+                std::fs::File::options()
+                    .write(true)
+                    .open(path)?
+                    .set_times(std::fs::FileTimes::new().set_modified(modified))?;
+            }
+            self.scan_test_boundary(path, "hash-recheck")?;
+        }
+        let after = observed_file_stamp(&tokio::fs::metadata(path).await?);
+        if before != after || current_hash != metadata.sha512 {
+            return Ok(ByteCheck::Different);
+        }
+        Ok(ByteCheck::Same(after))
+    }
+
+    /// Settle a row written before stamps existed (2.0.40 and older) with as
+    /// little reading as possible. Returns the stamp to record for it, or
+    /// `None` when the file must be hashed and parsed again.
+    ///
+    /// The caller has already matched size and enabled state. The row is kept
+    /// when its metadata has full-length hashes and nothing about the file
+    /// changed since it was hashed:
+    /// - from `stat` alone, without reading the file, when the file is regular
+    ///   and both its modification time and its change (Unix) or creation
+    ///   (Windows) time are no later than the row's last write, unless `read`
+    ///   (the pass verifies this folder's bytes, as exports do);
+    /// - otherwise (a data folder that was copied, migrated or restored gives
+    ///   every file newer times) by one read of its bytes, equal to the row's
+    ///   SHA-512, instead of a full hash and parse.
+    ///
+    /// Forge-labelled rows then re-read the jar's mod list (zip directory and
+    /// manifest entries only), because older parsers labelled NeoForge jars as
+    /// Forge; such rows are healed to NeoForge here.
+    ///
+    /// Accepted residual risk: a same-size replacement made before the upgrade
+    /// that also left both times older than the row keeps its old hashes until
+    /// the file next changes. Exports re-read every mod they link, so such a
+    /// file is never shipped as the old platform file.
+    async fn settle_legacy_row(
+        self,
+        metadata_id: &str,
+        last_written: chrono::DateTime<chrono::FixedOffset>,
+        stamp: &str,
+        times: Option<(std::time::SystemTime, std::time::SystemTime)>,
+        path: &Path,
+        read: bool,
+    ) -> anyhow::Result<Option<String>> {
+        let Some(metadata) = metarepo::get_metadata_by_id(&self.app.db, metadata_id).await? else {
+            return Ok(None);
+        };
+        if metadata.sha512.len() != 64 || metadata.sha1.len() != 20 {
+            return Ok(None);
+        }
+        let last_written = std::time::SystemTime::from(last_written);
+        let untouched = !read
+            && times.is_some_and(|(modified, changed)| {
+                modified <= last_written && changed <= last_written
+            });
+        let stamp = if untouched {
+            stamp.to_owned()
+        } else {
+            #[cfg(test)]
+            {
+                self.scan_test_boundary(path, "hash")?;
+                self.scan_test_pause(path, "hash").await;
+            }
+            let (hash, stable) = read_stable_file_hash(path)
+                .await
+                .with_context(|| format!("Could not read addon {}", path.display()))?;
+            match stable {
+                Some(observed) if hash == metadata.sha512 => observed,
+                _ => return Ok(None),
+            }
+        };
+        if metadata
+            .modloaders
+            .split(',')
+            .any(|loader| loader.trim() == "forge")
+        {
+            #[cfg(test)]
+            self.scan_test_boundary(path, "loader-check")?;
+            let owned = path.to_owned();
+            let (observed, parsed) = tokio::task::spawn_blocking(move || {
+                let mut file = std::fs::File::open(&owned)?;
+                let observed = observed_file_stamp(&file.metadata()?);
+                Ok::<_, std::io::Error>((observed, super::mods::parse_metadata(&mut file)))
+            })
+            .await??;
+            if observed != stamp {
+                return Ok(None);
+            }
+            if let Ok(Some(parsed)) = parsed {
+                if parsed
+                    .modloaders
+                    .contains(&crate::domain::instance::info::ModLoaderType::Neoforge)
+                {
+                    let loaders = parsed.modloaders.iter().map(ToString::to_string).join(",");
+                    if loaders != metadata.modloaders {
+                        metarepo::update_local_modloaders(
+                            &self.app.db,
+                            &metadata.id,
+                            &loaders,
+                            DbDateTime(Utc::now().fixed_offset()),
+                        )
+                        .await?;
+                    }
+                }
+            }
+        }
+        Ok(Some(stamp))
     }
 
     async fn cache_mod_file_unchecked(
@@ -1414,6 +1912,14 @@ impl ManagerRef<'_, MetaCacheManager> {
                 .await?
         };
         let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
+        let stamp = if let Some(observed) = result.file_stamp.as_deref() {
+            let metadata = metarepo::get_metadata_by_id(&self.app.db, &meta_id)
+                .await?
+                .context("Parsed addon metadata disappeared before ownership publication")?;
+            Some(qualified_file_stamp(&metadata, observed))
+        } else {
+            None
+        };
 
         let instance_id_val = *instance_id;
         let filename_owned = mod_filename.to_string();
@@ -1428,6 +1934,17 @@ impl ManagerRef<'_, MetaCacheManager> {
             enabled,
             addon_type_owned,
             meta_id_owned,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await?;
+
+        mfcdb::update_mod_file_stamp(
+            &self.app.db,
+            *instance_id,
+            &addon_type,
+            &mod_filename,
+            &meta_id,
+            stamp.as_deref(),
             DbDateTime(Utc::now().fixed_offset()),
         )
         .await?;
@@ -1486,48 +2003,130 @@ impl ManagerRef<'_, MetaCacheManager> {
         Ok(meta_id)
     }
 
+    /// Scan a server's `mods/` and selected world's `datapacks/` and bring
+    /// `ServerModFileCache` in line with them.
+    ///
+    /// The server operation gate (Start, Stop, toggles, the addon list) is held
+    /// only to snapshot the folders and to commit results, never while files
+    /// are hashed. Unchanged files are trusted on their stamp. One unreadable
+    /// file, an enabled/disabled duplicate or an unusable `level-name` never
+    /// fails the scan: those locations keep their rows and everything else is
+    /// still refreshed and pruned.
     pub async fn cache_server_local(
         self,
         server_id: i32,
         server_shortpath: &str,
     ) -> anyhow::Result<()> {
-        let _activity = self.app.runtime_lifecycle.admit("server addon scan")?;
+        let activity = self.app.runtime_lifecycle.admit("server addon scan")?;
+        let cancel = activity.cancellation();
+        let result = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => Err(anyhow!(
+                "Addon scan of server {server_id} stopped because the launcher is closing"
+            )),
+            result = self.scan_server(server_id, server_shortpath) => result,
+        };
+        drop(activity);
+        result
+    }
+
+    async fn scan_server(self, server_id: i32, server_shortpath: &str) -> anyhow::Result<()> {
+        use crate::managers::server::world;
+        use futures::StreamExt;
         let lock = self
             .app
             .server_manager()
             .get_op_lock(crate::domain::server::ServerId(server_id));
-        let _guard = lock.lock().await;
+
+        // Phase 1: snapshot rows and folder listings under the gate.
+        let guard = lock.lock().await;
         let current = carbon_repos::repos::server::get_server(&self.app.db, server_id)
             .await?
             .ok_or_else(|| anyhow::anyhow!("Server disappeared"))?;
         if current.shortpath != server_shortpath {
             anyhow::bail!("Server root changed during scan");
         }
-        let server_path = self
+        let data = self
             .app
             .settings_manager()
             .runtime_path
             .get_servers()
-            .get_server_path(server_shortpath);
-        let data = server_path.get_data_path();
-        let world = crate::managers::server::world::selected(&data)?;
-        let datapack_relative = format!("{world}/datapacks");
-        let cached = mfcdb::get_server_mod_files_by_server(&self.app.db, server_id).await?;
+            .get_server_path(server_shortpath)
+            .get_data_path();
+        let world = match world::selected(&data) {
+            Ok(world) => Some(world),
+            Err(error) => {
+                warn!(
+                    ?error,
+                    "Server {server_id}: cannot use its level-name; scanning mods only and keeping datapack entries"
+                );
+                None
+            }
+        };
+        let rows = mfcdb::get_server_mod_files_by_server(&self.app.db, server_id).await?;
+        let mut folders = vec![("mods".to_owned(), "mods", "jar")];
+        if let Some(world) = &world {
+            folders.push((format!("{world}/datapacks"), "datapacks", "zip"));
+        }
+        // Locations that exist on disk in some form; their rows are never pruned.
         let mut seen = HashSet::new();
-        for (relative, kind, extension) in [
-            ("mods", "mods", "jar"),
-            (datapack_relative.as_str(), "datapacks", "zip"),
-        ] {
-            let folder = crate::managers::server::world::checked_join(&data, relative)?;
-            let mut entries = match tokio::fs::read_dir(&folder).await {
-                Ok(entries) => entries,
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
-                Err(error) => return Err(error.into()),
-            };
-            while let Some(entry) = entries.next_entry().await? {
-                if !entry.file_type().await?.is_file() {
+        // Folders listed completely, with the extension they hold; only these
+        // may have stale rows pruned.
+        let mut read_folders = HashMap::new();
+        let mut by_location = HashMap::<String, Vec<ServerListedAddon>>::new();
+        for (relative, kind, extension) in folders {
+            // A linked folder (a `mods/` shared between servers, a world on
+            // another drive) is listed through, as installs write through it.
+            let folder = match world::folder(&data, &relative) {
+                Ok(folder) => folder,
+                Err(error) => {
+                    warn!(
+                        ?error,
+                        "Server {server_id}: skipping addon folder {relative}"
+                    );
                     continue;
                 }
+            };
+            let mut entries = match tokio::fs::read_dir(&folder).await {
+                Ok(entries) => entries,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    // Behind a link to a drive that is not plugged in, the
+                    // folder is not known to be empty: its entries are kept.
+                    match world::unavailable_link(&folder) {
+                        Some(link) => warn!(
+                            "Server {server_id}: keeping the entries of {relative}, as {} is a link to a folder that cannot be found",
+                            link.display()
+                        ),
+                        None => {
+                            read_folders.insert(relative, extension);
+                        }
+                    }
+                    continue;
+                }
+                Err(error) => {
+                    warn!(
+                        ?error,
+                        "Server {server_id}: cannot list {}",
+                        folder.display()
+                    );
+                    continue;
+                }
+            };
+            let mut complete = true;
+            loop {
+                let entry = match entries.next_entry().await {
+                    Ok(Some(entry)) => entry,
+                    Ok(None) => break,
+                    Err(error) => {
+                        warn!(
+                            ?error,
+                            "Server {server_id}: stopped listing {}",
+                            folder.display()
+                        );
+                        complete = false;
+                        break;
+                    }
+                };
                 let filename = entry.file_name().to_string_lossy().to_string();
                 if !addon_has_extension(&filename, extension) {
                     continue;
@@ -1538,27 +2137,461 @@ impl ManagerRef<'_, MetaCacheManager> {
                     .unwrap_or(&filename)
                     .to_owned();
                 let location = format!("{relative}/{base}");
-                if !seen.insert(location.clone()) {
-                    anyhow::bail!("Ambiguous enabled and disabled server addon: {location}");
+                let metadata = match entry.metadata().await {
+                    Ok(metadata) => metadata,
+                    Err(error) => {
+                        warn!(
+                            ?error,
+                            "Server {server_id}: cannot read {}",
+                            entry.path().display()
+                        );
+                        seen.insert(location);
+                        continue;
+                    }
+                };
+                if !metadata.file_type().is_file() {
+                    continue;
                 }
-                if crate::managers::server::world::selected(&data)? != world {
-                    anyhow::bail!("Active world changed during scan");
-                }
-                self.refresh_server_addon(server_id, &folder, base, location, enabled, kind.into())
-                    .await?;
+                seen.insert(location.clone());
+                by_location
+                    .entry(location.clone())
+                    .or_default()
+                    .push(ServerListedAddon {
+                        kind,
+                        folder: folder.clone(),
+                        filename: base,
+                        location,
+                        enabled,
+                        size: metadata.len(),
+                        stamp: observed_file_stamp(&metadata),
+                        times: change_times(&metadata),
+                    });
+            }
+            if complete {
+                read_folders.insert(relative, extension);
             }
         }
-        if crate::managers::server::world::selected(&data)? != world {
-            anyhow::bail!("Active world changed during scan");
+        // Rows whose files are gone go now, before anything is read, so the
+        // addon list never shows a removed jar next to its replacement while
+        // the rest is read, nor keeps it when the scan is stopped.
+        let pruned = self
+            .prune_server_rows(server_id, &data, &rows, &seen, &read_folders)
+            .await;
+        drop(guard);
+        if pruned != 0 {
+            self.app
+                .invalidate(GET_SERVER_ADDONS, Some(server_id.into()));
         }
-        for entry in cached {
-            let active = entry.location.starts_with("mods/")
-                || entry.location.starts_with(&format!("{datapack_relative}/"));
-            if active && !seen.contains(&entry.location) {
-                mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &entry.id).await?;
+
+        let mut listed = Vec::new();
+        for (location, mut entries) in by_location {
+            if entries.len() > 1 {
+                warn!(
+                    "Server {server_id}: both {location} and {location}.disabled exist; keeping its entry unchanged until one of them is removed"
+                );
+                continue;
+            }
+            listed.extend(entries.pop());
+        }
+        listed.sort_by(|a, b| a.location.cmp(&b.location));
+
+        // Phase 2: hash new or changed files with the gate released, on a
+        // worker that keeps going while a batch waits for the gate.
+        let parallelism = (available_parallelism().map_or(1, |n| n.get()) / 2).max(1);
+        let app = self.app.clone();
+        let rows = Arc::new(rows);
+        let mut results = ScanWorker::spawn(
+            futures::stream::iter(listed)
+                .map(move |addon| {
+                    let (app, rows) = (app.clone(), rows.clone());
+                    async move {
+                        app.meta_cache_manager()
+                            .server_scan_work(server_id, &rows, addon)
+                            .await
+                    }
+                })
+                .buffer_unordered(parallelism)
+                .filter_map(futures::future::ready),
+        );
+
+        // Phase 3, once per batch: re-take the gate only to commit what is
+        // still current.
+        loop {
+            let (batch, finished) = next_commit_batch(&mut results, || {}).await;
+            let Some(orphaned) = self
+                .commit_server_batch(server_id, server_shortpath, &data, world.as_deref(), batch)
+                .await?
+            else {
+                return Ok(());
+            };
+            if !orphaned.is_empty() {
+                let again = self.recreate_server_metadata(server_id, orphaned).await;
+                let Some(lost) = self
+                    .commit_server_batch(
+                        server_id,
+                        server_shortpath,
+                        &data,
+                        world.as_deref(),
+                        again,
+                    )
+                    .await?
+                else {
+                    return Ok(());
+                };
+                if !lost.is_empty() {
+                    warn!(
+                        "Server {server_id}: {} scan result(s) lost their metadata twice; the next scan reads them again",
+                        lost.len()
+                    );
+                }
+            }
+            if finished {
+                return results.settled().await;
             }
         }
-        Ok(())
+    }
+
+    /// Create again, with the server gate released, the metadata of results
+    /// whose new metadata was garbage-collected before they were committed.
+    async fn recreate_server_metadata(
+        self,
+        server_id: i32,
+        orphaned: Vec<ServerScanOutcome>,
+    ) -> Vec<ServerScanOutcome> {
+        let mut again = Vec::new();
+        for outcome in orphaned {
+            let ServerScanOutcome::Parsed {
+                row, addon, result, ..
+            } = outcome
+            else {
+                continue;
+            };
+            match self.ensure_mod_metadata(&result, &addon.filename).await {
+                Ok(metadata_id) => again.push(ServerScanOutcome::Parsed {
+                    row,
+                    addon,
+                    result,
+                    metadata_id,
+                }),
+                Err(error) => warn!(?error, "Server {server_id}: could not store a scan result"),
+            }
+        }
+        again
+    }
+
+    /// Remove the rows of server addons that are gone. The caller holds the
+    /// server gate and has just listed the folders: `seen` holds every
+    /// location that exists in some form, `read_folders` every folder listed
+    /// completely, with the extension it holds. Returns how many were removed.
+    async fn prune_server_rows(
+        self,
+        server_id: i32,
+        data: &Path,
+        rows: &[mfcdb::ServerModFileCacheRow],
+        seen: &HashSet<String>,
+        read_folders: &HashMap<String, &'static str>,
+    ) -> usize {
+        use crate::managers::server::world;
+        let mut listings = FolderListings::default();
+        let mut removed = 0;
+        for row in rows {
+            if seen.contains(&row.location) {
+                continue;
+            }
+            let Some((relative, extension, name)) =
+                read_folders.iter().find_map(|(relative, extension)| {
+                    row.location
+                        .strip_prefix(&format!("{relative}/"))
+                        .filter(|name| !name.contains('/'))
+                        .map(|name| (relative, *extension, name))
+                })
+            else {
+                continue;
+            };
+            let Ok(folder) = world::folder(data, relative) else {
+                continue;
+            };
+            // A name the scan never lists is stale even if such a file exists.
+            if addon_has_extension(name, extension)
+                && !listings.confirmed_absent(&folder, name).await
+            {
+                continue;
+            }
+            let expected = row.clone();
+            let deleted = self
+                .app
+                .db
+                .write(move |mut conn| {
+                    let tx = conn.transaction()?;
+                    let current = mfcdb::get_server_mod_file_cache_by_id_conn(&tx, &expected.id)?;
+                    if current.as_ref() != Some(&expected) {
+                        return Ok(false);
+                    }
+                    mfcdb::delete_server_mod_file_cache_by_id_conn(&tx, &expected.id)?;
+                    tx.commit()?;
+                    Ok(true)
+                })
+                .await;
+            match deleted {
+                Ok(true) => removed += 1,
+                Ok(false) => {}
+                Err(error) => warn!(?error, "Server {server_id}: could not remove a stale entry"),
+            }
+        }
+        removed
+    }
+
+    /// Decide what one listed server addon needs and do it, without the gate.
+    /// `None`: nothing to store (unchanged, or unreadable and logged).
+    async fn server_scan_work(
+        self,
+        server_id: i32,
+        rows: &[mfcdb::ServerModFileCacheRow],
+        addon: ServerListedAddon,
+    ) -> Option<ServerScanOutcome> {
+        let row = rows
+            .iter()
+            .find(|row| row.addon_type == addon.kind && row.location == addon.location)
+            .cloned();
+        let path = addon.folder.join(addon.disk_name());
+        if let Some(row) = &row {
+            if row.enabled == addon.enabled && row.filesize as u64 == addon.size {
+                let observed = row.file_stamp.as_deref().and_then(qualified_observation);
+                if observed == Some(addon.stamp.as_str()) {
+                    return None;
+                }
+                if observed.is_some() {
+                    match self
+                        .verify_cached_bytes(row.file_stamp.as_deref(), &row.metadata_id, &path)
+                        .await
+                    {
+                        Ok(ByteCheck::Same(observed)) => {
+                            return Some(ServerScanOutcome::Stamp {
+                                row: row.clone(),
+                                addon,
+                                observed,
+                            });
+                        }
+                        Ok(ByteCheck::Different) => {}
+                        Err(error) => {
+                            warn!(
+                                ?error,
+                                "Server {server_id}: cannot check {}",
+                                path.display()
+                            );
+                            return None;
+                        }
+                    }
+                }
+                if row.file_stamp.is_none() {
+                    match self
+                        .settle_legacy_row(
+                            &row.metadata_id,
+                            row.last_updated_at,
+                            &addon.stamp,
+                            addon.times,
+                            &path,
+                            false,
+                        )
+                        .await
+                    {
+                        Ok(Some(observed)) => {
+                            return Some(ServerScanOutcome::Stamp {
+                                row: row.clone(),
+                                addon,
+                                observed,
+                            });
+                        }
+                        Ok(None) => {}
+                        Err(error) => {
+                            warn!(
+                                ?error,
+                                "Server {server_id}: cannot check {}",
+                                path.display()
+                            );
+                            return None;
+                        }
+                    }
+                }
+            }
+        }
+        let parsed = async {
+            let result = self
+                .hash_and_parse_mod_file(&addon.folder, &addon.filename, addon.enabled)
+                .await?;
+            let metadata_id = self.ensure_mod_metadata(&result, &addon.filename).await?;
+            Ok::<_, anyhow::Error>((result, metadata_id))
+        }
+        .await;
+        match parsed {
+            Ok((result, metadata_id)) => Some(ServerScanOutcome::Parsed {
+                row,
+                addon,
+                result,
+                metadata_id,
+            }),
+            Err(error) => {
+                warn!(
+                    ?error,
+                    "Server {server_id}: could not scan {}",
+                    path.display()
+                );
+                None
+            }
+        }
+    }
+
+    /// Commit one batch of a server scan under the server gate. `None`: the
+    /// server moved or was removed since the snapshot, so the scan stops.
+    /// Otherwise the results whose new metadata was garbage-collected before
+    /// this commit; the gate is never held while metadata is created.
+    async fn commit_server_batch(
+        self,
+        server_id: i32,
+        server_shortpath: &str,
+        data: &Path,
+        world: Option<&str>,
+        outcomes: Vec<ServerScanOutcome>,
+    ) -> anyhow::Result<Option<Vec<ServerScanOutcome>>> {
+        use crate::managers::server::world;
+        #[cfg(test)]
+        self.scan_test_pause(Path::new(&format!("server-{server_id}")), "commit")
+            .await;
+        let mut orphaned = Vec::new();
+        if outcomes.is_empty() {
+            return Ok(Some(orphaned));
+        }
+        let lock = self
+            .app
+            .server_manager()
+            .get_op_lock(crate::domain::server::ServerId(server_id));
+        let _guard = lock.lock().await;
+        match carbon_repos::repos::server::get_server(&self.app.db, server_id).await? {
+            Some(current) if current.shortpath == server_shortpath => {}
+            _ => {
+                info!("Server {server_id} moved or was removed during its addon scan");
+                return Ok(None);
+            }
+        }
+        let world_now = world::selected(data).ok();
+        let datapacks_current = world.is_some() && world_now.as_deref() == world;
+        let mut changed = 0;
+        for outcome in outcomes {
+            let kind = match &outcome {
+                ServerScanOutcome::Stamp { addon, .. }
+                | ServerScanOutcome::Parsed { addon, .. } => addon.kind,
+            };
+            if kind == "datapacks" && !datapacks_current {
+                continue;
+            }
+            let committed = match &outcome {
+                ServerScanOutcome::Stamp {
+                    row,
+                    addon,
+                    observed,
+                } => self.commit_server_stamp(row, addon, observed).await,
+                ServerScanOutcome::Parsed {
+                    row,
+                    addon,
+                    result,
+                    metadata_id,
+                } => {
+                    self.commit_server_parsed(server_id, row, addon, result, metadata_id)
+                        .await
+                }
+            };
+            match committed {
+                Ok(CommitOutcome::Written) => changed += 1,
+                Ok(CommitOutcome::Unchanged | CommitOutcome::Discarded) => {}
+                Ok(CommitOutcome::Orphaned) => orphaned.push(outcome),
+                Err(error) => warn!(?error, "Server {server_id}: could not store a scan result"),
+            }
+        }
+        if changed != 0 {
+            self.app
+                .invalidate(GET_SERVER_ADDONS, Some(server_id.into()));
+        }
+        Ok(Some(orphaned))
+    }
+
+    async fn commit_server_stamp(
+        self,
+        row: &mfcdb::ServerModFileCacheRow,
+        addon: &ServerListedAddon,
+        observed: &str,
+    ) -> anyhow::Result<CommitOutcome> {
+        let path = addon.folder.join(addon.disk_name());
+        if current_file_stamp(&path).await.as_deref() != Some(observed) {
+            return Ok(CommitOutcome::Discarded);
+        }
+        let expected = row.clone();
+        let observed = observed.to_owned();
+        Ok(self
+            .app
+            .db
+            .write(move |mut conn| {
+                let tx = conn.transaction()?;
+                let current = mfcdb::get_server_mod_file_cache_by_id_conn(&tx, &expected.id)?;
+                if current.as_ref() != Some(&expected) {
+                    return Ok(CommitOutcome::Discarded);
+                }
+                let Some(metadata) = metarepo::get_metadata_by_id_conn(&tx, &expected.metadata_id)?
+                else {
+                    return Ok(CommitOutcome::Discarded);
+                };
+                let stamp = qualified_file_stamp(&metadata, &observed);
+                if expected.file_stamp.as_deref() == Some(stamp.as_str()) {
+                    return Ok(CommitOutcome::Unchanged);
+                }
+                mfcdb::update_server_mod_file_stamp_conn(
+                    &tx,
+                    expected.server_id,
+                    &expected.addon_type,
+                    &expected.location,
+                    &expected.metadata_id,
+                    Some(&stamp),
+                    DbDateTime(Utc::now().fixed_offset()),
+                )?;
+                tx.commit()?;
+                Ok(CommitOutcome::Written)
+            })
+            .await?)
+    }
+
+    /// Publish a freshly parsed server addon. Never creates metadata: the
+    /// caller holds the server gate, and an install holding that gate may be
+    /// waiting for the icon permit or hash lock that creating it takes.
+    async fn commit_server_parsed(
+        self,
+        server_id: i32,
+        row: &Option<mfcdb::ServerModFileCacheRow>,
+        addon: &ServerListedAddon,
+        result: &ModFileParseResult,
+        metadata_id: &str,
+    ) -> anyhow::Result<CommitOutcome> {
+        let path = addon.folder.join(addon.disk_name());
+        let current = current_file_stamp(&path).await;
+        if current.is_none() || current != result.file_stamp {
+            return Ok(CommitOutcome::Discarded);
+        }
+        match publish_server_row(
+            &self.app.db,
+            server_id,
+            &addon.filename,
+            &addon.location,
+            addon.enabled,
+            addon.kind,
+            metadata_id,
+            result,
+            Some(row.clone()),
+        )
+        .await
+        {
+            Ok(true) => Ok(CommitOutcome::Written),
+            Ok(false) => Ok(CommitOutcome::Discarded),
+            Err(error) if error.is_foreign_key_violation() => Ok(CommitOutcome::Orphaned),
+            Err(error) => Err(error.into()),
+        }
     }
 
     /// Check if a specific entity is currently being cached
@@ -1566,6 +2599,157 @@ impl ManagerRef<'_, MetaCacheManager> {
         let currently_caching = self.get_currently_caching_entities().await;
         currently_caching.contains(&entity_id)
     }
+}
+
+/// Whole-file reads per path, for tests that count how often a file is read.
+#[cfg(test)]
+static WHOLE_FILE_READS: std::sync::Mutex<Vec<PathBuf>> = std::sync::Mutex::new(Vec::new());
+
+#[cfg(test)]
+fn note_whole_file_read(path: &Path) {
+    WHOLE_FILE_READS.lock().unwrap().push(path.to_owned());
+}
+
+/// How many times the whole of `path` has been read so far.
+#[cfg(test)]
+pub(crate) fn whole_file_reads(path: &Path) -> usize {
+    WHOLE_FILE_READS
+        .lock()
+        .unwrap()
+        .iter()
+        .filter(|read| *read == path)
+        .count()
+}
+
+/// Hash `path` once. The stamp is returned only when nothing about the file
+/// changed during the read: the opened handle's stamp before it equals the
+/// path's stamp after it, as in [`MetaCacheManager::hash_and_parse_mod_file`].
+pub(crate) async fn read_stable_file_hash(
+    path: &Path,
+) -> std::io::Result<(Vec<u8>, Option<String>)> {
+    let mut file = tokio::fs::File::open(path).await?;
+    let before = observed_file_stamp(&file.metadata().await?);
+    let mut digest = Sha512::new();
+    #[cfg(test)]
+    note_whole_file_read(path);
+    carbon_scheduler::buffered_digest(&mut file, |bytes| digest.update(bytes)).await?;
+    drop(file);
+    let after = current_file_stamp(path).await;
+    let stable = (after.as_deref() == Some(before.as_str())).then_some(before);
+    Ok((digest.finalize().to_vec(), stable))
+}
+
+fn qualified_file_stamp(metadata: &metarepo::ModMetadataRow, observed: &str) -> String {
+    // Bind parser qualification to local metadata, including the loader field
+    // repaired by the NeoForge correction. Legacy raw/NULL stamps do not qualify.
+    let fields = serde_json::to_vec(&(
+        &metadata.id,
+        &metadata.modloaders,
+        &metadata.modid,
+        &metadata.name,
+        &metadata.version,
+        &metadata.description,
+        &metadata.authors,
+        metadata.murmur2,
+        &metadata.sha512,
+        &metadata.sha1,
+    ))
+    .expect("local metadata fields serialize");
+    format!(
+        "parsed-v1:{}|{observed}",
+        hex::encode(Sha512::digest(fields))
+    )
+}
+
+fn qualified_observation(stamp: &str) -> Option<&str> {
+    stamp
+        .strip_prefix("parsed-v1:")?
+        .split_once('|')
+        .map(|v| v.1)
+}
+
+fn observed_file_stamp(metadata: &std::fs::Metadata) -> String {
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|v| v.duration_since(std::time::UNIX_EPOCH).ok());
+    // No device number: it changes when an external or network drive is
+    // mounted again under another number, and the path already names the
+    // filesystem. No inode number either: Linux numbers FAT and exFAT files
+    // (and some FUSE and network mounts) again whenever it loads them, so
+    // every addon would be read again after each reboot or remount. A
+    // replaced file still changes its change time, which no program can set.
+    // Moving, copying or restoring the data folder, or a recursive chmod, also
+    // moves every change time: the next scan then reads each addon once.
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        format!(
+            "{:?}:{}:{}:{}",
+            modified,
+            metadata.len(),
+            metadata.ctime(),
+            metadata.ctime_nsec()
+        )
+    }
+    #[cfg(not(unix))]
+    {
+        format!(
+            "{:?}:{:?}:{}",
+            modified,
+            metadata.created().ok(),
+            metadata.len()
+        )
+    }
+}
+
+/// Make an instance row's stored stamp describe `path` as it is now, as if
+/// the file had been replaced without changing anything a stamp observes
+/// (possible on Windows, which has no change time).
+#[cfg(test)]
+pub(crate) async fn restamp_for_test(
+    app: &App,
+    instance_id: InstanceId,
+    kind: &str,
+    filename: &str,
+    path: &Path,
+) {
+    let row =
+        mfcdb::get_mod_file_cache_by_instance_kind_filename(&app.db, *instance_id, kind, filename)
+            .await
+            .unwrap()
+            .unwrap();
+    let metadata = metarepo::get_metadata_by_id(&app.db, &row.metadata_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let stamp = qualified_file_stamp(
+        &metadata,
+        &observed_file_stamp(&std::fs::metadata(path).unwrap()),
+    );
+    mfcdb::update_mod_file_stamp(
+        &app.db,
+        *instance_id,
+        kind,
+        filename,
+        &row.metadata_id,
+        Some(&stamp),
+        DbDateTime(Utc::now().fixed_offset()),
+    )
+    .await
+    .unwrap();
+}
+
+/// Whether an instance scan lists an entry of this name in `kind`'s folder.
+/// Worlds are directories of any name.
+fn listable_addon_name(kind: crate::domain::instance::AddonType, name: &str) -> bool {
+    use crate::domain::instance::AddonType;
+    let extensions: &[&str] = match kind {
+        AddonType::Worlds => return true,
+        AddonType::Mods => &["jar", "zip"],
+        AddonType::ResourcePacks | AddonType::Shaders | AddonType::DataPacks => &["zip"],
+    };
+    extensions.iter().any(|ext| addon_has_extension(name, ext))
 }
 
 /// Whether `filename`'s extension matches `ext`, ignoring case (a
@@ -1578,6 +2762,19 @@ fn addon_has_extension(filename: &str, ext: &str) -> bool {
     Path::new(stripped)
         .extension()
         .is_some_and(|e| e.eq_ignore_ascii_case(ext))
+}
+
+async fn thumbnail_retry_allowed<K: Eq + std::hash::Hash>(
+    failures: &RwLock<HashMap<K, (std::time::Instant, u32)>>,
+    project: &K,
+) -> bool {
+    // Retain the attempt count across eligible retries. The read guard is
+    // dropped before any download, semaphore, or writer acquisition.
+    failures
+        .read()
+        .await
+        .get(project)
+        .is_none_or(|(deadline, _)| *deadline <= std::time::Instant::now())
 }
 
 fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
@@ -1621,303 +2818,1225 @@ fn scale_mod_image(image: &[u8]) -> anyhow::Result<Vec<u8>> {
     Ok(output)
 }
 
-fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNotifier) {
-    tokio::spawn(async move {
-        let app = &app;
-        let update_notifier = &update_notifier;
+/// One addon as listed under the instance gate.
+#[derive(Debug, Clone)]
+struct ListedAddon {
+    kind: crate::domain::instance::AddonType,
+    /// Name without the `.disabled` suffix.
+    filename: String,
+    enabled: bool,
+    size: u64,
+    /// Observed stamp of a regular file. Links take the full parse path, whose
+    /// stamps describe the link target; worlds have no content stamp.
+    stamp: Option<String>,
+    times: Option<(std::time::SystemTime, std::time::SystemTime)>,
+}
 
-        let cache_instance = |instance_id: InstanceId| async move {
-            let _activity = app.runtime_lifecycle.admit("local addon scan")?;
-            let instance_manager = app.instance_manager();
+impl ListedAddon {
+    fn disk_name(&self) -> String {
+        if self.enabled || self.kind == crate::domain::instance::AddonType::Worlds {
+            self.filename.clone()
+        } else {
+            format!("{}.disabled", self.filename)
+        }
+    }
+}
+
+/// Rows and folder listings of one instance, taken under its gate.
+struct InstanceSnapshot {
+    shortpath: String,
+    folders: Arc<HashMap<&'static str, PathBuf>>,
+    rows: Vec<mfcdb::ModFileCacheRow>,
+    listed: HashMap<(String, String), ListedAddon>,
+    /// Folders that could not be listed completely, with the reason. Their
+    /// rows are kept: a missing name there proves nothing.
+    unobserved: HashMap<String, String>,
+}
+
+enum InstanceScanWork {
+    /// Re-read the bytes of a file in the requested verify scope.
+    Verify(mfcdb::ModFileCacheRow, ListedAddon),
+    /// A row from before stamps existed; may be stamped from `stat` alone,
+    /// or with `true` (inside the verify scope) after one read of its bytes.
+    Legacy(mfcdb::ModFileCacheRow, ListedAddon, bool),
+    /// New, changed, linked or unqualified: hash and parse it.
+    Parse(Option<mfcdb::ModFileCacheRow>, ListedAddon),
+}
+
+enum InstanceScanOutcome {
+    /// The row still describes the file; record this stamp for it.
+    Stamp(mfcdb::ModFileCacheRow, ListedAddon, String),
+    Parsed {
+        row: Option<mfcdb::ModFileCacheRow>,
+        addon: ListedAddon,
+        result: ModFileParseResult,
+        metadata_id: String,
+    },
+    /// Could not be read; logged, and its row (if any) is kept.
+    Failed,
+}
+
+enum ByteCheck {
+    /// The bytes equal the row's metadata; carries the file's stamp.
+    Same(String),
+    Different,
+}
+
+/// Modification time and change (Unix) or creation (elsewhere) time.
+fn change_times(
+    metadata: &std::fs::Metadata,
+) -> Option<(std::time::SystemTime, std::time::SystemTime)> {
+    let modified = metadata.modified().ok()?;
+    #[cfg(unix)]
+    let changed = {
+        use std::os::unix::fs::MetadataExt;
+        std::time::UNIX_EPOCH.checked_add(std::time::Duration::new(
+            u64::try_from(metadata.ctime()).ok()?,
+            u32::try_from(metadata.ctime_nsec()).ok()?,
+        ))?
+    };
+    #[cfg(not(unix))]
+    let changed = metadata.created().ok()?;
+    Some((modified, changed))
+}
+
+/// Stamp of whatever `path` names now, following links like the parser does.
+pub(crate) async fn current_file_stamp(path: &Path) -> Option<String> {
+    tokio::fs::metadata(path)
+        .await
+        .ok()
+        .map(|metadata| observed_file_stamp(&metadata))
+}
+
+/// Whether `path` still has the stamp an addon row stored (`stored`, the row's
+/// `fileStamp`), i.e. holds the bytes the row's metadata names as far as a
+/// stamp can tell, without reading it. The file is opened, so a missing or
+/// unreadable file is an error here rather than a mismatch. A row without a
+/// stamp of this parser revision never matches.
+pub(crate) async fn opened_stamp_matches(
+    path: &Path,
+    stored: Option<&str>,
+) -> std::io::Result<bool> {
+    let file = tokio::fs::File::open(path).await?;
+    let observed = observed_file_stamp(&file.metadata().await?);
+    Ok(stored.and_then(qualified_observation) == Some(observed.as_str()))
+}
+
+/// Entry names of addon folders exactly as the folder lists them, read once
+/// per folder under the gate before stale rows are removed.
+///
+/// Membership is by exact name, never by probing a path: on case-insensitive
+/// filesystems (Windows, macOS) `JEI.jar` resolves to a file renamed to
+/// `jei.jar`, which would keep the old row next to the new one forever.
+#[derive(Default)]
+struct FolderListings(HashMap<PathBuf, Option<HashSet<String>>>);
+
+impl FolderListings {
+    /// Whether neither spelling of an addon is listed in `folder`, links
+    /// included. A folder that cannot be listed completely keeps its rows; a
+    /// missing folder lists nothing, unless it is behind a link to a folder
+    /// that cannot be found (a drive that is not plugged in), which keeps
+    /// them.
+    async fn confirmed_absent(&mut self, folder: &Path, name: &str) -> bool {
+        if !self.0.contains_key(folder) {
+            let listing = Self::list(folder).await;
+            self.0.insert(folder.to_owned(), listing);
+        }
+        match &self.0[folder] {
+            Some(names) => !names.contains(name) && !names.contains(&format!("{name}.disabled")),
+            None => false,
+        }
+    }
+
+    async fn list(folder: &Path) -> Option<HashSet<String>> {
+        let mut entries = match tokio::fs::read_dir(folder).await {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return crate::managers::server::world::unavailable_link(folder)
+                    .is_none()
+                    .then(HashSet::new);
+            }
+            Err(_) => return None,
+        };
+        let mut names = HashSet::new();
+        loop {
+            match entries.next_entry().await {
+                Ok(Some(entry)) => {
+                    names.insert(entry.file_name().to_string_lossy().into_owned());
+                }
+                Ok(None) => return Some(names),
+                Err(_) => return None,
+            }
+        }
+    }
+}
+
+/// Scan results are committed in batches of at most this many, so a pass
+/// that is paused (Play), pre-empted (another instance's Addons tab, an
+/// install) or stopped (Quit) keeps what it already read, and the addon list
+/// fills in while a large folder is read, as when each file was stored on its
+/// own.
+const SCAN_COMMIT_BATCH: usize = 32;
+/// A result waits at most this long for its batch to fill.
+const SCAN_COMMIT_INTERVAL: std::time::Duration = std::time::Duration::from_secs(1);
+
+/// Collect scan outcomes until a commit is due: [`SCAN_COMMIT_BATCH`] of
+/// them, [`SCAN_COMMIT_INTERVAL`] after the first, or the end of the work.
+/// Returns the batch and whether the work is finished.
+async fn next_commit_batch<T>(
+    results: &mut (impl futures::Stream<Item = T> + Unpin),
+    mut progress: impl FnMut(),
+) -> (Vec<T>, bool) {
+    use futures::StreamExt;
+    let mut batch = Vec::new();
+    let Some(first) = results.next().await else {
+        return (batch, true);
+    };
+    progress();
+    batch.push(first);
+    let due = TokioInstant::now() + SCAN_COMMIT_INTERVAL;
+    while batch.len() < SCAN_COMMIT_BATCH {
+        match tokio::time::timeout_at(due, results.next()).await {
+            Ok(Some(outcome)) => {
+                progress();
+                batch.push(outcome);
+            }
+            Ok(None) => return (batch, true),
+            Err(_) => break,
+        }
+    }
+    (batch, false)
+}
+
+/// The hashing and parsing of one scan pass, run on its own task.
+///
+/// It keeps running while the pass waits for the instance or server gate to
+/// commit a batch. Work it has in flight may hold the launcher-wide icon
+/// permit or a per-hash metadata lock, and an install holding the gate waits
+/// for exactly those: if the work stopped whenever the committer waited, the
+/// two would wait for each other forever. Dropping the worker (the pass was
+/// paused for gameplay, pre-empted or stopped) stops the work.
+struct ScanWorker<T> {
+    results: tokio::sync::mpsc::UnboundedReceiver<T>,
+    task: tokio::task::JoinHandle<()>,
+}
+
+impl<T: Send + 'static> ScanWorker<T> {
+    fn spawn(work: impl futures::Stream<Item = T> + Send + 'static) -> Self {
+        use futures::StreamExt;
+        let (sender, results) = tokio::sync::mpsc::unbounded_channel();
+        let task = tokio::spawn(async move {
+            let mut work = std::pin::pin!(work);
+            while let Some(result) = work.next().await {
+                if sender.send(result).is_err() {
+                    break;
+                }
+            }
+        });
+        Self { results, task }
+    }
+
+    /// After the last result: whether the work ended normally.
+    async fn settled(&mut self) -> anyhow::Result<()> {
+        (&mut self.task)
+            .await
+            .map_err(|error| anyhow!("Addon scan stopped unexpectedly: {error}"))
+    }
+}
+
+impl<T> futures::Stream for ScanWorker<T> {
+    type Item = T;
+
+    fn poll_next(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<Option<T>> {
+        self.results.poll_recv(cx)
+    }
+}
+
+impl<T> Drop for ScanWorker<T> {
+    fn drop(&mut self) {
+        self.task.abort();
+    }
+}
+
+/// How one scan result fared at commit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommitOutcome {
+    Written,
+    /// The row already says exactly this.
+    Unchanged,
+    /// The file or row changed after the snapshot, so the result is dropped.
+    Discarded,
+    /// The metadata created for it was garbage-collected before the commit
+    /// (an addon, instance or server was deleted meanwhile). The pass creates
+    /// it again with the gate released and commits once more.
+    Orphaned,
+}
+
+/// One server addon as listed under the server gate.
+#[derive(Debug, Clone)]
+struct ServerListedAddon {
+    kind: &'static str,
+    folder: PathBuf,
+    /// Name without the `.disabled` suffix.
+    filename: String,
+    location: String,
+    enabled: bool,
+    size: u64,
+    stamp: String,
+    times: Option<(std::time::SystemTime, std::time::SystemTime)>,
+}
+
+impl ServerListedAddon {
+    fn disk_name(&self) -> String {
+        if self.enabled {
+            self.filename.clone()
+        } else {
+            format!("{}.disabled", self.filename)
+        }
+    }
+}
+
+enum ServerScanOutcome {
+    Stamp {
+        row: mfcdb::ServerModFileCacheRow,
+        addon: ServerListedAddon,
+        observed: String,
+    },
+    Parsed {
+        row: Option<mfcdb::ServerModFileCacheRow>,
+        addon: ServerListedAddon,
+        result: ModFileParseResult,
+        metadata_id: String,
+    },
+}
+
+/// Upsert an instance row and its qualified stamp in one transaction; used by
+/// installer publication and by scans alike, so both write identical stamps.
+/// With `expected`, the write happens only while the row is still exactly what
+/// the scan saw, so a concurrent toggle, delete or install always wins.
+#[allow(clippy::too_many_arguments)]
+async fn publish_instance_row(
+    db: &carbon_repos::db_exec::Db,
+    instance_id: InstanceId,
+    filename: &str,
+    kind: &str,
+    enabled: bool,
+    metadata_id: &str,
+    result: &ModFileParseResult,
+    expected: Option<Option<mfcdb::ModFileCacheRow>>,
+) -> carbon_repos::db_error::DbResult<bool> {
+    let (filename, kind, metadata_id) =
+        (filename.to_owned(), kind.to_owned(), metadata_id.to_owned());
+    let observed = result.file_stamp.clone();
+    let filesize = result.content_len as i32;
+    db.write(move |mut conn| {
+        let tx = conn.transaction()?;
+        if let Some(expected) = expected {
+            let current = mfcdb::get_mod_file_cache_by_instance_kind_filename_conn(
+                &tx,
+                *instance_id,
+                &kind,
+                &filename,
+            )?;
+            if current != expected {
+                return Ok(false);
+            }
+        }
+        mfcdb::upsert_mod_file_cache_conn(
+            &tx,
+            *instance_id,
+            &filename,
+            filesize,
+            enabled,
+            &kind,
+            &metadata_id,
+            DbDateTime(Utc::now().fixed_offset()),
+        )?;
+        let metadata = metarepo::get_metadata_by_id_conn(&tx, &metadata_id)?
+            .expect("validated owner in the same transaction");
+        let stamp = observed
+            .as_deref()
+            .map(|value| qualified_file_stamp(&metadata, value));
+        mfcdb::update_mod_file_stamp_conn(
+            &tx,
+            *instance_id,
+            &kind,
+            &filename,
+            &metadata_id,
+            stamp.as_deref(),
+            DbDateTime(Utc::now().fixed_offset()),
+        )?;
+        tx.commit()?;
+        Ok(true)
+    })
+    .await
+}
+
+/// Upsert a server row and its qualified stamp in one transaction. With
+/// `expected`, the write happens only while the row is still exactly what the
+/// scan saw, so a concurrent toggle, delete or install always wins.
+#[allow(clippy::too_many_arguments)]
+async fn publish_server_row(
+    db: &carbon_repos::db_exec::Db,
+    server_id: i32,
+    filename: &str,
+    location: &str,
+    enabled: bool,
+    kind: &str,
+    metadata_id: &str,
+    result: &ModFileParseResult,
+    expected: Option<Option<mfcdb::ServerModFileCacheRow>>,
+) -> carbon_repos::db_error::DbResult<bool> {
+    let (filename, location, kind, metadata_id) = (
+        filename.to_owned(),
+        location.to_owned(),
+        kind.to_owned(),
+        metadata_id.to_owned(),
+    );
+    let observed = result.file_stamp.clone();
+    let filesize = result.content_len as i32;
+    db.write(move |mut conn| {
+        let tx = conn.transaction()?;
+        if let Some(expected) = expected {
+            let current = mfcdb::get_server_mod_file_cache_by_location_conn(
+                &tx, server_id, &kind, &location,
+            )?;
+            if current != expected {
+                return Ok(false);
+            }
+        }
+        mfcdb::upsert_server_mod_file_cache_at_location_conn(
+            &tx,
+            server_id,
+            &filename,
+            &location,
+            filesize,
+            enabled,
+            &kind,
+            &metadata_id,
+            DbDateTime(Utc::now().fixed_offset()),
+        )?;
+        let metadata = metarepo::get_metadata_by_id_conn(&tx, &metadata_id)?
+            .expect("validated owner in the same transaction");
+        let stamp = observed
+            .as_deref()
+            .map(|value| qualified_file_stamp(&metadata, value));
+        mfcdb::update_server_mod_file_stamp_conn(
+            &tx,
+            server_id,
+            &kind,
+            &location,
+            &metadata_id,
+            stamp.as_deref(),
+            DbDateTime(Utc::now().fixed_offset()),
+        )?;
+        tx.commit()?;
+        Ok(true)
+    })
+    .await
+}
+
+/// Scan one instance's addon folders and bring `ModFileCache` in line.
+///
+/// The instance gate (Play, toggles, deletes, settings, installs) is held only
+/// to snapshot rows and folder listings and later to commit, never while files
+/// are hashed. Files outside `verify` are trusted on their parser-qualified
+/// stamp. An unreadable file or folder never fails the pass: the file stays
+/// uncached and rows in folders that could not be listed are kept.
+async fn cache_instance(
+    app: &App,
+    update_notifier: &UpdateNotifier,
+    instance_id: InstanceId,
+    verify: VerifyScope,
+) -> anyhow::Result<()> {
+    let activity = app.runtime_lifecycle.admit("local addon scan")?;
+    let cancel = activity.cancellation();
+    let result = tokio::select! {
+        biased;
+        _ = cancel.cancelled() => Err(anyhow!(
+            "Addon scan of instance {instance_id} stopped because the launcher is closing"
+        )),
+        result = scan_instance(app, update_notifier, instance_id, verify) => result,
+    };
+    drop(activity);
+    result
+}
+
+async fn snapshot_instance(
+    app: &App,
+    instance_id: InstanceId,
+    scanning_subtask: &crate::managers::vtask::Subtask,
+) -> anyhow::Result<InstanceSnapshot> {
+    use crate::domain::instance::AddonType;
+    let mcm = app.meta_cache_manager();
+    let shortpath = {
+        let instance_manager = app.instance_manager();
+        let instances = instance_manager.instances.read().await;
+        let Some(instance) = instances.get(&instance_id) else {
+            anyhow::bail!("Cannot verify addons: instance {instance_id} no longer exists");
+        };
+        instance.shortpath.clone()
+    };
+    let instance_path = InstancesPath::subpath().get_instance_path(&shortpath);
+    let root_path = app.settings_manager().runtime_path.get_root().to_path();
+    let mut folders = HashMap::new();
+    let mut listed = HashMap::<(String, String), ListedAddon>::new();
+    let mut unobserved = HashMap::<String, String>::new();
+    let addon_types = AddonType::all();
+    scanning_subtask.update_items(0, addon_types.len() as u32);
+    for (index, addon_type) in addon_types.iter().copied().enumerate() {
+        let kind = addon_type.to_db_string();
+        let pathbuf = root_path.join(addon_type.get_folder_path(&instance_path));
+        folders.insert(kind, pathbuf.clone());
+        scanning_subtask.update_items(index as u32, addon_types.len() as u32);
+
+        match mcm.scan_folder_metadata(&pathbuf).await {
+            Ok(metadata) if metadata.is_dir() => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            result => {
+                let detail = match result {
+                    Ok(_) => "expected an addon directory".to_owned(),
+                    Err(error) => error.to_string(),
+                };
+                unobserved.insert(kind.to_owned(), format!("{}: {detail}", pathbuf.display()));
+                continue;
+            }
+        }
+        let mut entries = match mcm.scan_read_dir(&pathbuf).await {
+            Ok(entries) => entries,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+            Err(error) => {
+                unobserved.insert(kind.to_owned(), format!("{}: {error}", pathbuf.display()));
+                continue;
+            }
+        };
+        loop {
+            let entry = match mcm.scan_next_entry(&mut entries, &pathbuf).await {
+                Ok(Some(entry)) => entry,
+                Ok(None) => break,
+                Err(error) => {
+                    unobserved.insert(kind.to_owned(), format!("{}: {error}", pathbuf.display()));
+                    break;
+                }
+            };
+            let file_name = entry.file_name();
+            let Some(utf8_name) = file_name.to_str() else {
+                continue;
+            };
+            if !listable_addon_name(addon_type, utf8_name) {
+                continue;
+            }
+            let metadata = match mcm.scan_entry_metadata(&entry).await {
+                Ok(metadata) => metadata,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
+                Err(error) => {
+                    unobserved.insert(
+                        kind.to_owned(),
+                        format!("{}: {error}", entry.path().display()),
+                    );
+                    continue;
+                }
+            };
+            if addon_type == AddonType::Worlds {
+                if !metadata.is_dir() {
+                    continue;
+                }
+                match crate::managers::instance::installer::publication::world_install_incomplete(
+                    &entry.path(),
+                )
+                .await
+                {
+                    Ok(false) => {}
+                    Ok(true) => continue,
+                    Err(error) => {
+                        unobserved.insert(
+                            kind.to_owned(),
+                            format!("{}: {error:#}", entry.path().display()),
+                        );
+                        continue;
+                    }
+                }
+                listed.insert(
+                    (kind.to_owned(), utf8_name.to_owned()),
+                    ListedAddon {
+                        kind: addon_type,
+                        filename: utf8_name.to_owned(),
+                        enabled: true,
+                        size: metadata.len(),
+                        stamp: None,
+                        times: None,
+                    },
+                );
+            } else {
+                // file || symlink
+                if metadata.is_dir() {
+                    continue;
+                }
+                let enabled = !utf8_name.ends_with(".disabled");
+                let base = utf8_name.strip_suffix(".disabled").unwrap_or(utf8_name);
+                // DirEntry metadata describes a link, while the parser and the
+                // final checks describe its target. Links always take the full
+                // parse path, whose stamps are consistent with each other.
+                let regular = !metadata.file_type().is_symlink();
+                listed.insert(
+                    (kind.to_owned(), base.to_owned()),
+                    ListedAddon {
+                        kind: addon_type,
+                        filename: base.to_owned(),
+                        enabled,
+                        size: metadata.len(),
+                        stamp: regular.then(|| observed_file_stamp(&metadata)),
+                        times: regular.then(|| change_times(&metadata)).flatten(),
+                    },
+                );
+            }
+        }
+    }
+    scanning_subtask.complete_items();
+
+    #[cfg(test)]
+    mcm.scan_test_boundary(
+        &PathBuf::from(format!("instance-{}", *instance_id)),
+        "cache-read",
+    )
+    .context("Could not read cached addon owners")?;
+    let rows = mfcdb::get_mod_files_by_instance(&app.db, *instance_id)
+        .await
+        .context("Could not read cached addon owners")?;
+    Ok(InstanceSnapshot {
+        shortpath,
+        folders: Arc::new(folders),
+        rows,
+        listed,
+        unobserved,
+    })
+}
+
+/// What the commits of one instance scan did, for its log line.
+#[derive(Default, Clone, Copy)]
+struct InstanceCommitCounts {
+    written: usize,
+    discarded: usize,
+    failed: usize,
+}
+
+impl InstanceCommitCounts {
+    fn add(&mut self, other: Self) {
+        self.written += other.written;
+        self.discarded += other.discarded;
+        self.failed += other.failed;
+    }
+}
+
+async fn scan_instance(
+    app: &App,
+    update_notifier: &UpdateNotifier,
+    instance_id: InstanceId,
+    verify: VerifyScope,
+) -> anyhow::Result<()> {
+    use crate::domain::instance::AddonType;
+    use futures::StreamExt;
+    let instance_manager = app.instance_manager();
+    let instance_name = instance_manager
+        .instances
+        .read()
+        .await
+        .get(&instance_id)
+        .map(|instance| instance.shortpath.clone())
+        .unwrap_or_else(|| format!("Instance {}", *instance_id));
+    let task = VisualTask::new(Translation::CacheTaskLocal { instance_name });
+    let _task_id = app.task_manager().spawn_task(&task).await;
+    info!("Starting local mod caching for instance {instance_id} (verify {verify:?})");
+
+    // An instance renamed while its files were hashed is scanned again at its
+    // new folder: the results name paths that no longer exist.
+    let mut counts = InstanceCommitCounts::default();
+    // Rows of files that are gone are removed in phase 1 only, never by a
+    // batch commit.
+    let mut removed_total = 0;
+    let mut attempt = 0;
+    'scan: loop {
+        attempt += 1;
+        // Phase 1: snapshot rows and listings under the gate, and remove the
+        // rows of files that are gone before anything is read, so the list
+        // never shows a removed addon next to its replacement while the rest
+        // is read, nor keeps it when the pass is paused for Play.
+        let scanning_subtask = task.subtask(Translation::CacheSubtaskScanningFiles);
+        let (snapshot, removed) = {
             let _operation = instance_manager.lock_instance(instance_id).await;
             #[cfg(test)]
             instance_manager
                 .pause_addon_scan_for_test(instance_id)
                 .await;
-            let app2 = app.clone();
-            let cached_entries = tokio::spawn(async move {
-                let instance_id_val = *instance_id;
-                mfcdb::get_mod_files_by_instance(&app2.db, instance_id_val).await
-            });
+            let snapshot = snapshot_instance(app, instance_id, &scanning_subtask).await?;
+            let stale = snapshot
+                .rows
+                .iter()
+                .filter(|row| {
+                    !snapshot.unobserved.contains_key(&row.addon_type)
+                        && !snapshot
+                            .listed
+                            .contains_key(&(row.addon_type.clone(), row.filename.clone()))
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            let removed =
+                remove_stale_instance_rows(app, instance_id, &snapshot.folders, stale).await;
+            (snapshot, removed)
+        };
+        if removed != 0 {
+            update_notifier.send(CacheEntityId::Instance(instance_id));
+            removed_total += removed;
+        }
+        for (kind, reason) in &snapshot.unobserved {
+            warn!(
+                "Instance {instance_id}: could not list all {kind}; keeping their entries ({reason})"
+            );
+        }
 
-            let instance_manager = app.instance_manager();
-            let instances = instance_manager.instances.read().await;
-            let Some(instance) = instances.get(&instance_id) else {
-                error!("invalid instance id {instance_id} for mod scanning");
-                return Ok(());
+        // Phase 2: decide per file, then hash and parse without the gate.
+        let mut listed = snapshot.listed.clone();
+        let mut work = Vec::new();
+        for row in &snapshot.rows {
+            let key = (row.addon_type.clone(), row.filename.clone());
+            let Some(addon) = listed.remove(&key) else {
+                continue;
             };
+            if addon.enabled != row.enabled || addon.size != row.filesize as u64 {
+                work.push(InstanceScanWork::Parse(Some(row.clone()), addon));
+                continue;
+            }
+            if addon.kind == AddonType::Worlds {
+                continue;
+            }
+            let Some(stamp) = addon.stamp.as_deref() else {
+                work.push(InstanceScanWork::Parse(Some(row.clone()), addon));
+                continue;
+            };
+            let observed = row.file_stamp.as_deref().and_then(qualified_observation);
+            if verify.contains(addon.kind) {
+                if row.file_stamp.is_none() {
+                    // A 2.0.40 row: one read settles it, as for stamped rows.
+                    work.push(InstanceScanWork::Legacy(row.clone(), addon, true));
+                } else {
+                    work.push(InstanceScanWork::Verify(row.clone(), addon));
+                }
+            } else if observed == Some(stamp) {
+                continue;
+            } else if observed.is_some() {
+                // Touched (copied back, toggled on Unix, re-timestamped): one read
+                // settles whether the bytes still match before a full parse.
+                work.push(InstanceScanWork::Verify(row.clone(), addon));
+            } else if row.file_stamp.is_none() {
+                work.push(InstanceScanWork::Legacy(row.clone(), addon, false));
+            } else {
+                work.push(InstanceScanWork::Parse(Some(row.clone()), addon));
+            }
+        }
+        let mut new_files = listed.into_iter().collect::<Vec<_>>();
+        new_files.sort_by(|a, b| a.0.cmp(&b.0));
+        work.extend(
+            new_files
+                .into_iter()
+                .map(|(_, addon)| InstanceScanWork::Parse(None, addon)),
+        );
 
-            let instance_path = InstancesPath::subpath().get_instance_path(&instance.shortpath);
-            let instance_name = instance.shortpath.clone();
+        // About half the cores, and at least one so a single-core host
+        // progresses. The work runs on a worker that keeps going while a batch
+        // waits for the gate.
+        let parallelism = (available_parallelism().map_or(1, |n| n.get()) / 2).max(1);
+        let total = work.len() as u32;
+        let finalization_subtask = (total != 0).then(|| {
+            let subtask = task.subtask(Translation::CacheSubtaskFinalizingCache);
+            subtask.update_items(0, total);
+            subtask
+        });
+        let mut processed = 0;
+        let worker_app = app.clone();
+        let folders = snapshot.folders.clone();
+        let mut results = ScanWorker::spawn(
+            futures::stream::iter(work)
+                .map(move |item| {
+                    run_instance_work(worker_app.clone(), instance_id, folders.clone(), item)
+                })
+                .buffer_unordered(parallelism),
+        );
 
-            drop(instances);
-
-            let task = VisualTask::new(Translation::CacheTaskLocal {
-                instance_name: instance_name.clone(),
-            });
-            let task_id = app.task_manager().spawn_task(&task).await;
-
-            info!("Starting local mod caching for instance {}", instance_id);
-
-            let root_path = app.settings_manager().runtime_path.get_root().to_path();
-
-            let mut modpaths = HashMap::<String, (bool, u64, String)>::new();
-            let mut total_files_scanned = 0;
-
-            let addon_types = crate::domain::instance::AddonType::all();
-            let scanning_subtask = task.subtask(Translation::CacheSubtaskScanningFiles);
-            scanning_subtask.update_items(0, addon_types.len() as u32);
-
-            let mut addon_count = 0;
-            for addon_type in crate::domain::instance::AddonType::all() {
-                let addon_subpath = addon_type.get_folder_path(&instance_path);
-                let mut pathbuf = PathBuf::new();
-                pathbuf.push(&root_path);
-                pathbuf.push(&addon_subpath);
-
-                if !pathbuf.is_dir() {
-                    debug!(
-                        "Skipping {:?} directory for instance {} - does not exist: {}",
-                        addon_type,
-                        instance_id,
-                        pathbuf.display()
+        // Phase 3, once per batch: re-take the gate only to commit what is
+        // still current.
+        loop {
+            let (batch, finished) = next_commit_batch(&mut results, || {
+                processed += 1;
+                if let Some(subtask) = &finalization_subtask {
+                    subtask.update_items(processed, total);
+                }
+            })
+            .await;
+            let Some(committed) =
+                commit_instance_results(app, instance_id, &snapshot, batch).await?
+            else {
+                if attempt < 3 {
+                    info!(
+                        "Instance {instance_id} was moved during its addon scan; scanning it again"
                     );
+                    continue 'scan;
+                }
+                anyhow::bail!(
+                    "Instance {instance_id} was moved or removed while its addons were being scanned"
+                );
+            };
+            if committed.written != 0 {
+                update_notifier.send(CacheEntityId::Instance(instance_id));
+            }
+            counts.add(committed);
+            if finished {
+                results.settled().await?;
+                if let Some(subtask) = &finalization_subtask {
+                    subtask.complete_items();
+                }
+                break 'scan;
+            }
+        }
+    }
+
+    let InstanceCommitCounts {
+        written,
+        discarded,
+        failed,
+    } = counts;
+    info!(
+        "Completed local mod caching for instance {instance_id}: {written} updated, {removed_total} removed, {discarded} changed during the scan, {failed} unreadable"
+    );
+    Ok(())
+}
+
+/// Commit one batch of an instance scan. Results whose new metadata was
+/// garbage-collected before the commit get it created again with the gate
+/// released and are committed once more. `None`: the instance moved since the
+/// snapshot, so these results name paths that no longer exist.
+async fn commit_instance_results(
+    app: &App,
+    instance_id: InstanceId,
+    snapshot: &InstanceSnapshot,
+    outcomes: Vec<InstanceScanOutcome>,
+) -> anyhow::Result<Option<InstanceCommitCounts>> {
+    let Some((mut counts, orphaned)) =
+        commit_instance_batch(app, instance_id, snapshot, outcomes).await?
+    else {
+        return Ok(None);
+    };
+    if orphaned.is_empty() {
+        return Ok(Some(counts));
+    }
+    let mcm = app.meta_cache_manager();
+    let mut again = Vec::new();
+    for outcome in orphaned {
+        let InstanceScanOutcome::Parsed {
+            row, addon, result, ..
+        } = outcome
+        else {
+            continue;
+        };
+        match mcm.ensure_mod_metadata(&result, &addon.filename).await {
+            Ok(metadata_id) => again.push(InstanceScanOutcome::Parsed {
+                row,
+                addon,
+                result,
+                metadata_id,
+            }),
+            Err(error) => {
+                counts.failed += 1;
+                warn!(
+                    ?error,
+                    "Instance {instance_id}: could not store a scan result"
+                );
+            }
+        }
+    }
+    let Some((retried, orphaned)) =
+        commit_instance_batch(app, instance_id, snapshot, again).await?
+    else {
+        return Ok(None);
+    };
+    counts.add(retried);
+    if !orphaned.is_empty() {
+        counts.failed += orphaned.len();
+        warn!(
+            "Instance {instance_id}: {} scan result(s) lost their metadata twice; the next scan reads them again",
+            orphaned.len()
+        );
+    }
+    Ok(Some(counts))
+}
+
+/// Commit one batch of an instance scan under the instance gate. Returns its
+/// counts and the results whose new metadata was garbage-collected before
+/// the commit: the gate is never held while metadata is created, because an
+/// install holding it may be waiting for the icon permit or hash lock that
+/// creating metadata takes. `None`: the instance moved since the snapshot.
+async fn commit_instance_batch(
+    app: &App,
+    instance_id: InstanceId,
+    snapshot: &InstanceSnapshot,
+    outcomes: Vec<InstanceScanOutcome>,
+) -> anyhow::Result<Option<(InstanceCommitCounts, Vec<InstanceScanOutcome>)>> {
+    #[cfg(test)]
+    app.meta_cache_manager()
+        .scan_test_pause(Path::new(&format!("instance-{}", *instance_id)), "commit")
+        .await;
+    let mut counts = InstanceCommitCounts::default();
+    let mut orphaned = Vec::new();
+    if outcomes.is_empty() {
+        return Ok(Some((counts, orphaned)));
+    }
+    let instance_manager = app.instance_manager();
+    let _operation = instance_manager.lock_instance(instance_id).await;
+    let current_shortpath = instance_manager
+        .instances
+        .read()
+        .await
+        .get(&instance_id)
+        .map(|instance| instance.shortpath.clone());
+    match current_shortpath {
+        Some(current) if current == snapshot.shortpath => {}
+        Some(_) => return Ok(None),
+        None => anyhow::bail!(
+            "Instance {instance_id} was moved or removed while its addons were being scanned"
+        ),
+    }
+    let mut stamps = Vec::new();
+    let mut others = Vec::new();
+    for outcome in outcomes {
+        match outcome {
+            InstanceScanOutcome::Failed => counts.failed += 1,
+            InstanceScanOutcome::Stamp(row, addon, observed) => stamps.push((row, addon, observed)),
+            parsed @ InstanceScanOutcome::Parsed { .. } => others.push(parsed),
+        }
+    }
+    if !stamps.is_empty() {
+        let total = stamps.len();
+        match commit_instance_stamps(app, &snapshot.folders, stamps).await {
+            Ok(stamped) => {
+                for committed in stamped {
+                    match committed {
+                        CommitOutcome::Written => counts.written += 1,
+                        CommitOutcome::Unchanged => {}
+                        CommitOutcome::Discarded | CommitOutcome::Orphaned => counts.discarded += 1,
+                    }
+                }
+            }
+            Err(error) => {
+                counts.failed += total;
+                warn!(
+                    ?error,
+                    "Instance {instance_id}: could not store {total} scan result(s)"
+                );
+            }
+        }
+    }
+    for outcome in others {
+        let InstanceScanOutcome::Parsed {
+            row,
+            addon,
+            result,
+            metadata_id,
+        } = &outcome
+        else {
+            continue;
+        };
+        let committed = commit_instance_parsed(
+            app,
+            instance_id,
+            &snapshot.folders,
+            row,
+            addon,
+            result,
+            metadata_id,
+        )
+        .await;
+        match committed {
+            Ok(CommitOutcome::Written) => counts.written += 1,
+            Ok(CommitOutcome::Unchanged) => {}
+            Ok(CommitOutcome::Discarded) => counts.discarded += 1,
+            Ok(CommitOutcome::Orphaned) => orphaned.push(outcome),
+            Err(error) => {
+                counts.failed += 1;
+                warn!(
+                    ?error,
+                    "Instance {instance_id}: could not store a scan result"
+                );
+            }
+        }
+    }
+    Ok(Some((counts, orphaned)))
+}
+
+/// Remove the rows of addons whose files are gone. The caller holds the
+/// instance gate. Each name is confirmed absent in both spellings by an exact
+/// listing, and a row is removed only while it is still exactly what the
+/// snapshot saw. Returns how many were removed.
+async fn remove_stale_instance_rows(
+    app: &App,
+    instance_id: InstanceId,
+    folders: &HashMap<&'static str, PathBuf>,
+    stale: Vec<mfcdb::ModFileCacheRow>,
+) -> usize {
+    use crate::domain::instance::AddonType;
+    let mut listings = FolderListings::default();
+    let mut removed = 0;
+    for row in stale {
+        // A name the scan never lists is stale even if such a file exists.
+        if let Some(kind) = AddonType::from_db_string(&row.addon_type)
+            .filter(|kind| listable_addon_name(*kind, &row.filename))
+        {
+            if !listings
+                .confirmed_absent(&folders[kind.to_db_string()], &row.filename)
+                .await
+            {
+                continue;
+            }
+        }
+        let expected = row.clone();
+        let deleted = app
+            .db
+            .write(move |mut conn| {
+                let tx = conn.transaction()?;
+                let current = mfcdb::get_mod_file_cache_by_id_conn(&tx, &expected.id)?;
+                if current.as_ref() != Some(&expected) {
+                    return Ok(false);
+                }
+                mfcdb::delete_mod_file_cache_by_id_conn(&tx, &expected.id)?;
+                tx.commit()?;
+                Ok(true)
+            })
+            .await;
+        match deleted {
+            Ok(true) => removed += 1,
+            Ok(false) => {}
+            Err(error) => warn!(
+                ?error,
+                "Instance {instance_id}: could not remove a stale entry"
+            ),
+        }
+    }
+    removed
+}
+
+async fn run_instance_work(
+    app: App,
+    instance_id: InstanceId,
+    folders: Arc<HashMap<&'static str, PathBuf>>,
+    item: InstanceScanWork,
+) -> InstanceScanOutcome {
+    let mcm = app.meta_cache_manager();
+    let (row, addon) = match item {
+        InstanceScanWork::Verify(row, addon) => {
+            let path = folders[addon.kind.to_db_string()].join(addon.disk_name());
+            match mcm
+                .verify_cached_bytes(row.file_stamp.as_deref(), &row.metadata_id, &path)
+                .await
+            {
+                Ok(ByteCheck::Same(observed)) => {
+                    return InstanceScanOutcome::Stamp(row, addon, observed);
+                }
+                Ok(ByteCheck::Different) => (Some(row), addon),
+                Err(error) => {
+                    warn!(
+                        ?error,
+                        "Instance {instance_id}: could not verify {}",
+                        path.display()
+                    );
+                    return InstanceScanOutcome::Failed;
+                }
+            }
+        }
+        InstanceScanWork::Legacy(row, addon, read) => {
+            let path = folders[addon.kind.to_db_string()].join(addon.disk_name());
+            let stamp = addon.stamp.clone().unwrap_or_default();
+            match mcm
+                .settle_legacy_row(
+                    &row.metadata_id,
+                    row.last_updated_at,
+                    &stamp,
+                    addon.times,
+                    &path,
+                    read,
+                )
+                .await
+            {
+                Ok(Some(observed)) => return InstanceScanOutcome::Stamp(row, addon, observed),
+                Ok(None) => (Some(row), addon),
+                Err(error) => {
+                    warn!(
+                        ?error,
+                        "Instance {instance_id}: could not check {}",
+                        path.display()
+                    );
+                    return InstanceScanOutcome::Failed;
+                }
+            }
+        }
+        InstanceScanWork::Parse(row, addon) => (row, addon),
+    };
+    let folder = folders[addon.kind.to_db_string()].clone();
+    let parsed = async {
+        let result = if addon.kind == crate::domain::instance::AddonType::Worlds {
+            mcm.world_dir_parse_result(&folder, &addon.filename).await?
+        } else {
+            mcm.hash_and_parse_mod_file(&folder, &addon.filename, addon.enabled)
+                .await?
+        };
+        let metadata_id = mcm.ensure_mod_metadata(&result, &addon.filename).await?;
+        Ok::<_, anyhow::Error>((result, metadata_id))
+    }
+    .await;
+    match parsed {
+        Ok((result, metadata_id)) => InstanceScanOutcome::Parsed {
+            row,
+            addon,
+            result,
+            metadata_id,
+        },
+        Err(error) => {
+            warn!(
+                ?error,
+                "Instance {instance_id}: could not scan {}",
+                folder.join(addon.disk_name()).display()
+            );
+            InstanceScanOutcome::Failed
+        }
+    }
+}
+
+/// Record verified or settled legacy stamps, one per result, in a single
+/// transaction for the batch: the first scan after an upgrade from 2.0.40, or
+/// after the data folder moved, stamps nearly every row. A result is
+/// discarded when its file or row changed after the snapshot. The outcomes
+/// are in the order of `stamps`.
+async fn commit_instance_stamps(
+    app: &App,
+    folders: &HashMap<&'static str, PathBuf>,
+    stamps: Vec<(mfcdb::ModFileCacheRow, ListedAddon, String)>,
+) -> anyhow::Result<Vec<CommitOutcome>> {
+    let mut outcomes = vec![CommitOutcome::Discarded; stamps.len()];
+    let mut current = Vec::new();
+    for (index, (row, addon, observed)) in stamps.into_iter().enumerate() {
+        let path = folders[addon.kind.to_db_string()].join(addon.disk_name());
+        if current_file_stamp(&path).await.as_deref() == Some(observed.as_str()) {
+            current.push((index, row, observed));
+        }
+    }
+    if current.is_empty() {
+        return Ok(outcomes);
+    }
+    let stored = app
+        .db
+        .write(move |mut conn| {
+            let tx = conn.transaction()?;
+            let now = DbDateTime(Utc::now().fixed_offset());
+            let mut stored = Vec::with_capacity(current.len());
+            for (index, row, observed) in current {
+                let still = mfcdb::get_mod_file_cache_by_id_conn(&tx, &row.id)?;
+                if still.as_ref() != Some(&row) {
                     continue;
                 }
-
-                debug!(
-                    "Scanning {:?} directory for instance {}: {}",
-                    addon_type,
-                    instance_id,
-                    pathbuf.display()
-                );
-
-                let mut entries = match tokio::fs::read_dir(&pathbuf).await {
-                    Ok(entries) => entries,
-                    Err(e) => {
-                        error!({ dir = ?pathbuf, error = ?e }, "could not read {addon_type:?} folder for instance {instance_id}");
-                        continue;
-                    }
+                let Some(metadata) = metarepo::get_metadata_by_id_conn(&tx, &row.metadata_id)?
+                else {
+                    continue;
                 };
-
-                while let Ok(Some(entry)) = entries.next_entry().await {
-                    let file_name = entry.file_name();
-                    let Some(mut utf8_name) = file_name.to_str() else {
-                        continue;
-                    };
-
-                    let allowed_extensions = match addon_type {
-                        crate::domain::instance::AddonType::Mods => vec![".jar", ".zip"],
-                        crate::domain::instance::AddonType::ResourcePacks => vec![".zip"],
-                        crate::domain::instance::AddonType::Shaders => vec![".zip"],
-                        crate::domain::instance::AddonType::DataPacks => vec![".zip"],
-                        crate::domain::instance::AddonType::Worlds => vec![], // Worlds are directories, handled differently
-                    };
-
-                    if addon_type == crate::domain::instance::AddonType::Worlds {
-                        let Ok(metadata) = entry.metadata().await else {
-                            continue;
-                        };
-                        if !metadata.is_dir() {
-                            continue;
-                        }
-                        if crate::managers::instance::installer::publication::world_install_incomplete(&entry.path()).await? {
-                            continue;
-                        }
-
-                        modpaths.insert(
-                            utf8_name.to_string(),
-                            (true, metadata.len(), addon_type.to_db_string().to_string()),
-                        );
-                        total_files_scanned += 1;
-                    } else {
-                        let allowed_base_ext = allowed_extensions
-                            .iter()
-                            .any(|&ext| utf8_name.ends_with(ext));
-                        let disabled_extensions: Vec<String> = allowed_extensions
-                            .iter()
-                            .map(|ext| format!("{}.disabled", ext))
-                            .collect();
-                        let allowed_disabled_ext = disabled_extensions
-                            .iter()
-                            .any(|ext| utf8_name.ends_with(ext));
-
-                        if !allowed_base_ext && !allowed_disabled_ext {
-                            continue;
-                        }
-
-                        utf8_name = utf8_name.strip_suffix(".disabled").unwrap_or(utf8_name);
-
-                        let Ok(metadata) = entry.metadata().await else {
-                            continue;
-                        };
-                        // file || symlink
-                        if metadata.is_dir() {
-                            continue;
-                        }
-
-                        modpaths.insert(
-                            utf8_name.to_string(),
-                            (
-                                !allowed_disabled_ext,
-                                metadata.len(),
-                                addon_type.to_db_string().to_string(),
-                            ),
-                        );
-                        total_files_scanned += 1;
-                    }
+                let stamp = qualified_file_stamp(&metadata, &observed);
+                if row.file_stamp.as_deref() == Some(stamp.as_str()) {
+                    stored.push((index, CommitOutcome::Unchanged));
+                    continue;
                 }
-
-                addon_count += 1;
-                scanning_subtask.update_items(addon_count, addon_types.len() as u32);
+                mfcdb::update_mod_file_stamp_conn(
+                    &tx,
+                    row.instance_id,
+                    &row.addon_type,
+                    &row.filename,
+                    &row.metadata_id,
+                    Some(&stamp),
+                    now,
+                )?;
+                stored.push((index, CommitOutcome::Written));
             }
+            tx.commit()?;
+            Ok(stored)
+        })
+        .await?;
+    for (index, outcome) in stored {
+        outcomes[index] = outcome;
+    }
+    Ok(outcomes)
+}
 
-            debug!(
-                "File scanning complete for instance {}: found {} files total",
-                instance_id, total_files_scanned
-            );
+/// Publish a freshly parsed file. Discarded when the file or row changed
+/// after the snapshot (toggle, delete, install, external edit), rather than
+/// overwrite newer state. Never creates metadata: the caller holds the
+/// instance gate (see [`commit_instance_batch`]).
+async fn commit_instance_parsed(
+    app: &App,
+    instance_id: InstanceId,
+    folders: &HashMap<&'static str, PathBuf>,
+    row: &Option<mfcdb::ModFileCacheRow>,
+    addon: &ListedAddon,
+    result: &ModFileParseResult,
+    metadata_id: &str,
+) -> anyhow::Result<CommitOutcome> {
+    let path = folders[addon.kind.to_db_string()].join(addon.disk_name());
+    if addon.kind == crate::domain::instance::AddonType::Worlds {
+        let is_dir = tokio::fs::metadata(&path)
+            .await
+            .is_ok_and(|metadata| metadata.is_dir());
+        if !is_dir
+            || !matches!(
+                crate::managers::instance::installer::publication::world_install_incomplete(&path)
+                    .await,
+                Ok(false)
+            )
+        {
+            return Ok(CommitOutcome::Discarded);
+        }
+    } else {
+        let current = current_file_stamp(&path).await;
+        if current.is_none() || current != result.file_stamp {
+            return Ok(CommitOutcome::Discarded);
+        }
+    }
+    let published = publish_instance_row(
+        &app.db,
+        instance_id,
+        &addon.filename,
+        addon.kind.to_db_string(),
+        addon.enabled,
+        metadata_id,
+        result,
+        Some(row.clone()),
+    )
+    .await;
+    match published {
+        Ok(true) => Ok(CommitOutcome::Written),
+        Ok(false) => Ok(CommitOutcome::Discarded),
+        Err(error) if error.is_foreign_key_violation() => Ok(CommitOutcome::Orphaned),
+        Err(error) => Err(error.into()),
+    }
+}
 
-            trace!({ modpaths = ?modpaths }, "modpaths found for instance {instance_id}");
-
-            scanning_subtask.complete_items();
-
-            let mut has_outdated_entries = false;
-
-            if let Ok(Ok(cached_entries)) = cached_entries.await {
-                has_outdated_entries = cached_entries.len() != modpaths.len();
-
-                for entry in cached_entries {
-                    if let Some((enabled, real_size, addon_type)) = modpaths.get(&entry.filename) {
-                        if *real_size == entry.filesize as u64
-                            && *enabled == entry.enabled
-                            && *addon_type == entry.addon_type
-                        {
-                            modpaths.remove(&entry.filename);
-                            continue;
-                        }
-                    } else {
-                        let instance_id_val = *instance_id;
-                        mfcdb::delete_mod_file_cache_by_instance_filename(
-                            &app.db,
-                            instance_id_val,
-                            &entry.filename,
-                        )
-                        .await?;
-                    }
-
-                    has_outdated_entries = true;
-                }
-            }
-
-            // Throttle concurrent file hashing to about half the available cores, with a
-            // floor of 1 so single-core or cgroup-limited hosts still make progress; a value
-            // of 0 would make the Semaphore::acquire below block forever.
-            let default_parallelism_approx =
-                (available_parallelism().map_or(1, |n| n.get()) / 2).max(1);
-
-            let rate_limiter = Arc::new(tokio::sync::Semaphore::new(default_parallelism_approx));
-
-            let total_files_to_process = modpaths.len() as u32;
-            let finalization_subtask = if !modpaths.is_empty() {
-                let subtask = task.subtask(Translation::CacheSubtaskFinalizingCache);
-                subtask.update_items(0, total_files_to_process);
-                Some(subtask)
-            } else {
-                None
-            };
-
-            let processed_count = Arc::new(AtomicI32::new(0));
-
-            let entry_futures =
-                modpaths
-                    .into_iter()
-                    .map(|(filename, (enabled, _, addon_type_str))| {
-                        let instance_path = instance_path.clone();
-                        let root_path = root_path.clone();
-                        let update_notifier = &update_notifier;
-                        let finalization_subtask = finalization_subtask.as_ref();
-                        let processed_count_clone = Arc::clone(&processed_count);
-                        let total_files = total_files_to_process;
-
-                        let rate_limiter = Arc::clone(&rate_limiter);
-
-                        async move {
-                            let _permit = rate_limiter.acquire().await.expect("rate limiter");
-
-                            let addon_type =
-                                crate::domain::instance::AddonType::from_db_string(&addon_type_str)
-                                    .unwrap_or(crate::domain::instance::AddonType::Mods);
-
-                            let addon_subpath = addon_type.get_folder_path(&instance_path);
-                            let mut pathbuf = PathBuf::new();
-                            pathbuf.push(&root_path);
-                            pathbuf.push(&addon_subpath);
-
-                            let stored = match app
-                                .meta_cache_manager()
-                                .cache_mod_file_unchecked(
-                                    instance_id,
-                                    &pathbuf,
-                                    filename.clone(),
-                                    enabled,
-                                    addon_type_str,
-                                )
-                                .await
-                            {
-                                Ok(_) => true,
-                                Err(e) => {
-                                    // One bad entry must not poison the rest of the scan.
-                                    error!(
-                                        { error = ?e },
-                                        "could not store scan result for `{filename}` of instance {instance_id} in db"
-                                    );
-                                    false
-                                }
-                            };
-
-                            if let Some(finalization_subtask) = finalization_subtask {
-                                let current_count = processed_count_clone
-                                    .fetch_add(1, atomic::Ordering::Relaxed)
-                                    + 1;
-                                finalization_subtask
-                                    .update_items(current_count as u32, total_files);
-                            }
-
-                            if stored {
-                                update_notifier.send(CacheEntityId::Instance(instance_id));
-                            }
-
-                            stored
-                        }
-                    });
-
-            let results = futures::future::join_all(entry_futures).await;
-
-            if let Some(finalization_subtask) = finalization_subtask {
-                finalization_subtask.complete_items();
-            }
-
-            let success_count = results.into_iter().filter(|&stored| stored).count();
-
-            if has_outdated_entries {
-                let _ = update_notifier.send(CacheEntityId::Instance(instance_id));
-            }
-
-            info!(
-                "Completed local mod caching for instance {}: scanned {} files, updated {} entries",
-                instance_id, total_files_scanned, success_count
-            );
-
-            Ok(())
-        };
-
-        let cache_instance = &cache_instance;
+fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNotifier) {
+    tokio::spawn(async move {
+        let app = &app;
+        let update_notifier = &update_notifier;
 
         LoopWatcher::new(rx).await.loop_interrupt(
             |CacheTargetInfo {
                 entity_id,
                 is_override,
                 is_priority,
+                verify,
+                generation,
             }| async move {
                 let mut pause = app.meta_cache_manager().pause_caching.subscribe();
                 let r = loop {
@@ -1938,7 +4057,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 
                         let r = match entity_id {
                             CacheEntityId::Instance(instance_id) => {
-                                cache_instance(instance_id).await
+                                cache_instance(app, update_notifier, instance_id, verify).await
                             }
                             CacheEntityId::Server(server_id) => {
                                 let db_server = carbon_repos::repos::server::get_server(&app.db, server_id)
@@ -1969,7 +4088,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                     };
 
                     tokio::select! {
-                        _ = wait_for_pause => {
+                        biased;
+                        _ = wait_for_pause, if !is_override => {
                             info!("Local mod caching paused for {entity_id} - waiting for unpause");
 
                             // wait for unpause
@@ -1988,7 +4108,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                     };
                 };
 
-                move |targets: &mut CacheTargets| targets.release_target(entity_id, r)
+                move |targets: &mut CacheTargets| targets.release_pass(entity_id, generation, r)
             }
         ).await;
     });
@@ -1997,6 +4117,1534 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    pub(super) async fn addon_fixture(
+        app: &App,
+        name: &str,
+        kind: crate::domain::instance::AddonType,
+        filename: &str,
+        bytes: &[u8],
+    ) -> (InstanceId, PathBuf) {
+        addon_fixture_version(
+            app,
+            name,
+            kind,
+            filename,
+            bytes,
+            crate::domain::instance::info::StandardVersion {
+                release: "1.20.1".into(),
+                modloaders: Default::default(),
+            },
+        )
+        .await
+    }
+
+    pub(super) async fn addon_fixture_version(
+        app: &App,
+        name: &str,
+        kind: crate::domain::instance::AddonType,
+        filename: &str,
+        bytes: &[u8],
+        version: crate::domain::instance::info::StandardVersion,
+    ) -> (InstanceId, PathBuf) {
+        use crate::domain::instance::info::GameVersion;
+        use crate::managers::instance::InstanceVersionSource;
+        let group = app.instance_manager().get_default_group().await.unwrap();
+        let id = app
+            .instance_manager()
+            .create_instance(
+                group,
+                name.into(),
+                false,
+                InstanceVersionSource::Version(GameVersion::Standard(version)),
+                String::new(),
+            )
+            .await
+            .unwrap();
+        let shortpath = app.instance_manager().instances.read().await[&id]
+            .shortpath
+            .clone();
+        let root = app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath);
+        let folder = kind.get_folder_path(&root);
+        tokio::fs::create_dir_all(&folder).await.unwrap();
+        let path = folder.join(filename);
+        tokio::fs::write(&path, bytes).await.unwrap();
+        (id, path)
+    }
+
+    async fn task11r1_observation_failure(stage: &'static str, ordinary: bool) {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = addon_fixture(
+            &app,
+            "task11r1-observation",
+            crate::domain::instance::AddonType::Mods,
+            "one.jar",
+            b"one",
+        )
+        .await;
+        tokio::fs::write(path.with_file_name("two.jar"), b"two")
+            .await
+            .unwrap();
+        app.meta_cache_manager()
+            .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        let mut before = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap();
+        before.sort_by(|a, b| a.id.cmp(&b.id));
+        for owner in &before {
+            metarepo::upsert_mr_update_context(
+                &app.db,
+                &owner.metadata_id,
+                "task11r1-reference",
+                "healthy",
+                DbDateTime(Utc::now().fixed_offset()),
+            )
+            .await
+            .unwrap();
+        }
+        if ordinary {
+            let packs = path
+                .parent()
+                .unwrap()
+                .parent()
+                .unwrap()
+                .join("resourcepacks");
+            tokio::fs::create_dir_all(&packs).await.unwrap();
+            tokio::fs::write(packs.join("observed.zip"), b"new observed region")
+                .await
+                .unwrap();
+        }
+        let fault_path = match stage {
+            "entry-stat" => path.clone(),
+            "cache-read" => PathBuf::from(format!("instance-{}", *id)),
+            _ => path.parent().unwrap().to_owned(),
+        };
+        {
+            let manager = app.meta_cache_manager();
+            let mut state = manager.scan_test_state.lock().unwrap();
+            state.observations.clear();
+            state
+                .fail_after
+                .insert((fault_path, stage), if stage == "iterate" { 2 } else { 1 });
+        }
+        let result = if ordinary {
+            let (tx, rx) = oneshot::channel();
+            app.meta_cache_manager()
+                .local_targets
+                .send_modify_always(|q| {
+                    q.set_priority(CacheTarget {
+                        entity_id: CacheEntityId::Instance(id),
+                        callback: Some(Box::new(move |r| {
+                            let _ = tx.send(r);
+                        })),
+                    })
+                })
+                .await;
+            tokio::time::timeout(std::time::Duration::from_secs(5), rx)
+                .await
+                .unwrap()
+                .unwrap()
+        } else {
+            tokio::time::timeout(
+                std::time::Duration::from_secs(5),
+                app.meta_cache_manager().override_caching_and_wait(
+                    CacheEntityId::Instance(id),
+                    false,
+                    false,
+                ),
+            )
+            .await
+            .unwrap()
+        };
+        let mut after = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap();
+        if ordinary {
+            assert!(
+                after
+                    .iter()
+                    .any(|r| r.addon_type == "resourcepacks" && r.filename == "observed.zip")
+            );
+            after.retain(|r| r.addon_type == "mods");
+        }
+        after.sort_by(|a, b| a.id.cmp(&b.id));
+        for owner in &before {
+            assert!(
+                metarepo::get_metadata_by_id(&app.db, &owner.metadata_id)
+                    .await
+                    .unwrap()
+                    .is_some()
+            );
+            assert_eq!(
+                metarepo::get_mr_update_context(&app.db, &owner.metadata_id, "task11r1-reference")
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .update_paths,
+                "healthy"
+            );
+        }
+        assert_eq!(
+            after
+                .iter()
+                .map(|r| (&r.id, &r.metadata_id))
+                .collect::<Vec<_>>(),
+            before
+                .iter()
+                .map(|r| (&r.id, &r.metadata_id))
+                .collect::<Vec<_>>(),
+            "incomplete {stage} observation cannot retire healthy owners; callback={result:?}"
+        );
+        if !ordinary {
+            if stage == "cache-read" {
+                // Without the rows there is nothing to reconcile against.
+                let error = format!("{:#}", result.unwrap_err());
+                assert!(
+                    error.contains("injected") && error.contains("cached addon owners"),
+                    "actionable {stage} error: {error}"
+                );
+            } else {
+                // A folder that cannot be listed keeps its rows but never fails
+                // an install or export that does not depend on it.
+                result.unwrap_or_else(|error| panic!("{stage} must not fail the pass: {error:#}"));
+            }
+        }
+        assert_eq!(std::fs::read(path).unwrap(), b"one");
+    }
+    #[tokio::test]
+    async fn task11r1_folder_stat_failure_preserves_owners() {
+        task11r1_observation_failure("folder-stat", false).await;
+    }
+    #[tokio::test]
+    async fn task11r1_read_dir_failure_preserves_owners() {
+        task11r1_observation_failure("read-dir", false).await;
+    }
+    #[tokio::test]
+    async fn task11r1_partial_iteration_preserves_owners() {
+        task11r1_observation_failure("iterate", false).await;
+    }
+    #[tokio::test]
+    async fn task11r1_entry_stat_failure_preserves_owners() {
+        task11r1_observation_failure("entry-stat", false).await;
+    }
+    #[tokio::test]
+    async fn task11r1_cache_read_failure_is_not_success() {
+        task11r1_observation_failure("cache-read", false).await;
+    }
+    #[tokio::test]
+    async fn task11r1_ordinary_incomplete_scan_preserves_owners() {
+        task11r1_observation_failure("iterate", true).await;
+    }
+    #[tokio::test]
+    async fn task11r1_missing_target_is_not_verified_success() {
+        let app = crate::setup_managers_for_test().await;
+        assert!(
+            app.meta_cache_manager()
+                .override_caching_and_wait(
+                    CacheEntityId::Instance(InstanceId(i32::MAX)),
+                    false,
+                    false
+                )
+                .await
+                .is_err()
+        );
+    }
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn task11r2_stable_symlink_equal_size_and_changed_target() {
+        let app = crate::setup_managers_for_test().await;
+        let body = r#"{"schemaVersion":1,"id":"example","version":"1"}"#;
+        let bytes = metadata_jar("fabric.mod.json", body);
+        let changed = metadata_jar("fabric.mod.json", &body.replace("\"1\"", "\"2\""));
+        assert_eq!(bytes.len(), changed.len());
+        assert!(bytes.len() < 255);
+        let (id, path) = addon_fixture(
+            &app,
+            "task11r2-symlink",
+            crate::domain::instance::AddonType::Mods,
+            "example.jar",
+            &bytes,
+        )
+        .await;
+        // The link and its extensionless target are both owned by this fixture.
+        // Equal link-text/content lengths admit the reviewed reuse branch.
+        let target_name = "t".repeat(bytes.len());
+        let target = path.parent().unwrap().join(&target_name);
+        tokio::fs::rename(&path, &target).await.unwrap();
+        std::os::unix::fs::symlink(&target_name, &path).unwrap();
+        assert_eq!(
+            std::fs::symlink_metadata(&path).unwrap().len(),
+            std::fs::metadata(&path).unwrap().len()
+        );
+        assert_eq!(std::fs::canonicalize(&path).unwrap(), target);
+        let scan = || {
+            app.meta_cache_manager().override_caching_and_wait(
+                CacheEntityId::Instance(id),
+                false,
+                false,
+            )
+        };
+        scan().await.unwrap();
+        let before = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        scan()
+            .await
+            .expect("unchanged admitted symlink must not compare link identity to target identity");
+        let unchanged = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        assert_eq!(before.id, unchanged.id);
+        assert_eq!(before.metadata_id, unchanged.metadata_id);
+        let modified = std::fs::metadata(&target).unwrap().modified().unwrap();
+        tokio::fs::write(&target, &changed).await.unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&target)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(modified))
+            .unwrap();
+        scan().await.unwrap();
+        let after = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        assert_eq!(after.id, before.id);
+        assert_ne!(after.metadata_id, before.metadata_id);
+        assert_eq!(
+            metarepo::get_metadata_by_id(&app.db, &after.metadata_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .version
+                .as_deref(),
+            Some("2")
+        );
+        assert!(
+            std::fs::symlink_metadata(&path)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), changed);
+    }
+
+    #[tokio::test]
+    async fn task11r1_forced_unchanged_verifies_without_parse_or_rewrite() {
+        let app = crate::setup_managers_for_test().await;
+        let bytes = metadata_jar(
+            "fabric.mod.json",
+            r#"{"schemaVersion":1,"id":"example","version":"1.0.0"}"#,
+        );
+        let (id, path) = addon_fixture(
+            &app,
+            "task11r1-reuse",
+            crate::domain::instance::AddonType::Mods,
+            "mod.jar",
+            &bytes,
+        )
+        .await;
+        // The export pass: byte verification of the mods folder.
+        let scan = || {
+            app.meta_cache_manager().override_caching_verified_and_wait(
+                CacheEntityId::Instance(id),
+                VerifyScope::MODS,
+                false,
+                false,
+            )
+        };
+        scan().await.unwrap();
+        let before = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        app.meta_cache_manager()
+            .scan_test_state
+            .lock()
+            .unwrap()
+            .observations
+            .clear();
+        scan().await.unwrap();
+        let after = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        let manager = app.meta_cache_manager();
+        let state = manager.scan_test_state.lock().unwrap();
+        assert_eq!(
+            state
+                .observations
+                .get(&(path.clone(), "hash"))
+                .copied()
+                .unwrap_or(0),
+            1,
+            "verification reads the actual bytes exactly once"
+        );
+        assert!(
+            state
+                .observations
+                .get(&(path.clone(), "hash-recheck"))
+                .copied()
+                .unwrap_or(0)
+                > 0,
+            "reuse retains final path/content verification"
+        );
+        assert_eq!(
+            state
+                .observations
+                .get(&(path, "parse"))
+                .copied()
+                .unwrap_or(0),
+            0,
+            "qualified equal bytes must skip ZIP/logo/fingerprint parsing"
+        );
+        assert_eq!(
+            before, after,
+            "unchanged qualified owner must not be rewritten"
+        );
+    }
+    #[tokio::test]
+    async fn task11r1_proven_deletion_and_absent_optional_folders_succeed() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = addon_fixture(
+            &app,
+            "task11r1-absence",
+            crate::domain::instance::AddonType::Mods,
+            "one.jar",
+            b"one",
+        )
+        .await;
+        tokio::fs::write(path.with_file_name("two.jar"), b"two")
+            .await
+            .unwrap();
+        let scan = || {
+            app.meta_cache_manager().override_caching_and_wait(
+                CacheEntityId::Instance(id),
+                false,
+                false,
+            )
+        };
+        scan().await.unwrap();
+        let before = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .into_iter()
+            .find(|r| r.filename == "two.jar")
+            .unwrap();
+        tokio::fs::remove_file(&path).await.unwrap();
+        scan().await.unwrap();
+        assert_eq!(
+            mfcdb::get_mod_files_by_instance(&app.db, *id)
+                .await
+                .unwrap(),
+            vec![before]
+        );
+        tokio::fs::remove_file(path.with_file_name("two.jar"))
+            .await
+            .unwrap();
+        tokio::fs::remove_dir(path.parent().unwrap()).await.unwrap();
+        scan().await.unwrap();
+        assert!(
+            mfcdb::get_mod_files_by_instance(&app.db, *id)
+                .await
+                .unwrap()
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn task11r1_marker_change_and_legacy_qualification_controls() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = addon_fixture(
+            &app,
+            "task11r1-qualification",
+            crate::domain::instance::AddonType::Mods,
+            "mod.jar",
+            b"qualified bytes",
+        )
+        .await;
+        let scan = || {
+            app.meta_cache_manager().override_caching_and_wait(
+                CacheEntityId::Instance(id),
+                false,
+                false,
+            )
+        };
+        scan().await.unwrap();
+        let before = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        // Back-dated, so the legacy control below sees a file that last
+        // changed before its row was written.
+        let modified = std::fs::metadata(&path).unwrap().modified().unwrap()
+            - std::time::Duration::from_secs(2);
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(modified))
+            .unwrap();
+        let mcm = app.meta_cache_manager();
+        mcm.clear_scan_observations();
+        scan().await.unwrap();
+        let after = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        assert_eq!(before.id, after.id);
+        assert_eq!(before.metadata_id, after.metadata_id);
+        assert_ne!(before.file_stamp, after.file_stamp);
+        // A touched qualified file is settled by one read, not a re-parse.
+        assert_eq!(mcm.scan_observations(&path, "hash"), 1);
+        assert_eq!(mcm.scan_observations(&path, "parse"), 0);
+
+        // A 2.0.40 row (no stamp, written after the file last changed) is
+        // stamped from `stat` alone.
+        mfcdb::update_mod_file_stamp(
+            &app.db,
+            *id,
+            "mods",
+            "mod.jar",
+            &before.metadata_id,
+            None,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        mcm.clear_scan_observations();
+        scan().await.unwrap();
+        let backfilled = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        assert_eq!(mcm.scan_observations(&path, "hash"), 0);
+        assert_eq!(mcm.scan_observations(&path, "parse"), 0);
+        assert_eq!(backfilled.metadata_id, before.metadata_id);
+        assert!(
+            backfilled
+                .file_stamp
+                .as_deref()
+                .is_some_and(|stamp| stamp.starts_with("parsed-v1:"))
+        );
+
+        // An unknown marker never qualifies: the file is parsed again.
+        mfcdb::update_mod_file_stamp(
+            &app.db,
+            *id,
+            "mods",
+            "mod.jar",
+            &before.metadata_id,
+            Some("unqualified-old-marker"),
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        mcm.clear_scan_observations();
+        scan().await.unwrap();
+        assert_eq!(mcm.scan_observations(&path, "parse"), 1);
+    }
+
+    #[tokio::test]
+    async fn task11r1_image_loop_retains_same_entity_notification() {
+        let targets = LockNotify::new(None::<CacheEntityId>);
+        let worker_targets = targets.clone();
+        let (entered, mut events) = mpsc::unbounded_channel();
+        let release = Arc::new(tokio::sync::Notify::new());
+        let worker_release = release.clone();
+        let worker = tokio::spawn(async move {
+            let mut watcher = LoopWatcher::new(worker_targets).await;
+            watcher
+                .loop_interrupt(|id| {
+                    let entered = entered.clone();
+                    let release = worker_release.clone();
+                    async move {
+                        entered.send(id).unwrap();
+                        release.notified().await;
+                        |_: &mut Option<CacheEntityId>| false
+                    }
+                })
+                .await;
+        });
+        let a = CacheEntityId::Instance(InstanceId(1));
+        targets.send(Some(a)).await;
+        assert_eq!(events.recv().await.unwrap(), a);
+        targets.send(Some(a)).await;
+        targets.send(Some(a)).await;
+        tokio::task::yield_now().await;
+        tokio::task::yield_now().await;
+        release.notify_one();
+        let next = tokio::time::timeout(std::time::Duration::from_millis(200), events.recv()).await;
+        assert_eq!(
+            next.unwrap(),
+            Some(a),
+            "a pending same-entity image request must run after the current pass"
+        );
+        release.notify_one();
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), events.recv())
+                .await
+                .is_err(),
+            "pending identical notifications coalesce without replaying completed work"
+        );
+        let b = CacheEntityId::Instance(InstanceId(2));
+        targets.send(Some(b)).await;
+        assert_eq!(
+            tokio::time::timeout(std::time::Duration::from_millis(200), events.recv())
+                .await
+                .unwrap(),
+            Some(b)
+        );
+        worker.abort();
+    }
+
+    #[tokio::test]
+    async fn task11_expired_thumbnail_retry_releases_lock() {
+        let failures = RwLock::new(HashMap::new());
+        assert!(thumbnail_retry_allowed(&failures, &"project").await);
+        failures.write().await.insert(
+            "project",
+            (
+                std::time::Instant::now() + std::time::Duration::from_secs(60),
+                3,
+            ),
+        );
+        assert!(!thumbnail_retry_allowed(&failures, &"project").await);
+        failures.write().await.insert(
+            "project",
+            (
+                std::time::Instant::now() - std::time::Duration::from_secs(1),
+                3,
+            ),
+        );
+        let retry = tokio::time::timeout(
+            std::time::Duration::from_millis(100),
+            thumbnail_retry_allowed(&failures, &"project"),
+        )
+        .await;
+        assert!(
+            retry.is_ok(),
+            "expired retry must not upgrade its own read lock"
+        );
+        assert!(retry.unwrap());
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), failures.write())
+                .await
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn task11_late_request_waits_for_a_pass_that_observed_it() {
+        let mut targets = CacheTargets::new();
+        let entity = CacheEntityId::Instance(InstanceId(1));
+        targets.set_override(CacheTarget {
+            entity_id: entity,
+            callback: None,
+        });
+        let first_pass = targets.target().unwrap();
+        let (tx, mut rx) = oneshot::channel();
+        targets.set_override(CacheTarget {
+            entity_id: entity,
+            callback: Some(Box::new(move |r| {
+                let _ = tx.send(r);
+            })),
+        });
+        targets.release_pass(entity, first_pass.generation, Ok(()));
+        assert!(
+            matches!(rx.try_recv(), Err(oneshot::error::TryRecvError::Empty)),
+            "late request cannot complete from an earlier snapshot"
+        );
+        let next_pass = targets.target().unwrap();
+        targets.release_pass(entity, next_pass.generation, Ok(()));
+        assert!(rx.try_recv().unwrap().is_ok());
+    }
+
+    #[test]
+    fn task11_foreground_entities_keep_independent_callbacks() {
+        let mut targets = CacheTargets::new();
+        let a = CacheEntityId::Instance(InstanceId(101));
+        let b = CacheEntityId::Instance(InstanceId(102));
+        let mut receivers = Vec::new();
+        for entity_id in [a, b, a] {
+            let (tx, rx) = oneshot::channel();
+            targets.set_override(CacheTarget {
+                entity_id,
+                callback: Some(Box::new(move |r| {
+                    let _ = tx.send(r);
+                })),
+            });
+            receivers.push(rx);
+        }
+        for rx in &mut receivers {
+            assert!(
+                matches!(rx.try_recv(), Err(oneshot::error::TryRecvError::Empty)),
+                "requesting another entity must not cancel an accepted waiter"
+            );
+        }
+        assert_eq!(targets.target().unwrap().entity_id, a);
+        targets.release_target(a, Ok(()));
+        assert!(receivers[0].try_recv().unwrap().is_ok());
+        assert!(receivers[2].try_recv().unwrap().is_ok());
+        assert!(matches!(
+            receivers[1].try_recv(),
+            Err(oneshot::error::TryRecvError::Empty)
+        ));
+        assert_eq!(targets.target().unwrap().entity_id, b);
+        targets.release_target(b, Ok(()));
+        assert!(receivers[1].try_recv().unwrap().is_ok());
+    }
+
+    struct RemoteProbe {
+        stages: mpsc::UnboundedSender<(CacheEntityId, &'static str)>,
+        query: tokio::sync::Notify,
+        save: tokio::sync::Notify,
+    }
+    static REMOTE_PROBE: std::sync::OnceLock<RemoteProbe> = std::sync::OnceLock::new();
+    struct ProbeCacher;
+    #[async_trait::async_trait]
+    impl ModplatformCacher for ProbeCacher {
+        const NAME: &'static str = "task11-probe";
+        type SaveBundle = ();
+        async fn query_platform(
+            _app: &App,
+            id: CacheEntityId,
+            sender: &mut BundleSender<Self::SaveBundle>,
+        ) -> anyhow::Result<()> {
+            let p = REMOTE_PROBE.get().unwrap();
+            p.stages.send((id, "query")).unwrap();
+            p.query.notified().await;
+            sender.send(());
+            Ok(())
+        }
+        async fn save_batch(_app: &App, id: CacheEntityId, _bundle: ()) {
+            let p = REMOTE_PROBE.get().unwrap();
+            p.stages.send((id, "save")).unwrap();
+            p.save.notified().await;
+            p.stages.send((id, "saved")).unwrap();
+        }
+        async fn cache_icons(_app: &App, _id: CacheEntityId, _notifier: &UpdateNotifier) {}
+    }
+
+    #[tokio::test]
+    async fn task11_remote_loop_waits_for_query_and_save_while_globally_paused() {
+        let app = crate::setup_managers_for_test().await;
+        let (stages, mut events) = mpsc::unbounded_channel();
+        assert!(
+            REMOTE_PROBE
+                .set(RemoteProbe {
+                    stages,
+                    query: tokio::sync::Notify::new(),
+                    save: tokio::sync::Notify::new()
+                })
+                .is_ok()
+        );
+        let mut paused = app.meta_cache_manager().pause_caching.subscribe();
+        app.instance_manager()
+            .any_instance_running
+            .send_replace(true);
+        while !*paused.borrow_and_update() {
+            paused.changed().await.unwrap();
+        }
+        let targets = LockNotify::new(CacheTargets::new());
+        let (sender, _) = watch::channel(());
+        let notifier = UpdateNotifier {
+            target: Arc::new(AtomicI32::new(0)),
+            sender: Arc::new(sender),
+        };
+        cache_modplatform::<ProbeCacher>(app.clone(), targets.clone(), notifier);
+        let a = CacheEntityId::Instance(InstanceId(111));
+        let b = CacheEntityId::Server(111);
+        targets.send_modify_always(|q| q.waiting.push_back(a)).await;
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(50), events.recv())
+                .await
+                .is_err(),
+            "ordinary remote work remains paused"
+        );
+        let mut receivers = Vec::new();
+        for entity_id in [a, b] {
+            let (tx, rx) = oneshot::channel();
+            receivers.push(rx);
+            targets
+                .send_modify_always(|q| {
+                    q.set_override(CacheTarget {
+                        entity_id,
+                        callback: Some(Box::new(move |r| {
+                            let _ = tx.send(r);
+                        })),
+                    })
+                })
+                .await;
+        }
+        let probe = REMOTE_PROBE.get().unwrap();
+        for (i, entity) in [a, b].into_iter().enumerate() {
+            assert_eq!(
+                tokio::time::timeout(std::time::Duration::from_secs(3), events.recv())
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                (entity, "query")
+            );
+            assert!(matches!(
+                receivers[i].try_recv(),
+                Err(oneshot::error::TryRecvError::Empty)
+            ));
+            probe.query.notify_one();
+            assert_eq!(
+                tokio::time::timeout(std::time::Duration::from_secs(3), events.recv())
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                (entity, "save")
+            );
+            assert!(
+                matches!(
+                    receivers[i].try_recv(),
+                    Err(oneshot::error::TryRecvError::Empty)
+                ),
+                "query completion must still await persistence"
+            );
+            probe.save.notify_one();
+            assert_eq!(
+                tokio::time::timeout(std::time::Duration::from_secs(3), events.recv())
+                    .await
+                    .unwrap()
+                    .unwrap(),
+                (entity, "saved")
+            );
+            tokio::time::timeout(std::time::Duration::from_secs(3), &mut receivers[i])
+                .await
+                .unwrap()
+                .unwrap()
+                .unwrap();
+        }
+    }
+
+    #[test]
+    fn task11_callback_errors_and_revocation_stay_with_their_entity() {
+        let mut q = CacheTargets::new();
+        let mut receivers = Vec::new();
+        for entity_id in [
+            CacheEntityId::Instance(InstanceId(1)),
+            CacheEntityId::Server(1),
+        ] {
+            let (tx, rx) = oneshot::channel();
+            receivers.push(rx);
+            q.set_override(CacheTarget {
+                entity_id,
+                callback: Some(Box::new(move |r| {
+                    let _ = tx.send(r);
+                })),
+            });
+        }
+        q.revoke_target(CacheEntityId::Instance(InstanceId(1)));
+        assert!(receivers[0].try_recv().unwrap().is_err());
+        assert!(matches!(
+            receivers[1].try_recv(),
+            Err(oneshot::error::TryRecvError::Empty)
+        ));
+        q.release_target(
+            CacheEntityId::Server(1),
+            Err(anyhow!("fixture query failure")),
+        );
+        assert!(receivers[1].try_recv().unwrap().is_err());
+    }
+
+    #[tokio::test]
+    async fn task11_explicit_finalization_ignores_unrelated_global_pause() {
+        let app = crate::setup_managers_for_test().await;
+        // Set the actual source of the global pause without starting any process.
+        let mut paused = app.meta_cache_manager().pause_caching.subscribe();
+        app.instance_manager()
+            .any_instance_running
+            .send_replace(true);
+        while !*paused.borrow_and_update() {
+            paused.changed().await.unwrap();
+        }
+        let (id, path) = addon_fixture(
+            &app,
+            "task11-idle",
+            crate::domain::instance::AddonType::Mods,
+            "mod.jar",
+            b"idle target",
+        )
+        .await;
+        // Hold the real instance gate so caching must yield to the pause branch.
+        let manager = app.instance_manager();
+        let gate = manager.lock_instance(id).await;
+        let request = app.meta_cache_manager().override_caching_and_wait(
+            CacheEntityId::Instance(id),
+            true,
+            true,
+        );
+        tokio::pin!(request);
+        tokio::select! {
+            _ = &mut request => panic!("cache must wait for ownership"),
+            _ = tokio::time::sleep(std::time::Duration::from_millis(40)) => {}
+        }
+        drop(gate);
+        // Empty provider work after a real local scan: unknown hashes are intentionally ignored here.
+        let mut sha = Sha512::new();
+        sha.update(b"idle target");
+        app.meta_cache_manager()
+            .ignored_remote_mr_hashes
+            .write()
+            .await
+            .insert(hex::encode(sha.finalize()));
+        let parsed = app
+            .meta_cache_manager()
+            .hash_and_parse_mod_file(&path.parent().unwrap().to_path_buf(), "mod.jar", true)
+            .await
+            .unwrap();
+        app.meta_cache_manager()
+            .ignored_remote_cf_hashes
+            .write()
+            .await
+            .insert(parsed.murmur2);
+        let result = tokio::time::timeout(std::time::Duration::from_secs(3), request).await;
+        assert!(
+            result.is_ok(),
+            "explicit local and both remote stages must settle while globally paused"
+        );
+        result.unwrap().unwrap();
+    }
+
+    #[tokio::test]
+    async fn task11_instance_scan_retains_equal_names_in_distinct_kinds() {
+        use crate::domain::instance::AddonType;
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = addon_fixture(
+            &app,
+            "task11-folders",
+            AddonType::ResourcePacks,
+            "shared.zip",
+            b"resource",
+        )
+        .await;
+        let datapacks = path.parent().unwrap().parent().unwrap().join("datapacks");
+        tokio::fs::create_dir_all(&datapacks).await.unwrap();
+        tokio::fs::write(datapacks.join("shared.zip"), b"datapack")
+            .await
+            .unwrap();
+        app.meta_cache_manager()
+            .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        let rows = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap();
+        assert_eq!(
+            rows.len(),
+            2,
+            "resource pack and staged datapack must retain independent ownership"
+        );
+        assert_ne!(rows[0].id, rows[1].id);
+        assert_ne!(rows[0].metadata_id, rows[1].metadata_id);
+    }
+
+    #[tokio::test]
+    async fn task11_instance_scan_uppercase_and_disabled_extensions() {
+        use crate::domain::instance::AddonType;
+        let app = crate::setup_managers_for_test().await;
+        let (id, path) = addon_fixture(
+            &app,
+            "task11-upper",
+            AddonType::ResourcePacks,
+            "Pack.ZIP",
+            b"resource",
+        )
+        .await;
+        tokio::fs::write(
+            path.parent().unwrap().join("Other.ZIP.disabled"),
+            b"disabled",
+        )
+        .await
+        .unwrap();
+        app.meta_cache_manager()
+            .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        let rows = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 2);
+        assert!(rows.iter().any(|r| r.filename == "Pack.ZIP" && r.enabled));
+        assert!(rows.iter().any(|r| r.filename == "Other.ZIP" && !r.enabled));
+        let root = path.parent().unwrap().parent().unwrap();
+        for (folder, filename) in [
+            ("mods", "Mod.JAR"),
+            ("shaderpacks", "Shader.ZIP"),
+            ("datapacks", "Data.ZIP"),
+        ] {
+            tokio::fs::create_dir_all(root.join(folder)).await.unwrap();
+            tokio::fs::write(root.join(folder).join(filename), b"enabled")
+                .await
+                .unwrap();
+            tokio::fs::write(
+                root.join(folder).join(format!(
+                    "Disabled.{ext}.disabled",
+                    ext = filename.split('.').last().unwrap()
+                )),
+                b"disabled",
+            )
+            .await
+            .unwrap();
+        }
+        tokio::fs::create_dir_all(root.join("saves/World.disabled"))
+            .await
+            .unwrap();
+        tokio::fs::write(root.join("saves/World.disabled/level.dat"), b"world")
+            .await
+            .unwrap();
+        app.meta_cache_manager()
+            .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        let rows = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap();
+        assert_eq!(rows.len(), 9);
+        for kind in ["mods", "shaders", "datapacks"] {
+            assert_eq!(rows.iter().filter(|r| r.addon_type == kind).count(), 2);
+            assert_eq!(
+                rows.iter()
+                    .filter(|r| r.addon_type == kind && !r.enabled)
+                    .count(),
+                1
+            );
+        }
+        assert!(
+            rows.iter()
+                .any(|r| r.addon_type == "worlds" && r.filename == "World.disabled" && r.enabled)
+        );
+    }
+
+    pub(super) fn metadata_jar(name: &str, body: &str) -> Vec<u8> {
+        use std::io::Write;
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        zip.start_file(
+            name,
+            zip::write::SimpleFileOptions::default()
+                .compression_method(zip::CompressionMethod::Stored),
+        )
+        .unwrap();
+        zip.write_all(body.as_bytes()).unwrap();
+        zip.finish().unwrap().into_inner()
+    }
+
+    pub(super) async fn ordinary_scan(app: &App, id: InstanceId) {
+        let (tx, rx) = oneshot::channel();
+        app.meta_cache_manager()
+            .local_targets
+            .send_modify_always(|targets| {
+                targets.set_priority(CacheTarget {
+                    entity_id: CacheEntityId::Instance(id),
+                    callback: Some(Box::new(move |r| {
+                        let _ = tx.send(r);
+                    })),
+                });
+            })
+            .await;
+        tokio::time::timeout(std::time::Duration::from_secs(3), rx)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn task11_forced_scan_rehashes_same_size_preserved_time_replacement() {
+        use crate::domain::instance::AddonType;
+        let app = crate::setup_managers_for_test().await;
+        let body = r#"{"schemaVersion":1,"id":"example","version":"1.0.0","name":"Example"}"#;
+        let first = metadata_jar("fabric.mod.json", body);
+        let second = metadata_jar("fabric.mod.json", &body.replace("1.0.0", "2.0.0"));
+        assert_eq!(first.len(), second.len());
+        let (id, path) = addon_fixture(
+            &app,
+            "task11-same-size",
+            AddonType::Mods,
+            "test.jar",
+            &first,
+        )
+        .await;
+        // The export pass: the mods folder is verified byte for byte.
+        let cache = || {
+            app.meta_cache_manager().override_caching_verified_and_wait(
+                CacheEntityId::Instance(id),
+                VerifyScope::MODS,
+                false,
+                false,
+            )
+        };
+        cache().await.unwrap();
+        let before = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        let old_metadata = metarepo::get_metadata_by_id(&app.db, &before.metadata_id)
+            .await
+            .unwrap()
+            .unwrap();
+        metarepo::upsert_mr_mod_cache(
+            &app.db,
+            hex::encode(&old_metadata.sha512),
+            "project".into(),
+            "version".into(),
+            "title".into(),
+            "1".into(),
+            "slug".into(),
+            "desc".into(),
+            "".into(),
+            2,
+            "".into(),
+            "test.jar".into(),
+            "https://fixture.invalid/old.jar".into(),
+            DbDateTime(Utc::now().fixed_offset()),
+            before.metadata_id.clone(),
+        )
+        .await
+        .unwrap();
+        let linked = |rows: Vec<mfcdb::MrExportRow>| {
+            rows.into_iter()
+                .find(|row| row.filename == "test.jar")
+                .and_then(|row| row.mr_file_url)
+        };
+        assert_eq!(
+            linked(
+                mfcdb::get_instance_mr_export_files(&app.db, *id)
+                    .await
+                    .unwrap()
+            )
+            .as_deref(),
+            Some("https://fixture.invalid/old.jar"),
+            "fixture: the original bytes are linked"
+        );
+        ordinary_scan(&app, id).await;
+        let skipped = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        assert!(before.file_stamp.is_some());
+        assert_eq!(
+            skipped.last_updated_at, before.last_updated_at,
+            "ordinary unchanged scan must not rewrite/parse the file"
+        );
+        mfcdb::update_mod_file_stamp(
+            &app.db,
+            *id,
+            "mods",
+            "test.jar",
+            &before.metadata_id,
+            None,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        ordinary_scan(&app, id).await;
+        assert!(
+            mfcdb::get_mod_files_by_instance(&app.db, *id)
+                .await
+                .unwrap()[0]
+                .file_stamp
+                .is_some(),
+            "legacy NULL marker requires refresh"
+        );
+        let stamp = std::fs::metadata(&path).unwrap().modified().unwrap();
+        tokio::fs::write(&path, &second).await.unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_times(std::fs::FileTimes::new().set_modified(stamp))
+            .unwrap();
+        // Simulate even a marker-preserving external replacement: export authority is bytes.
+        let preserved_qualification = qualified_file_stamp(
+            &old_metadata,
+            &observed_file_stamp(&std::fs::metadata(&path).unwrap()),
+        );
+        mfcdb::update_mod_file_stamp(
+            &app.db,
+            *id,
+            "mods",
+            "test.jar",
+            &before.metadata_id,
+            Some(&preserved_qualification),
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        cache().await.unwrap();
+        let after = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        assert_eq!(before.id, after.id);
+        assert_ne!(
+            before.metadata_id, after.metadata_id,
+            "equal length and time do not prove content identity"
+        );
+        let parsed = metarepo::get_metadata_by_id(&app.db, &after.metadata_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(parsed.version.as_deref(), Some("2.0.0"));
+        assert_eq!(parsed.modloaders, "fabric");
+        assert_eq!(
+            linked(
+                mfcdb::get_instance_mr_export_files(&app.db, *id)
+                    .await
+                    .unwrap()
+            ),
+            None,
+            "the replaced bytes must not keep the old Modrinth link"
+        );
+        cache().await.unwrap();
+        let unchanged = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        assert_eq!(after.metadata_id, unchanged.metadata_id);
+    }
+
+    #[tokio::test]
+    async fn task11_neoforge_legacy_metadata_heals_without_replacing_identity() {
+        let app = crate::setup_managers_for_test().await;
+        let bytes = metadata_jar(
+            "META-INF/neoforge.mods.toml",
+            "[[mods]]\nmodId = 'example'\nversion = '1.0.0'\ndisplayName = 'Example'\n",
+        );
+        let (id, path) = addon_fixture(
+            &app,
+            "task11-heal",
+            crate::domain::instance::AddonType::Mods,
+            "neo.jar",
+            &bytes,
+        )
+        .await;
+        let mcm = app.meta_cache_manager();
+        let cache = |verify| {
+            mcm.override_caching_verified_and_wait(
+                CacheEntityId::Instance(id),
+                verify,
+                false,
+                false,
+            )
+        };
+        cache(VerifyScope::NONE).await.unwrap();
+        let before = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        metarepo::upsert_mr_update_context(
+            &app.db,
+            &before.metadata_id,
+            "retained",
+            "sentinel",
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        let loaders = || async {
+            metarepo::get_metadata_by_id(&app.db, &before.metadata_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .modloaders
+        };
+
+        // 2.0.40 shape: labelled Forge by the old parser, no stamp, written
+        // after the file last changed. The jar's mod list is re-read (no
+        // content hash) and the label healed.
+        metarepo::update_local_modloaders(
+            &app.db,
+            &before.metadata_id,
+            "forge",
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        mfcdb::update_mod_file_stamp(
+            &app.db,
+            *id,
+            "mods",
+            "neo.jar",
+            &before.metadata_id,
+            None,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        mcm.clear_scan_observations();
+        ordinary_scan(&app, id).await;
+        assert_eq!(loaders().await, "neoforge");
+        assert_eq!(mcm.scan_observations(&path, "hash"), 0);
+        assert_eq!(mcm.scan_observations(&path, "loader-check"), 1);
+        let healed = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        assert_eq!(healed.id, before.id);
+        assert_eq!(healed.metadata_id, before.metadata_id);
+        assert!(
+            healed
+                .file_stamp
+                .as_deref()
+                .is_some_and(|stamp| stamp.starts_with("parsed-v1:"))
+        );
+
+        // A stamped row whose label no longer matches its stamp is re-parsed
+        // when its bytes are verified, which heals it the same way.
+        metarepo::update_local_modloaders(
+            &app.db,
+            &before.metadata_id,
+            "forge",
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        cache(VerifyScope::MODS).await.unwrap();
+        let after = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        assert_eq!(after.id, before.id);
+        assert_eq!(after.metadata_id, before.metadata_id);
+        assert_eq!(loaders().await, "neoforge");
+        assert_eq!(
+            metarepo::get_mr_update_context(&app.db, &after.metadata_id, "retained")
+                .await
+                .unwrap()
+                .unwrap()
+                .update_paths,
+            "sentinel"
+        );
+    }
+
+    /// A Fabric 1.20.1 instance with one scanned mod, for update badge tests.
+    async fn release_install_fixture(app: &App, name: &str) -> (InstanceId, String) {
+        use crate::domain::instance::{
+            AddonType,
+            info::{ModLoader, ModLoaderType, StandardVersion},
+        };
+        let (id, _) = addon_fixture_version(
+            app,
+            name,
+            AddonType::Mods,
+            "mod.jar",
+            name.as_bytes(),
+            StandardVersion {
+                release: "1.20.1".into(),
+                modloaders: [ModLoader {
+                    type_: ModLoaderType::Fabric,
+                    version: "fixture".into(),
+                }]
+                .into_iter()
+                .collect(),
+            },
+        )
+        .await;
+        app.meta_cache_manager()
+            .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        let row = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0);
+        (id, row.metadata_id)
+    }
+
+    async fn badged(app: &App, id: InstanceId) -> bool {
+        app.instance_manager().list_mods(id, None).await.unwrap()[0].has_update
+    }
+
+    /// Rows cached with every newer channel (as the CurseForge cacher writes
+    /// them) must not badge a Release for betas: the channel floor is applied
+    /// when the list is read, so no cache refresh is needed.
+    #[tokio::test]
+    async fn curseforge_release_install_is_not_badged_for_a_newer_beta() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, metadata_id) = release_install_fixture(&app, "cf-release-install").await;
+        let seed = |paths: &'static str| {
+            metarepo::upsert_cf_mod_cache(
+                &app.db,
+                0,
+                4242,
+                100,
+                "Fixture".into(),
+                "1.0.0".into(),
+                "fixture".into(),
+                "summary".into(),
+                "author".into(),
+                carbon_platforms::ModChannel::Stable as i32,
+                paths.into(),
+                DbDateTime(Utc::now().fixed_offset()),
+                metadata_id.clone(),
+            )
+        };
+
+        seed("1.20.1,fabric,beta").await.unwrap();
+        assert!(
+            !badged(&app, id).await,
+            "a Release with only a newer beta is up to date"
+        );
+
+        seed("1.20.1,fabric,beta;1.20.1,fabric,stable")
+            .await
+            .unwrap();
+        assert!(badged(&app, id).await, "a newer Release is an update");
+    }
+
+    /// Seeds both platforms' cache rows for the fixture's jar, each with its
+    /// own channel label and a newer beta path.
+    async fn seed_both_platforms(
+        app: &App,
+        id: InstanceId,
+        metadata_id: &str,
+        cf: carbon_platforms::ModChannel,
+        mr: carbon_platforms::ModChannel,
+    ) {
+        metarepo::upsert_cf_mod_cache(
+            &app.db,
+            0,
+            4242,
+            100,
+            "Fixture".into(),
+            "1.0.0".into(),
+            "fixture".into(),
+            "summary".into(),
+            "author".into(),
+            cf as i32,
+            "1.20.1,fabric,beta".into(),
+            DbDateTime(Utc::now().fixed_offset()),
+            metadata_id.into(),
+        )
+        .await
+        .unwrap();
+        let sha512 = hex::encode(
+            metarepo::get_metadata_by_id(&app.db, metadata_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .sha512,
+        );
+        metarepo::upsert_mr_mod_cache(
+            &app.db,
+            sha512,
+            "project".into(),
+            "installed".into(),
+            "Fixture".into(),
+            "1.0.0".into(),
+            "fixture".into(),
+            "description".into(),
+            "author".into(),
+            mr as i32,
+            String::new(),
+            "mod.jar".into(),
+            "https://fixture.invalid/mod.jar".into(),
+            DbDateTime(Utc::now().fixed_offset()),
+            metadata_id.into(),
+        )
+        .await
+        .unwrap();
+        let context = modrinth::target_compatibility(app, CacheEntityId::Instance(id))
+            .await
+            .unwrap()
+            .key("mods");
+        metarepo::upsert_mr_update_context(
+            &app.db,
+            metadata_id,
+            &context,
+            "1.20.1,fabric,beta",
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+    }
+
+    /// One jar can be a Release on one platform and a Beta on the other. It is
+    /// held to its most stable label on both, so neither platform's newer
+    /// beta badges it.
+    #[tokio::test]
+    async fn a_jar_either_platform_calls_a_release_is_not_badged_for_betas() {
+        use carbon_platforms::ModChannel::{Beta, Stable};
+        for (name, cf, mr, expected) in [
+            ("cf-release-mr-beta", Stable, Beta, false),
+            ("cf-beta-mr-release", Beta, Stable, false),
+            ("cf-beta-mr-beta", Beta, Beta, true),
+        ] {
+            let app = crate::setup_managers_for_test().await;
+            let (id, metadata_id) = release_install_fixture(&app, name).await;
+            seed_both_platforms(&app, id, &metadata_id, cf, mr).await;
+            assert_eq!(badged(&app, id).await, expected, "{name}");
+        }
+    }
+
+    #[tokio::test]
+    async fn modrinth_release_install_is_not_badged_for_a_newer_beta() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, metadata_id) = release_install_fixture(&app, "mr-release-install").await;
+        let sha512 = hex::encode(
+            metarepo::get_metadata_by_id(&app.db, &metadata_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .sha512,
+        );
+        metarepo::upsert_mr_mod_cache(
+            &app.db,
+            sha512,
+            "project".into(),
+            "installed".into(),
+            "Fixture".into(),
+            "1.0.0".into(),
+            "fixture".into(),
+            "description".into(),
+            "author".into(),
+            carbon_platforms::ModChannel::Stable as i32,
+            String::new(),
+            "mod.jar".into(),
+            "https://fixture.invalid/mod.jar".into(),
+            DbDateTime(Utc::now().fixed_offset()),
+            metadata_id.clone(),
+        )
+        .await
+        .unwrap();
+        let context = modrinth::target_compatibility(&app, CacheEntityId::Instance(id))
+            .await
+            .unwrap()
+            .key("mods");
+        let seed = |paths: &'static str| {
+            metarepo::upsert_mr_update_context(
+                &app.db,
+                &metadata_id,
+                &context,
+                paths,
+                DbDateTime(Utc::now().fixed_offset()),
+            )
+        };
+
+        seed("1.20.1,fabric,beta").await.unwrap();
+        assert!(
+            !badged(&app, id).await,
+            "a Release with only a newer beta is up to date"
+        );
+
+        seed("1.20.1,fabric,beta;1.20.1,fabric,stable")
+            .await
+            .unwrap();
+        assert!(badged(&app, id).await, "a newer Release is an update");
+    }
 
     #[test]
     fn addon_has_extension_ignores_case_and_the_disabled_suffix() {

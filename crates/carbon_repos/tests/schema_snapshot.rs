@@ -37,7 +37,7 @@ fn migrated_schema_matches_committed_snapshot() {
     let dir = tempfile::tempdir().unwrap();
     let mut conn = Connection::open(dir.path().join("snapshot.db")).unwrap();
     let (migrations, count) = carbon_repos::get_migrations();
-    assert_eq!(count, 26, "snapshot baseline assumes exactly 26 migrations");
+    assert_eq!(count, 27, "snapshot baseline assumes exactly 27 migrations");
     migrations.to_latest(&mut conn).unwrap();
 
     let dump = dump_schema(&conn).unwrap();

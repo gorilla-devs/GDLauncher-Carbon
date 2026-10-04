@@ -72,6 +72,7 @@ pub async fn export_modrinth(
     let handle = tokio::spawn(async move {
         let try_result: anyhow::Result<_> = async {
             let mut mods = Vec::new();
+            let mut linked_files = Vec::new();
 
             let t_create_bundle = vtask.subtask(Translation::InstanceExportCreatingBundle);
             t_create_bundle.start_opaque();
@@ -100,28 +101,34 @@ pub async fn export_modrinth(
 
                     let mods_filter = mods_filter.as_mut().map(|v| &mut v.0).unwrap();
 
+                    // Re-read every mod before linking it: a same-size
+                    // replacement must not ship as the old Modrinth file.
                     app.meta_cache_manager()
-                        .override_caching_and_wait(crate::managers::metadata::cache::CacheEntityId::Instance(instance_id), false, true)
+                        .override_caching_verified_and_wait(
+                            crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
+                            crate::managers::metadata::cache::VerifyScope::MODS,
+                            false,
+                            true,
+                        )
                         .await?;
 
                     let instance_id_val = *instance_id;
                     let cached =
                         mfcdb::get_instance_mr_export_files(&app.db, instance_id_val).await?;
 
-                    let mods2 = cached.into_iter().filter_map(|row| {
-                        let Some(file_url) = row.mr_file_url else {
-                            return None;
-                        };
-
-                        match mods_filter.remove(&row.filename) {
-                            Some(_) => {
-                                Some((row.filename, row.filesize, row.sha512, row.sha1, file_url))
-                            }
-                            None => None,
+                    for row in cached {
+                        let Some(file_url) = row.mr_file_url else { continue; };
+                        // The artifact cache may refer to another file of the same
+                        // provider version. Preserve this local file as an override.
+                        if !row.mr_sha512.as_deref().is_some_and(|hash| hash.eq_ignore_ascii_case(&hex::encode(&row.sha512))) { continue; }
+                        if mods_filter.contains_key(&row.filename) {
+                            let path = basepath.join("mods").join(&row.filename);
+                            crate::managers::metadata::cache::verify_file_hash(&path, &row.sha512).await?;
+                            linked_files.push((path, row.sha512.clone()));
+                            mods_filter.remove(&row.filename);
+                            mods.push((row.filename, row.filesize, row.sha512, row.sha1, file_url));
                         }
-                    });
-
-                    mods.extend(mods2);
+                    }
                 }
             }
 
@@ -231,6 +238,9 @@ pub async fn export_modrinth(
                 } => {},
             }
 
+            #[cfg(test)]
+            app.instance_manager().test_hooks.pause("task11_export_before_publish", instance_id).await;
+            super::verify_linked_export_files(&app, instance_id, &linked_files).await?;
             tmpfile.try_rename_or_move(save_path).await?;
 
             println!("Completed items");

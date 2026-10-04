@@ -7,7 +7,7 @@ use carbon_repos::{
 use rusqlite::Connection;
 fn older() -> MigrationSet {
     let (mut migrations, _) = carbon_repos::get_migrations();
-    migrations.migrations.pop();
+    migrations.migrations.truncate(25);
     migrations
 }
 /// The schema the older build checks a down-run against.

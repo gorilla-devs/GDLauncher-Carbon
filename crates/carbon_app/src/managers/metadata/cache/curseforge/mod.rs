@@ -283,15 +283,8 @@ impl ModplatformCacher for CurseforgeModCacher {
                 let file_id = row.file_id;
                 let mcm = app.meta_cache_manager();
 
-                {
-                    let fails = mcm.failed_cf_thumbs.read().await;
-                    if let Some((time, _)) = fails.get(&project_id) {
-                        if *time > std::time::Instant::now() {
-                            return
-                        } else {
-                            mcm.failed_cf_thumbs.write().await.remove(&project_id);
-                        }
-                    }
+                if !super::thumbnail_retry_allowed(&mcm.failed_cf_thumbs, &project_id).await {
+                    return;
                 }
 
                 let r = async {
@@ -341,14 +334,17 @@ impl ModplatformCacher for CurseforgeModCacher {
                     let mut fails = mcm.failed_cf_thumbs.write().await;
                     fails.entry(project_id)
                         .and_modify(|v| *v = (
-                            std::time::Instant::now() + std::time::Duration::from_secs(u64::pow(2, v.1 + 1)),
-                            v.1 + 1,
+                            std::time::Instant::now() + std::time::Duration::from_secs(u64::pow(2, v.1.saturating_add(1).min(10))),
+                            v.1.saturating_add(1).min(10),
                         ))
                         .or_insert_with(|| (
                             std::time::Instant::now() + std::time::Duration::from_secs(2),
                             1
                         ));
+                } else {
+                    mcm.failed_cf_thumbs.write().await.remove(&project_id);
                 }
+
             });
 
         futures::future::join_all(futures).await.into_iter();
@@ -366,25 +362,28 @@ async fn cache_curseforge_meta_unchecked(
 ) -> anyhow::Result<()> {
     // This is undocumented, we're guessing what the valid values here are.
     // It seems to contain both game versions and modloaders
-    fn parse_update_paths(file_info: &File) -> Vec<(String, ModLoaderType, ModChannel)> {
+    fn parse_update_paths(file_info: &File, kind: &str) -> Vec<(String, String, ModChannel)> {
         let mut game_versions = Vec::new();
         let mut loaders = Vec::new();
 
         for entry in &file_info.game_versions {
             let entry = entry.to_lowercase();
             match ModLoaderType::try_from(&entry as &str) {
-                Ok(loader) => loaders.push(loader),
+                Ok(loader) => loaders.push(loader.to_string().to_lowercase()),
                 Err(_) => game_versions.push(entry),
             }
         }
 
+        if kind != "mods" {
+            loaders = vec![kind.to_owned()];
+        }
         let mut pairs = Vec::new();
 
         for game_version in game_versions {
             for loader in &loaders {
                 pairs.push((
                     game_version.to_lowercase(),
-                    *loader,
+                    loader.clone(),
                     file_info.release_type.into(),
                 ));
             }
@@ -393,30 +392,29 @@ async fn cache_curseforge_meta_unchecked(
         pairs
     }
 
-    let file_update_paths = parse_update_paths(fileinfo);
-    let mut update_paths = Vec::<(String, ModLoaderType, ModChannel)>::new();
+    let kind = match modinfo.class_id {
+        Some(carbon_platforms::curseforge::ClassId::ResourcePacks) => "resourcepacks",
+        Some(carbon_platforms::curseforge::ClassId::Shaders) => "shaders",
+        Some(carbon_platforms::curseforge::ClassId::Datapacks) => "datapacks",
+        _ => "mods",
+    };
+    let mut update_paths = Vec::<(String, String, ModChannel)>::new();
 
     let mut latest_files_sorted = mod_files.iter().collect::<Vec<_>>();
     latest_files_sorted.sort_by(|f1, f2| Ord::cmp(&f2.file_date, &f1.file_date));
 
     for file in latest_files_sorted {
-        if file.id == fileinfo.id {
-            break; // skip all older files than the one we currently have
+        if !super::eligibility::strictly_newer(
+            file.mod_id == fileinfo.mod_id,
+            file.id == fileinfo.id,
+            &file.file_date,
+            &fileinfo.file_date,
+        ) {
+            continue;
         }
-
-        let nf_update_paths = parse_update_paths(&file);
-
-        for path in nf_update_paths {
-            let (pv, pl, pc) = &path;
-
-            let can_use = file_update_paths
-                .iter()
-                .any(|(pv2, pl2, pc2)| pv == pv2 && pl == pl2 && pc >= pc2);
-
-            if can_use {
-                if !update_paths.contains(&path) {
-                    update_paths.push(path);
-                }
+        for path in parse_update_paths(file, kind) {
+            if !update_paths.contains(&path) {
+                update_paths.push(path);
             }
         }
     }

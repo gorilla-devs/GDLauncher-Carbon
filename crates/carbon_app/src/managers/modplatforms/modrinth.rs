@@ -40,7 +40,10 @@ impl Modrinth {
     /// Points the client at a stand-in for the API, so request shape can be
     /// asserted without depending on live data.
     #[cfg(test)]
-    fn with_base_url(client: reqwest_middleware::ClientWithMiddleware, base_url: &str) -> Self {
+    pub(crate) fn with_base_url(
+        client: reqwest_middleware::ClientWithMiddleware,
+        base_url: &str,
+    ) -> Self {
         Self {
             client,
             base_url: base_url.parse().expect("Invalid base URL"),
@@ -296,7 +299,7 @@ pub async fn convert_mr_version_to_standard_version(
     if let Some(forge_version) = modrinth_version.forge {
         let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
 
-        let forge_version = forge_manifest
+        let loaders = forge_manifest
             .game_versions
             .into_iter()
             .find(|v| v.id == minecraft_version)
@@ -306,12 +309,17 @@ pub async fn convert_mr_version_to_standard_version(
                     minecraft_version
                 )
             })?
-            .loaders
-            .into_iter()
-            .find(|l| l.id.contains(&forge_version))
-            .ok_or_else(|| {
-                anyhow::anyhow!("forge manifest does not contain loader '{}'", forge_version)
-            })?;
+            .loaders;
+        let forge_version = super::select_pinned_loader(
+            loaders,
+            |l| l.id.as_str(),
+            &forge_version,
+            &minecraft_version,
+            "forge",
+        )
+        .ok_or_else(|| {
+            anyhow::anyhow!("forge manifest does not contain loader '{}'", forge_version)
+        })?;
 
         modloaders.insert(ModLoader {
             type_: ModLoaderType::Forge,

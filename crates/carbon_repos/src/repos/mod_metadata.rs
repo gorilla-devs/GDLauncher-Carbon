@@ -104,7 +104,23 @@ pub struct MrExportEnrichRow {
 // Static queries
 // ---------------------------------------------------------------------------
 
+#[derive(carbon_macro::FromRow, Debug, Clone, PartialEq)]
+pub struct MrUpdateContextRow {
+    pub metadata_id: String,
+    pub context: String,
+    pub update_paths: String,
+    pub cached_at: DateTime<FixedOffset>,
+}
+
 queries! {
+    fn get_mr_update_context(metadata_id: &str, context: &str) -> Option<MrUpdateContextRow> =
+        "SELECT metadataId, context, updatePaths, cachedAt FROM ModrinthUpdateCache
+         WHERE metadataId=:metadata_id AND context=:context";
+    fn upsert_mr_update_context(metadata_id: &str, context: &str, paths: &str, updated_at: DbDateTime) -> usize =
+        "INSERT INTO ModrinthUpdateCache(metadataId,context,updatePaths,cachedAt)
+         SELECT id,:context,:paths,:updated_at FROM ModMetadata WHERE id=:metadata_id
+         ON CONFLICT(metadataId,context) DO UPDATE SET updatePaths=excluded.updatePaths,cachedAt=excluded.cachedAt";
+
     // --- ModMetadata ----------------------------------------------------------
     fn get_metadata_by_id(id: &str) -> Option<ModMetadataRow> =
         "SELECT id, lastUpdatedAt, murmur2, sha512, sha1, name, modid, version, description, authors, modloaders FROM ModMetadata WHERE id = :id";
@@ -126,6 +142,8 @@ queries! {
     ) -> usize =
         "INSERT INTO ModMetadata (id, lastUpdatedAt, murmur2, sha512, sha1, modloaders, name, modid, version, description, authors)
          VALUES (:id, :updated_at, :murmur2, :sha512, :sha1, :modloaders, :name, :modid, :version, :description, :authors)";
+    fn update_local_modloaders(id: &str, modloaders: &str, updated_at: DbDateTime) -> usize =
+        "UPDATE ModMetadata SET modloaders = :modloaders, lastUpdatedAt = :updated_at WHERE id = :id";
     fn gc_orphan_metadata() -> usize =
         "DELETE FROM ModMetadata
          WHERE NOT EXISTS (SELECT 1 FROM ModFileCache f WHERE f.metadataId = ModMetadata.id)

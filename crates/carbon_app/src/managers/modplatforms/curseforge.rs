@@ -34,6 +34,19 @@ impl CurseForge {
         }
     }
 
+    /// Points the client at a stand-in for the API, so callers can be tested
+    /// against fixed responses instead of live data.
+    #[cfg(test)]
+    pub(crate) fn with_base_url(
+        client: reqwest_middleware::ClientWithMiddleware,
+        base_url: &str,
+    ) -> Self {
+        Self {
+            client,
+            base_url: base_url.parse().expect("Invalid base URL"),
+        }
+    }
+
     #[tracing::instrument(skip(self))]
     pub async fn get_modloaders(
         &self,
@@ -309,7 +322,7 @@ pub async fn convert_cf_version_to_standard_version(
                     "forge" => {
                         let forge_manifest = app.minecraft_manager().get_forge_manifest().await?;
 
-                        let forge_version = forge_manifest
+                        let loaders = forge_manifest
                             .game_versions
                             .into_iter()
                             .find(|v| v.id == mc_version)
@@ -319,15 +332,17 @@ pub async fn convert_cf_version_to_standard_version(
                                     mc_version
                                 )
                             })?
-                            .loaders
-                            .into_iter()
-                            .find(|l| l.id.contains(version))
-                            .ok_or_else(|| {
-                                anyhow::anyhow!(
-                                    "forge manifest does not contain loader '{}'",
-                                    version
-                                )
-                            })?;
+                            .loaders;
+                        let forge_version = super::select_pinned_loader(
+                            loaders,
+                            |l| l.id.as_str(),
+                            version,
+                            &mc_version,
+                            loader,
+                        )
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("forge manifest does not contain loader '{}'", version)
+                        })?;
 
                         Ok(ModLoader {
                             type_: ModLoaderType::Forge,
@@ -338,7 +353,7 @@ pub async fn convert_cf_version_to_standard_version(
                         let neoforge_manifest =
                             app.minecraft_manager().get_neoforge_manifest().await?;
 
-                        let neoforge_version = neoforge_manifest
+                        let loaders = neoforge_manifest
                             .game_versions
                             .into_iter()
                             .find(|v| v.id == mc_version)
@@ -348,15 +363,20 @@ pub async fn convert_cf_version_to_standard_version(
                                     mc_version
                                 )
                             })?
-                            .loaders
-                            .into_iter()
-                            .find(|l| l.id.contains(version))
-                            .ok_or_else(|| {
-                                anyhow::anyhow!(
-                                    "neoforge manifest does not contain loader '{}'",
-                                    version
-                                )
-                            })?;
+                            .loaders;
+                        let neoforge_version = super::select_pinned_loader(
+                            loaders,
+                            |l| l.id.as_str(),
+                            version,
+                            &mc_version,
+                            loader,
+                        )
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "neoforge manifest does not contain loader '{}'",
+                                version
+                            )
+                        })?;
 
                         Ok(ModLoader {
                             type_: ModLoaderType::Neoforge,
@@ -366,7 +386,7 @@ pub async fn convert_cf_version_to_standard_version(
                     "fabric" => {
                         let fabric_manifest = app.minecraft_manager().get_fabric_manifest().await?;
 
-                        let fabric_version = fabric_manifest
+                        let loaders = fabric_manifest
                             .game_versions
                             .into_iter()
                             .find(|v| v.id == dummy_string)
@@ -376,15 +396,17 @@ pub async fn convert_cf_version_to_standard_version(
                                     mc_version
                                 )
                             })?
-                            .loaders
-                            .into_iter()
-                            .find(|l| l.id.contains(version))
-                            .ok_or_else(|| {
-                                anyhow::anyhow!(
-                                    "fabric manifest does not contain loader '{}'",
-                                    version
-                                )
-                            })?;
+                            .loaders;
+                        let fabric_version = super::select_pinned_loader(
+                            loaders,
+                            |l| l.id.as_str(),
+                            version,
+                            &mc_version,
+                            loader,
+                        )
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("fabric manifest does not contain loader '{}'", version)
+                        })?;
 
                         Ok(ModLoader {
                             type_: ModLoaderType::Fabric,
@@ -394,7 +416,7 @@ pub async fn convert_cf_version_to_standard_version(
                     "quilt" => {
                         let quilt_manifest = app.minecraft_manager().get_quilt_manifest().await?;
 
-                        let quilt_version = quilt_manifest
+                        let loaders = quilt_manifest
                             .game_versions
                             .into_iter()
                             .find(|v| v.id == mc_version)
@@ -404,15 +426,17 @@ pub async fn convert_cf_version_to_standard_version(
                                     mc_version
                                 )
                             })?
-                            .loaders
-                            .into_iter()
-                            .find(|l| l.id.contains(version))
-                            .ok_or_else(|| {
-                                anyhow::anyhow!(
-                                    "quilt manifest does not contain loader '{}'",
-                                    version
-                                )
-                            })?;
+                            .loaders;
+                        let quilt_version = super::select_pinned_loader(
+                            loaders,
+                            |l| l.id.as_str(),
+                            version,
+                            &mc_version,
+                            loader,
+                        )
+                        .ok_or_else(|| {
+                            anyhow::anyhow!("quilt manifest does not contain loader '{}'", version)
+                        })?;
 
                         Ok(ModLoader {
                             type_: ModLoaderType::Quilt,

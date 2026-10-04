@@ -63,7 +63,7 @@ pub async fn get_modpack_metadata(
             let (addon_file, addon) = tokio::try_join!(addon_file, addon)?;
 
             let name = addon.data.name.clone();
-            let file_name = addon_file.data.file_name.clone();
+            let file_name = cached_version_name(&addon_file.data).to_owned();
             let slug = addon.data.slug.clone();
             let url = addon.data.logo.as_ref().map(|logo| logo.url.clone());
 
@@ -152,5 +152,46 @@ pub async fn get_modpack_metadata(
             url_slug: addon.data.slug,
             has_image: has_icon,
         });
+    }
+}
+
+fn cached_version_name(file: &carbon_platforms::curseforge::File) -> &str {
+    &file.display_name
+}
+
+#[cfg(test)]
+mod task11_tests {
+    #[tokio::test]
+    async fn task11_cache_label_matches_upstream_display_name() {
+        let file = serde_json::from_value(serde_json::json!({
+            "id": 2, "gameId": 432, "modId": 10, "isAvailable": true,
+            "displayName": "Pack Release 2", "fileName": "pack-release-2-client.zip", "releaseType": 1,
+            "fileStatus": 4, "hashes": [], "fileDate": "2026-01-01T00:00:00Z", "fileLength": 0,
+            "downloadCount": 0, "gameVersions": ["1.20.1"], "sortableGameVersions": [],
+            "dependencies": [], "fileFingerprint": 0
+        })).unwrap();
+        assert_eq!(super::cached_version_name(&file), "Pack Release 2");
+        let app = crate::setup_managers_for_test().await;
+        super::modpackdb::upsert_cf_modpack(
+            &app.db,
+            10,
+            2,
+            "Pack",
+            super::cached_version_name(&file),
+            "pack",
+            super::DbDateTime(chrono::Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        let cached = super::get_modpack_metadata(
+            &app,
+            super::CurseforgeModpack {
+                project_id: 10,
+                file_id: 2,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(cached.version_name, file.display_name);
     }
 }

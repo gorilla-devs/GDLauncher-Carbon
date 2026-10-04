@@ -115,6 +115,7 @@ pub async fn export_gdlauncher(
     tokio::spawn(async move {
         let try_result: anyhow::Result<_> = async {
             let mut pack_files: Vec<PackFile> = Vec::new();
+            let mut linked_files = Vec::new();
 
             let t_calc_size = vtask.subtask(Translation::InstanceExportCalculateSize);
             t_calc_size.set_weight(0.0);
@@ -149,12 +150,14 @@ pub async fn export_gdlauncher(
 
                         let folder_filter = folder_filter.as_mut().map(|v| &mut v.0).unwrap();
 
-                        // Ensure cache is up to date
+                        // Ensure cache is up to date, re-reading every mod
+                        // so a same-size replacement is never linked.
                         app.meta_cache_manager()
-                            .override_caching_and_wait(
+                            .override_caching_verified_and_wait(
                                 crate::managers::metadata::cache::CacheEntityId::Instance(
                                     instance_id,
                                 ),
+                                crate::managers::metadata::cache::VerifyScope::MODS,
                                 true,
                                 false,
                             )
@@ -166,6 +169,15 @@ pub async fn export_gdlauncher(
                             mfcdb::get_instance_gdl_export_files(&app.db, instance_id_val).await?;
 
                         for row in cached_files {
+                            let folder = match row.addon_type.as_str() {
+                                "mods" => "mods",
+                                "resourcepacks" => "resourcepacks",
+                                "shaders" => "shaderpacks",
+                                _ => continue,
+                            };
+                            if folder != *addon_folder || !row.enabled {
+                                continue;
+                            }
                             // Check if in filter
                             if !folder_filter.contains_key(&row.filename) {
                                 continue;
@@ -184,6 +196,14 @@ pub async fn export_gdlauncher(
                             };
 
                             if can_resolve {
+                                let path = basepath.join(folder).join(&row.filename);
+                                super::verify_linked_mod(
+                                    &path,
+                                    &row.sha512,
+                                    row.file_stamp.as_deref(),
+                                )
+                                .await?;
+                                linked_files.push((path, row.sha512));
                                 // Remove from filter so it's NOT bundled in overrides
                                 folder_filter.remove(&row.filename);
                                 pack_files.push(PackFile::Platform(PlatformFile { hashes }));
@@ -340,6 +360,9 @@ pub async fn export_gdlauncher(
             // If the destination directory was removed (e.g. share was cancelled),
             // skip the move — the caller no longer needs the file.
             if save_path.parent().map_or(true, |p| p.exists()) {
+                let manager = app.instance_manager();
+                let _ownership = manager.lock_instance(instance_id).await;
+                super::verify_linked_export_files(&linked_files).await?;
                 tmpfile.try_rename_or_move(save_path).await?;
             } else {
                 tracing::debug!(

@@ -1,3 +1,4 @@
+use super::eligibility::UpdateContext;
 use super::{BundleSender, CacheEntityId, ModplatformCacher, UpdateNotifier};
 use crate::domain::instance::InstanceId;
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
@@ -27,10 +28,10 @@ pub mod modpack;
 /// Update paths are only ever read filtered by this pair, so it is also the only
 /// filter worth asking the API about. `None` when the entity has no usable
 /// version yet, in which case update paths are left alone.
-async fn target_compatibility(
+pub(crate) async fn target_compatibility(
     app: &App,
     entity_id: CacheEntityId,
-) -> Option<(Vec<String>, Vec<String>)> {
+) -> Option<UpdateContext> {
     match entity_id {
         CacheEntityId::Instance(instance_id) => {
             let instance_manager = app.instance_manager();
@@ -51,16 +52,43 @@ async fn target_compatibility(
                 .map(|loader| loader.type_.to_string().to_lowercase())
                 .collect::<Vec<_>>();
 
-            (!loaders.is_empty()).then(|| (vec![version.release.clone()], loaders))
+            let game = version.release.clone();
+            drop(instances);
+            use crate::managers::instance::shader_loader::{
+                ShaderLoaderKind, ShaderRecommendation,
+            };
+            let shader_engines = match app
+                .instance_manager()
+                .check_shader_requirements(instance_id)
+                .await
+                .ok()
+            {
+                Some(ShaderRecommendation::LoaderPresent { loader }) => vec![match loader {
+                    ShaderLoaderKind::Iris | ShaderLoaderKind::Oculus => "iris".into(),
+                    ShaderLoaderKind::OptiFine => "optifine".into(),
+                }],
+                _ => Vec::new(),
+            };
+            Some(UpdateContext {
+                game,
+                loaders,
+                shader_engines,
+            })
         }
         CacheEntityId::Server(server_id) => {
             let server = carbon_repos::repos::server::get_server(&app.db, server_id)
                 .await
                 .ok()??;
 
-            let loader = server.modloader_type?;
-
-            Some((vec![server.game_version], vec![loader.to_lowercase()]))
+            Some(UpdateContext {
+                game: server.game_version,
+                loaders: server
+                    .modloader_type
+                    .into_iter()
+                    .map(|l| l.to_lowercase())
+                    .collect(),
+                shader_engines: vec![],
+            })
         }
     }
 }
@@ -73,21 +101,29 @@ async fn target_compatibility(
 /// same project and was published after the installed file: the newest version
 /// for this entity's game version can predate a file installed for another one.
 fn build_update_paths(installed: &Version, project_id: &str, candidates: &[Version]) -> String {
-    let mut paths = HashSet::<(&str, ModLoaderType, ModChannel)>::new();
+    let mut paths = HashSet::<(&str, String, ModChannel)>::new();
 
     let updates = candidates.iter().filter(|candidate| {
-        candidate.project_id == project_id
-            && candidate.id != installed.id
-            && candidate.date_published > installed.date_published
+        super::eligibility::strictly_newer(
+            candidate.project_id == project_id,
+            candidate.id == installed.id,
+            &candidate.date_published,
+            &installed.date_published,
+        )
     });
 
     for update in updates {
         for game_version in &update.game_versions {
             for loader in &update.loaders {
-                let Ok(loader) = ModLoaderType::try_from(loader as &str) else {
+                let loader = loader.to_lowercase();
+                if ModLoaderType::try_from(loader.as_str()).is_err()
+                    && !matches!(
+                        loader.as_str(),
+                        "minecraft" | "datapack" | "iris" | "optifine"
+                    )
+                {
                     continue;
-                };
-
+                }
                 paths.insert((game_version, loader, update.version_type.into()));
             }
         }
@@ -112,11 +148,12 @@ impl ModplatformCacher for ModrinthModCacher {
     const NAME: &'static str = "modrinth";
     type SaveBundle = (
         Vec<String>,
-        Vec<(String, String)>,
+        Vec<(String, String, String)>,
         VersionHashesResponse,
         ProjectsResponse,
         Vec<TeamResponse>,
         Vec<Version>,
+        Option<UpdateContext>,
     );
 
     async fn query_platform(
@@ -128,26 +165,31 @@ impl ModplatformCacher for ModrinthModCacher {
         // nothing to match on the platform (instance variant excludes them). A
         // file needs a refresh when its metadata has no Modrinth cache row, or
         // one cached more than a day ago.
+        let target_compat = target_compatibility(app, entity_id).await;
+        let context = target_compat
+            .as_ref()
+            .map(UpdateContext::base_key)
+            .unwrap_or_default();
         let cutoff = DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset());
         let modlist = match entity_id {
             CacheEntityId::Instance(instance_id) => {
                 let instance_id_val = *instance_id;
-                mfcdb::instance_mods_needing_mr_refresh(&app.db, instance_id_val, cutoff)
+                mfcdb::instance_mods_needing_mr_context(&app.db, instance_id_val, &context, cutoff)
                     .await?
                     .into_iter()
                     .map(|m| {
                         let sha512 = hex::encode(&m.sha512);
-                        (sha512.clone(), (m.metadata_id, sha512))
+                        (sha512.clone(), (m.metadata_id, sha512, m.addon_type))
                     })
                     .collect::<Vec<_>>()
             }
             CacheEntityId::Server(server_id) => {
-                mfcdb::server_mods_needing_mr_refresh(&app.db, server_id, cutoff)
+                mfcdb::server_mods_needing_mr_context(&app.db, server_id, &context, cutoff)
                     .await?
                     .into_iter()
                     .map(|m| {
                         let sha512 = hex::encode(&m.sha512);
-                        (sha512.clone(), (m.metadata_id, sha512))
+                        (sha512.clone(), (m.metadata_id, sha512, m.addon_type))
                     })
                     .collect::<Vec<_>>()
             }
@@ -158,7 +200,7 @@ impl ModplatformCacher for ModrinthModCacher {
 
         let mut modlist = modlist
             .into_iter()
-            .filter(|(_, (_, sha512))| !ignored_hashes.contains(sha512))
+            .filter(|(_, (_, sha512, _))| !ignored_hashes.contains(sha512))
             .collect::<VecDeque<_>>();
 
         if modlist.is_empty() {
@@ -184,8 +226,6 @@ impl ModplatformCacher for ModrinthModCacher {
         }
 
         drop(failed_instances);
-
-        let target_compat = target_compatibility(app, entity_id).await;
 
         let fut = async {
             while !modlist.is_empty() {
@@ -238,10 +278,22 @@ impl ModplatformCacher for ModrinthModCacher {
                 // Each channel is asked separately: a mod whose newest build is a
                 // beta may still have a newer stable one than the installed file,
                 // and which of them counts as an update is the user's choice.
-                let combined_versions_response = match &target_compat {
-                    Some((game_versions, loaders)) => {
-                        let mut newest_per_channel = Vec::new();
-
+                let mut combined_versions_response = Vec::new();
+                if let Some(context) = &target_compat {
+                    let kinds = metadata
+                        .iter()
+                        .map(|(_, _, kind)| kind.as_str())
+                        .collect::<HashSet<_>>();
+                    for kind in kinds {
+                        let loaders = context.request_loaders(kind);
+                        if loaders.is_empty() {
+                            continue;
+                        }
+                        let hashes = metadata
+                            .iter()
+                            .filter(|(_, _, k)| k == kind)
+                            .map(|(_, hash, _)| hash.clone())
+                            .collect::<Vec<_>>();
                         for version_type in
                             [VersionType::Release, VersionType::Beta, VersionType::Alpha]
                         {
@@ -249,23 +301,17 @@ impl ModplatformCacher for ModrinthModCacher {
                             let latest = mpm
                                 .modrinth
                                 .get_latest_versions_from_hashes(&LatestVersionsBody {
-                                    hashes: sha512_hashes.clone(),
+                                    hashes: hashes.clone(),
                                     algorithm: HashAlgorithm::SHA512,
                                     loaders: loaders.clone(),
-                                    game_versions: game_versions.clone(),
+                                    game_versions: vec![context.game.clone()],
                                     version_types: Some(vec![version_type]),
                                 })
                                 .await?;
-
-                            newest_per_channel.extend(latest.0.into_values());
+                            combined_versions_response.extend(latest.0.into_values());
                         }
-
-                        newest_per_channel
                     }
-                    // Without a known game version and loader there is nothing to
-                    // ask for; mods are still cached, only update paths are skipped.
-                    None => Vec::new(),
-                };
+                }
 
                 sender.send((
                     sha512_hashes,
@@ -274,6 +320,7 @@ impl ModplatformCacher for ModrinthModCacher {
                     projects_response,
                     teams_response,
                     combined_versions_response,
+                    target_compat.clone(),
                 ));
             }
 
@@ -300,11 +347,11 @@ impl ModplatformCacher for ModrinthModCacher {
     async fn save_batch(
         app: &App,
         entity_id: CacheEntityId,
-        (sha512_hashes, batch, versions, projects, teams, combined_versions): Self::SaveBundle,
+        (sha512_hashes, batch, versions, projects, teams, combined_versions, context): Self::SaveBundle,
     ) {
         trace!("processing modrinth mod batch for {entity_id}");
 
-        let mut matches = sha512_hashes
+        let matches = sha512_hashes
             .iter()
             .map(|hash| versions.get_key_value(hash))
             .filter_map(|version_match| match version_match {
@@ -327,8 +374,9 @@ impl ModplatformCacher for ModrinthModCacher {
         drop(ignored_hashes);
 
         let combined_versions = &combined_versions;
-        let futures = batch.into_iter().filter_map(|(metadata_id, sha512)| {
-            let sha512_match = matches.remove(&sha512);
+        let context = &context;
+        let futures = batch.into_iter().filter_map(|(metadata_id, sha512, kind)| {
+            let sha512_match = matches.get(&sha512).copied();
             sha512_match.map(|(project, team, version)| async move {
                 // The version matched on the queried hash, but Modrinth's response
                 // is external data: an odd or hash-mismatched result can still list
@@ -363,6 +411,15 @@ impl ModplatformCacher for ModrinthModCacher {
                             .unwrap_or_else(|| member.user.username.clone())
                     })
                     .join(", ");
+
+                if let Some(context) = context {
+                    let candidates = combined_versions.iter().filter(|v| context.compatible(&kind, &v.game_versions, &v.loaders)).cloned().collect::<Vec<_>>();
+                    let paths = build_update_paths(version, &project.id, &candidates);
+                    if let Err(error) = metarepo::upsert_mr_update_context(&app.db, &metadata_id, &context.key(&kind), &paths,
+                        DbDateTime(chrono::Utc::now().fixed_offset())).await {
+                        error!(?error, "Could not store Modrinth update context");
+                    }
+                }
 
                 let r = cache_modrinth_meta_unchecked(
                     app,
@@ -416,15 +473,8 @@ impl ModplatformCacher for ModrinthModCacher {
                 let version_id = row.version_id;
                 let mcm = app.meta_cache_manager();
 
-                {
-                    let fails = mcm.failed_mr_thumbs.read().await;
-                    if let Some((time, _)) = fails.get(&project_id) {
-                        if *time > std::time::Instant::now() {
-                            return
-                        } else {
-                            mcm.failed_mr_thumbs.write().await.remove(&project_id);
-                        }
-                    }
+                if !super::thumbnail_retry_allowed(&mcm.failed_mr_thumbs, &project_id).await {
+                    return;
                 }
 
                 let r = async {
@@ -473,14 +523,17 @@ impl ModplatformCacher for ModrinthModCacher {
                     let mut fails = mcm.failed_mr_thumbs.write().await;
                     fails.entry(project_id)
                         .and_modify(|v| *v = (
-                            std::time::Instant::now() + std::time::Duration::from_secs(u64::pow(2, v.1 + 1)),
-                            v.1 + 1,
+                            std::time::Instant::now() + std::time::Duration::from_secs(u64::pow(2, v.1.saturating_add(1).min(10))),
+                            v.1.saturating_add(1).min(10),
                         ))
                         .or_insert_with(|| (
                             std::time::Instant::now() + std::time::Duration::from_secs(2),
                             1
                         ));
+                } else {
+                    mcm.failed_mr_thumbs.write().await.remove(&project_id);
                 }
+
             });
 
         futures::future::join_all(futures).await.into_iter();
@@ -596,6 +649,179 @@ mod test {
     }
 
     #[test]
+    fn task11_non_mod_loader_tags_produce_update_paths() {
+        for loader in ["minecraft", "datapack", "iris", "optifine"] {
+            let mut installed = version("installed", "project", 10, VersionType::Release);
+            installed.loaders = vec![loader.into()];
+            let mut newer = version("newer", "project", 20, VersionType::Release);
+            newer.loaders = vec![loader.into()];
+            assert!(
+                !build_update_paths(&installed, "project", &[newer]).is_empty(),
+                "{loader}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn task11_shared_artifact_refresh_keeps_both_game_contexts() {
+        use crate::domain::instance::{
+            AddonType,
+            info::{ModLoader, StandardVersion},
+        };
+        let app = crate::setup_managers_for_test().await;
+        let mut instances = Vec::new();
+        for (name, game) in [("context-a", "1.20.1"), ("context-b", "1.20.2")] {
+            let (id, _) = super::super::tests::addon_fixture_version(
+                &app,
+                name,
+                AddonType::Mods,
+                "mod.jar",
+                b"shared artifact",
+                StandardVersion {
+                    release: game.into(),
+                    modloaders: [ModLoader {
+                        type_: ModLoaderType::Forge,
+                        version: "fixture".into(),
+                    }]
+                    .into_iter()
+                    .collect(),
+                },
+            )
+            .await;
+            app.meta_cache_manager()
+                .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+                .await
+                .unwrap();
+            let row = mfcdb::get_mod_files_by_instance(&app.db, *id)
+                .await
+                .unwrap()
+                .remove(0);
+            instances.push((id, row.metadata_id, game));
+        }
+        assert_eq!(
+            instances[0].1, instances[1].1,
+            "physical artifact stays shared"
+        );
+        let meta = metarepo::get_metadata_by_id(&app.db, &instances[0].1)
+            .await
+            .unwrap()
+            .unwrap();
+        let hash = hex::encode(meta.sha512);
+        for (id, metadata, game) in &instances {
+            let context = target_compatibility(&app, CacheEntityId::Instance(*id))
+                .await
+                .unwrap();
+            let missing = mfcdb::instance_mods_needing_mr_context(
+                &app.db,
+                **id,
+                &context.base_key(),
+                DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset()),
+            )
+            .await
+            .unwrap();
+            assert_eq!(
+                missing.len(),
+                1,
+                "a fresh shared artifact must not suppress missing target eligibility"
+            );
+            let mut installed = version("installed", "project", 10, VersionType::Release);
+            installed.game_versions = vec!["1.20.1".into(), "1.20.2".into()];
+            installed.files = vec![file(&hash)];
+            let mut newer = version(&format!("new-{game}"), "project", 20, VersionType::Release);
+            newer.game_versions = vec![(*game).into()];
+            ModrinthModCacher::save_batch(
+                &app,
+                CacheEntityId::Instance(*id),
+                (
+                    vec![hash.clone()],
+                    vec![(metadata.clone(), hash.clone(), "mods".into())],
+                    VersionHashesResponse([(hash.clone(), installed)].into_iter().collect()),
+                    ProjectsResponse(vec![project("project")]),
+                    vec![team("project")],
+                    vec![newer],
+                    target_compatibility(&app, CacheEntityId::Instance(*id)).await,
+                ),
+            )
+            .await;
+        }
+        for (id, _, game) in &instances {
+            let listed = app.instance_manager().list_mods(*id, None).await.unwrap();
+            assert!(
+                listed[0].has_update,
+                "{game} must retain its own newer compatible candidate"
+            );
+            let context = target_compatibility(&app, CacheEntityId::Instance(*id))
+                .await
+                .unwrap();
+            assert!(
+                mfcdb::instance_mods_needing_mr_context(
+                    &app.db,
+                    **id,
+                    &context.base_key(),
+                    DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset())
+                )
+                .await
+                .unwrap()
+                .is_empty()
+            );
+        }
+        let (id, metadata, _) = &instances[1];
+        let context = target_compatibility(&app, CacheEntityId::Instance(*id))
+            .await
+            .unwrap();
+        // Negative eligibility has its own freshness and may not erase A's positive path.
+        metarepo::upsert_mr_update_context(
+            &app.db,
+            metadata,
+            &context.key("mods"),
+            "",
+            DbDateTime(chrono::Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+        assert!(!app.instance_manager().list_mods(*id, None).await.unwrap()[0].has_update);
+        assert!(
+            app.instance_manager()
+                .list_mods(instances[0].0, None)
+                .await
+                .unwrap()[0]
+                .has_update
+        );
+        assert!(
+            mfcdb::instance_mods_needing_mr_context(
+                &app.db,
+                **id,
+                &context.base_key(),
+                DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset())
+            )
+            .await
+            .unwrap()
+            .is_empty()
+        );
+        metarepo::upsert_mr_update_context(
+            &app.db,
+            metadata,
+            &context.key("mods"),
+            "",
+            DbDateTime((chrono::Utc::now() - chrono::Duration::days(2)).fixed_offset()),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            mfcdb::instance_mods_needing_mr_context(
+                &app.db,
+                **id,
+                &context.base_key(),
+                DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset())
+            )
+            .await
+            .unwrap()
+            .len(),
+            1
+        );
+    }
+
+    #[test]
     fn no_update_paths_without_candidates() {
         let installed = version("installed", "project", 10, VersionType::Release);
 
@@ -704,13 +930,22 @@ mod test {
         let bundle = (
             vec![bad_sha512.clone(), good_sha512.clone()],
             vec![
-                ("bad-metadata".to_string(), bad_sha512.clone()),
-                ("good-metadata".to_string(), good_sha512.clone()),
+                (
+                    "bad-metadata".to_string(),
+                    bad_sha512.clone(),
+                    "mods".into(),
+                ),
+                (
+                    "good-metadata".to_string(),
+                    good_sha512.clone(),
+                    "mods".into(),
+                ),
             ],
             VersionHashesResponse(versions),
             ProjectsResponse(vec![project("bad-project"), project("good-project")]),
             vec![team("bad-project"), team("good-project")],
             Vec::new(),
+            None,
         );
 
         // Must not panic: a panic here would take down the shared
@@ -773,11 +1008,16 @@ mod test {
 
         let bundle = (
             vec![queried_sha512.clone()],
-            vec![("metadata".to_string(), queried_sha512.clone())],
+            vec![(
+                "metadata".to_string(),
+                queried_sha512.clone(),
+                "mods".into(),
+            )],
             VersionHashesResponse(versions),
             ProjectsResponse(vec![project("project")]),
             vec![team("project")],
             Vec::new(),
+            None,
         );
 
         ModrinthModCacher::save_batch(&app, CacheEntityId::Server(1), bundle).await;

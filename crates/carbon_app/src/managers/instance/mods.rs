@@ -7,12 +7,15 @@ use crate::domain::instance::info::{GameVersion, ModLoaderType};
 use crate::domain::instance::{self as domain, info};
 use crate::managers::AppInner;
 use crate::managers::instance::InstanceType;
+use crate::managers::metadata::cache::eligibility::{
+    Installed, InstalledId, UpdateContext, choose_update, installed_channel,
+};
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 use anyhow::Context;
 use anyhow::{anyhow, bail};
 use carbon_platforms::curseforge::FileReleaseType;
 use carbon_platforms::curseforge::filters::{
-    ModFilesParameters, ModFilesParametersQuery, ModParameters,
+    ModFileParameters, ModFilesParameters, ModFilesParametersQuery, ModParameters,
 };
 use carbon_platforms::modrinth::project::ProjectVersionsFilters;
 use carbon_platforms::modrinth::search::ProjectID;
@@ -220,41 +223,28 @@ impl ManagerRef<'_, InstanceManager> {
             .runtime_path
             .get_instances()
             .get_instance_path(&shortpath);
-        let setup = path.get_root().join(".setup");
-        if addon_metadata(&setup).await?.is_some() {
-            use super::modpack::session::{Kind, Phase, Producer, Session};
-            let session = Session::load(&path.get_root())
-                .await?
-                .context("Unverified pending setup; finish or cancel it before changing addons")?;
-            let initial = session.producer == Producer::Create
-                && session.kind == Kind::VersionOnly
-                && session.phase == Phase::Reserved;
-            let imported = session.producer == Producer::Import
-                && session.kind == Kind::ImportedComplete
-                && session.phase == Phase::Committed;
-            let installed = super::schema::parse_instance_config(&session.installed_config)?;
-            if session.instance_id != Some(*instance_id)
-                || !(initial || imported)
-                || session.pending_config.is_some()
-                || session.requested_pack.is_some()
-                || session.target.is_some()
-                || session.original_options.is_some()
-                || session.archive.is_some()
-                || session.copied_to.is_some()
-                || !same_addon_game_version(&installed.game_configuration.version, &version)
-                || installed.modpack != modpack
-            {
-                bail!("A setup is pending. Finish or cancel it before changing addons");
-            }
-            for marker in [
-                "change-pack-version.json",
-                "repair",
-                "apply-started",
-                "representation-transitions",
-                "staging-packinfo.json",
-            ] {
-                if addon_metadata(&setup.join(marker)).await?.is_some() {
-                    bail!("A setup is pending. Finish or cancel it before changing addons");
+        let root = path.get_root();
+        if addon_metadata(&root.join(".setup")).await?.is_some() {
+            use super::modpack::session::{self, Session};
+            let pending = Session::load(&root)
+                .await
+                .with_context(|| unreadable_setup_refusal(&config, PendingChange::Addons))?;
+            let allowed = match &pending {
+                // A 2.0.40 setup without a record that only waits for a version
+                // install (an empty one, or a clean modpack-complete, like a
+                // completed import, whose platform link 2.0.40 and Play never
+                // download) never stages addon content, and 2.0.40 allowed
+                // addon edits beside it. Read-only: not every caller holds the
+                // gate.
+                None => matches!(
+                    session::classify_legacy(&root).await,
+                    Ok(Some(
+                        session::LegacyRequest::VersionOnly
+                            | session::LegacyRequest::Complete { .. }
+                    ))
+                ),
+                Some(pending) => {
+                    setup_allows_addon_edits(&root, instance_id, &config, pending).await?
                 }
             };
             if !allowed {
@@ -296,57 +286,38 @@ impl ManagerRef<'_, InstanceManager> {
         let config = data.config.clone();
         drop(instances);
 
-        let update_paths = match &config.game_configuration.version {
-            Some(GameVersion::Standard(version)) => {
-                let v = version.release.to_lowercase();
-
-                version
-                    .modloaders
-                    .iter()
-                    .map(|loader| (v.clone(), loader.type_.to_string().to_lowercase()))
-                    .collect::<Vec<_>>()
-            }
-            _ => Vec::new(),
-        };
-
+        let context = crate::managers::metadata::cache::modrinth::target_compatibility(
+            self.app,
+            crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
+        )
+        .await;
         let mod_sources = self.instance_cfg_mod_sources(&config).await?;
-
-        fn split_paths<'a>(paths: &'a str) -> Vec<(&'a str, &'a str, &'a str)> {
-            paths
-                .split(';')
-                .filter(|p| !p.is_empty())
-                .filter_map(|path| path.split_once(','))
-                .filter_map(|(v, lc)| lc.split_once(',').map(|(l, c)| (v, l, c)))
-                .collect()
-        }
-
-        let has_update_for_paths =
-            |current_channel: ModChannel, paths: &Vec<(&str, &str, &str)>| {
-                let mut best_channel = ModChannel::Alpha;
-
-                paths
-                    .iter()
-                    .filter(|(v1, l1, _)| update_paths.iter().any(|(v2, l2)| v1 == v2 && l1 == l2))
-                    .filter_map(|(_, _, channel)| ModChannel::from_str(channel).ok())
-                    .filter(|channel| {
-                        if *channel >= best_channel
-                            && mod_sources
-                                .channels
-                                .iter()
-                                .any(|c| c.channel == *channel && c.allow_updates)
-                        {
-                            best_channel = *channel;
-                            true
-                        } else {
-                            false
-                        }
-                    })
-                    .next()
-                    .is_some()
-            };
+        // The installed jar's cached channel sets the update floor, so a
+        // Release is only badged for a newer Release under the default policy.
+        let has_update_for_paths = |kind: &str, paths: &str, installed: ModChannel| {
+            context
+                .as_ref()
+                .is_some_and(|context| context.has_path(kind, paths, &mod_sources, installed))
+        };
 
         let instance_id_val = *instance_id;
         let mut mods = mfcdb::get_instance_mods_full(&self.app.db, instance_id_val).await?;
+
+        // Legacy artifact paths are not evidence for a context we never queried.
+        for row in &mut mods {
+            row.mr_update_paths = if let Some(context) = &context {
+                carbon_repos::repos::mod_metadata::get_mr_update_context(
+                    &self.app.db,
+                    &row.meta_id,
+                    &context.key(&row.addon_type),
+                )
+                .await?
+                .filter(|v| v.cached_at > chrono::Utc::now() - chrono::Duration::days(1))
+                .map(|v| v.update_paths)
+            } else {
+                None
+            };
+        }
 
         // Apply the optional addon-type filter in Rust BEFORE the duplicate
         // detection pass, so the modid counts are computed over exactly the
@@ -376,53 +347,37 @@ impl ManagerRef<'_, InstanceManager> {
             .collect();
 
         let mods = mods.into_iter().map(|m| {
-            let has_curseforge_update = if m.cf_project_id.is_some() {
-                match ModChannel::try_from(m.cf_release_type.unwrap()) {
-                    Ok(channel) => {
-                        !mod_sources
-                            .platform_blacklist
-                            .contains(&ModPlatform::Curseforge)
-                            && has_update_for_paths(
-                                channel,
-                                &split_paths(m.cf_update_paths.as_deref().unwrap_or("")),
-                            )
-                    }
-                    Err(_) => {
-                        tracing::error!(
-                            "Invalid ModChannel in database for curseforge entry {}: {}",
-                            m.meta_id,
-                            m.cf_release_type.unwrap()
-                        );
-                        false
-                    }
-                }
-            } else {
-                false
+            // Both platforms' badges hold the jar to its most stable label, so
+            // a file one platform calls a Release is not badged for the other
+            // platform's betas.
+            let installed = installed_channel([
+                m.cf_project_id
+                    .and_then(|_| cached_channel("curseforge", &m.meta_id, m.cf_release_type)),
+                m.mr_project_id
+                    .as_ref()
+                    .and_then(|_| cached_channel("modrinth", &m.meta_id, m.mr_release_type)),
+            ]);
+            let has_update_on = |platform: ModPlatform, listed: bool, paths: &Option<String>| {
+                listed
+                    && !mod_sources.platform_blacklist.contains(&platform)
+                    && installed.is_some_and(|installed| {
+                        has_update_for_paths(
+                            &m.addon_type,
+                            paths.as_deref().unwrap_or(""),
+                            installed,
+                        )
+                    })
             };
-
-            let has_modrinth_update = if m.mr_project_id.is_some() {
-                match ModChannel::try_from(m.mr_release_type.unwrap()) {
-                    Ok(channel) => {
-                        !mod_sources
-                            .platform_blacklist
-                            .contains(&ModPlatform::Modrinth)
-                            && has_update_for_paths(
-                                channel,
-                                &split_paths(m.mr_update_paths.as_deref().unwrap_or("")),
-                            )
-                    }
-                    Err(_) => {
-                        tracing::error!(
-                            "Invalid ModChannel in database for modrinth entry {}: {}",
-                            m.meta_id,
-                            m.mr_release_type.unwrap()
-                        );
-                        false
-                    }
-                }
-            } else {
-                false
-            };
+            let has_curseforge_update = has_update_on(
+                ModPlatform::Curseforge,
+                m.cf_project_id.is_some(),
+                &m.cf_update_paths,
+            );
+            let has_modrinth_update = has_update_on(
+                ModPlatform::Modrinth,
+                m.mr_project_id.is_some(),
+                &m.mr_update_paths,
+            );
 
             let is_duplicate = m.enabled
                 && m.modid
@@ -892,7 +847,7 @@ impl ManagerRef<'_, InstanceManager> {
         let config = data.config.clone();
         drop(instances);
 
-        self.get_owned_mod_file(instance_id, &id).await?;
+        let owned = self.get_owned_mod_file(instance_id, &id).await?;
 
         let Some(GameVersion::Standard(version)) = &config.game_configuration.version else {
             bail!(
@@ -900,128 +855,30 @@ impl ManagerRef<'_, InstanceManager> {
             );
         };
 
+        let context = crate::managers::metadata::cache::modrinth::target_compatibility(
+            self.app,
+            crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
+        )
+        .await
+        .context("Unknown update compatibility context")?;
         let mod_sources = self.instance_cfg_mod_sources(&config).await?;
-
-        struct CfIds {
-            project_id: i32,
-            file_id: i32,
-        }
-        struct MrIds {
-            project_id: String,
-            version_id: String,
-        }
 
         let lookup_id = id.clone();
         let row = mfcdb::get_instance_mod_update_ids(&self.app.db, &lookup_id)
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let cf = row
-            .cf_project_id
-            .zip(row.cf_file_id)
-            .map(|(project_id, file_id)| CfIds {
-                project_id,
-                file_id,
-            });
-
-        let mr = match (row.mr_project_id, row.mr_version_id) {
-            (Some(project_id), Some(version_id)) => Some(MrIds {
-                project_id,
-                version_id,
-            }),
-            _ => None,
-        };
-
-        let mut versions = Vec::new();
-
-        if let Some(cf) = &cf {
-            let response = self
-                .app
-                .modplatforms_manager()
-                .curseforge
-                .get_mod_files(ModFilesParameters {
-                    mod_id: cf.project_id,
-                    query: ModFilesParametersQuery {
-                        game_version: Some(version.release.clone()),
-                        game_version_type_id: None,
-                        mod_loader_type: version.modloaders.iter().next().map(|v| v.type_.into()),
-                        index: None,
-                        page_size: None,
-                    },
-                })
-                .await?;
-
-            versions.extend(
-                response
-                    .data
-                    .into_iter()
-                    .map(|f| RemoteVersion::Curseforge(f)),
-            );
-        }
-
-        if let Some(mr) = &mr {
-            let response = self
-                .app
-                .modplatforms_manager()
-                .modrinth
-                .get_project_versions(ProjectVersionsFilters {
-                    project_id: ProjectID(mr.project_id.clone()),
-                    game_versions: Some(vec![version.release.clone()]),
-                    loaders: Some(
-                        version
-                            .modloaders
-                            .iter()
-                            .map(|ml| ml.type_.to_string())
-                            .collect(),
-                    ),
-                    limit: None,
-                    offset: None,
-                })
-                .await?;
-
-            versions.extend(response.into_iter().map(|v| RemoteVersion::Modrinth(v)));
-        }
-
-        versions.sort();
-
-        'select: for channel in &mod_sources.channels {
-            if !channel.allow_updates {
-                continue;
-            }
-
-            for i in 0..versions.len() {
-                let version = &versions[i];
-
-                if version.channel() >= channel.channel {
-                    let version = versions.remove(i);
-
-                    match &version {
-                        RemoteVersion::Curseforge(file) => {
-                            let cf = cf.as_ref().ok_or_else(|| {
-                                anyhow!("curseforge metadata missing while comparing curseforge version (mod {})", id)
-                            })?;
-
-                            if cf.file_id == file.id {
-                                break 'select;
-                            }
-                        }
-                        RemoteVersion::Modrinth(version) => {
-                            let mr = mr.as_ref().ok_or_else(|| {
-                                anyhow!("modrinth metadata missing while comparing modrinth version (mod {})", id)
-                            })?;
-
-                            if mr.version_id == version.id {
-                                break 'select;
-                            }
-                        }
-                    }
-
-                    return Ok(Some(version));
-                }
-            }
-        }
-
-        Ok(None)
+        let platforms = self.app.modplatforms_manager();
+        resolve_mod_update(
+            &platforms.curseforge,
+            &platforms.modrinth,
+            &row,
+            version,
+            &owned.addon_type,
+            &context,
+            &mod_sources,
+        )
+        .await
     }
 
     pub async fn update_mod(
@@ -1055,7 +912,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .await
             }
             None => Err(anyhow!(
-                "unable to find newer mod version in availible update channels"
+                "unable to find newer mod version in available update channels"
             )),
         }
     }
@@ -1093,7 +950,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         let cf_project_id = cf.cf_project_id.ok_or_else(|| {
             anyhow!(
-                "Attempted to use update_curseforge_mod to update a mod not availible on curseforge"
+                "Attempted to use update_curseforge_mod to update a mod not available on curseforge"
             )
         })?;
         let cf_file_id = cf
@@ -1169,7 +1026,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         let mr_project_id = mr.mr_project_id.ok_or_else(|| {
             anyhow!(
-                "Attempted to use update_modrinth_mod to update a mod not availible on modrinth"
+                "Attempted to use update_modrinth_mod to update a mod not available on modrinth"
             )
         })?;
         let mr_version_id = mr
@@ -1244,6 +1101,174 @@ pub struct InvalidInstanceModIdError(InstanceId, String);
 #[derive(Error, Debug)]
 #[error("invalid mod id '{0}'")]
 pub struct InvalidModIdError(String);
+
+/// Picks the update `find_mod_update` offers for an installed addon, from what
+/// the platforms report for its project. Kept apart from the instance lookup so
+/// tests can point the platform clients at a stand-in API.
+async fn resolve_mod_update(
+    curseforge: &crate::managers::modplatforms::curseforge::CurseForge,
+    modrinth: &crate::managers::modplatforms::modrinth::Modrinth,
+    row: &mfcdb::ModUpdateIdsRow,
+    version: &info::StandardVersion,
+    addon_type: &str,
+    context: &UpdateContext,
+    mod_sources: &ModSources,
+) -> anyhow::Result<Option<RemoteVersion>> {
+    let cf = row.cf_project_id.zip(row.cf_file_id);
+    let mr = row.mr_project_id.clone().zip(row.mr_version_id.clone());
+
+    let mut versions = Vec::new();
+
+    if let Some((project_id, _)) = cf {
+        let response = curseforge
+            .get_mod_files(ModFilesParameters {
+                mod_id: project_id,
+                query: ModFilesParametersQuery {
+                    game_version: Some(version.release.clone()),
+                    game_version_type_id: None,
+                    mod_loader_type: (addon_type == "mods")
+                        .then(|| version.modloaders.iter().next().map(|v| v.type_.into()))
+                        .flatten(),
+                    index: None,
+                    page_size: None,
+                },
+            })
+            .await?;
+
+        versions.extend(
+            response
+                .data
+                .into_iter()
+                .map(|f| RemoteVersion::Curseforge(f)),
+        );
+    }
+
+    if let Some((project_id, _)) = &mr {
+        let response = modrinth
+            .get_project_versions(ProjectVersionsFilters {
+                project_id: ProjectID(project_id.clone()),
+                game_versions: Some(vec![version.release.clone()]),
+                loaders: Some(context.request_loaders(addon_type)),
+                limit: None,
+                offset: None,
+            })
+            .await?;
+
+        versions.extend(response.into_iter().map(|v| RemoteVersion::Modrinth(v)));
+    }
+
+    versions.retain(|candidate| match candidate {
+        RemoteVersion::Modrinth(v) => context.compatible(addon_type, &v.game_versions, &v.loaders),
+        RemoteVersion::Curseforge(v) => context.cf_compatible(addon_type, &v.game_versions),
+    });
+
+    let mut fetched = Vec::new();
+    if let Some((project_id, file_id)) = cf {
+        let version = curseforge
+            .get_mod_file(ModFileParameters {
+                mod_id: project_id,
+                file_id,
+            })
+            .await
+            .map(|response| RemoteVersion::Curseforge(response.data));
+        fetched.push((
+            version,
+            InstalledId::Curseforge {
+                project_id,
+                file_id,
+            },
+        ));
+    }
+    if let Some((project_id, version_id)) = mr {
+        let version = modrinth
+            .get_version(carbon_platforms::modrinth::search::VersionID(
+                version_id.clone(),
+            ))
+            .await
+            .map(RemoteVersion::Modrinth);
+        fetched.push((
+            version,
+            InstalledId::Modrinth {
+                project_id,
+                version_id,
+            },
+        ));
+    }
+    let cached = installed_channel([
+        row.cf_release_type
+            .and_then(|channel| ModChannel::try_from(channel).ok()),
+        row.mr_release_type
+            .and_then(|channel| ModChannel::try_from(channel).ok()),
+    ]);
+    let installed = installed_states(fetched, cached)?;
+
+    Ok(choose_update(versions, &installed, mod_sources))
+}
+
+/// The installed jar as each platform that listed it reports it now.
+///
+/// `cached` is the jar's channel from the metadata cache, the same one the
+/// update badge reads. If no platform's cached value is readable, the live
+/// channel stands in, or Stable (the most cautious floor) when no platform
+/// serves the file any more. A file a platform no longer has (404) is `Gone`,
+/// so the update that replaces a pulled build still works; any other failure
+/// still fails the update.
+fn installed_states(
+    fetched: Vec<(anyhow::Result<RemoteVersion>, InstalledId)>,
+    cached: Option<ModChannel>,
+) -> anyhow::Result<Vec<Installed>> {
+    let mut listed = Vec::new();
+    let mut gone = Vec::new();
+    for (version, id) in fetched {
+        match version {
+            Ok(version) => listed.push(version),
+            Err(error) if is_not_found(&error) => {
+                tracing::info!(
+                    ?id,
+                    "the installed file is no longer available on its platform; another file of its project can replace it"
+                );
+                gone.push(id);
+            }
+            Err(error) => return Err(error),
+        }
+    }
+    let channel = cached
+        .or_else(|| listed.iter().map(RemoteVersion::channel).max())
+        .unwrap_or(ModChannel::Stable);
+    Ok(listed
+        .into_iter()
+        .map(|version| Installed::Present { version, channel })
+        .chain(gone.into_iter().map(|id| Installed::Gone { id, channel }))
+        .collect())
+}
+
+/// A platform's cached channel for an installed file, or `None` (logged) if
+/// the stored value is not a channel.
+fn cached_channel(platform: &str, meta_id: &str, release_type: Option<i32>) -> Option<ModChannel> {
+    let release_type = release_type?;
+    ModChannel::try_from(release_type)
+        .inspect_err(|_| {
+            tracing::error!(
+                "Invalid ModChannel in database for {platform} entry {meta_id}: {release_type}"
+            );
+        })
+        .ok()
+}
+
+/// Whether a platform request failed because the requested file or version
+/// does not exist (anymore).
+fn is_not_found(error: &anyhow::Error) -> bool {
+    use crate::error::request::{RequestError, RequestErrorDetails};
+    error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<RequestError>(),
+            Some(RequestError {
+                error: RequestErrorDetails::UnexpectedStatus { status, .. },
+                ..
+            }) if *status == reqwest::StatusCode::NOT_FOUND || *status == reqwest::StatusCode::GONE
+        )
+    })
+}
 
 #[cfg(test)]
 mod test {
@@ -1721,18 +1746,21 @@ pub(crate) mod tests {
         let app = crate::setup_managers_for_test().await;
         let (id, row, path) =
             addon_fixture(&app, "invalid", AddonType::Mods, "safe.jar", b"safe").await;
-        mfcdb::upsert_mod_file_cache(
-            &app.db,
-            *id,
-            row.filename.clone(),
-            4,
-            true,
-            "unknown".into(),
-            row.metadata_id.clone(),
-            DbDateTime(Utc::now().fixed_offset()),
-        )
-        .await
-        .unwrap();
+        // The row itself must carry the kind this build does not know (as one
+        // written by a newer version would). An upsert cannot do that any
+        // more: the kind is part of the row's key, so it adds a second row.
+        use carbon_repos::db_exec::WriteAccess;
+        let row_id = row.id.clone();
+        app.db
+            .write(move |conn| {
+                conn.execute(
+                    "UPDATE ModFileCache SET addonType = 'unknown' WHERE id = ?1",
+                    [row_id],
+                )?;
+                Ok(())
+            })
+            .await
+            .unwrap();
         assert!(
             app.instance_manager()
                 .delete_mod(id, row.id.clone())
@@ -2464,6 +2492,435 @@ pub(crate) mod tests {
         assert!(
             path.exists(),
             "a directory must survive a file-addon delete"
+        );
+    }
+}
+
+/// `find_mod_update`'s platform half against a stand-in API.
+#[cfg(test)]
+mod update_resolution_tests {
+    use super::*;
+    use crate::domain::instance::info::{ModLoader, StandardVersion};
+    use crate::managers::modplatforms::{curseforge::CurseForge, modrinth::Modrinth};
+    use mockito::Matcher;
+    use serde_json::json;
+
+    struct Api {
+        server: mockito::ServerGuard,
+        curseforge: CurseForge,
+        modrinth: Modrinth,
+    }
+
+    async fn api() -> Api {
+        let server = mockito::Server::new_async().await;
+        let base = format!("{}/", server.url());
+        // No retry middleware: a 500 must surface at once.
+        let client = || reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
+        Api {
+            curseforge: CurseForge::with_base_url(client(), &base),
+            modrinth: Modrinth::with_base_url(client(), &base),
+            server,
+        }
+    }
+
+    impl Api {
+        async fn resolve(
+            &self,
+            row: &mfcdb::ModUpdateIdsRow,
+        ) -> anyhow::Result<Option<RemoteVersion>> {
+            let version = StandardVersion {
+                release: "1.20.1".into(),
+                modloaders: [ModLoader {
+                    type_: ModLoaderType::Fabric,
+                    version: "fixture".into(),
+                }]
+                .into_iter()
+                .collect(),
+            };
+            let context = UpdateContext {
+                game: "1.20.1".into(),
+                loaders: vec!["fabric".into()],
+                shader_engines: vec![],
+            };
+            let sources = ModSources {
+                channels: ModChannelWithUsage::str_to_vec("stable:true,beta:true,alpha:true")?,
+                platform_blacklist: vec![],
+            };
+            resolve_mod_update(
+                &self.curseforge,
+                &self.modrinth,
+                row,
+                &version,
+                "mods",
+                &context,
+                &sources,
+            )
+            .await
+        }
+
+        async fn get(
+            &mut self,
+            path: &str,
+            status: usize,
+            body: serde_json::Value,
+        ) -> mockito::Mock {
+            self.server
+                .mock("GET", path)
+                .match_query(Matcher::Any)
+                .with_status(status)
+                .with_body(body.to_string())
+                .create_async()
+                .await
+        }
+    }
+
+    const CF_PROJECT: i32 = 4242;
+    const CF_INSTALLED: i32 = 100;
+
+    /// `release_type`: 1 release, 2 beta, 3 alpha.
+    fn cf_file(id: i32, day: u32, release_type: u8) -> serde_json::Value {
+        json!({
+            "id": id, "gameId": 432, "modId": CF_PROJECT, "isAvailable": true,
+            "displayName": format!("file-{id}"), "fileName": format!("file-{id}.jar"),
+            "releaseType": release_type, "fileStatus": 4, "hashes": [],
+            "fileDate": format!("2026-01-{day:02}T00:00:00Z"), "fileLength": 1,
+            "downloadCount": 0, "downloadUrl": null, "gameVersions": ["1.20.1", "Fabric"],
+            "sortableGameVersions": [], "dependencies": [], "fileFingerprint": 0
+        })
+    }
+
+    fn mr_version(id: &str, day: u32, version_type: &str) -> serde_json::Value {
+        json!({
+            "id": id, "project_id": "project", "name": id, "version_number": id,
+            "dependencies": [], "game_versions": ["1.20.1"], "version_type": version_type,
+            "loaders": ["fabric"], "featured": false, "author_id": "author",
+            "date_published": format!("2026-01-{day:02}T00:00:00Z"), "downloads": 0, "files": []
+        })
+    }
+
+    fn cf_row() -> mfcdb::ModUpdateIdsRow {
+        mfcdb::ModUpdateIdsRow {
+            cf_project_id: Some(CF_PROJECT),
+            cf_file_id: Some(CF_INSTALLED),
+            cf_release_type: Some(ModChannel::Stable as i32),
+            mr_project_id: None,
+            mr_version_id: None,
+            mr_release_type: None,
+        }
+    }
+
+    fn mr_row() -> mfcdb::ModUpdateIdsRow {
+        mfcdb::ModUpdateIdsRow {
+            cf_project_id: None,
+            cf_file_id: None,
+            cf_release_type: None,
+            mr_project_id: Some("project".into()),
+            mr_version_id: Some("installed".into()),
+            mr_release_type: Some(ModChannel::Stable as i32),
+        }
+    }
+
+    fn chosen(update: Option<RemoteVersion>) -> Option<String> {
+        update.map(|update| match update {
+            RemoteVersion::Curseforge(file) => file.id.to_string(),
+            RemoteVersion::Modrinth(version) => version.id,
+        })
+    }
+
+    /// A jar both platforms list, with each platform's cached channel.
+    fn dual_row(cf: ModChannel, mr: ModChannel) -> mfcdb::ModUpdateIdsRow {
+        mfcdb::ModUpdateIdsRow {
+            cf_release_type: Some(cf as i32),
+            mr_project_id: Some("project".into()),
+            mr_version_id: Some("installed".into()),
+            mr_release_type: Some(mr as i32),
+            ..cf_row()
+        }
+    }
+
+    /// A stand-in API whose CurseForge project lists `cf_files` and whose
+    /// Modrinth project lists `mr_versions`. The installed file (id
+    /// `CF_INSTALLED`) and version (id "installed") are served from those
+    /// lists, and answer 404 when the lists do not hold them.
+    async fn serving(cf_files: Vec<serde_json::Value>, mr_versions: Vec<serde_json::Value>) -> Api {
+        let mut api = api().await;
+        let installed_file = cf_files
+            .iter()
+            .find(|file| file["id"] == CF_INSTALLED)
+            .cloned();
+        let installed_version = mr_versions
+            .iter()
+            .find(|version| version["id"] == "installed")
+            .cloned();
+        api.get(
+            &format!("/mods/{CF_PROJECT}/files"),
+            200,
+            json!({ "data": cf_files }),
+        )
+        .await;
+        let (status, body) = match installed_file {
+            Some(file) => (200, json!({ "data": file })),
+            None => (404, json!({ "error": "not found" })),
+        };
+        api.get(
+            &format!("/mods/{CF_PROJECT}/files/{CF_INSTALLED}"),
+            status,
+            body,
+        )
+        .await;
+        api.get("/project/project/version", 200, json!(mr_versions))
+            .await;
+        let (status, body) = match installed_version {
+            Some(version) => (200, version),
+            None => (404, json!({ "error": "not_found" })),
+        };
+        api.get("/version/installed", status, body).await;
+        api
+    }
+
+    fn cached(row: mfcdb::ModUpdateIdsRow, channel: ModChannel) -> mfcdb::ModUpdateIdsRow {
+        mfcdb::ModUpdateIdsRow {
+            cf_release_type: row.cf_release_type.map(|_| channel as i32),
+            mr_release_type: row.mr_release_type.map(|_| channel as i32),
+            ..row
+        }
+    }
+
+    #[tokio::test]
+    async fn a_release_install_is_not_moved_to_a_newer_beta() {
+        let mut api = api().await;
+        api.get(
+            &format!("/mods/{CF_PROJECT}/files"),
+            200,
+            json!({ "data": [cf_file(CF_INSTALLED, 10, 1), cf_file(200, 20, 2), cf_file(300, 25, 3)] }),
+        )
+        .await;
+        api.get(
+            &format!("/mods/{CF_PROJECT}/files/{CF_INSTALLED}"),
+            200,
+            json!({ "data": cf_file(CF_INSTALLED, 10, 1) }),
+        )
+        .await;
+        api.get(
+            "/project/project/version",
+            200,
+            json!([
+                mr_version("installed", 10, "release"),
+                mr_version("beta", 20, "beta")
+            ]),
+        )
+        .await;
+        api.get(
+            "/version/installed",
+            200,
+            mr_version("installed", 10, "release"),
+        )
+        .await;
+
+        assert_eq!(chosen(api.resolve(&cf_row()).await.unwrap()), None);
+        assert_eq!(chosen(api.resolve(&mr_row()).await.unwrap()), None);
+    }
+
+    #[tokio::test]
+    async fn a_removed_installed_file_is_replaced_by_a_compatible_release() {
+        let mut api = api().await;
+        api.get(
+            &format!("/mods/{CF_PROJECT}/files"),
+            200,
+            json!({ "data": [cf_file(150, 5, 1), cf_file(200, 20, 2)] }),
+        )
+        .await;
+        let removed = api
+            .get(
+                &format!("/mods/{CF_PROJECT}/files/{CF_INSTALLED}"),
+                404,
+                json!({ "error": "not found" }),
+            )
+            .await;
+        api.get(
+            "/project/project/version",
+            200,
+            json!([
+                mr_version("stable", 5, "release"),
+                mr_version("beta", 20, "beta")
+            ]),
+        )
+        .await;
+        api.get("/version/installed", 404, json!({ "error": "not_found" }))
+            .await;
+
+        assert_eq!(
+            chosen(api.resolve(&cf_row()).await.unwrap()).as_deref(),
+            Some("150"),
+            "the Release uploaded after the removed file replaces it"
+        );
+        removed.assert_async().await;
+        assert_eq!(
+            chosen(api.resolve(&mr_row()).await.unwrap()).as_deref(),
+            Some("stable")
+        );
+    }
+
+    #[tokio::test]
+    async fn any_other_failure_to_read_the_installed_file_still_fails() {
+        let mut api = api().await;
+        api.get(
+            &format!("/mods/{CF_PROJECT}/files"),
+            200,
+            json!({ "data": [cf_file(150, 5, 1)] }),
+        )
+        .await;
+        api.get(
+            &format!("/mods/{CF_PROJECT}/files/{CF_INSTALLED}"),
+            500,
+            json!({ "error": "internal" }),
+        )
+        .await;
+
+        let Err(error) = api.resolve(&cf_row()).await else {
+            panic!("a 500 on the installed file must fail the update");
+        };
+        assert!(!is_not_found(&error), "{error:?}");
+        assert!(format!("{error:#}").contains("500"), "{error:#}");
+    }
+
+    /// The badge reads the cached channel, so the resolver must too, even
+    /// when the platform has relabelled the file since.
+    #[tokio::test]
+    async fn the_cached_channel_sets_the_floor_not_the_live_one() {
+        // Cached as a beta, live as a Release.
+        let api = serving(
+            vec![cf_file(CF_INSTALLED, 10, 1), cf_file(200, 20, 2)],
+            vec![
+                mr_version("installed", 10, "release"),
+                mr_version("beta", 20, "beta"),
+            ],
+        )
+        .await;
+        assert_eq!(
+            chosen(
+                api.resolve(&cached(cf_row(), ModChannel::Beta))
+                    .await
+                    .unwrap()
+            )
+            .as_deref(),
+            Some("200")
+        );
+        assert_eq!(
+            chosen(
+                api.resolve(&cached(mr_row(), ModChannel::Beta))
+                    .await
+                    .unwrap()
+            )
+            .as_deref(),
+            Some("beta")
+        );
+        assert_eq!(
+            chosen(api.resolve(&cf_row()).await.unwrap()),
+            None,
+            "cached as a Release, the same file has no update"
+        );
+        assert_eq!(chosen(api.resolve(&mr_row()).await.unwrap()), None);
+    }
+
+    #[tokio::test]
+    async fn a_removed_beta_moves_to_the_newer_beta_not_an_older_release() {
+        // CurseForge numbers files in upload order: the older Release has a
+        // lower id than the removed file, the newer beta a higher one.
+        let api = serving(
+            vec![cf_file(50, 5, 1), cf_file(250, 25, 2)],
+            vec![
+                mr_version("release", 5, "release"),
+                mr_version("beta", 25, "beta"),
+            ],
+        )
+        .await;
+        assert_eq!(
+            chosen(
+                api.resolve(&cached(cf_row(), ModChannel::Beta))
+                    .await
+                    .unwrap()
+            )
+            .as_deref(),
+            Some("250")
+        );
+        assert_eq!(
+            chosen(
+                api.resolve(&cached(mr_row(), ModChannel::Beta))
+                    .await
+                    .unwrap()
+            )
+            .as_deref(),
+            Some("beta")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_jar_both_platforms_list_is_held_to_its_most_stable_label() {
+        // CurseForge and Modrinth label the installed jar differently, and
+        // each has a newer beta.
+        for (cf, mr) in [
+            (ModChannel::Stable, ModChannel::Beta),
+            (ModChannel::Beta, ModChannel::Stable),
+        ] {
+            let api = serving(
+                vec![
+                    cf_file(
+                        CF_INSTALLED,
+                        10,
+                        if cf == ModChannel::Stable { 1 } else { 2 },
+                    ),
+                    cf_file(200, 20, 2),
+                ],
+                vec![
+                    mr_version(
+                        "installed",
+                        10,
+                        if mr == ModChannel::Stable {
+                            "release"
+                        } else {
+                            "beta"
+                        },
+                    ),
+                    mr_version("newer-beta", 21, "beta"),
+                ],
+            )
+            .await;
+            assert_eq!(
+                chosen(api.resolve(&dual_row(cf, mr)).await.unwrap()),
+                None,
+                "CurseForge {cf:?}, Modrinth {mr:?}"
+            );
+            assert_eq!(
+                chosen(
+                    api.resolve(&dual_row(ModChannel::Beta, ModChannel::Beta))
+                        .await
+                        .unwrap()
+                )
+                .as_deref(),
+                Some("newer-beta"),
+                "a beta on both platforms still moves to the newest beta"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_file_removed_from_one_platform_follows_its_listing_on_the_other() {
+        // CurseForge removed the installed beta; Modrinth still lists the
+        // same jar, published on day 20. File 50 was uploaded before it.
+        let api = serving(
+            vec![cf_file(50, 5, 1), cf_file(250, 25, 2)],
+            vec![mr_version("installed", 20, "beta")],
+        )
+        .await;
+        assert_eq!(
+            chosen(
+                api.resolve(&dual_row(ModChannel::Beta, ModChannel::Beta))
+                    .await
+                    .unwrap()
+            )
+            .as_deref(),
+            Some("250")
         );
     }
 }

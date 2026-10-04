@@ -85,6 +85,17 @@ pub fn get_migrations() -> (MigrationSet, i32) {
             kind: MigrationKind::Breaking,
             data_down: "full",
         },
+        MigrationDef {
+            name: "20261004010000_instance_addon_kind",
+            up_sql: include_str!(
+                "../prisma/migrations/20261004010000_instance_addon_kind/migration.sql"
+            ),
+            down_sql: Some(include_str!(
+                "../prisma/migrations/20261004010000_instance_addon_kind/down.sql"
+            )),
+            kind: MigrationKind::Breaking,
+            data_down: "full",
+        },
         // new-migration:anchor — the tool inserts new MigrationDef entries directly above this line
     ];
     let count = migrations.len() as i32;

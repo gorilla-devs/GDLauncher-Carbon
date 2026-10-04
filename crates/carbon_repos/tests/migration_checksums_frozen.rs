@@ -132,6 +132,14 @@ const FROZEN: &[(&str, &str)] = &[
         "20260410000000_add_server_modpack_info",
         "0c1160f20ea909a746ad9716360e71f29df538e4116d6cf8a3a4aa75c54c55d3",
     ),
+    (
+        "20261004000000_server_addon_location",
+        "f18baea65ba40b76d8a7da6d72d3de8c6096d52835895e34511106c6f73cc3cc",
+    ),
+    (
+        "20261004010000_instance_addon_kind",
+        "83ec55cbae34573acd2be9601db5e35be0e62548846b3545958236874602919d",
+    ),
     // new-migration:anchor — new_migration appends the new (name, checksum) tuple directly above this line
 ];
 

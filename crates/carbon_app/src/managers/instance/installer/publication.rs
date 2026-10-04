@@ -1777,9 +1777,14 @@ pub(super) async fn rollback_receipt(
                 row.addon_type.clone(),
             )
             .await?;
-        let restored = mfcdb::get_mod_file_cache_by_instance_filename(&app.db, *id, &row.filename)
-            .await?
-            .context("Restored addon cache row missing")?;
+        let restored = mfcdb::get_mod_file_cache_by_instance_kind_filename(
+            &app.db,
+            *id,
+            &row.addon_type,
+            &row.filename,
+        )
+        .await?
+        .context("Restored addon cache row missing")?;
         if restored.id != row.id
             && mfcdb::restore_mod_file_cache_identity(
                 &app.db,
@@ -1801,8 +1806,13 @@ pub(super) async fn rollback_receipt(
         .as_ref()
         .is_none_or(|(_, _, _, _, row)| row.filename != proof.name)
     {
-        if let Some(row) =
-            mfcdb::get_mod_file_cache_by_instance_filename(&app.db, *id, &proof.name).await?
+        if let Some(row) = mfcdb::get_mod_file_cache_by_instance_kind_filename(
+            &app.db,
+            *id,
+            proof.kind.to_db_string(),
+            &proof.name,
+        )
+        .await?
         {
             if row.addon_type == proof.kind.to_db_string() {
                 mfcdb::delete_mod_file_cache_by_id(&app.db, &row.id).await?;
@@ -1923,18 +1933,25 @@ impl WorldReceipt {
             bail!("World receipt has another destination");
         }
         self.validate_commit().await?;
-        for (path, _, _) in &self.files {
-            tokio::fs::remove_file(path).await?;
-        }
-        for (path, _) in self.directories.iter().rev() {
-            tokio::fs::remove_dir(path).await?;
-        }
-        let name = self.destination.file_name().unwrap().to_string_lossy();
-        if let Some(row) =
-            mfcdb::get_mod_file_cache_by_instance_filename(&app.db, *id, &name).await?
-        {
-            if row.addon_type == AddonType::Worlds.to_db_string() {
-                mfcdb::delete_mod_file_cache_by_id(&app.db, &row.id).await?;
+        for tree in &self.trees {
+            for (path, _) in &tree.files {
+                tokio::fs::remove_file(path).await?;
+            }
+            for (path, _) in tree.directories.iter().rev() {
+                tokio::fs::remove_dir(path).await?;
+            }
+            let name = tree.destination.file_name().unwrap().to_string_lossy();
+            if let Some(row) = mfcdb::get_mod_file_cache_by_instance_kind_filename(
+                &app.db,
+                *id,
+                AddonType::Worlds.to_db_string(),
+                &name,
+            )
+            .await?
+            {
+                if row.addon_type == AddonType::Worlds.to_db_string() {
+                    mfcdb::delete_mod_file_cache_by_id(&app.db, &row.id).await?;
+                }
             }
         }
         app.invalidate(INSTANCE_MODS, Some(id.0.into()));

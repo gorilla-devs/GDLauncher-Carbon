@@ -52,7 +52,7 @@ pub struct FkEdge {
     pub class: RepairClass,
 }
 
-/// The complete FK edge list of the migrated schema (user_version 25), derived
+/// The complete FK edge list of the latest migrated schema, derived
 /// from `pragma_foreign_key_list`, ordered so that repairs run parent-first:
 /// reassigns and null-fixes keep `Instance`/`Server` rows alive for their file
 /// caches; first-level cache deletes precede the image caches that hang off
@@ -99,6 +99,13 @@ pub const EDGES: &[FkEdge] = &[
     },
     FkEdge {
         child: "ModrinthModCache",
+        child_cols: &["metadataId"],
+        parent: "ModMetadata",
+        parent_cols: &["id"],
+        class: RepairClass::CacheDelete,
+    },
+    FkEdge {
+        child: "ModrinthUpdateCache",
         child_cols: &["metadataId"],
         parent: "ModMetadata",
         parent_cols: &["id"],
@@ -457,6 +464,67 @@ mod tests {
             sweep_and_decide(&mut conn).unwrap(),
             SweepOutcome::Enabled
         ));
+    }
+
+    #[test]
+    fn orphan_modrinth_update_context_is_deleted_healthy_context_survives() {
+        let (_d, mut conn) = migrated();
+        conn.execute("INSERT INTO ModMetadata (id, murmur2, name, sha512, sha1, modloaders) VALUES ('healthy', 1, 'fixture', zeroblob(64), zeroblob(20), '')", []).unwrap();
+        conn.execute("INSERT INTO ModrinthUpdateCache VALUES ('healthy', 'fabric-1.21', 'healthy-paths', 123)", []).unwrap();
+        conn.execute("INSERT INTO ModrinthUpdateCache VALUES ('missing-parent', 'fabric-1.21', 'orphan-paths', 456)", []).unwrap();
+        assert_eq!(fk_violations(&conn), 1);
+        let outcome = sweep_and_decide(&mut conn).unwrap();
+        assert!(
+            matches!(outcome, SweepOutcome::Enabled),
+            "known regenerable context must repair: {outcome:?}"
+        );
+        let contexts: Vec<(String, String, String, i64)> = conn
+            .prepare("SELECT metadataId, context, updatePaths, cachedAt FROM ModrinthUpdateCache")
+            .unwrap()
+            .query_map([], |row| {
+                Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?))
+            })
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            contexts,
+            vec![(
+                "healthy".into(),
+                "fabric-1.21".into(),
+                "healthy-paths".into(),
+                123
+            )]
+        );
+        assert_fk_on_consistent(&conn);
+    }
+
+    #[test]
+    fn healthy_modrinth_update_contexts_are_unchanged() {
+        let (_d, mut conn) = migrated();
+        conn.execute("INSERT INTO ModMetadata (id, murmur2, sha512, sha1, modloaders) VALUES ('healthy', 1, zeroblob(64), zeroblob(20), '')", []).unwrap();
+        conn.execute("INSERT INTO ModrinthUpdateCache VALUES ('healthy', 'fabric-1.21', 'paths-one', 123), ('healthy', 'forge-1.21', 'paths-two', 456)", []).unwrap();
+        assert!(matches!(
+            sweep_and_decide(&mut conn).unwrap(),
+            SweepOutcome::Enabled
+        ));
+        let contexts: Vec<(String, String, i64)> = conn
+            .prepare(
+                "SELECT context, updatePaths, cachedAt FROM ModrinthUpdateCache ORDER BY context",
+            )
+            .unwrap()
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap();
+        assert_eq!(
+            contexts,
+            vec![
+                ("fabric-1.21".into(), "paths-one".into(), 123),
+                ("forge-1.21".into(), "paths-two".into(), 456)
+            ]
+        );
+        assert_fk_on_consistent(&conn);
     }
 
     /// Every `(child table, parent table, child column)` foreign key the live

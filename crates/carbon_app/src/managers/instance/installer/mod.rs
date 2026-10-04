@@ -1213,7 +1213,10 @@ impl Installer {
                         if cancel.is_cancelled() {
                             bail!("Addon installation cancelled");
                         }
-                        // ensure the task stays alive until the mod is cached
+                        // Keep the task alive until the instance's rows are current.
+                        // Publication already hashed what it wrote, so this pass
+                        // trusts unchanged files on their stamps and only holds
+                        // the instance gate to snapshot and commit.
                         app_clone
                             .meta_cache_manager()
                             .override_caching_and_wait(

@@ -750,6 +750,7 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
         };
 
         let mut metadata: ModFileMetadata = modstoml.into();
+        metadata.modloaders = vec![ModLoaderType::Neoforge];
         match metadata.version {
             Some(version) if version == "${file.jarVersion}" => {
                 metadata.version = None;
@@ -855,6 +856,22 @@ mod test {
         let meta = parse_metadata(&mut Cursor::new(&vec));
 
         meta
+    }
+
+    #[test]
+    fn task11_neoforge_source_identifies_neoforge() {
+        let body = "[[mods]]\nmodId = 'example'\nversion = '1.0.0'\ndisplayName = 'Example'\n";
+        let parsed = parsemeta("META-INF/neoforge.mods.toml", body)
+            .unwrap()
+            .unwrap();
+        assert_eq!(parsed.modloaders, vec![ModLoaderType::Neoforge]);
+        assert_eq!(
+            parsemeta("META-INF/mods.toml", body)
+                .unwrap()
+                .unwrap()
+                .modloaders,
+            vec![ModLoaderType::Forge]
+        );
     }
 
     #[test]
