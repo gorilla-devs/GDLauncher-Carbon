@@ -206,10 +206,13 @@ const Settings = (props: SettingsProps) => {
                 if (xms() > val) setXms(val)
               }}
               OnRelease={(val) => {
-                if (val !== props.serverDetails.xmx) {
+                if (
+                  val !== props.serverDetails.xmx ||
+                  xms() !== props.serverDetails.xms
+                ) {
                   save({
                     xmx: val,
-                    ...(xms() > val ? { xms: val } : {})
+                    xms: Math.min(xms(), val)
                   })
                 }
               }}
@@ -250,7 +253,7 @@ const Settings = (props: SettingsProps) => {
               }}
               OnRelease={(val) => {
                 if (val !== props.serverDetails.xms) {
-                  save({ xms: val })
+                  save({ xmx: xmx(), xms: val })
                 }
               }}
             />

@@ -27,6 +27,47 @@ import { VirtualGroup, SelectionState, LibraryMode } from "../../types"
 import { parseServerIds } from "../../utils/selectionIds"
 import { ANIMATION, TILE_SIZES, TileSize } from "../../constants"
 
+const MAX_ENTRANCE_DELAY = 500
+
+function entranceDelay(base: number, index: number) {
+  return Math.min(
+    MAX_ENTRANCE_DELAY + 1,
+    base + Math.min(index, 13) * ANIMATION.STAGGER_PER_ITEM
+  )
+}
+
+function mountEntrance(
+  element: HTMLDivElement,
+  id: string | number,
+  delay: number,
+  state: Pick<
+    GroupSectionProps,
+    "animatedInstanceIds" | "initialAnimationComplete"
+  >,
+  reducedMotion: boolean
+): Animation | undefined {
+  const animate =
+    !state.animatedInstanceIds.has(id) &&
+    !state.initialAnimationComplete.value &&
+    !reducedMotion &&
+    delay <= MAX_ENTRANCE_DELAY &&
+    typeof element.animate === "function"
+  state.animatedInstanceIds.add(id)
+  // Skipped/completed/unavailable animation paths are visible immediately.
+  element.style.opacity = "1"
+  if (!animate) return
+  const animation = element.animate([{ opacity: 0 }, { opacity: 1 }], {
+    duration: ANIMATION.ENTRANCE_DURATION,
+    delay,
+    easing: "linear",
+    fill: "both"
+  })
+  animation.onfinish = () => {
+    element.style.opacity = "1"
+  }
+  return animation
+}
+
 interface GroupSectionProps {
   group: VirtualGroup<ListInstance | ListServer>
   groupIndex: number
@@ -75,14 +116,14 @@ export function GroupSection(props: GroupSectionProps) {
 
   // Calculate stagger delay base for this group
   const groupStaggerBase = createMemo(() => {
-    const instancesCountInPreviousGroups = props.displayedGroups
-      .slice(0, props.groupIndex)
-      .reduce((acc, group) => acc + group.instances.length, 0)
-    return (
-      ANIMATION.STAGGER_BASE +
-      props.groupIndex * ANIMATION.STAGGER_PER_GROUP +
-      ANIMATION.STAGGER_PER_GROUP * instancesCountInPreviousGroups
-    )
+    let delay = ANIMATION.STAGGER_BASE
+    for (let i = 0; i < props.groupIndex; i++) {
+      // Saturate the prefix count; only the first small set can animate.
+      const count = Math.min(props.displayedGroups[i].instances.length, 8)
+      delay += ANIMATION.STAGGER_PER_GROUP * (1 + count)
+      if (delay > MAX_ENTRANCE_DELAY) return MAX_ENTRANCE_DELAY + 1
+    }
+    return delay
   })
 
   return (
@@ -222,8 +263,9 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
   // Type-prefixed string ID for selection
   const instanceStringId = `instance-${props.instance.id}`
 
-  const totalDelay =
-    props.groupStaggerBase + props.instanceIndex * ANIMATION.STAGGER_PER_ITEM
+  const globalStore = useGlobalStore()
+  let entranceAnimation: Animation | undefined
+  const totalDelay = entranceDelay(props.groupStaggerBase, props.instanceIndex)
 
   const isBeingDragged = createMemo(
     () =>
@@ -283,22 +325,14 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
   })
 
   onMount(() => {
-    const shouldAnimate =
-      !props.animatedInstanceIds.has(props.instance.id) &&
-      !props.initialAnimationComplete.value
-
-    if (ref && shouldAnimate) {
-      props.animatedInstanceIds.add(props.instance.id)
-      const anim = ref.animate([{ opacity: 0 }, { opacity: 1 }], {
-        duration: ANIMATION.ENTRANCE_DURATION,
-        delay: totalDelay,
-        easing: "linear",
-        fill: "both"
-      })
-      anim.onfinish = () => {
-        if (ref) ref.style.opacity = "1"
-      }
-    }
+    if (ref)
+      entranceAnimation = mountEntrance(
+        ref,
+        props.instance.id,
+        totalDelay,
+        props,
+        globalStore.settings.data?.reducedMotion ?? false
+      )
 
     if (ref) {
       props.tileRefs.set(instanceStringId, ref)
@@ -313,6 +347,10 @@ function InstanceTileWrapper(props: InstanceTileWrapperProps) {
   })
 
   onCleanup(() => {
+    if (entranceAnimation) {
+      entranceAnimation.onfinish = null
+      entranceAnimation.cancel()
+    }
     props.tileRefs.delete(instanceStringId)
     dragContext.unregisterDropZone(`before-instance-${props.instance.id}`)
   })
@@ -408,8 +446,9 @@ function ServerTileWrapper(props: ServerTileWrapperProps) {
   // Type-prefixed string ID for selection and animation tracking
   const serverStringId = `server-${props.server.id}`
 
-  const totalDelay =
-    props.groupStaggerBase + props.serverIndex * ANIMATION.STAGGER_PER_ITEM
+  const globalStore = useGlobalStore()
+  let entranceAnimation: Animation | undefined
+  const totalDelay = entranceDelay(props.groupStaggerBase, props.serverIndex)
 
   const isBeingDragged = createMemo(
     () =>
@@ -420,22 +459,14 @@ function ServerTileWrapper(props: ServerTileWrapperProps) {
   )
 
   onMount(() => {
-    const shouldAnimate =
-      !props.animatedInstanceIds.has(serverStringId) &&
-      !props.initialAnimationComplete.value
-
-    if (ref && shouldAnimate) {
-      props.animatedInstanceIds.add(serverStringId)
-      const anim = ref.animate([{ opacity: 0 }, { opacity: 1 }], {
-        duration: ANIMATION.ENTRANCE_DURATION,
-        delay: totalDelay,
-        easing: "linear",
-        fill: "both"
-      })
-      anim.onfinish = () => {
-        if (ref) ref.style.opacity = "1"
-      }
-    }
+    if (ref)
+      entranceAnimation = mountEntrance(
+        ref,
+        serverStringId,
+        totalDelay,
+        props,
+        globalStore.settings.data?.reducedMotion ?? false
+      )
 
     if (ref) {
       props.tileRefs.set(serverStringId, ref)
@@ -450,6 +481,10 @@ function ServerTileWrapper(props: ServerTileWrapperProps) {
   })
 
   onCleanup(() => {
+    if (entranceAnimation) {
+      entranceAnimation.onfinish = null
+      entranceAnimation.cancel()
+    }
     props.tileRefs.delete(serverStringId)
   })
 

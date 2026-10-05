@@ -6,6 +6,7 @@
  */
 
 import { Accessor, createMemo } from "solid-js"
+import { FolderKind } from "../types"
 import { DropTarget, useDragContext } from "../DragContext"
 
 type DragContextValue = ReturnType<typeof useDragContext>
@@ -15,6 +16,8 @@ export interface UseDropIndicatorsOptions {
   itemId: number
   /** The type of item */
   itemType: "instance" | "folder" | "server"
+  itemKind: FolderKind
+  isFirstUngrouped?: Accessor<boolean>
   /** Drag context value */
   dragContext: DragContextValue
 }
@@ -48,7 +51,7 @@ export interface DropIndicatorState {
 export function useDropIndicators(
   options: UseDropIndicatorsOptions
 ): DropIndicatorState {
-  const { itemId, itemType, dragContext } = options
+  const { itemId, itemType, itemKind, dragContext } = options
   const isFolder = itemType === "folder"
   const isInstance = itemType === "instance"
   const isServer = itemType === "server"
@@ -56,8 +59,11 @@ export function useDropIndicators(
 
   const isReorderableDrag = () => {
     const t = dragContext.dragType()
-    return t === "instance" || t === "server"
+    return t === itemKind
   }
+
+  const matchingGroupDrag = () =>
+    dragContext.dragType() === (itemKind === "server" ? "serverGroup" : "group")
 
   const isDragActive = () =>
     dragContext.isDragging() || dragContext.justDropped()
@@ -68,23 +74,14 @@ export function useDropIndicators(
     const target = dragContext.dropTarget()
     return (
       isDragActive() &&
-      dragContext.dragType() === "group" &&
+      matchingGroupDrag() &&
       target?.type === "beforeGroup" &&
       target.groupId === itemId
     )
   })
 
-  // Drop indicator for instances/servers before folders
-  const showInstanceAtFolderDropIndicator = createMemo(() => {
-    if (!isFolder) return false
-    const target = dragContext.dropTarget()
-    return (
-      isDragActive() &&
-      isReorderableDrag() &&
-      target?.type === "beforeInstanceAtFolder" &&
-      target.folderId === itemId
-    )
-  })
+  // Folders-first rendering cannot honor an item before a folder.
+  const showInstanceAtFolderDropIndicator = () => false
 
   // Drop indicator logic for instances/servers
   const showInstanceDropIndicator = createMemo(() => {
@@ -100,11 +97,11 @@ export function useDropIndicators(
 
   // Group drop indicator at instance/server position
   const showGroupDropIndicator = createMemo(() => {
-    if (!isReorderable) return false
+    if (!isReorderable || !options.isFirstUngrouped?.()) return false
     const target = dragContext.dropTarget()
     return (
       isDragActive() &&
-      dragContext.dragType() === "group" &&
+      matchingGroupDrag() &&
       target?.type === "beforeGroupAtInstance" &&
       target.beforeInstanceId === itemId
     )
@@ -142,10 +139,7 @@ export function useDropIndicators(
     }
 
     if (isFolder) {
-      return (
-        dragContext.dragType() === "group" &&
-        dragContext.draggedIds().includes(itemId)
-      )
+      return matchingGroupDrag() && dragContext.draggedIds().includes(itemId)
     }
 
     return false
@@ -161,8 +155,6 @@ export function useDropIndicators(
 
     if (showFolderDropIndicator())
       return { type: "beforeGroup" as const, groupId: itemId }
-    if (showInstanceAtFolderDropIndicator())
-      return { type: "beforeInstanceAtFolder" as const, folderId: itemId }
     if (showInstanceDropIndicator()) return target
     if (showGroupDropIndicator())
       return {

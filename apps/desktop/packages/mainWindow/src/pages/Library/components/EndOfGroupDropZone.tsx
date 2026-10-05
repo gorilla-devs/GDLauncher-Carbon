@@ -7,6 +7,7 @@
 import { Accessor, createEffect, onCleanup, Show } from "solid-js"
 import { useDragContext } from "../DragContext"
 import DropPreviewTile from "./DropPreviewTile"
+import { FolderKind } from "../types"
 import { TILE_SIZES, TileSize } from "../constants"
 
 interface EndOfGroupDropZoneProps {
@@ -83,6 +84,7 @@ export function EndOfGroupDropZone(props: EndOfGroupDropZoneProps) {
  */
 
 interface EndOfGroupsDropZoneProps {
+  kind: FolderKind
   tileSize: Accessor<number>
 }
 
@@ -93,12 +95,21 @@ export function EndOfGroupsDropZone(props: EndOfGroupsDropZoneProps) {
 
   const isOver = () => {
     const target = dragContext.dropTarget()
-    return target?.type === "endOfGroups"
+    return (
+      target?.type === "endOfGroups" &&
+      dragContext.dragType() ===
+        (props.kind === "server" ? "serverGroup" : "group")
+    )
   }
 
   // Register drop zone
   createEffect(() => {
-    if (dragContext.isDragging() && dragContext.dragType() === "group" && ref) {
+    if (
+      dragContext.isDragging() &&
+      dragContext.dragType() ===
+        (props.kind === "server" ? "serverGroup" : "group") &&
+      ref
+    ) {
       const rect = ref.getBoundingClientRect()
       dragContext.registerDropZone({
         id: "end-of-groups",

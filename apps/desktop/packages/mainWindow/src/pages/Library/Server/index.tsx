@@ -110,10 +110,8 @@ const Server = (props: { children?: any }) => {
     }
   }
 
-  const visibleTabs = createMemo(() => {
-    if (details()?.modloaderType) return ALL_TABS
-    return ALL_TABS.filter((t) => t.id !== "addons")
-  })
+  // Vanilla servers support datapacks through the same Addons route.
+  const visibleTabs = () => ALL_TABS
 
   const basePath = () => `/library/server/${params.id}`
 

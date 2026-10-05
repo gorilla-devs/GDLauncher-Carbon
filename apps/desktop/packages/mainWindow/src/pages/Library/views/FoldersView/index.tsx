@@ -57,6 +57,7 @@ export default function FoldersView(props: FoldersViewProps) {
     <>
       {/* Main Grid: Ungrouped instances + Folder tiles */}
       <LibraryGrid
+        libraryMode={props.libraryMode}
         libraryItems={props.libraryItems}
         tileSize={props.tileSize}
         defaultGroupId={props.defaultGroupId}

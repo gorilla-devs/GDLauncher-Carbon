@@ -6,7 +6,7 @@
  * Self-registers as a drop zone to prevent oscillation when items shift.
  */
 
-import { Accessor, createEffect, onCleanup } from "solid-js"
+import { Accessor, createEffect, onCleanup, Show } from "solid-js"
 import { useDragContext, DropTarget } from "../DragContext"
 import { TILE_SIZES, TileSize } from "../constants"
 
@@ -30,12 +30,14 @@ const DropPreviewTile = (props: DropPreviewTileProps) => {
   // but the preview div doesn't — without padding the cursor can land in a
   // gap between the preview zone and adjacent tile zones, causing oscillation.
   const ZONE_PADDING = 16
-  let lastRegisteredZoneId: string | null = null
 
   createEffect(() => {
-    if (previewRef && dragContext.isDragging()) {
+    if (
+      previewRef &&
+      dragContext.isDragging() &&
+      props.dropTarget.type !== "beforeInstanceAtFolder"
+    ) {
       const id = `drop-preview-${props.dropTarget.type}-${JSON.stringify(props.dropTarget)}`
-      lastRegisteredZoneId = id
       const rawRect = previewRef.getBoundingClientRect()
       const rect = new DOMRect(
         rawRect.left - ZONE_PADDING,
@@ -60,22 +62,21 @@ const DropPreviewTile = (props: DropPreviewTileProps) => {
 
       // Report position so the DragGhost can snap here
       dragContext.setDropPreviewRect(previewRef.getBoundingClientRect())
+      onCleanup(() => {
+        dragContext.unregisterDropZone(id)
+        dragContext.setDropPreviewRect(null)
+      })
     }
-  })
-
-  onCleanup(() => {
-    if (lastRegisteredZoneId) {
-      dragContext.unregisterDropZone(lastRegisteredZoneId)
-    }
-    dragContext.setDropPreviewRect(null)
   })
 
   return (
-    <div
-      ref={previewRef}
-      data-drop-preview
-      class={`${sizeConfig().container} pointer-events-none`}
-    />
+    <Show when={props.dropTarget.type !== "beforeInstanceAtFolder"}>
+      <div
+        ref={previewRef}
+        data-drop-preview
+        class={`${sizeConfig().container} pointer-events-none`}
+      />
+    </Show>
   )
 }
 

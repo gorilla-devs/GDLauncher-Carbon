@@ -118,10 +118,9 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
       header: "",
       size: 48,
       cell: (props: any) => {
-        const row = props.row.original
-        const isDup = config.isDuplicate?.(row) ?? false
+        const isDup = () => config.isDuplicate?.(props.row.original) ?? false
         return (
-          <Show when={isDup}>
+          <Show when={isDup()}>
             <Tooltip>
               <TooltipTrigger>
                 <div class="i-hugeicons:alert-01 hidden text-lg text-yellow-500 lg:flex" />

@@ -1,4 +1,12 @@
-import { createSignal, createEffect, createMemo, For, Show } from "solid-js"
+import {
+  createSignal,
+  createEffect,
+  createMemo,
+  For,
+  Show,
+  onCleanup,
+  untrack
+} from "solid-js"
 import { useParams } from "@solidjs/router"
 import {
   Button,
@@ -35,10 +43,24 @@ const GROUP_TRANSLATION_KEYS: Record<string, NamespacedTranslationKey> = {
 }
 
 const PropertiesTab = () => {
-  const [t] = useTransContext()
   const params = useParams<{ id: string }>()
+  // A draft and every pending acknowledgement belong to one query identity.
+  return (
+    <Show when={parseInt(params.id, 10)} keyed>
+      {(id) => <PropertiesEditor serverId={id} />}
+    </Show>
+  )
+}
+
+const PropertiesEditor = (props: { serverId: number }) => {
+  const [t] = useTransContext()
   const routeData = useServerData()
-  const serverId = () => parseInt(params.id, 10)
+  const serverId = () => props.serverId
+  const [saving, setSaving] = createSignal(false)
+  let active = true
+  onCleanup(() => {
+    active = false
+  })
 
   const [properties, setProperties] = createSignal<Record<string, string>>({})
   const [originalProperties, setOriginalProperties] = createSignal<
@@ -57,7 +79,7 @@ const PropertiesTab = () => {
 
   createEffect(() => {
     const data = propertiesQuery.data
-    if (data) {
+    if (data && !untrack(saving) && !untrack(dirty)) {
       setProperties({ ...data })
       setOriginalProperties({ ...data })
       setDirty(false)
@@ -91,11 +113,13 @@ const PropertiesTab = () => {
   })
 
   const updateProperty = (key: string, value: string) => {
+    if (saving() || !active) return
     setProperties((prev) => ({ ...prev, [key]: value }))
     setDirty(true)
   }
 
   const handleSave = async () => {
+    if (saving() || !active) return
     const current = properties()
     const original = originalProperties()
     const changes: Record<string, string> = {}
@@ -105,16 +129,33 @@ const PropertiesTab = () => {
       }
     }
 
-    if (Object.keys(changes).length > 0) {
+    if (Object.keys(changes).length === 0) return
+    setSaving(true)
+    try {
       await updatePropertiesMutation.mutateAsync({
         id: serverId(),
         properties: changes
       })
-      propertiesQuery.refetch()
+      if (!active) return
+      // isPending covers only the mutation. Editing stays locked until this
+      // authoritative query acknowledgement also finishes successfully.
+      const result = await propertiesQuery.refetch()
+      if (!active) return
+      if (result.isError) throw result.error
+      if (!result.data)
+        throw new Error("Server properties refresh returned no data")
+      setOriginalProperties({ ...result.data })
+      setProperties({ ...result.data })
+      setDirty(false)
+    } finally {
+      if (active) setSaving(false)
     }
   }
 
   const handleReset = () => {
+    if (saving() || !active) return
+    // Reset to the last acknowledged baseline, retaining unsolicited data
+    // outside a dirty draft until the operator finishes or resets that draft.
     setProperties({ ...originalProperties() })
     setDirty(false)
   }
@@ -142,6 +183,7 @@ const PropertiesTab = () => {
         <RightHandSide>
           <Show when={prop.type === "boolean"}>
             <Switch
+              disabled={saving()}
               checked={value() === "true"}
               onChange={(e) =>
                 updateProperty(
@@ -154,6 +196,7 @@ const PropertiesTab = () => {
           <Show when={prop.type === "string"}>
             <Input
               class="w-60"
+              disabled={saving()}
               value={value()}
               onInput={(e) => updateProperty(prop.key, e.currentTarget.value)}
             />
@@ -162,6 +205,7 @@ const PropertiesTab = () => {
             <Input
               class="w-40"
               type="number"
+              disabled={saving()}
               value={value()}
               onInput={(e) => {
                 const val = e.currentTarget.value
@@ -173,6 +217,7 @@ const PropertiesTab = () => {
           </Show>
           <Show when={prop.type === "enum" && prop.enumValues}>
             <Select
+              disabled={saving()}
               value={value()}
               onChange={(v) => {
                 if (v) updateProperty(prop.key, v)
@@ -222,14 +267,20 @@ const PropertiesTab = () => {
             <Trans key="instances:_trn_server_properties_unsaved_changes" />
           </span>
           <div class="flex items-center gap-2">
-            <Button size="small" type="secondary" onClick={handleReset}>
+            <Button
+              size="small"
+              type="secondary"
+              disabled={saving()}
+              onClick={handleReset}
+            >
               <Trans key="instances:_trn_server_properties_reset" />
             </Button>
             <Button
               size="small"
               type="primary"
               onClick={handleSave}
-              loading={updatePropertiesMutation.isPending}
+              disabled={saving()}
+              loading={saving()}
             >
               <Trans key="instances:_trn_server_properties_save" />
             </Button>

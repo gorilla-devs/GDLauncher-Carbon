@@ -21,6 +21,7 @@ import { DropOverlayIndicator } from "@/pages/Library/components/DropOverlayIndi
 interface LibraryItemTileProps {
   item: LibraryItem
   itemIndex: () => number
+  isFirstUngrouped?: Accessor<boolean>
   tileSize: () => number
   defaultGroupId: () => number | null
   openFolderId: () => number | null
@@ -73,10 +74,18 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
       ? ("server" as const)
       : ("instance" as const)
 
+  const itemKind = isFolder
+    ? (props.item.data as FolderData).kind
+    : isServer
+      ? "server"
+      : "instance"
+
   // Extracted hooks for drop indicators
   const dropIndicators = useDropIndicators({
     itemId,
     itemType,
+    itemKind,
+    isFirstUngrouped: props.isFirstUngrouped,
     dragContext
   })
 
@@ -84,6 +93,8 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
   useDropZoneRegistration({
     itemId,
     itemType,
+    itemKind,
+    isFirstUngrouped: props.isFirstUngrouped,
     ref: () => ref,
     dragContext,
     defaultGroupId: props.defaultGroupId

@@ -417,6 +417,7 @@ function ConsoleOptions(props: {
 const Console = (props: ConsoleProps) => {
   const [t] = useTransContext()
   const [logs, setLogs] = createStore<ParsedLogLine[]>([])
+  const [hasSessionOutput, setHasSessionOutput] = createSignal(false)
   const [command, setCommand] = createSignal("")
   const [commandHistory, setCommandHistory] = createSignal<string[]>([])
   const [historyIndex, setHistoryIndex] = createSignal(-1)
@@ -515,6 +516,11 @@ const Console = (props: ConsoleProps) => {
     on(
       () => props.serverId,
       (serverId) => {
+        setLogs([])
+        setHasSessionOutput(false)
+        setCommand("")
+        setCommandHistory([])
+        setHistoryIndex(-1)
         let wsConnection: WebSocket | null = null
         let reconnectTimer: ReturnType<typeof setTimeout> | null = null
         let cancelled = false
@@ -522,14 +528,15 @@ const Console = (props: ConsoleProps) => {
         const connect = () => {
           if (cancelled) return
 
-          wsConnection = new WebSocket(apiWsUrl(`/server/log?id=${serverId}`))
+          const socket = new WebSocket(apiWsUrl(`/server/log?id=${serverId}`))
+          wsConnection = socket
 
-          wsConnection.onmessage = (event) => {
+          socket.onmessage = (event) => {
             // Effect re-run / unmount can flip `cancelled` between us
             // dispatching `close()` and the socket actually closing. A late
             // message in that window would otherwise replace the new
             // session's logs with the previous session's snapshot.
-            if (cancelled) return
+            if (cancelled || wsConnection !== socket) return
 
             const data = JSON.parse(event.data)
 
@@ -547,9 +554,11 @@ const Console = (props: ConsoleProps) => {
             if (Array.isArray(data)) {
               // Initial snapshot from backend: replace local state. This is
               // also what clears stale logs when a fresh session begins.
+              setHasSessionOutput(data.length > 0)
               setLogs(data.map(parseLogLine))
               setLastSeenLogCount(0)
             } else if (typeof data === "string") {
+              setHasSessionOutput(true)
               setLogs(
                 produce((prev) => {
                   prev.push(parseLogLine(data))
@@ -558,8 +567,8 @@ const Console = (props: ConsoleProps) => {
             }
           }
 
-          wsConnection.onerror = () => {
-            if (cancelled) return
+          socket.onerror = () => {
+            if (cancelled || wsConnection !== socket) return
             setLogs(
               produce((prev) => {
                 prev.push(parseLogLine("[Connection error]"))
@@ -567,12 +576,13 @@ const Console = (props: ConsoleProps) => {
             )
           }
 
-          wsConnection.onclose = () => {
+          socket.onclose = () => {
             // Backend closes the socket when it recycles the log buffer for
             // a new session, or when the server is genuinely gone. Try to
             // reconnect — the next connection either reattaches to the
             // current session's buffer (post-crash) or to the new session.
-            if (cancelled) return
+            if (cancelled || wsConnection !== socket) return
+            wsConnection = null
             reconnectTimer = setTimeout(connect, 1000)
           }
         }
@@ -581,6 +591,11 @@ const Console = (props: ConsoleProps) => {
 
         onCleanup(() => {
           cancelled = true
+          if (wsConnection) {
+            wsConnection.onmessage = null
+            wsConnection.onerror = null
+            wsConnection.onclose = null
+          }
           if (reconnectTimer !== null) {
             clearTimeout(reconnectTimer)
           }
@@ -662,7 +677,7 @@ const Console = (props: ConsoleProps) => {
 
   const handleSendCommand = () => {
     const cmd = command().trim()
-    if (!cmd) return
+    if (!props.isRunning || !cmd) return
 
     sendCommandMutation.mutate({
       id: props.serverId,
@@ -777,7 +792,7 @@ const Console = (props: ConsoleProps) => {
       </Show>
 
       {/* Floating scroll-to-bottom button */}
-      <Show when={!autoFollow() && props.isRunning && logs.length > 0}>
+      <Show when={!autoFollow() && hasSessionOutput() && logs.length > 0}>
         <div class="absolute bottom-14 left-0 right-0 z-20 flex justify-center">
           <div class="w-72">
             <ScrollBottomButton
@@ -794,7 +809,7 @@ const Console = (props: ConsoleProps) => {
         id="server_console_container"
       >
         <Switch>
-          <Match when={!props.isRunning}>
+          <Match when={!props.isRunning && !hasSessionOutput()}>
             <div class="flex h-full select-none items-center justify-center text-center text-xl text-lightSlate-600">
               <Trans key="logs:_trn_server_not_running" />
             </div>

@@ -147,17 +147,6 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
           }
           break
         }
-
-        case "beforeInstanceAtFolder": {
-          // Move instances to default group, positioned before the folder
-          for (const id of draggedIds) {
-            moveInstanceMutation.mutate({
-              instance: id,
-              target: { BeforeGroup: target.folderId }
-            })
-          }
-          break
-        }
       }
 
       // Clear selection after drop
@@ -229,16 +218,6 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
           }
           break
         }
-
-        case "beforeInstanceAtFolder": {
-          for (const id of draggedIds) {
-            moveServerMutation.mutate({
-              server: id,
-              target: { beforeGroup: target.folderId }
-            })
-          }
-          break
-        }
       }
 
       options.selection.clearSelection()
@@ -262,10 +241,10 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
       }
 
       case "beforeGroupAtInstance": {
-        // Move group before an ungrouped instance
+        // Member-area folder gestures mean the folders-first bucket tail.
         moveGroupMutation.mutate({
           group: groupId,
-          target: { BeforeInstance: target.beforeInstanceId }
+          target: "EndOfLibrary"
         })
         break
       }
@@ -300,7 +279,7 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
       case "beforeGroupAtInstance": {
         moveServerGroupMutation.mutate({
           group: groupId,
-          target: { beforeServer: target.beforeInstanceId }
+          target: "endOfLibrary"
         })
         break
       }
@@ -382,6 +361,9 @@ export function useLibraryDragDrop(options: UseLibraryDragDropOptions) {
       options.onAfterDrop?.()
       return
     }
+
+    // Reject obsolete positional targets before selection/animation effects.
+    if (target.type === "beforeInstanceAtFolder") return
 
     // Capture positions and order BEFORE mutation for FLIP animation
     options.flipAnimation.capturePositions(

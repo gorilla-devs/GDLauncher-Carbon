@@ -53,11 +53,12 @@ export function LibraryHeader(props: LibraryHeaderProps) {
   }))
 
   // Server arrange currently only supports sort-by-name, so instance-only
-  // criteria (lastPlayed, mostPlayed) aren't offered in server mode.
+  // criteria (lastPlayed, mostPlayed, dateCreated) aren't offered in server mode.
   const arrange = (
     criteria: "name" | "lastPlayed" | "mostPlayed" | "dateCreated"
   ) => {
     if (isServerMode()) {
+      if (criteria !== "name") return
       arrangeServerLibraryMutation.mutate(undefined)
     } else {
       arrangeLibraryMutation.mutate(criteria)
@@ -445,13 +446,13 @@ export function LibraryHeader(props: LibraryHeaderProps) {
                   <Trans key="ui:_trn_by_most_played" />
                 </div>
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => arrange("dateCreated")}>
+                <div class="flex items-center gap-2">
+                  <div class="i-hugeicons:calendar-add-01 h-4 w-4" />
+                  <Trans key="ui:_trn_by_date_created" />
+                </div>
+              </DropdownMenuItem>
             </Show>
-            <DropdownMenuItem onClick={() => arrange("dateCreated")}>
-              <div class="flex items-center gap-2">
-                <div class="i-hugeicons:calendar-add-01 h-4 w-4" />
-                <Trans key="ui:_trn_by_date_created" />
-              </div>
-            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </Show>

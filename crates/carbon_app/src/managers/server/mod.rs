@@ -2831,37 +2831,12 @@ impl ManagerRef<'_, ServerManager> {
     pub async fn update_server(self, update: ServerSettingsUpdate) -> anyhow::Result<()> {
         let lock = self.get_op_lock(update.server_id);
         let _guard = lock.lock().await;
-        let mut patch = ServerPatch::default();
+        let server_id = update.server_id;
+        let disable_restart = update.auto_restart == Some(false);
+        persist_server_settings(&self.app.db, update).await?;
 
-        if let Some(name) = update.name {
-            patch.name = Some(name);
-        }
-        if let Some(xmx) = update.xmx {
-            patch.xmx = Some(xmx);
-        }
-        if let Some(xms) = update.xms {
-            patch.xms = Some(xms);
-        }
-        if let Some(extra_args) = update.extra_java_args {
-            patch.extra_java_args = Some(extra_args.unwrap_or_default());
-        }
-        if let Some(auto_restart) = update.auto_restart {
-            patch.auto_restart = Some(auto_restart);
-        }
-
-        let server_id = update.server_id.0;
-        self.app
-            .db
-            .write(move |conn| {
-                if let Some(q) = patch.build(server_id) {
-                    q.execute(&conn)?;
-                }
-                Ok(())
-            })
-            .await?;
-
-        if update.auto_restart == Some(false) {
-            self.cancel_pending_restart(update.server_id).await;
+        if disable_restart {
+            self.cancel_pending_restart(server_id).await;
         }
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
@@ -4398,6 +4373,43 @@ fn generate_shortpath(name: &str) -> String {
 
     format!("{}_{}", base, timestamp)
 }
+
+// Runs only the settings DB publication; lifecycle ownership remains in the manager.
+async fn persist_server_settings(
+    db: &carbon_repos::db_exec::Db,
+    update: ServerSettingsUpdate,
+) -> carbon_repos::db_error::DbResult<()> {
+    let mut patch = ServerPatch::default();
+    patch.name = update.name;
+    patch.xmx = update.xmx;
+    patch.xms = update.xms;
+    patch.extra_java_args = update.extra_java_args.map(|args| args.unwrap_or_default());
+    patch.auto_restart = update.auto_restart;
+    let server_id = update.server_id.0;
+    db.write(move |conn| {
+        // Read and validate on the same serialized writer as publication.
+        // Partial updates must see earlier queued updates, never a read-pool
+        // snapshot of the heap before those updates were applied.
+        let current = server_repo::get_server_conn(&conn, server_id)?.ok_or_else(|| {
+            carbon_repos::db_error::DbError::Conversion("Server not found".into())
+        })?;
+        let xmx = patch.xmx.unwrap_or(current.xmx);
+        let xms = patch.xms.unwrap_or(current.xms);
+        if xmx <= 0 || xms <= 0 || xms > xmx {
+            return Err(carbon_repos::db_error::DbError::Conversion(
+                "Server heap must satisfy 0 < Xms <= Xmx".into(),
+            ));
+        }
+        if let Some(query) = patch.build(server_id) {
+            query.execute(&conn)?;
+        }
+        Ok(())
+    })
+    .await
+}
+
+#[cfg(test)]
+mod task26_tests;
 
 #[cfg(test)]
 mod tests {

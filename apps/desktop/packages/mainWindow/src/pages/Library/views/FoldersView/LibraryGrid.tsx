@@ -5,20 +5,26 @@
  * Handles the layout and rendering of LibraryItemTile components.
  */
 
-import { For, Show, Accessor } from "solid-js"
+import { For, Show, Accessor, createMemo } from "solid-js"
 import { useDragContext, DragType } from "../../DragContext"
 import LibraryItemTile from "@/components/Library/LibraryItemTile"
 import {
   EndOfGroupDropZone,
   EndOfGroupsDropZone
 } from "../../components/EndOfGroupDropZone"
-import { LibraryItem, SelectionState, FLIPAnimation } from "../../types"
+import {
+  LibraryItem,
+  LibraryMode,
+  SelectionState,
+  FLIPAnimation
+} from "../../types"
 import { EntranceAnimationReturn } from "../../hooks/useFLIPAnimation"
 import { TILE_SIZES, TileSize } from "../../constants"
 import { useDragLayoutAnimation } from "../../hooks/useDragLayoutAnimation"
 
 interface LibraryGridProps {
   libraryItems: LibraryItem[]
+  libraryMode?: LibraryMode
   tileSize: Accessor<number>
   defaultGroupId: number | null
   openFolderId: Accessor<number | null>
@@ -39,6 +45,14 @@ interface LibraryGridProps {
 export function LibraryGrid(props: LibraryGridProps) {
   const dragContext = useDragContext()
 
+  const firstUngroupedIndex = createMemo(() =>
+    props.libraryItems.findIndex((item) => item.type !== "folder")
+  )
+  const showFolderTail = () =>
+    (dragContext.isDragging() || dragContext.justDropped()) &&
+    dragContext.dragType() ===
+      (props.libraryMode === "servers" ? "serverGroup" : "group")
+
   // Wrap entranceAnimation in refs object for LibraryItemTile
   const libraryItemRefs = new Map<string, HTMLDivElement>()
 
@@ -58,38 +72,49 @@ export function LibraryGrid(props: LibraryGridProps) {
     >
       <For each={props.libraryItems}>
         {(item, itemIndex) => (
-          <LibraryItemTile
-            item={item}
-            itemIndex={itemIndex}
-            tileSize={props.tileSize}
-            defaultGroupId={() => props.defaultGroupId}
-            openFolderId={props.openFolderId}
-            toggleFolder={props.onToggleFolder}
-            isSelected={props.selection.isSelected}
-            toggleSelection={props.selection.toggleSelection}
-            selectedIds={props.selection.selectedIds}
-            onDragStart={(type, ids, e) => props.onDragStart(type, ids, e)}
-            justDropped={props.justDropped}
-            tileRefs={props.tileRefs}
-            libraryItemRefs={libraryItemRefs}
-            animatedLibraryItemIds={
-              props.entranceAnimation.animatedIds as Set<string>
-            }
-            libraryInitialAnimationComplete={{
-              get value() {
-                return props.entranceAnimation.initialComplete
-              },
-              set value(v) {
-                props.entranceAnimation.value = v
+          <>
+            <Show
+              when={showFolderTail() && itemIndex() === firstUngroupedIndex()}
+            >
+              <EndOfGroupsDropZone
+                kind={props.libraryMode === "servers" ? "server" : "instance"}
+                tileSize={props.tileSize}
+              />
+            </Show>
+            <LibraryItemTile
+              item={item}
+              itemIndex={itemIndex}
+              isFirstUngrouped={() => itemIndex() === firstUngroupedIndex()}
+              tileSize={props.tileSize}
+              defaultGroupId={() => props.defaultGroupId}
+              openFolderId={props.openFolderId}
+              toggleFolder={props.onToggleFolder}
+              isSelected={props.selection.isSelected}
+              toggleSelection={props.selection.toggleSelection}
+              selectedIds={props.selection.selectedIds}
+              onDragStart={(type, ids, e) => props.onDragStart(type, ids, e)}
+              justDropped={props.justDropped}
+              tileRefs={props.tileRefs}
+              libraryItemRefs={libraryItemRefs}
+              animatedLibraryItemIds={
+                props.entranceAnimation.animatedIds as Set<string>
               }
-            }}
-            libraryItemsLength={() => props.libraryItems.length}
-            newlyCreatedFolderId={props.newlyCreatedFolderId}
-            clearNewlyCreatedFolderId={props.clearNewlyCreatedFolderId}
-            selectedCount={props.selectedCount}
-            onBatchDelete={props.onBatchDelete}
-            onSelectExclusive={props.onSelectExclusive}
-          />
+              libraryInitialAnimationComplete={{
+                get value() {
+                  return props.entranceAnimation.initialComplete
+                },
+                set value(v) {
+                  props.entranceAnimation.value = v
+                }
+              }}
+              libraryItemsLength={() => props.libraryItems.length}
+              newlyCreatedFolderId={props.newlyCreatedFolderId}
+              clearNewlyCreatedFolderId={props.clearNewlyCreatedFolderId}
+              selectedCount={props.selectedCount}
+              onBatchDelete={props.onBatchDelete}
+              onSelectExclusive={props.onSelectExclusive}
+            />
+          </>
         )}
       </For>
 
@@ -111,15 +136,12 @@ export function LibraryGrid(props: LibraryGridProps) {
         />
       </Show>
 
-      {/* End of groups drop zone for folder reordering */}
-      <Show
-        when={
-          (dragContext.isDragging() || dragContext.justDropped()) &&
-          (dragContext.dragType() === "group" ||
-            dragContext.dragType() === "serverGroup")
-        }
-      >
-        <EndOfGroupsDropZone tileSize={props.tileSize} />
+      {/* With no members, the folder boundary is the end of the grid. */}
+      <Show when={showFolderTail() && firstUngroupedIndex() === -1}>
+        <EndOfGroupsDropZone
+          kind={props.libraryMode === "servers" ? "server" : "instance"}
+          tileSize={props.tileSize}
+        />
       </Show>
     </div>
   )
