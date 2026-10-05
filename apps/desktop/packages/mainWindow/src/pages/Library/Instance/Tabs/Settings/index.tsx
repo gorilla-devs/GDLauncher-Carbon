@@ -35,18 +35,18 @@ const Settings = () => {
     onMutate: async (variables) => {
       // Cancel outgoing refetches to prevent overwriting optimistic update
       await queryClient.cancelQueries({
-        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
+        queryKey: ["instance.getInstanceDetails", variables.instance]
       })
 
       // Snapshot current state for rollback on error
       const previousDetails = queryClient.getQueryData<InstanceDetails>([
         "instance.getInstanceDetails",
-        parseInt(params.id, 10)
+        variables.instance
       ])
 
       // Optimistically update cache
       queryClient.setQueryData(
-        ["instance.getInstanceDetails", parseInt(params.id, 10)],
+        ["instance.getInstanceDetails", variables.instance],
         (old: InstanceDetails | undefined) => {
           if (!old) return old
           return {
@@ -99,19 +99,19 @@ const Settings = () => {
 
       return { previousDetails }
     },
-    onError: (_err, _variables, context) => {
+    onError: (_err, variables, context) => {
       // Rollback to previous state on error
       if (context?.previousDetails) {
         queryClient.setQueryData(
-          ["instance.getInstanceDetails", parseInt(params.id, 10)],
+          ["instance.getInstanceDetails", variables.instance],
           context.previousDetails
         )
       }
     },
-    onSettled: () => {
+    onSettled: (_data, _error, variables) => {
       // Refetch to ensure cache is in sync with backend
       queryClient.invalidateQueries({
-        queryKey: ["instance.getInstanceDetails", parseInt(params.id, 10)]
+        queryKey: ["instance.getInstanceDetails", variables.instance]
       })
     }
   }))
@@ -122,11 +122,20 @@ const Settings = () => {
 
   const routeData = useInstanceData()
 
-  const initialJavaArgs = createMemo((prev: string | null) => {
-    if (prev) return prev
-
-    return routeData?.instanceDetails?.data?.extraJavaArgs as string | null
-  }, null)
+  const initialJavaArgs = createMemo<{
+    instance: number
+    baseline?: { value: string | null }
+  }>((previous) => {
+    const instance = parseInt(params.id, 10)
+    if (previous?.instance === instance && previous.baseline !== undefined)
+      return previous
+    const details = routeData.instanceDetails.data
+    return {
+      instance,
+      baseline:
+        details?.id === instance ? { value: details.extraJavaArgs } : undefined
+    }
+  })
 
   const mbTotalRAM = () => Number(routeData.totalRam.data) / 1024 / 1024
 
@@ -596,10 +605,13 @@ const Settings = () => {
             type="secondary"
             class="h-10"
             textColor="text-red-500"
+            disabled={initialJavaArgs().baseline === undefined}
             onClick={() => {
+              const captured = initialJavaArgs()
+              if (captured.baseline === undefined) return
               updateInstanceMutation.mutate({
-                extraJavaArgs: { Set: initialJavaArgs() },
-                instance: parseInt(params.id, 10)
+                extraJavaArgs: { Set: captured.baseline.value },
+                instance: captured.instance
               })
             }}
           >

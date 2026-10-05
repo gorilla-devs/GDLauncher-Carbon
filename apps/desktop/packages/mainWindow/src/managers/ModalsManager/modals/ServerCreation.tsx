@@ -178,7 +178,12 @@ const ServerCreation = (props: ModalProps) => {
         name,
         gameVersion: selectedVersion(),
         port: portValue(),
-        group: null,
+        group:
+          typeof props.data?.groupId === "number" &&
+          Number.isSafeInteger(props.data.groupId) &&
+          props.data.groupId > 0
+            ? props.data.groupId
+            : null,
         modloaderType: ml !== "vanilla" ? ml : null,
         modloaderVersion: ml !== "vanilla" ? modloaderVersion() : null
       })

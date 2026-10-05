@@ -9,7 +9,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { Mod as ModType, AddonType } from "@gd/core_module/bindings"
 import { useModal } from "@/managers/ModalsManager"
 import { requiresDeletionConfirmation } from "@/pages/Library/shared/addons/addonCapabilities"
-import { onCleanup } from "solid-js"
+import { createEffect, on, onCleanup } from "solid-js"
 import { resolveBooleanPreference } from "./resolveBooleanPreference"
 
 type AddonDeletionTarget = Pick<ModType, "id" | "filename" | "addon_type">
@@ -84,6 +84,19 @@ export const useAddonMutations = (
   // Track active polling intervals for cleanup
   const activeIntervals = new Set<number>()
   let disposed = false
+  let routeGeneration = 0
+
+  createEffect(
+    on(
+      () => params.id,
+      () => {
+        routeGeneration++
+        activeIntervals.forEach((timer) => clearTimeout(timer))
+        activeIntervals.clear()
+      },
+      { defer: true }
+    )
+  )
 
   // Clean up all active intervals when component unmounts
   onCleanup(() => {
@@ -139,21 +152,25 @@ export const useAddonMutations = (
   }
 
   const handleUpdateMod = async (mod: ModType) => {
-    // Mark mod as updating and apply optimistic update
-    optimisticUpdates.startUpdatingMod(mod.id)
-    optimisticUpdates.optimisticUpdateAddon(mod.id)
-
+    const modId = mod.id
     const instanceId = parseInt(params.id, 10)
+    const generation = routeGeneration
+    const isCurrentUpdate = () =>
+      isCurrentInstance(instanceId) && generation === routeGeneration
+    // Mark mod as updating and apply optimistic update
+    optimisticUpdates.startUpdatingMod(modId)
+    optimisticUpdates.optimisticUpdateAddon(modId)
+
     try {
       const taskId = await updateModMutation.mutateAsync({
         instance_id: instanceId,
-        mod_id: mod.id
+        mod_id: modId
       })
       const poll = async () => {
-        if (!isCurrentInstance(instanceId)) return
+        if (!isCurrentUpdate()) return
         try {
           const task = await ctx.client.query(["vtask.getTaskOutcome", taskId])
-          if (!isCurrentInstance(instanceId)) return
+          if (!isCurrentUpdate()) return
           const { action } = resolveTaskPoll(task, null, false)
           if (
             action.kind === "failed" ||
@@ -161,17 +178,20 @@ export const useAddonMutations = (
             action.kind === "dismissed"
           ) {
             if (action.kind === "failed")
-              toast.error("Addon update failed", {
-                description: action.message
-              })
-            optimisticUpdates.stopUpdatingMod(mod.id)
+              toast.error(
+                addonOutcomeText("content:_trn_addon_update_failed"),
+                {
+                  description: action.message
+                }
+              )
+            optimisticUpdates.stopUpdatingMod(modId)
             await refetchAddons()
             return // Retained failures remain inspectable from the navbar.
           }
         } catch {
           /* A read failure cannot certify completion. */
         }
-        if (!isCurrentInstance(instanceId)) return
+        if (!isCurrentUpdate()) return
         const timer = setTimeout(() => {
           activeIntervals.delete(timer as unknown as number)
           void poll()
@@ -182,8 +202,8 @@ export const useAddonMutations = (
     } catch (error) {
       console.error("Failed to update mod:", error)
       // Stop updating state and rollback on error
-      if (isCurrentInstance(instanceId)) {
-        optimisticUpdates.stopUpdatingMod(mod.id)
+      if (isCurrentUpdate()) {
+        optimisticUpdates.stopUpdatingMod(modId)
         optimisticUpdates.rollbackToServerState()
       }
       throw error // Re-throw to handle in UI

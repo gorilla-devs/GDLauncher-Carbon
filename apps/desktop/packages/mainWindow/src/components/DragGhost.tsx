@@ -3,17 +3,14 @@ import { Portal } from "solid-js/web"
 import { useDragContext } from "@/pages/Library/DragContext"
 import { ListInstance, ListServer } from "@gd/core_module/bindings"
 import DefaultImg from "/assets/images/default-instance-img.png"
-import { getInstanceImageUrl } from "@/utils/instances"
+import { getInstanceImageUrl, getServerImageUrl } from "@/utils/instances"
+import type { FolderData } from "@/pages/Library/types"
 import { getModloaderIcon } from "@/utils/sidebar"
 
 interface DragGhostProps {
   instances: ListInstance[]
   servers: ListServer[]
-  groups: {
-    id: number
-    name: string
-    instances: ListInstance[] | ListServer[]
-  }[]
+  groups: Pick<FolderData, "id" | "name" | "instances" | "kind">[]
   tileSize: 1 | 2 | 3 | 4 | 5
 }
 
@@ -58,7 +55,11 @@ const DragGhost = (props: DragGhostProps) => {
     }
 
     if (type === "group" || type === "serverGroup") {
-      return props.groups.filter((g) => ids.includes(g.id))
+      return props.groups.filter(
+        (g) =>
+          ids.includes(g.id) &&
+          g.kind === (type === "serverGroup" ? "server" : "instance")
+      )
     }
 
     return []
@@ -172,13 +173,7 @@ const DragGhost = (props: DragGhostProps) => {
               }
             >
               <GroupGhost
-                groups={
-                  draggedItems() as {
-                    id: number
-                    name: string
-                    instances: ListInstance[]
-                  }[]
-                }
+                groups={draggedItems() as DragGhostProps["groups"]}
                 tileSize={props.tileSize}
               />
             </Show>
@@ -395,7 +390,7 @@ const ServerGhost = (props: ServerGhostProps) => {
 }
 
 interface GroupGhostProps {
-  groups: { id: number; name: string; instances: ListInstance[] }[]
+  groups: DragGhostProps["groups"]
   tileSize: 1 | 2 | 3 | 4 | 5
 }
 
@@ -404,6 +399,18 @@ const GroupGhost = (props: GroupGhostProps) => {
   const previewInstances = () => firstGroup()?.instances.slice(0, 4) || []
   const count = () => props.groups.length
   const dim = () => getTileDimensions(props.tileSize)
+  const imageUrl = (item: ListInstance | ListServer) => {
+    if (firstGroup()?.kind === "server") {
+      const revision = (item as ListServer).iconRevision
+      return revision == null
+        ? DefaultImg
+        : getServerImageUrl(item.id, revision)
+    }
+    const revision = (item as ListInstance).icon_revision
+    return revision == null
+      ? DefaultImg
+      : getInstanceImageUrl(item.id, revision)
+  }
 
   return (
     <div class="relative">
@@ -446,14 +453,7 @@ const GroupGhost = (props: GroupGhostProps) => {
                   <Show when={instance()}>
                     {(inst) => (
                       <img
-                        src={
-                          inst().icon_revision
-                            ? getInstanceImageUrl(
-                                inst().id,
-                                inst().icon_revision!
-                              )
-                            : DefaultImg
-                        }
+                        src={imageUrl(inst())}
                         alt=""
                         class="w-full h-full object-cover"
                       />

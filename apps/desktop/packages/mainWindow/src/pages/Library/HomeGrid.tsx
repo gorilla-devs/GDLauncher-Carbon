@@ -47,7 +47,8 @@ import {
 import {
   parseInstanceIds,
   parseFolderIds,
-  parseServerIds
+  parseServerIds,
+  parseServerFolderIds
 } from "./utils/selectionIds"
 import "@/components/Library/folderTransitions.css"
 import "./styles/modeTransitions.css"
@@ -124,6 +125,18 @@ const HomeGridInner = () => {
   const showFoldersView = createMemo(() => isFoldersView() && !filter().trim())
 
   const selection = useLibrarySelection()
+
+  createEffect(
+    on(
+      libraryMode,
+      () => {
+        selection.clearSelection()
+        setOpenFolderId(null)
+        dragContext.cancelDrag()
+      },
+      { defer: true }
+    )
+  )
 
   const entranceAnimation = useEntranceAnimation()
 
@@ -423,9 +436,25 @@ const HomeGridInner = () => {
       const selectedServersList = (globalStore.servers.data || []).filter(
         (server) => selectedServerIds.includes(server.id)
       )
+      const folderIds = parseServerFolderIds(selectedStringIds)
+      const folders = (globalStore.serverGroups.data || []).filter((group) =>
+        folderIds.includes(group.id)
+      )
+
+      if (selectedServersList.length === 0 && folders.length === 0) {
+        selection.clearSelection()
+        return
+      }
 
       if (selectedServersList.length === 0) {
-        selection.clearSelection()
+        modals?.openModal(
+          { name: "confirmBatchFolderDeletion" },
+          {
+            kind: "server",
+            folders,
+            onComplete: selection.clearSelection
+          }
+        )
         return
       }
 
@@ -433,6 +462,7 @@ const HomeGridInner = () => {
         { name: "confirmBatchServerDeletion" },
         {
           servers: selectedServersList,
+          folders,
           onComplete: selection.clearSelection
         }
       )
@@ -470,7 +500,11 @@ const HomeGridInner = () => {
       // Only folders selected
       modals?.openModal(
         { name: "confirmBatchFolderDeletion" },
-        { folders: selectedFoldersList, onComplete: selection.clearSelection }
+        {
+          kind: "instance",
+          folders: selectedFoldersList,
+          onComplete: selection.clearSelection
+        }
       )
     } else {
       // Mixed selection - open mixed deletion modal
@@ -685,6 +719,7 @@ const HomeGridInner = () => {
           .map((item) => ({
             id: item.data.id,
             name: item.data.name,
+            kind: item.data.kind,
             instances: item.data.instances
           }))}
         tileSize={tileSize() as 1 | 2 | 3 | 4 | 5}

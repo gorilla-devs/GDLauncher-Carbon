@@ -353,6 +353,7 @@ const PlayersTab = () => {
               </Button>
             </div>
             <PlayerList
+              avatarPolicy="local-network"
               entries={(bannedIpsQuery.data ?? []).map((e: any) => ({
                 name: e.ip,
                 uuid: e.ip,
@@ -380,6 +381,7 @@ interface PlayerListEntry {
 }
 
 interface PlayerListProps {
+  avatarPolicy?: "player" | "local-network"
   entries: PlayerListEntry[]
   onRemove: (id: string) => Promise<void>
   nameField: string
@@ -402,12 +404,22 @@ const PlayerList = (props: PlayerListProps) => {
           {(entry) => (
             <div class="border-darkSlate-600 flex items-center justify-between border-b px-4 py-3 last:border-b-0">
               <div class="flex items-center gap-3">
-                <img
-                  src={`https://mc-heads.net/avatar/${entry.name}/24`}
-                  alt=""
-                  class="h-6 w-6 rounded"
-                  loading="lazy"
-                />
+                <Show
+                  when={props.avatarPolicy !== "local-network"}
+                  fallback={
+                    <div
+                      class="i-hugeicons:global h-6 w-6 shrink-0"
+                      aria-hidden="true"
+                    />
+                  }
+                >
+                  <img
+                    src={`https://mc-heads.net/avatar/${entry.name}/24`}
+                    alt=""
+                    class="h-6 w-6 rounded"
+                    loading="lazy"
+                  />
+                </Show>
                 <span class="text-lightSlate-200 text-sm">{entry.name}</span>
                 <Show when={entry.extra}>
                   <span class="bg-darkSlate-700 text-lightSlate-500 rounded px-1.5 py-0.5 text-xs">

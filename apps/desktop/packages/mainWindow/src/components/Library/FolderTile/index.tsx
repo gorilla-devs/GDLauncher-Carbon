@@ -9,7 +9,8 @@ import {
 import { useTransContext } from "@gd/i18n"
 import { useDragContext } from "@/pages/Library/DragContext"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
-import { getInstanceImageUrl } from "@/utils/instances"
+import { getInstanceImageUrl, getServerImageUrl } from "@/utils/instances"
+import type { FolderKind } from "@/pages/Library/types"
 import { useModal } from "@/managers/ModalsManager"
 import {
   Checkbox,
@@ -33,6 +34,7 @@ import type { ListInstance, ListServer } from "@gd/core_module/bindings"
 
 interface FolderTileProps {
   groupId: number
+  kind: FolderKind
   isOpen: boolean
   onToggle: () => void
   size: 1 | 2 | 3 | 4 | 5
@@ -52,12 +54,9 @@ const FolderTile = (props: FolderTileProps) => {
   const [isHovering, setIsHovering] = createSignal(false)
   const [isMenuOpen, setIsMenuOpen] = createSignal(false)
 
-  // Detect whether this folder is a server group or instance group
-  const isServerGroup = createMemo(
-    () =>
-      globalStore.serverGroups.data?.some((g) => g.id === props.groupId) ??
-      false
-  )
+  const isServerGroup = () => props.kind === "server"
+  const folderKey = () =>
+    `${isServerGroup() ? "server-folder" : "folder"}-${props.groupId}`
 
   // Look up group from globalStore - creates reactive dependency
   const group = createMemo(() =>
@@ -103,7 +102,7 @@ const FolderTile = (props: FolderTileProps) => {
     return (
       dragContext.isDragging() &&
       dragContext.dragDetached() &&
-      (dtype === "group" || dtype === "serverGroup") &&
+      dtype === (isServerGroup() ? "serverGroup" : "group") &&
       dragContext.draggedIds().includes(props.groupId)
     )
   })
@@ -125,7 +124,7 @@ const FolderTile = (props: FolderTileProps) => {
     const dtype = dragContext.dragType()
     if (
       dragContext.isDragging() &&
-      (dtype === "instance" || dtype === "server") &&
+      dtype === (isServerGroup() ? "server" : "instance") &&
       ref
     ) {
       const rect = ref.getBoundingClientRect()
@@ -137,7 +136,7 @@ const FolderTile = (props: FolderTileProps) => {
         rect.height
       )
       dragContext.registerDropZone({
-        id: `folder-${props.groupId}`,
+        id: folderKey(),
         rect: dropRect,
         element: ref,
         rectTransform: (r) =>
@@ -145,12 +144,12 @@ const FolderTile = (props: FolderTileProps) => {
         target: { type: "dropOnFolder", groupId: props.groupId }
       })
     } else {
-      dragContext.unregisterDropZone(`folder-${props.groupId}`)
+      dragContext.unregisterDropZone(folderKey())
     }
   })
 
   onCleanup(() => {
-    dragContext.unregisterDropZone(`folder-${props.groupId}`)
+    dragContext.unregisterDropZone(folderKey())
   })
 
   // Size classes matching InstanceTile sizes
@@ -163,7 +162,7 @@ const FolderTile = (props: FolderTileProps) => {
     if (!g) return
     modalsContext?.openModal(
       { name: "confirmBatchFolderDeletion" },
-      { folders: [g], onComplete: () => {} }
+      { kind: props.kind, folders: [g], onComplete: () => {} }
     )
   }
 
@@ -190,14 +189,16 @@ const FolderTile = (props: FolderTileProps) => {
                 <div class="i-hugeicons:folder-remove h-4 w-4" />
                 {t("instances:_trn_unlink_folder")}
               </ContextMenuItem>
-              <ContextMenuSeparator />
-              <ContextMenuItem
-                class="flex items-center gap-2 text-red-400"
-                onClick={handleManageFolder}
-              >
-                <div class="i-hugeicons:delete-02 h-4 w-4" />
-                {t("instances:_trn_delete_folder_all")}
-              </ContextMenuItem>
+              <Show when={!isServerGroup()}>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  class="flex items-center gap-2 text-red-400"
+                  onClick={handleManageFolder}
+                >
+                  <div class="i-hugeicons:delete-02 h-4 w-4" />
+                  {t("instances:_trn_delete_folder_all")}
+                </ContextMenuItem>
+              </Show>
             </ContextMenuGroup>
           }
         >
@@ -280,15 +281,17 @@ const FolderTile = (props: FolderTileProps) => {
                           <Show when={instance()}>
                             {(inst) => {
                               const iconRev = () =>
-                                "icon_revision" in inst()
-                                  ? (inst() as ListInstance).icon_revision
-                                  : (inst() as ListServer).iconRevision
+                                isServerGroup()
+                                  ? (inst() as ListServer).iconRevision
+                                  : (inst() as ListInstance).icon_revision
                               return (
                                 <img
                                   src={
                                     iconRev() !== null &&
                                     iconRev() !== undefined
-                                      ? getInstanceImageUrl(
+                                      ? (isServerGroup()
+                                          ? getServerImageUrl
+                                          : getInstanceImageUrl)(
                                           inst().id,
                                           iconRev()!
                                         )

@@ -83,12 +83,11 @@ export default function FoldersView(props: FoldersViewProps) {
             onClose={() => props.setOpenFolderId(null)}
             tileSize={props.tileSize() as 1 | 2 | 3 | 4 | 5}
             isDefaultGroup={false}
-            isServerMode={props.libraryMode === "servers"}
             selectedIds={props.selection.selectedIds()}
             onToggleSelection={props.selection.toggleSelection}
             onSetSelection={(ids) => props.selection.selectAll(ids)}
             onDragStart={(itemId, isItemSelected, e) => {
-              const isServer = props.libraryMode === "servers"
+              const isServer = folder().kind === "server"
               const ids = isItemSelected
                 ? isServer
                   ? parseServerIds(props.selection.selectedIds())

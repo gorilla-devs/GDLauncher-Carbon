@@ -50,7 +50,10 @@ vi.mock("@/managers/ModalsManager", () => ({
 vi.mock("@/pages/Library/shared/addons/addonCapabilities", () => ({
   requiresDeletionConfirmation: (type: string) => type === "worlds"
 }))
-vi.mock("solid-js", () => ({ onCleanup: vi.fn() }))
+vi.mock("solid-js", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("solid-js")>()),
+  onCleanup: vi.fn()
+}))
 
 import { useAddonMutations } from "./useAddonMutations"
 

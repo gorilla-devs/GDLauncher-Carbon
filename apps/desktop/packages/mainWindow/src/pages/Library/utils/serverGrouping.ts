@@ -43,9 +43,10 @@ export function computeServerLibraryItems(
     } else if (groupServers.length === 0 || filteredServers.length > 0) {
       // Show as folder — servers inside are rendered by ExpandedFolderContent
       items.push({
-        id: `folder-${group.id}`,
+        id: `server-folder-${group.id}`,
         type: "folder",
         data: {
+          kind: "server",
           id: group.id,
           name: group.name,
           libraryPosition: group.libraryPosition,

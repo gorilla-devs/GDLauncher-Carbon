@@ -394,33 +394,35 @@ const LogsContent = (props: Props) => {
               bufferSize={10}
             >
               {(log, index) => {
-                const rowSearchResult = open()
-                  ? props.logSearchResults?.filter(
-                      (result) => result.entry_index === index()
-                    )
-                  : undefined
+                const rowSearchResult = () =>
+                  open()
+                    ? props.logSearchResults?.filter(
+                        (result) => result.entry_index === index()
+                      )
+                    : undefined
 
-                const baseIndex = props.logSearchResults?.findIndex(
-                  (result) => result.entry_index === index()
-                )
-
-                let relativeCurrentResultIndex = -1
-
-                const currResultIndex = currentResultIndex()
-
-                if (
-                  currResultIndex !== null &&
-                  props.logSearchResults?.[currResultIndex]?.entry_index ===
-                    index()
-                ) {
-                  // Find which result within this row matches the current global index
-                  const rowResultIndex = rowSearchResult?.findIndex(
-                    (result) =>
-                      result === props.logSearchResults?.[currResultIndex]
+                const baseIndex = () =>
+                  props.logSearchResults?.findIndex(
+                    (result) => result.entry_index === index()
                   )
-                  if (rowResultIndex !== undefined && rowResultIndex !== -1) {
-                    relativeCurrentResultIndex = rowResultIndex
+
+                const relativeCurrentResultIndex = () => {
+                  const currResultIndex = currentResultIndex()
+                  if (
+                    currResultIndex !== null &&
+                    props.logSearchResults?.[currResultIndex]?.entry_index ===
+                      index()
+                  ) {
+                    // Match the current global result within this mounted row.
+                    const rowResultIndex = rowSearchResult()?.findIndex(
+                      (result) =>
+                        result === props.logSearchResults?.[currResultIndex]
+                    )
+                    if (rowResultIndex !== undefined && rowResultIndex !== -1) {
+                      return rowResultIndex
+                    }
                   }
+                  return -1
                 }
 
                 return (
@@ -473,9 +475,9 @@ const LogsContent = (props: Props) => {
                       />
                     </Show>
                     <ContentFormatter
-                      relativeCurrentResultIndex={relativeCurrentResultIndex}
-                      baseIndex={baseIndex ?? null}
-                      searchResults={rowSearchResult}
+                      relativeCurrentResultIndex={relativeCurrentResultIndex()}
+                      baseIndex={baseIndex() ?? null}
+                      searchResults={rowSearchResult()}
                       message={log.message}
                       level={log.level}
                       sourceKind={log.sourceKind}

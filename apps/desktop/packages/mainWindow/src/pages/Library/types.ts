@@ -32,12 +32,16 @@ export type LibraryItem =
 /**
  * Data for a folder in the library.
  */
-export interface FolderData {
+export type FolderKind = "instance" | "server"
+
+export type FolderData = {
   id: number
   name: string
   libraryPosition: number | null
-  instances: ListInstance[] | ListServer[]
-}
+} & (
+  | { kind: "instance"; instances: ListInstance[] }
+  | { kind: "server"; instances: ListServer[] }
+)
 
 /**
  * A virtual group for accordion mode.

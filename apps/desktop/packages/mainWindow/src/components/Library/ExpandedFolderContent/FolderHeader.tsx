@@ -24,6 +24,7 @@ interface FolderHeaderProps {
   onEditValueChange: (value: string) => void
   onKeyDown: (e: KeyboardEvent) => void
   onSort: (sortBy: LibrarySortCriteria) => void
+  canArrange: boolean
   onClose: () => void
   viewTransitionName: string | undefined
   inputRef?: (el: HTMLInputElement) => void
@@ -95,33 +96,35 @@ export function FolderHeader(props: FolderHeaderProps) {
       </div>
       <div class="flex items-center gap-2">
         {/* Sort dropdown */}
-        <DropdownMenu>
-          <DropdownMenuTrigger>
-            <Button
-              variant="ghost"
-              size="small"
-              title={t("instances:_trn_rearrange")}
-            >
-              <div class="i-hugeicons:arrow-up-down h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuLabel>
-              <Trans key="instances:_trn_rearrange" />
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <For each={SORT_OPTIONS}>
-              {(option) => (
-                <DropdownMenuItem onClick={() => props.onSort(option.sortBy)}>
-                  <div class="flex items-center gap-2">
-                    <div class={`${option.icon} h-4 w-4`} />
-                    <Trans key={option.key} />
-                  </div>
-                </DropdownMenuItem>
-              )}
-            </For>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Show when={props.canArrange}>
+          <DropdownMenu>
+            <DropdownMenuTrigger>
+              <Button
+                variant="ghost"
+                size="small"
+                title={t("instances:_trn_rearrange")}
+              >
+                <div class="i-hugeicons:arrow-up-down h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuLabel>
+                <Trans key="instances:_trn_rearrange" />
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <For each={SORT_OPTIONS}>
+                {(option) => (
+                  <DropdownMenuItem onClick={() => props.onSort(option.sortBy)}>
+                    <div class="flex items-center gap-2">
+                      <div class={`${option.icon} h-4 w-4`} />
+                      <Trans key={option.key} />
+                    </div>
+                  </DropdownMenuItem>
+                )}
+              </For>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </Show>
         <Show when={!props.isDefaultGroup}>
           <Button
             variant="ghost"

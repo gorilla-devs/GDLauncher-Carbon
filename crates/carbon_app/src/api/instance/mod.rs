@@ -2690,9 +2690,11 @@ impl From<importer::FullImportScanStatus> for FullImportScanStatus {
     }
 }
 
+mod log_stream;
+
 mod log {
-    use axum::extract::{WebSocketUpgrade, ws::Message};
-    use tracing::{error, trace};
+    use axum::extract::WebSocketUpgrade;
+    use futures::StreamExt;
 
     use super::*;
 
@@ -2707,58 +2709,19 @@ mod log {
         req: WebSocketUpgrade,
         State(app): State<App>,
     ) -> impl IntoResponse {
-        req.on_upgrade(move |mut socket| async move {
+        req.on_upgrade(move |socket| async move {
             let log_rx = app
                 .instance_manager()
                 .get_log(domain::GameLogId(query.id))
                 .await;
 
-            let Ok(mut log_rx) = log_rx else {
+            let Ok(log_rx) = log_rx else {
                 tracing::warn!("log entry not found");
-
-                socket.send(Message::Text(r#"{"init":"notfound"}"#.to_string()));
                 return;
             };
 
-            socket.send(Message::Text(r#"{"init":"found"}"#.to_string()));
-
-            tracing::trace!("starting log stream");
-
-            let mut last_idx = 0;
-
-            loop {
-                tracing::trace!("waiting for log data to come in");
-
-                let new_lines = {
-                    let log = log_rx.borrow();
-
-                    let new_lines = log
-                        .get_span(last_idx..)
-                        .into_iter()
-                        .map(|entry| entry.clone())
-                        .collect::<Vec<_>>();
-
-                    last_idx = log.len();
-
-                    new_lines
-                };
-
-                if let Err(e) = socket
-                    .send(Message::Text(
-                        serde_json::to_string(&new_lines)
-                            .expect("serialization of a log entry should be infallible"),
-                    ))
-                    .await
-                {
-                    error!(?e, "Failed to send log entry");
-                }
-
-                if let Err(_) = log_rx.changed().await {
-                    trace!("`log_rx` was closed, killing log stream");
-
-                    return;
-                }
-            }
+            let (sink, peer) = socket.split();
+            super::log_stream::stream_log(sink, peer, log_rx).await;
         })
     }
 }

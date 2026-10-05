@@ -80,11 +80,14 @@ const Logs = () => {
   createEffect(() => {
     if (selectedLog() === undefined) return
 
+    let current = true
+
     const wsConnection = new WebSocket(
       apiWsUrl(`/instance/log?id=${selectedLog()}`)
     )
 
     wsConnection.onmessage = (event) => {
+      if (!current) return
       setIsLoading(false)
       const newLogs = JSON.parse(event.data) as LogEntry[]
       setLogs((prev) => [...prev, ...newLogs])
@@ -100,10 +103,16 @@ const Logs = () => {
     }
 
     onCleanup(() => {
+      // Revoke already-queued callbacks before transport cancellation.
+      current = false
+      wsConnection.onmessage = null
       setLogs([])
       setIsLoading(true)
 
-      if (wsConnection && wsConnection.readyState === wsConnection.OPEN) {
+      if (
+        wsConnection.readyState === wsConnection.CONNECTING ||
+        wsConnection.readyState === wsConnection.OPEN
+      ) {
         wsConnection.close()
       }
     })

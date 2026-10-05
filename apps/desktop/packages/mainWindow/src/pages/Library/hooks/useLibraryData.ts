@@ -232,6 +232,7 @@ function computeLibraryItems(
           id: `folder-${group.id}`,
           type: "folder",
           data: {
+            kind: "instance",
             id: group.id,
             name: folderName,
             libraryPosition: group.library_position,

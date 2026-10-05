@@ -5,7 +5,7 @@ import InstanceTile from "@/components/InstanceTile"
 import ServerTile from "@/components/Server/Tile"
 import FolderTile from "@/components/Library/FolderTile"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
-import { LibraryItem } from "@/pages/Library/types"
+import { FolderData, LibraryItem } from "@/pages/Library/types"
 import DropPreviewTile from "@/pages/Library/components/DropPreviewTile"
 import {
   useDropIndicators,
@@ -142,6 +142,7 @@ const LibraryItemTile = (props: LibraryItemTileProps) => {
         <Show when={isFolder}>
           <FolderTile
             groupId={itemId}
+            kind={(props.item.data as FolderData).kind}
             isOpen={props.openFolderId() === itemId}
             onToggle={() => props.toggleFolder(itemId)}
             size={props.tileSize() as 1 | 2 | 3 | 4 | 5}

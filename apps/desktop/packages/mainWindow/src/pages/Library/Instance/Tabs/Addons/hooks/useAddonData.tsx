@@ -1,4 +1,4 @@
-import { createSignal, createMemo, createEffect, onMount } from "solid-js"
+import { createSignal, createMemo, createEffect, onMount, on } from "solid-js"
 import { createStore, reconcile } from "solid-js/store"
 import { useParams } from "@solidjs/router"
 import { rspc } from "@/utils/rspcClient"
@@ -82,7 +82,17 @@ export const useAddonData = () => {
 
   // Track mods that are currently being updated
   const [updatingModIds, setUpdatingModIds] = createSignal<Set<string>>(
-    new Set()
+    new Set<string>()
+  )
+
+  createEffect(
+    on(
+      () => params.id,
+      () => {
+        setUpdatingModIds(new Set<string>())
+      },
+      { defer: true }
+    )
   )
 
   const [cachePrioritized, setCachePrioritized] = createSignal(false)
@@ -168,8 +178,16 @@ export const useAddonData = () => {
 
   const rollbackToServerState = () => {
     if (allAddons.data) {
-      setAddonsStore(reconcile(allAddons.data, { key: "id" }))
-      setUpdatingModIds(new Set<string>())
+      // Rolling back another action does not complete admitted update tasks.
+      const updating = updatingModIds()
+      setAddonsStore(
+        reconcile(
+          allAddons.data.map((addon) =>
+            updating.has(addon.id) ? { ...addon, has_update: false } : addon
+          ),
+          { key: "id" }
+        )
+      )
     }
   }
 

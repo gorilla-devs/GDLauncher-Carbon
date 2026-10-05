@@ -38,13 +38,13 @@ import { useModal } from "@/managers/ModalsManager"
 import { EndOfGroupDropZone } from "@/pages/Library/components/EndOfGroupDropZone"
 import DropPreviewTile from "@/pages/Library/components/DropPreviewTile"
 import { FolderHeader } from "./FolderHeader"
+import type { FolderData, FolderKind } from "@/pages/Library/types"
 
 interface ExpandedFolderContentProps {
-  group: { id: number; name: string; instances: (ListInstance | ListServer)[] }
+  group: FolderData
   onClose: () => void
   tileSize: 1 | 2 | 3 | 4 | 5
   isDefaultGroup: boolean
-  isServerMode?: boolean
   selectedIds: Set<string>
   onToggleSelection: (id: string) => void
   onSetSelection: (ids: string[]) => void
@@ -59,7 +59,11 @@ interface ExpandedFolderContentProps {
 }
 
 // Backdrop drop zone - dropping on it moves instances to root library
-const BackdropDropZone = (props: { onClose: () => void; folderId: number }) => {
+const BackdropDropZone = (props: {
+  onClose: () => void
+  folderId: number
+  kind: FolderKind
+}) => {
   const dragContext = useDragContext()
   let ref: HTMLDivElement | undefined
 
@@ -71,18 +75,14 @@ const BackdropDropZone = (props: { onClose: () => void; folderId: number }) => {
   // Register drop zone when dragging instances or servers
   createEffect(() => {
     const dtype = dragContext.dragType()
-    if (
-      dragContext.isDragging() &&
-      (dtype === "instance" || dtype === "server") &&
-      ref
-    ) {
+    if (dragContext.isDragging() && dtype === props.kind && ref) {
       const rect = ref.getBoundingClientRect()
       dragContext.registerDropZone({
         id: "backdrop-ungrouped",
         rect,
         element: ref,
         target: { type: "ungrouped" },
-        scope: `folder-${props.folderId}`
+        scope: `${props.kind === "server" ? "server-folder" : "folder"}-${props.folderId}`
       })
     } else {
       dragContext.unregisterDropZone("backdrop-ungrouped")
@@ -112,6 +112,23 @@ const BackdropDropZone = (props: { onClose: () => void; folderId: number }) => {
   )
 }
 
+export function openFolderCreation(
+  kind: FolderKind,
+  groupId: number,
+  importing: boolean,
+  openModal: NonNullable<ReturnType<typeof useModal>>["openModal"] | undefined
+) {
+  if (kind === "server") {
+    if (importing) return
+    openModal?.({ name: "serverCreation" }, { groupId })
+  } else if (kind === "instance") {
+    openModal?.(
+      { name: "instanceCreation" },
+      { groupId, ...(importing ? { import: true } : {}) }
+    )
+  }
+}
+
 const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   const dragContext = useDragContext()
   const globalStore = useGlobalStore()
@@ -128,10 +145,13 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   // (props.group comes from a <Show> callback and becomes stale when parent unmounts)
   const groupId = props.group.id
   const groupName = props.group.name
+  const kind = props.group.kind
+  const isServerMode = () => kind === "server"
+  const folderScope = `${kind === "server" ? "server-folder" : "folder"}-${groupId}`
 
   // Set active scope for folder overlay - only scoped zones will be considered during drag
   createEffect(() => {
-    dragContext.setActiveScope(`folder-${groupId}`)
+    dragContext.setActiveScope(folderScope)
     onCleanup(() => {
       dragContext.setActiveScope(null)
     })
@@ -156,7 +176,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   // Excludes instances that are queued or downloading (preparing).
   const getItemRects = (): Map<string, DOMRect> => {
     const nonSelectable = new Set<string>()
-    const idPrefix = props.isServerMode ? "server" : "instance"
+    const idPrefix = isServerMode() ? "server" : "instance"
     for (const inst of safeInstances()) {
       if ("status" in inst && inst.status.status === "valid") {
         const s = inst.status.value.state.state
@@ -187,14 +207,11 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   // Register drop zones for instance/server reordering within folder
   createEffect(() => {
     const dtype = dragContext.dragType()
-    if (
-      dragContext.isDragging() &&
-      (dtype === "instance" || dtype === "server")
-    ) {
+    if (dragContext.isDragging() && dtype === kind) {
       const draggedIds = dragContext.draggedIds()
       // Use safeInstances which handles stale props gracefully
       const instances = safeInstances()
-      const idPrefix = props.isServerMode ? "server" : "instance"
+      const idPrefix = isServerMode() ? "server" : "instance"
 
       instances.forEach((instance, _index) => {
         const zoneId = `before-folder-instance-${instance.id}`
@@ -229,7 +246,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
             instanceId: instance.id,
             groupId: groupId
           },
-          scope: `folder-${groupId}`
+          scope: folderScope
         })
         registeredDropZoneIds.add(zoneId)
       })
@@ -246,18 +263,14 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   // to the backdrop's "ungrouped" zone when not on a specific instance's beforeInstance zone
   createEffect(() => {
     const dtype = dragContext.dragType()
-    if (
-      dragContext.isDragging() &&
-      (dtype === "instance" || dtype === "server") &&
-      scrollContainerRef
-    ) {
+    if (dragContext.isDragging() && dtype === kind && scrollContainerRef) {
       const rect = scrollContainerRef.getBoundingClientRect()
       dragContext.registerDropZone({
         id: `folder-content-area-${groupId}`,
         rect,
         element: scrollContainerRef,
         target: { type: "folderContentArea", groupId: groupId },
-        scope: `folder-${groupId}`
+        scope: folderScope
       })
       registeredDropZoneIds.add(`folder-content-area-${groupId}`)
     } else {
@@ -276,6 +289,10 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
 
   const renameGroupMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.renameGroup"]
+  }))
+
+  const renameServerGroupMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.renameServerGroup"]
   }))
 
   const arrangeGroupMutation = rspc.createMutation(() => ({
@@ -324,10 +341,12 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
         previewInstances.map((inst) => {
           // Determine icon revision and URL based on item type
           const rev =
-            "icon_revision" in inst ? inst.icon_revision : inst.iconRevision
-          if (!rev) return Promise.resolve()
+            kind === "instance"
+              ? (inst as ListInstance).icon_revision
+              : (inst as ListServer).iconRevision
+          if (rev == null) return Promise.resolve()
           const src =
-            "icon_revision" in inst
+            kind === "instance"
               ? getInstanceImageUrl(inst.id, rev)
               : getServerImageUrl(inst.id, rev)
           return new Promise<void>((resolve) => {
@@ -369,7 +388,10 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
   const handleSave = () => {
     const newName = editValue().trim()
     if (newName && newName !== groupName) {
-      renameGroupMutation.mutate({
+      const mutation = isServerMode()
+        ? renameServerGroupMutation
+        : renameGroupMutation
+      mutation.mutate({
         group: groupId,
         name: newName
       })
@@ -431,7 +453,11 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
           }}
         >
           {/* Backdrop - also serves as drop zone to move instances to root */}
-          <BackdropDropZone onClose={handleClose} folderId={groupId} />
+          <BackdropDropZone
+            onClose={handleClose}
+            folderId={groupId}
+            kind={kind}
+          />
 
           {/* Overlay content - centered via parent flex */}
           <div
@@ -473,9 +499,11 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
               onSave={handleSave}
               onEditValueChange={setEditValue}
               onKeyDown={handleKeyDown}
-              onSort={(sortBy) =>
+              canArrange={!isServerMode()}
+              onSort={(sortBy) => {
+                if (kind !== "instance") return
                 arrangeGroupMutation.mutate({ group: groupId, sortBy })
-              }
+              }}
               onClose={handleClose}
               viewTransitionName={
                 clickedFolderId() === groupId ? "folder-name" : undefined
@@ -500,16 +528,13 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                 >
                   <For each={safeInstances()}>
                     {(instance, index) => {
-                      const idPrefix = props.isServerMode
-                        ? "server"
-                        : "instance"
+                      const idPrefix = isServerMode() ? "server" : "instance"
                       const instanceStringId = `${idPrefix}-${instance.id}`
                       const isBeingDragged = () =>
                         (dragContext.isDragging() ||
                           dragContext.justDropped()) &&
                         dragContext.dragDetached() &&
-                        (dragContext.dragType() === "instance" ||
-                          dragContext.dragType() === "server") &&
+                        dragContext.dragType() === kind &&
                         dragContext.draggedIds().includes(instance.id)
 
                       const isSelected = () =>
@@ -553,17 +578,15 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                               <DropPreviewTile
                                 tileSize={() => props.tileSize}
                                 dropTarget={target()}
-                                scope={`folder-${groupId}`}
+                                scope={folderScope}
                               />
                             )}
                           </Show>
                           {/* Remove dragged tile from DOM so the grid collapses the gap */}
                           <Show when={!isBeingDragged()}>
                             <div
-                              data-instance-tile={
-                                !props.isServerMode || undefined
-                              }
-                              data-server-tile={props.isServerMode || undefined}
+                              data-instance-tile={!isServerMode() || undefined}
+                              data-server-tile={isServerMode() || undefined}
                               class="relative"
                               style={getFolderPreviewStyle()}
                               ref={(el) => {
@@ -574,7 +597,7 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                               }}
                             >
                               <Show
-                                when={props.isServerMode}
+                                when={isServerMode()}
                                 fallback={
                                   <InstanceTile
                                     instance={instance as ListInstance}
@@ -646,15 +669,14 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
                   <Show
                     when={
                       (dragContext.isDragging() || dragContext.justDropped()) &&
-                      (dragContext.dragType() === "instance" ||
-                        dragContext.dragType() === "server")
+                      dragContext.dragType() === kind
                     }
                   >
                     <EndOfGroupDropZone
                       groupId={groupId}
                       zoneIdPrefix="end-of-folder"
                       tileSize={() => props.tileSize}
-                      scope={`folder-${groupId}`}
+                      scope={folderScope}
                     />
                   </Show>
                 </div>
@@ -662,28 +684,40 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
               <ContextMenuContent>
                 <ContextMenuItem
                   class="flex items-center gap-2"
-                  onClick={() => {
-                    modalsContext?.openModal(
-                      { name: "instanceCreation" },
-                      { groupId: groupId }
+                  onClick={() =>
+                    openFolderCreation(
+                      kind,
+                      groupId,
+                      false,
+                      modalsContext?.openModal
                     )
-                  }}
+                  }
                 >
                   <div class="i-hugeicons:file-add h-4 w-4" />
-                  <Trans key="library:_trn_create_new_instance" />
+                  <Trans
+                    key={
+                      isServerMode()
+                        ? "instances:_trn_server_create"
+                        : "library:_trn_create_new_instance"
+                    }
+                  />
                 </ContextMenuItem>
-                <ContextMenuItem
-                  class="flex items-center gap-2"
-                  onClick={() => {
-                    modalsContext?.openModal(
-                      { name: "instanceCreation" },
-                      { import: true, groupId: groupId }
-                    )
-                  }}
-                >
-                  <div class="i-hugeicons:download-02 h-4 w-4" />
-                  <Trans key="library:_trn_import_instance" />
-                </ContextMenuItem>
+                <Show when={!isServerMode()}>
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={() =>
+                      openFolderCreation(
+                        kind,
+                        groupId,
+                        true,
+                        modalsContext?.openModal
+                      )
+                    }
+                  >
+                    <div class="i-hugeicons:download-02 h-4 w-4" />
+                    <Trans key="library:_trn_import_instance" />
+                  </ContextMenuItem>
+                </Show>
               </ContextMenuContent>
             </ContextMenu>
           </div>

@@ -79,11 +79,13 @@ const Java = () => {
   const mbTotalRAM = () =>
     Math.round(Number(routeData.totalRam.data) / 1024 / 1024)
 
-  const initialJavaArgs = createMemo((prev: string | undefined) => {
-    if (prev) return prev
-
-    return settings.data?.javaCustomArgs
-  })
+  const initialJavaArgs = createMemo<{ value: string } | undefined>(
+    (previous) => {
+      if (previous !== undefined) return previous
+      const loaded = settings.data
+      return loaded === undefined ? undefined : { value: loaded.javaCustomArgs }
+    }
+  )
 
   const flattenedAvailableJavas = () =>
     Object.values(routeData.availableJavas.data || {}).reduce(
@@ -241,10 +243,13 @@ const Java = () => {
                   type="secondary"
                   class="h-10"
                   size="small"
+                  disabled={initialJavaArgs() === undefined}
                   onClick={() => {
+                    const baseline = initialJavaArgs()
+                    if (baseline === undefined) return
                     settingsMutation.mutate({
                       javaCustomArgs: {
-                        Set: initialJavaArgs() || ""
+                        Set: baseline.value
                       }
                     })
                   }}
