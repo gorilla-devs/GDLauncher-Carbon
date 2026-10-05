@@ -35,26 +35,36 @@ const Metrics = (props: MetricsProps) => {
   const [metrics, setMetrics] = createSignal<MetricsData | null>(null)
 
   createEffect(() => {
+    const serverId = props.serverId
+    setMetrics(null)
     if (!props.isRunning) {
-      setMetrics(null)
       return
     }
 
+    let current = true
     const wsConnection = new WebSocket(
-      apiWsUrl(`/server/metrics?id=${props.serverId}`)
+      apiWsUrl(`/server/metrics?id=${serverId}`)
     )
 
     wsConnection.onmessage = (event) => {
+      if (!current) return
       const data = JSON.parse(event.data) as MetricsData
       setMetrics(data)
     }
 
     wsConnection.onerror = () => {
+      if (!current) return
       setMetrics(null)
     }
 
     onCleanup(() => {
-      if (wsConnection && wsConnection.readyState === wsConnection.OPEN) {
+      current = false
+      wsConnection.onmessage = null
+      wsConnection.onerror = null
+      if (
+        wsConnection.readyState === wsConnection.CONNECTING ||
+        wsConnection.readyState === wsConnection.OPEN
+      ) {
         wsConnection.close()
       }
     })

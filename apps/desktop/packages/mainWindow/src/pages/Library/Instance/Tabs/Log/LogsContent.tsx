@@ -1,4 +1,12 @@
-import { createSignal, For, Match, Show, Switch } from "solid-js"
+import {
+  createEffect,
+  createSignal,
+  For,
+  Match,
+  Show,
+  Switch,
+  onCleanup
+} from "solid-js"
 
 import { isFullScreen, LogQuery, setIsFullScreen } from "."
 import { LogEntry, LogEntryLevel, LogEntrySourceKind } from "@/utils/logs"
@@ -20,6 +28,7 @@ interface Props {
   query: LogQuery
   setQuery: SetStoreFunction<LogQuery>
   logSearchResults: FESearchResult[] | undefined
+  onFinderVisibilityChange?: (open: boolean) => void
   isActive: boolean
   /** The instance is running a game a previous launcher session started, so
    *  there is no live log for it — see the notice this renders. */
@@ -264,6 +273,8 @@ function ScrollBottomButton(props: {
 
 const LogsContent = (props: Props) => {
   const [open, setOpen] = createSignal(false)
+  createEffect(() => props.onFinderVisibilityChange?.(open()))
+  onCleanup(() => props.onFinderVisibilityChange?.(false))
   const [logsDensity, setLogsDensity] = createSignal<LogDensity>("low")
   const [columns, setColumns] = createSignal<Columns>({
     timestamp: true,

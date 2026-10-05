@@ -1,10 +1,11 @@
 import { LogEntry } from "@/utils/logs"
 import { apiWsUrl, rspc } from "@/utils/rspcClient.js"
 import { useParams } from "@solidjs/router"
-import { createEffect, createSignal, onCleanup } from "solid-js"
+import { createEffect, createSignal, onCleanup, untrack } from "solid-js"
 import LogsSidebar from "./LogsSidebar"
 import LogsContent from "./LogsContent"
 import { createStore } from "solid-js/store"
+import type { FESearchResult } from "@gd/core_module/bindings"
 import { VirtualizerHandle } from "virtua/lib/solid"
 
 export const [isFullScreen, setIsFullScreen] = createSignal(false)
@@ -29,6 +30,9 @@ const Logs = () => {
   const [autoFollow, setAutoFollow] = createSignal(true)
   const params = useParams<{ id: string }>()
   const [newLogsCount, setNewLogsCount] = createSignal(0)
+  const [finderOpen, setFinderOpen] = createSignal(false)
+  const [searchResults, setSearchResults] = createSignal<FESearchResult[]>()
+  let markSearchDirty = () => {}
   const [query, setQuery] = createStore<LogQuery>({
     query: null,
     matchCase: false,
@@ -48,7 +52,10 @@ const Logs = () => {
       }
     ],
     enabled:
-      !!query.query && selectedLog() !== undefined && selectedLog() !== null
+      finderOpen() &&
+      !!query.query &&
+      selectedLog() !== undefined &&
+      selectedLog() !== null
   }))
 
   const availableLogEntries = rspc.createQuery(() => ({
@@ -69,6 +76,72 @@ const Logs = () => {
 
   const isActive = () =>
     availableLogEntries.data?.find((log) => log.id === selectedLog())?.active
+
+  createEffect((previousKey: string | undefined) => {
+    const key = JSON.stringify([
+      params.id,
+      selectedLog(),
+      query.query,
+      query.matchCase,
+      query.matchWholeWord,
+      query.useRegex,
+      finderOpen()
+    ])
+    const active = isActive()
+    if (key !== previousKey) setSearchResults(undefined)
+    markSearchDirty = () => {}
+    if (!finderOpen() || !query.query || selectedLog() == null) return key
+
+    let current = true
+    let dirty = false
+    let inFlight = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const queue = () => {
+      if (!current) return
+      dirty = true
+      if (inFlight || timer !== undefined) return
+      // A fixed batch window still fires during continuous output.
+      timer = setTimeout(() => {
+        timer = undefined
+        refresh()
+      }, 250)
+    }
+    const refresh = () => {
+      if (!current || inFlight) return
+      // A request started before opening may contain an older snapshot.
+      // Join it, then obtain one current snapshot after it settles.
+      dirty = logSearchResults.isFetching
+      inFlight = true
+      // Join existing work instead of cancelling it on each chunk.
+      void logSearchResults
+        .refetch({ cancelRefetch: false })
+        .then(
+          (result) => {
+            if (current) setSearchResults(result.data)
+          },
+          () => {
+            // The query retains its failure; obsolete results have no authority.
+            if (current) setSearchResults(undefined)
+          }
+        )
+        .finally(() => {
+          inFlight = false
+          if (current && dirty) queue()
+        })
+    }
+    markSearchDirty = () => {
+      if (active) queue()
+    }
+    onCleanup(() => {
+      current = false
+      if (timer !== undefined) clearTimeout(timer)
+      markSearchDirty = () => {}
+    })
+    // Opening, changing the search, or retiring a live session obtains
+    // the current snapshot. Finite owners do not schedule growth refreshes.
+    untrack(refresh)
+    return key
+  })
 
   createEffect(() => {
     if (!availableLogEntries.data) return
@@ -91,6 +164,7 @@ const Logs = () => {
       setIsLoading(false)
       const newLogs = JSON.parse(event.data) as LogEntry[]
       setLogs((prev) => [...prev, ...newLogs])
+      if (newLogs.length > 0) markSearchDirty()
 
       if (!autoFollowPreference() || !virtualizerRef) return
 
@@ -210,7 +284,8 @@ const Logs = () => {
         logs={logs}
         query={query}
         setQuery={setQuery}
-        logSearchResults={logSearchResults.data}
+        logSearchResults={searchResults()}
+        onFinderVisibilityChange={setFinderOpen}
         isActive={isActive() || false}
         adopted={isAdoptedRunning()}
         isLoading={isLoading()}

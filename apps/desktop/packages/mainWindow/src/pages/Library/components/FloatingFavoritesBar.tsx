@@ -540,7 +540,9 @@ function DockAvatar(props: DockAvatarProps) {
     !isServerMode() && instance()?.status.status === "invalid"
   const isBusy = () =>
     isServerMode()
-      ? serverStatus() === "starting" || serverStatus() === "stopping"
+      ? serverStatus() === "starting" ||
+        serverStatus() === "stopping" ||
+        serverStatus() === "installing"
       : isLoading()
 
   const handleClick = () => {
@@ -560,6 +562,7 @@ function DockAvatar(props: DockAvatarProps) {
     e?.stopPropagation()
 
     if (isServerMode()) {
+      if (serverStatus() !== "stopped" && serverStatus() !== "running") return
       if (isServerRunning()) {
         stopServerMutation.mutate(props.instanceId)
       } else {

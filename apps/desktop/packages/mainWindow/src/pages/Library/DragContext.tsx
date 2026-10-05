@@ -161,10 +161,34 @@ export function DragProvider(props: { children: JSX.Element }) {
   } | null>(null)
   const [dragDetached, setDragDetached] = createSignal(false)
 
+  let dragGeneration = 0
+  let dropFrames: number[] = []
   let dropTimers: ReturnType<typeof setTimeout>[] = []
   const clearDropTimers = () => {
     for (const id of dropTimers) clearTimeout(id)
     dropTimers = []
+    for (const id of dropFrames) cancelAnimationFrame(id)
+    dropFrames = []
+  }
+
+  const scheduleDropFrame = (generation: number, callback: () => void) => {
+    dropFrames.push(
+      requestAnimationFrame(() => {
+        if (generation === dragGeneration) callback()
+      })
+    )
+  }
+
+  const scheduleDropTimer = (
+    generation: number,
+    callback: () => void,
+    delay: number
+  ) => {
+    dropTimers.push(
+      setTimeout(() => {
+        if (generation === dragGeneration) callback()
+      }, delay)
+    )
   }
 
   // Edge autoscroll: while dragging near the top/bottom of the scroll
@@ -247,7 +271,10 @@ export function DragProvider(props: { children: JSX.Element }) {
     if (speed !== 0) {
       container.scrollTop += speed
       // Keep the loop alive while inside an edge zone.
-      autoscrollRaf = requestAnimationFrame(runAutoscrollFrame)
+      const generation = dragGeneration
+      autoscrollRaf = requestAnimationFrame(() => {
+        if (generation === dragGeneration) runAutoscrollFrame()
+      })
     }
   }
 
@@ -256,7 +283,10 @@ export function DragProvider(props: { children: JSX.Element }) {
     autoscrollPointerX = clientX
     autoscrollPointerY = clientY
     if (autoscrollRaf === null) {
-      autoscrollRaf = requestAnimationFrame(runAutoscrollFrame)
+      const generation = dragGeneration
+      autoscrollRaf = requestAnimationFrame(() => {
+        if (generation === dragGeneration) runAutoscrollFrame()
+      })
     }
   }
 
@@ -410,6 +440,7 @@ export function DragProvider(props: { children: JSX.Element }) {
     e: PointerEvent,
     origin?: string
   ) => {
+    cancelDrag()
     dragOrigin = origin ?? null
     setDragType(type)
     setDraggedIds(ids)
@@ -494,6 +525,7 @@ export function DragProvider(props: { children: JSX.Element }) {
   }
 
   const executeDrop = () => {
+    const generation = dragGeneration
     cleanup()
 
     if (hasDragStarted()) {
@@ -509,6 +541,9 @@ export function DragProvider(props: { children: JSX.Element }) {
       if (ids.length > 0 && type && onDropHandler) {
         onDropHandler(target, ids, type, dragOrigin)
       }
+
+      // A synchronous handler may have started or cancelled another gesture.
+      if (generation !== dragGeneration) return
 
       // Animated exit for favorites unfavorite — keep ghost alive during animation
       const isFavUnfavorite =
@@ -533,8 +568,9 @@ export function DragProvider(props: { children: JSX.Element }) {
         setDragSelectEnabled(true)
         resetDropTargetHysteresis()
         // isDragging, dragType, draggedIds, dragOrigin stay alive for the ghost
-        dropTimers.push(
-          setTimeout(() => {
+        scheduleDropTimer(
+          generation,
+          () => {
             setDropAnimating(null)
             setIsDragging(false)
             setDragDetached(false)
@@ -543,10 +579,11 @@ export function DragProvider(props: { children: JSX.Element }) {
             setDropTarget(null)
             setDropPreviewRect(null)
             dragOrigin = null
-            requestAnimationFrame(() => {
+            scheduleDropFrame(generation, () => {
               setJustDropped(false)
             })
-          }, 300)
+          },
+          300
         )
         return
       }
@@ -563,8 +600,9 @@ export function DragProvider(props: { children: JSX.Element }) {
         setDragSelectEnabled(true)
         resetDropTargetHysteresis()
         // isDragging, dragType, draggedIds stay alive for the ghost
-        dropTimers.push(
-          setTimeout(() => {
+        scheduleDropTimer(
+          generation,
+          () => {
             setDropAnimating(null)
             setIsDragging(false)
             setDragDetached(false)
@@ -573,28 +611,31 @@ export function DragProvider(props: { children: JSX.Element }) {
             setDropTarget(null)
             setDropPreviewRect(null)
             dragOrigin = null
-            requestAnimationFrame(() => {
+            scheduleDropFrame(generation, () => {
               setJustDropped(false)
             })
-          }, 300)
+          },
+          300
         )
         return
       }
 
       // No preview rect (e.g. drop on favorites, null target) — clear immediately
       setIsDragging(false)
-      dropTimers.push(
-        setTimeout(() => {
+      scheduleDropTimer(
+        generation,
+        () => {
           if (!isDragging()) {
             setDragType(null)
             setDraggedIds([])
             setDropTarget(null)
             setDropPreviewRect(null)
           }
-          requestAnimationFrame(() => {
+          scheduleDropFrame(generation, () => {
             setJustDropped(false)
           })
-        }, 100)
+        },
+        100
       )
     } else {
       // No drag started — clear immediately
@@ -645,7 +686,10 @@ export function DragProvider(props: { children: JSX.Element }) {
   }
 
   const cancelDrag = () => {
+    dragGeneration++
     clearDropTimers()
+    setDropAnimating(null)
+    setJustDropped(false)
     cleanup()
     dragOrigin = null
     setIsDragging(false)
@@ -660,10 +704,7 @@ export function DragProvider(props: { children: JSX.Element }) {
     resetDropTargetHysteresis()
   }
 
-  onCleanup(() => {
-    clearDropTimers()
-    cleanup()
-  })
+  onCleanup(cancelDrag)
 
   const value: DragContextValue = {
     isDragging,

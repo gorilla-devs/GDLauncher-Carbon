@@ -1,4 +1,10 @@
-import { Button, Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
+import {
+  Button,
+  Progress,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "@gd/ui"
 import { useLocation, useParams } from "@solidjs/router"
 import { Match, Show, Switch, createMemo } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -99,13 +105,42 @@ const Server = (props: { children?: any }) => {
   const isStarting = () => details()?.state?.status === "starting"
   const isStopping = () => details()?.state?.status === "stopping"
   const isStopped = () => details()?.state?.status === "stopped"
-  const isBusy = () => isStarting() || isStopping()
+  const isInstalling = () => details()?.state?.status === "installing"
+  const isDeleting = () => details()?.state?.status === "deleting"
+  const isBusy = () => isStarting() || isStopping() || isInstalling()
+  const canStartStop = () =>
+    details()?.id === serverId() && (isStopped() || isRunning())
+  const taskId = () => {
+    const state = details()?.state
+    if (state?.status === "installing") return state.task_id
+    if (state?.status === "stopped") return state.failed_task
+    return null
+  }
+  const task = rspc.createQuery(() => ({
+    queryKey: ["vtask.getTask", taskId() ?? null],
+    enabled: taskId() != null,
+    refetchInterval: isInstalling() ? 500 : false
+  }))
+  const ownedTask = () => (task.data?.id === taskId() ? task.data : undefined)
+  const taskPercentage = () => {
+    const progress = ownedTask()?.progress
+    return progress?.type === "Known"
+      ? Math.round(progress.value * 100)
+      : undefined
+  }
+  const taskFailure = () => {
+    const progress = ownedTask()?.progress
+    return progress?.type === "Failed"
+      ? progress.value.cause.map((cause) => cause.display).join("\n  → ")
+      : undefined
+  }
   const isAutoRestartAbandoned = () => details()?.autoRestartAbandoned ?? false
 
   const handleStartStop = () => {
+    if (!canStartStop()) return
     if (isRunning()) {
       stopServerMutation.mutate(serverId())
-    } else if (!isBusy()) {
+    } else if (isStopped()) {
       startServerMutation.mutate(serverId())
     }
   }
@@ -197,20 +232,21 @@ const Server = (props: { children?: any }) => {
                 data-status={details()?.state?.status}
                 classList={{
                   "bg-green-900/30 text-green-400": isRunning(),
-                  "bg-yellow-900/30 text-yellow-400": isStarting(),
+                  "bg-yellow-900/30 text-yellow-400":
+                    isStarting() || isInstalling(),
                   "bg-orange-900/30 text-orange-400": isStopping(),
                   "bg-darkSlate-700 text-lightSlate-500":
-                    !isRunning() && !isStarting() && !isStopping()
+                    !isRunning() && !isBusy()
                 }}
               >
                 <div
                   class="h-2 w-2 rounded-full"
                   classList={{
                     "bg-green-400": isRunning(),
-                    "bg-yellow-400 animate-pulse": isStarting(),
+                    "bg-yellow-400 animate-pulse":
+                      isStarting() || isInstalling(),
                     "bg-orange-400": isStopping(),
-                    "bg-lightSlate-600":
-                      !isRunning() && !isStarting() && !isStopping()
+                    "bg-lightSlate-600": !isRunning() && !isBusy()
                   }}
                 />
                 <Switch>
@@ -229,11 +265,39 @@ const Server = (props: { children?: any }) => {
                   <Match when={isStopping()}>
                     <Trans key="instances:_trn_server_status_stopping" />
                   </Match>
-                  <Match when={true}>
+                  <Match when={isInstalling()}>
+                    <Trans
+                      key="tasks:_trn_server_task_install"
+                      options={{ server_name: details()?.name }}
+                    />
+                  </Match>
+                  <Match when={isDeleting()}>
+                    <Trans
+                      key="instances:_trn_deleting_servers_progress"
+                      options={{ current: 1, total: 1 }}
+                    />
+                  </Match>
+                  <Match when={isStopped()}>
                     <Trans key="instances:_trn_server_status_stopped" />
                   </Match>
                 </Switch>
               </div>
+              <Show when={isInstalling()}>
+                <div class="flex min-w-48 flex-col gap-2 text-sm">
+                  <Progress value={taskPercentage()} max={100} size="small" />
+                  <Show when={taskPercentage() !== undefined}>
+                    <span>{taskPercentage()}%</span>
+                  </Show>
+                </div>
+              </Show>
+              <Show when={taskFailure()}>
+                <div
+                  class="whitespace-pre-wrap text-sm text-red-400"
+                  role="alert"
+                >
+                  <Trans key="instances:_trn_repair_failed" />: {taskFailure()}
+                </div>
+              </Show>
               {/* Auto-restart gave up — surfaces until the next manual start */}
               <Show when={isAutoRestartAbandoned()}>
                 <div class="flex items-center gap-1.5 text-xs font-medium text-yellow-500">
@@ -315,6 +379,7 @@ const Server = (props: { children?: any }) => {
             size="large"
             variant={isRunning() ? "red" : undefined}
             loading={isBusy()}
+            disabled={!canStartStop()}
             style={{
               "view-transition-name": "server-tile-play-button",
               contain: "layout"
@@ -340,7 +405,13 @@ const Server = (props: { children?: any }) => {
               <Match when={isStopping()}>
                 <Trans key="instances:_trn_server_action_stopping" />
               </Match>
-              <Match when={true}>
+              <Match when={isInstalling()}>
+                <Trans
+                  key="tasks:_trn_server_task_install"
+                  options={{ server_name: details()?.name }}
+                />
+              </Match>
+              <Match when={isStopped()}>
                 <div class="i-hugeicons:play text-xl" />
                 <Trans key="instances:_trn_server_action_start" />
               </Match>
@@ -362,6 +433,7 @@ const Server = (props: { children?: any }) => {
               size="small"
               variant={isRunning() ? "red" : undefined}
               loading={isBusy()}
+              disabled={!canStartStop()}
               onClick={handleStartStop}
             >
               <Switch>
@@ -379,10 +451,19 @@ const Server = (props: { children?: any }) => {
           </TooltipTrigger>
           <TooltipContent>
             <Trans
+              options={{ server_name: details()?.name }}
               key={
                 isRunning()
                   ? "instances:_trn_server_action_stop"
-                  : "instances:_trn_server_action_start"
+                  : isStopped()
+                    ? "instances:_trn_server_action_start"
+                    : isInstalling()
+                      ? "tasks:_trn_server_task_install"
+                      : isStarting()
+                        ? "instances:_trn_server_action_starting"
+                        : isStopping()
+                          ? "instances:_trn_server_action_stopping"
+                          : "instances:_trn_server_loading"
               }
             />
           </TooltipContent>

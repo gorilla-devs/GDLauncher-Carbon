@@ -4,7 +4,9 @@ import {
   onMount,
   createSignal,
   onCleanup,
-  createMemo
+  createMemo,
+  createEffect,
+  batch
 } from "solid-js"
 import {
   flexRender,
@@ -67,6 +69,9 @@ export function AddonTable<T extends AddonTableItem>(
 ) {
   const [scrollTop, setScrollTop] = createSignal(0)
   const [containerHeight, setContainerHeight] = createSignal(window.innerHeight)
+  const [scrollViewportHeight, setScrollViewportHeight] = createSignal(
+    window.innerHeight
+  )
   let tableRef: HTMLDivElement | undefined
   let headerRef: HTMLDivElement | undefined
   let resizeObserver: ResizeObserver | undefined
@@ -78,6 +83,7 @@ export function AddonTable<T extends AddonTableItem>(
   const defaultRowHeight =
     typeof config.rowHeight === "number" ? config.rowHeight : 60
   const rowHeightCache = new RowHeightCache(defaultRowHeight)
+  const [heightRevision, setHeightRevision] = createSignal(0)
 
   const [isDragging, setIsDragging] = createSignal(false)
   const [dragStartRow, setDragStartRow] = createSignal<string | null>(null)
@@ -156,6 +162,40 @@ export function AddonTable<T extends AddonTableItem>(
   }
 
   const rows = createMemo(() => table.getRowModel().rows)
+  const rowOffsets = createMemo(() => {
+    heightRevision()
+    if (!enableDynamicHeight) return []
+    const offsets = [0]
+    for (let index = 0; index < rows().length; index++) {
+      offsets.push(offsets[index] + getRowHeight(index))
+    }
+    return offsets
+  })
+  const contentHeight = () =>
+    enableDynamicHeight
+      ? (rowOffsets()[rows().length] ?? 0)
+      : rows().length * defaultRowHeight
+  const boundedScrollTop = () =>
+    Math.max(
+      0,
+      Math.min(scrollTop(), Math.max(0, contentHeight() - containerHeight()))
+    )
+
+  createEffect(() => {
+    const offset = boundedScrollTop()
+    if (scrollTop() <= offset) return
+    if (scrollContainerRef && headerRef && tableRef) {
+      // The virtual offset starts below the sticky header, not at page zero.
+      const measuredOffset =
+        headerRef.getBoundingClientRect().bottom -
+        tableRef.getBoundingClientRect().top
+      scrollContainerRef.scrollTop = Math.max(
+        0,
+        scrollContainerRef.scrollTop + offset - measuredOffset
+      )
+    }
+    setScrollTop(offset)
+  })
 
   const getRowRange = (startRowId: string, endRowId: string) => {
     const allRows = rows()
@@ -193,8 +233,14 @@ export function AddonTable<T extends AddonTableItem>(
       }
 
     // Use scrollTop signal for reactivity
-    const currentScrollTop = scrollTop()
-    const currentContainerHeight = containerHeight()
+    const currentScrollTop = boundedScrollTop()
+    // Rows are drawn for a whole viewport below the scroll offset, not just
+    // the body area last measured on screen: content above the table can
+    // move it without a scroll or resize, which would leave that measure stale.
+    const currentContainerHeight = Math.max(
+      containerHeight(),
+      scrollViewportHeight()
+    )
 
     if (enableDynamicHeight) {
       // Dynamic height calculation
@@ -215,7 +261,7 @@ export function AddonTable<T extends AddonTableItem>(
       }
 
       // Find end index
-      accumulatedHeight = rowHeightCache.getOffsetForIndex(start)
+      accumulatedHeight = rowOffsets()[start]
       for (let i = start; i < total; i++) {
         if (
           accumulatedHeight >
@@ -234,22 +280,23 @@ export function AddonTable<T extends AddonTableItem>(
         end,
         total,
         rows: allRows.slice(start, end),
-        startOffset: rowHeightCache.getOffsetForIndex(start),
-        endOffset:
-          rowHeightCache.getTotalHeight(total) -
-          rowHeightCache.getOffsetForIndex(end)
+        startOffset: rowOffsets()[start],
+        endOffset: rowOffsets()[total] - rowOffsets()[end]
       }
     } else {
       // Fixed height calculation (optimized)
       const fixedHeight = defaultRowHeight
-      const start = Math.max(
-        0,
-        Math.floor(currentScrollTop / fixedHeight) - BUFFER_SIZE
+      const start = Math.min(
+        total - 1,
+        Math.max(0, Math.floor(currentScrollTop / fixedHeight) - BUFFER_SIZE)
       )
-      const end = Math.min(
-        total,
-        Math.ceil((currentScrollTop + currentContainerHeight) / fixedHeight) +
-          BUFFER_SIZE
+      const end = Math.max(
+        start + 1,
+        Math.min(
+          total,
+          Math.ceil((currentScrollTop + currentContainerHeight) / fixedHeight) +
+            BUFFER_SIZE
+        )
       )
 
       return {
@@ -493,9 +540,8 @@ export function AddonTable<T extends AddonTableItem>(
     return document.documentElement
   }
 
-  const createScrollHandler = (_container: HTMLElement) => {
+  const createScrollHandler = (container: HTMLElement) => {
     let animationFrameId: number | null = null
-    let lastKnownScrollTop = 0
 
     const updateScrollPosition = () => {
       if (!tableRef || !headerRef) return
@@ -509,11 +555,26 @@ export function AddonTable<T extends AddonTableItem>(
       const scrollOffset = headerBottom - tableTop
       const newScrollTop = Math.max(0, scrollOffset)
 
-      // Always update if there's a significant change
-      if (Math.abs(newScrollTop - lastKnownScrollTop) > 0.1) {
-        lastKnownScrollTop = newScrollTop
-        setScrollTop(newScrollTop)
-      }
+      // The document rectangle describes all content, not its client viewport.
+      const viewportTop =
+        container === document.documentElement
+          ? 0
+          : container.getBoundingClientRect().top
+      const viewportHeight =
+        container.clientHeight ||
+        (container === document.documentElement ? window.innerHeight : 0)
+      const viewportBottom = viewportTop + viewportHeight
+      const bodyTop = Math.max(
+        viewportTop,
+        Math.min(viewportBottom, headerBottom)
+      )
+      batch(() => {
+        setContainerHeight(Math.max(0, viewportBottom - bodyTop))
+        setScrollViewportHeight(viewportHeight)
+        if (Math.abs(newScrollTop - scrollTop()) > 0.1) {
+          setScrollTop(newScrollTop)
+        }
+      })
     }
 
     const handleScroll = () => {
@@ -561,18 +622,18 @@ export function AddonTable<T extends AddonTableItem>(
       resizeObserver = new ResizeObserver((entries) => {
         for (const entry of entries) {
           if (entry.target === container) {
-            setContainerHeight(entry.contentRect.height)
+            handler()
           }
         }
       })
 
       resizeObserver.observe(container)
 
-      setContainerHeight(container.clientHeight)
       handler()
 
       // Use both scroll and scrollend for better updates
       container.addEventListener("scroll", handler, { passive: true })
+      window.addEventListener("resize", handler)
 
       // scrollend fires when scrolling momentum stops - ensures final update
       if ("onscrollend" in container) {
@@ -581,6 +642,7 @@ export function AddonTable<T extends AddonTableItem>(
 
       scrollHandlerCleanup = () => {
         container.removeEventListener("scroll", handler)
+        window.removeEventListener("resize", handler)
         if ("onscrollend" in container) {
           container.removeEventListener("scrollend", handler)
         }
@@ -698,8 +760,12 @@ export function AddonTable<T extends AddonTableItem>(
                         const entry = entries[0]
                         if (entry) {
                           const height = entry.contentRect.height
-                          if (height > 0) {
+                          if (
+                            height > 0 &&
+                            height !== rowHeightCache.get(rowIndex())
+                          ) {
                             rowHeightCache.set(rowIndex(), height)
+                            setHeightRevision((revision) => revision + 1)
                           }
                         }
                       })
