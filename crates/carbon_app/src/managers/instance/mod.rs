@@ -688,15 +688,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 if let Some(game) = adopted.get(&instance.shortpath).copied() {
                     if let InstanceType::Valid(data) = &mut instance.type_ {
                         if matches!(data.state, LaunchState::Inactive { .. }) {
-                            data.state = LaunchState::Running(RunningInstance::adopted(
-                                game.pid,
-                                game.verified_start_time,
+                            data.state = LaunchState::Running(RunningInstance::adopted_record(
+                                game.verified_process,
                                 game.start_time,
                                 Utc::now(),
                             ));
                             self.app
                                 .runtime_lifecycle
-                                .adopted_game_published(game.pid, game.verified_start_time);
+                                .adopted_record_published(game.verified_process);
                             adopted_ids.push(instance_id);
                         }
                     }
@@ -3929,6 +3928,7 @@ struct AdoptedGame {
     /// lookup — since the game can exit and have its pid recycled by an
     /// unrelated process at any point after this reconcile pass.
     verified_start_time: u64,
+    verified_process: orphan_pid::ProcessRecord,
 }
 
 /// Reconcile every instance directory directly under `instances_root`
@@ -3947,6 +3947,13 @@ struct AdoptedGame {
 /// else (dead pid, or a live pid the process table says is no longer java,
 /// meaning the number was reused) just has its stale pidfile removed.
 async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<String, AdoptedGame> {
+    reconcile_running_instances_under_observed(instances_root, orphan_pid::observe_process).await
+}
+
+async fn reconcile_running_instances_under_observed(
+    instances_root: &Path,
+    observe: impl Fn(u32) -> orphan_pid::ProcessObservation,
+) -> HashMap<String, AdoptedGame> {
     let mut adopted: HashMap<String, AdoptedGame> = HashMap::new();
 
     let mut entries = match tokio::fs::read_dir(instances_root).await {
@@ -3965,7 +3972,7 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
     // read each) and collect the recorded pids up front, so the process
     // table only needs a single targeted refresh for this whole pass
     // instead of a full system scan per instance.
-    let mut recorded: Vec<(String, PathBuf, Option<(u32, Option<u64>)>)> = Vec::new();
+    let mut recorded: Vec<(String, PathBuf, Option<orphan_pid::ProcessRecord>)> = Vec::new();
     loop {
         let entry = match entries.next_entry().await {
             Ok(Some(entry)) => entry,
@@ -3986,11 +3993,11 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
             continue;
         };
 
-        let pid = match orphan_pid::read_pid_file(&root, PID_FILE_NAME).await {
+        let pid = match orphan_pid::read_process_file(&root, PID_FILE_NAME).await {
             Ok(pid) => pid,
             Err(e) => {
                 warn!(
-                    "Failed to read pidfile for instance {} at {}: {} — removing it",
+                    "Failed to read pidfile for instance {} at {}: {} — retaining recovery evidence",
                     shortpath,
                     root.display(),
                     e
@@ -4001,56 +4008,33 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
                 // future startup unless it is cleaned up here, exactly like
                 // a stale-but-parseable one is by `RemoveStale`/`NotOurs`
                 // below.
-                orphan_pid::remove_pid_file(&root, PID_FILE_NAME).await;
+                // Malformed present identity remains recoverable; never downgrade.
                 None
             }
         };
         recorded.push((shortpath.to_string(), root, pid));
     }
 
-    let pids: Vec<Pid> = recorded
-        .iter()
-        .filter_map(|(_, _, pid)| pid.map(|(p, _)| Pid::from_u32(p)))
-        .collect();
-
-    let mut system = System::new();
-    if !pids.is_empty() {
-        system.refresh_processes(ProcessesToUpdate::Some(&pids));
-    }
-
-    // Pass 2: reconcile. A pid that is dead, alive but no longer java, or
-    // alive and java-looking but whose identity can't be proven (a legacy
-    // pidfile, or a start time that doesn't match what was recorded when
-    // this launcher spawned it) leaves nothing behind but a stale file to
-    // remove; only a live JVM whose start time matches is a game to adopt,
-    // and its pidfile stays exactly where it is.
-    for (shortpath, root, pid) in recorded {
-        let live = pid.and_then(|(p, _)| orphan_pid::live_proc(&system, p));
-
-        match orphan_pid::reconcile_pid(pid, live) {
-            orphan_pid::PidReconcileAction::NoPidFile => {}
-            orphan_pid::PidReconcileAction::RemoveStale => {
-                orphan_pid::remove_pid_file(&root, PID_FILE_NAME).await;
+    for (shortpath, root, record) in recorded {
+        let Some(record) = record else {
+            continue;
+        };
+        let observed = observe(record.pid);
+        match orphan_pid::identity_status(record, observed, true) {
+            orphan_pid::IdentityStatus::GoneOrReused => {
+                orphan_pid::remove_process_file_if_matches(&root, PID_FILE_NAME, record).await;
             }
-            orphan_pid::PidReconcileAction::NotOurs => {
-                // Safe: NotOurs is only ever produced from `Some(pid)`.
-                let (pid, _) = pid.expect("NotOurs implies a recorded pid");
-                warn!(
-                    "Instance {} has a recorded pid ({}) that cannot be proven to still be its own game (legacy pidfile or start-time mismatch) — refusing to adopt it",
-                    shortpath, pid
-                );
-                orphan_pid::remove_pid_file(&root, PID_FILE_NAME).await;
+            orphan_pid::IdentityStatus::Unknown => {
+                warn!("Instance {shortpath} process ownership unconfirmed; marker retained");
             }
-            orphan_pid::PidReconcileAction::StillRunning => {
-                // Safe: StillRunning is only ever produced from `Some(pid)`,
-                // and only when `live` matched it — see `reconcile_pid`.
-                let (pid, _) = pid.expect("StillRunning implies a recorded pid");
-                let verified_start_time = live
-                    .expect("StillRunning implies a live java process")
-                    .start_time;
-
-                // Falling back to "now" only understates how long the game has
-                // been up; it never invents playtime that was not played.
+            orphan_pid::IdentityStatus::Same => {
+                let verified_process = orphan_pid::verified_record(record, observed, true)
+                    .expect("Same verified process");
+                // Persist a conservative legacy upgrade before carrying it into
+                // polling/lifecycle, so later restarts use the same stable token.
+                if verified_process != record {
+                    orphan_pid::write_process_file(&root, PID_FILE_NAME, verified_process).await;
+                }
                 let start_time =
                     tokio::fs::metadata(orphan_pid::pid_file_path(&root, PID_FILE_NAME))
                         .await
@@ -4058,17 +4042,13 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
                         .and_then(|m| m.modified().ok())
                         .map(DateTime::<Utc>::from)
                         .unwrap_or_else(Utc::now);
-
-                info!(
-                    "Instance {} still has a game running (pid {}) from a previous launcher session — adopting it",
-                    shortpath, pid
-                );
                 adopted.insert(
                     shortpath,
                     AdoptedGame {
-                        pid,
+                        pid: record.pid,
                         start_time,
-                        verified_start_time,
+                        verified_start_time: record.start_time.unwrap_or(0),
+                        verified_process,
                     },
                 );
             }
@@ -4891,12 +4871,8 @@ mod test {
     }
 
     #[tokio::test]
-    async fn reconcile_running_instances_removes_a_corrupt_pidfile() {
-        // A pidfile that fails to parse (garbage content, a bad upgrade, disk
-        // corruption) can never be reconciled — there is no recorded pid to
-        // check against the process table — so unlike a dead-but-parseable
-        // pid it must self-heal by being removed outright, or it would keep
-        // warning on every future startup forever.
+    async fn reconcile_running_instances_retains_a_corrupt_pidfile() {
+        // Malformed ownership remains recoverable; it never grants adoption.
         let dir = tempfile::tempdir().unwrap();
         let instance_root = dir.path().join("some-instance");
         tokio::fs::create_dir_all(&instance_root).await.unwrap();
@@ -4911,13 +4887,12 @@ mod test {
         let adopted = super::reconcile_running_instances_under(dir.path()).await;
 
         assert!(adopted.is_empty(), "a corrupt pidfile must not be adopted");
-        assert_eq!(
+        assert!(
             super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
                 .await
-                .unwrap(),
-            None,
-            "a corrupt pidfile must be removed, not left behind to fail the same way again"
+                .is_err()
         );
+        assert!(instance_root.join(super::PID_FILE_NAME).exists());
     }
 
     #[tokio::test]
@@ -4996,15 +4971,7 @@ mod test {
     /// platform-independent.
     #[cfg(unix)]
     async fn spawn_fake_jvm(dir: &std::path::Path) -> tokio::process::Child {
-        let fake = dir.join("java");
-        tokio::fs::copy("/bin/sleep", &fake).await.unwrap();
-
-        tokio::process::Command::new(&fake)
-            .arg("60")
-            // Never outlive the test, however it ends.
-            .kill_on_drop(true)
-            .spawn()
-            .unwrap()
+        super::orphan_pid::spawn_fake_java(dir).await
     }
 
     #[cfg(unix)]
@@ -5056,7 +5023,7 @@ mod test {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn reconcile_running_instances_drops_a_legacy_pidfile_for_a_live_game_without_adopting_it()
+    async fn reconcile_running_instances_retains_a_legacy_pidfile_for_a_live_game_without_adopting_it()
      {
         let dir = tempfile::tempdir().unwrap();
         let instance_root = dir.path().join("some-instance");
@@ -5084,8 +5051,8 @@ mod test {
             super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
                 .await
                 .unwrap(),
-            None,
-            "an unverifiable legacy pidfile must still be removed"
+            Some((pid, None)),
+            "an unverifiable legacy pidfile remains recoverable"
         );
 
         fake_jvm.kill().await.unwrap();
@@ -5093,7 +5060,7 @@ mod test {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn reconcile_running_instances_drops_a_pidfile_with_mismatched_start_time_without_adopting_it()
+    async fn reconcile_running_instances_retains_a_pidfile_with_mismatched_start_time_without_adopting_it()
      {
         let dir = tempfile::tempdir().unwrap();
         let instance_root = dir.path().join("some-instance");
@@ -5126,8 +5093,12 @@ mod test {
             super::orphan_pid::read_pid_file(&instance_root, super::PID_FILE_NAME)
                 .await
                 .unwrap(),
-            None,
-            "an unverifiable pidfile must still be removed"
+            if cfg!(target_os = "linux") {
+                Some((pid, Some(real_start_time.saturating_sub(86_400))))
+            } else {
+                None
+            },
+            "Linux legacy clock mismatch remains unconfirmed; other platforms keep their existing mismatch policy"
         );
 
         fake_jvm.kill().await.unwrap();
@@ -5538,5 +5509,149 @@ mod task18_icon_tests {
         };
         assert_eq!(path, "icon.svg");
         assert_eq!(std::fs::read(root.path().join(path)).unwrap(), svg);
+    }
+}
+
+#[cfg(test)]
+mod task22_tests {
+    use super::*;
+    fn record() -> orphan_pid::ProcessRecord {
+        orphan_pid::ProcessRecord {
+            pid: 4242,
+            start_time: Some(1700000000),
+            identity: Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
+                boot_id: uuid::Uuid::parse_str("cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80").unwrap(),
+                start_ticks: 123456,
+            }),
+        }
+    }
+    #[tokio::test]
+    async fn task22_actual_adoption_roundtrip_survives_clock_step() {
+        let root = tempfile::tempdir().unwrap();
+        let instance = root.path().join("owned");
+        tokio::fs::create_dir(&instance).await.unwrap();
+        let record = record();
+        orphan_pid::write_process_file(&instance, PID_FILE_NAME, record).await;
+        for epoch in [1699999970, 1700000030] {
+            let adopted = reconcile_running_instances_under_observed(root.path(), |pid| {
+                assert_eq!(pid, 4242);
+                orphan_pid::ProcessObservation::Present {
+                    process: orphan_pid::LiveProc {
+                        is_java: true,
+                        start_time: epoch,
+                    },
+                    identity: record.identity,
+                }
+            })
+            .await;
+            assert_eq!(adopted["owned"].verified_process, record);
+            assert_eq!(
+                orphan_pid::read_process_file(&instance, PID_FILE_NAME)
+                    .await
+                    .unwrap(),
+                Some(record)
+            );
+        }
+    }
+    #[tokio::test]
+    async fn task22_actual_adoption_unknown_and_legacy_mismatch_retains_markers() {
+        let root = tempfile::tempdir().unwrap();
+        let instance = root.path().join("owned");
+        tokio::fs::create_dir(&instance).await.unwrap();
+        let record = record();
+        orphan_pid::write_process_file(&instance, PID_FILE_NAME, record).await;
+        assert!(
+            reconcile_running_instances_under_observed(root.path(), |_| {
+                orphan_pid::ProcessObservation::Unknown
+            })
+            .await
+            .is_empty()
+        );
+        assert_eq!(
+            orphan_pid::read_process_file(&instance, PID_FILE_NAME)
+                .await
+                .unwrap(),
+            Some(record)
+        );
+        let legacy = orphan_pid::ProcessRecord::legacy(4242, 1700000000);
+        orphan_pid::write_process_file(&instance, PID_FILE_NAME, legacy).await;
+        let observed = orphan_pid::ProcessObservation::Present {
+            process: orphan_pid::LiveProc {
+                is_java: true,
+                start_time: 1700000030,
+            },
+            identity: record.identity,
+        };
+        assert!(
+            reconcile_running_instances_under_observed(root.path(), |_| observed)
+                .await
+                .is_empty()
+        );
+        #[cfg(target_os = "linux")]
+        assert_eq!(
+            orphan_pid::read_process_file(&instance, PID_FILE_NAME)
+                .await
+                .unwrap(),
+            Some(legacy)
+        );
+        #[cfg(not(target_os = "linux"))]
+        assert_eq!(
+            orphan_pid::read_process_file(&instance, PID_FILE_NAME)
+                .await
+                .unwrap(),
+            None
+        );
+        tokio::fs::write(
+            instance.join(PID_FILE_NAME),
+            b"4242\n1700000000\nunknown-extension",
+        )
+        .await
+        .unwrap();
+        assert!(
+            reconcile_running_instances_under_observed(root.path(), |_| panic!(
+                "Malformed extension cannot query/adopt via legacy fallback"
+            ))
+            .await
+            .is_empty()
+        );
+        assert!(instance.join(PID_FILE_NAME).exists());
+    }
+    #[tokio::test]
+    async fn task22_actual_legacy_upgrade_requires_java_epoch_proof_and_reuse_cleanup() {
+        let root = tempfile::tempdir().unwrap();
+        let instance = root.path().join("owned");
+        tokio::fs::create_dir(&instance).await.unwrap();
+        let record = record();
+        orphan_pid::write_process_file(
+            &instance,
+            PID_FILE_NAME,
+            orphan_pid::ProcessRecord::legacy(4242, 1700000000),
+        )
+        .await;
+        let adopted = reconcile_running_instances_under_observed(root.path(), |_| {
+            orphan_pid::ProcessObservation::Present {
+                process: orphan_pid::LiveProc {
+                    is_java: true,
+                    start_time: 1700000000,
+                },
+                identity: record.identity,
+            }
+        })
+        .await;
+        assert_eq!(adopted["owned"].verified_process, record);
+        assert_eq!(
+            orphan_pid::read_process_file(&instance, PID_FILE_NAME)
+                .await
+                .unwrap(),
+            Some(record)
+        );
+        assert!(
+            reconcile_running_instances_under_observed(root.path(), |_| {
+                orphan_pid::ProcessObservation::Absent
+            })
+            .await
+            .is_empty()
+        );
+        assert!(!instance.join(PID_FILE_NAME).exists());
     }
 }

@@ -413,14 +413,10 @@ impl ServerProvider for LocalServerProvider {
 
         // Recovery records identity; startup never automatically signals this
         // process. Current destructive recovery remains an explicit operator action.
-        let mut system = System::new();
-        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(pid)]));
-        match orphan_pid::process_start_time(&system, pid) {
-            Some(start_time) => write_pid_file(&server_root, pid, start_time).await,
-            None => warn!(
-                "Could not determine start time for server process (pid {}); not writing a pidfile for it",
-                pid
-            ),
+        if let Some(record) = runtime_activity.child_identity() {
+            super::provider::write_process_file(&server_root, record).await;
+        } else {
+            warn!("Could not capture server identity for {pid}; durable intent remains Unknown");
         }
 
         let ownership = std::sync::Arc::new(std::sync::Mutex::new(Some(runtime_activity)));

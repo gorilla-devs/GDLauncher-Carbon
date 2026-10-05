@@ -1,6 +1,7 @@
 //! Relocation admission owns external writers independently of UI/map state.
 //! Lock order: briefly acquire lifecycle mutex before instance/server operation gates;
 //! never hold it across awaits. Abandoned external ownership remains a blocker.
+use super::orphan_pid::{self, IdentityStatus, ProcessRecord};
 use anyhow::{Context, Result, bail};
 use std::{
     collections::HashMap,
@@ -32,10 +33,22 @@ pub struct RuntimeLifecycle {
 }
 trait ProcessAbsenceObserver: std::fmt::Debug + Send + Sync {
     fn confirmed_absent(&self, pid: u32, start: u64) -> bool;
+    fn observation(&self, _record: ProcessRecord) -> orphan_pid::ProcessObservation {
+        orphan_pid::ProcessObservation::Unknown
+    }
+    fn record_gone(&self, record: ProcessRecord) -> bool {
+        self.confirmed_absent(record.pid, record.start_time.unwrap_or(0))
+    }
 }
 #[derive(Debug)]
 struct RealProcessAbsenceObserver;
 impl ProcessAbsenceObserver for RealProcessAbsenceObserver {
+    fn observation(&self, record: ProcessRecord) -> orphan_pid::ProcessObservation {
+        orphan_pid::observe_process(record.pid)
+    }
+    fn record_gone(&self, record: ProcessRecord) -> bool {
+        recorded_identity_confirmed_gone(record)
+    }
     fn confirmed_absent(&self, pid: u32, start: u64) -> bool {
         recorded_process_confirmed_absent(pid, start)
     }
@@ -57,8 +70,8 @@ struct State {
     next_id: u64,
     activities: HashMap<u64, ActivityEntry>,
     shutdown: Option<ShutdownStatus>,
-    adopted: HashMap<(u32, u64), String>,
-    adopted_games: std::collections::HashSet<(u32, u64)>,
+    adopted: HashMap<ProcessRecord, String>,
+    adopted_games: std::collections::HashSet<ProcessRecord>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -370,6 +383,7 @@ pub struct RuntimeActivity {
     retain_on_drop: bool,
     record: Option<std::path::PathBuf>,
     detached_game: bool,
+    child_identity: Mutex<Option<ProcessRecord>>,
 }
 impl RuntimeActivity {
     /// Final no-await spawn authorization shares the freeze mutex. The caller
@@ -507,24 +521,26 @@ impl RuntimeActivity {
         Ok(())
     }
     pub fn record_child_pid(&self, pid: Option<u32>) -> Result<()> {
-        let Some(record) = &self.record else {
-            return Ok(());
-        };
         let Some(pid) = pid else {
             return Ok(());
         };
-        let mut system = System::new();
-        system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(pid)]));
-        let start = system.process(Pid::from_u32(pid)).map(|p| p.start_time());
-        {
-            let start = start.unwrap_or(0);
-            let bytes = serde_json::to_vec(&(pid, start))?;
-            // A partial record remains Unknown on next startup; never removes authority.
-            let mut file = std::fs::OpenOptions::new().write(true).open(record)?;
-            std::io::Write::write_all(&mut file, &bytes)?;
-            file.sync_all()?;
+        self.record_child_observed(pid, orphan_pid::observe_process(pid))
+    }
+    fn record_child_observed(
+        &self,
+        pid: u32,
+        observed: orphan_pid::ProcessObservation,
+    ) -> Result<()> {
+        let identity = orphan_pid::capture_observed(pid, observed);
+        *self.child_identity.lock().unwrap() = identity;
+        if let (Some(record), Some(identity)) = (&self.record, identity) {
+            persist_child_record(record, identity)?;
         }
+        // No identity leaves the pre-spawn empty intent Unknown.
         Ok(())
+    }
+    pub fn child_identity(&self) -> Option<ProcessRecord> {
+        *self.child_identity.lock().unwrap()
     }
     pub fn finish(mut self) {
         self.retain_on_drop = false;
@@ -665,6 +681,49 @@ pub(crate) fn recorded_process_confirmed_absent(pid: u32, start: u64) -> bool {
     )
 }
 
+/// Versioned durable records cannot accidentally decode as old epoch tuples.
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ChildRecord {
+    version: u8,
+    process: ProcessRecord,
+}
+fn encode_child_record(process: ProcessRecord) -> Result<Vec<u8>> {
+    Ok(serde_json::to_vec(&ChildRecord {
+        version: 1,
+        process,
+    })?)
+}
+fn decode_child_record(bytes: &[u8]) -> Result<ProcessRecord> {
+    if bytes.iter().find(|byte| !byte.is_ascii_whitespace()) == Some(&b'[') {
+        let (pid, start): (u32, u64) = serde_json::from_slice(bytes)?;
+        return Ok(ProcessRecord::legacy(pid, start));
+    }
+    let record: ChildRecord = serde_json::from_slice(bytes)?;
+    anyhow::ensure!(record.version == 1, "Unknown durable child record version");
+    record.process.validate_identity()
+}
+fn persist_child_record(path: &std::path::Path, identity: ProcessRecord) -> Result<()> {
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(path)?;
+    std::io::Write::write_all(&mut file, &encode_child_record(identity)?)?;
+    file.sync_all()?;
+    Ok(())
+}
+pub(crate) fn recorded_identity_confirmed_gone(record: ProcessRecord) -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        orphan_pid::identity_status(record, orphan_pid::observe_process(record.pid), false)
+            == IdentityStatus::GoneOrReused
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        recorded_process_confirmed_absent(record.pid, record.start_time.unwrap_or(0))
+    }
+}
+
 impl RuntimeLifecycle {
     pub fn with_runtime_path(root: &std::path::Path) -> Self {
         Self {
@@ -718,19 +777,37 @@ impl RuntimeLifecycle {
         };
         while let Some(entry) = entries.next_entry().await? {
             let bytes = tokio::fs::read(entry.path()).await?;
-            let (pid, start): (u32, u64) = serde_json::from_slice(&bytes)
-                .with_context(|| format!("Unconfirmed external writer ownership at {}; after independently confirming the child has exited, remove this record and restart to retry", entry.path().display()))?;
-            let mut system = System::new();
-            system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(pid)]));
-            let observed = system.process(Pid::from_u32(pid)).map(|p| p.start_time());
-            if confirmed_absent(pid, observed, start) {
+            let mut record = decode_child_record(&bytes)
+                .with_context(|| format!("Unconfirmed external writer ownership at {}; independently verify exit before removing this record", entry.path().display()))?;
+            if self.process_observer.record_gone(record) {
+                let current = decode_child_record(&tokio::fs::read(entry.path()).await?)?;
+                anyhow::ensure!(
+                    current == record,
+                    "Durable child identity changed; ownership retained"
+                );
                 tokio::fs::remove_file(entry.path()).await?;
+                let mut state = self.state.lock().unwrap();
+                state.adopted.remove(&record);
+                state.adopted_games.remove(&record);
             } else {
+                if let Some(upgraded) = orphan_pid::verified_record(
+                    record,
+                    self.process_observer.observation(record),
+                    false,
+                ) {
+                    if upgraded != record {
+                        persist_child_record(&entry.path(), upgraded)?;
+                        let mut state = self.state.lock().unwrap();
+                        state.adopted.remove(&record);
+                        state.adopted_games.remove(&record);
+                        record = upgraded;
+                    }
+                }
                 self.state
                     .lock()
                     .unwrap()
                     .adopted
-                    .insert((pid, start), entry.path().display().to_string());
+                    .insert(record, entry.path().display().to_string());
             }
         }
         Ok(())
@@ -859,6 +936,7 @@ impl RuntimeLifecycle {
             retain_on_drop: false,
             record: None,
             detached_game: false,
+            child_identity: Mutex::new(None),
         })
     }
     /// [`Self::admit`] for work a blocked quit or move names by `policy`
@@ -1303,12 +1381,16 @@ impl RuntimeLifecycle {
     }
     /// Called only after the existing instance reconciler verifies and publishes
     /// an adopted game. Recovered generic child records cannot grant this policy.
+    pub(crate) fn adopted_record_published(&self, record: ProcessRecord) {
+        let mut state = self.state.lock().unwrap();
+        state
+            .adopted
+            .entry(record)
+            .or_insert_with(|| format!("adopted game {}", record.pid));
+        state.adopted_games.insert(record);
+    }
     pub(crate) fn adopted_game_published(&self, pid: u32, start: u64) {
-        self.state
-            .lock()
-            .unwrap()
-            .adopted_games
-            .insert((pid, start));
+        self.adopted_record_published(ProcessRecord::legacy(pid, start));
     }
     pub fn admission_frozen(&self) -> bool {
         let state = self.state.lock().unwrap();
@@ -1394,7 +1476,7 @@ impl RuntimeLifecycle {
             .collect();
         let resolved: Vec<_> = unresolved
             .into_iter()
-            .filter(|(pid, start)| self.process_observer.confirmed_absent(*pid, *start))
+            .filter(|record| self.process_observer.record_gone(*record))
             .collect();
         let mut state = self.state.lock().unwrap();
         for (record, (status, program)) in inspected {
@@ -1417,22 +1499,42 @@ impl RuntimeLifecycle {
             state.unresolved.remove(&path);
         }
     }
-    fn persist_reconciled_process(&self, pid: u32, start: u64) -> Result<()> {
+    fn persist_reconciled_process(&self, identity: ProcessRecord) -> Result<()> {
         let Some(root) = &self.child_records else {
             return Ok(());
         };
         std::fs::create_dir_all(root)?;
-        let record = root.join(format!("reconciled-{pid}-{start}.json"));
+        let token = match identity.identity {
+            Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
+                boot_id,
+                start_ticks,
+            }) => format!("linux-{boot_id}-{start_ticks}"),
+            None => format!(
+                "epoch-{}",
+                identity
+                    .start_time
+                    .map(|start| start.to_string())
+                    .unwrap_or_else(|| "unknown".into())
+            ),
+        };
+        let record = root.join(format!("reconciled-{}-{token}.json", identity.pid));
         let mut file = match std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
-            .open(record)
+            .open(&record)
         {
             Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => return Ok(()),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+                let existing = decode_child_record(&std::fs::read(&record)?)?;
+                anyhow::ensure!(
+                    existing == identity,
+                    "Reconciled child identity changed; ownership retained"
+                );
+                return Ok(());
+            }
             Err(error) => return Err(error.into()),
         };
-        std::io::Write::write_all(&mut file, &serde_json::to_vec(&(pid, start))?)?;
+        std::io::Write::write_all(&mut file, &encode_child_record(identity)?)?;
         file.sync_all()?;
         #[cfg(unix)]
         {
@@ -1460,19 +1562,20 @@ impl RuntimeLifecycle {
             if !entry.file_type().await?.is_dir() {
                 continue;
             }
-            let record = super::orphan_pid::read_pid_file(&entry.path(), marker)
+            let record = orphan_pid::read_process_file(&entry.path(), marker)
                 .await
                 .with_context(|| format!("Cannot reconcile {}", entry.path().display()))?;
-            if let Some((pid, expected)) = record {
-                let mut system = System::new();
-                system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(pid)]));
-                let observed = system.process(Pid::from_u32(pid)).map(|p| p.start_time());
-                if !confirmed_absent(pid, observed, expected.unwrap_or(0)) {
-                    // Best-effort UI reconciliation can discard legacy/mismatched
-                    // pidfiles. Preserve relocation ownership before allowing it.
-                    self.persist_reconciled_process(pid, expected.unwrap_or(0))?;
+            if let Some(record) = record {
+                if !self.process_observer.record_gone(record) {
+                    let record = orphan_pid::verified_record(
+                        record,
+                        self.process_observer.observation(record),
+                        true,
+                    )
+                    .unwrap_or(record);
+                    self.persist_reconciled_process(record)?;
                     self.state.lock().unwrap().adopted.insert(
-                        (pid, expected.unwrap_or(0)),
+                        record,
                         format!(
                             "{} (present or unconfirmed process)",
                             entry.path().display()
@@ -2178,7 +2281,7 @@ mod tests {
             .lock()
             .unwrap()
             .adopted
-            .insert((42, 100), "adopted".into());
+            .insert(ProcessRecord::legacy(42, 100), "adopted".into());
         assert!(l.begin_relocation("one").is_err());
         assert!(l.commit_shutdown("one").is_err());
     }
@@ -2226,7 +2329,7 @@ mod task07_request_tests {
                 .lock()
                 .unwrap()
                 .adopted
-                .insert((42, 10), "recovered owner".into());
+                .insert(ProcessRecord::legacy(42, 10), "recovered owner".into());
             lifecycle.adopted_game_published(42, 10);
             for _ in 0..2 {
                 lifecycle
@@ -2249,7 +2352,7 @@ mod task07_request_tests {
                         .lock()
                         .unwrap()
                         .adopted_games
-                        .contains(&(42, 10))
+                        .contains(&ProcessRecord::legacy(42, 10))
                 );
             }
         }
@@ -2266,7 +2369,7 @@ mod task07_request_tests {
             .lock()
             .unwrap()
             .adopted
-            .insert((42, 10), "proven adopted game".into());
+            .insert(ProcessRecord::legacy(42, 10), "proven adopted game".into());
         lifecycle.adopted_game_published(42, 10);
         lifecycle
             .prepare_shutdown("quit", ShutdownPurpose::Quit, async { Ok(()) })
@@ -2286,7 +2389,7 @@ mod task07_request_tests {
                 .lock()
                 .unwrap()
                 .adopted
-                .contains_key(&(42, 10))
+                .contains_key(&ProcessRecord::legacy(42, 10))
         );
     }
     #[tokio::test]
@@ -2302,7 +2405,7 @@ mod task07_request_tests {
             .lock()
             .unwrap()
             .adopted
-            .insert((42, 10), "recovered server".into());
+            .insert(ProcessRecord::legacy(42, 10), "recovered server".into());
         lifecycle
             .prepare_shutdown("move", ShutdownPurpose::Relocation, async { Ok(()) })
             .unwrap();
@@ -2834,5 +2937,312 @@ mod task18_settlement_tests {
             .commit_prepared_shutdown("queue", ShutdownPurpose::Quit)
             .unwrap();
         drop(held);
+    }
+}
+
+#[cfg(test)]
+mod task22_tests {
+    use super::*;
+    #[derive(Debug)]
+    struct SyntheticObserver(Mutex<orphan_pid::ProcessObservation>);
+    impl ProcessAbsenceObserver for SyntheticObserver {
+        fn confirmed_absent(&self, _: u32, _: u64) -> bool {
+            panic!("Stable route required")
+        }
+        fn observation(&self, _: ProcessRecord) -> orphan_pid::ProcessObservation {
+            *self.0.lock().unwrap()
+        }
+        fn record_gone(&self, record: ProcessRecord) -> bool {
+            #[cfg(target_os = "linux")]
+            {
+                orphan_pid::identity_status(record, self.observation(record), false)
+                    == IdentityStatus::GoneOrReused
+            }
+            // Model the separate conservative non-Linux durable policy, not
+            // adoption's epoch classifier. Injected Absent means confirmed
+            // native PID absence; no native query is made by this fixture.
+            #[cfg(not(target_os = "linux"))]
+            {
+                matches!(
+                    self.observation(record),
+                    orphan_pid::ProcessObservation::Absent
+                )
+            }
+        }
+    }
+    fn record() -> ProcessRecord {
+        ProcessRecord {
+            pid: 4242,
+            start_time: Some(1700000000),
+            identity: Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
+                boot_id: uuid::Uuid::parse_str("cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80").unwrap(),
+                start_ticks: 123456,
+            }),
+        }
+    }
+    fn observed(record: ProcessRecord, epoch: u64) -> orphan_pid::ProcessObservation {
+        orphan_pid::ProcessObservation::Present {
+            process: orphan_pid::LiveProc {
+                is_java: true,
+                start_time: epoch,
+            },
+            identity: record.identity,
+        }
+    }
+    #[test]
+    fn task22_lifecycle_clock_unknown_stop_and_captured_release_controls() {
+        let record = record();
+        let observer = Arc::new(SyntheticObserver(Mutex::new(observed(record, 1700000030))));
+        let lifecycle = Arc::new(RuntimeLifecycle {
+            process_observer: observer.clone(),
+            ..Default::default()
+        });
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle.adopted_record_published(record);
+        assert!(lifecycle.begin_relocation("clock".into()).is_err());
+        assert!(
+            lifecycle
+                .state
+                .lock()
+                .unwrap()
+                .adopted
+                .contains_key(&record)
+        );
+        *observer.0.lock().unwrap() = orphan_pid::ProcessObservation::Unknown;
+        lifecycle.refresh_adopted();
+        assert!(lifecycle.begin_relocation("unknown".into()).is_err());
+        // A requested Stop changes no authority; only observed exit/reuse releases.
+        let mut replacement = record;
+        replacement.identity = Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
+            boot_id: uuid::Uuid::new_v4(),
+            start_ticks: 123456,
+        });
+        lifecycle.adopted_record_published(replacement);
+        *observer.0.lock().unwrap() = observed(replacement, 1700000000);
+        lifecycle.refresh_adopted();
+        #[cfg(target_os = "linux")]
+        assert!(
+            !lifecycle
+                .state
+                .lock()
+                .unwrap()
+                .adopted
+                .contains_key(&record)
+        );
+        #[cfg(not(target_os = "linux"))]
+        assert!(
+            lifecycle
+                .state
+                .lock()
+                .unwrap()
+                .adopted
+                .contains_key(&record)
+        );
+    }
+}
+
+#[cfg(test)]
+mod task22_invalid_token_tests {
+    use super::*;
+    #[test]
+    fn task22_nil_boot_durable_extension_is_malformed_without_fallback() {
+        let bytes = br#"{"version":1,"process":{"pid":4242,"start_time":1700000000,"identity":{"kind":"LinuxBootTicks","boot_id":"00000000-0000-0000-0000-000000000000","start_ticks":123456}}}"#;
+        assert!(
+            lifecycle
+                .state
+                .lock()
+                .unwrap()
+                .adopted
+                .contains_key(&replacement)
+        );
+        *observer.0.lock().unwrap() = orphan_pid::ProcessObservation::Absent;
+        lifecycle.refresh_adopted();
+        assert!(lifecycle.begin_relocation("gone".into()).is_ok());
+    }
+    #[tokio::test]
+    async fn task22_durable_child_restart_clock_reuse_unknown_and_legacy_controls() {
+        let root = tempfile::tempdir().unwrap();
+        let record = record();
+        let observer = Arc::new(SyntheticObserver(Mutex::new(observed(record, 1700000030))));
+        let mut lifecycle = RuntimeLifecycle::with_runtime_path(root.path());
+        lifecycle.process_observer = observer.clone();
+        let path = lifecycle.child_records.as_ref().unwrap();
+        std::fs::create_dir_all(path).unwrap();
+        let file = path.join("owned.json");
+        std::fs::write(&file, encode_child_record(record).unwrap()).unwrap();
+        lifecycle.reconcile_children().await.unwrap();
+        assert!(file.exists());
+        assert!(
+            lifecycle
+                .state
+                .lock()
+                .unwrap()
+                .adopted
+                .contains_key(&record)
+        );
+        *observer.0.lock().unwrap() = orphan_pid::ProcessObservation::Unknown;
+        lifecycle.reconcile_children().await.unwrap();
+        assert!(file.exists());
+        let mut reused = record;
+        reused.identity = Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
+            boot_id: uuid::Uuid::new_v4(),
+            start_ticks: 123456,
+        });
+        lifecycle.reconcile_children().await.unwrap();
+        #[cfg(target_os = "linux")]
+        assert!(!file.exists());
+        #[cfg(not(target_os = "linux"))]
+        {
+            assert!(
+                file.exists(),
+                "A present PID remains a durable non-Linux blocker"
+            );
+            assert_eq!(
+                decode_child_record(&std::fs::read(&file).unwrap()).unwrap(),
+                record
+            );
+            *observer.0.lock().unwrap() = orphan_pid::ProcessObservation::Absent;
+            lifecycle.reconcile_children().await.unwrap();
+            assert!(!file.exists());
+        }
+        let legacy = ProcessRecord::legacy(4242, 1700000000);
+        std::fs::write(
+            &file,
+            serde_json::to_vec(&(legacy.pid, legacy.start_time.unwrap())).unwrap(),
+        )
+        .unwrap();
+        *observer.0.lock().unwrap() = observed(record, 1700000030);
+        lifecycle.reconcile_children().await.unwrap();
+        assert!(file.exists());
+        assert!(
+            lifecycle
+                .state
+                .lock()
+                .unwrap()
+                .adopted
+                .contains_key(&legacy)
+        );
+        *observer.0.lock().unwrap() = observed(record, 1700000000);
+        lifecycle.reconcile_children().await.unwrap();
+        assert_eq!(
+            decode_child_record(&std::fs::read(file).unwrap()).unwrap(),
+            record
+        );
+    }
+    #[test]
+    fn task22_durable_malformed_version_has_no_legacy_fallback() {
+        assert_eq!(
+            decode_child_record(b"[4242,1700000000]").unwrap(),
+            ProcessRecord::legacy(4242, 1700000000)
+        );
+    }
+
+    #[test]
+    fn task22_owned_capture_persists_same_token_and_unconfirmed_intent() {
+        let root = tempfile::tempdir().unwrap();
+        let lifecycle = Arc::new(RuntimeLifecycle::with_runtime_path(root.path()));
+        lifecycle.reconciliation_finished(Ok(()));
+        let mut activity = lifecycle.admit("synthetic owned spawn").unwrap();
+        activity.external_child().unwrap();
+        let identity = orphan_pid::ProcessIdentity::LinuxBootTicks {
+            boot_id: uuid::Uuid::parse_str("cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80").unwrap(),
+            start_ticks: 123456,
+        };
+        activity
+            .record_child_observed(
+                4242,
+                orphan_pid::ProcessObservation::Present {
+                    process: orphan_pid::LiveProc {
+                        is_java: true,
+                        start_time: 1700000000,
+                    },
+                    identity: Some(identity),
+                },
+            )
+            .unwrap();
+        let record = activity.child_identity().unwrap();
+        assert_eq!(record.identity, Some(identity));
+        let path = activity.record.clone().unwrap();
+        assert_eq!(
+            decode_child_record(&std::fs::read(&path).unwrap()).unwrap(),
+            record
+        );
+        activity.finish();
+        assert!(!path.exists());
+        let mut uncertain = lifecycle.admit("synthetic unconfirmed spawn").unwrap();
+        uncertain.external_child().unwrap();
+        uncertain
+            .record_child_observed(4242, orphan_pid::ProcessObservation::Unknown)
+            .unwrap();
+        assert!(uncertain.child_identity().is_none());
+        let path = uncertain.record.clone().unwrap();
+        drop(uncertain);
+        assert!(decode_child_record(&std::fs::read(path).unwrap()).is_err());
+        assert!(lifecycle.begin_relocation("unknown".into()).is_err());
+    }
+}
+
+#[cfg(test)]
+mod task22_metadata_tests {
+    use super::*;
+    fn record(epoch: u64) -> ProcessRecord {
+        ProcessRecord {
+            pid: 4242,
+            start_time: Some(epoch),
+            identity: Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
+                boot_id: uuid::Uuid::parse_str("cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80").unwrap(),
+                start_ticks: 123456,
+            }),
+        }
+    }
+    #[test]
+    fn task22_stable_owner_metadata_does_not_split_game_survival_authority() {
+        let lifecycle = RuntimeLifecycle::default();
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle
+            .state
+            .lock()
+            .unwrap()
+            .adopted
+            .insert(record(1700000000), "previous durable owner".into());
+        lifecycle.adopted_record_published(record(1700000030));
+        lifecycle
+            .begin_shutdown("quit", ShutdownPurpose::Quit)
+            .unwrap();
+        assert_eq!(
+            lifecycle.settle_shutdown("quit", Ok(())).unwrap().phase,
+            ShutdownPhase::Ready
+        );
+        assert_eq!(lifecycle.state.lock().unwrap().adopted.len(), 1);
+    }
+    #[test]
+    fn task22_reconciled_durable_record_is_idempotent_for_same_stable_token() {
+        let root = tempfile::tempdir().unwrap();
+        let lifecycle = RuntimeLifecycle::with_runtime_path(root.path());
+        lifecycle
+            .persist_reconciled_process(record(1700000000))
+            .unwrap();
+        lifecycle
+            .persist_reconciled_process(record(1700000030))
+            .unwrap();
+        assert_eq!(
+            std::fs::read_dir(lifecycle.child_records.as_ref().unwrap())
+                .unwrap()
+                .count(),
+            1
+        );
+    }
+}
+
+#[cfg(test)]
+mod task22_invalid_token_tests {
+    use super::*;
+    #[test]
+    fn task22_nil_boot_durable_extension_is_malformed_without_fallback() {
+        let bytes = br#"{"version":1,"process":{"pid":4242,"start_time":1700000000,"identity":{"kind":"LinuxBootTicks","boot_id":"00000000-0000-0000-0000-000000000000","start_ticks":123456}}}"#;
+        assert!(
+            decode_child_record(bytes).is_err(),
+            "Malformed stable token must remain Unknown, never prove reuse or gain epoch fallback"
+        );
     }
 }

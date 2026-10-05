@@ -985,27 +985,20 @@ impl ManagerRef<'_, InstanceManager> {
                             // later be matched against an unrelated process that
                             // reused the pid, which is worse than leaving no pidfile
                             // at all.
-                            let mut system = System::new();
-                            system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(
-                                process_id,
-                            )]));
-                            match orphan_pid::process_start_time(&system, process_id) {
-                                Some(process_start_time) => {
-                                    orphan_pid::write_pid_file(
-                                        &instance_path.get_root(),
-                                        super::PID_FILE_NAME,
-                                        process_id,
-                                        process_start_time,
-                                    )
-                                    .await;
-                                }
-                                None => {
-                                    tracing::warn!(
-                                        "Could not determine start time for instance {} process (pid {}); not writing a pidfile for it",
-                                        *instance_id,
-                                        process_id
-                                    );
-                                }
+                            let owned_process_record = game_activity
+                                .as_ref()
+                                .and_then(|activity| activity.child_identity());
+                            if let Some(record) = owned_process_record {
+                                orphan_pid::write_process_file(
+                                    &instance_path.get_root(),
+                                    super::PID_FILE_NAME,
+                                    record,
+                                )
+                                .await;
+                            } else {
+                                tracing::warn!(
+                                    "Could not capture owned game identity for {process_id}; durable intent remains Unknown"
+                                );
                             }
 
                             let Some(running_log_id) = log_id else {
@@ -1041,6 +1034,7 @@ impl ManagerRef<'_, InstanceManager> {
                                         // there is nothing here that ever needs to
                                         // re-verify it against a start time.
                                         process_start_time: None,
+                                        process_identity: None,
                                         start_time,
                                         log: Some(running_log_id),
                                         // This core owns the process, so the loop
@@ -1211,11 +1205,14 @@ impl ManagerRef<'_, InstanceManager> {
                             // The pidfile no longer refers to anything a future startup
                             // reap needs to clean up. Best-effort, removed exactly once
                             // here on both paths.
-                            orphan_pid::remove_pid_file(
-                                &instance_path.get_root(),
-                                super::PID_FILE_NAME,
-                            )
-                            .await;
+                            if let Some(record) = owned_process_record {
+                                orphan_pid::remove_process_file_if_matches(
+                                    &instance_path.get_root(),
+                                    super::PID_FILE_NAME,
+                                    record,
+                                )
+                                .await;
+                            }
 
                             let _ = app.rich_presence_manager().stop_activity().await;
 
@@ -1495,41 +1492,41 @@ impl ManagerRef<'_, InstanceManager> {
     }
 
     pub async fn kill_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
-        if let Some((process_id, expected_start_time)) =
-            self.request_instance_stop(instance_id).await?
-        {
-            let pid = Pid::from_u32(process_id);
-            let mut system = System::new();
-            system.refresh_processes(ProcessesToUpdate::Some(&[pid]));
-
-            if orphan_pid::is_verified_live_java_process(&system, process_id, expected_start_time) {
-                if let Some(process) = system.process(pid) {
-                    if !process.kill() {
-                        bail!("failed to signal adopted game process {process_id}");
+        if let Some(record) = self.request_instance_stop(instance_id).await? {
+            match orphan_pid::identity_status(record, orphan_pid::observe_process(record.pid), true)
+            {
+                orphan_pid::IdentityStatus::Same => {
+                    // Recheck immediately before signalling; the residual lookup-to-
+                    // signal race requires a native process-handle redesign.
+                    let mut system = System::new();
+                    system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(record.pid)]));
+                    if orphan_pid::identity_status(
+                        record,
+                        orphan_pid::observe_process(record.pid),
+                        true,
+                    ) != orphan_pid::IdentityStatus::Same
+                    {
+                        bail!("Adopted game identity changed or is unconfirmed; retry Stop");
                     }
+                    if let Some(process) = system.process(Pid::from_u32(record.pid)) {
+                        if !process.kill() {
+                            bail!("failed to signal adopted game process {}", record.pid);
+                        }
+                    } else {
+                        bail!("Adopted game disappeared before Stop; polling will reconcile it");
+                    }
+                    self.observe_adopted_alive(instance_id, record, Utc::now())
+                        .await;
+                    self.bank_adopted_playtime_session(instance_id, Some(record))
+                        .await;
                 }
-                // The game was alive right up to the signal above, so this
-                // last interval was genuinely played — the one case where
-                // an adopted session's final seconds can be banked exactly,
-                // rather than dropped as the poller has to drop them.
-                self.observe_adopted_alive(instance_id, Utc::now()).await;
-                self.bank_adopted_playtime(instance_id).await;
-                return Ok(()); // liveness poller owns release after observed exit
-            } else {
-                // Already gone, or the number now belongs to something
-                // else (a start-time mismatch is treated exactly the same
-                // as the pid being gone — either way this is not the game
-                // that was adopted). There is nothing to stop and nothing
-                // to bank — it stopped playing at an unknown earlier
-                // moment — and the instance still has to come back to
-                // Inactive: the poller would eventually do it, but not
-                // before the user has been told their click did nothing.
-                warn!(
-                    "adopted game process {process_id} for instance {instance_id} is gone, or no longer verifiably the same process"
-                );
+                orphan_pid::IdentityStatus::GoneOrReused => {
+                    self.release_adopted_instance(instance_id, record).await
+                }
+                orphan_pid::IdentityStatus::Unknown => {
+                    bail!("Adopted game identity is unconfirmed; ownership retained, retry Stop")
+                }
             }
-
-            self.release_adopted_instance(instance_id, process_id).await;
         }
 
         Ok(())
@@ -1539,7 +1536,7 @@ impl ManagerRef<'_, InstanceManager> {
     /// only record of its process, and tell the frontend.
     ///
     /// A no-op unless the instance is still adopted-Running with exactly
-    /// `expected_pid` — the pid the caller (`kill_instance`, or the liveness
+    /// `expected` — the full identity the caller (`kill_instance`, or the liveness
     /// poller in `watch_adopted_instances`) just verified before deciding to
     /// release it. Without this guard a caller acting on a decision made a
     /// moment earlier could tear down state that has since moved on: the
@@ -1554,7 +1551,14 @@ impl ManagerRef<'_, InstanceManager> {
     /// or closing the window they just opened) for a game they launched
     /// earlier — so it must not print the close either, or the two go out of
     /// step.
-    pub async fn release_adopted_instance(self, instance_id: InstanceId, expected_pid: u32) {
+    pub async fn release_adopted_instance(
+        self,
+        instance_id: InstanceId,
+        expected: orphan_pid::ProcessRecord,
+    ) {
+        // Same gate as launch/rename/delete. Hold it through conditional marker
+        // cleanup; release the global map before IO and never admit fresh work.
+        let _ownership = self.lock_instance(instance_id).await;
         let shortpath = {
             let mut instances = self.instances.write().await;
             let Some(instance) = instances.get_mut(&instance_id) else {
@@ -1566,7 +1570,7 @@ impl ManagerRef<'_, InstanceManager> {
             let LaunchState::Running(running) = &data.state else {
                 return;
             };
-            if !running.is_adopted() || running.process_id != expected_pid {
+            if !running.is_adopted() || running.process_record() != expected {
                 return;
             }
 
@@ -1581,7 +1585,7 @@ impl ManagerRef<'_, InstanceManager> {
             .get_instances()
             .get_instance_path(&shortpath)
             .get_root();
-        orphan_pid::remove_pid_file(&root, super::PID_FILE_NAME).await;
+        orphan_pid::remove_process_file_if_matches(&root, super::PID_FILE_NAME, expected).await;
 
         self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
@@ -1599,10 +1603,27 @@ impl ManagerRef<'_, InstanceManager> {
     /// seconds for the length of a play session is churn with nothing to show
     /// for it. Nothing is lost by writing late — `last_alive_at` remembers how
     /// far the session got, and the release path banks up to it.
-    async fn observe_adopted_alive(self, instance_id: InstanceId, now: DateTime<Utc>) {
+    async fn observe_adopted_alive(
+        self,
+        instance_id: InstanceId,
+        expected: orphan_pid::ProcessRecord,
+        now: DateTime<Utc>,
+    ) {
         let seconds = {
             let mut instances = self.instances.write().await;
-            let Some(playtime) = adopted_playtime_mut(&mut instances, instance_id) else {
+            let Some(instance) = instances.get_mut(&instance_id) else {
+                return;
+            };
+            let Ok(data) = instance.data_mut() else {
+                return;
+            };
+            let LaunchState::Running(running) = &mut data.state else {
+                return;
+            };
+            if !running.is_adopted() || running.process_record() != expected {
+                return;
+            }
+            let Some(playtime) = running.playtime.as_mut() else {
                 return;
             };
 
@@ -1635,7 +1656,7 @@ impl ManagerRef<'_, InstanceManager> {
     async fn bank_adopted_playtime_session(
         self,
         instance_id: InstanceId,
-        expected: Option<(u32, Option<u64>)>,
+        expected: Option<orphan_pid::ProcessRecord>,
     ) {
         let seconds = {
             let mut instances = self.instances.write().await;
@@ -1705,7 +1726,7 @@ impl ManagerRef<'_, InstanceManager> {
                 // run task.
                 let _liveness = liveness;
                 // Capture the adopted session identity before the cancellation boundary.
-                let mut remaining: Vec<(InstanceId, u32, Option<u64>)> = {
+                let mut remaining: Vec<(InstanceId, orphan_pid::ProcessRecord)> = {
                     let manager = app.instance_manager();
                     let instances = manager.instances.read().await;
                     instance_ids
@@ -1718,20 +1739,18 @@ impl ManagerRef<'_, InstanceManager> {
                             let LaunchState::Running(running) = &data.state else {
                                 return None;
                             };
-                            running.is_adopted().then_some((
-                                *id,
-                                running.process_id,
-                                running.process_start_time,
-                            ))
+                            running
+                                .is_adopted()
+                                .then_some((*id, running.process_record()))
                         })
                         .collect()
                 };
 
                 loop {
                     if !adopted_watcher_tick(&cancel, async {
-                        for (id, pid, start) in &remaining {
+                        for (id, record) in &remaining {
                             app.instance_manager()
-                                .bank_adopted_playtime_session(*id, Some((*pid, *start)))
+                                .bank_adopted_playtime_session(*id, Some(*record))
                                 .await;
                         }
                     })
@@ -1744,12 +1763,12 @@ impl ManagerRef<'_, InstanceManager> {
                     // the user may have stopped one through `kill_instance` in
                     // the meantime, and it is no longer adopted (or no longer
                     // running) if so.
-                    let still_adopted: Vec<(InstanceId, u32, Option<u64>)> = {
+                    let still_adopted: Vec<(InstanceId, orphan_pid::ProcessRecord)> = {
                         let manager = app.instance_manager();
                         let instances = manager.instances.read().await;
                         remaining
                             .iter()
-                            .filter_map(|(id, expected_pid, expected_start)| {
+                            .filter_map(|(id, expected)| {
                                 let instance = instances.get(id)?;
                                 let InstanceType::Valid(data) = &instance.type_ else {
                                     return None;
@@ -1760,11 +1779,8 @@ impl ManagerRef<'_, InstanceManager> {
                                 running
                                     .is_adopted()
                                     .then_some(())
-                                    .filter(|_| {
-                                        running.process_id == *expected_pid
-                                            && running.process_start_time == *expected_start
-                                    })
-                                    .map(|_| (*id, running.process_id, running.process_start_time))
+                                    .filter(|_| running.process_record() == *expected)
+                                    .map(|_| (*id, running.process_record()))
                             })
                             .collect()
                     };
@@ -1773,48 +1789,32 @@ impl ManagerRef<'_, InstanceManager> {
                         break;
                     }
 
-                    let pids: Vec<Pid> = still_adopted
-                        .iter()
-                        .map(|(_, pid, _)| Pid::from_u32(*pid))
-                        .collect();
-                    let mut system = System::new();
-                    system.refresh_processes(ProcessesToUpdate::Some(&pids));
-
                     let observed_at = Utc::now();
 
                     remaining.clear();
-                    for (instance_id, pid, expected_start_time) in still_adopted {
-                        // Released back to Inactive unless the pid is still
-                        // verifiably the same live java process it was adopted
-                        // as. A bare liveness check is not enough here: the game
-                        // can have exited and had its pid recycled by an
-                        // unrelated process between two polls, and passing that
-                        // unverified would keep the instance Running (accruing
-                        // playtime, offering a Stop that would kill the
-                        // stranger's JVM) for a game that is actually long gone.
-                        if !orphan_pid::is_verified_live_java_process(
-                            &system,
-                            pid,
-                            expected_start_time,
+                    for (instance_id, record) in still_adopted {
+                        match orphan_pid::identity_status(
+                            record,
+                            orphan_pid::observe_process(record.pid),
+                            true,
                         ) {
-                            info!(
-                                "adopted game process {pid} for instance {instance_id} has exited, or is no longer verifiably the same process; instance is inactive again"
-                            );
-                            // Banked up to the last tick that saw it alive, not to
-                            // now: it died at some unknowable point in between.
-                            // Must run before the release, which drops the
-                            // bookkeeping along with the rest of the running state.
-                            app.instance_manager()
-                                .bank_adopted_playtime(instance_id)
-                                .await;
-                            app.instance_manager()
-                                .release_adopted_instance(instance_id, pid)
-                                .await;
-                        } else {
-                            app.instance_manager()
-                                .observe_adopted_alive(instance_id, observed_at)
-                                .await;
-                            remaining.push((instance_id, pid, expected_start_time));
+                            orphan_pid::IdentityStatus::GoneOrReused => {
+                                app.instance_manager()
+                                    .bank_adopted_playtime_session(instance_id, Some(record))
+                                    .await;
+                                app.instance_manager()
+                                    .release_adopted_instance(instance_id, record)
+                                    .await;
+                            }
+                            orphan_pid::IdentityStatus::Same => {
+                                app.instance_manager()
+                                    .observe_adopted_alive(instance_id, record, observed_at)
+                                    .await;
+                                remaining.push((instance_id, record));
+                            }
+                            orphan_pid::IdentityStatus::Unknown => {
+                                remaining.push((instance_id, record))
+                            }
                         }
                     }
                 }
@@ -1855,7 +1855,7 @@ mod task18_r1_adopted_tests {
                 adopted_watcher_tick(&cancel, async move {
                     let seconds = take_adopted_bank(
                         &mut *owned_running.lock().await,
-                        Some((4242, Some(123))),
+                        Some(orphan_pid::ProcessRecord::legacy(4242, 123)),
                     );
                     write_adopted_seconds(seconds, |seconds| async move {
                         entered.send(()).unwrap();
@@ -1904,7 +1904,10 @@ mod task18_r1_adopted_tests {
             at + chrono::Duration::seconds(55)
         );
         assert_eq!(
-            take_adopted_bank(&mut running, Some((4242, Some(123)))),
+            take_adopted_bank(
+                &mut running,
+                Some(orphan_pid::ProcessRecord::legacy(4242, 123))
+            ),
             0,
             "no double bank"
         );
@@ -1917,8 +1920,20 @@ mod task18_r1_adopted_tests {
         let at = DateTime::<Utc>::from_timestamp(1_700_000_000, 0).unwrap();
         let mut running = RunningInstance::adopted(4242, 123, at, at);
         running.playtime.as_mut().unwrap().last_alive_at = at + chrono::Duration::seconds(55);
-        assert_eq!(take_adopted_bank(&mut running, Some((4242, Some(999)))), 0);
-        assert_eq!(take_adopted_bank(&mut running, Some((9999, Some(123)))), 0);
+        assert_eq!(
+            take_adopted_bank(
+                &mut running,
+                Some(orphan_pid::ProcessRecord::legacy(4242, 999))
+            ),
+            0
+        );
+        assert_eq!(
+            take_adopted_bank(
+                &mut running,
+                Some(orphan_pid::ProcessRecord::legacy(9999, 123))
+            ),
+            0
+        );
         assert_eq!(running.playtime.as_ref().unwrap().banked_at, at);
         let seconds = take_adopted_bank(&mut running, None);
         assert_eq!(seconds, 55);
@@ -1949,12 +1964,11 @@ async fn adopted_watcher_tick(
         _ = tokio::time::sleep(ADOPTED_POLL_INTERVAL) => true,
     }
 }
-fn take_adopted_bank(running: &mut RunningInstance, expected: Option<(u32, Option<u64>)>) -> u32 {
-    if !running.is_adopted()
-        || expected.is_some_and(|(pid, start)| {
-            running.process_id != pid || running.process_start_time != start
-        })
-    {
+fn take_adopted_bank(
+    running: &mut RunningInstance,
+    expected: Option<orphan_pid::ProcessRecord>,
+) -> u32 {
+    if !running.is_adopted() || expected.is_some_and(|record| running.process_record() != record) {
         return 0;
     }
     let Some(playtime) = running.playtime.as_mut() else {
@@ -2128,6 +2142,7 @@ pub struct RunningInstance {
     /// unrelated process in the time between two polls, and a bare pid
     /// lookup at that point can no longer tell the two apart.
     process_start_time: Option<u64>,
+    process_identity: Option<orphan_pid::ProcessIdentity>,
     start_time: DateTime<Utc>,
     /// `None` when the game was adopted: the stdout pipe belonged to the core
     /// that spawned it, and died with that process. Nothing can re-attach to
@@ -2193,12 +2208,32 @@ impl RunningInstance {
             process_id,
             kill_tx: None,
             process_start_time: Some(process_start_time),
+            process_identity: None,
             start_time,
             log: None,
             playtime: Some(AdoptedPlaytime {
                 last_alive_at: now,
                 banked_at: now,
             }),
+        }
+    }
+
+    pub fn adopted_record(
+        record: orphan_pid::ProcessRecord,
+        start_time: DateTime<Utc>,
+        now: DateTime<Utc>,
+    ) -> Self {
+        let mut running =
+            Self::adopted(record.pid, record.start_time.unwrap_or(0), start_time, now);
+        running.process_start_time = record.start_time;
+        running.process_identity = record.identity;
+        running
+    }
+    fn process_record(&self) -> orphan_pid::ProcessRecord {
+        orphan_pid::ProcessRecord {
+            pid: self.process_id,
+            start_time: self.process_start_time,
+            identity: self.process_identity,
         }
     }
 
@@ -2236,7 +2271,7 @@ impl InstanceManager {
     async fn request_instance_stop(
         &self,
         instance_id: InstanceId,
-    ) -> anyhow::Result<Option<(u32, Option<u64>)>> {
+    ) -> anyhow::Result<Option<orphan_pid::ProcessRecord>> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -2247,7 +2282,7 @@ impl InstanceManager {
         let target = (
             running.kill_tx.clone(),
             running.process_id,
-            running.process_start_time,
+            running.process_record(),
         );
         drop(instances);
         if let Some(tx) = target.0 {
@@ -2258,7 +2293,7 @@ impl InstanceManager {
                 }
             }
         } else {
-            Ok(Some((target.1, target.2)))
+            Ok(Some(target.2))
         }
     }
 }
@@ -2478,6 +2513,7 @@ mod tests {
                         process_id: 17,
                         kill_tx: Some(tx),
                         process_start_time: None,
+                        process_identity: None,
                         start_time: Utc::now(),
                         log: None,
                         playtime: None,
@@ -2608,7 +2644,7 @@ mod tests {
         drop(map);
         assert_eq!(
             manager.request_instance_stop(InstanceId(17)).await.unwrap(),
-            Some((17, Some(123)))
+            Some(orphan_pid::ProcessRecord::legacy(17, 123))
         );
         manager
             .instances
@@ -2782,6 +2818,7 @@ mod tests {
                         process_id: 4242,
                         kill_tx: Some(kill_tx),
                         process_start_time: None,
+                        process_identity: None,
                         start_time: Utc::now(),
                         log: Some(GameLogId(1)),
                         playtime: None,
@@ -2902,7 +2939,10 @@ mod tests {
         // the instance moved to Queued in the meantime (a relaunch, a
         // concurrent release). Nothing here belongs to this call anymore.
         app.instance_manager()
-            .release_adopted_instance(instance_id, 4242)
+            .release_adopted_instance(
+                instance_id,
+                orphan_pid::ProcessRecord::legacy(4242, 1_700_000_000),
+            )
             .await;
 
         let instance_manager = app.instance_manager();
@@ -2981,6 +3021,7 @@ mod tests {
             process_id: 4242,
             kill_tx: Some(kill_tx),
             process_start_time: None,
+            process_identity: None,
             start_time: Utc::now(),
             log: Some(GameLogId(1)),
             playtime: None,
@@ -3027,3 +3068,29 @@ mod tests {
 
 #[cfg(test)]
 pub(super) use modpack::execute_plan as execute_import_baseline_test_plan;
+
+#[cfg(test)]
+mod task22_tests {
+    use super::*;
+    #[test]
+    fn task22_adopted_session_carries_full_identity_and_rejects_stale_bank() {
+        let at = DateTime::<Utc>::from_timestamp(1700000000, 0).unwrap();
+        let record = orphan_pid::ProcessRecord {
+            pid: 4242,
+            start_time: Some(1700000000),
+            identity: Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
+                boot_id: uuid::Uuid::parse_str("cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80").unwrap(),
+                start_ticks: 123456,
+            }),
+        };
+        let mut running = RunningInstance::adopted_record(record, at, at);
+        assert_eq!(running.process_record(), record);
+        assert!(running.is_adopted());
+        running.playtime.as_mut().unwrap().last_alive_at = at + chrono::Duration::seconds(30);
+        let mut stale = record;
+        stale.identity = None;
+        assert_eq!(take_adopted_bank(&mut running, Some(stale)), 0);
+        assert_eq!(take_adopted_bank(&mut running, Some(record)), 30);
+        assert_eq!(take_adopted_bank(&mut running, Some(record)), 0);
+    }
+}

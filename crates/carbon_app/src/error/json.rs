@@ -165,24 +165,30 @@ pub fn get_json_context(err: &serde_json::Error, body: &str, max_len: usize) -> 
 
     let string_can_end = body.chars().next().map(|char| char == '[' || char == '{') != Some(true);
 
-    let line_offset = body
-        .char_indices()
-        .filter(|(_, c)| *c == '\n')
-        .nth(err.line() - 1)
-        .unwrap_or_default()
-        .0;
+    // serde reports consumed bytes on a one-based line. A completed wrong-
+    // type value therefore splits AFTER its last byte (no column subtraction).
+    let line_offset = if err.line() <= 1 {
+        0
+    } else {
+        body.bytes()
+            .enumerate()
+            .filter(|(_, byte)| *byte == b'\n')
+            .nth(err.line().saturating_sub(2))
+            .map(|(i, _)| i + 1)
+            .unwrap_or(body.len())
+    };
+    let line_end = body[line_offset..]
+        .find('\n')
+        .map(|i| line_offset + i)
+        .unwrap_or(body.len());
+    let mut offset = line_offset + err.column().min(line_end - line_offset);
+    while !body.is_char_boundary(offset) {
+        offset -= 1;
+    }
+    let (ctx_before, ctx_after) = body.split_at(offset);
 
-    let (pre_line, ctx_line) = body.split_at(line_offset);
-
-    let ctx = ctx_line.to_owned();
-    let offset = ctx.char_indices().nth(err.column()).unwrap_or_default().0;
-    let ctx_split = ctx.split_at(offset);
-
-    let ctx_before = pre_line.to_owned() + ctx_split.0;
-    let ctx_after = ctx_split.1.to_owned();
-
-    let obj_before = read_json_context_back(&ctx_before, max_len, string_can_end);
-    let obj_after = read_json_context_forward(&ctx_after, max_len, string_can_end);
+    let obj_before = read_json_context_back(ctx_before, max_len, string_can_end);
+    let obj_after = read_json_context_forward(ctx_after, max_len, string_can_end);
 
     obj_before + "<~~ " + obj_after.as_str()
 }
@@ -194,5 +200,75 @@ fn json_matching_brace(c: char) -> char {
         '{' => '}',
         '}' => '{',
         other => other,
+    }
+}
+
+#[cfg(test)]
+mod task22_tests {
+    use super::*;
+    #[derive(Debug, serde::Deserialize)]
+    struct Payload {
+        bad: bool,
+    }
+    #[test]
+    fn task22_multiline_unicode_marks_failing_value() {
+        let body = "{\n  \"bad\": \"é\",\n  \"next\": \"innocent\"\n}";
+        let err = serde_json::from_str::<Payload>(body).unwrap_err();
+        assert_eq!((err.line(), err.column()), (2, 13));
+        let context = get_json_context(&err, body, 400);
+        assert!(context.contains("\"é\"<~~ "), "{context}");
+    }
+    #[test]
+    fn task22_ascii_first_middle_last_crlf_and_blank_line_controls() {
+        for body in [
+            "{\"bad\":\"x\"}   ",
+            "{\n\"bad\":\"x\",\n\"next\":1}",
+            "{\n\"next\":1,\n\"bad\":\"x\"}",
+            "{\r\n\r\n\"bad\":\"x\",\r\n\"next\":1}",
+            "{\"pré\":\"é\",\"bad\":\"x\"}",
+        ] {
+            let err = serde_json::from_str::<Payload>(body).unwrap_err();
+            let ctx = get_json_context(&err, body, 400);
+            assert!(ctx.contains("\"x\"<~~ "), "{ctx}");
+        }
+        let parsed = serde_json::from_str::<Payload>("{\"bad\":true}").unwrap();
+        assert!(parsed.bad);
+    }
+    #[test]
+    fn task22_eof_and_syntax_remain_at_consumed_byte_boundary() {
+        for body in [
+            "{\"bad\":",
+            "{\"bad\":\"unfinished",
+            "[1,2",
+            "{\"bad\":true,",
+            "\"é",
+        ] {
+            let err = serde_json::from_str::<serde_json::Value>(body).unwrap_err();
+            let ctx = get_json_context(&err, body, 0);
+            assert!(ctx.ends_with("<~~ "), "{body:?} => {ctx}");
+        }
+        let body = "{\n\"bad\":@\n}";
+        let err = serde_json::from_str::<Payload>(body).unwrap_err();
+        assert!(get_json_context(&err, body, 400).contains("@<~~ "));
+        let unicode = "{\"bad\":é}";
+        let error = serde_json::from_str::<Payload>(unicode).unwrap_err();
+        assert!(get_json_context(&error, unicode, 400).contains("<~~ é"));
+        let err = serde_json::from_str::<Payload>("").unwrap_err();
+        assert_eq!(get_json_context(&err, "", 400), "");
+    }
+    #[test]
+    fn task22_unicode_bounds_and_unlimited_zero_contract() {
+        let body = format!(
+            "{{\"bad\":\"{}\",\"next\":\"{}\"}}",
+            "é".repeat(1200),
+            "界".repeat(1200)
+        );
+        let err = serde_json::from_str::<Payload>(&body).unwrap_err();
+        let bounded = get_json_context(&err, &body, 400);
+        let (before, after) = bounded.split_once("<~~ ").unwrap();
+        assert!(before.chars().count() <= 405);
+        assert!(after.chars().count() <= 404);
+        assert!(get_json_context(&err, &body, 0).chars().count() > 1200);
+        assert!(bounded.contains("é\"<~~ "));
     }
 }

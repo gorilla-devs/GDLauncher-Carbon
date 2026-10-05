@@ -551,7 +551,20 @@ impl ServerManager {
             }
         }
         if let Some(root) = &handle.marker_root {
-            orphan_pid::remove_pid_file_strict(root, provider::PID_FILE_NAME).await?;
+            let captured = handle
+                .runtime_activity
+                .lock()
+                .unwrap()
+                .as_ref()
+                .and_then(|activity| activity.child_identity());
+            if let Some(record) = captured {
+                orphan_pid::remove_process_file_if_matches_strict(
+                    root,
+                    provider::PID_FILE_NAME,
+                    record,
+                )
+                .await?;
+            }
         }
         let mut servers = self.servers.write().await;
         let server = servers
@@ -1074,14 +1087,9 @@ impl ManagerRef<'_, ServerManager> {
                 .get_servers()
                 .get_server_path(&server.shortpath)
                 .get_root();
-            if let Ok(Some((pid, start))) = provider::read_pid_file(&root).await {
-                if super::runtime_lifecycle::recorded_process_confirmed_absent(
-                    pid,
-                    start.unwrap_or(0),
-                ) {
-                    if let Err(error) =
-                        orphan_pid::remove_pid_file_strict(&root, provider::PID_FILE_NAME).await
-                    {
+            if let Ok(Some(record)) = provider::read_process_file(&root).await {
+                if super::runtime_lifecycle::recorded_identity_confirmed_gone(record) {
+                    if let Err(error) = provider::retire_recovered_marker(&root, record).await {
                         warn!("Cannot retire confirmed-absent server marker: {error:#}");
                     }
                     continue;

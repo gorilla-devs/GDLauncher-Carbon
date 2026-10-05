@@ -159,6 +159,18 @@ pub fn pid_file_path(server_root: &Path) -> PathBuf {
 /// write failure is only logged. Losing the pidfile just means an unclean
 /// exit during this run won't be auto-cleaned up on the next launch — it
 /// must never block or fail the launch itself.
+pub async fn write_process_file(server_root: &Path, record: orphan_pid::ProcessRecord) {
+    orphan_pid::write_process_file(server_root, PID_FILE_NAME, record).await;
+}
+pub async fn read_process_file(server_root: &Path) -> Result<Option<orphan_pid::ProcessRecord>> {
+    orphan_pid::read_process_file(server_root, PID_FILE_NAME).await
+}
+pub(crate) async fn retire_recovered_marker(
+    server_root: &Path,
+    captured: orphan_pid::ProcessRecord,
+) -> Result<()> {
+    orphan_pid::remove_process_file_if_matches_strict(server_root, PID_FILE_NAME, captured).await
+}
 pub async fn write_pid_file(server_root: &Path, pid: u32, start_time: u64) {
     orphan_pid::write_pid_file(server_root, PID_FILE_NAME, pid, start_time).await;
 }
@@ -384,5 +396,76 @@ mod task07_tests {
         .await
         .unwrap_err();
         assert!(error.to_string().contains("exit Unknown"), "{error:#}");
+    }
+}
+
+#[cfg(test)]
+mod task22_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task22_server_marker_roundtrip_keeps_stable_identity() {
+        let root = tempfile::tempdir().unwrap();
+        let record = orphan_pid::ProcessRecord {
+            pid: 4242,
+            start_time: Some(1700000000),
+            identity: Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
+                boot_id: uuid::Uuid::parse_str("cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80").unwrap(),
+                start_ticks: 123456,
+            }),
+        };
+        write_process_file(root.path(), record).await;
+        assert_eq!(read_process_file(root.path()).await.unwrap(), Some(record));
+        assert_eq!(
+            orphan_pid::identity_status(
+                record,
+                orphan_pid::ProcessObservation::Present {
+                    process: orphan_pid::LiveProc {
+                        is_java: true,
+                        start_time: 1700000030
+                    },
+                    identity: record.identity
+                },
+                true
+            ),
+            orphan_pid::IdentityStatus::Same
+        );
+        remove_pid_file(root.path()).await;
+        assert_eq!(read_process_file(root.path()).await.unwrap(), None);
+    }
+    #[tokio::test]
+    async fn task22_server_recovery_cleanup_preserves_replacement_marker() {
+        let root = tempfile::tempdir().unwrap();
+        let captured = orphan_pid::ProcessRecord {
+            pid: 4242,
+            start_time: Some(1700000000),
+            identity: Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
+                boot_id: uuid::Uuid::parse_str("cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80").unwrap(),
+                start_ticks: 123456,
+            }),
+        };
+        let replacement = orphan_pid::ProcessRecord {
+            identity: Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
+                boot_id: uuid::Uuid::parse_str("cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80").unwrap(),
+                start_ticks: 123457,
+            }),
+            ..captured
+        };
+        write_process_file(root.path(), replacement).await;
+        assert!(
+            retire_recovered_marker(root.path(), captured)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            read_process_file(root.path()).await.unwrap(),
+            Some(replacement)
+        );
+        retire_recovered_marker(root.path(), replacement)
+            .await
+            .unwrap();
+        assert_eq!(read_process_file(root.path()).await.unwrap(), None);
+        retire_recovered_marker(root.path(), replacement)
+            .await
+            .unwrap();
     }
 }

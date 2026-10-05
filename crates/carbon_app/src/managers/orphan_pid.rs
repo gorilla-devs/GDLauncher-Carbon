@@ -9,26 +9,329 @@
 //!
 //! Instance recovery uses the identity classification below for adoption.
 //! Server recovery retains live or ambiguous ownership without signalling;
-//! ServerManager retires only confirmed-absent markers. Save completion for a
+//! ServerManager retires only markers with proven absence or stable reuse. Save completion for a
 //! recovered server is unknown and requires operator recovery. RuntimeLifecycle
-//! adds a conservative still-present-PID blocker until stable identity support.
+//! retains unconfirmed ownership as a relocation blocker.
 //!
-//! A pid alone is not a stable identity: the OS recycles pid numbers, and a
-//! long-lived core (or a reboot) can easily outlive the JVM it recorded, so
-//! by the time reconciliation runs the same pid may belong to a completely
-//! unrelated process. The pidfile therefore also records the process's start
-//! time (seconds since epoch, from `sysinfo::Process::start_time()`) as a
-//! second line, and reconciliation only ever treats a pid as this
-//! launcher's own JVM when the live process's start time matches the
-//! recorded one within tolerance. A pidfile written before this check
-//! existed has only the pid line (the "legacy" format) and can never be
-//! verified, so it is always treated the same as a stranger's process:
-//! removed, never killed, never adopted.
+//! A PID is reusable. New Linux records retain epoch metadata on their first
+//! two lines and append `linux-boot-ticks-v1 <boot UUID> <start ticks>`. The
+//! exact boot/ticks pair supplies ownership across wall-clock adjustments.
+//! Legacy epochs require the previous conservative proof before upgrade;
+//! missing/malformed identity or legacy clock mismatch stays unconfirmed.
+//! Unknown identity never authorizes signalling or destroys recovery evidence.
 
 use anyhow::{Context, Result};
 use std::path::{Path, PathBuf};
 use sysinfo::{Pid, System};
 use tracing::warn;
+
+/// Stable Linux identity; epoch time remains metadata, never Linux authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "kind", deny_unknown_fields)]
+pub enum ProcessIdentity {
+    LinuxBootTicks {
+        boot_id: uuid::Uuid,
+        start_ticks: u64,
+    },
+}
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProcessRecord {
+    pub pid: u32,
+    pub start_time: Option<u64>,
+    pub identity: Option<ProcessIdentity>,
+}
+// Epoch time is metadata once a stable token exists. Keys/cleanup compare the
+// full authoritative PID/boot/ticks identity; legacy keys still include epoch.
+impl PartialEq for ProcessRecord {
+    fn eq(&self, other: &Self) -> bool {
+        self.pid == other.pid
+            && match (self.identity, other.identity) {
+                (Some(a), Some(b)) => a == b,
+                (None, None) => self.start_time == other.start_time,
+                _ => false,
+            }
+    }
+}
+impl Eq for ProcessRecord {}
+impl std::hash::Hash for ProcessRecord {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        std::hash::Hash::hash(&self.pid, state);
+        std::hash::Hash::hash(&self.identity, state);
+        if self.identity.is_none() {
+            std::hash::Hash::hash(&self.start_time, state);
+        }
+    }
+}
+impl ProcessRecord {
+    pub(crate) fn validate_identity(self) -> Result<Self> {
+        if let Some(ProcessIdentity::LinuxBootTicks { boot_id, .. }) = self.identity {
+            anyhow::ensure!(!boot_id.is_nil(), "Invalid boot identity");
+        }
+        Ok(self)
+    }
+    pub fn legacy(pid: u32, start_time: u64) -> Self {
+        Self {
+            pid,
+            start_time: Some(start_time),
+            identity: None,
+        }
+    }
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProcessObservation {
+    Present {
+        process: LiveProc,
+        identity: Option<ProcessIdentity>,
+    },
+    Absent,
+    Unknown,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum IdentityStatus {
+    Same,
+    GoneOrReused,
+    Unknown,
+}
+
+/// Legacy clock mismatches cannot prove exit/reuse on Linux. A present stable
+/// extension is authoritative and can never fall back to epoch matching.
+pub fn identity_status(
+    record: ProcessRecord,
+    observed: ProcessObservation,
+    require_java: bool,
+) -> IdentityStatus {
+    if record.validate_identity().is_err() {
+        return IdentityStatus::Unknown;
+    }
+    match observed {
+        ProcessObservation::Absent => IdentityStatus::GoneOrReused,
+        ProcessObservation::Unknown => IdentityStatus::Unknown,
+        ProcessObservation::Present { process, identity } => {
+            if require_java && !process.is_java {
+                return IdentityStatus::GoneOrReused;
+            }
+            match (record.identity, identity) {
+                (Some(expected), Some(actual)) if expected == actual => IdentityStatus::Same,
+                (Some(_), Some(_)) => IdentityStatus::GoneOrReused,
+                (Some(_), None) => IdentityStatus::Unknown,
+                (None, _)
+                    if record
+                        .start_time
+                        .is_some_and(|start| start_times_match(start, process.start_time)) =>
+                {
+                    IdentityStatus::Same
+                }
+                (None, _) if record.start_time.is_none() => IdentityStatus::Unknown,
+                (None, _) => {
+                    #[cfg(target_os = "linux")]
+                    {
+                        IdentityStatus::Unknown
+                    }
+                    #[cfg(not(target_os = "linux"))]
+                    {
+                        IdentityStatus::GoneOrReused
+                    }
+                }
+            }
+        }
+    }
+}
+/// Capture a legacy upgrade only after its existing Java/epoch proof succeeds.
+pub fn verified_record(
+    record: ProcessRecord,
+    observed: ProcessObservation,
+    require_java: bool,
+) -> Option<ProcessRecord> {
+    if identity_status(record, observed, require_java) != IdentityStatus::Same {
+        return None;
+    }
+    let ProcessObservation::Present { identity, .. } = observed else {
+        return None;
+    };
+    Some(ProcessRecord {
+        identity: record.identity.or(identity),
+        ..record
+    })
+}
+
+#[cfg(target_os = "linux")]
+fn parse_linux_identity(pid: u32, boot: &str, stat: &str) -> Option<ProcessIdentity> {
+    let boot = uuid::Uuid::parse_str(boot.trim()).ok()?;
+    if boot.is_nil() {
+        return None;
+    }
+    let open = stat.find('(')?;
+    let close = stat.rfind(')')?;
+    if close <= open || stat[..open].trim().parse::<u32>().ok()? != pid {
+        return None;
+    }
+    // comm may contain whitespace and closing parentheses. The final ')' ends
+    // field 2; field 22 is the twentieth token starting with field 3.
+    let mut fields = stat[close + 1..].split_ascii_whitespace();
+    let state = fields.next()?;
+    if state.len() != 1 || !state.as_bytes()[0].is_ascii_alphabetic() {
+        return None;
+    }
+    let start_ticks = fields.nth(18)?.parse::<u64>().ok()?;
+    Some(ProcessIdentity::LinuxBootTicks {
+        boot_id: boot,
+        start_ticks,
+    })
+}
+#[cfg(target_os = "linux")]
+fn read_linux_identity(pid: u32) -> std::io::Result<ProcessIdentity> {
+    let boot = std::fs::read_to_string("/proc/sys/kernel/random/boot_id")?;
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat"))?;
+    parse_linux_identity(pid, &boot, &stat)
+        .ok_or_else(|| std::io::Error::other("Invalid Linux process identity"))
+}
+/// The snapshot is bracketed by stable observations: a recycled PID cannot
+/// supply one generation's Java name and another generation's start token.
+#[cfg(target_os = "linux")]
+fn observe_bracketed(
+    before: std::io::Result<ProcessIdentity>,
+    snapshot: impl FnOnce() -> Option<LiveProc>,
+    after: impl FnOnce() -> std::io::Result<ProcessIdentity>,
+    absence_confirmed: impl FnOnce() -> bool,
+) -> ProcessObservation {
+    let before = match before {
+        Ok(identity) => identity,
+        Err(error) => {
+            return if error.kind() == std::io::ErrorKind::NotFound && absence_confirmed() {
+                ProcessObservation::Absent
+            } else {
+                ProcessObservation::Unknown
+            };
+        }
+    };
+    let process = snapshot();
+    match (process, after()) {
+        (Some(process), Ok(identity)) if before == identity => ProcessObservation::Present {
+            process,
+            identity: Some(identity),
+        },
+        _ => ProcessObservation::Unknown,
+    }
+}
+pub fn observe_process(pid: u32) -> ProcessObservation {
+    let snapshot = || {
+        let mut system = System::new();
+        system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[Pid::from_u32(pid)]));
+        live_proc(&system, pid)
+    };
+    #[cfg(target_os = "linux")]
+    {
+        observe_bracketed(
+            read_linux_identity(pid),
+            snapshot,
+            || read_linux_identity(pid),
+            || {
+                // ENOENT from an unavailable proc mount is not absence proof.
+                std::fs::read_to_string("/proc/self/stat").is_ok()
+                    && matches!(std::fs::metadata(format!("/proc/{pid}")), Err(e) if e.kind() == std::io::ErrorKind::NotFound)
+            },
+        )
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        match snapshot() {
+            Some(process) => ProcessObservation::Present {
+                process,
+                identity: None,
+            },
+            None => ProcessObservation::Absent,
+        }
+    }
+}
+/// Called immediately at owned spawn, while the actual child is retained.
+pub fn capture_process(pid: u32) -> Option<ProcessRecord> {
+    capture_observed(pid, observe_process(pid))
+}
+pub(crate) fn capture_observed(pid: u32, observed: ProcessObservation) -> Option<ProcessRecord> {
+    #[cfg(target_os = "linux")]
+    if matches!(observed, ProcessObservation::Present { identity: None, .. }) {
+        return None;
+    }
+    match observed {
+        ProcessObservation::Present { process, identity } => Some(ProcessRecord {
+            pid,
+            start_time: Some(process.start_time),
+            identity,
+        }),
+        _ => None,
+    }
+}
+
+pub async fn write_process_file(root: &Path, file_name: &str, record: ProcessRecord) {
+    let mut content = format!("{}\n{}", record.pid, record.start_time.unwrap_or(0));
+    if let Some(ProcessIdentity::LinuxBootTicks {
+        boot_id,
+        start_ticks,
+    }) = record.identity
+    {
+        content.push_str(&format!("\nlinux-boot-ticks-v1 {boot_id} {start_ticks}"));
+    }
+    if let Err(error) = tokio::fs::write(pid_file_path(root, file_name), content).await {
+        warn!("Failed to write process marker: {error}");
+    }
+}
+pub async fn read_process_file(root: &Path, file_name: &str) -> Result<Option<ProcessRecord>> {
+    let path = pid_file_path(root, file_name);
+    let content = match tokio::fs::read_to_string(&path).await {
+        Ok(content) => content,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let mut lines = content.lines();
+    let pid = lines.next().unwrap_or("").trim().parse::<u32>()?;
+    let start_time = match lines.next().map(str::trim) {
+        Some("") | None => None,
+        Some(value) => Some(value.parse::<u64>()?),
+    };
+    let identity = match lines.next() {
+        None => None,
+        Some(extension) => {
+            let fields: Vec<_> = extension.split_ascii_whitespace().collect();
+            anyhow::ensure!(
+                fields.len() == 3 && fields[0] == "linux-boot-ticks-v1",
+                "Unknown process identity extension"
+            );
+            let boot_id = uuid::Uuid::parse_str(fields[1])?;
+            anyhow::ensure!(!boot_id.is_nil(), "Invalid boot identity");
+            Some(ProcessIdentity::LinuxBootTicks {
+                boot_id,
+                start_ticks: fields[2].parse()?,
+            })
+        }
+    };
+    anyhow::ensure!(
+        lines.next().is_none(),
+        "Unexpected process identity extension"
+    );
+    Ok(Some(ProcessRecord {
+        pid,
+        start_time,
+        identity,
+    }))
+}
+pub async fn remove_process_file_if_matches_strict(
+    root: &Path,
+    file_name: &str,
+    expected: ProcessRecord,
+) -> Result<()> {
+    match read_process_file(root, file_name).await? {
+        None => Ok(()),
+        Some(actual) if actual == expected => Ok(remove_pid_file_strict(root, file_name).await?),
+        Some(_) => anyhow::bail!("Process marker changed; replacement ownership retained"),
+    }
+}
+/// Exit cleanup is bound to the full captured marker, not a reused bare PID.
+pub async fn remove_process_file_if_matches(root: &Path, file_name: &str, expected: ProcessRecord) {
+    if read_process_file(root, file_name).await.ok().flatten() == Some(expected) {
+        remove_pid_file(root, file_name).await;
+    }
+}
 
 /// Path to a pidfile given its root directory and file name. Both the
 /// writer (right after spawning the java process) and the reader (on core
@@ -93,27 +396,9 @@ pub async fn remove_pid_file_strict(root: &Path, file_name: &str) -> std::io::Re
 /// from a current one, so reconciliation can refuse to verify it instead of
 /// trusting it.
 pub async fn read_pid_file(root: &Path, file_name: &str) -> Result<Option<(u32, Option<u64>)>> {
-    let path = pid_file_path(root, file_name);
-    match tokio::fs::read_to_string(&path).await {
-        Ok(content) => {
-            let mut lines = content.lines();
-            let pid = lines
-                .next()
-                .unwrap_or("")
-                .trim()
-                .parse::<u32>()
-                .with_context(|| format!("invalid pid recorded in {}", path.display()))?;
-            let start_time = match lines.next().map(str::trim) {
-                Some(line) if !line.is_empty() => Some(line.parse::<u64>().with_context(|| {
-                    format!("invalid start time recorded in {}", path.display())
-                })?),
-                _ => None,
-            };
-            Ok(Some((pid, start_time)))
-        }
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(e).with_context(|| format!("failed to read pidfile at {}", path.display())),
-    }
+    Ok(read_process_file(root, file_name)
+        .await?
+        .map(|record| (record.pid, record.start_time)))
 }
 
 /// Outcome of reconciling one recorded pid against the live process table.
@@ -275,6 +560,56 @@ pub fn is_verified_live_java_process(
 /// verify against.
 pub fn process_start_time(system: &System, pid: u32) -> Option<u64> {
     system.process(Pid::from_u32(pid)).map(|p| p.start_time())
+}
+
+/// For tests that run a copy of a program named `java` as a stand-in JVM:
+/// waits until `pid` is seen under that name. `spawn` can return before the
+/// child is: Linux lets the parent go on and closes the child's exec-error
+/// pipe before it renames the child late in `exec`, so the child can still
+/// be seen under the test binary's name, which is not Java.
+#[cfg(test)]
+pub(crate) fn wait_until_named_java(pid: u32) {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+    loop {
+        let (_, name) = observe_process_named(pid);
+        if name.as_deref() == Some("java") {
+            return;
+        }
+        assert!(
+            std::time::Instant::now() < deadline,
+            "process {pid} was not seen named java within 5 s; last seen as {name:?}"
+        );
+        std::thread::sleep(std::time::Duration::from_millis(5));
+    }
+}
+
+/// For tests: starts a copy of `sleep` named `java` in `dir`, which the
+/// launcher takes for a game or server JVM, and returns once it is seen
+/// under that name. Dropping the child ends it.
+#[cfg(all(test, unix))]
+pub(crate) async fn spawn_fake_java(dir: &std::path::Path) -> tokio::process::Child {
+    let fake = dir.join("java");
+    tokio::fs::copy("/bin/sleep", &fake).await.unwrap();
+    // Another test forking while the copy was open for writing can hold it
+    // open in its child until that child execs: ETXTBSY.
+    let mut attempts = 0;
+    let child = loop {
+        match tokio::process::Command::new(&fake)
+            .arg("60")
+            // Never outlive the test, however it ends.
+            .kill_on_drop(true)
+            .spawn()
+        {
+            Ok(child) => break child,
+            Err(error) if error.raw_os_error() == Some(26) && attempts < 50 => {
+                attempts += 1;
+                tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            }
+            Err(error) => panic!("cannot start the fake JVM: {error}"),
+        }
+    };
+    wait_until_named_java(child.id().expect("the fake JVM has a pid"));
+    child
 }
 
 #[cfg(test)]
@@ -702,5 +1037,290 @@ mod tests {
         // Confirms reconciliation never tried to kill anything here: this
         // test's own process is still alive to make this assertion at all.
         assert!(System::new_all().process(Pid::from_u32(own_pid)).is_some());
+    }
+}
+
+#[cfg(test)]
+mod task22_tests {
+    use super::*;
+    pub(super) fn record() -> ProcessRecord {
+        ProcessRecord {
+            pid: 4242,
+            start_time: Some(1_700_000_000),
+            identity: Some(ProcessIdentity::LinuxBootTicks {
+                boot_id: uuid::Uuid::parse_str("cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80").unwrap(),
+                start_ticks: 123456,
+            }),
+        }
+    }
+    fn live(epoch: u64, identity: Option<ProcessIdentity>) -> ProcessObservation {
+        ProcessObservation::Present {
+            process: LiveProc {
+                is_java: true,
+                start_time: epoch,
+            },
+            identity,
+        }
+    }
+    #[tokio::test]
+    async fn task22_clock_steps_marker_roundtrip_retains_owned_game() {
+        let root = tempfile::tempdir().unwrap();
+        let record = record();
+        write_process_file(root.path(), ".gdl_instance.pid", record).await;
+        let read = read_process_file(root.path(), ".gdl_instance.pid")
+            .await
+            .unwrap()
+            .unwrap();
+        for epoch in [1_699_999_970, 1_700_000_030] {
+            assert_eq!(
+                identity_status(read, live(epoch, record.identity), true),
+                IdentityStatus::Same
+            );
+            assert_eq!(
+                verified_record(read, live(epoch, record.identity), true),
+                Some(record)
+            );
+        }
+        assert!(pid_file_path(root.path(), ".gdl_instance.pid").exists());
+    }
+    #[test]
+    fn task22_reused_ticks_boot_and_non_java_never_authorize_stop() {
+        let record = record();
+        let ProcessIdentity::LinuxBootTicks {
+            boot_id,
+            start_ticks,
+        } = record.identity.unwrap();
+        for identity in [
+            ProcessIdentity::LinuxBootTicks {
+                boot_id,
+                start_ticks: start_ticks + 1,
+            },
+            ProcessIdentity::LinuxBootTicks {
+                boot_id: uuid::Uuid::new_v4(),
+                start_ticks,
+            },
+        ] {
+            assert_eq!(
+                identity_status(
+                    record,
+                    live(record.start_time.unwrap(), Some(identity)),
+                    true
+                ),
+                IdentityStatus::GoneOrReused
+            );
+            assert_eq!(
+                verified_record(
+                    record,
+                    live(record.start_time.unwrap(), Some(identity)),
+                    true
+                ),
+                None
+            );
+        }
+        assert_eq!(
+            identity_status(
+                record,
+                ProcessObservation::Present {
+                    process: LiveProc {
+                        is_java: false,
+                        start_time: 1_700_000_000
+                    },
+                    identity: record.identity
+                },
+                true
+            ),
+            IdentityStatus::GoneOrReused
+        );
+        assert_eq!(
+            identity_status(record, ProcessObservation::Absent, true),
+            IdentityStatus::GoneOrReused
+        );
+    }
+    #[test]
+    fn task22_unknown_never_downgrades_stable_identity() {
+        let record = record();
+        for observation in [
+            ProcessObservation::Unknown,
+            live(record.start_time.unwrap(), None),
+        ] {
+            assert_eq!(
+                identity_status(record, observation, true),
+                IdentityStatus::Unknown
+            );
+            assert_eq!(verified_record(record, observation, true), None);
+        }
+    }
+    #[test]
+    fn task22_legacy_epoch_proof_and_pid_only_controls() {
+        let mut record = ProcessRecord::legacy(4242, 1000);
+        for epoch in [998, 1000, 1002] {
+            assert_eq!(
+                identity_status(record, live(epoch, self::record().identity), true),
+                IdentityStatus::Same
+            );
+            assert_eq!(
+                verified_record(record, live(epoch, self::record().identity), true)
+                    .unwrap()
+                    .identity,
+                self::record().identity
+            );
+        }
+        #[cfg(target_os = "linux")]
+        let mismatch = IdentityStatus::Unknown;
+        #[cfg(not(target_os = "linux"))]
+        let mismatch = IdentityStatus::GoneOrReused;
+        for epoch in [997, 1003, 1030] {
+            assert_eq!(
+                identity_status(record, live(epoch, self::record().identity), true),
+                mismatch
+            );
+            assert!(verified_record(record, live(epoch, self::record().identity), true).is_none());
+        }
+        record.start_time = None;
+        assert_eq!(
+            identity_status(record, live(1000, self::record().identity), true),
+            IdentityStatus::Unknown
+        );
+    }
+    #[tokio::test]
+    async fn task22_malformed_present_extensions_are_retained_without_epoch_fallback() {
+        let root = tempfile::tempdir().unwrap();
+        let path = pid_file_path(root.path(), "marker");
+        for extension in [
+            "unknown 1 2",
+            "linux-boot-ticks-v1 invalid 123",
+            "linux-boot-ticks-v1 cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80 nope",
+            "",
+            "linux-boot-ticks-v1 cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80 123\nextra",
+        ] {
+            tokio::fs::write(&path, format!("4242\n1700000000\n{extension}\n"))
+                .await
+                .unwrap();
+            assert!(
+                read_process_file(root.path(), "marker").await.is_err(),
+                "{extension}"
+            );
+            assert!(read_pid_file(root.path(), "marker").await.is_err());
+            assert!(path.exists());
+        }
+    }
+    #[tokio::test]
+    async fn task22_exit_cleanup_cannot_remove_replacement_full_identity() {
+        let root = tempfile::tempdir().unwrap();
+        let captured = record();
+        let mut replacement = captured;
+        replacement.identity = Some(ProcessIdentity::LinuxBootTicks {
+            boot_id: uuid::Uuid::new_v4(),
+            start_ticks: 123456,
+        });
+        write_process_file(root.path(), "marker", replacement).await;
+        remove_process_file_if_matches(root.path(), "marker", captured).await;
+        assert_eq!(
+            read_process_file(root.path(), "marker").await.unwrap(),
+            Some(replacement)
+        );
+        remove_process_file_if_matches(root.path(), "marker", replacement).await;
+        assert_eq!(
+            read_process_file(root.path(), "marker").await.unwrap(),
+            None
+        );
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn task22_linux_stat_handles_command_parentheses_and_whitespace() {
+        let stat = format!(
+            "4242 (java (worker) ) name) S {} 123456 0",
+            vec!["0"; 18].join(" ")
+        );
+        assert_eq!(
+            parse_linux_identity(4242, "cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80\n", &stat),
+            record().identity
+        );
+        assert!(
+            parse_linux_identity(4243, "cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80", &stat).is_none()
+        );
+        assert!(parse_linux_identity(4242, "invalid", &stat).is_none());
+        assert!(
+            parse_linux_identity(
+                4242,
+                "cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80",
+                "4242 (java) S 0"
+            )
+            .is_none()
+        );
+    }
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn task22_bracketing_refuses_mixed_generations_and_unproven_absence() {
+        let identity = record().identity.unwrap();
+        let snapshot = || {
+            Some(LiveProc {
+                is_java: true,
+                start_time: 1000,
+            })
+        };
+        assert!(matches!(
+            observe_bracketed(Ok(identity), snapshot, || Ok(identity), || false),
+            ProcessObservation::Present { .. }
+        ));
+        let changed = ProcessIdentity::LinuxBootTicks {
+            boot_id: uuid::Uuid::new_v4(),
+            start_ticks: 123456,
+        };
+        assert_eq!(
+            observe_bracketed(Ok(identity), snapshot, || Ok(changed), || false),
+            ProcessObservation::Unknown
+        );
+        assert_eq!(
+            observe_bracketed(Ok(identity), || None, || Ok(identity), || false),
+            ProcessObservation::Unknown
+        );
+        for absent in [true, false] {
+            assert_eq!(
+                observe_bracketed(
+                    Err(std::io::Error::from(std::io::ErrorKind::NotFound)),
+                    || panic!("No lookup after failed token"),
+                    || panic!("No lookup after failed token"),
+                    || absent
+                ),
+                if absent {
+                    ProcessObservation::Absent
+                } else {
+                    ProcessObservation::Unknown
+                }
+            );
+        }
+        assert_eq!(
+            observe_bracketed(
+                Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied)),
+                snapshot,
+                || Ok(identity),
+                || true
+            ),
+            ProcessObservation::Unknown
+        );
+    }
+}
+
+#[cfg(test)]
+mod task22_strict_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task22_duplicate_strict_cleanup_absence_file_and_failure_controls() {
+        let root = tempfile::tempdir().unwrap();
+        remove_pid_file_strict(root.path(), "marker").await.unwrap();
+        tokio::fs::write(
+            root.path().join("marker"),
+            b"4242\n1700000000\nlinux-boot-ticks-v1 cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80 123456",
+        )
+        .await
+        .unwrap();
+        remove_pid_file_strict(root.path(), "marker").await.unwrap();
+        assert!(!root.path().join("marker").exists());
+        tokio::fs::create_dir(root.path().join("marker"))
+            .await
+            .unwrap();
+        assert!(remove_pid_file_strict(root.path(), "marker").await.is_err());
+        assert!(root.path().join("marker").is_dir());
     }
 }

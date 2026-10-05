@@ -3,6 +3,9 @@ THIRD-PARTY SOFTWARE NOTICES
 
 This software incorporates components from the following open source projects:
 
+Database component copyright notices and MIT license texts are included in
+DATABASE-LICENSES.txt in this directory.
+
 - nonzero_ext 0.3.0 [Apache-2.0]
 - sentry-anyhow 0.34.0 [Apache-2.0]
 - sentry-backtrace 0.34.0 [Apache-2.0]
@@ -19,7 +22,6 @@ This software incorporates components from the following open source projects:
 - backon 1.6.0 [Apache-2.0]
 - sketches-ddsketch 0.1.3 [Apache-2.0]
 - lzma-rust2 0.15.7 [Apache-2.0]
-- prisma-client-rust 0.6.7 [Apache-2.0]
 - imgref 1.12.0 [Apache-2.0]
 - opentelemetry 0.17.0 [Apache-2.0]
 - quaint 0.2.0-alpha.13 [Apache-2.0]
@@ -133,8 +135,8 @@ This software incorporates components from the following open source projects:
 - nom 8.0.0 [MIT]
 - libc 0.2.180 [MIT]
 - hyper 0.14.32 [MIT]
-- libsqlite3-sys 0.22.2 [MIT]
-- rusqlite 0.25.4 [MIT]
+- libsqlite3-sys 0.38.1 [MIT]
+- rusqlite 0.40.1 [MIT]
 - flate2 1.1.8 [MIT]
 - bzip2 0.6.1 [MIT]
 - hyper 1.8.1 [MIT]
@@ -643,7 +645,7 @@ This software incorporates components from the following open source projects:
 - quick-xml 0.38.4 [MIT]
 - atomic-shim 0.2.0 [MIT]
 - connection-string 0.1.13 [MIT]
-- hashlink 0.7.0 [MIT]
+- hashlink 0.12.1 [MIT]
 - urlencoding 2.1.3 [MIT]
 - loop9 0.1.5 [MIT]
 - colored 2.2.0 [MPL-2.0]

@@ -317,3 +317,36 @@ pub fn censor_error(error: reqwest_middleware::Error) -> reqwest_middleware::Err
         e => e,
     }
 }
+
+#[cfg(test)]
+mod task22_tests {
+    use super::*;
+    #[derive(Debug, serde::Deserialize)]
+    struct Payload {
+        #[serde(rename = "bad")]
+        _bad: bool,
+    }
+    #[test]
+    fn task22_direct_request_error_preserves_actual_serde_coordinates_and_context() {
+        let body = "{\n  \"bad\": \"é\",\n  \"next\": \"innocent\"\n}";
+        let error = serde_json::from_str::<Payload>(body).unwrap_err();
+        let source = error.to_string();
+        let coordinates = (error.line(), error.column());
+        let details = RequestErrorDetails::from_json_decode_error(error, body);
+        let RequestErrorDetails::MalformedResponse {
+            details:
+                MalformedResponseDetails::JsonDecodeError {
+                    ctx,
+                    line,
+                    column,
+                    source: actual,
+                },
+        } = details
+        else {
+            panic!("Wrong diagnostic kind");
+        };
+        assert_eq!((line, column), coordinates);
+        assert_eq!(actual, source);
+        assert!(ctx.contains("\"é\"<~~ "), "{ctx}");
+    }
+}
