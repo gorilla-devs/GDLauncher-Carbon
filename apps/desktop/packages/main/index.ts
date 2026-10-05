@@ -31,7 +31,11 @@ import type { ChildProcessWithoutNullStreams } from "child_process"
 import { spawn } from "child_process"
 import crypto from "crypto"
 import log from "electron-log/main"
-import { hashEmailForOverwolf } from "./utils/emailHash"
+import {
+  AccountIdentityReceiver,
+  CoreOutputLines,
+  redactCoreIdentity
+} from "./utils/accountIdentity"
 import { buildCoreModuleArgs } from "./utils/coreArgs.js"
 import {
   IncompleteMigrationError,
@@ -84,42 +88,16 @@ import {
 console.log("Modules imported successfully")
 
 let overwolfReady = false
-let pendingEmail: string | null | undefined = null
-
-function setOverwolfEmail(email: string) {
-  if (overwolfReady && app.overwolf) {
-    try {
-      const hashes = hashEmailForOverwolf(email)
-      app.overwolf.setUserEmailHashes(hashes)
-      console.log("GDL account email hashes sent to Overwolf")
-    } catch (error) {
-      console.error("Failed to set email hashes:", error)
-    }
-  } else {
-    pendingEmail = email
+const accountIdentity = new AccountIdentityReceiver((hashes) => {
+  if (!app.overwolf) return
+  try {
+    app.overwolf.setUserEmailHashes(hashes)
+  } catch (error) {
+    console.error("Failed to update email hashes:", error)
   }
-}
-
-function clearOverwolfEmail() {
-  if (overwolfReady && app.overwolf) {
-    try {
-      app.overwolf.setUserEmailHashes({})
-      console.log("GDL account email hashes cleared")
-    } catch (error) {
-      console.error("Failed to clear email hashes:", error)
-    }
-  } else {
-    pendingEmail = null
-  }
-}
-
+})
 function applyPendingEmail() {
-  if (pendingEmail) {
-    setOverwolfEmail(pendingEmail)
-  } else if (pendingEmail === null) {
-    clearOverwolfEmail()
-  }
-  pendingEmail = undefined
+  accountIdentity.setReady(overwolfReady && !!app.overwolf)
 }
 
 export const RUNTIME_PATH_OVERRIDE_NAME = "runtime_path_override"
@@ -468,6 +446,8 @@ const loadCoreModule: CoreModule = () =>
       e2eEntitlementKey: e2eEntitlementKey?.value
     })
 
+    const identitySession = crypto.randomUUID()
+    accountIdentity.beginCore(identitySession)
     try {
       coreModule = spawn(coreModulePath, args, {
         shell: false,
@@ -475,7 +455,8 @@ const loadCoreModule: CoreModule = () =>
         stdio: "pipe",
         env: {
           ...process.env,
-          RUST_BACKTRACE: "full"
+          RUST_BACKTRACE: "full",
+          GDL_IDENTITY_SESSION: identitySession
         }
       })
       coreProcessHandle = coreModule
@@ -522,8 +503,11 @@ const loadCoreModule: CoreModule = () =>
       return
     })
 
+    const coreOutputLines = new CoreOutputLines()
     coreModule.stdout.on("data", (data) => {
-      const dataString = data.toString()
+      const completeLines = coreOutputLines.push(data.toString())
+      if (!completeLines.length) return
+      const dataString = completeLines.join("\n")
 
       // Strip sensitive payloads before lines reach the user-facing buffer
       // or main.log:
@@ -535,9 +519,10 @@ const loadCoreModule: CoreModule = () =>
       //     end up in shared support logs.
       // IPC parsing below uses the raw `dataString`, so redaction here only
       // affects what gets persisted/displayed.
-      const sanitized = dataString
-        .replace(/(_STATUS_:READY\|\d+\|)[^\s|]+/g, "$1<redacted>")
-        .replace(/(_GDL_ACCOUNT_EMAIL_:)[^\s\r\n]+/g, "$1<redacted>")
+      const sanitized = redactCoreIdentity(dataString).replace(
+        /(_STATUS_:READY\|\d+\|)[^\s|]+/g,
+        "$1<redacted>"
+      )
 
       console.log(`[CORE] Message: ${sanitized}`)
 
@@ -675,7 +660,7 @@ const loadCoreModule: CoreModule = () =>
         } else if (row.startsWith("_INSTANCE_STATE_:")) {
           const rightPart = row.split(":")[1]
           const event = rightPart.split("|")[0]
-          const action: FELauncherActionOnGameLaunch = rightPart.split("|")[1]
+          const action = rightPart.split("|")[1] as FELauncherActionOnGameLaunch
 
           if (event === "GAME_LAUNCHED") {
             isGameRunning = true
@@ -734,12 +719,9 @@ const loadCoreModule: CoreModule = () =>
           showAppCloseWarning = rightPart === "true"
           console.log("Show app close warning:", showAppCloseWarning)
         } else if (row.startsWith("_GDL_ACCOUNT_EMAIL_:")) {
-          const email = row.split(":")[1]?.trim() || ""
-          if (email) {
-            setOverwolfEmail(email)
-          } else {
-            clearOverwolfEmail()
-          }
+          accountIdentity.acceptPayload(
+            row.slice("_GDL_ACCOUNT_EMAIL_:".length)
+          )
         }
       }
     })

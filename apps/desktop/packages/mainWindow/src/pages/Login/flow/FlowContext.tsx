@@ -35,7 +35,11 @@ export interface FlowProviderProps {
     FECheckUsernameAvailability
   >
   createProfileMutation: UseMutationResult<null, RSPCError, FECreateProfile>
-  enrollResumeMutation: UseMutationResult<null, RSPCError, undefined>
+  enrollResumeMutation: UseMutationResult<
+    "complete" | "retryable" | "loginRequired",
+    RSPCError,
+    string
+  >
   accountsQuery: UseQueryResult<AccountEntry[], RSPCError>
   gdlAccountQuery: UseQueryResult<FEGDLAccount | null, RSPCError>
 }

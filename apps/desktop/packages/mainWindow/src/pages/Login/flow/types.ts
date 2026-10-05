@@ -77,7 +77,12 @@ export type AuthStep =
       type: "enrolling"
       method: "browser" | "device-code"
     }
-  | { type: "profile-creation"; accessToken: string }
+  | {
+      type: "profile-creation"
+      accessToken: string
+      flowId: string
+      verificationRetry: boolean
+    }
   | { type: "gdl-account"; gdlAccount: GDLAccountState }
   | { type: "gdl-account-form"; email?: string; displayName?: string }
   | { type: "gdl-account-verification"; email: string; uuid: string }
@@ -219,14 +224,22 @@ export interface FlowController {
     accessToken: string,
     username: string
   ): Promise<"available" | "taken" | "notallowed">
-  createProfile(accessToken: string, username: string): Promise<void>
+  captureEnrollment(): number
+  ownsEnrollment(revision: number): boolean
+  profileVerificationPending(flowId: string): boolean
+  createProfile(
+    flowId: string,
+    accessToken: string,
+    username: string,
+    verificationOnly?: boolean
+  ): Promise<"complete" | "retryable" | "loginRequired" | "stale">
   checkGDLAccount(showLoading?: boolean): Promise<GDLAccountState>
   setupGDLAccount(): Promise<void>
   linkExistingGDLAccount(gdlAccountData: any): Promise<void>
   skipGDLAccount(): Promise<void>
   checkExistingAccount(): Promise<void>
   completeAuth(uuid: string): Promise<void>
-  finalizeEnrollment(): Promise<void>
+  finalizeEnrollment(flowId: string, revision: number): Promise<boolean>
 
   // Shared data (reactive store)
   data: AuthSharedData

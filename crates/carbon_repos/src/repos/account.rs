@@ -68,6 +68,15 @@ queries! {
         "UPDATE Account SET username = :username, accessToken = :access_token, msRefreshToken = :ms_refresh_token,
          tokenExpires = :token_expires, idToken = :id_token, gdlToken = :gdl_token, skinId = :skin_id WHERE uuid = :uuid";
 
+    // Refresh only the still-existing credential snapshot. Profile metadata and
+    // lastUsed may have independently changed and are deliberately preserved.
+    fn refresh_account_credentials(uuid: &str, expected_refresh: Option<&str>, access_token: &str, token_expires: DbDateTime, refresh_token: Option<&str>, id_token: Option<&str>, gdl_token: Option<&str>) -> usize =
+        "UPDATE Account SET accessToken = :access_token, tokenExpires = :token_expires, msRefreshToken = :refresh_token, idToken = :id_token, gdlToken = :gdl_token WHERE uuid = :uuid AND msRefreshToken IS :expected_refresh";
+    fn reject_account_credentials(uuid: &str, expected_refresh: Option<&str>) -> usize =
+        "UPDATE Account SET msRefreshToken = NULL, idToken = NULL, gdlToken = NULL WHERE uuid = :uuid AND msRefreshToken IS :expected_refresh";
+    fn set_account_gdl_token_owned(uuid: &str, expected_id: &str, token: &str) -> usize =
+        "UPDATE Account SET gdlToken = :token WHERE uuid = :uuid AND idToken = :expected_id";
+
     fn set_account_gdl_token(uuid: &str, token: Option<&str>) -> usize =
         "UPDATE Account SET gdlToken = :token WHERE uuid = :uuid";
     fn expire_account_token_now(uuid: &str, now: DbDateTime) -> usize =

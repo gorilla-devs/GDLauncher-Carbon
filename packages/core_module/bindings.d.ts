@@ -110,9 +110,9 @@ export type Procedures = {
         { key: "account.enroll.begin", input: never, result: null } | 
         { key: "account.enroll.beginBrowser", input: boolean, result: null } | 
         { key: "account.enroll.cancel", input: never, result: null } | 
-        { key: "account.enroll.finalize", input: never, result: null } | 
+        { key: "account.enroll.finalize", input: string, result: FinalizeEnrollmentOutcome } | 
         { key: "account.enroll.protocolCallback", input: string, result: null } | 
-        { key: "account.enroll.resume", input: never, result: null } | 
+        { key: "account.enroll.resume", input: string, result: ProfileVerificationOutcome } | 
         { key: "account.refreshAccount", input: string, result: null } | 
         { key: "account.registerGdlAccount", input: FERegisterAccount, result: FEGDLAccount } | 
         { key: "account.removeGdlAccount", input: never, result: null } | 
@@ -932,7 +932,7 @@ export type CFFEModFilesParameters = { modId: number; query: CFFEModFilesParamet
 
 export type RepairPreviewArgs = { instance: FEInstanceId }
 
-export type EnrollmentStatus = "refreshingMSAuth" | "requestingCode" | { pollingCode: DeviceCode } | { waitingForBrowser: { auth_url: string; redirect_uri: string; expires_at: string } } | "mcLogin" | "xboxAuth" | "mcentitlements" | "mcProfile" | { needsProfileCreation: { access_token: string } } | { complete: AccountEntry } | { failed: EnrollmentError }
+export type DeviceCode = { userCode: string; verificationUri: string; expiresAt: string }
 
 export type CFFECategory = { id: number; name: string; slug: string; url: string; iconUrl: string | null; dateModified: string; isClass: boolean | null; classId: FEUnifiedSearchType | null; parentCategoryId: number | null; displayIndex: number | null }
 
@@ -985,5 +985,8 @@ export type FERequestEmailChange = { email: string; uuid: string }
 
 export type BanPlayerRequest = { serverId: FEServerId; username: string; reason: string | null }
 
-export type DatapackWorld = { name: string; identity: string }
-export type CopyDatapack = { instance_id: number; mod_id: string; world: DatapackWorld }
+export type ImportEntitySelectionType = "file" | "directory"
+
+export type FECurseforgeSearchSortField = "featured" | "popularity" | "totalDownloads" | "lastUpdated" | "name" | "author" | "category" | "gameVersion"
+
+export type FinalizeEnrollmentOutcome = "complete" | "obsolete"

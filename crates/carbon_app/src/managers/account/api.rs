@@ -1,4 +1,7 @@
-use std::time::Duration;
+use std::{
+    future::Future,
+    time::{Duration, Instant},
+};
 
 use anyhow::{Context, anyhow, bail};
 use axum::routing::trace;
@@ -25,20 +28,26 @@ pub struct DeviceCode {
     pub verification_uri: String,
     pub polling_interval: Duration,
     pub expires_at: DateTime<Utc>,
+    deadline: Instant,
+}
+
+#[derive(Deserialize)]
+struct DeviceCodeResponse {
+    user_code: String,
+    device_code: String,
+    verification_uri: String,
+    expires_in: i64,
+    #[serde(default = "default_poll_interval")]
+    interval: u32,
+    // message: String,
+}
+
+fn default_poll_interval() -> u32 {
+    5
 }
 
 impl DeviceCode {
     pub async fn request_code(client: &ClientWithMiddleware) -> anyhow::Result<Self> {
-        #[derive(Deserialize)]
-        struct DeviceCodeResponse {
-            user_code: String,
-            device_code: String,
-            verification_uri: String,
-            expires_in: i64,
-            interval: u32,
-            // message: String,
-        }
-
         let response = client
             .get(endpoints::device_code_url())
             .query(&[
@@ -58,103 +67,392 @@ impl DeviceCode {
             .await
             .map_err(reqwest::Error::without_url)?;
 
+        Self::from_response(response)
+    }
+
+    fn from_response(response: DeviceCodeResponse) -> anyhow::Result<Self> {
+        let lifetime = Duration::from_secs(response.expires_in.max(0) as u64);
         Ok(Self {
             user_code: response.user_code,
             device_code: response.device_code,
             verification_uri: response.verification_uri,
-            // polling_interval: Duration::from_secs(response.interval.into()),
-            polling_interval: Duration::from_secs(1),
-            expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
+            polling_interval: Duration::from_secs(u64::from(response.interval.max(1))),
+            expires_at: expiry_after(response.expires_in.max(0))?,
+            deadline: Instant::now()
+                .checked_add(lifetime)
+                .ok_or_else(|| anyhow!("Invalid device-code lifetime"))?,
         })
     }
 
     #[tracing::instrument(skip(self))]
     pub async fn poll_ms_auth(&self) -> anyhow::Result<Result<MsAuth, DeviceCodeExpiredError>> {
-        // Since we're polling, we don't want a retry system
-        let bare_client = reqwest::Client::new();
+        // Polling owns retries; this bare client never retries token POSTs.
+        let client = reqwest::Client::new();
+        let client = &client;
+        self.poll_with(Instant::now, tokio::time::sleep, |remaining| async move {
+            let request = async {
+                let response = client
+                    .post(endpoints::ms_token_url())
+                    .form(&device_poll_form(
+                        env!("MS_AUTH_CLIENT_ID"),
+                        &self.device_code,
+                    ))
+                    .send()
+                    .await
+                    .map_err(reqwest::Error::without_url)?;
+                let status = response.status();
+                let body = response
+                    .bytes()
+                    .await
+                    .map_err(reqwest::Error::without_url)?;
+                Ok((status, body.to_vec()))
+            };
+            device_request_deadline(remaining, request).await
+        })
+        .await
+    }
 
+    async fn poll_with<N, S, SF, R, RF>(
+        &self,
+        now: N,
+        sleep: S,
+        mut request: R,
+    ) -> anyhow::Result<Result<MsAuth, DeviceCodeExpiredError>>
+    where
+        N: Fn() -> Instant,
+        S: Fn(Duration) -> SF,
+        SF: Future<Output = ()>,
+        R: FnMut(Duration) -> RF,
+        RF: Future<Output = anyhow::Result<(StatusCode, Vec<u8>)>>,
+    {
+        let mut interval = self.polling_interval;
         loop {
-            tokio::time::sleep(self.polling_interval).await;
-
-            trace!("Polling for auth token at {:?}", Utc::now());
-
-            let response = bare_client
-                .post(endpoints::ms_token_url())
-                .form(&[
-                    ("client_id", env!("MS_AUTH_CLIENT_ID")),
-                    (
-                        "scope",
-                        "XboxLive.signin XboxLive.offline_access profile openid email",
-                    ),
-                    ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
-                    ("device_code", &self.device_code),
-                ])
-                .send()
-                .await?;
-
-            let response_at = Utc::now();
-
-            match response.status() {
-                StatusCode::BAD_REQUEST => {
-                    trace!("Device code request returned 400 at {:?}", response_at);
-
-                    #[derive(Deserialize)]
-                    struct BadRequestError {
-                        error: String,
-                    }
-
-                    let error = response
-                        .json::<BadRequestError>()
-                        .await
-                        .map_err(RequestError::from_error)?
-                        .error;
-
-                    error!("Bad request error: {error}");
-
-                    match &error as &str {
-                        "authorization_pending" => continue,
-                        "expired_token" => return Ok(Err(DeviceCodeExpiredError)),
-                        _ => bail!(RequestError {
-                            context: RequestContext::none(),
-                            error: RequestErrorDetails::UnexpectedStatus {
-                                status: StatusCode::BAD_REQUEST,
-                                details: Some(error),
-                            },
-                        }),
-                    };
-                }
-                StatusCode::OK => {
-                    trace!("Device code request returned 200 at {:?}", response_at);
-
-                    #[derive(Deserialize)]
-                    struct MsAuthResponse {
-                        access_token: String,
-                        id_token: String,
-                        refresh_token: String,
-                        expires_in: i64,
-                    }
-
-                    let response = response
-                        .json::<MsAuthResponse>()
-                        .await
-                        .map_err(RequestError::from_error)?;
-
-                    break Ok(Ok(MsAuth {
-                        access_token: response.access_token,
-                        id_token: response.id_token,
-                        refresh_token: response.refresh_token,
-                        expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
-                    }));
-                }
-                _ => {
-                    trace!(
-                        "Device code request returned unexpected {:?} status at {:?}",
-                        response, response_at
-                    );
-
-                    bail!(RequestError::from_status(&response,))
-                }
+            let remaining = self.deadline.saturating_duration_since(now());
+            if remaining.is_zero() {
+                return Ok(Err(DeviceCodeExpiredError));
             }
+            sleep(interval.min(remaining)).await;
+            let remaining = self.deadline.saturating_duration_since(now());
+            if remaining.is_zero() {
+                return Ok(Err(DeviceCodeExpiredError));
+            }
+            let response = request(remaining).await;
+            if now() >= self.deadline {
+                return Ok(Err(DeviceCodeExpiredError));
+            }
+            let (status, body) = match response {
+                Err(e) if e.is::<DeviceCodeExpiredError>() => {
+                    return Ok(Err(DeviceCodeExpiredError));
+                }
+                other => other?,
+            };
+            match decode_device_poll(status, &body)? {
+                PollResponse::Pending => {}
+                PollResponse::SlowDown => {
+                    interval = interval.saturating_add(Duration::from_secs(5))
+                }
+                PollResponse::Expired => return Ok(Err(DeviceCodeExpiredError)),
+                PollResponse::Complete(auth) => return Ok(Ok(auth)),
+            }
+        }
+    }
+}
+async fn device_request_deadline<F>(
+    remaining: Duration,
+    request: F,
+) -> anyhow::Result<(StatusCode, Vec<u8>)>
+where
+    F: Future<Output = anyhow::Result<(StatusCode, Vec<u8>)>>,
+{
+    match tokio::time::timeout(remaining, request).await {
+        Ok(result) => result,
+        Err(_) => Err(DeviceCodeExpiredError.into()),
+    }
+}
+fn expiry_after(seconds: i64) -> anyhow::Result<DateTime<Utc>> {
+    chrono::Duration::try_seconds(seconds)
+        .and_then(|duration| Utc::now().checked_add_signed(duration))
+        .ok_or_else(|| anyhow!("Invalid authentication lifetime"))
+}
+fn device_poll_form<'a>(client_id: &'a str, code: &'a str) -> [(&'static str, &'a str); 4] {
+    [
+        ("client_id", client_id),
+        (
+            "scope",
+            "XboxLive.signin XboxLive.offline_access profile openid email",
+        ),
+        ("grant_type", "urn:ietf:params:oauth:grant-type:device_code"),
+        ("device_code", code),
+    ]
+}
+enum PollResponse {
+    Pending,
+    SlowDown,
+    Expired,
+    Complete(MsAuth),
+}
+fn decode_device_poll(status: StatusCode, body: &[u8]) -> anyhow::Result<PollResponse> {
+    if status == StatusCode::BAD_REQUEST {
+        #[derive(Deserialize)]
+        struct OAuthError {
+            error: String,
+        }
+        let error: OAuthError = serde_json::from_slice(body)?;
+        return match error.error.as_str() {
+            "authorization_pending" => Ok(PollResponse::Pending),
+            "slow_down" => Ok(PollResponse::SlowDown),
+            "expired_token" => Ok(PollResponse::Expired),
+            _ => bail!("Device authorization request failed"),
+        };
+    }
+    if status != StatusCode::OK {
+        bail!("Device authorization request returned {}", status);
+    }
+    #[derive(Deserialize)]
+    struct Response {
+        access_token: String,
+        id_token: String,
+        refresh_token: String,
+        expires_in: i64,
+    }
+    let r: Response = serde_json::from_slice(body)?;
+    Ok(PollResponse::Complete(MsAuth {
+        access_token: r.access_token,
+        id_token: r.id_token,
+        refresh_token: r.refresh_token,
+        expires_at: expiry_after(r.expires_in)?,
+    }))
+}
+
+#[cfg(test)]
+mod task19_poll_tests {
+    use super::*;
+    #[test]
+    fn device_response_honors_interval() {
+        let response: DeviceCodeResponse = serde_json::from_str(r#"{"user_code":"EXAMPLE","device_code":"dummy-code","verification_uri":"https://example.invalid","expires_in":60,"interval":5}"#).unwrap();
+        let code = DeviceCode::from_response(response).unwrap();
+        assert_eq!(code.polling_interval, Duration::from_secs(5));
+    }
+    #[test]
+    fn slowdown_continues_valid_authorization() {
+        assert!(
+            decode_device_poll(StatusCode::BAD_REQUEST, br#"{"error":"slow_down"}"#).is_ok(),
+            "slow_down aborted a still-valid enrollment"
+        );
+    }
+    fn code(interval: u32, lifetime: i64) -> DeviceCode {
+        DeviceCode::from_response(DeviceCodeResponse {
+            user_code: "EXAMPLE".into(),
+            device_code: "dummy-code".into(),
+            verification_uri: "https://example.invalid".into(),
+            expires_in: lifetime,
+            interval,
+        })
+        .unwrap()
+    }
+    fn response(error: &str) -> (StatusCode, Vec<u8>) {
+        (
+            StatusCode::BAD_REQUEST,
+            serde_json::to_vec(&json!({"error":error})).unwrap(),
+        )
+    }
+    fn success() -> (StatusCode, Vec<u8>) {
+        (StatusCode::OK,br#"{"access_token":"dummy-ms","id_token":"dummy-id","refresh_token":"dummy-refresh","expires_in":60}"#.to_vec())
+    }
+    #[tokio::test]
+    async fn polling_waits_follow_interval_cumulative_slowdown_and_pending() {
+        use std::cell::{Cell, RefCell};
+        let code = code(5, 120);
+        let now = Cell::new(Instant::now());
+        let waits = RefCell::new(Vec::new());
+        let mut responses = [
+            response("authorization_pending"),
+            response("slow_down"),
+            response("slow_down"),
+            response("authorization_pending"),
+            success(),
+        ]
+        .into_iter();
+        let auth = code
+            .poll_with(
+                || now.get(),
+                |delay| {
+                    waits.borrow_mut().push(delay.as_secs());
+                    now.set(now.get() + delay);
+                    std::future::ready(())
+                },
+                |_| std::future::ready(Ok(responses.next().unwrap())),
+            )
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(*waits.borrow(), vec![5, 5, 10, 15, 15]);
+        assert_eq!(auth.access_token, "dummy-ms");
+        assert_eq!(auth.refresh_token, "dummy-refresh");
+    }
+    #[tokio::test]
+    async fn expiry_before_after_wait_and_during_request_prevents_auth_completion() {
+        use std::cell::Cell;
+        for during_request in [false, true] {
+            let mut code = code(1, 20);
+            let initial = Instant::now();
+            code.deadline = initial + Duration::from_secs(if during_request { 2 } else { 1 });
+            let now = Cell::new(initial);
+            let calls = Cell::new(0);
+            let outcome = code
+                .poll_with(
+                    || now.get(),
+                    |delay| {
+                        now.set(now.get() + delay);
+                        std::future::ready(())
+                    },
+                    |remaining| {
+                        calls.set(calls.get() + 1);
+                        assert_eq!(remaining, Duration::from_secs(1));
+                        now.set(now.get() + remaining);
+                        std::future::ready(Ok(success()))
+                    },
+                )
+                .await
+                .unwrap();
+            assert!(outcome.is_err());
+            assert_eq!(calls.get(), if during_request { 1 } else { 0 });
+        }
+        let expired = code(1, 0);
+        assert!(
+            expired
+                .poll_with(
+                    Instant::now,
+                    |_| async { panic!("expired wait") },
+                    |_| async { panic!("expired request") }
+                )
+                .await
+                .unwrap()
+                .is_err()
+        );
+    }
+    #[tokio::test]
+    async fn one_second_pending_expired_and_success_controls() {
+        use std::cell::Cell;
+        for terminal in [response("expired_token"), success()] {
+            let code = code(1, 10);
+            let now = Cell::new(Instant::now());
+            let waits = Cell::new(0);
+            let expected_success = terminal.0 == StatusCode::OK;
+            let mut replies = [response("authorization_pending"), terminal].into_iter();
+            let result = code
+                .poll_with(
+                    || now.get(),
+                    |delay| {
+                        assert_eq!(delay, Duration::from_secs(1));
+                        waits.set(waits.get() + 1);
+                        now.set(now.get() + delay);
+                        std::future::ready(())
+                    },
+                    |_| std::future::ready(Ok(replies.next().unwrap())),
+                )
+                .await
+                .unwrap();
+            assert_eq!(result.is_ok(), expected_success);
+            assert_eq!(waits.get(), 2);
+        }
+    }
+    #[test]
+    fn device_defaults_malformed_lifetimes_and_exact_request_forms() {
+        let omitted:DeviceCodeResponse=serde_json::from_str(r#"{"user_code":"EXAMPLE","device_code":"dummy-code","verification_uri":"https://example.invalid","expires_in":60}"#).unwrap();
+        assert_eq!(
+            DeviceCode::from_response(omitted).unwrap().polling_interval,
+            Duration::from_secs(5)
+        );
+        assert!(
+            DeviceCode::from_response(DeviceCodeResponse {
+                user_code: "EXAMPLE".into(),
+                device_code: "dummy".into(),
+                verification_uri: "https://example.invalid".into(),
+                expires_in: i64::MAX,
+                interval: 1
+            })
+            .is_err()
+        );
+        let request = reqwest::Client::new()
+            .post("https://example.invalid/token")
+            .form(&device_poll_form("dummy-client", "dummy-code"))
+            .build()
+            .unwrap();
+        assert_eq!(
+            std::str::from_utf8(request.body().unwrap().as_bytes().unwrap()).unwrap(),
+            "client_id=dummy-client&scope=XboxLive.signin+XboxLive.offline_access+profile+openid+email&grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Adevice_code&device_code=dummy-code"
+        );
+        let request = reqwest::Client::new()
+            .post("https://example.invalid/token")
+            .form(&refresh_form("dummy-client", "dummy-refresh"))
+            .build()
+            .unwrap();
+        assert_eq!(
+            std::str::from_utf8(request.body().unwrap().as_bytes().unwrap()).unwrap(),
+            "client_id=dummy-client&refresh_token=dummy-refresh&grant_type=refresh_token&redirect_uri=https%3A%2F%2Flogin.microsoftonline.com%2Fcommon%2Foauth2%2Fnativeclient"
+        );
+    }
+
+    #[tokio::test]
+    async fn request_and_body_timeout_is_typed_expiration() {
+        let error = device_request_deadline(Duration::from_millis(10), std::future::pending())
+            .await
+            .unwrap_err();
+        assert!(error.is::<DeviceCodeExpiredError>());
+    }
+    #[tokio::test]
+    async fn dropping_enrollment_cancels_poll_wait_and_injected_request() {
+        use std::sync::{
+            Arc, Mutex,
+            atomic::{AtomicUsize, Ordering},
+        };
+        for in_request in [false, true] {
+            let requests = Arc::new(AtomicUsize::new(0));
+            let completed = Arc::new(AtomicUsize::new(0));
+            let (entered, ready) = tokio::sync::oneshot::channel();
+            let entered = Arc::new(Mutex::new(Some(entered)));
+            let future = {
+                let requests = requests.clone();
+                let completed = completed.clone();
+                async move {
+                    let code = code(1, 60);
+                    let _ = code
+                        .poll_with(
+                            Instant::now,
+                            |_| {
+                                if !in_request {
+                                    entered.lock().unwrap().take().unwrap().send(()).unwrap();
+                                }
+                                async move {
+                                    if !in_request {
+                                        std::future::pending::<()>().await;
+                                    }
+                                }
+                            },
+                            |_| {
+                                requests.fetch_add(1, Ordering::SeqCst);
+                                entered.lock().unwrap().take().unwrap().send(()).unwrap();
+                                std::future::pending()
+                            },
+                        )
+                        .await;
+                    completed.fetch_add(1, Ordering::SeqCst);
+                }
+            };
+            let (enrollment, worker) =
+                super::super::enroll::EnrollmentTask::running_for_test(future);
+            ready.await.unwrap();
+            drop(enrollment);
+            assert!(
+                tokio::time::timeout(Duration::from_millis(100), worker)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .is_err()
+            );
+            assert_eq!(requests.load(Ordering::SeqCst), usize::from(in_request));
+            assert_eq!(completed.load(Ordering::SeqCst), 0);
         }
     }
 }
@@ -180,41 +478,104 @@ impl MsAuth {
         refresh_token: &str,
     ) -> anyhow::Result<Self> {
         trace!("Refreshing auth token");
-        #[derive(Deserialize)]
-        struct RefreshResponse {
-            access_token: String,
-            id_token: String,
-            refresh_token: String,
-            expires_in: i64,
-        }
 
         let response = client
             .post(endpoints::ms_token_url())
-            .form(&[
-                ("client_id", env!("MS_AUTH_CLIENT_ID")),
-                ("refresh_token", refresh_token),
-                ("grant_type", "refresh_token"),
-                (
-                    "redirect_uri",
-                    "https://login.microsoftonline.com/common/oauth2/nativeclient",
-                ),
-            ])
+            .form(&refresh_form(env!("MS_AUTH_CLIENT_ID"), refresh_token))
             .send()
             .await
-            .with_context(|| format!("Failed to refresh auth token with refresh token"))?
-            .error_for_status()?
-            .json::<RefreshResponse>()
-            .await
-            .with_context(|| format!("Failed to parse refresh response"))?;
+            .with_context(|| format!("Failed to refresh auth token with refresh token"))?;
+        let status = response.status();
+        let body = response.bytes().await?;
+        decode_refresh(status, &body)
+    }
+}
 
-        trace!("Refreshed auth token");
+fn refresh_form<'a>(client_id: &'a str, token: &'a str) -> [(&'static str, &'a str); 4] {
+    [
+        ("client_id", client_id),
+        ("refresh_token", token),
+        ("grant_type", "refresh_token"),
+        (
+            "redirect_uri",
+            "https://login.microsoftonline.com/common/oauth2/nativeclient",
+        ),
+    ]
+}
 
-        Ok(Self {
-            access_token: response.access_token,
-            id_token: response.id_token,
-            refresh_token: response.refresh_token,
-            expires_at: Utc::now() + chrono::Duration::seconds(response.expires_in),
-        })
+#[derive(Debug, Error)]
+#[error("Microsoft refresh grant was rejected; sign in again")]
+pub struct RefreshRejected;
+fn decode_refresh(status: StatusCode, body: &[u8]) -> anyhow::Result<MsAuth> {
+    if status == StatusCode::BAD_REQUEST {
+        #[derive(Deserialize)]
+        struct OAuthError {
+            error: String,
+        }
+        if serde_json::from_slice::<OAuthError>(body)
+            .is_ok_and(|error| error.error == "invalid_grant")
+        {
+            return Err(RefreshRejected.into());
+        }
+    }
+    if !status.is_success() {
+        bail!("Microsoft refresh request returned {}", status);
+    }
+    #[derive(Deserialize)]
+    struct Response {
+        access_token: String,
+        id_token: String,
+        refresh_token: String,
+        expires_in: i64,
+    }
+    let response: Response = serde_json::from_slice(body)?;
+    Ok(MsAuth {
+        access_token: response.access_token,
+        id_token: response.id_token,
+        refresh_token: response.refresh_token,
+        expires_at: expiry_after(response.expires_in)?,
+    })
+}
+#[cfg(test)]
+mod task19_refresh_response_tests {
+    use super::*;
+    #[test]
+    fn invalid_grant_is_a_permanent_refresh_rejection() {
+        let error = decode_refresh(
+            StatusCode::BAD_REQUEST,
+            br#"{"error":"invalid_grant","error_description":"synthetic"}"#,
+        )
+        .unwrap_err();
+        assert!(
+            error.is::<RefreshRejected>(),
+            "recognized invalid_grant remained an unclassified transient error"
+        );
+    }
+    #[test]
+    fn temporary_and_unrecognized_errors_never_clear_refresh_credentials() {
+        for (status, body) in [
+            (
+                StatusCode::TOO_MANY_REQUESTS,
+                br#"{"error":"invalid_grant"}"#.as_slice(),
+            ),
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                br#"{"error":"invalid_grant"}"#.as_slice(),
+            ),
+            (StatusCode::BAD_REQUEST, b"malformed".as_slice()),
+            (
+                StatusCode::BAD_REQUEST,
+                br#"{"error":"unrecognized"}"#.as_slice(),
+            ),
+            (
+                StatusCode::UNAUTHORIZED,
+                br#"{"error":"invalid_grant"}"#.as_slice(),
+            ),
+        ] {
+            let error = decode_refresh(status, body).unwrap_err();
+            assert!(!error.is::<RefreshRejected>());
+        }
+        assert_eq!(decode_refresh(StatusCode::OK,br#"{"access_token":"dummy-ms","id_token":"dummy-id","refresh_token":"dummy-refresh","expires_in":60}"#).unwrap().refresh_token,"dummy-refresh");
     }
 }
 

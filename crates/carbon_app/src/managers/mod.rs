@@ -242,17 +242,8 @@ mod app {
             // Send GDL account email for Overwolf ad personalization
             let _app = app.clone();
             tokio::spawn(async move {
-                match _app.account_manager().get_gdl_account().await {
-                    Ok(account::gdl_account::GDLAccountStatus::Valid(user)) => {
-                        println!("_GDL_ACCOUNT_EMAIL_:{}", user.email);
-                    }
-                    Ok(_) => {
-                        println!("_GDL_ACCOUNT_EMAIL_:");
-                    }
-                    Err(e) => {
-                        error!("Error getting GDL account: {e}");
-                        println!("_GDL_ACCOUNT_EMAIL_:");
-                    }
+                if let Err(e) = _app.account_manager().publish_initial_gdl_identity().await {
+                    error!("Error publishing initial GDL identity: {e}");
                 }
             });
 

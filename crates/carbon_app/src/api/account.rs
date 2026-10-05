@@ -57,7 +57,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         query(*) ENROLL_GET_STATUS[app, args: ()] {
-            let r = app.account_manager().get_enrollment_status(|s| Result::<EnrollmentStatus, FeError>::from(s)).await;
+            let r = app.account_manager().get_enrollment_status(|id, s| EnrollmentStatus::from_backend(id, s)).await;
 
             match r {
                 None => Ok(None),
@@ -66,12 +66,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
             }
         }
 
-        mutation ENROLL_FINALIZE[app, args: ()] {
-            app.account_manager().finalize_enrollment().await
+        mutation ENROLL_FINALIZE[app, flow_id: String] {
+            app.account_manager().finalize_enrollment(flow_id).await
         }
 
-        mutation ENROLL_RESUME[app, args: ()] {
-            app.account_manager().resume_enrollment().await
+        mutation ENROLL_RESUME[app, flow_id: String] {
+            app.account_manager().resume_enrollment(flow_id).await
         }
 
         mutation REFRESH_ACCOUNT[app, uuid: String] {
@@ -289,9 +289,14 @@ enum EnrollmentStatus {
     MCEntitlements,
     McProfile,
     NeedsProfileCreation {
+        flow_id: String,
+        verification_retry: bool,
         access_token: String,
     },
-    Complete(AccountEntry),
+    Complete {
+        flow_id: String,
+        account: AccountEntry,
+    },
     Failed(EnrollmentError),
 }
 
@@ -384,8 +389,8 @@ impl From<Option<domain::StatusFlags>> for StatusFlags {
     }
 }
 
-impl From<&account::EnrollmentStatus> for Result<EnrollmentStatus, FeError> {
-    fn from(value: &account::EnrollmentStatus) -> Self {
+impl EnrollmentStatus {
+    fn from_backend(flow_id: &str, value: &account::EnrollmentStatus) -> Result<Self, FeError> {
         use EnrollmentStatus as Api;
         use account::EnrollmentStatus as BE;
 
@@ -406,15 +411,23 @@ impl From<&account::EnrollmentStatus> for Result<EnrollmentStatus, FeError> {
             &BE::XboxAuth => Api::XboxAuth,
             &BE::MCEntitlements => Api::MCEntitlements,
             &BE::McProfile => Api::McProfile,
-            BE::NeedsProfileCreation { access_token, .. } => Api::NeedsProfileCreation {
+            BE::NeedsProfileCreation {
+                access_token,
+                verification_retry,
+                ..
+            } => Api::NeedsProfileCreation {
+                flow_id: flow_id.to_owned(),
+                verification_retry: *verification_retry,
                 access_token: access_token.clone(),
             },
-            BE::Complete(account) => Api::Complete({
-                // this is bad, but it used to be far worse
-                let account: account::FullAccount = account.clone().into();
-                let account: domain::AccountWithStatus = account.into();
-                account.into()
-            }),
+            BE::Complete(account) => Api::Complete {
+                flow_id: flow_id.to_owned(),
+                account: {
+                    let account: account::FullAccount = account.clone().into();
+                    let account: domain::AccountWithStatus = account.into();
+                    account.into()
+                },
+            },
             BE::Failed(e) => Api::Failed(EnrollmentError::from(
                 e.as_ref().map_err(FeError::from_anyhow)?.clone(),
             )),
@@ -740,5 +753,75 @@ impl From<DisplayNameHistoryEntry> for FEDisplayNameHistoryEntry {
             display_name: value.display_name,
             changed_at: value.changed_at,
         }
+    }
+}
+
+#[cfg(test)]
+mod task19_serialization_tests {
+    use super::*;
+    #[test]
+    fn profile_retry_exposes_only_flow_and_creation_token() {
+        let status = account::EnrollmentStatus::NeedsProfileCreation {
+            access_token: "dummy-mc-public".into(),
+            verification_retry: true,
+            ms_auth: account::api::MsAuth {
+                access_token: "private-ms".into(),
+                id_token: "private-id".into(),
+                refresh_token: "private-refresh".into(),
+                expires_at: Utc::now(),
+            },
+            mc_auth: account::api::McAuth {
+                access_token: "dummy-mc-public".into(),
+                expires_at: Utc::now(),
+            },
+            entitlements: account::api::McEntitlement::Owned,
+        };
+        let wire = serde_json::to_value(
+            EnrollmentStatus::from_backend("synthetic-flow", &status).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(
+            wire,
+            serde_json::json!({"needsProfileCreation":{"flow_id":"synthetic-flow","verification_retry":true,"access_token":"dummy-mc-public"}})
+        );
+    }
+    #[test]
+    fn completed_status_carries_original_flow_without_private_authentication() {
+        assert_eq!(
+            serde_json::to_value(account::FinalizeEnrollmentOutcome::Complete).unwrap(),
+            "complete"
+        );
+        assert_eq!(
+            serde_json::to_value(account::FinalizeEnrollmentOutcome::Obsolete).unwrap(),
+            "obsolete"
+        );
+        let status = account::EnrollmentStatus::Complete(account::api::FullAccount {
+            ms: account::api::MsAuth {
+                access_token: "private-ms".into(),
+                id_token: "private-id".into(),
+                refresh_token: "private-refresh".into(),
+                expires_at: Utc::now(),
+            },
+            mc: account::api::McAccount {
+                auth: account::api::McAuth {
+                    access_token: "private-mc".into(),
+                    expires_at: Utc::now(),
+                },
+                entitlement: account::api::McEntitlement::Owned,
+                profile: account::api::McProfile {
+                    uuid: "synthetic-a".into(),
+                    username: "Example".into(),
+                    skin: None,
+                },
+            },
+            gdl_token: None,
+        });
+        let wire =
+            serde_json::to_value(EnrollmentStatus::from_backend("original-flow", &status).unwrap())
+                .unwrap();
+        assert_eq!(wire["complete"]["flow_id"], "original-flow");
+        assert_eq!(wire["complete"]["account"]["uuid"], "synthetic-a");
+        assert_eq!(wire["complete"].as_object().unwrap().len(), 2);
+        assert!(!wire.to_string().contains("private-"));
     }
 }

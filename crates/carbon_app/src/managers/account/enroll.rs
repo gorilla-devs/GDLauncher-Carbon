@@ -21,6 +21,8 @@ use url::Url;
 /// Active process of adding an account
 pub struct EnrollmentTask {
     pub status: Arc<RwLock<EnrollmentStatus>>,
+    pub id: String,
+    pub cancel: tokio_util::sync::CancellationToken,
     abort: AbortHandle,
 }
 
@@ -40,6 +42,7 @@ pub enum EnrollmentStatus {
     McProfile,
     NeedsProfileCreation {
         access_token: String,
+        verification_retry: bool,
         ms_auth: MsAuth,
         mc_auth: McAuth,
         entitlements: super::api::McEntitlement,
@@ -49,6 +52,49 @@ pub enum EnrollmentStatus {
 }
 
 impl EnrollmentTask {
+    #[cfg(test)]
+    pub(super) fn inert(status: EnrollmentStatus) -> Self {
+        let (abort, _) = AbortHandle::new_pair();
+        Self {
+            status: Arc::new(RwLock::new(status)),
+            abort,
+            id: uuid::Uuid::new_v4().to_string(),
+            cancel: tokio_util::sync::CancellationToken::new(),
+        }
+    }
+
+    fn spawn(
+        status: Arc<RwLock<EnrollmentStatus>>,
+        task: impl std::future::Future<Output = ()> + Send + 'static,
+    ) -> (
+        Self,
+        tokio::task::JoinHandle<Result<(), futures::future::Aborted>>,
+    ) {
+        let (task, abort) = abortable(task);
+        let handle = tokio::spawn(task);
+        (
+            Self {
+                status,
+                abort,
+                id: uuid::Uuid::new_v4().to_string(),
+                cancel: tokio_util::sync::CancellationToken::new(),
+            },
+            handle,
+        )
+    }
+    #[cfg(test)]
+    pub(super) fn running_for_test(
+        task: impl std::future::Future<Output = ()> + Send + 'static,
+    ) -> (
+        Self,
+        tokio::task::JoinHandle<Result<(), futures::future::Aborted>>,
+    ) {
+        Self::spawn(
+            Arc::new(RwLock::new(EnrollmentStatus::RequestingCode)),
+            task,
+        )
+    }
+
     /// Begin account enrollment. `invalidate_fn` will be called
     /// whenever the task's status updates.
     pub fn begin(
@@ -94,6 +140,7 @@ impl EnrollmentTask {
                         // Set status to NeedsProfileCreation instead of failing
                         update_status(EnrollmentStatus::NeedsProfileCreation {
                             access_token: mc_auth.access_token.clone(),
+                            verification_retry: false,
                             ms_auth: ms_auth.clone(),
                             mc_auth: mc_auth.clone(),
                             entitlements: entitlements.clone(),
@@ -135,13 +182,7 @@ impl EnrollmentTask {
             };
         };
 
-        let (task, abort_handle) = abortable(task);
-        tokio::task::spawn(task);
-
-        Self {
-            status,
-            abort: abort_handle,
-        }
+        Self::spawn(status, task).0
     }
 
     /// Begin browser-based account enrollment using OAuth authorization code flow.
@@ -304,6 +345,7 @@ impl EnrollmentTask {
                         // Set status to NeedsProfileCreation instead of failing
                         update_status(EnrollmentStatus::NeedsProfileCreation {
                             access_token: mc_auth.access_token.clone(),
+                            verification_retry: false,
                             ms_auth: ms_auth.clone(),
                             mc_auth: mc_auth.clone(),
                             entitlements: entitlements.clone(),
@@ -345,13 +387,7 @@ impl EnrollmentTask {
             };
         };
 
-        let (task, abort_handle) = abortable(task);
-        tokio::task::spawn(task);
-
-        Self {
-            status,
-            abort: abort_handle,
-        }
+        Self::spawn(status, task).0
     }
 
     pub fn refresh(
@@ -426,6 +462,7 @@ impl EnrollmentTask {
                         // Set status to NeedsProfileCreation instead of failing
                         update_status(EnrollmentStatus::NeedsProfileCreation {
                             access_token: mc_auth.access_token.clone(),
+                            verification_retry: false,
                             ms_auth: ms_auth.clone(),
                             mc_auth: mc_auth.clone(),
                             entitlements: entitlements.clone(),
@@ -472,21 +509,13 @@ impl EnrollmentTask {
             };
         };
 
-        let (task, abort_handle) = abortable(task);
-        let handler = tokio::task::spawn(task);
-
-        (
-            Self {
-                status,
-                abort: abort_handle,
-            },
-            handler,
-        )
+        Self::spawn(status, task)
     }
 }
 
 impl Drop for EnrollmentTask {
     fn drop(&mut self) {
+        self.cancel.cancel();
         self.abort.abort()
     }
 }

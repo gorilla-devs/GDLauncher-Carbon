@@ -94,13 +94,24 @@ export class FlowControllerImpl implements FlowController {
     RSPCError,
     FECreateProfile
   >
-  private enrollResumeMutation: UseMutationResult<null, RSPCError, undefined>
+  private enrollResumeMutation: UseMutationResult<
+    "complete" | "retryable" | "loginRequired",
+    RSPCError,
+    string
+  >
   private accountsQuery: UseQueryResult<AccountEntry[], RSPCError>
   private gdlAccountQuery: UseQueryResult<FEGDLAccount | null, RSPCError>
 
   // Abort controller for cancelling pending operations
   private abortController: AbortController | null = null
   private initPromise: Promise<void> | null = null
+  private enrollmentRevision = 0
+  private enrollmentBoundary: Promise<unknown> = Promise.resolve()
+  private createdProfiles = new Set<string>()
+  captureEnrollment = () => this.enrollmentRevision
+  ownsEnrollment = (revision: number) => revision === this.enrollmentRevision
+  profileVerificationPending = (flowId: string) =>
+    this.createdProfiles.has(flowId)
 
   constructor(
     config: AuthFlowConfig,
@@ -117,7 +128,11 @@ export class FlowControllerImpl implements FlowController {
         FECheckUsernameAvailability
       >
       createProfileMutation: UseMutationResult<null, RSPCError, FECreateProfile>
-      enrollResumeMutation: UseMutationResult<null, RSPCError, undefined>
+      enrollResumeMutation: UseMutationResult<
+        "complete" | "retryable" | "loginRequired",
+        RSPCError,
+        string
+      >
       accountsQuery: UseQueryResult<AccountEntry[], RSPCError>
       gdlAccountQuery: UseQueryResult<FEGDLAccount | null, RSPCError>
     }
@@ -219,6 +234,8 @@ export class FlowControllerImpl implements FlowController {
   // ============================================================================
 
   cleanup(): void {
+    ++this.enrollmentRevision
+    this.createdProfiles.clear()
     // Abort any pending operations
     if (this.abortController) {
       this.abortController.abort()
@@ -235,6 +252,7 @@ export class FlowControllerImpl implements FlowController {
     step: AuthStep,
     options?: { direction?: TransitionDirection }
   ): Promise<void> {
+    const revision = this.captureEnrollment()
     const currentState = this.state()
 
     // Block navigation during loading
@@ -261,11 +279,14 @@ export class FlowControllerImpl implements FlowController {
     // Wait for SolidJS to flush DOM updates before capturing old snapshot
     await new Promise((resolve) => queueMicrotask(() => resolve(undefined)))
 
+    if (!this.ownsEnrollment(revision)) return
+
     // Use View Transition API for smooth transitions
     if ("startViewTransition" in document) {
       const transition = (document as any).startViewTransition(() => {
         // Only update state in callback
-        this.setState({ phase: "content", step })
+        if (this.ownsEnrollment(revision))
+          this.setState({ phase: "content", step })
       })
 
       try {
@@ -276,7 +297,7 @@ export class FlowControllerImpl implements FlowController {
       }
 
       // Clear next direction after transition
-      this.nextDirectionSignal[1](null)
+      if (this.ownsEnrollment(revision)) this.nextDirectionSignal[1](null)
     } else {
       // Fallback for browsers without View Transition API support
       this.setState({ phase: "content", step })
@@ -362,25 +383,25 @@ export class FlowControllerImpl implements FlowController {
   }
 
   async startEnrollment(method: "browser" | "device-code"): Promise<void> {
-    try {
-      if (method === "device-code") {
+    const revision = ++this.enrollmentRevision
+    const pending = this.enrollmentBoundary.then(async () => {
+      if (!this.ownsEnrollment(revision)) return
+      if (method === "device-code")
         await this.enrollBeginMutation.mutateAsync(undefined)
-      } else {
-        await this.enrollBeginBrowserMutation.mutateAsync(true)
-      }
-      // Enrollment status will be polled by EnrollingStep component
-    } catch (error) {
-      console.error("[FlowController] Failed to start enrollment:", error)
-      throw error
-    }
+      else await this.enrollBeginBrowserMutation.mutateAsync(true)
+    })
+    this.enrollmentBoundary = pending.catch(() => undefined)
+    await pending
   }
 
   async cancelEnrollment(): Promise<void> {
-    try {
-      await this.enrollCancelMutation.mutateAsync(undefined)
-    } catch (error) {
-      console.error("[FlowController] Failed to cancel enrollment:", error)
-    }
+    ++this.enrollmentRevision
+    this.createdProfiles.clear()
+    const pending = this.enrollmentBoundary.then(() =>
+      this.enrollCancelMutation.mutateAsync(undefined)
+    )
+    this.enrollmentBoundary = pending.catch(() => undefined)
+    await this.enrollmentBoundary
   }
 
   async checkUsernameAvailability(
@@ -402,17 +423,23 @@ export class FlowControllerImpl implements FlowController {
     }
   }
 
-  async createProfile(accessToken: string, username: string): Promise<void> {
+  async createProfile(
+    flowId: string,
+    accessToken: string,
+    username: string,
+    verificationOnly = false
+  ): Promise<"complete" | "retryable" | "loginRequired" | "stale"> {
+    const revision = this.captureEnrollment()
+    if (verificationOnly) this.createdProfiles.add(flowId)
     try {
-      await this.createProfileMutation.mutateAsync({
-        accessToken,
-        username
-      })
-
-      // Resume enrollment flow - this saves the account and sets it as active on the backend
-      await this.enrollResumeMutation.mutateAsync(undefined)
-
-      // Sync frontend state with backend after enrollment is finalized
+      if (!this.createdProfiles.has(flowId)) {
+        await this.createProfileMutation.mutateAsync({ accessToken, username })
+        if (!this.ownsEnrollment(revision)) return "stale"
+        this.createdProfiles.add(flowId)
+      }
+      const outcome = await this.enrollResumeMutation.mutateAsync(flowId)
+      if (!this.ownsEnrollment(revision)) return "stale"
+      if (outcome !== "complete") return outcome
       await Promise.all([
         this.rspcContext.queryClient.refetchQueries({
           queryKey: ["account.getAccounts"]
@@ -421,22 +448,18 @@ export class FlowControllerImpl implements FlowController {
           queryKey: ["account.getActiveUuid"]
         })
       ])
-
-      // Get the new active UUID from the backend
+      if (!this.ownsEnrollment(revision)) return "stale"
       const activeUuid = await this.rspcContext.client.query([
         "account.getActiveUuid"
       ])
-
-      // Update local state with the newly enrolled account
-      if (activeUuid) {
-        this.data.activeUuid = activeUuid
-      }
-
-      // Update accounts list
+      if (!this.ownsEnrollment(revision)) return "stale"
       const accountsResult = await this.accountsQuery.refetch()
+      if (!this.ownsEnrollment(revision)) return "stale"
+      if (activeUuid) this.data.activeUuid = activeUuid
       this.data.accounts = accountsResult.data || []
+      return "complete"
     } catch (error) {
-      console.error("[FlowController] Failed to create profile:", error)
+      if (!this.ownsEnrollment(revision)) return "stale"
       throw error
     }
   }
@@ -499,6 +522,7 @@ export class FlowControllerImpl implements FlowController {
   }
 
   async checkGDLAccount(showLoading = false): Promise<GDLAccountState> {
+    const revision = this.captureEnrollment()
     if (showLoading) {
       this.showGlobalLoading("checking-gdl")
     }
@@ -512,6 +536,7 @@ export class FlowControllerImpl implements FlowController {
 
       // Verify account exists
       const accounts = await this.accountsQuery.refetch()
+      if (!this.ownsEnrollment(revision)) return { type: "none" }
       const accountExists = accounts.data?.some(
         (acc: any) => acc.uuid === activeUuid
       )
@@ -527,6 +552,7 @@ export class FlowControllerImpl implements FlowController {
           activeUuid
         ])
 
+        if (!this.ownsEnrollment(revision)) return { type: "none" }
         if (gdlAccount) {
           this.data.hasGDLAccount = true
           this.data.foundGDLAccountData = gdlAccount
@@ -541,6 +567,7 @@ export class FlowControllerImpl implements FlowController {
 
         return { type: "none" }
       } catch (error) {
+        if (!this.ownsEnrollment(revision)) return { type: "none" }
         console.error("[FlowController] Failed to peek GDL account:", error)
         return { type: "error", message: extractErrorDisplay(error) }
       }
@@ -671,12 +698,15 @@ export class FlowControllerImpl implements FlowController {
    * Finalize Microsoft account enrollment
    * Saves the completed enrollment to database and sets it as active account
    */
-  async finalizeEnrollment(): Promise<void> {
+  async finalizeEnrollment(flowId: string, revision: number): Promise<boolean> {
+    if (!this.ownsEnrollment(revision)) return false
     try {
-      // Call backend to persist the account
-      await this.rspcContext.client.mutation(["account.enroll.finalize"])
-
-      // Refetch accounts to update UI
+      const outcome = await this.rspcContext.client.mutation([
+        "account.enroll.finalize",
+        flowId
+      ])
+      if (outcome === "obsolete") return false
+      if (!this.ownsEnrollment(revision)) return false
       await Promise.all([
         this.rspcContext.queryClient.refetchQueries({
           queryKey: ["account.getAccounts"]
@@ -685,21 +715,18 @@ export class FlowControllerImpl implements FlowController {
           queryKey: ["account.getActiveUuid"]
         })
       ])
-
-      // Get the new active UUID from the backend and update local state
-      // This is critical for checkGDLAccount() to work correctly after enrollment
+      if (!this.ownsEnrollment(revision)) return false
       const activeUuid = await this.rspcContext.client.query([
         "account.getActiveUuid"
       ])
-      if (activeUuid) {
-        this.data.activeUuid = activeUuid
-      }
-
-      // Update local accounts list
+      if (!this.ownsEnrollment(revision)) return false
       const accountsResult = await this.accountsQuery.refetch()
+      if (!this.ownsEnrollment(revision)) return false
+      if (activeUuid) this.data.activeUuid = activeUuid
       this.data.accounts = accountsResult.data || []
+      return true
     } catch (error) {
-      console.error("[FlowController] Failed to finalize enrollment:", error)
+      if (!this.ownsEnrollment(revision)) return false
       throw error
     }
   }
@@ -838,7 +865,11 @@ export function createFlowController(
       FECheckUsernameAvailability
     >
     createProfileMutation: UseMutationResult<null, RSPCError, FECreateProfile>
-    enrollResumeMutation: UseMutationResult<null, RSPCError, undefined>
+    enrollResumeMutation: UseMutationResult<
+      "complete" | "retryable" | "loginRequired",
+      RSPCError,
+      string
+    >
     accountsQuery: UseQueryResult<AccountEntry[], RSPCError>
     gdlAccountQuery: UseQueryResult<FEGDLAccount | null, RSPCError>
   }

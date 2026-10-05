@@ -1,3 +1,4 @@
+import { parseInvalidateFrame, invalidationKey } from "./queryInvalidation"
 import {
   QueryClient,
   QueryCache,
@@ -437,25 +438,7 @@ export const rspc = {
 // Initialisation (called once when the backend port is known)
 // ---------------------------------------------------------------------------
 
-interface InvalidateOperation {
-  key: string
-  args: never
-}
-
-/** Parses one invalidations WS frame, returning `undefined` (and warning)
- *  instead of throwing on a malformed frame — a bad frame should drop
- *  silently rather than take down the socket's message handler. Exported
- *  for unit testing. */
-export function parseInvalidateFrame(
-  raw: unknown
-): InvalidateOperation | undefined {
-  try {
-    return JSON.parse(raw as string) as InvalidateOperation
-  } catch (error) {
-    console.warn("Invalidations channel: dropping unparsable frame", error)
-    return undefined
-  }
-}
+export { parseInvalidateFrame } from "./queryInvalidation"
 
 export default function initRspc(_port: number, _apiToken: string) {
   port = _port
@@ -490,10 +473,7 @@ export default function initRspc(_port: number, _apiToken: string) {
           return
         }
 
-        const key = [data.key]
-        if (data.args !== null) {
-          key.push(data.args)
-        }
+        const key = invalidationKey(data)
         queryClient
           .invalidateQueries({
             queryKey: key

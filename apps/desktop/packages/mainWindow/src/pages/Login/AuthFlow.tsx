@@ -1,3 +1,4 @@
+import { leaveEnrollment } from "./flow/enrollmentTransitions"
 import {
   Switch,
   Match,
@@ -12,7 +13,7 @@ import {
 } from "solid-js"
 import { useLocation, useSearchParams } from "@solidjs/router"
 import { Spinner, Button } from "@gd/ui"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
@@ -172,6 +173,7 @@ function AuthFlowInner(props: AuthFlowInnerProps) {
 }
 
 function AuthFlowContent() {
+  const [t] = useTransContext()
   const flow = useFlow()
   const animations = useAnimations()
   const navigator = useGDNavigate()
@@ -207,6 +209,17 @@ function AuthFlowContent() {
     return /^[a-zA-Z0-9_]+$/.test(name)
   })
 
+  const [verificationRetry, setVerificationRetry] = createSignal(false)
+  createEffect(
+    on(
+      () => getCurrentStep(),
+      (step) => {
+        setVerificationRetry(
+          step?.type === "profile-creation" && step.verificationRetry
+        )
+      }
+    )
+  )
   const canSubmitProfile = createMemo(
     () => isUsernameValid() && usernameAvailable() === "available"
   )
@@ -231,7 +244,7 @@ function AuthFlowContent() {
     const step = getCurrentStep()
 
     // Only check if on profile creation step
-    if (step?.type !== "profile-creation") return
+    if (step?.type !== "profile-creation" || verificationRetry()) return
 
     // Reset states
     setUsernameAvailable(null)
@@ -240,19 +253,23 @@ function AuthFlowContent() {
     if (!isUsernameValid()) return
 
     // Debounce the check
+    const revision = flow.captureEnrollment()
     const timer = setTimeout(async () => {
+      if (!flow.ownsEnrollment(revision)) return
       setUsernameChecking(true)
       try {
         const result = await flow.checkUsernameAvailability(
           step.accessToken,
           name
         )
+        if (!flow.ownsEnrollment(revision)) return
         setUsernameAvailable(result)
       } catch (err) {
+        if (!flow.ownsEnrollment(revision)) return
         console.error("Error checking username:", err)
-        setUsernameError("Failed to check username availability")
+        setUsernameError(t("auth:_trn_profile_creation.check_failed"))
       } finally {
-        setUsernameChecking(false)
+        if (flow.ownsEnrollment(revision)) setUsernameChecking(false)
       }
     }, 500)
 
@@ -334,31 +351,51 @@ function AuthFlowContent() {
   }
 
   const handleCreateProfile = async () => {
-    if (!canSubmitProfile()) return
-
+    if ((!canSubmitProfile() && !verificationRetry()) || buttonLoading()) return
     const step = getCurrentStep()
     if (step?.type !== "profile-creation") return
-
+    const revision = flow.captureEnrollment()
     setButtonLoading(true)
     setUsernameError(null)
-
     try {
-      await flow.createProfile(step.accessToken, username())
+      const outcome = await flow.createProfile(
+        step.flowId,
+        step.accessToken,
+        username(),
+        verificationRetry()
+      )
+      if (!flow.ownsEnrollment(revision) || outcome === "stale") return
+      if (outcome === "loginRequired") {
+        await flow.goToStep({
+          type: "error",
+          message: t("auth:_trn_login.session_expired_message"),
+          canRetry: true
+        })
+        return
+      }
+      if (outcome === "retryable") {
+        setVerificationRetry(true)
+        setUsernameError(t("auth:_trn_profile_creation.verification_failed"))
+        return
+      }
       const gdlState = await flow.checkGDLAccount()
+      if (!flow.ownsEnrollment(revision)) return
       await flow.goToStep({ type: "gdl-account", gdlAccount: gdlState })
     } catch (err: any) {
-      console.error("Error creating profile:", err)
-      if (err.message?.includes("InvalidUsername")) {
-        setUsernameError("Invalid username")
+      if (!flow.ownsEnrollment(revision)) return
+      const retry = flow.profileVerificationPending(step.flowId)
+      setVerificationRetry(retry)
+      if (retry)
+        setUsernameError(t("auth:_trn_profile_creation.verification_failed"))
+      else if (err.message?.includes("InvalidUsername")) {
+        setUsernameError(t("auth:_trn_profile_creation.username_invalid"))
         setUsernameAvailable("notallowed")
       } else if (err.message?.includes("NameNotAvailable")) {
-        setUsernameError("Username not available")
+        setUsernameError(t("auth:_trn_profile_creation.taken"))
         setUsernameAvailable("taken")
-      } else {
-        setUsernameError("Failed to create profile")
-      }
+      } else setUsernameError(t("auth:_trn_profile_creation.create_failed"))
     } finally {
-      setButtonLoading(false)
+      if (flow.ownsEnrollment(revision)) setButtonLoading(false)
     }
   }
 
@@ -403,14 +440,14 @@ function AuthFlowContent() {
     if (!canSubmitGdlForm()) {
       // Show validation errors
       if (!gdlEmail().trim()) {
-        setGdlEmailError("Email is required")
+        setGdlEmailError(t("auth:_trn_login.email_required"))
       } else if (!isGdlEmailValid()) {
-        setGdlEmailError("Please enter a valid email address")
+        setGdlEmailError(t("auth:_trn_login.email_invalid"))
       }
       if (!gdlDisplayName().trim()) {
-        setGdlDisplayNameError("Display name is required")
+        setGdlDisplayNameError(t("auth:_trn_login.display_name_required"))
       } else if (!isGdlDisplayNameValid()) {
-        setGdlDisplayNameError("Display name must be at least 3 characters")
+        setGdlDisplayNameError(t("auth:_trn_login.display_name_too_short"))
       }
       return
     }
@@ -422,7 +459,7 @@ function AuthFlowContent() {
     try {
       const activeUuid = flow.data.activeUuid
       if (!activeUuid) {
-        throw new Error("No active account found")
+        throw new Error(t("auth:_trn_login.no_active_account"))
       }
 
       // Register the account
@@ -441,7 +478,9 @@ function AuthFlowContent() {
     } catch (error) {
       console.error("[AuthFlow] Failed to register GDL account:", error)
       setGdlEmailError(
-        error instanceof Error ? error.message : "Failed to create account"
+        error instanceof Error
+          ? error.message
+          : t("auth:_trn_login.create_account_failed")
       )
     } finally {
       setButtonLoading(false)
@@ -908,14 +947,13 @@ function AuthFlowContent() {
                       }
                       break
                     case "enrolling":
-                      flow.goToStep(
-                        { type: "auth-method" },
-                        { direction: "backward" }
-                      )
+                      void leaveEnrollment(flow)
                       break
                     case "profile-creation":
                       // Cancel enrollment and return to auth-method
                       flow.cancelEnrollment()
+                      setButtonLoading(false)
+                      setVerificationRetry(false)
                       flow.goToStep(
                         { type: "auth-method" },
                         { direction: "backward" }
@@ -1027,10 +1065,20 @@ function AuthFlowContent() {
                 type="primary"
                 fullWidth
                 onClick={handleCreateProfile}
-                disabled={!canSubmitProfile() || buttonLoading()}
+                disabled={
+                  (!canSubmitProfile() && !verificationRetry()) ||
+                  buttonLoading()
+                }
                 loading={buttonLoading()}
               >
-                <Trans key="auth:_trn_profile_creation.create_profile" />
+                <Show
+                  when={verificationRetry()}
+                  fallback={
+                    <Trans key="auth:_trn_profile_creation.create_profile" />
+                  }
+                >
+                  <Trans key="auth:_trn_profile_creation.retry_verification" />
+                </Show>
                 <div class="i-hugeicons:arrow-right-01 h-4 w-4" />
               </Button>
             </Show>

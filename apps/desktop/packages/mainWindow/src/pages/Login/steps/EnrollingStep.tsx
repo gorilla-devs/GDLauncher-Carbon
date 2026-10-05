@@ -22,6 +22,10 @@ import { msToMinutes, msToSeconds, parseTwoDigitNumber } from "@/utils/helpers"
 import GateAnimationRiveWrapper from "@/utils/GateAnimationRiveWrapper"
 import GateAnimation from "../../../gate_animation.riv"
 import { useFlow } from "../flow/FlowContext"
+import {
+  completeEnrollment,
+  switchEnrollment
+} from "../flow/enrollmentTransitions"
 import type { AuthStep } from "../flow/types"
 import { rspc } from "@/utils/rspcClient"
 
@@ -110,23 +114,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
   })
 
   // Handle switch to device code
-  const handleSwitchToDeviceCode = async () => {
-    setLoading(true)
-    try {
-      // Cancel current enrollment
-      await flow.cancelEnrollment()
-
-      // Start device code enrollment
-      await flow.startEnrollment("device-code")
-
-      await flow.goToStep({
-        type: "enrolling",
-        method: "device-code"
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  const handleSwitchToDeviceCode = () => switchEnrollment(flow, setLoading)
 
   // Handle manual browser open (browser method only)
   const openBrowser = () => {
@@ -170,21 +158,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
 
     // Handle successful completion
     if (typeof backendStatus === "object" && "complete" in backendStatus) {
-      // Enrollment successful - save to database, then check GDL account
-      flow
-        .finalizeEnrollment()
-        .then(() => flow.checkGDLAccount())
-        .then((gdlState) => {
-          flow.goToStep({ type: "gdl-account", gdlAccount: gdlState })
-        })
-        .catch((error) => {
-          console.error("[EnrollingStep] Failed to finalize enrollment:", error)
-          flow.goToStep({
-            type: "error",
-            message: "Failed to save account. Please try again.",
-            canRetry: true
-          })
-        })
+      void completeEnrollment(flow, backendStatus.complete.flow_id)
       return
     }
 
@@ -195,7 +169,9 @@ export function EnrollingStep(props: EnrollingStepProps) {
     ) {
       flow.goToStep({
         type: "profile-creation",
-        accessToken: backendStatus.needsProfileCreation.access_token
+        accessToken: backendStatus.needsProfileCreation.access_token,
+        flowId: backendStatus.needsProfileCreation.flow_id,
+        verificationRetry: backendStatus.needsProfileCreation.verification_retry
       })
       return
     }

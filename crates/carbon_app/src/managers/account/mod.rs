@@ -47,6 +47,13 @@ use super::{AppInner, AppRef, ManagerRef};
 pub mod api;
 pub mod endpoints;
 mod enroll;
+mod finalize;
+mod identity;
+mod publication;
+mod resume;
+mod schedule;
+pub use finalize::FinalizeEnrollmentOutcome;
+pub use resume::ProfileVerificationOutcome;
 pub mod gdl_account;
 mod oauth_server;
 pub mod protocol_handler;
@@ -65,7 +72,8 @@ const REFRESH_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 const REFRESH_WAIT_POLL_INTERVAL: Duration = Duration::from_millis(250);
 
 pub(crate) struct AccountManager {
-    currently_refreshing: RwLock<HashMap<String, EnrollmentTask>>,
+    publication: publication::Publication,
+    identity: identity::Identity,
     active_enrollment: RwLock<Option<EnrollmentTask>>,
     /// Account refreshing will be disabled until this time has passed
     refreshloop_sleep: Mutex<Option<Instant>>,
@@ -82,7 +90,8 @@ pub(crate) struct AccountManager {
 impl AccountManager {
     pub fn new(client: reqwest_middleware::ClientWithMiddleware, gdl_base_api: String) -> Self {
         Self {
-            currently_refreshing: RwLock::new(HashMap::new()),
+            publication: publication::Publication::default(),
+            identity: identity::Identity::default(),
             active_enrollment: RwLock::new(None),
             refreshloop_sleep: Mutex::new(None),
             skin_manager: SkinManager {},
@@ -137,37 +146,49 @@ impl<'s> ManagerRef<'s, AccountManager> {
     /// If the exchange fails (e.g., network error), it logs a warning but doesn't fail.
     /// The GDL token can be exchanged again later.
     pub async fn exchange_gdl_token(self, uuid: &str) -> anyhow::Result<String> {
-        // Get the account's MS id_token
-        let account = account_repo::get_account(&self.app.db, &uuid)
-            .await?
-            .ok_or_else(|| anyhow!("Account not found: {}", uuid))?;
+        self.exchange_gdl_token_owned(uuid, None).await
+    }
 
-        let Some(id_token) = account.id_token else {
-            bail!(
-                "No MS id_token for account {}, cannot exchange GDL token",
-                uuid
-            );
+    async fn exchange_gdl_token_owned(
+        self,
+        uuid: &str,
+        expected: Option<&publication::Ticket>,
+    ) -> anyhow::Result<String> {
+        let (ticket, id_token) = {
+            let mut state = self.publication.gate.lock().await;
+            if expected.is_some_and(|ticket| !state.owns(ticket)) {
+                bail!("Account was replaced during token exchange");
+            }
+            let account = account_repo::get_account(&self.app.db, uuid)
+                .await?
+                .ok_or_else(|| anyhow!("Account not found"))?;
+            let id = account
+                .id_token
+                .ok_or_else(|| anyhow!("No Microsoft ID token for GDL exchange"))?;
+            (state.capture(uuid), id)
         };
-
-        // Exchange for GDL token
         let response = self
             .gdl_account_task
             .exchange_token(&id_token)
             .await
-            .with_context(|| format!("GDL token exchange failed for account {uuid}"))?;
-
-        info!("Successfully exchanged GDL token for account {}", uuid);
-
-        let token = response.access_token.clone();
-
-        // Store the GDL token in the database
-        account_repo::set_account_gdl_token(&self.app.db, &uuid, Some(&response.access_token))
-            .await?;
-
-        self.app
-            .invalidate(GET_ACCOUNTS, Some(uuid.to_string().into()));
-
-        Ok(token)
+            .context("GDL token exchange failed")?;
+        ensure!(
+            self.publication
+                .publish_gdl_token(
+                    &self.app.db,
+                    &ticket,
+                    &id_token,
+                    &response.access_token,
+                    |args| self.app.invalidate(GET_ACCOUNTS, args)
+                )
+                .await?,
+            "Account credentials changed during token exchange"
+        );
+        let state = self.publication.gate.lock().await;
+        if state.owns(&ticket) {
+            self.gdl_token_exchange_backoff.lock().await.remove(uuid);
+        }
+        Ok(response.access_token)
     }
 
     /// Ensure we have a *usable* GDL auth token for the given account.
@@ -250,9 +271,12 @@ impl<'s> ManagerRef<'s, AccountManager> {
             }
         }
 
+        let ticket = self.publication.gate.lock().await.capture(uuid);
         // Attempt exchange
         match self.exchange_gdl_token(uuid).await {
             Ok(token) => {
+                let state = self.publication.gate.lock().await;
+                ensure!(state.owns(&ticket), "Account changed during token recovery");
                 // Clear backoff on success
                 self.manager
                     .gdl_token_exchange_backoff
@@ -262,6 +286,10 @@ impl<'s> ManagerRef<'s, AccountManager> {
                 Ok(token)
             }
             Err(e) => {
+                let state = self.publication.gate.lock().await;
+                if !state.owns(&ticket) {
+                    return Err(e);
+                }
                 // Set/increase backoff
                 let mut backoff_map = self.manager.gdl_token_exchange_backoff.lock().await;
                 let new_backoff = match backoff_map.get(uuid.as_str()) {
@@ -362,7 +390,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
         let deadline = Instant::now() + REFRESH_WAIT_TIMEOUT;
 
         loop {
-            if !self.currently_refreshing.read().await.contains_key(uuid) {
+            if !self
+                .publication
+                .gate
+                .lock()
+                .await
+                .refreshing
+                .contains_key(uuid)
+            {
                 return Ok(());
             }
 
@@ -472,9 +507,11 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         if let AccountType::Microsoft { .. } = &account.account.type_ {
             let refreshing = self
-                .currently_refreshing
-                .read()
+                .publication
+                .gate
+                .lock()
                 .await
+                .refreshing
                 .contains_key(&account.account.uuid);
 
             if refreshing {
@@ -615,28 +652,54 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
     pub async fn save_gdl_account(&self, uuid: Option<String>) -> anyhow::Result<()> {
         use carbon_repos::repos::app_configuration::AppConfigurationPatch;
-
-        self.app
-            .settings_manager()
-            .set(AppConfigurationPatch {
-                gdl_account_uuid: Some(uuid.clone()),
-                ..Default::default()
-            })
-            .await?;
-
+        let selection = {
+            let mut state = self.identity.state.lock().await;
+            self.app
+                .settings_manager()
+                .set(AppConfigurationPatch {
+                    gdl_account_uuid: Some(uuid.clone()),
+                    ..Default::default()
+                })
+                .await?;
+            state.select(uuid)
+        };
         self.app.invalidate(GET_GDL_ACCOUNT, None);
         self.app.invalidate(GET_SETTINGS, None);
+        self.publish_gdl_identity(selection).await;
+        Ok(())
+    }
 
-        // Notify Electron main process of GDL account email change for Overwolf ad personalization
-        let email = match uuid {
-            Some(account_uuid) => self.gdl_account_email(&account_uuid).await,
-            None => None,
+    async fn publish_gdl_identity(&self, selection: identity::Selection) {
+        self.identity
+            .resolve_and_publish(
+                selection,
+                |selected| async move {
+                    match selected.as_deref().filter(|id| !id.is_empty()) {
+                        Some(uuid) => self.gdl_account_email(uuid).await,
+                        None => None,
+                    }
+                },
+                identity::stdout,
+            )
+            .await;
+    }
+
+    pub async fn publish_initial_gdl_identity(&self) -> anyhow::Result<()> {
+        let selection = {
+            let mut state = self.identity.state.lock().await;
+            if state.initialized {
+                return Ok(());
+            }
+            let uuid = self
+                .app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .gdl_account_uuid;
+            state.select(uuid);
+            state.selection.clone()
         };
-
-        println!("_GDL_ACCOUNT_EMAIL_:{}", email.unwrap_or_default());
-
-        // TODO!: Should get status from the API
-
+        self.publish_gdl_identity(selection).await;
         Ok(())
     }
 
@@ -1049,30 +1112,22 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
     pub async fn remove_gdl_account(self) -> anyhow::Result<()> {
         use carbon_repos::repos::app_configuration::AppConfigurationPatch;
-
+        let mut state = self.identity.state.lock().await;
         self.app
             .settings_manager()
             .set(AppConfigurationPatch {
                 gdl_account_uuid: Some(None),
-                ..Default::default()
-            })
-            .await?;
-
-        self.app
-            .settings_manager()
-            .set(AppConfigurationPatch {
                 gdl_account_status: Some(None),
                 ..Default::default()
             })
             .await?;
-
+        let selection = state.select(None);
+        identity::stdout(identity::Event {
+            selection,
+            email: None,
+        });
         self.app.invalidate(GET_GDL_ACCOUNT, None);
         self.app.invalidate(GET_SETTINGS, None);
-
-        // Notify Electron main process that GDL account was removed for Overwolf ad personalization
-        info!("_GDL_ACCOUNT_EMAIL_:");
-        println!("_GDL_ACCOUNT_EMAIL_:");
-
         Ok(())
     }
 
@@ -1213,227 +1268,95 @@ impl<'s> ManagerRef<'s, AccountManager> {
         }
     }
 
-    /// Add or update an account
-    async fn add_account(self, account: FullAccount) -> anyhow::Result<()> {
-        let uuid = account.uuid.clone();
-        let db_account = account_repo::get_account(&self.app.db, &uuid).await?;
-
-        if db_account.is_some() {
-            // don't change lastUsed
-            info!("Updating account information for {:?}", &account.uuid);
-
-            match account.type_ {
-                FullAccountType::Offline => {
-                    account_repo::update_account_offline(
-                        &self.app.db,
-                        &account.uuid,
-                        &account.username,
-                    )
-                    .await?;
-                }
-                FullAccountType::Microsoft {
-                    access_token,
-                    refresh_token,
-                    token_expires,
-                    id_token,
-                    gdl_token,
-                    email: _,
-                    skin_id,
-                } => {
-                    let token_expires =
-                        DbDateTime(token_expires.with_timezone(&FixedOffset::east(0)));
-                    account_repo::update_account_microsoft(
-                        &self.app.db,
-                        &account.uuid,
-                        &account.username,
-                        &access_token,
-                        Some(token_expires),
-                        refresh_token.as_deref(),
-                        id_token.as_deref(),
-                        gdl_token.as_deref(),
-                        skin_id.as_deref(),
-                    )
-                    .await?;
-                }
-            }
-
-            self.app.invalidate(GET_ACCOUNTS, Some(uuid.into()));
-        } else {
-            info!("Creating account {:?}", &account.uuid);
-
-            let last_used = DbDateTime(Utc::now().into());
-            match account.type_ {
-                FullAccountType::Offline => {
-                    account_repo::insert_account_offline(
-                        &self.app.db,
-                        &account.uuid,
-                        &account.username,
-                        last_used,
-                        None,
-                    )
-                    .await?;
-                }
-                FullAccountType::Microsoft {
-                    access_token,
-                    refresh_token,
-                    token_expires,
-                    id_token,
-                    gdl_token,
-                    email: _,
-                    skin_id,
-                } => {
-                    let token_expires =
-                        DbDateTime(token_expires.with_timezone(&FixedOffset::east(0)));
-                    account_repo::insert_account_microsoft(
-                        &self.app.db,
-                        &account.uuid,
-                        &account.username,
-                        last_used,
-                        &access_token,
-                        Some(token_expires),
-                        refresh_token.as_deref(),
-                        id_token.as_deref(),
-                        gdl_token.as_deref(),
-                        skin_id.as_deref(),
-                    )
-                    .await?;
-                }
-            }
-
-            self.app.invalidate(GET_ACCOUNTS, None);
-        }
-
-        Ok(())
+    /// Lock order: enrollment (if present) → publication → identity/settings/DB.
+    /// No provider operation or refresh join is awaited under publication ownership.
+    async fn publish_enrolled_account(
+        self,
+        account: FullAccount,
+    ) -> anyhow::Result<publication::Ticket> {
+        self.publication
+            .publish_enrollment(
+                &self.app.db,
+                account,
+                |uuid| async move {
+                    self.set_active_uuid(Some(uuid.clone())).await?;
+                    self.gdl_token_exchange_backoff.lock().await.remove(&uuid);
+                    Ok(())
+                },
+                |args| self.app.invalidate(GET_ACCOUNTS, args),
+            )
+            .await
     }
 
     pub async fn refresh_account(
         self,
         uuid: String,
     ) -> anyhow::Result<tokio::task::JoinHandle<Result<(), futures::future::Aborted>>> {
-        info!("Refreshing account {uuid}");
+        self.start_refresh(uuid, false).await
+    }
 
-        let account = account_repo::get_account(&self.app.db, &uuid)
-            .await?
-            .ok_or(RefreshAccountError::NoAccount)?;
-
-        let Some(refresh_token) = &account.ms_refresh_token else {
-            warn!("No refresh token, aborting refresh for {uuid}");
-            bail!(RefreshAccountError::NoRefreshToken)
-        };
-
-        // stays locked until we insert an enrollment task
-        let mut refreshing = self.currently_refreshing.write().await;
-        if refreshing.contains_key(&uuid) {
-            warn!("{uuid} is already being refreshed");
-            bail!(RefreshAccountError::AlreadyRefreshing);
-        }
-
+    async fn start_refresh(
+        self,
+        uuid: String,
+        automatic: bool,
+    ) -> anyhow::Result<tokio::task::JoinHandle<Result<(), futures::future::Aborted>>> {
         struct Invalidator {
             app: AppRef,
-            account: FullAccount,
+            ticket: publication::Ticket,
+            operation: String,
         }
-
         #[async_trait]
         impl InvalidateCtx for Invalidator {
             async fn invalidate(&self) {
                 let app = self.app.upgrade();
-                let account_manager = app.account_manager();
-                let mut refreshing = account_manager.currently_refreshing.write().await;
-                // this should never happen
-                let enrollment = refreshing.get(&self.account.uuid).expect("account refresh invalidator recieved an invalidation without an active enrollemt");
-                let status = enrollment.status.read().await;
-
-                match &*status {
-                    EnrollmentStatus::Complete(account) => {
-                        let r = account_manager.add_account(account.clone().into()).await;
-
-                        match r {
-                            Ok(_) => {
-                                info!("Refreshed account {}", &self.account.uuid);
-                                // Clear any GDL token exchange backoff on successful refresh
-                                account_manager
-                                    .manager
-                                    .gdl_token_exchange_backoff
-                                    .lock()
-                                    .await
-                                    .remove(&self.account.uuid);
-                            }
-                            Err(e) => {
-                                error!({ error = ?e }, "Failed to update account information {}", &self.account.uuid)
-                            }
+                let manager = app.account_manager();
+                match manager
+                    .publication
+                    .complete_refresh(&app.db, &self.ticket, &self.operation, |args| {
+                        app.invalidate(GET_ACCOUNTS, args)
+                    })
+                    .await
+                {
+                    Ok(true) => {
+                        let state = manager.publication.gate.lock().await;
+                        if state.owns(&self.ticket) {
+                            manager
+                                .gdl_token_exchange_backoff
+                                .lock()
+                                .await
+                                .remove(&self.ticket.uuid);
                         }
-
-                        drop(status);
-                        refreshing.remove(&self.account.uuid);
                     }
-                    EnrollmentStatus::Failed(e) => {
-                        let FullAccountType::Microsoft {
-                            access_token,
-                            token_expires,
-                            skin_id,
-                            ..
-                        } = &self.account.type_
-                        else {
-                            error!(
-                                "account type was not microsoft during refresh for {}",
-                                &self.account.uuid
-                            );
-                            return;
-                        };
-
-                        if let Ok(e) = e {
-                            warn!(
-                                "Failed to refresh account {} due to an account validity issue, marking the account as requiring relogin (Invalid)",
-                                self.account.uuid,
-                            );
-
-                            account_manager.add_account(FullAccount {
-                                username: self.account.username.clone(),
-                                uuid: self.account.uuid.clone(),
-                                type_: FullAccountType::Microsoft {
-                                    access_token: access_token.clone(),
-                                    refresh_token: None,
-                                    id_token: None,
-                                    gdl_token: None,
-                                    email: None,
-                                    token_expires: token_expires.clone(),
-                                    skin_id: skin_id.clone(),
-                                },
-                                last_used: self.account.last_used.clone(),
-                            }).await.expect("db error, this can't be handled in the account invalidator right now");
-                        } else {
-                            warn!("Failed to refresh account {}: {e:?}", self.account.uuid);
-                        }
-
-                        drop(status);
-                        refreshing.remove(&self.account.uuid);
-                    }
-                    _ => {}
+                    Ok(false) => {}
+                    Err(e) => error!(error=?e,"Failed to publish account refresh"),
                 }
-
-                ()
             }
         }
-
-        let (enrollment, handler) = EnrollmentTask::refresh(
-            self.app.reqwest_client.clone(),
-            refresh_token.clone(),
-            Invalidator {
-                app: AppRef(Arc::downgrade(self.app)),
-                account: account.try_into()?,
-            },
-            self.manager.gdl_account_task.clone(),
-        );
-
-        refreshing.insert(uuid.clone(), enrollment);
-        drop(refreshing);
-
-        self.app.invalidate(GET_ACCOUNTS, Some(uuid.into()));
-
-        Ok(handler)
+        self.publication
+            .admit_refresh(
+                &self.app.db,
+                &uuid,
+                automatic,
+                Instant::now(),
+                |refresh_token, ticket, operation| {
+                    EnrollmentTask::refresh(
+                        self.app.reqwest_client.clone(),
+                        refresh_token,
+                        Invalidator {
+                            app: AppRef(Arc::downgrade(self.app)),
+                            ticket,
+                            operation,
+                        },
+                        self.gdl_account_task.clone(),
+                    )
+                },
+                |args| self.app.invalidate(GET_ACCOUNTS, args),
+            )
+            .await
     }
 
     pub async fn delete_account(self, uuid: String) -> anyhow::Result<()> {
+        let mut state = self.publication.gate.lock().await;
         let settings = self.app.settings_manager().get_settings().await?;
 
         let active_account = settings.active_account_uuid;
@@ -1463,7 +1386,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
         // A plain `DELETE` reports affected rows instead of erroring on a
         // missing row; `rows_affected == 0` detects the not-found case.
-        let rows_affected = account_repo::delete_account(&self.app.db, &uuid).await?;
+        let rows_affected = state.delete(&self.app.db, &uuid).await?;
 
         if rows_affected == 0 {
             bail!(DeleteAccountError::AccountDoesNotExist(uuid))
@@ -1594,135 +1517,76 @@ impl<'s> ManagerRef<'s, AccountManager> {
 
     pub async fn get_enrollment_status<T>(
         self,
-        f: impl FnOnce(&EnrollmentStatus) -> T,
+        f: impl FnOnce(&str, &EnrollmentStatus) -> T,
     ) -> Option<T> {
         match &*self.active_enrollment.read().await {
             None => None,
-            Some(enrollment) => Some(f(&*enrollment.status.read().await)),
+            Some(enrollment) => Some(f(&enrollment.id, &*enrollment.status.read().await)),
         }
     }
 
-    pub async fn finalize_enrollment(self) -> anyhow::Result<()> {
-        let enrollment = self.active_enrollment.write().await.take();
-
-        match enrollment {
-            None => bail!(FinalizeEnrollmentError::NotActive),
-            Some(enrollment) => {
-                let mut status = EnrollmentStatus::RequestingCode;
-                mem::swap(&mut *enrollment.status.write().await, &mut status);
-
-                match status {
-                    EnrollmentStatus::Complete(account) => {
-                        let uuid = account.mc.profile.uuid.clone();
-                        self.add_account(account.into()).await?;
-                        self.set_active_uuid(Some(uuid.clone())).await?;
-
-                        // Exchange MS token for GDL token (non-blocking)
-                        match self.exchange_gdl_token(&uuid).await {
-                            Ok(_) => {
-                                self.manager
-                                    .gdl_token_exchange_backoff
-                                    .lock()
-                                    .await
-                                    .remove(&uuid);
-                            }
-                            Err(e) => {
-                                warn!("Failed to exchange GDL token during enrollment: {}", e);
-                            }
-                        }
-
-                        self.app.invalidate(ENROLL_GET_STATUS, None);
-
-                        Ok(())
-                    }
-                    _ => bail!(FinalizeEnrollmentError::NotComplete),
-                }
-            }
-        }
-    }
-
-    pub async fn resume_enrollment(self) -> anyhow::Result<()> {
-        let enrollment_opt = self.active_enrollment.read().await;
-
-        let enrollment = match &*enrollment_opt {
-            None => bail!(ResumeEnrollmentError::NotActive),
-            Some(enrollment) => enrollment,
+    pub async fn finalize_enrollment(
+        self,
+        expected: String,
+    ) -> anyhow::Result<FinalizeEnrollmentOutcome> {
+        let ticket = finalize::finalize(
+            &self.active_enrollment,
+            &expected,
+            |account| self.publish_enrolled_account(account.into()),
+            || self.app.invalidate(ENROLL_GET_STATUS, None),
+        )
+        .await?;
+        let Some(ticket) = ticket else {
+            return Ok(FinalizeEnrollmentOutcome::Obsolete);
         };
-
-        let mut status_lock = enrollment.status.write().await;
-        let status = mem::replace(&mut *status_lock, EnrollmentStatus::RequestingCode);
-
-        match status {
-            EnrollmentStatus::NeedsProfileCreation {
-                access_token,
-                ms_auth,
-                mc_auth,
-                entitlements,
-            } => {
-                // Update status to indicate we're fetching the profile
-                *status_lock = EnrollmentStatus::McProfile;
-                drop(status_lock);
-                drop(enrollment_opt);
-
-                // Fetch the profile again (should succeed now that user created it)
-                let mc_profile = api::get_profile(&self.app.reqwest_client, &access_token)
-                    .await?
-                    .map_err(|e| {
-                        anyhow::anyhow!("Failed to get profile after creation: {:?}", e)
-                    })?;
-
-                let account = api::McAccount {
-                    entitlement: entitlements,
-                    profile: mc_profile,
-                    auth: mc_auth,
-                };
-
-                let full_account = api::FullAccount {
-                    ms: ms_auth,
-                    mc: account,
-                    gdl_token: None, // Will be exchanged after enrollment
-                };
-
-                // Update status to Complete
-                if let Some(enrollment) = &*self.active_enrollment.read().await {
-                    *enrollment.status.write().await =
-                        EnrollmentStatus::Complete(full_account.clone());
-                }
-
-                self.app.invalidate(ENROLL_GET_STATUS, None);
-
-                // Finalize the enrollment
-                let uuid = full_account.mc.profile.uuid.clone();
-                self.add_account(full_account.into()).await?;
-                self.set_active_uuid(Some(uuid.clone())).await?;
-
-                // Exchange MS token for GDL token (non-blocking)
-                match self.exchange_gdl_token(&uuid).await {
-                    Ok(_) => {
-                        self.manager
-                            .gdl_token_exchange_backoff
-                            .lock()
-                            .await
-                            .remove(&uuid);
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Failed to exchange GDL token during resume_enrollment: {}",
-                            e
-                        );
-                    }
-                }
-
-                Ok(())
-            }
-            other_status => {
-                // Restore the original status
-                if let Some(enrollment) = &*self.active_enrollment.read().await {
-                    *enrollment.status.write().await = other_status;
-                }
-                bail!(ResumeEnrollmentError::NotInProfileCreationState)
-            }
+        if let Err(e) = self
+            .exchange_gdl_token_owned(&ticket.uuid, Some(&ticket))
+            .await
+        {
+            warn!("Failed to exchange GDL token during enrollment: {}", e);
         }
+        Ok(FinalizeEnrollmentOutcome::Complete)
+    }
+
+    pub async fn resume_enrollment(
+        self,
+        expected: String,
+    ) -> anyhow::Result<ProfileVerificationOutcome> {
+        // Retain the continuation if the RPC caller disconnects. Cancel/replacement
+        // still cancels its provider wait through the enrollment lifecycle.
+        let app = self.app.clone();
+        tokio::spawn(async move {
+            let manager = app.account_manager();
+            let published = std::sync::Mutex::new(None);
+            let outcome = resume::resume(
+                &manager.active_enrollment,
+                &expected,
+                |token| async move { api::get_profile(&manager.app.reqwest_client, &token).await },
+                |account| async {
+                    let ticket = manager.publish_enrolled_account(account.into()).await?;
+                    *published.lock().unwrap() = Some(ticket);
+                    Ok(())
+                },
+                || app.invalidate(ENROLL_GET_STATUS, None),
+            )
+            .await?;
+            // Optional exchange is deliberately outside the enrollment publication gate.
+            // exchange_gdl_token captures and revalidates account ownership itself.
+            let ticket = published.into_inner().unwrap();
+            if let Some(ticket) = ticket {
+                if let Err(e) = manager
+                    .exchange_gdl_token_owned(&ticket.uuid, Some(&ticket))
+                    .await
+                {
+                    warn!(
+                        "Failed to exchange GDL token after profile verification: {}",
+                        e
+                    );
+                }
+            }
+            Ok(outcome)
+        })
+        .await?
     }
 
     /// Attempt to immediately update account information, expiring the account on failure.
@@ -1746,10 +1610,14 @@ impl<'s> ManagerRef<'s, AccountManager> {
             false => None,
         };
 
-        let account = self
-            .get_account(uuid.clone())
-            .await?
-            .ok_or_else(|| ValidateAccountError::AccountMissing(uuid.clone()))?;
+        let (ticket, account) = {
+            let mut state = self.publication.gate.lock().await;
+            let account = self
+                .get_account(uuid.clone())
+                .await?
+                .ok_or_else(|| ValidateAccountError::AccountMissing(uuid.clone()))?;
+            (state.capture(&uuid), account)
+        };
 
         let access_token = match account.status {
             AccountStatus::Ok {
@@ -1769,6 +1637,16 @@ impl<'s> ManagerRef<'s, AccountManager> {
         }
 
         drop(refresh_lock);
+        let state = self.publication.gate.lock().await;
+        if !state.owns(&ticket) {
+            return Ok(());
+        }
+        let current = account_repo::get_account(&self.app.db, &uuid).await?;
+        if current.as_ref().and_then(|row| row.access_token.as_deref())
+            != Some(access_token.as_str())
+        {
+            return Ok(());
+        }
 
         let profile = match profile {
             Ok(Ok(x)) => x,
@@ -1804,6 +1682,7 @@ impl<'s> ManagerRef<'s, AccountManager> {
             self.app.invalidate(GET_HEAD, Some(uuid.clone().into()));
         }
 
+        self.app.invalidate(GET_ACCOUNTS, None);
         debug!("Account is valid");
 
         Ok(())
@@ -1919,27 +1798,18 @@ impl AccountRefreshService {
                     // 3. All other accounts
 
                     let mut accounts = accounts.into_iter().collect::<Vec<_>>();
-                    accounts.sort_by(|a, b| {
-                        if let Some(gdl_account_uuid) = &saved_gdl_account_uuid {
-                            if &a.uuid == gdl_account_uuid {
-                                return Ordering::Less;
-                            } else if &b.uuid == gdl_account_uuid {
-                                return Ordering::Greater;
-                            }
-                        }
-
-                        let Some(current_account) = &current_account else {
-                            return Ordering::Equal;
-                        };
-
-                        if &a.uuid == current_account {
-                            return Ordering::Less;
-                        } else if &b.uuid == current_account {
-                            return Ordering::Greater;
-                        }
-
-                        Ordering::Equal
-                    });
+                    account_manager
+                        .publication
+                        .gate
+                        .lock()
+                        .await
+                        .schedule
+                        .order(
+                            &mut accounts,
+                            saved_gdl_account_uuid.as_deref(),
+                            current_account.as_deref(),
+                            Instant::now(),
+                        );
 
                     for account in accounts {
                         trace!(
@@ -1974,8 +1844,9 @@ impl AccountRefreshService {
                                 "Attempting to refresh access token for expired account {}",
                                 &account.uuid
                             );
-                            let Ok(handler) =
-                                account_manager.refresh_account(account.uuid.clone()).await
+                            let Ok(handler) = account_manager
+                                .start_refresh(account.uuid.clone(), true)
+                                .await
                             else {
                                 error!("Failed to refresh access token for {}", &account.uuid);
                                 notifier_clone.notify_one();
@@ -2049,6 +1920,8 @@ pub enum CancelEnrollmentStatusError {
 
 #[derive(Error, Debug)]
 pub enum RefreshAccountError {
+    #[error("automatic refresh is waiting for its retry deadline")]
+    Backoff,
     #[error("already refreshing")]
     AlreadyRefreshing,
 
@@ -2076,6 +1949,8 @@ pub enum FinalizeEnrollmentError {
 
 #[derive(Error, Debug)]
 pub enum ResumeEnrollmentError {
+    #[error("enrollment was cancelled or replaced")]
+    Obsolete,
     #[error("no active enrollment")]
     NotActive,
 
