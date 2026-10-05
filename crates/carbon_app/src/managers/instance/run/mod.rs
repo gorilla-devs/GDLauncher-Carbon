@@ -1027,25 +1027,51 @@ impl ManagerRef<'_, InstanceManager> {
 
                     time_at_start = Some(Utc::now());
 
-                    tokio::select! {
-                        _ = child.wait() => {
-                            tracing::debug!("Instance waited");
-                        },
-                        Some(()) = kill_rx.recv() => {
-                            tracing::debug!("Instance killed");
-                            if let Err(e) = child.kill().await {
-                                tracing::warn!(
-                                    "Failed to kill child process for instance {}: {}",
-                                    *instance_id,
-                                    e
-                                );
+                    let (stop_reads, stop_rx) = watch::channel(false);
+                    let (exit_result, incomplete_drain) = supervise_logs(
+                        async {
+                            tokio::select! {
+                                _ = child.wait() => {
+                                    tracing::debug!("Instance waited");
+                                },
+                                Some(()) = kill_rx.recv() => {
+                                    tracing::debug!("Instance killed");
+                                    if let Err(e) = child.kill().await {
+                                        tracing::warn!(
+                                            "Failed to kill child process for instance {}: {}",
+                                            *instance_id,
+                                            e
+                                        );
+                                    }
+                                },
+                                _ = update_playtime => {
+                                    tracing::debug!("Instance updated playtime");
+                                }
                             }
+
+                            child.wait().await
                         },
-                        _ = read_logs(log.as_ref().expect("log must exist when launching game"), stdout, stderr, file.as_mut()) => {
-                            tracing::debug!("Instance read logs");
-                        },
-                        _ = update_playtime => {
-                            tracing::debug!("Instance updated playtime");
+                        read_logs(
+                            log.as_ref().expect("log must exist when launching game"),
+                            stdout,
+                            stderr,
+                            file.as_mut(),
+                            stop_rx,
+                        ),
+                        stop_reads,
+                        || tokio::time::sleep(POST_EXIT_LOG_GRACE),
+                    )
+                    .await;
+                    if incomplete_drain {
+                        let message = "Log drain timed out after game exit; inherited pipes remained open and later output may be incomplete";
+                        tracing::warn!("{message}");
+                        if let Some(log) = log.as_ref() {
+                            log.send_modify(|log| log.add_entry(LogEntry::system_message(message)));
+                        }
+                        if let Some(file) = file.as_mut() {
+                            let _ = file
+                                .write_all(format_message_as_log4j_event(message).as_bytes())
+                                .await;
                         }
                     }
 
@@ -1062,7 +1088,7 @@ impl ManagerRef<'_, InstanceManager> {
                     }
 
                     _runtime_activity.settling();
-                    if let Ok(exitcode) = child.wait().await {
+                    if let Ok(exitcode) = exit_result {
                         if let Some(ownership) = game_activity.take() {
                             ownership.finish();
                         }
@@ -1321,74 +1347,41 @@ impl ManagerRef<'_, InstanceManager> {
     }
 
     pub async fn kill_instance(self, instance_id: InstanceId) -> anyhow::Result<()> {
-        let instances = self.instances.read().await;
-        let instance = instances
-            .get(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?;
+        if let Some((process_id, expected_start_time)) =
+            self.request_instance_stop(instance_id).await?
+        {
+            let pid = Pid::from_u32(process_id);
+            let mut system = System::new();
+            system.refresh_processes(ProcessesToUpdate::Some(&[pid]));
 
-        let LaunchState::Running(running) = &instance.data()?.state else {
-            bail!("kill_instance called on instance that was not running")
-        };
-
-        info!("killing instance {instance_id}");
-
-        match &running.kill_tx {
-            // Owned by this core: the run task holds the child handle, kills
-            // it, and does all the bookkeeping afterwards (pidfile removal,
-            // playtime, exit code, post-exit hook, transition to Inactive).
-            Some(kill_tx) => {
-                kill_tx.send(()).await?;
-            }
-            // Adopted: there is no run task and no handle, so the pid is
-            // signalled directly and everything that task would have done has
-            // to happen here instead. Narrowed to "still verifiably the same
-            // live java process it was adopted as" first — the pid alone is
-            // not enough: the game can have exited and had its number
-            // recycled by an unrelated process in the time since adoption
-            // (or since the last poll), so the start time recorded at
-            // adoption is checked again here, not just trusted.
-            None => {
-                let process_id = running.process_id;
-                let expected_start_time = running.process_start_time;
-                drop(instances);
-
-                let pid = Pid::from_u32(process_id);
-                let mut system = System::new();
-                system.refresh_processes(ProcessesToUpdate::Some(&[pid]));
-
-                if orphan_pid::is_verified_live_java_process(
-                    &system,
-                    process_id,
-                    expected_start_time,
-                ) {
-                    if let Some(process) = system.process(pid) {
-                        if !process.kill() {
-                            bail!("failed to signal adopted game process {process_id}");
-                        }
+            if orphan_pid::is_verified_live_java_process(&system, process_id, expected_start_time) {
+                if let Some(process) = system.process(pid) {
+                    if !process.kill() {
+                        bail!("failed to signal adopted game process {process_id}");
                     }
-                    // The game was alive right up to the signal above, so this
-                    // last interval was genuinely played — the one case where
-                    // an adopted session's final seconds can be banked exactly,
-                    // rather than dropped as the poller has to drop them.
-                    self.observe_adopted_alive(instance_id, Utc::now()).await;
-                    self.bank_adopted_playtime(instance_id).await;
-                    return Ok(()); // liveness poller owns release after observed exit
-                } else {
-                    // Already gone, or the number now belongs to something
-                    // else (a start-time mismatch is treated exactly the same
-                    // as the pid being gone — either way this is not the game
-                    // that was adopted). There is nothing to stop and nothing
-                    // to bank — it stopped playing at an unknown earlier
-                    // moment — and the instance still has to come back to
-                    // Inactive: the poller would eventually do it, but not
-                    // before the user has been told their click did nothing.
-                    warn!(
-                        "adopted game process {process_id} for instance {instance_id} is gone, or no longer verifiably the same process"
-                    );
                 }
-
-                self.release_adopted_instance(instance_id, process_id).await;
+                // The game was alive right up to the signal above, so this
+                // last interval was genuinely played — the one case where
+                // an adopted session's final seconds can be banked exactly,
+                // rather than dropped as the poller has to drop them.
+                self.observe_adopted_alive(instance_id, Utc::now()).await;
+                self.bank_adopted_playtime(instance_id).await;
+                return Ok(()); // liveness poller owns release after observed exit
+            } else {
+                // Already gone, or the number now belongs to something
+                // else (a start-time mismatch is treated exactly the same
+                // as the pid being gone — either way this is not the game
+                // that was adopted). There is nothing to stop and nothing
+                // to bank — it stopped playing at an unknown earlier
+                // moment — and the instance still has to come back to
+                // Inactive: the poller would eventually do it, but not
+                // before the user has been told their click did nothing.
+                warn!(
+                    "adopted game process {process_id} for instance {instance_id} is gone, or no longer verifiably the same process"
+                );
             }
+
+            self.release_adopted_instance(instance_id, process_id).await;
         }
 
         Ok(())
@@ -1876,31 +1869,105 @@ impl From<&LaunchState> for domain::LaunchState {
     }
 }
 
+impl InstanceManager {
+    // Return the adopted identity only; native process inspection remains in the caller.
+    async fn request_instance_stop(
+        &self,
+        instance_id: InstanceId,
+    ) -> anyhow::Result<Option<(u32, Option<u64>)>> {
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+        let LaunchState::Running(running) = &instance.data()?.state else {
+            bail!("kill_instance called on instance that was not running")
+        };
+        let target = (
+            running.kill_tx.clone(),
+            running.process_id,
+            running.process_start_time,
+        );
+        drop(instances);
+        if let Some(tx) = target.0 {
+            match tx.try_send(()) {
+                Ok(()) | Err(mpsc::error::TrySendError::Full(())) => Ok(None),
+                Err(mpsc::error::TrySendError::Closed(())) => {
+                    bail!("instance Stop receiver is closed")
+                }
+            }
+        } else {
+            Ok(Some((target.1, target.2)))
+        }
+    }
+}
+
+// Bound only the inherited-pipe wait after confirmed child exit. On expiry,
+// readers stop at a read boundary; their already-read chunks still reach the sinks.
+const POST_EXIT_LOG_GRACE: Duration = Duration::from_secs(2);
+
+async fn supervise_logs<
+    S: std::future::Future,
+    D: std::future::Future<Output = ()>,
+    G: std::future::Future<Output = ()>,
+>(
+    supervision: S,
+    drain: D,
+    stop_reads: watch::Sender<bool>,
+    grace: impl FnOnce() -> G,
+) -> (S::Output, bool) {
+    tokio::pin!(supervision, drain);
+    let result = tokio::select! {
+        result = &mut supervision => result,
+        _ = &mut drain => return (supervision.await, false),
+    };
+    tokio::select! {
+        _ = &mut drain => (result, false),
+        _ = grace() => {
+            stop_reads.send_replace(true);
+            drain.await;
+            (result, true)
+        }
+    }
+}
+
 async fn read_logs(
     log: &watch::Sender<GameLog>,
     stdout: impl AsyncReadExt + Unpin + Send + 'static,
     stderr: impl AsyncReadExt + Unpin + Send + 'static,
     file: Option<&mut File>,
+    stop_reads: watch::Receiver<bool>,
 ) {
     let (stdout_tx, stdout_rx) = mpsc::channel::<Vec<u8>>(1000);
     let (stderr_tx, stderr_rx) = mpsc::channel::<Vec<u8>>(1000);
 
-    let stdout_task = tokio::spawn(read_pipe(stdout, stdout_tx));
-    let stderr_task = tokio::spawn(read_pipe(stderr, stderr_tx));
-
-    process_logs(log, stdout_rx, stderr_rx, file).await;
-
-    let _ = tokio::join!(stdout_task, stderr_task);
+    // These owned futures are joined, never detached. Cancelling the run drops
+    // readers as well; normal exit keeps processing until their queues settle.
+    tokio::join!(
+        read_pipe(stdout, stdout_tx, stop_reads.clone()),
+        read_pipe(stderr, stderr_tx, stop_reads),
+        process_logs(log, stdout_rx, stderr_rx, file),
+    );
 }
 
 async fn read_pipe(
     mut pipe: impl AsyncReadExt + Unpin + Send + 'static,
     tx: mpsc::Sender<Vec<u8>>,
+    mut stop_reads: watch::Receiver<bool>,
 ) {
     let mut buf = [0; 1024];
 
     loop {
-        match pipe.read(&mut buf).await {
+        let read = tokio::select! {
+            biased;
+            _ = async {
+                loop {
+                    if *stop_reads.borrow_and_update() { break; }
+                    if stop_reads.changed().await.is_err() { std::future::pending::<()>().await; }
+                }
+            } => break,
+            read = pipe.read(&mut buf) => read,
+        };
+        match read {
             Ok(size) if size != 0 => {
                 if let Err(e) = tx.send(buf[..size].to_vec()).await {
                     tracing::error!("Failed to send data through channel: {}", e);
@@ -2034,6 +2101,305 @@ mod tests {
             )
             .await?;
         Ok(())
+    }
+
+    async fn task17_owned_manager() -> (InstanceManager, mpsc::Receiver<()>) {
+        let manager = InstanceManager::new();
+        let (tx, rx) = mpsc::channel(1);
+        manager.instances.write().await.insert(
+            InstanceId(17),
+            Instance {
+                shortpath: "synthetic-stop".into(),
+                type_: InstanceType::Valid(instance_data_with_state(LaunchState::Running(
+                    RunningInstance {
+                        task_id: None,
+                        process_id: 17,
+                        kill_tx: Some(tx),
+                        process_start_time: None,
+                        start_time: Utc::now(),
+                        log: None,
+                        playtime: None,
+                    },
+                ))),
+            },
+        );
+        (manager, rx)
+    }
+
+    #[tokio::test]
+    async fn task17_stop_duplicate_hook_window_releases_map() {
+        let (manager, mut rx) = task17_owned_manager().await;
+        manager.request_instance_stop(InstanceId(17)).await.unwrap();
+        // Receiver is held but unpolled, representing the post-exit hook window.
+        let duplicate = manager.request_instance_stop(InstanceId(17));
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), duplicate)
+                .await
+                .is_ok(),
+            "duplicate Stop must complete while receiver is retained"
+        );
+        let mut map = tokio::time::timeout(Duration::from_millis(50), manager.instances.write())
+            .await
+            .unwrap();
+        map.get_mut(&InstanceId(17))
+            .unwrap()
+            .data_mut()
+            .unwrap()
+            .state = LaunchState::Inactive { failed_task: None };
+        assert_eq!(rx.try_recv(), Ok(()));
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[tokio::test]
+    async fn task17_stop_cancel_and_closed_controls() {
+        let (manager, rx) = task17_owned_manager().await;
+        manager.request_instance_stop(InstanceId(17)).await.unwrap();
+        let pending = manager.request_instance_stop(InstanceId(17));
+        let _ = tokio::time::timeout(Duration::from_millis(10), pending).await;
+        assert!(
+            tokio::time::timeout(Duration::from_millis(50), manager.instances.write())
+                .await
+                .is_ok()
+        );
+        drop(rx);
+        assert!(manager.request_instance_stop(InstanceId(17)).await.is_err());
+        assert!(
+            manager
+                .request_instance_stop(InstanceId(999))
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn task17_drain_ready_exit_retains_both_streams() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session.log");
+        let mut file = File::create(&path).await.unwrap();
+        let (tx, rx) = watch::channel(GameLog::new());
+        let stdout = std::io::Cursor::new(b"stdout diagnostic\n".to_vec());
+        let stderr = std::io::Cursor::new(b"stderr diagnostic\n".to_vec());
+        let (stop, stop_rx) = watch::channel(false);
+        let (_, incomplete) = supervise_logs(
+            std::future::ready(()),
+            read_logs(&tx, stdout, stderr, Some(&mut file), stop_rx),
+            stop,
+            || tokio::time::sleep(POST_EXIT_LOG_GRACE),
+        )
+        .await;
+        assert!(!incomplete);
+        file.flush().await.unwrap();
+        let bytes = tokio::fs::read(path).await.unwrap();
+        assert_eq!(bytes.len(), 36, "exit cancelled diagnostic delivery");
+        assert_eq!(
+            rx.borrow().search("diagnostic", true, false, false).len(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn task17_drain_alone_control() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session.log");
+        let mut file = File::create(&path).await.unwrap();
+        let (tx, rx) = watch::channel(GameLog::new());
+        read_logs(
+            &tx,
+            std::io::Cursor::new(b"stdout diagnostic\n".to_vec()),
+            std::io::Cursor::new(b"stderr diagnostic\n".to_vec()),
+            Some(&mut file),
+            watch::channel(false).1,
+        )
+        .await;
+        file.flush().await.unwrap();
+        assert_eq!(tokio::fs::read(path).await.unwrap().len(), 36);
+        assert_eq!(
+            rx.borrow().search("diagnostic", true, false, false).len(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn task17_stop_waiting_for_map_can_cancel_and_adopted_stays_separate() {
+        let (manager, mut rx) = task17_owned_manager().await;
+        let mut map = manager.instances.write().await;
+        assert!(
+            tokio::time::timeout(
+                Duration::from_millis(10),
+                manager.request_instance_stop(InstanceId(17))
+            )
+            .await
+            .is_err()
+        );
+        assert!(rx.try_recv().is_err());
+        let LaunchState::Running(run) = &mut map
+            .get_mut(&InstanceId(17))
+            .unwrap()
+            .data_mut()
+            .unwrap()
+            .state
+        else {
+            panic!()
+        };
+        run.kill_tx = None;
+        run.process_start_time = Some(123);
+        drop(map);
+        assert_eq!(
+            manager.request_instance_stop(InstanceId(17)).await.unwrap(),
+            Some((17, Some(123)))
+        );
+        manager
+            .instances
+            .write()
+            .await
+            .get_mut(&InstanceId(17))
+            .unwrap()
+            .data_mut()
+            .unwrap()
+            .state = LaunchState::Inactive { failed_task: None };
+        assert!(manager.request_instance_stop(InstanceId(17)).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn task17_drain_inherited_pipe_deadline_preserves_delivered_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("session.log");
+        let mut file = File::create(&path).await.unwrap();
+        let (tx, mut rx) = watch::channel(GameLog::new());
+        let (mut writer, reader) = tokio::io::duplex(64);
+        writer.write_all(b"retained diagnostic\n").await.unwrap();
+        let (stop, stop_rx) = watch::channel(false);
+        // Controlled deadline becomes ready only after the real processor published
+        // the chunk. The writer deliberately retains its pipe after child completion.
+        let deadline = async move {
+            while rx
+                .borrow()
+                .search("diagnostic", true, false, false)
+                .is_empty()
+            {
+                rx.changed().await.unwrap();
+            }
+        };
+        let (_, incomplete) = tokio::time::timeout(
+            Duration::from_secs(1),
+            supervise_logs(
+                std::future::ready(()),
+                read_logs(&tx, reader, tokio::io::empty(), Some(&mut file), stop_rx),
+                stop,
+                || deadline,
+            ),
+        )
+        .await
+        .unwrap();
+        assert!(incomplete);
+        file.flush().await.unwrap();
+        assert_eq!(
+            tokio::fs::read(path).await.unwrap(),
+            b"retained diagnostic\n"
+        );
+        assert!(
+            writer.write_all(b"after deadline").await.is_err(),
+            "reader must be owned and closed before return"
+        );
+    }
+
+    #[tokio::test]
+    async fn task17_drain_eof_keeps_stop_supervision_alive() {
+        let (stop, stop_rx) = watch::channel(false);
+        let (tx, _rx) = watch::channel(GameLog::new());
+        let (finish_tx, finish_rx) = tokio::sync::oneshot::channel();
+        let (result, control) = tokio::join!(
+            supervise_logs(
+                async {
+                    finish_rx.await.unwrap();
+                    17
+                },
+                read_logs(&tx, tokio::io::empty(), tokio::io::empty(), None, stop_rx),
+                stop,
+                || std::future::pending()
+            ),
+            async {
+                tokio::task::yield_now().await;
+                finish_tx.send(()).unwrap();
+            }
+        );
+        assert_eq!(result, (17, false));
+        assert_eq!(control, ());
+    }
+
+    #[tokio::test]
+    async fn task17_drain_deadline_finishes_a_chunk_waiting_to_enqueue() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("queued.log");
+        let mut file = File::create(&path).await.unwrap();
+        let (tx, rx) = watch::channel(GameLog::new());
+        let (stop, stop_rx) = watch::channel(false);
+        let (queue, queued) = mpsc::channel(1);
+        queue.send(b"first diagnostic\n".to_vec()).await.unwrap();
+        let reader = read_pipe(std::io::Cursor::new(b"second diagnostic\n"), queue, stop_rx);
+        tokio::pin!(reader);
+        assert!(futures::poll!(&mut reader).is_pending()); // chunk read, enqueue blocked
+        stop.send_replace(true);
+        let (other_tx, other_rx) = mpsc::channel(1);
+        drop(other_tx);
+        tokio::join!(
+            &mut reader,
+            process_logs(&tx, queued, other_rx, Some(&mut file))
+        );
+        file.flush().await.unwrap();
+        assert_eq!(
+            tokio::fs::read(path).await.unwrap(),
+            b"first diagnostic\nsecond diagnostic\n"
+        );
+        assert_eq!(
+            rx.borrow().search("diagnostic", true, false, false).len(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn task17_drain_stop_and_split_xml_keep_sources() {
+        let (manager, mut stop_rx) = task17_owned_manager().await;
+        manager.request_instance_stop(InstanceId(17)).await.unwrap();
+        let (tx, rx) = watch::channel(GameLog::new());
+        let (mut writer, reader) = tokio::io::duplex(16);
+        let (cancel, cancel_rx) = watch::channel(false);
+        let xml = format_message_as_log4j_event("stdout complete");
+        let (result, written) = tokio::join!(
+            supervise_logs(
+                async { stop_rx.recv().await.unwrap() },
+                read_logs(
+                    &tx,
+                    reader,
+                    std::io::Cursor::new(b"stderr complete\n"),
+                    None,
+                    cancel_rx
+                ),
+                cancel,
+                || tokio::time::sleep(POST_EXIT_LOG_GRACE)
+            ),
+            async {
+                for chunk in xml.as_bytes().chunks(3) {
+                    writer.write_all(chunk).await.unwrap();
+                }
+                drop(writer);
+            }
+        );
+        assert!(!result.1);
+        assert_eq!(written, ());
+        let log = rx.borrow();
+        let a = log.search("stdout complete", true, false, false);
+        let b = log.search("stderr complete", true, false, false);
+        assert_eq!(a.len(), 1);
+        assert_eq!(b.len(), 1);
+        assert_eq!(
+            log.get_entry(a[0].entry_index).unwrap().source_kind,
+            LogEntrySourceKind::StdOut
+        );
+        assert_eq!(
+            log.get_entry(b[0].entry_index).unwrap().source_kind,
+            LogEntrySourceKind::StdErr
+        );
     }
 
     // --- shutdown_running ---------------------------------------------

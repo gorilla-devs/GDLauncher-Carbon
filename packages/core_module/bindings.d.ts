@@ -731,7 +731,7 @@ export type MRFEProjectVersionsFilters = { project_id: MRFEProjectID; game_versi
  */
 export type FECancelDeletionStatus = "success" | "noScheduledDeletion" | { failed: string | null }
 
-export type FESearchResult = { entry_index: number; pos: number; len: number }
+export type FERequestNewEmailChangeStatus = { status: "success" } | { status: "failed"; value: number | null }
 
 export type WhitelistEntry = { uuid: string; name: string }
 

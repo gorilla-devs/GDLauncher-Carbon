@@ -97,6 +97,11 @@ pub struct InstanceManager {
             ),
         >,
     >,
+    // One independent disk-history initialization per instance; never tied to live logs.
+    log_history: DashMap<InstanceId, Arc<Mutex<bool>>>,
+    /// Stops the installed-version check of a running version change (see
+    /// `cancel_version_change_check`).
+    version_change_checks: modpack::VersionChangeChecks,
     modpack_info_semaphore: Mutex<()>,
     pub any_instance_running: Arc<watch::Sender<bool>>,
     instance_running_tracker: Arc<LivenessTracker>,
@@ -263,6 +268,8 @@ impl InstanceManager {
             import_manager: InstanceImportManager::new(),
             export_manager: InstanceExportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
+            log_history: DashMap::new(),
+            version_change_checks: DashMap::new(),
             modpack_info_semaphore: Mutex::new(()),
             any_instance_running: any_instance_running.clone(),
             instance_running_tracker: LivenessTracker::new(move |count| {
@@ -2979,9 +2986,22 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?
             .map(|inst| GroupId(inst.group_id));
 
-        self.remove_instance(instance_id).await?;
-        self.instances.write().await.remove(&instance_id);
-        drop(path_guard);
+        {
+            // The row and the loaded entry go together, so whoever holds
+            // path_lock sees the folder name either reserved or free.
+            let _path_guard = self.path_lock.lock().await;
+            self.remove_instance(instance_id).await?;
+            self.instances.write().await.remove(&instance_id);
+            // Retired before the logs, so a Logs tab still loading this
+            // instance's past logs adds none back (see `get_logs`).
+            self.log_history.remove(&instance_id);
+            self.game_logs
+                .write()
+                .await
+                .retain(|_, (id, _, _)| *id != instance_id);
+            self.unsaved_playtime.remove(&instance_id);
+        }
+        self.app.meta_cache_manager().gc_mod_metadata().await;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);

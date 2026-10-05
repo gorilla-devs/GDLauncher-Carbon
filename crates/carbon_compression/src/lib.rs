@@ -203,33 +203,38 @@ where
     let path_clone = path.as_ref().to_path_buf();
     let dest_folder_clone = dest_folder.to_path_buf();
 
-    let task_handler = tokio::task::spawn_blocking(move || {
-        let mut file = std::fs::File::open(&path_clone)?;
-        let file_clone = std::fs::File::open(&path_clone)?;
-        let format = detect_compression_format(&mut file)?;
-        trace!("Starting compression for file: {path_clone:?} to {dest_folder_clone:?}");
-        trace!("Detected compression format: {format:?}");
-
-        match format {
-            CompressionFormat::Zip => {
-                let mut archive = zip::ZipArchive::new(file_clone)?;
-                decompress_zip(&mut archive, &dest_folder_clone)?;
-            }
-            CompressionFormat::Tar => {
-                let mut archive = tar::Archive::new(file_clone);
-                decompress_tar(&mut archive, &dest_folder_clone)?;
-            }
-            CompressionFormat::Gzip => {
-                decompress_gzip(&path_clone, &dest_folder_clone)?;
-            }
-        }
-
-        Ok::<(), CompressionError>(())
-    });
+    let task_handler =
+        tokio::task::spawn_blocking(move || decompress_blocking(&path_clone, &dest_folder_clone));
 
     task_handler.await??;
 
     Ok(())
+}
+
+/// Synchronous extraction for callers that already own a blocking worker and its
+/// destination lifetime. The async wrapper uses this same format/path/link policy.
+pub fn decompress_blocking(path: &Path, dest_folder: &Path) -> Result<(), CompressionError> {
+    let mut file = std::fs::File::open(path)?;
+    let file_clone = std::fs::File::open(path)?;
+    let format = detect_compression_format(&mut file)?;
+    trace!("Starting compression for file: {path:?} to {dest_folder:?}");
+    trace!("Detected compression format: {format:?}");
+
+    match format {
+        CompressionFormat::Zip => {
+            let mut archive = zip::ZipArchive::new(file_clone)?;
+            decompress_zip(&mut archive, dest_folder)?;
+        }
+        CompressionFormat::Tar => {
+            let mut archive = tar::Archive::new(file_clone);
+            decompress_tar(&mut archive, dest_folder)?;
+        }
+        CompressionFormat::Gzip => {
+            decompress_gzip(path, dest_folder)?;
+        }
+    }
+
+    Ok::<(), CompressionError>(())
 }
 
 #[cfg(test)]

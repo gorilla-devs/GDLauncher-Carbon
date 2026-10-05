@@ -5,7 +5,11 @@ use serde::Serialize;
 use std::{
     borrow::Cow,
     ops::{Bound, RangeBounds},
-    sync::atomic::{AtomicI32, Ordering},
+    path::Path,
+    sync::{
+        Arc,
+        atomic::{AtomicI32, Ordering},
+    },
     time::Instant,
 };
 use unicode_segmentation::UnicodeSegmentation;
@@ -13,8 +17,8 @@ use unicode_segmentation::UnicodeSegmentation;
 use thiserror::Error;
 use tokio::{
     fs::File,
-    io::{AsyncReadExt, AsyncWriteExt},
-    sync::watch,
+    io::AsyncWriteExt,
+    sync::{Mutex, watch},
 };
 
 use crate::{api::keys::instance::*, domain::instance::GameLogEntry};
@@ -51,7 +55,10 @@ impl GameLog {
         let mut results = Vec::new();
 
         let regex = if use_regex {
-            match regex::Regex::new(query) {
+            match regex::RegexBuilder::new(query)
+                .case_insensitive(!match_case)
+                .build()
+            {
                 Ok(r) => Some(r),
                 Err(_) => return vec![],
             }
@@ -60,6 +67,16 @@ impl GameLog {
         };
 
         for (entry_index, entry) in self.entries.iter().enumerate() {
+            if let Some(regex) = &regex {
+                for mat in regex.find_iter(&entry.message) {
+                    results.push(SearchResult {
+                        entry_index,
+                        pos: entry.message[..mat.start()].encode_utf16().count(),
+                        len: entry.message[mat.start()..mat.end()].encode_utf16().count(),
+                    });
+                }
+                continue;
+            }
             let message: Cow<str> = if match_case {
                 entry.message.as_str().into()
             } else {
@@ -74,19 +91,58 @@ impl GameLog {
             let message_graphemes: Vec<&str> = message.graphemes(true).collect();
             let query_graphemes: Vec<&str> = search_query.graphemes(true).collect();
 
-            if use_regex {
-                if let Some(regex) = &regex {
-                    for mat in regex.find_iter(&message) {
-                        let start_grapheme_pos = message[..mat.start()].graphemes(true).count();
-                        let end_grapheme_pos = message[..mat.end()].graphemes(true).count();
-                        results.push(SearchResult {
-                            entry_index,
-                            pos: start_grapheme_pos,
-                            len: end_grapheme_pos - start_grapheme_pos,
-                        });
-                    }
-                }
-            } else if match_whole_word {
+            // Literal matching keeps its grapheme/overlap/word rules on the folded
+            // string. Only the returned spans are mapped back to the original text.
+            let mut folded_bytes = 0;
+            let mut utf16 = 0;
+            let original_spans: Vec<_> = entry
+                .message
+                .chars()
+                .map(|ch| {
+                    let width = if match_case {
+                        ch.len_utf8()
+                    } else {
+                        ch.to_lowercase().map(char::len_utf8).sum()
+                    };
+                    let span = (
+                        folded_bytes,
+                        folded_bytes + width,
+                        utf16,
+                        utf16 + ch.len_utf16(),
+                    );
+                    folded_bytes += width;
+                    utf16 += ch.len_utf16();
+                    span
+                })
+                .collect();
+            let boundaries: Vec<usize> = message
+                .grapheme_indices(true)
+                .map(|(i, _)| i)
+                .chain(std::iter::once(message.len()))
+                .collect();
+            let literal_span = |pos: usize, len: usize| {
+                let start = boundaries[pos];
+                let end = boundaries[pos + len];
+                let begin = original_spans
+                    .get(original_spans.partition_point(|(_, b, _, _)| *b <= start))
+                    .map(|(_, _, a, _)| *a)
+                    .unwrap_or(utf16);
+                let finish = if start == end {
+                    begin
+                } else {
+                    original_spans
+                        .get(
+                            original_spans
+                                .partition_point(|(a, _, _, _)| *a < end)
+                                .saturating_sub(1),
+                        )
+                        .map(|(_, _, _, b)| *b)
+                        .unwrap_or(begin)
+                };
+                (begin, finish - begin)
+            };
+
+            if match_whole_word {
                 let mut pos = 0;
                 while pos < message_graphemes.len() {
                     if message_graphemes[pos..].starts_with(&query_graphemes) {
@@ -108,8 +164,8 @@ impl GameLog {
                         if is_word_start && is_word_end {
                             results.push(SearchResult {
                                 entry_index,
-                                pos,
-                                len: query_graphemes.len(),
+                                pos: literal_span(pos, query_graphemes.len()).0,
+                                len: literal_span(pos, query_graphemes.len()).1,
                             });
                         }
                     }
@@ -121,8 +177,8 @@ impl GameLog {
                     if message_graphemes[pos..].starts_with(&query_graphemes) {
                         results.push(SearchResult {
                             entry_index,
-                            pos,
-                            len: query_graphemes.len(),
+                            pos: literal_span(pos, query_graphemes.len()).0,
+                            len: literal_span(pos, query_graphemes.len()).1,
                         });
                     }
                     pos += 1;
@@ -307,7 +363,9 @@ impl GameLog {
 #[derive(Debug)]
 pub struct SearchResult {
     pub entry_index: usize,
+    /// UTF-16 code units in the original message (JavaScript slice offsets).
     pub pos: usize,
+    /// UTF-16 code units in the original matched substring.
     pub len: usize,
 }
 
@@ -318,18 +376,9 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         datetime: Option<DateTime<Local>>,
     ) -> (GameLogId, watch::Sender<GameLog>) {
-        let (log_tx, log_rx) = watch::channel(GameLog::new());
-        let id = GameLogId(LOG_ID.fetch_add(1, Ordering::Relaxed));
-
-        let current_datetime = datetime.unwrap_or_else(chrono::Local::now);
-
-        self.game_logs
-            .write()
-            .await
-            .insert(id, (instance_id, current_datetime, log_rx));
+        let result = self.register_log(instance_id, datetime).await;
         self.app.invalidate(GET_LOGS, None);
-
-        (id, log_tx)
+        result
     }
 
     pub async fn delete_log(self, id: GameLogId) -> anyhow::Result<()> {
@@ -438,90 +487,37 @@ impl ManagerRef<'_, InstanceManager> {
                 .collect()
         }
 
-        // Get instance logs path for file size computation
-        let logs_path = {
+        // The gate is held only for this snapshot, taken against root
+        // rename/delete. Reading and parsing past logs can take seconds on a
+        // large pack, and must not hold up Play, settings or the game's state
+        // changes meanwhile. A delete retires this history registration
+        // under the gate, so a load it overtakes adds nothing back.
+        let (logs_path, history) = {
+            let _instance_guard = self.lock_instance(instance_id).await;
             let instance_lock = self.instances.read().await;
-            instance_lock.get(&instance_id).map(|v| {
-                self.app
-                    .settings_manager()
-                    .runtime_path
-                    .get_instances()
-                    .get_instance_path(&v.shortpath)
-                    .get_gdl_logs_path()
-            })
+            match instance_lock.get(&instance_id) {
+                Some(v) => (
+                    Some(
+                        self.app
+                            .settings_manager()
+                            .runtime_path
+                            .get_instances()
+                            .get_instance_path(&v.shortpath)
+                            .get_gdl_logs_path(),
+                    ),
+                    Some(self.log_history_state(instance_id)),
+                ),
+                None => (None, None),
+            }
         };
 
-        let in_memory_logs =
-            read_logs_from_memory(self.clone(), instance_id, logs_path.clone()).await;
-
-        if in_memory_logs.len() == 0 {
-            let instance_lock = self.instances.read().await;
-            let Some(shortpath) = instance_lock.get(&instance_id).map(|v| v.shortpath.clone())
-            else {
-                tracing::error!("instance id {instance_id} not found in instances");
-                return in_memory_logs;
-            };
-            drop(instance_lock);
-
-            let instance_logs_path = self
-                .app
-                .settings_manager()
-                .runtime_path
-                .get_instances()
-                .get_instance_path(&shortpath)
-                .get_gdl_logs_path();
-
-            if instance_logs_path.exists() {
-                let Ok(instance_logs_path) = instance_logs_path.read_dir() else {
-                    tracing::error!("Failed to read instance logs directory");
-                    return in_memory_logs;
-                };
-
-                for entry in instance_logs_path {
-                    let Ok(entry) = entry else {
-                        tracing::error!("Failed to read log file entry");
-                        continue;
-                    };
-                    let file_name = entry.file_name();
-                    let file_name = file_name.to_string_lossy();
-
-                    if file_name.ends_with(".log") {
-                        let file_datetime_str = file_name
-                            .strip_suffix(".log")
-                            .expect("file name should end with .log because we just checked that");
-
-                        let Ok(naive) =
-                            NaiveDateTime::parse_from_str(file_datetime_str, "%Y-%m-%d_%H-%M-%S")
-                        else {
-                            continue;
-                        };
-
-                        // Use from_local_datetime since the filename is in local time
-                        let Some(file_as_datetime) = Local.from_local_datetime(&naive).single()
-                        else {
-                            continue;
-                        };
-
-                        let (log_id, tx) =
-                            self.create_log(instance_id, Some(file_as_datetime)).await;
-
-                        // read the file and send it to the log
-                        let Ok(mut file) = tokio::fs::File::open(entry.path()).await else {
-                            tracing::error!({ file_name = ?file_name }, "Failed to open log file");
-                            continue;
-                        };
-
-                        let mut stdout_processor =
-                            LogProcessor::new(LogEntrySourceKind::StdOut, &tx).await;
-
-                        let mut buf = Vec::new();
-                        let _ = file.read_to_end(&mut buf).await;
-
-                        if let Err(e) = stdout_processor.process_data(&buf, None).await {
-                            tracing::error!({ error = ?e }, "Failed to process stdout data");
-                        }
-                    }
-                }
+        if let (Some(path), Some(history)) = (&logs_path, &history) {
+            #[cfg(test)]
+            self.test_hooks.pause("log_history", instance_id).await;
+            match self.load_log_history_into(instance_id, path, history).await {
+                Ok(true) => self.app.invalidate(GET_LOGS, None),
+                Ok(false) => {}
+                Err(error) => tracing::error!(%error, "Failed to initialize retained log history"),
             }
         }
 
@@ -540,6 +536,187 @@ impl ManagerRef<'_, InstanceManager> {
         let log = log.borrow();
 
         Ok(log.search(query, match_case, match_whole_word, use_regex))
+    }
+}
+
+impl InstanceManager {
+    async fn register_log(
+        &self,
+        instance_id: InstanceId,
+        datetime: Option<DateTime<Local>>,
+    ) -> (GameLogId, watch::Sender<GameLog>) {
+        let (log_tx, log_rx) = watch::channel(GameLog::new());
+        let id = GameLogId(LOG_ID.fetch_add(1, Ordering::Relaxed));
+
+        let current_datetime = datetime.unwrap_or_else(chrono::Local::now);
+
+        let mut logs = self.game_logs.write().await;
+        // If history won the IO race, promote that record to the new live receiver.
+        // An already-live same-second launch retains the pre-existing filename limitation.
+        let existing = logs
+            .iter()
+            .find(|(_, (owner, date, rx))| {
+                *owner == instance_id
+                    && rx.has_changed().is_err()
+                    && date.format("%Y-%m-%d_%H-%M-%S").to_string()
+                        == current_datetime.format("%Y-%m-%d_%H-%M-%S").to_string()
+            })
+            .map(|(id, _)| *id);
+        let id = existing.unwrap_or(id);
+        logs.insert(id, (instance_id, current_datetime, log_rx));
+        (id, log_tx)
+    }
+
+    /// This instance's history registration: one load at a time, and loaded
+    /// entries are kept only while it is still the registered one.
+    pub(super) fn log_history_state(&self, instance_id: InstanceId) -> Arc<Mutex<bool>> {
+        self.log_history.entry(instance_id).or_default().clone()
+    }
+
+    #[cfg(test)]
+    async fn load_log_history(
+        &self,
+        instance_id: InstanceId,
+        path: &std::path::Path,
+    ) -> anyhow::Result<bool> {
+        let state = self.log_history_state(instance_id);
+        self.load_log_history_into(instance_id, path, &state).await
+    }
+
+    pub(super) async fn load_log_history_into(
+        &self,
+        instance_id: InstanceId,
+        path: &std::path::Path,
+        state: &Arc<Mutex<bool>>,
+    ) -> anyhow::Result<bool> {
+        let mut initialized = state.lock().await;
+        if *initialized {
+            return Ok(false);
+        }
+        let entries = match tokio::fs::read_dir(path).await {
+            Ok(entries) => entries,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                // No logs folder in a folder that is there: nothing played
+                // yet. With the folder itself gone (renamed meanwhile) the
+                // next look tries the new one.
+                *initialized = path.parent().is_some_and(Path::exists);
+                return Ok(false);
+            }
+            Err(e) => return Err(e.into()),
+        };
+        let entries = futures::stream::unfold(entries, |mut entries| async move {
+            match entries.next_entry().await {
+                Ok(Some(entry)) => Some((Ok(entry.path()), entries)),
+                Ok(None) => None,
+                Err(error) => Some((Err(error), entries)),
+            }
+        });
+        let changed = self
+            .merge_log_history_entries(instance_id, state, entries)
+            .await?;
+        *initialized = true;
+        Ok(changed)
+    }
+
+    async fn merge_log_history_entries(
+        &self,
+        instance_id: InstanceId,
+        state: &Arc<Mutex<bool>>,
+        entries: impl futures::Stream<Item = std::io::Result<std::path::PathBuf>>,
+    ) -> anyhow::Result<bool> {
+        let mut changed = false;
+        let mut failures = 0usize;
+        let mut first_error = None;
+        let mut record_failure = |error: anyhow::Error| {
+            tracing::warn!(%error, "Failed to load retained log history entry");
+            failures += 1;
+            if first_error.is_none() {
+                first_error = Some(error);
+            }
+        };
+        use futures::StreamExt;
+        tokio::pin!(entries);
+        while let Some(entry) = entries.next().await {
+            let path = match entry {
+                Ok(path) => path,
+                Err(error) => {
+                    record_failure(anyhow::anyhow!(
+                        "Failed to enumerate retained log entry: {error}"
+                    ));
+                    continue;
+                }
+            };
+            let name = path.file_name().expect("directory entries have filenames");
+            let name = name.to_string_lossy();
+            let Some(stem) = name.strip_suffix(".log") else {
+                continue;
+            };
+            let Ok(naive) = NaiveDateTime::parse_from_str(stem, "%Y-%m-%d_%H-%M-%S") else {
+                continue;
+            };
+            let Some(datetime) = Local.from_local_datetime(&naive).single() else {
+                continue;
+            };
+            let matches = |id: &InstanceId, date: &DateTime<Local>| {
+                *id == instance_id && date.format("%Y-%m-%d_%H-%M-%S").to_string() == stem
+            };
+            if self
+                .game_logs
+                .read()
+                .await
+                .values()
+                .any(|(id, date, _)| matches(id, date))
+            {
+                continue;
+            }
+            let bytes = match tokio::fs::read(&path).await {
+                Ok(bytes) => bytes,
+                Err(error) => {
+                    record_failure(anyhow::anyhow!(
+                        "Failed to read retained log {}: {error}",
+                        path.display()
+                    ));
+                    continue;
+                }
+            };
+            let (tx, rx) = watch::channel(GameLog::new());
+            if let Err(error) = LogProcessor::new(LogEntrySourceKind::StdOut, &tx)
+                .await
+                .process_data(&bytes, None)
+                .await
+            {
+                record_failure(anyhow::anyhow!(
+                    "Failed to process retained log {}: {error}",
+                    path.display()
+                ));
+                continue;
+            }
+            drop(tx);
+            // create_log may have registered this same filename while IO was pending.
+            let mut logs = self.game_logs.write().await;
+            // A delete retired this registration while the file was read
+            // (it does so before clearing the instance's logs).
+            let retired = !self
+                .log_history
+                .get(&instance_id)
+                .is_some_and(|current| Arc::ptr_eq(&current, state));
+            if retired {
+                return Ok(changed);
+            }
+            if !logs.values().any(|(id, date, _)| matches(id, date)) {
+                let id = GameLogId(LOG_ID.fetch_add(1, Ordering::Relaxed));
+                logs.insert(id, (instance_id, datetime, rx));
+                changed = true;
+            }
+        }
+        // Healthy entries are already merged. Keep initialization incomplete so a
+        // later request retries failures without replacing healthy/live receivers.
+        if let Some(error) = first_error {
+            anyhow::bail!(
+                "Failed to load {failures} retained log history entries; first error: {error}"
+            );
+        }
+        Ok(changed)
     }
 }
 
@@ -789,5 +966,282 @@ mod test {
 
         let results = log.search("els", false, false, false);
         println!("{:?}", results);
+    }
+}
+
+#[cfg(test)]
+mod task17_tests {
+    use super::*;
+
+    fn log(message: &str) -> GameLog {
+        let mut log = GameLog::new();
+        log.add_entry(LogEntry::plaintext(message, LogEntrySourceKind::StdOut));
+        log
+    }
+
+    #[test]
+    fn task17_search_regex_case_toggle() {
+        let log = log("ERROR launching Minecraft");
+        assert_eq!(log.search("ERROR", false, false, true).len(), 1);
+        assert_eq!(log.search("ERROR", true, false, true).len(), 1);
+        assert_eq!(log.search("error", false, false, true).len(), 1);
+        assert_eq!(log.search("ERROR", false, false, false).len(), 1);
+        assert!(log.search("error", true, false, true).is_empty());
+        assert!(log.search("[", false, false, true).is_empty());
+        assert_eq!(log.search(r"\p{Lu}+", true, false, true).len(), 2);
+    }
+
+    #[test]
+    fn task17_search_original_utf16_spans() {
+        for message in [
+            "😀 ERROR",
+            "e\u{301} ERROR",
+            "İ ERROR",
+            "👩‍💻 ERROR",
+            "ascii ERROR",
+        ] {
+            for regex in [false, true] {
+                let results = log(message).search("error", false, false, regex);
+                assert_eq!(results.len(), 1, "{message} regex={regex}");
+                let units: Vec<u16> = message.encode_utf16().collect();
+                let r = &results[0];
+                assert_eq!(
+                    String::from_utf16(&units[r.pos..r.pos + r.len]).unwrap(),
+                    "ERROR",
+                    "{message} regex={regex}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn task17_search_literal_controls() {
+        assert_eq!(log("banana").search("ana", true, false, false).len(), 2);
+        assert_eq!(
+            log("error terror error_ error!")
+                .search("error", false, true, false)
+                .len(),
+            3
+        );
+        assert!(log("e\u{301}").search("e", true, false, false).is_empty());
+        let r = log("İ").search("i\u{307}", false, false, false);
+        assert_eq!((r[0].pos, r[0].len), (0, 1));
+    }
+
+    #[tokio::test]
+    async fn task17_history_play_before_logs_preserves_live_receiver() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path().join("2025-01-14_12-00-00.log"),
+            b"retained history\n",
+        )
+        .unwrap();
+        let manager = InstanceManager::new();
+        let id = InstanceId(17);
+        let now = Local
+            .with_ymd_and_hms(2025, 1, 15, 12, 0, 0)
+            .single()
+            .unwrap();
+        let (current, tx) = manager.register_log(id, Some(now)).await;
+        std::fs::write(
+            dir.path().join("2025-01-15_12-00-00.log"),
+            b"current disk\n",
+        )
+        .unwrap();
+        manager.load_log_history(id, dir.path()).await.unwrap();
+        let logs = manager.game_logs.read().await;
+        assert_eq!(logs.len(), 2);
+        tx.send_modify(|log| log.add_entry(LogEntry::system_message("later")));
+        assert_eq!(
+            logs[&current]
+                .2
+                .borrow()
+                .search("later", true, false, false)
+                .len(),
+            1
+        );
+        assert!(logs.values().any(|(_, _, rx)| {
+            !rx.borrow()
+                .search("retained", true, false, false)
+                .is_empty()
+        }));
+        assert!(std::fs::read(dir.path().join("2025-01-14_12-00-00.log")).is_ok());
+    }
+
+    #[tokio::test]
+    async fn task17_history_logs_first_and_current_only() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(dir.path().join("2025-01-14_12-00-00.log"), b"retained\n").unwrap();
+        let manager = InstanceManager::new();
+        manager
+            .load_log_history(InstanceId(17), dir.path())
+            .await
+            .unwrap();
+        assert_eq!(manager.game_logs.read().await.len(), 1);
+        manager
+            .load_log_history(InstanceId(17), dir.path())
+            .await
+            .unwrap();
+        assert_eq!(manager.game_logs.read().await.len(), 1);
+        let empty = tempfile::tempdir().unwrap();
+        let manager = InstanceManager::new();
+        manager.register_log(InstanceId(17), None).await;
+        manager
+            .load_log_history(InstanceId(17), empty.path())
+            .await
+            .unwrap();
+        assert_eq!(manager.game_logs.read().await.len(), 1);
+    }
+    #[tokio::test]
+    async fn task17_history_concurrent_load_retry_and_registration_orders() {
+        let dir = tempfile::tempdir().unwrap();
+        let blocked = dir.path().join("logs");
+        std::fs::write(&blocked, b"not a directory").unwrap();
+        let manager = InstanceManager::new();
+        let id = InstanceId(17);
+        assert!(manager.load_log_history(id, &blocked).await.is_err());
+        std::fs::remove_file(&blocked).unwrap();
+        std::fs::create_dir(&blocked).unwrap();
+        std::fs::write(blocked.join("2025-01-14_12-00-00.log"), b"old\n").unwrap();
+        let (a, b) = tokio::join!(
+            manager.load_log_history(id, &blocked),
+            manager.load_log_history(id, &blocked)
+        );
+        assert!(a.unwrap());
+        assert!(!b.unwrap());
+        assert_eq!(manager.game_logs.read().await.len(), 1);
+        let date = Local
+            .with_ymd_and_hms(2025, 1, 14, 12, 0, 0)
+            .single()
+            .unwrap();
+        let (current, tx) = manager.register_log(id, Some(date)).await;
+        assert_eq!(manager.game_logs.read().await.len(), 1);
+        tx.send_modify(|log| log.add_entry(LogEntry::system_message("current")));
+        assert_eq!(manager.game_logs.read().await[&current].2.borrow().len(), 1);
+        // An initialized registry does not resurrect a log removed from memory.
+        drop(tx);
+        manager.game_logs.write().await.clear();
+        assert!(!manager.load_log_history(id, &blocked).await.unwrap());
+        assert!(manager.game_logs.read().await.is_empty());
+        // A fresh core still rediscovers the retained physical session.
+        let fresh = InstanceManager::new();
+        fresh.load_log_history(id, &blocked).await.unwrap();
+        assert_eq!(fresh.game_logs.read().await.len(), 1);
+    }
+
+    #[test]
+    fn task17_search_matching_unicode_and_regex_syntax() {
+        for (message, query, pos, len) in [
+            ("a 😀 b", "😀", 2, 2),
+            ("a e\u{301} b", "e\u{301}", 2, 2),
+            ("İ ERROR", "ERROR", 2, 5),
+        ] {
+            for regex in [false, true] {
+                let results = log(message).search(query, false, true, regex);
+                assert_eq!((results[0].pos, results[0].len), (pos, len));
+            }
+        }
+        assert_eq!(log("foo BAR").search(r"\S+", false, false, true).len(), 2);
+        assert_eq!(log("error").search("ERROR", false, false, true).len(), 1);
+        assert_eq!(log("ΟΣ").search("ος", false, false, false).len(), 1);
+    }
+    #[tokio::test]
+    async fn task17_r1_history_bad_entry_does_not_hide_later_healthy_sessions() {
+        let dir = tempfile::tempdir().unwrap();
+        let bad = dir.path().join("2025-01-14_12-00-00.log");
+        let good = dir.path().join("2025-01-15_12-00-00.log");
+        std::fs::create_dir(&bad).unwrap();
+        std::fs::write(&good, b"healthy retained\n").unwrap();
+        let manager = InstanceManager::new();
+        let id = InstanceId(17);
+        let now = Local
+            .with_ymd_and_hms(2025, 1, 16, 12, 0, 0)
+            .single()
+            .unwrap();
+        let (live, tx) = manager.register_log(id, Some(now)).await;
+        let result = manager
+            .merge_log_history_entries(
+                id,
+                &manager.log_history_state(id),
+                futures::stream::iter(vec![Ok(bad.clone()), Ok(good.clone())]),
+            )
+            .await;
+        assert!(
+            result.is_err(),
+            "failed historical identity must remain diagnosable"
+        );
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("2025-01-14_12-00-00.log")
+        );
+        assert_eq!(
+            manager.game_logs.read().await.len(),
+            2,
+            "a failed earlier entry must not hide healthy later history"
+        );
+        let healthy_id = *manager
+            .game_logs
+            .read()
+            .await
+            .keys()
+            .find(|log| **log != live)
+            .unwrap();
+        tx.send_modify(|log| log.add_entry(LogEntry::system_message("still live")));
+        assert_eq!(
+            manager.game_logs.read().await[&live]
+                .2
+                .borrow()
+                .search("still live", true, false, false)
+                .len(),
+            1
+        );
+        assert!(manager.load_log_history(id, dir.path()).await.is_err());
+        assert_eq!(manager.game_logs.read().await.len(), 2);
+        std::fs::remove_dir(&bad).unwrap();
+        std::fs::write(&bad, b"repaired history\n").unwrap();
+        assert!(manager.load_log_history(id, dir.path()).await.unwrap());
+        let logs = manager.game_logs.read().await;
+        assert_eq!(logs.len(), 3);
+        assert!(logs.contains_key(&healthy_id));
+        assert!(logs.contains_key(&live));
+        assert!(logs.values().any(|(_, _, rx)| {
+            !rx.borrow()
+                .search("repaired", true, false, false)
+                .is_empty()
+        }));
+        drop(logs);
+        assert!(!manager.load_log_history(id, dir.path()).await.unwrap());
+    }
+
+    #[tokio::test]
+    async fn task17_r1_history_entry_enumeration_error_keeps_following_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let good = dir.path().join("2025-01-15_12-00-00.log");
+        std::fs::write(&good, b"retained after enumeration error\n").unwrap();
+        let manager = InstanceManager::new();
+        let entries = futures::stream::iter(vec![
+            Err(std::io::Error::new(
+                std::io::ErrorKind::PermissionDenied,
+                "controlled directory entry denial",
+            )),
+            Ok(good),
+        ]);
+        assert!(
+            manager
+                .merge_log_history_entries(
+                    InstanceId(17),
+                    &manager.log_history_state(InstanceId(17)),
+                    entries
+                )
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            manager.game_logs.read().await.len(),
+            1,
+            "enumeration errors must not hide later valid entries"
+        );
     }
 }

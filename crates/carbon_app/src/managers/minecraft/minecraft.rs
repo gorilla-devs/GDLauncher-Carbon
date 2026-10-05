@@ -675,10 +675,13 @@ pub async fn generate_startup_command(
         substitute_arguments(&mut command, jvm_arguments);
     }
 
-    // Extra JVM arguments come from instance/global settings and supported
-    // launcher imports. Preserve their token grammar, including legitimate
-    // agent arguments used by profilers, hot-swap tools and authlib-injector.
-    command.extend(parse_extra_java_args(extra_java_args));
+    // Extra JVM arguments come from local instance/global settings and imported
+    // installed-instance settings, including legacy GDLauncher and CurseForge.
+    // They share the persisted representation, so launch cannot infer provenance.
+    // Any source-specific sanitization/provenance policy belongs at the import
+    // boundary. Preserve the token grammar and intentional agent arguments used
+    // by profilers, hot-swap tools and authlib-injector.
+    command.extend(extra_java_launch_args(extra_java_args));
 
     if Os::native() == Os::Osx {
         let lwjgl_3 = version
@@ -833,121 +836,254 @@ pub async fn launch_minecraft(
     )?)
 }
 
+// The resolved destination is shared across instances. Weak entries can be retired
+// only under this registry lock, so concurrent callers always acquire the same gate.
+static NATIVE_CACHE_LOCKS: std::sync::LazyLock<
+    std::sync::Mutex<HashMap<PathBuf, std::sync::Weak<Mutex<()>>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
 pub async fn extract_natives(
     runtime_path: &RuntimePath,
     version: &VersionInfo,
     lwjgl_group: &LibraryGroup,
     java_arch: &JavaArch,
 ) -> anyhow::Result<()> {
-    async fn extract_single_library_natives(
-        runtime_path: &RuntimePath,
-        library: &Library,
-        dest: &Path,
-        native_name: &str,
-    ) -> anyhow::Result<()> {
-        let native_name = native_name.replace("${arch}", ARCH_WIDTH);
-        // A native may be declared for this OS without a matching download classifier
-        // (legacy/url-style or third-party libraries). The download phase skips those, so
-        // there is nothing on disk to extract; skip instead of panicking on the missing entry.
-        let Some(classifier) = library
-            .downloads
-            .as_ref()
-            .and_then(|downloads| downloads.classifiers.as_ref())
-            .and_then(|classifiers| classifiers.get(&native_name))
-        else {
-            warn!(
-                "Library `{}` declares a native for this OS but has no matching download classifier `{native_name}`; skipping native extraction",
-                library.name
-            );
-            return Ok(());
-        };
-        let path = runtime_path
-            .get_libraries()
-            .get_library_path(classifier.path.clone());
-
-        info!("Extracting natives from {}", path.display());
-
-        carbon_compression::decompress(&path, dest)
-            .await
-            .with_context(|| {
-                format!(
-                    "Failed to decompress natives from `{}` to `{}`",
-                    path.to_string_lossy(),
-                    dest.to_string_lossy()
-                )
-            })?;
-
-        Ok(())
-    }
-
-    info!("Start natives extraction for id {}", version.id);
-
-    let dest = runtime_path.get_natives().get_versioned(&version.id);
-
-    // Natives are immutable per Minecraft version and live in a directory shared by every
-    // instance on that version. Re-extracting on each launch would truncate native libraries
-    // that another instance running the same version has already loaded (a Windows sharing
-    // violation), so skip when a prior run already finished extraction here. The marker records
-    // the Java architecture the natives were extracted for: the shared directory holds only one
-    // arch's libraries, so a launch with a different-arch Java must re-extract rather than reuse
-    // mismatched natives.
-    let extraction_marker = dest.join(".gdl_natives_extracted");
-    let arch_tag = format!("{java_arch:?}");
-    let marker_matches = tokio::fs::read_to_string(&extraction_marker)
-        .await
-        .map(|marker| marker == arch_tag)
-        .unwrap_or(false);
-
-    // The marker alone is content-blind: an AV quarantine or an uneven cache wipe can
-    // remove some or all of the extracted native libraries while leaving this marker
-    // file untouched (it's an innocuous text file, not something quarantine scanners
-    // flag). Trusting the marker in that case leaves natives referenced but missing on
-    // disk, which only surfaces at launch as an opaque UnsatisfiedLinkError with nothing
-    // in the launcher's own logs pointing at it. Confirm real output still exists before
-    // taking the fast path.
-    if marker_matches && natives_dir_has_libraries(&dest).await {
-        info!(
-            "Natives for {} ({arch_tag}) already extracted; skipping",
-            version.id
-        );
-        return Ok(());
-    }
-
-    tokio::fs::create_dir_all(&dest).await?;
-
+    let mut archives = Vec::new();
     for library in version
         .libraries
         .iter()
         .chain(lwjgl_group.libraries.iter())
-        .filter(|&lib| library_is_allowed(lib, java_arch))
+        .filter(|lib| library_is_allowed(lib, java_arch))
     {
-        match &library.natives {
-            Some(natives) => {
-                if let Some(native_name) = natives.get(&Os::native_arch(java_arch)) {
-                    extract_single_library_natives(runtime_path, library, &dest, native_name)
-                        .await
-                        .with_context(|| {
-                            format!(
-                                "Failed to extract native `{}` for library `{}`",
-                                &native_name, &library.name
-                            )
-                        })?;
-                }
-            }
-            None => continue,
+        let Some(native) = library
+            .natives
+            .as_ref()
+            .and_then(|n| n.get(&Os::native_arch(java_arch)))
+        else {
+            continue;
         };
-    }
-
-    // Record completion (and the arch we extracted for) so subsequent same-arch launches skip
-    // re-extraction. Best-effort: a failed marker write must not fail an otherwise successful
-    // extraction; it only costs a redundant re-extraction next launch.
-    if let Err(e) = tokio::fs::write(&extraction_marker, arch_tag.as_bytes()).await {
-        warn!(
-            "Failed to write natives extraction marker for {}: {e:?}",
-            version.id
+        let native = native.replace("${arch}", ARCH_WIDTH);
+        let Some(classifier) = library
+            .downloads
+            .as_ref()
+            .and_then(|d| d.classifiers.as_ref())
+            .and_then(|c| c.get(&native))
+        else {
+            warn!(
+                "Library `{}` has no matching native classifier `{native}`; skipping native extraction",
+                library.name
+            );
+            continue;
+        };
+        archives.push(
+            runtime_path
+                .get_libraries()
+                .get_library_path(classifier.path.clone()),
         );
     }
+    let dest = runtime_path.get_natives().get_versioned(&version.id);
+    tokio::fs::create_dir_all(&dest).await?;
+    let dest = native_cache_key(dest).await;
+    let lock = {
+        let mut locks = NATIVE_CACHE_LOCKS.lock().unwrap();
+        locks.retain(|_, lock| lock.strong_count() > 0);
+        if let Some(lock) = locks.get(&dest).and_then(std::sync::Weak::upgrade) {
+            lock
+        } else {
+            let lock = Arc::new(Mutex::new(()));
+            locks.insert(dest.clone(), Arc::downgrade(&lock));
+            lock
+        }
+    };
+    let ownership = lock.lock_owned().await;
+    let arch_tag = format!("{java_arch:?}");
+    // The worker owns the gate and staging through all blocking IO, even if its
+    // async caller is cancelled. This is in-core coordination, not a cross-core lock.
+    tokio::task::spawn_blocking(move || {
+        let _ownership = ownership;
+        extract_native_cache(&dest, &archives, &arch_tag)
+    })
+    .await?
+}
 
+/// The natives folder as its lock key: its resolved path, so two spellings
+/// of one folder share a lock. Some Windows volumes (RAM disks, drives the
+/// Mount Manager does not map) cannot report a final path; there the folder
+/// as configured is the key, and extraction uses it as 2.0.40 did.
+async fn native_cache_key(dest: PathBuf) -> PathBuf {
+    match tokio::fs::canonicalize(&dest).await {
+        Ok(resolved) => resolved,
+        Err(error) => {
+            warn!(
+                "Could not resolve the natives folder {}: {error}",
+                dest.display()
+            );
+            dest
+        }
+    }
+}
+
+fn selected_native_outputs(
+    archives: &[PathBuf],
+    dest: &Path,
+) -> anyhow::Result<std::collections::BTreeSet<PathBuf>> {
+    let mut outputs = std::collections::BTreeSet::new();
+    for path in archives {
+        let mut archive = match zip::ZipArchive::new(std::fs::File::open(path)?) {
+            Ok(archive) => archive,
+            Err(_) => {
+                // Keep the generic extractor's TAR/TAR.GZ support. These uncommon
+                // native formats have no ZIP directory: inventory private output.
+                let staging = tempfile::Builder::new()
+                    .prefix(".gdl-native-inventory-")
+                    .tempdir_in(dest)?;
+                carbon_compression::decompress_blocking(path, staging.path())?;
+                let mut pending = vec![staging.path().to_path_buf()];
+                while let Some(directory) = pending.pop() {
+                    for entry in std::fs::read_dir(directory)? {
+                        let entry = entry?;
+                        let kind = entry.file_type()?;
+                        if kind.is_dir() {
+                            pending.push(entry.path());
+                        } else if kind.is_file() {
+                            outputs
+                                .insert(entry.path().strip_prefix(staging.path())?.to_path_buf());
+                        }
+                    }
+                }
+                continue;
+            }
+        };
+        for i in 0..archive.len() {
+            let file = archive.by_index(i)?;
+            if file.name().ends_with('/')
+                || file.unix_mode().is_some_and(|m| m & 0o170000 == 0o120000)
+            {
+                continue;
+            }
+            if let Some(path) = file.enclosed_name() {
+                outputs.insert(path.to_path_buf());
+            }
+        }
+    }
+    Ok(outputs)
+}
+
+fn native_output_present(path: &Path) -> anyhow::Result<bool> {
+    match std::fs::symlink_metadata(path) {
+        Ok(meta) if meta.is_file() => Ok(true),
+        Ok(_) => anyhow::bail!("Native output is not a regular file: {}", path.display()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
+        Err(e) => Err(e.into()),
+    }
+}
+
+// A narrow IO seam; production always uses the real filesystem primitive.
+fn native_hard_link(source: &Path, target: &Path) -> std::io::Result<()> {
+    #[cfg(test)]
+    {
+        let hook = NATIVE_LINK_TEST_HOOKS.lock().unwrap().remove(target);
+        if let Some(hook) = hook {
+            return hook(source, target);
+        }
+    }
+    std::fs::hard_link(source, target)
+}
+
+#[cfg(test)]
+static NATIVE_LINK_TEST_HOOKS: std::sync::LazyLock<
+    std::sync::Mutex<HashMap<PathBuf, Box<dyn FnOnce(&Path, &Path) -> std::io::Result<()> + Send>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
+fn publish_missing_native(source: &Path, target: &Path) -> anyhow::Result<()> {
+    if native_output_present(target)? {
+        return Ok(());
+    }
+    // Same-filesystem staging permits atomic no-clobber installation. A concurrent
+    // publisher wins without us truncating its file (including a loaded DLL).
+    match native_hard_link(source, target) {
+        Ok(()) => Ok(()),
+        Err(e)
+            if e.kind() == std::io::ErrorKind::AlreadyExists && native_output_present(target)? =>
+        {
+            Ok(())
+        }
+        Err(link_error) => {
+            // Some writable volumes cannot create hard links. Use the shared
+            // no-replace publication of the complete staged file; never copy
+            // directly to the public target. The extraction worker owns
+            // staging, including failed publication.
+            match crate::util::publish::move_noclobber(source, target) {
+                Ok(()) => Ok(()),
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::AlreadyExists
+                        && native_output_present(target)? => Ok(()),
+                Err(error) => Err(error).with_context(|| {
+                    format!("Failed to publish native {} without replacing it (hard link failed: {link_error})", target.display())
+                }),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+static NATIVE_CACHE_TEST_HOOKS: std::sync::LazyLock<
+    std::sync::Mutex<HashMap<PathBuf, Box<dyn FnOnce() + Send>>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(HashMap::new()));
+
+fn extract_native_cache(dest: &Path, archives: &[PathBuf], arch_tag: &str) -> anyhow::Result<()> {
+    let marker = dest.join(".gdl_natives_extracted");
+    let same_arch = std::fs::read_to_string(&marker)
+        .map(|s| s == arch_tag)
+        .unwrap_or(false);
+    let outputs = selected_native_outputs(archives, dest)?;
+    let mut complete = true;
+    for path in &outputs {
+        complete &= native_output_present(&dest.join(path))?;
+    }
+    if same_arch && complete {
+        return Ok(());
+    }
+
+    let staging = tempfile::Builder::new()
+        .prefix(".gdl-native-stage-")
+        .tempdir_in(dest)?;
+    #[cfg(test)]
+    {
+        let hook = NATIVE_CACHE_TEST_HOOKS.lock().unwrap().remove(dest);
+        if let Some(hook) = hook {
+            hook();
+        }
+    }
+    // Preserve the shared extractor's formats, enclosed paths, skipped links,
+    // permissions and version-then-LWJGL last-entry-wins extraction order.
+    for path in archives {
+        carbon_compression::decompress_blocking(path, staging.path())
+            .with_context(|| format!("Failed to extract native archive {}", path.display()))?;
+    }
+    for path in &outputs {
+        let target = dest.join(path);
+        if let Some(parent) = target.parent() {
+            std::fs::create_dir_all(parent)?;
+        }
+        if same_arch {
+            publish_missing_native(&staging.path().join(path), &target)?;
+        } else {
+            // Keep the existing different/unknown-architecture replacement policy.
+            // The shared version path does not provide cross-architecture live isolation.
+            std::fs::copy(staging.path().join(path), &target)?;
+        }
+    }
+    for path in &outputs {
+        anyhow::ensure!(
+            native_output_present(&dest.join(path))?,
+            "Native output missing after extraction: {}",
+            path.display()
+        );
+    }
+    if let Err(e) = std::fs::write(marker, arch_tag.as_bytes()) {
+        warn!("Failed to write natives extraction marker: {e}");
+    }
     Ok(())
 }
 
@@ -959,6 +1095,7 @@ pub async fn extract_natives(
 /// directory having been emptied or partially wiped out from under an intact marker
 /// (the marker itself never has this extension, so its mere presence can't pass this
 /// check).
+#[cfg(test)]
 async fn natives_dir_has_libraries(dest: &Path) -> bool {
     let Ok(mut entries) = tokio::fs::read_dir(dest).await else {
         return false;
@@ -1316,6 +1453,26 @@ mod tests {
         );
     }
 
+    /// Where a volume cannot report a folder's final path (some Windows RAM
+    /// disks and virtual drives), natives extraction keys its lock on the
+    /// folder as configured instead of failing every Play.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn native_cache_key_falls_back_to_the_configured_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let natives = dir.path().join("natives/1.20.1");
+        std::fs::create_dir_all(&natives).unwrap();
+        assert_eq!(
+            native_cache_key(natives.clone()).await,
+            std::fs::canonicalize(&natives).unwrap()
+        );
+        // A link that leads to itself cannot be resolved either.
+        std::os::unix::fs::symlink("loop", dir.path().join("loop")).unwrap();
+        let unresolvable = dir.path().join("loop/1.20.1");
+        assert!(std::fs::canonicalize(&unresolvable).is_err());
+        assert_eq!(native_cache_key(unresolvable.clone()).await, unresolvable);
+    }
+
     #[tokio::test]
     async fn natives_dir_has_libraries_detects_missing_native_files() {
         let native_ext = std::env::consts::DLL_EXTENSION;
@@ -1350,5 +1507,460 @@ mod tests {
         .await
         .unwrap();
         assert!(natives_dir_has_libraries(healthy.path()).await);
+    }
+}
+
+#[cfg(test)]
+mod task17_native_tests {
+    use super::*;
+    use std::io::Write;
+
+    fn fixture() -> (tempfile::TempDir, RuntimePath, VersionInfo, LibraryGroup) {
+        let dir = tempfile::tempdir().unwrap();
+        let runtime = RuntimePath::new(dir.path().to_path_buf());
+        let native_os = serde_json::to_value(Os::native_arch(&JavaArch::X86_64)).unwrap();
+        let mut natives = serde_json::Map::new();
+        natives.insert(
+            native_os.as_str().unwrap().into(),
+            serde_json::json!("native-${arch}"),
+        );
+        let lib: Library = serde_json::from_value(serde_json::json!({
+            "name":"fixture:natives:1", "natives":natives,
+            "downloads":{"classifiers":{format!("native-{}", ARCH_WIDTH):{
+                "path":"fixture/native.jar", "sha1":"", "size":0, "url":"https://fixture.invalid/native.jar"
+            }}},
+        })).unwrap();
+        let version: VersionInfo = serde_json::from_value(serde_json::json!({
+            "id":"task17", "assetIndex":{"id":"test","sha1":"","size":0,"totalSize":0,"url":"https://fixture.invalid/assets"},
+            "assets":"test", "downloads":{}, "libraries":[lib], "mainClass":"fixture.Main", "minimumLauncherVersion":0,
+            "releaseTime":"2025-01-01T00:00:00Z", "time":"2025-01-01T00:00:00Z", "type":"release"
+        })).unwrap();
+        let group: LibraryGroup = serde_json::from_value(serde_json::json!({
+            "id":"test", "version":"1", "uid":"test", "releaseTime":"2025-01-01T00:00:00Z", "type":"release", "libraries":[]
+        })).unwrap();
+        let archive = runtime
+            .get_libraries()
+            .get_library_path("fixture/native.jar".into());
+        std::fs::create_dir_all(archive.parent().unwrap()).unwrap();
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(archive).unwrap());
+        for (name, bytes) in [
+            (format!("one.{}", std::env::consts::DLL_EXTENSION), b"one"),
+            (
+                format!("nested/two.{}", std::env::consts::DLL_EXTENSION),
+                b"two",
+            ),
+        ] {
+            zip.start_file(name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(bytes).unwrap();
+        }
+        zip.finish().unwrap();
+        (dir, runtime, version, group)
+    }
+
+    #[tokio::test]
+    async fn task17_native_cache_repairs_selected_missing_nested_output() {
+        let (_dir, runtime, version, group) = fixture();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        let dest = runtime.get_natives().get_versioned(&version.id);
+        let one = dest.join(format!("one.{}", std::env::consts::DLL_EXTENSION));
+        let two = dest.join(format!("nested/two.{}", std::env::consts::DLL_EXTENSION));
+        let before = std::fs::metadata(&one).unwrap().modified().unwrap();
+        std::fs::remove_file(&two).unwrap();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(two).unwrap(), b"two");
+        assert_eq!(std::fs::metadata(&one).unwrap().modified().unwrap(), before);
+        assert_eq!(std::fs::read(one).unwrap(), b"one");
+    }
+
+    #[tokio::test]
+    async fn task17_native_cache_complete_empty_and_mismatched_controls() {
+        let (_dir, runtime, version, group) = fixture();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        let dest = runtime.get_natives().get_versioned(&version.id);
+        let one = dest.join(format!("one.{}", std::env::consts::DLL_EXTENSION));
+        std::fs::write(&one, b"healthy-live").unwrap();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(&one).unwrap(), b"healthy-live");
+        std::fs::write(dest.join(".gdl_natives_extracted"), b"different-arch").unwrap();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(&one).unwrap(), b"one");
+        std::fs::remove_file(&one).unwrap();
+        std::fs::remove_file(dest.join(format!("nested/two.{}", std::env::consts::DLL_EXTENSION)))
+            .unwrap();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(&one).unwrap(), b"one");
+    }
+    #[tokio::test]
+    async fn task17_native_cache_selection_failure_and_occupied_output() {
+        let (_dir, runtime, mut version, group) = fixture();
+        let mut denied = version.libraries[0].clone();
+        denied.rules = Some(vec![
+            serde_json::from_value(serde_json::json!({"action":"disallow"})).unwrap(),
+        ]);
+        denied
+            .downloads
+            .as_mut()
+            .unwrap()
+            .classifiers
+            .as_mut()
+            .unwrap()
+            .values_mut()
+            .next()
+            .unwrap()
+            .path = "absent/denied.jar".into();
+        version.libraries.push(denied);
+        let mut missing_classifier = version.libraries[0].clone();
+        missing_classifier.downloads = None;
+        version.libraries.push(missing_classifier);
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        let dest = runtime.get_natives().get_versioned(&version.id);
+        let two = dest.join(format!("nested/two.{}", std::env::consts::DLL_EXTENSION));
+        std::fs::remove_file(&two).unwrap();
+        std::fs::create_dir(&two).unwrap();
+        assert!(
+            extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+                .await
+                .is_err()
+        );
+        assert!(two.is_dir());
+        std::fs::remove_dir(&two).unwrap();
+        std::fs::write(
+            runtime
+                .get_libraries()
+                .get_library_path("fixture/native.jar".into()),
+            b"invalid archive",
+        )
+        .unwrap();
+        assert!(
+            extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+                .await
+                .is_err()
+        );
+        assert_eq!(
+            std::fs::read(dest.join(format!("one.{}", std::env::consts::DLL_EXTENSION))).unwrap(),
+            b"one"
+        );
+    }
+
+    #[tokio::test]
+    async fn task17_native_cache_cancelled_waiter_keeps_worker_gate_and_stage() {
+        let (_dir, runtime, version, group) = fixture();
+        let dest = runtime.get_natives().get_versioned(&version.id);
+        std::fs::create_dir_all(&dest).unwrap();
+        let dest = dest.canonicalize().unwrap();
+        let (entered, wait_entered) = tokio::sync::oneshot::channel();
+        let (release, wait_release) = std::sync::mpsc::channel();
+        NATIVE_CACHE_TEST_HOOKS.lock().unwrap().insert(
+            dest.clone(),
+            Box::new(move || {
+                entered.send(()).unwrap();
+                wait_release.recv().unwrap();
+            }),
+        );
+        let task = {
+            let runtime = runtime.clone();
+            let version = version.clone();
+            let group = group.clone();
+            tokio::spawn(async move {
+                extract_natives(&runtime, &version, &group, &JavaArch::X86_64).await
+            })
+        };
+        wait_entered.await.unwrap();
+        task.abort();
+        assert!(task.await.unwrap_err().is_cancelled());
+        assert!(std::fs::read_dir(&dest).unwrap().any(|p| {
+            p.unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".gdl-native-stage-")
+        }));
+        let retry = extract_natives(&runtime, &version, &group, &JavaArch::X86_64);
+        tokio::pin!(retry);
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(20), &mut retry)
+                .await
+                .is_err()
+        );
+        release.send(()).unwrap();
+        retry.await.unwrap();
+        assert_eq!(
+            std::fs::read(dest.join(format!("nested/two.{}", std::env::consts::DLL_EXTENSION)))
+                .unwrap(),
+            b"two"
+        );
+        assert!(!std::fs::read_dir(&dest).unwrap().any(|p| {
+            p.unwrap()
+                .file_name()
+                .to_string_lossy()
+                .starts_with(".gdl-native-stage-")
+        }));
+    }
+
+    #[test]
+    fn task17_native_cache_publication_never_clobbers_existing() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("source");
+        let target = dir.path().join("target");
+        std::fs::write(&source, b"archive").unwrap();
+        std::fs::write(&target, b"live").unwrap();
+        publish_missing_native(&source, &target).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"live");
+    }
+
+    #[tokio::test]
+    async fn task17_native_cache_nested_only_is_complete_and_lwjgl_wins() {
+        let (_dir, runtime, version, mut group) = fixture();
+        let archive = runtime
+            .get_libraries()
+            .get_library_path("fixture/native.jar".into());
+        let nested = "platform/arch/libfixture.dylib";
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+        zip.start_file(nested, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(b"base").unwrap();
+        zip.finish().unwrap();
+        let mut last = version.libraries[0].clone();
+        last.downloads
+            .as_mut()
+            .unwrap()
+            .classifiers
+            .as_mut()
+            .unwrap()
+            .values_mut()
+            .next()
+            .unwrap()
+            .path = "fixture/lwjgl.jar".into();
+        group.libraries.push(last);
+        let mut zip = zip::ZipWriter::new(
+            std::fs::File::create(
+                runtime
+                    .get_libraries()
+                    .get_library_path("fixture/lwjgl.jar".into()),
+            )
+            .unwrap(),
+        );
+        zip.start_file(nested, zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(b"last").unwrap();
+        zip.finish().unwrap();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        let output = runtime
+            .get_natives()
+            .get_versioned(&version.id)
+            .join(nested);
+        assert_eq!(std::fs::read(&output).unwrap(), b"last");
+        std::fs::write(&output, b"healthy nested live").unwrap();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(&output).unwrap(), b"healthy nested live");
+        std::fs::remove_file(&output).unwrap();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(output).unwrap(), b"last");
+    }
+    #[tokio::test]
+    async fn task17_native_cache_retains_generic_archive_formats() {
+        let cases: &[(&[u8], &str)] = &[
+            (
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../carbon_compression/fixtures/compressed.tar"
+                )),
+                "compressed.txt",
+            ),
+            (
+                include_bytes!(concat!(
+                    env!("CARGO_MANIFEST_DIR"),
+                    "/../carbon_compression/fixtures/compressed.tar.gz"
+                )),
+                "3588ba2df450f9482cb035d9c2cc894f.txt",
+            ),
+        ];
+        for (bytes, name) in cases {
+            let (_dir, runtime, version, group) = fixture();
+            let archive = runtime
+                .get_libraries()
+                .get_library_path("fixture/native.jar".into());
+            std::fs::write(&archive, bytes).unwrap();
+            extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+                .await
+                .unwrap();
+            let output = runtime.get_natives().get_versioned(&version.id).join(name);
+            assert_eq!(std::fs::read(&output).unwrap(), b"Some compressed file");
+            std::fs::write(&output, b"healthy").unwrap();
+            extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+                .await
+                .unwrap();
+            assert_eq!(std::fs::read(&output).unwrap(), b"healthy");
+            std::fs::remove_file(&output).unwrap();
+            extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+                .await
+                .unwrap();
+            assert_eq!(std::fs::read(&output).unwrap(), b"Some compressed file");
+        }
+    }
+    async fn rejected_link_repair(empty: bool) {
+        let (_dir, runtime, version, group) = fixture();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        let dest = runtime
+            .get_natives()
+            .get_versioned(&version.id)
+            .canonicalize()
+            .unwrap();
+        let one = dest.join(format!("one.{}", std::env::consts::DLL_EXTENSION));
+        let two = dest.join(format!("nested/two.{}", std::env::consts::DLL_EXTENSION));
+        if empty {
+            std::fs::remove_file(&one).unwrap();
+        } else {
+            std::fs::write(&one, b"healthy sibling").unwrap();
+        }
+        let healthy_mtime = std::fs::metadata(&one).map(|m| m.modified().unwrap()).ok();
+        std::fs::remove_file(&two).unwrap();
+        for target in std::iter::once(two.clone()).chain(empty.then_some(one.clone())) {
+            NATIVE_LINK_TEST_HOOKS.lock().unwrap().insert(
+                target,
+                Box::new(move |source, target| {
+                    assert!(
+                        !target.exists(),
+                        "publication must begin without a live partial file"
+                    );
+                    assert!(source.is_file(), "staging must remain owned");
+                    let kind = if empty {
+                        std::io::ErrorKind::PermissionDenied
+                    } else {
+                        std::io::ErrorKind::Unsupported
+                    };
+                    Err(std::io::Error::new(
+                        kind,
+                        "controlled writable volume without hard links",
+                    ))
+                }),
+            );
+        }
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .expect("writable cache must repair even if hard links are unsupported");
+        assert_eq!(std::fs::read(&two).unwrap(), b"two");
+        if empty {
+            assert_eq!(std::fs::read(&one).unwrap(), b"one");
+        } else {
+            assert_eq!(std::fs::read(&one).unwrap(), b"healthy sibling");
+            assert_eq!(
+                std::fs::metadata(&one).unwrap().modified().unwrap(),
+                healthy_mtime.unwrap()
+            );
+        }
+        assert_eq!(
+            std::fs::read_to_string(dest.join(".gdl_natives_extracted")).unwrap(),
+            "X86_64"
+        );
+    }
+
+    #[tokio::test]
+    async fn task17_r1_native_partial_cache_repairs_without_hard_links() {
+        rejected_link_repair(false).await;
+    }
+
+    #[tokio::test]
+    async fn task17_r1_native_empty_cache_repairs_without_hard_links() {
+        rejected_link_repair(true).await;
+    }
+
+    #[test]
+    fn task17_r1_native_fallback_preserves_competing_regular_occupant() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("staged");
+        let target = dir.path().join("output");
+        std::fs::write(&source, b"complete archive output").unwrap();
+        NATIVE_LINK_TEST_HOOKS.lock().unwrap().insert(
+            target.clone(),
+            Box::new(|_, target| {
+                assert!(!target.exists());
+                std::fs::write(target, b"competing winner").unwrap();
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "controlled hard link denial",
+                ))
+            }),
+        );
+        publish_missing_native(&source, &target).unwrap();
+        assert_eq!(std::fs::read(&target).unwrap(), b"competing winner");
+        assert_eq!(std::fs::read(&source).unwrap(), b"complete archive output");
+    }
+
+    #[test]
+    fn task17_r1_native_fallback_rejects_competing_directory() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("staged");
+        let target = dir.path().join("output");
+        std::fs::write(&source, b"complete archive output").unwrap();
+        NATIVE_LINK_TEST_HOOKS.lock().unwrap().insert(
+            target.clone(),
+            Box::new(|_, target| {
+                assert!(!target.exists());
+                std::fs::create_dir(target).unwrap();
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "controlled hard link denial",
+                ))
+            }),
+        );
+        assert!(publish_missing_native(&source, &target).is_err());
+        assert!(target.is_dir());
+        assert_eq!(std::fs::read_dir(&target).unwrap().count(), 0);
+        assert_eq!(std::fs::read(&source).unwrap(), b"complete archive output");
+    }
+
+    #[test]
+    fn task17_r1_native_failed_fallback_retains_owned_staging() {
+        let dir = tempfile::tempdir().unwrap();
+        let source = dir.path().join("staged");
+        let parent = dir.path().join("target-parent");
+        std::fs::create_dir(&parent).unwrap();
+        let target = parent.join("output");
+        std::fs::write(&source, b"complete archive output").unwrap();
+        NATIVE_LINK_TEST_HOOKS.lock().unwrap().insert(
+            target.clone(),
+            Box::new(|_, target| {
+                assert!(!target.exists());
+                let parent = target.parent().unwrap();
+                std::fs::remove_dir(parent).unwrap();
+                std::fs::write(parent, b"competing parent occupant").unwrap();
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "controlled hard link denial",
+                ))
+            }),
+        );
+        let error = publish_missing_native(&source, &target).unwrap_err();
+        assert!(error.to_string().contains("controlled hard link denial"));
+        assert!(error.to_string().contains("without replacing"));
+        assert!(!target.exists());
+        assert_eq!(
+            std::fs::read(&parent).unwrap(),
+            b"competing parent occupant"
+        );
+        assert_eq!(std::fs::read(&source).unwrap(), b"complete archive output");
     }
 }

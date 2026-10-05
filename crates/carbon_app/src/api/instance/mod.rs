@@ -2772,6 +2772,7 @@ pub struct SearchLogsQuery {
     use_regex: bool,
 }
 
+/// Search offsets are UTF-16 code units in the original message, as used by JS slice.
 #[derive(Debug, Type, Serialize)]
 struct FESearchResult {
     pub entry_index: u32,
@@ -3095,4 +3096,45 @@ impl From<RegenerateShareCodeResponse> for FERegenerateShareCodeResponse {
 pub struct CancelPendingSetup {
     pub instance: FEInstanceId,
     pub expected_operation: String,
+}
+
+/// A Delete found the addon twice, as `name` and `name.disabled` (one
+/// row), and removed only `deleted`; `kept` is still in the folder and the
+/// row now shows it.
+#[derive(Type, Debug, Serialize)]
+struct FEKeptAddonCopy {
+    deleted: String,
+    kept: String,
+}
+
+impl From<manager::KeptAddonCopy> for FEKeptAddonCopy {
+    fn from(value: manager::KeptAddonCopy) -> Self {
+        Self {
+            deleted: value.deleted,
+            kept: value.kept,
+        }
+    }
+}
+
+#[cfg(test)]
+mod task17_search_wire_tests {
+    use super::*;
+
+    #[test]
+    fn task17_search_wire_preserves_original_utf16_offsets() {
+        use crate::managers::instance::log::{GameLog, LogEntry};
+        let mut log = GameLog::new();
+        log.add_entry(LogEntry::system_message("😀 ERROR"));
+        for regex in [false, true] {
+            let results: Vec<_> = log
+                .search("ERROR", false, false, regex)
+                .into_iter()
+                .map(FESearchResult::from)
+                .collect();
+            assert_eq!(
+                serde_json::to_value(results).unwrap(),
+                serde_json::json!([{"entry_index":0,"pos":3,"len":5}])
+            );
+        }
+    }
 }
