@@ -39,7 +39,7 @@ use tokio::sync::watch::Sender;
 use tokio::sync::{Mutex, RwLock};
 use tracing::{debug, error, info, trace, warn};
 
-pub use self::enroll::{EnrollmentError, EnrollmentStatus};
+pub use self::enroll::{EnrollmentError, EnrollmentStatus, FailureCategory};
 use self::{enroll::EnrollmentTask, skin::SkinManager};
 
 use super::{AppInner, AppRef, ManagerRef};
@@ -1844,14 +1844,35 @@ impl AccountRefreshService {
                                 "Attempting to refresh access token for expired account {}",
                                 &account.uuid
                             );
-                            let Ok(handler) = account_manager
+                            let handler = match account_manager
                                 .start_refresh(account.uuid.clone(), true)
                                 .await
-                            else {
-                                error!("Failed to refresh access token for {}", &account.uuid);
-                                notifier_clone.notify_one();
-                                first_check_done = true;
-                                continue;
+                            {
+                                Ok(handler) => handler,
+                                Err(e) => {
+                                    // Waiting out a retry delay or having no
+                                    // refresh token is expected every sweep.
+                                    if matches!(
+                                        e.downcast_ref(),
+                                        Some(
+                                            RefreshAccountError::Backoff
+                                                | RefreshAccountError::NoRefreshToken
+                                        )
+                                    ) {
+                                        debug!(
+                                            "Not refreshing access token for {}: {e}",
+                                            &account.uuid
+                                        );
+                                    } else {
+                                        error!(
+                                            "Failed to refresh access token for {}: {e:#}",
+                                            &account.uuid
+                                        );
+                                    }
+                                    notifier_clone.notify_one();
+                                    first_check_done = true;
+                                    continue;
+                                }
                             };
 
                             // This works because GDL account is guaranteed to be first in the list

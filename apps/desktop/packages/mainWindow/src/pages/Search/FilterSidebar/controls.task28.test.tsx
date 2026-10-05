@@ -11,7 +11,7 @@ import Language from "../../Settings/Language"
 const c = vi.hoisted(() => ({
   search: undefined as any,
   global: undefined as any,
-  changeLanguage: vi.fn(),
+  changeLanguage: vi.fn(async () => {}),
   settings: { language: "en" }
 }))
 // jsdom lacks native inert reflection. Model only its boolean DOM property;

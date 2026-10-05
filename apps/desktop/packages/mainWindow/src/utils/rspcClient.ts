@@ -228,8 +228,12 @@ export function handleGlobalError(
 // ---------------------------------------------------------------------------
 
 export const queryClient = new QueryClient({
+  // A query that shows its failure in place (an inline error with Retry)
+  // sets the same `meta` as a mutation with its own toast, so the global
+  // toast does not repeat it.
   queryCache: new QueryCache({
-    onError: (error) => handleGlobalError(error, "query")
+    onError: (error, query) =>
+      handleGlobalError(error, "query", query.meta?.localErrorToast === true)
   }),
   mutationCache: new MutationCache({
     onError: (error, _variables, _result, mutation) =>

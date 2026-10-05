@@ -530,9 +530,10 @@ const Java = () => {
                         </div>
                         <For each={profiles}>
                           {(profile) => {
-                            const id = flattenedAvailableJavas()?.find(
-                              (java) => java.id === profile.javaId
-                            )?.id
+                            const id = () =>
+                              flattenedAvailableJavas()?.find(
+                                (java) => java.id === profile.javaId
+                              )?.id
 
                             return (
                               <div class="hover:bg-darkSlate-600 flex items-center justify-between px-4 py-2">
@@ -541,7 +542,7 @@ const Java = () => {
                                 </h3>
                                 <div class="m-0 flex items-center gap-4">
                                   <Select
-                                    value={id || "unassigned"}
+                                    value={id() || "unassigned"}
                                     options={availableJavasOptions()}
                                     disabled={
                                       profile.isSystem &&

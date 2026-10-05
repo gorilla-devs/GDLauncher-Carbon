@@ -1,13 +1,14 @@
 use crate::api::{CoreModuleStatus, update_core_module_status};
+use crate::error::request::{RequestError, RequestErrorDetails};
 
 use super::api::{
     DeviceCode, DeviceCodeExpiredError, FullAccount, GetProfileError, McAccount, McAuth,
-    McEntitlementMissingError, MsAuth, XboxAuth, XboxError, get_profile,
+    McEntitlementMissingError, MsAuth, UnexpectedStatus, XboxAuth, XboxError, get_profile,
 };
 use super::endpoints;
 use super::gdl_account::GDLAccountTask;
 use super::oauth_server::{OAuthCallbackHandle, OAuthCallbackServer};
-use anyhow::anyhow;
+use anyhow::{Context, anyhow};
 use async_trait::async_trait;
 use chrono::Utc;
 use futures::{future::abortable, stream::AbortHandle};
@@ -171,15 +172,13 @@ impl EnrollmentTask {
                 Ok(())
             };
 
-            match task().await {
-                Ok(()) => {}
-                Err(EnrollmentErrorOrAnyhow::EnrollmentError(e)) => {
-                    update_status(EnrollmentStatus::Failed(Ok(e))).await
-                }
-                Err(EnrollmentErrorOrAnyhow::Anyhow(e)) => {
-                    update_status(EnrollmentStatus::Failed(Err(e))).await
-                }
-            };
+            publish_result(
+                &task_status,
+                &invalidate,
+                SignInMethod::DeviceCode,
+                task().await,
+            )
+            .await;
         };
 
         Self::spawn(status, task).0
@@ -308,12 +307,12 @@ impl EnrollmentTask {
                     ])
                     .send()
                     .await
-                    .map_err(|e| anyhow!("Failed to send token exchange request: {}", e))?
+                    .context("Failed to send token exchange request")?
                     .error_for_status()
-                    .map_err(|e| anyhow!("Token exchange failed: {}", e))?
+                    .context("Token exchange failed")?
                     .json::<TokenResponse>()
                     .await
-                    .map_err(|e| anyhow!("Failed to parse token response: {}", e))?;
+                    .context("Failed to parse token response")?;
 
                             Ok(MsAuth {
                                 access_token: token_response.access_token,
@@ -386,7 +385,13 @@ impl EnrollmentTask {
                 Ok(())
             };
 
-            publish_browser_result(&task_status, &invalidate, task().await).await;
+            publish_result(
+                &task_status,
+                &invalidate,
+                SignInMethod::Browser,
+                task().await,
+            )
+            .await;
         };
 
         Self::spawn(status, task).0
@@ -525,18 +530,110 @@ where
     exchange(waiter.await?).await
 }
 
-pub(super) async fn publish_browser_result(
+#[derive(Debug, Clone, Copy)]
+pub(super) enum SignInMethod {
+    DeviceCode,
+    Browser,
+}
+
+impl std::fmt::Display for SignInMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::DeviceCode => "device code",
+            Self::Browser => "browser",
+        })
+    }
+}
+
+/// Publishes how a sign-in ended. A failure's cause goes to the core log
+/// here: the renderer only gets a typed error or a [`FailureCategory`],
+/// never the cause's text, which can carry provider details.
+pub(super) async fn publish_result(
     status: &RwLock<EnrollmentStatus>,
     invalidate: &impl InvalidateCtx,
+    method: SignInMethod,
     result: Result<(), EnrollmentErrorOrAnyhow>,
 ) {
     let failure = match result {
         Ok(()) => return,
-        Err(EnrollmentErrorOrAnyhow::EnrollmentError(error)) => Ok(error),
-        Err(EnrollmentErrorOrAnyhow::Anyhow(error)) => Err(error),
+        Err(EnrollmentErrorOrAnyhow::EnrollmentError(error)) => {
+            info!("Microsoft sign-in ({method}) stopped: {error}");
+            Ok(error)
+        }
+        Err(EnrollmentErrorOrAnyhow::Anyhow(error)) => {
+            warn!(
+                category = ?FailureCategory::of(&error),
+                "Microsoft sign-in ({method}) failed: {error:#}"
+            );
+            Err(error)
+        }
     };
     *status.write().await = EnrollmentStatus::Failed(failure);
     invalidate.invalidate().await;
+}
+
+/// What the sign-in screen may say about a failure without a typed
+/// [`EnrollmentError`]. Only this category reaches the renderer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FailureCategory {
+    /// No answer came back: offline, DNS, a proxy, VPN or antivirus in the
+    /// way, or a timeout.
+    Network,
+    /// Microsoft, Xbox or Minecraft answered that it is busy or failing.
+    ServiceUnavailable,
+    Other,
+}
+
+impl FailureCategory {
+    pub fn of(error: &anyhow::Error) -> Self {
+        error
+            .chain()
+            .find_map(Self::of_cause)
+            .unwrap_or(Self::Other)
+    }
+
+    fn of_cause(cause: &(dyn std::error::Error + 'static)) -> Option<Self> {
+        if let Some(error) = cause.downcast_ref::<reqwest::Error>() {
+            if error.is_connect() || error.is_timeout() {
+                return Some(Self::Network);
+            }
+            return error.status().and_then(Self::of_status);
+        }
+        if let Some(error) = cause.downcast_ref::<RequestError>() {
+            return match &error.error {
+                RequestErrorDetails::Timeout | RequestErrorDetails::ConnectionFailed => {
+                    Some(Self::Network)
+                }
+                RequestErrorDetails::UnexpectedStatus { status, .. } => Self::of_status(*status),
+                _ => None,
+            };
+        }
+        if let Some(error) = cause.downcast_ref::<UnexpectedStatus>() {
+            return Self::of_status(error.status);
+        }
+        if let Some(error) = cause.downcast_ref::<std::io::Error>() {
+            use std::io::ErrorKind::*;
+            return matches!(
+                error.kind(),
+                ConnectionRefused
+                    | ConnectionReset
+                    | ConnectionAborted
+                    | NotConnected
+                    | BrokenPipe
+                    | TimedOut
+                    | HostUnreachable
+                    | NetworkUnreachable
+                    | NetworkDown
+            )
+            .then_some(Self::Network);
+        }
+        None
+    }
+
+    fn of_status(status: reqwest::StatusCode) -> Option<Self> {
+        (status == reqwest::StatusCode::TOO_MANY_REQUESTS || status.is_server_error())
+            .then_some(Self::ServiceUnavailable)
+    }
 }
 
 impl Drop for EnrollmentTask {
@@ -665,6 +762,180 @@ impl From<GetProfileError> for EnrollmentErrorOrAnyhow {
 impl From<anyhow::Error> for EnrollmentErrorOrAnyhow {
     fn from(value: anyhow::Error) -> Self {
         Self::Anyhow(value)
+    }
+}
+
+#[cfg(test)]
+mod sign_in_failure_tests {
+    use super::*;
+    use crate::error::request::RequestContext;
+    use anyhow::Context as _;
+
+    fn client() -> reqwest_middleware::ClientWithMiddleware {
+        reqwest_middleware::ClientBuilder::new(
+            reqwest::Client::builder()
+                .timeout(Duration::from_millis(300))
+                .build()
+                .unwrap(),
+        )
+        .build()
+    }
+
+    /// A request the way the Xbox and Minecraft steps send it.
+    async fn request(url: &str) -> anyhow::Error {
+        let result: anyhow::Result<reqwest::Response> = async {
+            Ok(client()
+                .get(url)
+                .send()
+                .await
+                .context("Failed to authenticate Xbox account")?
+                .error_for_status()?)
+        }
+        .await;
+        result.expect_err("synthetic request unexpectedly succeeded")
+    }
+
+    async fn status(code: usize) -> anyhow::Error {
+        let mut server = mockito::Server::new_async().await;
+        let _mock = server
+            .mock("GET", "/")
+            .with_status(code)
+            .create_async()
+            .await;
+        request(&format!("{}/", server.url())).await
+    }
+
+    #[tokio::test]
+    async fn refused_connection_is_a_network_failure() {
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .unwrap()
+            .local_addr()
+            .unwrap()
+            .port();
+        let error = request(&format!("http://127.0.0.1:{port}/")).await;
+        assert_eq!(FailureCategory::of(&error), FailureCategory::Network);
+    }
+
+    #[tokio::test]
+    async fn unanswered_request_is_a_network_failure() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}/", listener.local_addr().unwrap());
+        let error = request(&url).await;
+        drop(listener);
+        assert_eq!(FailureCategory::of(&error), FailureCategory::Network);
+    }
+
+    #[tokio::test]
+    async fn busy_or_failing_service_is_unavailable_and_other_statuses_are_generic() {
+        for code in [429, 500, 503] {
+            assert_eq!(
+                FailureCategory::of(&status(code).await),
+                FailureCategory::ServiceUnavailable,
+                "status {code}"
+            );
+        }
+        for code in [400, 403, 404] {
+            assert_eq!(
+                FailureCategory::of(&status(code).await),
+                FailureCategory::Other,
+                "status {code}"
+            );
+        }
+    }
+
+    #[test]
+    fn typed_request_errors_keep_their_category_under_context() {
+        let typed = |error| {
+            anyhow::Error::new(RequestError {
+                context: RequestContext::none(),
+                error,
+            })
+            .context("Failed to get game profile")
+        };
+        assert_eq!(
+            FailureCategory::of(&typed(RequestErrorDetails::ConnectionFailed)),
+            FailureCategory::Network
+        );
+        assert_eq!(
+            FailureCategory::of(&typed(RequestErrorDetails::Timeout)),
+            FailureCategory::Network
+        );
+        assert_eq!(
+            FailureCategory::of(&typed(RequestErrorDetails::UnexpectedStatus {
+                status: reqwest::StatusCode::BAD_GATEWAY,
+                details: None,
+            })),
+            FailureCategory::ServiceUnavailable
+        );
+        assert_eq!(
+            FailureCategory::of(&typed(RequestErrorDetails::UnexpectedStatus {
+                status: reqwest::StatusCode::FORBIDDEN,
+                details: None,
+            })),
+            FailureCategory::Other
+        );
+        let reset = anyhow::Error::new(std::io::Error::from(std::io::ErrorKind::ConnectionReset));
+        assert_eq!(FailureCategory::of(&reset), FailureCategory::Network);
+        let local = anyhow::Error::new(std::io::Error::from(std::io::ErrorKind::AddrInUse));
+        assert_eq!(FailureCategory::of(&local), FailureCategory::Other);
+    }
+
+    #[test]
+    fn denials_and_text_only_failures_stay_generic() {
+        for error in [
+            anyhow!("access_denied: Cancelled by user"),
+            anyhow!("Timeout waiting for OAuth callback"),
+            anyhow!("error sending request: connection refused"),
+        ] {
+            assert_eq!(FailureCategory::of(&error), FailureCategory::Other);
+        }
+    }
+
+    struct Invalidations(std::sync::atomic::AtomicUsize);
+    #[async_trait]
+    impl InvalidateCtx for Invalidations {
+        async fn invalidate(&self) {
+            self.0.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn a_failed_sign_in_logs_its_cause_and_still_publishes_it() {
+        for method in [SignInMethod::DeviceCode, SignInMethod::Browser] {
+            let status = RwLock::new(EnrollmentStatus::RequestingCode);
+            let invalidate = Invalidations(Default::default());
+            let error = anyhow!("synthetic dns failure for {method}")
+                .context("Failed to authenticate Xbox account");
+            publish_result(
+                &status,
+                &invalidate,
+                method,
+                Err(EnrollmentErrorOrAnyhow::Anyhow(error)),
+            )
+            .await;
+            assert!(matches!(
+                &*status.read().await,
+                EnrollmentStatus::Failed(Err(_))
+            ));
+            assert_eq!(invalidate.0.load(std::sync::atomic::Ordering::SeqCst), 1);
+            assert!(logs_contain(&format!(
+                "Microsoft sign-in ({method}) failed: Failed to authenticate Xbox account: synthetic dns failure for {method}"
+            )));
+        }
+        let status = RwLock::new(EnrollmentStatus::RequestingCode);
+        publish_result(
+            &status,
+            &Invalidations(Default::default()),
+            SignInMethod::DeviceCode,
+            Err(EnrollmentErrorOrAnyhow::EnrollmentError(
+                EnrollmentError::EntitlementMissing,
+            )),
+        )
+        .await;
+        assert!(logs_contain(
+            "Microsoft sign-in (device code) stopped: game entitlement missing"
+        ));
     }
 }
 

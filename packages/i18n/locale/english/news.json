@@ -1,5 +1,7 @@
 {
   "_trn_news": "News",
+  "_trn_no_content": "No patch content is available.",
+  "_trn_patch_content_error": "Failed to load patch content.",
   "_trn_news_title": "Latest News",
   "_trn_news_subtitle": "Stay updated with the latest Minecraft news and updates",
   "_trn_news_feed": "News Feed",

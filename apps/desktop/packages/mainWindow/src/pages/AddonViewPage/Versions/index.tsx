@@ -2,7 +2,7 @@ import { useSearchParams } from "@solidjs/router"
 import VersionRow from "./VersionRow"
 import { rspc } from "@/utils/rspcClient"
 import { useInfiniteVersionsQuery } from "@/components/InfiniteScrollVersionsQueryWrapper"
-import { useContext, For, Show } from "solid-js"
+import { useContext, For, Show, createSignal } from "solid-js"
 import { StickyHeaderHeightContext } from "@/pages/AddonViewPage"
 import { Trans } from "@gd/i18n"
 import { AddonContext } from "@/pages/AddonViewPage"
@@ -20,6 +20,28 @@ const Versions = () => {
   const infiniteQuery = useInfiniteVersionsQuery()
 
   const rows = () => infiniteQuery.allRows()
+  const hasError = () => !!(mod?.error || infiniteQuery.infiniteQuery.error)
+  const [retrying, setRetrying] = createSignal(false)
+  const retryVersions = async () => {
+    if (retrying()) return
+    setRetrying(true)
+    try {
+      await Promise.all([
+        Promise.resolve().then(() => mod?.refetch()),
+        Promise.resolve().then(() => {
+          // Manual refetch bypasses Query's enabled flag. Task28 publishes
+          // targetReady only after the current scope/defaults are settled.
+          if (infiniteQuery.targetReady)
+            return infiniteQuery.infiniteQuery.refetch()
+        })
+      ])
+    } catch {
+      // Query state/shared notifications retain the failure. Event handlers
+      // must not leak an unhandled rejected retry promise.
+    } finally {
+      setRetrying(false)
+    }
+  }
 
   const instanceId = () => {
     if (!searchParams.instanceId) return undefined
@@ -110,28 +132,33 @@ const Versions = () => {
         </div>
       </div>
       <div class="flex-1 px-6">
+        <Show when={hasError()}>
+          <div
+            role="alert"
+            class="flex flex-col items-center gap-3 py-4 text-center"
+          >
+            <h3 class="text-lg font-semibold text-red-300">
+              <Trans key="content:_trn_error_loading_versions" />
+            </h3>
+            <Button
+              type="secondary"
+              size="small"
+              onClick={retryVersions}
+              disabled={retrying()}
+            >
+              <div class="i-hugeicons:refresh mr-2 h-4 w-4" />
+              <Trans key="general:_trn_retry" />
+            </Button>
+          </div>
+        </Show>
         <Show
           when={mod?.data && rows().length > 0}
           fallback={
             <Show
-              when={!mod?.data || infiniteQuery.isLoading}
+              when={!hasError() && (mod?.isPending || infiniteQuery.isLoading)}
               fallback={
                 <div class="flex flex-col items-center justify-center py-16 text-center">
-                  <Show when={infiniteQuery.infiniteQuery.error}>
-                    <div class="i-hugeicons:alert-02 text-3xl mb-4 text-red-400" />
-                    <h3 class="mb-2 text-lg font-semibold text-red-300">
-                      <Trans key="content:_trn_error_loading_versions" />
-                    </h3>
-                    <Button
-                      type="secondary"
-                      size="small"
-                      onClick={() => infiniteQuery.infiniteQuery.refetch()}
-                    >
-                      <div class="i-hugeicons:refresh mr-2 h-4 w-4" />
-                      <Trans key="general:_trn_retry" />
-                    </Button>
-                  </Show>
-                  <Show when={!infiniteQuery.infiniteQuery.error}>
+                  <Show when={!hasError()}>
                     <span class="text-lightSlate-400">
                       <Trans key="content:_trn_no_versions_found" />
                     </span>

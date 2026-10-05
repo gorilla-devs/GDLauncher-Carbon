@@ -295,6 +295,42 @@ describe("a coded cause with a mutation's own toast", () => {
   })
 })
 
+describe("a query that shows its failure in place", () => {
+  let consoleError: ReturnType<typeof vi.spyOn>
+  beforeEach(() => {
+    toastError.mockClear()
+    consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+  })
+  afterEach(() => {
+    queryClient.clear()
+    consoleError.mockRestore()
+  })
+
+  it("raises no global toast when its meta says it shows the error itself", async () => {
+    await queryClient
+      .fetchQuery({
+        queryKey: ["synthetic-inline-failure"],
+        queryFn: () =>
+          Promise.reject(new Error("Patch content request failed (404)")),
+        meta: { localErrorToast: true }
+      })
+      .catch(() => {})
+    expect(toastError).not.toHaveBeenCalled()
+    // Without the meta, the same kind of failure still raises the toast.
+    await queryClient
+      .fetchQuery({
+        queryKey: ["synthetic-global-failure"],
+        queryFn: () =>
+          Promise.reject(new Error("Patch content request failed (410)"))
+      })
+      .catch(() => {})
+    expect(toastError).toHaveBeenCalledExactlyOnceWith(
+      "Patch content request failed (410)",
+      expect.anything()
+    )
+  })
+})
+
 describe("parseInvalidateFrame", () => {
   it("returns undefined instead of throwing on a malformed frame", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {})

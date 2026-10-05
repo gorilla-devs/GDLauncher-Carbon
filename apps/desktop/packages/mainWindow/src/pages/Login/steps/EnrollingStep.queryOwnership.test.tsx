@@ -593,3 +593,114 @@ for (const outcome of ["complete", "profile"] as const) {
     )
   })
 }
+
+// Task29 consumes the installed Query and the existing Task19 revision owner.
+const terminal = (kind = "generic") => ({
+  failed: {
+    errorType: kind,
+    title: "",
+    description: kind === "generic" ? "" : "safe typed detail",
+    recoverySteps: [],
+    supportLink: ""
+  }
+})
+it("Task29 structured terminal stops polling/countdown and scoped Retry owns fresh cache", async () => {
+  const { root, revision } = await fixture()
+  control.requests.push(() => Promise.resolve("xboxAuth"))
+  await refetch()
+  await settle()
+  expect(root.textContent).toContain("progress")
+  const cleared = vi.spyOn(globalThis, "clearInterval")
+  control.requests.push(() => Promise.resolve(terminal()))
+  await refetch()
+  await settle()
+  expect(root.textContent).toContain("errors:_trn_error.enrollment_failed")
+  expect(root.textContent).not.toContain("progress")
+  const starts = control.starts
+  await new Promise<void>((resolve) => setTimeout(resolve, 1150))
+  expect(control.starts).toBe(starts)
+  expect(cleared).toHaveBeenCalled()
+  const oldQuery = control.client
+    .getQueryCache()
+    .findAll({ queryKey: ["account.enroll.getStatus"] })[0]
+  control.requests.push(() => Promise.resolve(waiting("terminal-retry")))
+  retry(root)
+  await settle()
+  expect(revision()).toBe(2)
+  expect(control.flow.startEnrollment).toHaveBeenCalledExactlyOnceWith(
+    "browser"
+  )
+  expect(control.query.data.waitingForBrowser.auth_url).toBe(
+    "https://synthetic.invalid/terminal-retry"
+  )
+  oldQuery.setData(terminal())
+  await settle()
+  expect(root.textContent).not.toContain("errors:_trn_error.enrollment_failed")
+})
+for (const [kind, key] of [
+  ["network", "errors:_trn_error.enrollment_network"],
+  ["serviceUnavailable", "errors:_trn_error.enrollment_service_unavailable"]
+] as const) {
+  it(`an untyped ${kind} failure shows its translated advice and stays terminal`, async () => {
+    const { root } = await fixture()
+    control.requests.push(() =>
+      Promise.resolve({
+        failed: {
+          errorType: kind,
+          title: "",
+          description: "",
+          recoverySteps: [],
+          supportLink: ""
+        }
+      })
+    )
+    await refetch()
+    await settle()
+    expect(root.querySelector('[role="alert"]')?.textContent).toBe(key)
+    expect(root.textContent).not.toContain(
+      "errors:_trn_error.enrollment_failed"
+    )
+    expect(
+      Array.from(root.querySelectorAll("button")).some((button) =>
+        button.textContent?.includes("general:_trn_cancel")
+      )
+    ).toBe(true)
+  })
+}
+it("Task29 terminal has a scoped Cancel that retires enrollment", async () => {
+  const { root } = await fixture()
+  control.requests.push(() => Promise.resolve(terminal("noGameOwnership")))
+  await refetch()
+  await settle()
+  expect(root.textContent).toContain("safe typed detail")
+  const cancel = Array.from(root.querySelectorAll("button")).find((button) =>
+    button.textContent?.includes("general:_trn_cancel")
+  )
+  expect(cancel).toBeDefined()
+  cancel!.click()
+  await settle()
+  expect(control.flow.cancelEnrollment).toHaveBeenCalledTimes(1)
+  expect(control.flow.goToStep).toHaveBeenCalledWith(
+    { type: "auth-method" },
+    { direction: "backward" }
+  )
+})
+it("Task29 transport outage remains nonterminal and can poll back to a healthy stage", async () => {
+  const { root } = await fixture()
+  control.requests.push(() => Promise.resolve("xboxAuth"))
+  await refetch()
+  await settle()
+  control.requests.push(() =>
+    Promise.reject(new Error("synthetic transport outage"))
+  )
+  await refetch()
+  await settle()
+  expect(control.query.data).toBe("xboxAuth")
+  control.requests.push(() => Promise.resolve(waiting("transport-recovered")))
+  await new Promise<void>((resolve) => setTimeout(resolve, 1150))
+  await settle()
+  expect(control.query.data.waitingForBrowser.auth_url).toBe(
+    "https://synthetic.invalid/transport-recovered"
+  )
+  expect(root.textContent).not.toContain("synthetic transport outage")
+})

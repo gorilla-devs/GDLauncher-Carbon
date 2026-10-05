@@ -329,6 +329,14 @@ struct EnrollmentError {
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 enum EnrollmentErrorType {
+    /// Untyped terminal backend failure; the renderer supplies translated recovery.
+    Generic,
+    /// Untyped failure where no answer came back (offline, DNS, proxy, timeout).
+    /// Like Generic, it carries no text; the renderer translates it.
+    Network,
+    /// Untyped failure where a sign-in service answered busy or failing (429/5xx).
+    /// Like Generic, it carries no text; the renderer translates it.
+    ServiceUnavailable,
     DeviceCodeExpired,
     /// signing in with xbox has returned an error
     XboxAccount,
@@ -428,9 +436,23 @@ impl EnrollmentStatus {
                     account.into()
                 },
             },
-            BE::Failed(e) => Api::Failed(EnrollmentError::from(
-                e.as_ref().map_err(FeError::from_anyhow)?.clone(),
-            )),
+            BE::Failed(Ok(error)) => Api::Failed(EnrollmentError::from(error.clone())),
+            // The cause stays off the wire (the core logs it); only its
+            // category tells the renderer which translated advice to show.
+            BE::Failed(Err(e)) => Api::Failed(EnrollmentError {
+                error_type: match account::FailureCategory::of(e) {
+                    account::FailureCategory::Network => EnrollmentErrorType::Network,
+                    account::FailureCategory::ServiceUnavailable => {
+                        EnrollmentErrorType::ServiceUnavailable
+                    }
+                    account::FailureCategory::Other => EnrollmentErrorType::Generic,
+                },
+                title: String::new(),
+                description: String::new(),
+                recovery_steps: Vec::new(),
+                support_link: String::new(),
+                xbox_error: None,
+            }),
         })
     }
 }
@@ -439,16 +461,19 @@ impl EnrollmentStatus {
 mod task20_tests {
     use super::*;
     #[test]
-    fn provider_denial_is_a_query_error_with_display_details() {
+    fn provider_denial_is_a_safe_structured_terminal_failure() {
         let status = account::EnrollmentStatus::Failed(Err(anyhow::anyhow!(
             "access_denied: Cancelled by user"
         )));
-        let Err(error) = EnrollmentStatus::from_backend("synthetic-flow", &status) else {
-            panic!("provider denial unexpectedly became enrollment data");
-        };
-        let json = serde_json::to_string(&error).unwrap();
-        assert!(json.contains("access_denied: Cancelled by user"));
-        assert!(!json.contains("DeviceCodeExpired"));
+        let api = EnrollmentStatus::from_backend("synthetic-flow", &status)
+            .expect("terminal provider denial must be data rather than a query error");
+        let json = serde_json::to_value(&api).unwrap();
+        assert_eq!(json["failed"]["errorType"], "generic");
+        assert_eq!(json["failed"]["description"], "");
+        let wire = json.to_string();
+        assert!(!wire.contains("access_denied"));
+        assert!(!wire.contains("Cancelled by user"));
+        assert!(!wire.contains("deviceCodeExpired"));
     }
 }
 
@@ -840,5 +865,90 @@ mod task19_serialization_tests {
         assert_eq!(wire["complete"]["account"]["uuid"], "synthetic-a");
         assert_eq!(wire["complete"].as_object().unwrap().len(), 2);
         assert!(!wire.to_string().contains("private-"));
+    }
+}
+
+#[cfg(test)]
+mod failure_category_wire_tests {
+    use super::*;
+    use crate::error::request::{RequestContext, RequestError, RequestErrorDetails};
+
+    fn wire(error: RequestErrorDetails) -> serde_json::Value {
+        let cause = anyhow::Error::new(RequestError {
+            context: RequestContext::none(),
+            error,
+        })
+        .context("synthetic private provider token=dummy-secret");
+        let status = account::EnrollmentStatus::Failed(Err(cause));
+        serde_json::to_value(EnrollmentStatus::from_backend("synthetic-flow", &status).unwrap())
+            .unwrap()
+    }
+
+    #[test]
+    fn untyped_failures_carry_only_their_category() {
+        for (error, expected) in [
+            (RequestErrorDetails::ConnectionFailed, "network"),
+            (RequestErrorDetails::Timeout, "network"),
+            (
+                RequestErrorDetails::UnexpectedStatus {
+                    status: reqwest::StatusCode::SERVICE_UNAVAILABLE,
+                    details: None,
+                },
+                "serviceUnavailable",
+            ),
+            (
+                RequestErrorDetails::UnexpectedStatus {
+                    status: reqwest::StatusCode::TOO_MANY_REQUESTS,
+                    details: None,
+                },
+                "serviceUnavailable",
+            ),
+            (
+                RequestErrorDetails::UnexpectedStatus {
+                    status: reqwest::StatusCode::FORBIDDEN,
+                    details: None,
+                },
+                "generic",
+            ),
+        ] {
+            let json = wire(error);
+            assert_eq!(json["failed"]["errorType"], expected);
+            assert_eq!(json["failed"]["title"], "");
+            assert_eq!(json["failed"]["description"], "");
+            assert!(!json.to_string().contains("dummy-secret"));
+        }
+    }
+}
+
+#[cfg(test)]
+mod task29_terminal_tests {
+    use super::*;
+
+    #[test]
+    fn untyped_backend_failure_is_terminal_without_private_context() {
+        let status = account::EnrollmentStatus::Failed(Err(anyhow::anyhow!(
+            "synthetic private provider token=dummy-secret"
+        )));
+        let api = EnrollmentStatus::from_backend("synthetic-flow", &status)
+            .expect("terminal backend failure must be structured");
+        let json = serde_json::to_value(api).unwrap();
+        assert_eq!(json["failed"]["errorType"], "generic");
+        assert!(!json.to_string().contains("dummy-secret"));
+    }
+
+    #[test]
+    fn typed_expiry_retains_its_safe_details_and_stage_is_nonterminal() {
+        let status =
+            account::EnrollmentStatus::Failed(Ok(account::EnrollmentError::DeviceCodeExpired));
+        let json = serde_json::to_value(
+            EnrollmentStatus::from_backend("synthetic-flow", &status).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(json["failed"]["errorType"], "deviceCodeExpired");
+        assert!(!json["failed"]["description"].as_str().unwrap().is_empty());
+        let stage =
+            EnrollmentStatus::from_backend("synthetic-flow", &account::EnrollmentStatus::XboxAuth)
+                .unwrap();
+        assert_eq!(serde_json::to_value(stage).unwrap(), "xboxAuth");
     }
 }

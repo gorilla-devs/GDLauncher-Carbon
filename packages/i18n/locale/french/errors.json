@@ -14,6 +14,8 @@
   "_trn_404_message": "Page introuvable",
   "_trn_its_gone": "Élément introuvable",
   "_trn_error.enrollment_failed": "Échec de l'inscription",
+  "_trn_error.enrollment_network": "Impossible de joindre les serveurs de connexion de Microsoft ou de Minecraft. Vérifiez votre connexion internet ainsi que tout proxy, VPN ou antivirus qui filtre le trafic web, puis réessayez.",
+  "_trn_error.enrollment_service_unavailable": "Le service de connexion de Microsoft ou de Minecraft est surchargé ou rencontre des problèmes en ce moment. Patientez quelques minutes, puis réessayez.",
   "_trn_error.xbox_code": "Code d'erreur Xbox",
   "_trn_network_error_toast": "Erreur réseau : vérifiez votre connexion internet",
   "_trn_rate_limited_toast": "Un service est temporairement indisponible, certains contenus peuvent ne pas se charger"

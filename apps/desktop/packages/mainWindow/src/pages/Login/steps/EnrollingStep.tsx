@@ -1,4 +1,4 @@
-import { Trans, useTransContext } from "@gd/i18n"
+import { Trans, useTransContext, type NamespacedTranslationKey } from "@gd/i18n"
 import {
   Button,
   Progress,
@@ -25,10 +25,11 @@ import GateAnimation from "../../../gate_animation.riv"
 import { useFlow } from "../flow/FlowContext"
 import {
   completeEnrollment,
-  switchEnrollment
+  switchEnrollment,
+  leaveEnrollment
 } from "../flow/enrollmentTransitions"
 import { extractErrorDisplay } from "../flow/FlowController"
-import type { AuthStep } from "../flow/types"
+import type { AuthStep, EnrollmentErrorType } from "../flow/types"
 import { rspc } from "@/utils/rspcClient"
 import { CancelledError, type Query } from "@tanstack/query-core"
 
@@ -42,6 +43,16 @@ import { CancelledError, type Query } from "@tanstack/query-core"
 
 interface EnrollingStepProps {
   step: Extract<AuthStep, { type: "enrolling" }>
+}
+
+// Untyped failures arrive without text (the core logs their cause), so their
+// category picks the translated advice shown instead.
+const UNTYPED_FAILURE_KEYS: Partial<
+  Record<EnrollmentErrorType, NamespacedTranslationKey>
+> = {
+  generic: "errors:_trn_error.enrollment_failed",
+  network: "errors:_trn_error.enrollment_network",
+  serviceUnavailable: "errors:_trn_error.enrollment_service_unavailable"
 }
 
 // Shared with AuthFlow so branch lifetime can be exercised without starting
@@ -64,6 +75,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
     flow.captureEnrollment()
   )
   const [statusReady, setStatusReady] = createSignal(false)
+  const [terminal, setTerminal] = createSignal(false)
   const { client, queryClient } = rspc.useContext()
   const queryCache = queryClient.getQueryCache()
   let ownedQuery: Query | undefined
@@ -99,7 +111,11 @@ export function EnrollingStep(props: EnrollingStepProps) {
     return {
       queryKey: ["account.enroll.getStatus"],
       queryHash: statusHash(revision),
-      enabled: statusReady() && !loading() && flow.ownsEnrollment(revision),
+      enabled:
+        statusReady() &&
+        !loading() &&
+        !terminal() &&
+        flow.ownsEnrollment(revision),
       queryFn: async ({ signal }) => {
         const requestQuery = ownedQuery
         const admitted = () =>
@@ -123,7 +139,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
         }
       },
       retry: false, // Terminal backend failures already have an explicit retry action.
-      refetchInterval: 1000, // Poll every second
+      refetchInterval: terminal() ? false : 1000,
       refetchIntervalInBackground: true
     }
   })
@@ -146,12 +162,20 @@ export function EnrollingStep(props: EnrollingStepProps) {
     const error = enrollmentStatus.error
     const data = status()
     if (!acceptsStatus()) return
-    if (error) {
-      setFailure(extractErrorDisplay(error))
-    } else if (data && typeof data === "object" && "failed" in data) {
+    if (data && typeof data === "object" && "failed" in data) {
+      setTerminal(true)
+      const untyped = UNTYPED_FAILURE_KEYS[data.failed.errorType]
       setFailure(
-        data.failed.description || t("errors:_trn_error.enrollment_failed")
+        (untyped && t(untyped)) ||
+          data.failed.description ||
+          t("errors:_trn_error.enrollment_failed")
       )
+    } else if (terminal()) {
+      // This attempt has finished. Only Retry may create a fresh owner/cache.
+      return
+    } else if (error) {
+      // Request/transport failures remain nonterminal and may recover by polling.
+      setFailure(extractErrorDisplay(error))
     } else if (
       !error &&
       data &&
@@ -166,6 +190,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
     setLoading(true)
     setStatusReady(false)
     retireStatus(ownedRevision())
+    setTerminal(false)
     setFailure(undefined)
     const started = flow.startEnrollment(method())
     const revision = flow.captureEnrollment()
@@ -255,9 +280,15 @@ export function EnrollingStep(props: EnrollingStepProps) {
   })
 
   // Set up countdown interval
-  const interval = setInterval(() => {
-    updateExpireTime()
-  }, 1000)
+  let interval: ReturnType<typeof setInterval> | undefined
+  createEffect(() => {
+    if (terminal()) {
+      clearInterval(interval)
+      interval = undefined
+    } else if (interval === undefined) {
+      interval = setInterval(() => updateExpireTime(), 1000)
+    }
+  })
 
   onCleanup(() => {
     active = false
@@ -641,6 +672,18 @@ export function EnrollingStep(props: EnrollingStepProps) {
         >
           <Trans key="auth:_trn_login.try_again" />
           <div class="i-hugeicons:refresh h-4 w-4" />
+        </Button>
+      </Show>
+      <Show when={terminal()}>
+        <Button
+          type="secondary"
+          fullWidth
+          disabled={loading()}
+          onClick={() => {
+            if (!loading() && ownsStatus()) void leaveEnrollment(flow)
+          }}
+        >
+          <Trans key="general:_trn_cancel" />
         </Button>
       </Show>
 

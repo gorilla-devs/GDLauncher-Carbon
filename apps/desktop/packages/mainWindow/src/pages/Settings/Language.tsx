@@ -30,7 +30,7 @@ const Language = () => {
             <Radio.group
               onChange={(value) => {
                 runWithOwner(owner, () => {
-                  changeLanguage(value as string)
+                  void changeLanguage(value as string).catch(() => {})
                 })
               }}
               value={settings.data?.language}

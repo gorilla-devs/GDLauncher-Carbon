@@ -1,6 +1,9 @@
 import { loadLanguageFiles, useTransContext } from "@gd/i18n"
 import { rspc } from "./rspcClient"
 
+let latestSelection = 0
+let publication: Promise<void> = Promise.resolve()
+
 /**
  * Change the language of the app
  * To be able to call this function, you need to use getOwner and runWithOwner because context is not available outside of computations
@@ -17,6 +20,7 @@ import { rspc } from "./rspcClient"
  *  ```
  */
 export default async function changeLanguage(lang: string) {
+  const selection = ++latestSelection
   const [_, { changeLanguage, addResources }] = useTransContext()
 
   const settingsMutation = rspc.createMutation(() => ({
@@ -24,15 +28,17 @@ export default async function changeLanguage(lang: string) {
   }))
 
   const resources = await loadLanguageFiles(lang)
-  for (const ns in resources) {
-    addResources(lang, ns, resources[ns])
-  }
-
-  settingsMutation.mutate({
-    language: {
-      Set: lang
+  if (selection !== latestSelection) return
+  const publish = publication.then(async () => {
+    if (selection !== latestSelection) return
+    for (const ns in resources) {
+      addResources(lang, ns, resources[ns])
     }
+    // Once dispatched, an older write must commit before the next write can
+    // start. Resource ordering alone cannot prevent reversed DB commits.
+    await settingsMutation.mutateAsync({ language: { Set: lang } })
+    if (selection === latestSelection) changeLanguage(lang)
   })
-
-  changeLanguage(lang)
+  publication = publish.catch(() => {})
+  await publish
 }

@@ -206,7 +206,11 @@ fn decode_device_poll(status: StatusCode, body: &[u8]) -> anyhow::Result<PollRes
         };
     }
     if status != StatusCode::OK {
-        bail!("Device authorization request returned {}", status);
+        return Err(UnexpectedStatus {
+            request: "Device authorization request",
+            status,
+        }
+        .into());
     }
     #[derive(Deserialize)]
     struct Response {
@@ -461,6 +465,15 @@ mod task19_poll_tests {
 #[error("pending device code expired")]
 pub struct DeviceCodeExpiredError;
 
+/// A Microsoft token endpoint answered with a status the flow cannot use.
+/// Typed so a failed sign-in can tell a busy service from other failures.
+#[derive(Error, Debug)]
+#[error("{request} returned {status}")]
+pub struct UnexpectedStatus {
+    request: &'static str,
+    pub status: StatusCode,
+}
+
 #[derive(Debug, Clone)]
 pub struct MsAuth {
     pub access_token: String,
@@ -519,7 +532,11 @@ fn decode_refresh(status: StatusCode, body: &[u8]) -> anyhow::Result<MsAuth> {
         }
     }
     if !status.is_success() {
-        bail!("Microsoft refresh request returned {}", status);
+        return Err(UnexpectedStatus {
+            request: "Microsoft refresh request",
+            status,
+        }
+        .into());
     }
     #[derive(Deserialize)]
     struct Response {
@@ -576,6 +593,32 @@ mod task19_refresh_response_tests {
             assert!(!error.is::<RefreshRejected>());
         }
         assert_eq!(decode_refresh(StatusCode::OK,br#"{"access_token":"dummy-ms","id_token":"dummy-id","refresh_token":"dummy-refresh","expires_in":60}"#).unwrap().refresh_token,"dummy-refresh");
+    }
+    #[test]
+    fn a_busy_token_endpoint_reads_as_unavailable_with_unchanged_text() {
+        use super::super::enroll::FailureCategory;
+        let refresh = decode_refresh(StatusCode::SERVICE_UNAVAILABLE, b"").unwrap_err();
+        assert_eq!(
+            refresh.to_string(),
+            "Microsoft refresh request returned 503 Service Unavailable"
+        );
+        assert_eq!(
+            FailureCategory::of(&refresh),
+            FailureCategory::ServiceUnavailable
+        );
+        let Err(poll) = decode_device_poll(StatusCode::BAD_GATEWAY, b"") else {
+            panic!("a 502 poll answer was accepted");
+        };
+        assert_eq!(
+            poll.to_string(),
+            "Device authorization request returned 502 Bad Gateway"
+        );
+        assert_eq!(
+            FailureCategory::of(&poll),
+            FailureCategory::ServiceUnavailable
+        );
+        let other = decode_refresh(StatusCode::UNAUTHORIZED, b"").unwrap_err();
+        assert_eq!(FailureCategory::of(&other), FailureCategory::Other);
     }
 }
 

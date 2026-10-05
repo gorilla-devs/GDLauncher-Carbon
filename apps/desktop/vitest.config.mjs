@@ -13,6 +13,8 @@ export default defineConfig({
       "**/*.task21.test.{ts,tsx}",
       // Controlled Solid/jsdom Task28 entry: vitest.task28.config.mjs.
       "**/*.task28.test.{ts,tsx}",
+      // Controlled Solid/jsdom Task29 entry: vitest.task29.config.mjs.
+      "**/*.task29.test.{ts,tsx}",
       "**/node_modules/**",
       "**/dist/**",
       "e2e-tests/**/*.spec.ts",

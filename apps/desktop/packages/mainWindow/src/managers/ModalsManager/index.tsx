@@ -298,6 +298,8 @@ const ModalsContext = createContext<Context>()
 export interface ModalStackEntryApi {
   registerPreventClose: (_accessor: () => boolean) => void
   unregisterPreventClose: () => void
+  /** Close only this live entry while it is still the current top modal. */
+  closeIfCurrentTop: () => boolean
 }
 
 // Lets the ModalLayout rendered for a given stack entry register its own
@@ -466,12 +468,24 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
               // entry's lifetime — `<For>` only calls this mapper once per
               // item), so the mounted ModalLayout's registration can never
               // land on a different modal instance.
+              let entryLive = true
+              onCleanup(() => {
+                entryLive = false
+              })
               const stackEntryApi: ModalStackEntryApi = {
                 registerPreventClose: (accessor) => {
                   modal.preventCloseAccessor = accessor
                 },
                 unregisterPreventClose: () => {
                   modal.preventCloseAccessor = undefined
+                },
+                closeIfCurrentTop: () => {
+                  const stack = modalStack()
+                  if (!entryLive || stack[stack.length - 1] !== modal) {
+                    return false
+                  }
+                  closeModal()
+                  return true
                 }
               }
 

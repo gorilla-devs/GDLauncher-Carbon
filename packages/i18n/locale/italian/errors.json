@@ -14,6 +14,8 @@
   "_trn_404_message": "Pagina non trovata",
   "_trn_its_gone": "È sparito",
   "_trn_error.enrollment_failed": "Impossibile completare l'iscrizione",
+  "_trn_error.enrollment_network": "Impossibile raggiungere i server di accesso di Microsoft o di Minecraft. Controlla la connessione a internet ed eventuali proxy, VPN o antivirus che filtrano il traffico web, poi riprova.",
+  "_trn_error.enrollment_service_unavailable": "Il servizio di accesso di Microsoft o di Minecraft è sovraccarico o ha problemi in questo momento. Attendi qualche minuto, poi riprova.",
   "_trn_error.xbox_code": "Codice di errore Xbox",
   "_trn_network_error_toast": "Errore di rete: controlla la tua connessione a internet",
   "_trn_rate_limited_toast": "Un servizio è temporaneamente non disponibile, alcuni contenuti potrebbero non caricarsi"

@@ -170,7 +170,7 @@ async fn no_callback_timeout_and_actual_enrollment_drop_abort() {
 #[tokio::test]
 async fn accepted_denial_publishes_failure_and_never_exchanges_tokens() {
     use super::super::enroll::{
-        EnrollmentStatus, InvalidateCtx, exchange_browser_code, publish_browser_result,
+        EnrollmentStatus, InvalidateCtx, SignInMethod, exchange_browser_code, publish_result,
     };
     use std::sync::atomic::{AtomicUsize, Ordering};
     struct Invalidation(AtomicUsize);
@@ -191,7 +191,13 @@ async fn accepted_denial_publishes_failure_and_never_exchanges_tokens() {
     assert_eq!(exchanges.load(Ordering::SeqCst), 0);
     let status = tokio::sync::RwLock::new(EnrollmentStatus::RequestingCode);
     let invalidate = Invalidation(AtomicUsize::new(0));
-    publish_browser_result(&status, &invalidate, result.map(|_| ()).map_err(Into::into)).await;
+    publish_result(
+        &status,
+        &invalidate,
+        SignInMethod::Browser,
+        result.map(|_| ()).map_err(Into::into),
+    )
+    .await;
     assert_eq!(invalidate.0.load(Ordering::SeqCst), 1);
     let current = status.read().await;
     let EnrollmentStatus::Failed(Err(error)) = &*current else {

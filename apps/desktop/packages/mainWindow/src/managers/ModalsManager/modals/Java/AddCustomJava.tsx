@@ -1,5 +1,5 @@
 import { Trans, useTransContext } from "@gd/i18n"
-import { ModalProps, useModal } from "@/managers/ModalsManager"
+import { ModalProps, useModalStackEntry } from "@/managers/ModalsManager"
 import ModalLayout from "@/managers/ModalsManager/ModalLayout"
 import { Button, Input, toast } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
@@ -8,8 +8,9 @@ import { Match, Switch, createSignal } from "solid-js"
 const AddCustomJava = (props: ModalProps) => {
   const [value, setValue] = createSignal("")
   const [validPath, setValidPath] = createSignal<boolean | null>(null)
+  const [submitting, setSubmitting] = createSignal(false)
   const [t] = useTransContext()
-  const modalsContext = useModal()
+  const modalEntry = useModalStackEntry()
 
   const createCustomJavaVersionMutation = rspc.createMutation(() => ({
     mutationKey: ["java.createCustomJavaVersion"]
@@ -65,12 +66,29 @@ const AddCustomJava = (props: ModalProps) => {
               disabled={
                 !validPath() ||
                 validateJavaPath.isPending ||
+                submitting() ||
                 createCustomJavaVersionMutation.isPending
               }
-              onClick={() => {
-                createCustomJavaVersionMutation.mutate(value())
-                toast.success(t("notifications:_trn_custom_java_added"))
-                modalsContext?.closeModal()
+              onClick={async () => {
+                if (
+                  !validPath() ||
+                  validateJavaPath.isPending ||
+                  submitting() ||
+                  createCustomJavaVersionMutation.isPending
+                )
+                  return
+                const path = value()
+                setSubmitting(true)
+                try {
+                  await createCustomJavaVersionMutation.mutateAsync(path)
+                  toast.success(t("notifications:_trn_custom_java_added"))
+                  modalEntry?.closeIfCurrentTop()
+                } catch {
+                  // The shared mutation handler reports the error; keep the
+                  // entered value available for correction or another attempt.
+                } finally {
+                  setSubmitting(false)
+                }
               }}
             >
               <Trans key="general:_trn_add_custom_java_path" />

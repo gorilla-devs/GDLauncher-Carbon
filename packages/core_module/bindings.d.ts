@@ -408,10 +408,6 @@ export type MRFEProjectSearchResponse = { hits: MRFEProjectSearchResult[]; offse
 
 export type CFFEPagination = { index: number; pageSize: number; resultCount: number; totalCount: number }
 
-export type FEModResponse = { data: CFFEMod; pagination: CFFEPagination | null }
-
-export type CauseSegment = { display: string; debug: string; code?: string | null; data?: any | null }
-
 export type FESubtask = { name: Translation; progress: FESubtaskProgress }
 
 export type FEModResponse = { data: CFFEMod; pagination: CFFEPagination | null }
@@ -436,8 +432,6 @@ export type CacheSizes = { gdlauncher: number; minecraft: number }
 
 export type FEManagedJavaOs = "windows" | "linux" | "macOs"
 
-export type EnrollmentErrorType = "deviceCodeExpired" | "xboxAccount" | "noGameOwnership" | "noGameProfile"
-
 export type CFFEFileModule = { name: string; fingerprint: string }
 
 export type MRFEProjectID = string
@@ -452,6 +446,8 @@ export type FEPlatformFilters = { platform: "curseforge"; filters: { sort_field:
 
 export type CFFEModDescriptionParameters = { modId: number }
 
+export type FEUpdateShareArgs = { shareCode: string; title?: string | null; maxDownloads?: number | null }
+
 export type CFFEFileReleaseType = "stable" | "beta" | "alpha"
 
 export type InstallLatestMod = { instance_id: FEInstanceId; mod_source: LatestModSource }
@@ -462,7 +458,7 @@ export type LaunchState = { state: "inactive"; value: { failed_task: FETaskId | 
 
 export type ImportRequest = { session: string; index: number; name: string | null }
 
-export type AccountEntry = { username: string; uuid: string; lastUsed: string; type: AccountType; status: AccountStatus }
+export type RepairPreviewArgs = { instance: FEInstanceId }
 
 export type ListServer = { id: FEServerId; groupId: FEServerGroupId; index: number; libraryPosition: number | null; name: string; favorite: boolean; serverType: ServerType; gameVersion: string; port: number; dateCreated: string; lastStarted: string | null; state: FEServerState; iconRevision: number | null; modloaderType: string | null; modloaderVersion: string | null; modpackInfo: FEServerModpackInfo | null; autoRestartAbandoned: boolean }
 
@@ -518,6 +514,8 @@ export type ListInstanceStatus = { status: "valid"; value: ValidListInstance } |
 export type FEWaitForInstanceShareResponse = { share_code: string; expires_at: string }
 
 export type FEJavaComponent = { id: string; path: string; version: string; type: FEJavaComponentType; isValid: boolean }
+
+export type FESharedMod = { name: string; curseforgeProjectId: number | null; curseforgeFileId: number | null; curseforgeSlug: string | null; modrinthProjectId: string | null; modrinthVersionId: string | null; modrinthSlug: string | null }
 
 export type CFFEModSearchSortField = "featured" | "popularity" | "lastUpdated" | "name" | "author" | "totalDownloads" | "category" | "gameVersion"
 
@@ -594,7 +592,7 @@ export type CreateInstanceVersion = { Version: GameVersion } | { Modpack: Modpac
 
 export type FEGetUserSharesArgs = { limit: number | null; offset: number | null }
 
-export type EnrollmentErrorType = "generic" | "deviceCodeExpired" | "xboxAccount" | "noGameOwnership" | "noGameProfile"
+export type RenameServerGroup = { group: FEServerGroupId; name: string }
 
 export type Translation = { translation: "InstanceTaskDeleting" } | { translation: "InstanceTaskLaunch"; args: { name: string } } | { translation: "InstanceTaskPrepare"; args: { name: string } } | { translation: "InstanceTaskCheckPackOrigin"; args: { name: string } } | { translation: "InstanceTaskCheckPackOriginVersions" } | { translation: "InstanceTaskLaunchRequestVersions" } | { translation: "InstanceTaskLaunchRequestModpack" } | { translation: "InstanceTaskLaunchDownloadModpack" } | { translation: "InstanceTaskLaunchDownloadModpackFiles" } | { translation: "InstanceTaskLaunchExtractModpackFiles" } | { translation: "InstanceTaskLaunchRequestAddonMetadata" } | { translation: "InstanceTaskLaunchApplyStagedPatches" } | { translation: "InstanceTaskLaunchDownloadJava" } | { translation: "InstanceTaskLaunchExtractJava" } | { translation: "InstanceTaskRequestModloaderInfo" } | { translation: "InstanceTaskRequestMinecraftFiles" } | { translation: "InstanceTaskLaunchCheckingFiles" } | { translation: "InstanceTaskLaunchDownloadFiles" } | { translation: "InstanceTaskGeneratingPackInfo" } | { translation: "InstanceTaskFillCache" } | { translation: "InstanceTaskLaunchExtractNatives" } | { translation: "InstanceTaskReconstructAssets" } | { translation: "InstanceTaskLaunchRunForgeProcessors" } | { translation: "InstanceTaskLaunchRunNeoforgeProcessors" } | { translation: "InstanceTaskInstallMod"; args: { mod_name: string; instance_name: string } } | { translation: "InstanceTaskStageDatapack"; args: { mod_name: string; instance_name: string } } | { translation: "InstanceTaskInstallWorldCopy"; args: { world_name: string; instance_name: string } } | { translation: "InstanceTaskInstallModDownloadFile" } | { translation: "ServerTaskInstall"; args: { server_name: string } } | { translation: "ServerTaskInstallFromModpack"; args: { server_name: string } } | { translation: "ServerTaskDownloadServerPack"; args: { server_name: string } } | { translation: "ServerTaskExtractServerPack" } | { translation: "ServerTaskDownloadModpackFiles" } | { translation: "ServerTaskExtractModpackOverrides" } | { translation: "ServerTaskDownloadServerJar" } | { translation: "ServerTaskInstallModloader" } | { translation: "ServerTaskInstallMod"; args: { mod_name: string; server_name: string } } | { translation: "ServerTaskInstallModDownloadFile" } | { translation: "FinalizingImport" } | { translation: "InstanceImportLegacyBadConfigFile" } | { translation: "InstanceImportConfigUnreadable" } | { translation: "InstanceImportSourceUnavailable" } | { translation: "InstanceImportJavaPathSkipped" } | { translation: "InstanceImportCommandsSkipped" } | { translation: "InstanceImportGameDirMissing" } | { translation: "InstanceImportUnknownMinecraftVersion" } | { translation: "InstanceImportHmclRelativeRunDir" } | { translation: "InstanceImportCfZipMalformed" } | { translation: "InstanceImportCfZipMissingManifest" } | { translation: "InstanceImportCfZipMalformedManifest" } | { translation: "InstanceImportCfZipNotMinecraftModpack" } | { translation: "InstanceImportMrpackMalformed" } | { translation: "InstanceImportMrpackMissingManifest" } | { translation: "InstanceImportMrpackMalformedManifest" } | { translation: "InstanceImportGdlpackMalformed" } | { translation: "InstanceImportGdlpackMissingManifest" } | { translation: "InstanceImportGdlpackMalformedManifest" } | { translation: "InstanceImportGdlpackOptionalUnsupported" } | { translation: "InstanceImportMmcZipMalformed" } | { translation: "InstanceImportMmcZipMissingConfig" } | { translation: "InstanceExport" } | { translation: "InstanceExportCreatingBundle" } | { translation: "InstanceExportCalculateSize" } | { translation: "InstanceExportScanningMods" } | { translation: "InstanceImportShareCode" } | { translation: "CacheTaskLocal"; args: { instance_name: string } } | { translation: "CacheTaskCurseForge"; args: { instance_name: string } } | { translation: "CacheTaskModrinth"; args: { instance_name: string } } | { translation: "CacheSubtaskScanningFiles" } | { translation: "CacheSubtaskQueryingPlatform"; args: { platform: string } } | { translation: "CacheSubtaskDownloadingImages" } | { translation: "CacheSubtaskFinalizingCache" } | { translation: "CacheStatusTitle" } | { translation: "CacheStatusNoActiveTasks" } | { translation: "CacheStatusIdle" } | { translation: "CacheStatusRunning" } | { translation: "CacheStatusFailed" } | { translation: "CacheStatusActiveTasks"; args: { count: number } } | { translation: "CacheStatusActiveCount"; args: { count: number } } | { translation: "CacheStatusOperationsInfo" } | { translation: "CacheErrorGeneric" } | { translation: "CacheSubtaskScanningDirectories" } | { translation: "CacheSubtaskQueryingPlatformDatabase"; args: { platform: string } } | { translation: "CacheSubtaskDownloadingThumbnails" } | { translation: "CacheSubtaskProcessingFiles" } | { translation: "CacheProgressDirectories"; args: { current: number; total: number } } | { translation: "CacheProgressFiles"; args: { current: number; total: number } } | { translation: "CacheCleanup" }
 
@@ -629,7 +627,7 @@ export type ServerType = "vanilla" | "forge" | "neoforge" | "fabric" | "quilt"
 
 export type InvalidImportEntry = { name: string; reason: Translation }
 
-export type MRFEUser = { username: string; name: string | null; id: string; avatar_url: string | null }
+export type CFFEFileHash = { value: string; algo: CFFEHashAlgo }
 
 export type FEGDLAccount = { email: string; microsoftOid: string; displayName: string; friendCode: string; profileIconUrl: string; hasCustomAvatar: boolean; microsoftEmail: string | null; isEmailVerified: boolean; hasPendingVerification: boolean; hasPendingDeletionRequest: boolean; verificationTimeout: number | null; deletionTimeout: number | null; emailChangeTimeout: number | null; displayNameChangeTimeout: number | null; verificationTimeoutAt: string | null; deletionTimeoutAt: string | null; emailChangeTimeoutAt: string | null; displayNameChangeTimeoutAt: string | null; scheduledDeletionEffectiveAt: string | null }
 
@@ -644,6 +642,11 @@ export type FEUnifiedModSearchSortOrder = "ascending" | "descending"
 export type OpsEntry = { uuid: string; name: string; level: number; bypassesPlayerLimit?: boolean }
 
 export type CFFEFileRelationType = "embeddedLibrary" | "optionalDependency" | "requiredDependency" | "tool" | "incompatible" | "include"
+
+/**
+ * Username availability status
+ */
+export type UsernameAvailability = "available" | "taken" | "notallowed"
 
 export type FEUnifiedSearchResponse = { data: FEUnifiedSearchResult[]; pagination: FEUnifiedPagination | null }
 

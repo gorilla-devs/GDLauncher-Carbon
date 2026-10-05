@@ -14,6 +14,8 @@
   "_trn_404_message": "Page not found",
   "_trn_its_gone": "It's gone",
   "_trn_error.enrollment_failed": "Failed to complete enrollment",
+  "_trn_error.enrollment_network": "Couldn't reach the Microsoft or Minecraft sign-in servers. Check your internet connection and any proxy, VPN or antivirus that filters web traffic, then try again.",
+  "_trn_error.enrollment_service_unavailable": "The Microsoft or Minecraft sign-in service is busy or having problems right now. Wait a few minutes, then try again.",
   "_trn_error.xbox_code": "Xbox error code",
   "_trn_network_error_toast": "Network error: check your internet connection",
   "_trn_rate_limited_toast": "A service is temporarily unavailable, some content may fail to load"

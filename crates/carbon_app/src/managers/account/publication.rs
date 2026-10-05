@@ -118,6 +118,7 @@ impl Publication {
     ) -> anyhow::Result<H> {
         let mut state = self.gate.lock().await;
         if state.refreshing.contains_key(uuid) {
+            debug!("{uuid} is already being refreshed");
             bail!(RefreshAccountError::AlreadyRefreshing);
         }
         if automatic && !state.schedule.eligible(uuid, now) {
@@ -126,9 +127,12 @@ impl Publication {
         let account = account_repo::get_account(db, uuid)
             .await?
             .ok_or(RefreshAccountError::NoAccount)?;
-        let token = account
-            .ms_refresh_token
-            .ok_or(RefreshAccountError::NoRefreshToken)?;
+        let Some(token) = account.ms_refresh_token else {
+            // Offline accounts and ones that need a new sign-in: expected.
+            debug!("No refresh token, aborting refresh for {uuid}");
+            bail!(RefreshAccountError::NoRefreshToken);
+        };
+        info!("Refreshing account {uuid}");
         let ticket = state.capture(uuid);
         let operation = uuid::Uuid::new_v4().to_string();
         let (mut task, handle) = start(token, ticket, operation.clone());
@@ -219,10 +223,11 @@ impl Publication {
         if !state.owns(ticket) {
             return Ok(false);
         }
+        // A failure carries its cause's text, for the log only.
         enum Outcome {
             Success(api::FullAccount),
-            Rejected,
-            Transient,
+            Rejected(String),
+            Transient(String),
         }
         let outcome = {
             let Some(task) = state
@@ -235,19 +240,34 @@ impl Publication {
             let status = task.status.read().await;
             match &*status {
                 EnrollmentStatus::Complete(account) => Outcome::Success(account.clone()),
-                EnrollmentStatus::Failed(Ok(_)) => Outcome::Rejected,
+                EnrollmentStatus::Failed(Ok(e)) => Outcome::Rejected(e.to_string()),
                 EnrollmentStatus::Failed(Err(e)) if e.is::<api::RefreshRejected>() => {
-                    Outcome::Rejected
+                    Outcome::Rejected(format!("{e:#}"))
                 }
-                EnrollmentStatus::Failed(Err(_)) => Outcome::Transient,
+                EnrollmentStatus::Failed(Err(e)) => Outcome::Transient(format!("{e:#}")),
                 _ => return Ok(false),
             }
         };
+        let uuid = &ticket.uuid;
         let result = match outcome {
-            Outcome::Success(account) => state.refresh(db, ticket, account.into()).await,
-            Outcome::Rejected => state.reject(db, ticket).await,
-            Outcome::Transient => {
-                state.schedule.failed(&ticket.uuid, Instant::now());
+            Outcome::Success(account) => {
+                let result = state.refresh(db, ticket, account.into()).await;
+                if let Ok(true) = result {
+                    info!("Refreshed account {uuid}");
+                }
+                result
+            }
+            Outcome::Rejected(cause) => {
+                warn!(
+                    "Microsoft rejected the saved sign-in of account {uuid}, marking it as needing a new sign-in: {cause}"
+                );
+                state.reject(db, ticket).await
+            }
+            Outcome::Transient(cause) => {
+                warn!(
+                    "Failed to refresh account {uuid}, keeping its saved sign-in and retrying later: {cause}"
+                );
+                state.schedule.failed(uuid, Instant::now());
                 Ok(false)
             }
         };
@@ -591,6 +611,57 @@ pub(super) mod task19_publication_tests {
         drop(gate);
         assert!(!callback.await.unwrap().unwrap());
         assert!(account_repo::get_account(&db, "a").await.unwrap().is_none());
+    }
+    #[tokio::test]
+    #[tracing_test::traced_test]
+    async fn refresh_outcomes_are_logged_with_their_cause() {
+        let (_dir, db) = database().await;
+        let publication = Publication::default();
+        publication
+            .save(&db, account("a", "healthy"), |_| {})
+            .await
+            .unwrap();
+        let (ticket, op) =
+            admit(&publication, EnrollmentStatus::Complete(api_account("new"))).await;
+        assert!(
+            publication
+                .complete_refresh(&db, &ticket, &op, |_| {})
+                .await
+                .unwrap()
+        );
+        assert!(logs_contain("Refreshed account a"));
+        let error = anyhow!("synthetic dns failure")
+            .context("Failed to refresh auth token with refresh token");
+        let (ticket, op) = admit(&publication, EnrollmentStatus::Failed(Err(error))).await;
+        publication
+            .complete_refresh(&db, &ticket, &op, |_| {})
+            .await
+            .unwrap();
+        assert!(logs_contain(
+            "Failed to refresh account a, keeping its saved sign-in and retrying later: \
+             Failed to refresh auth token with refresh token: synthetic dns failure"
+        ));
+        let (ticket, op) = admit(
+            &publication,
+            EnrollmentStatus::Failed(Err(api::RefreshRejected.into())),
+        )
+        .await;
+        publication
+            .complete_refresh(&db, &ticket, &op, |_| {})
+            .await
+            .unwrap();
+        assert!(logs_contain(
+            "Microsoft rejected the saved sign-in of account a, marking it as needing a new \
+             sign-in: Microsoft refresh grant was rejected; sign in again"
+        ));
+        assert!(
+            account_repo::get_account(&db, "a")
+                .await
+                .unwrap()
+                .unwrap()
+                .ms_refresh_token
+                .is_none()
+        );
     }
     #[tokio::test]
     async fn rejection_invalidates_but_transient_failure_preserves_credentials_and_backs_off() {

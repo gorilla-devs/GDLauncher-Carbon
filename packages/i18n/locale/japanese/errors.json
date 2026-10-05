@@ -14,6 +14,8 @@
   "_trn_404_message": "ページが見つかりません",
   "_trn_its_gone": "ページが存在しません",
   "_trn_error.enrollment_failed": "登録を完了できませんでした",
+  "_trn_error.enrollment_network": "Microsoft または Minecraft のサインインサーバーに接続できませんでした。インターネット接続と、Web 通信をフィルタリングするプロキシ・VPN・ウイルス対策ソフトを確認してから、もう一度お試しください。",
+  "_trn_error.enrollment_service_unavailable": "Microsoft または Minecraft のサインインサービスが混雑しているか、現在問題が発生しています。数分待ってから、もう一度お試しください。",
   "_trn_error.xbox_code": "Xboxエラーコード",
   "_trn_network_error_toast": "ネットワークエラー：インターネット接続を確認してください",
   "_trn_rate_limited_toast": "サービスが一時的に利用できません。一部のコンテンツを読み込めない可能性があります"

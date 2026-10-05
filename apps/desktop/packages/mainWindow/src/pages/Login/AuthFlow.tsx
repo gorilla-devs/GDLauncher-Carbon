@@ -187,6 +187,12 @@ function AuthFlowContent() {
     "available" | "taken" | "notallowed" | null
   >(null)
   const [usernameError, setUsernameError] = createSignal<string | null>(null)
+  const [confirmedUsername, setConfirmedUsername] = createSignal<{
+    name: string
+    step: Extract<AuthStep, { type: "profile-creation" }>
+    revision: number
+  }>()
+  let usernameRequest = 0
   const [buttonLoading, setButtonLoading] = createSignal(false)
 
   // GDL account form state
@@ -220,9 +226,17 @@ function AuthFlowContent() {
       }
     )
   )
-  const canSubmitProfile = createMemo(
-    () => isUsernameValid() && usernameAvailable() === "available"
-  )
+  const canSubmitProfile = createMemo(() => {
+    const confirmed = confirmedUsername()
+    return (
+      isUsernameValid() &&
+      !usernameChecking() &&
+      usernameAvailable() === "available" &&
+      confirmed?.name === username() &&
+      confirmed.step === getCurrentStep() &&
+      flow.ownsEnrollment(confirmed.revision)
+    )
+  })
 
   // Back button label (Cancel for enrolling/profile-creation, Back for others)
   const backButtonLabel = createMemo(() => {
@@ -242,38 +256,48 @@ function AuthFlowContent() {
   createEffect(() => {
     const name = username()
     const step = getCurrentStep()
-
-    // Only check if on profile creation step
-    if (step?.type !== "profile-creation" || verificationRetry()) return
+    const request = ++usernameRequest
+    const revision = flow.captureEnrollment()
+    let timer: ReturnType<typeof setTimeout> | undefined
+    onCleanup(() => {
+      ++usernameRequest
+      clearTimeout(timer)
+    })
 
     // Reset states
     setUsernameAvailable(null)
     setUsernameError(null)
+    setConfirmedUsername(undefined)
+    setUsernameChecking(false)
 
+    if (step?.type !== "profile-creation" || verificationRetry()) return
     if (!isUsernameValid()) return
 
     // Debounce the check
-    const revision = flow.captureEnrollment()
-    const timer = setTimeout(async () => {
-      if (!flow.ownsEnrollment(revision)) return
+    const token = step.accessToken
+    const ownsCheck = () =>
+      request === usernameRequest &&
+      flow.ownsEnrollment(revision) &&
+      getCurrentStep() === step &&
+      step.accessToken === token &&
+      username() === name
+    timer = setTimeout(async () => {
+      if (!ownsCheck()) return
       setUsernameChecking(true)
       try {
-        const result = await flow.checkUsernameAvailability(
-          step.accessToken,
-          name
-        )
-        if (!flow.ownsEnrollment(revision)) return
+        const result = await flow.checkUsernameAvailability(token, name)
+        if (!ownsCheck()) return
         setUsernameAvailable(result)
+        if (result === "available")
+          setConfirmedUsername({ name, step, revision })
       } catch (err) {
-        if (!flow.ownsEnrollment(revision)) return
+        if (!ownsCheck()) return
         console.error("Error checking username:", err)
         setUsernameError(t("auth:_trn_profile_creation.check_failed"))
       } finally {
-        if (flow.ownsEnrollment(revision)) setUsernameChecking(false)
+        if (ownsCheck()) setUsernameChecking(false)
       }
     }, 500)
-
-    onCleanup(() => clearTimeout(timer))
   })
 
   // Initialize GDL form when entering gdl-account-form step

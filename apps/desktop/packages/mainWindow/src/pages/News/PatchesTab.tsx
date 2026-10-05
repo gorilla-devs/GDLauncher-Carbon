@@ -81,6 +81,16 @@ const PatchesTab = (props: PatchesTabProps) => {
 
     return data.filter((item) => {
       const versionType = item.versionType?.toLowerCase()
+      if (filter === "pre-release") {
+        // Keep raw snapshots reachable in Snapshots. Release candidates are
+        // deliberately separate from this numbered prerelease convention.
+        return (
+          versionType === filter ||
+          [item.version, item.id].some((value) =>
+            /^\d+\.\d+(?:\.\d+)?-pre-?\d+$/i.test(value || "")
+          )
+        )
+      }
       return versionType === filter
     })
   })

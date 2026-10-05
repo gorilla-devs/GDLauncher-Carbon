@@ -28,14 +28,11 @@ const PageView = () => {
 
   // Fetch full patch content if it's a patch note
   const fetchPatchContent = async (contentPath: string) => {
-    try {
-      const resp = await fetch(contentPath)
-      const data = await resp.json()
-      return data.body || ""
-    } catch (err) {
-      console.error("Error fetching patch content:", err)
-      return ""
-    }
+    const resp = await fetch(contentPath)
+    if (!resp.ok)
+      throw new Error(`Patch content request failed (${resp.status})`)
+    const data = await resp.json()
+    return data.body || ""
   }
 
   const patchContent = createQuery(() => ({
@@ -43,7 +40,9 @@ const PageView = () => {
     queryFn: () => fetchPatchContent(currentArticle()!.contentPath!),
     enabled:
       !!currentArticle()?.contentPath && currentArticle()?.type === "patch",
-    staleTime: 30 * 60 * 1000 // 30 minutes
+    staleTime: 30 * 60 * 1000, // 30 minutes
+    // The page shows a failed load in place with Retry; no global toast too.
+    meta: { localErrorToast: true }
   }))
 
   return (
@@ -161,20 +160,49 @@ const PageView = () => {
               class="bg-darkSlate-700 border-darkSlate-600 rounded-2xl border p-8"
             >
               {article().type === "patch" ? (
-                <Show
-                  when={patchContent.data}
-                  fallback={
-                    <div class="flex items-center justify-center py-16">
-                      <div class="text-lightSlate-400 flex items-center gap-3">
-                        <Spinner class="h-6 w-6" />
-                        <span class="text-lg">Loading patch content...</span>
-                      </div>
+                <>
+                  <Show when={patchContent.isError}>
+                    <div
+                      role="alert"
+                      class="flex flex-col items-center gap-3 py-4"
+                    >
+                      <Trans key="news:_trn_patch_content_error" />
+                      <Button
+                        onClick={() => {
+                          void patchContent.refetch().catch(() => {})
+                        }}
+                        disabled={patchContent.isFetching}
+                      >
+                        <Trans key="general:_trn_retry" />
+                      </Button>
                     </div>
-                  }
-                >
-                  <div class="patch-content">
-                    <style>
-                      {`
+                  </Show>
+                  <Show
+                    when={patchContent.data !== undefined}
+                    fallback={
+                      <Show when={patchContent.isPending}>
+                        <div class="flex items-center justify-center py-16">
+                          <div class="text-lightSlate-400 flex items-center gap-3">
+                            <Spinner class="h-6 w-6" />
+                            <span class="text-lg">
+                              Loading patch content...
+                            </span>
+                          </div>
+                        </div>
+                      </Show>
+                    }
+                  >
+                    <Show
+                      when={patchContent.data}
+                      fallback={
+                        <p class="text-lightSlate-400 py-8 text-center">
+                          <Trans key="news:_trn_no_content" />
+                        </p>
+                      }
+                    >
+                      <div class="patch-content">
+                        <style>
+                          {`
                           .patch-content h1, .patch-content h2, .patch-content h3, .patch-content h4, .patch-content h5, .patch-content h6 {
                             font-weight: 700;
                             margin: 1.5rem 0 1rem 0;
@@ -283,14 +311,16 @@ const PageView = () => {
                             font-weight: 600;
                           }
                         `}
-                    </style>
-                    <div
-                      class="text-lightSlate-100 prose prose-lg prose-invert max-w-none leading-relaxed"
-                      // eslint-disable-next-line solid/no-innerhtml
-                      innerHTML={parseToHtml(patchContent.data)}
-                    />
-                  </div>
-                </Show>
+                        </style>
+                        <div
+                          class="text-lightSlate-100 prose prose-lg prose-invert max-w-none leading-relaxed"
+                          // eslint-disable-next-line solid/no-innerhtml
+                          innerHTML={parseToHtml(patchContent.data || "")}
+                        />
+                      </div>
+                    </Show>
+                  </Show>
+                </>
               ) : (
                 <div class="prose prose-xl prose-invert max-w-none">
                   <p class="text-lightSlate-100 leading-relaxed">

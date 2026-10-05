@@ -14,6 +14,8 @@
   "_trn_404_message": "页面未找到",
   "_trn_its_gone": "它不见了",
   "_trn_error.enrollment_failed": "注册失败",
+  "_trn_error.enrollment_network": "无法连接到 Microsoft 或 Minecraft 登录服务器。请检查您的网络连接，以及任何会过滤网络流量的代理、VPN 或杀毒软件，然后重试。",
+  "_trn_error.enrollment_service_unavailable": "Microsoft 或 Minecraft 的登录服务当前繁忙或出现问题。请等待几分钟后重试。",
   "_trn_error.xbox_code": "Xbox 错误代码",
   "_trn_network_error_toast": "网络错误：请检查您的网络连接",
   "_trn_rate_limited_toast": "服务暂时不可用，部分内容可能无法加载"
