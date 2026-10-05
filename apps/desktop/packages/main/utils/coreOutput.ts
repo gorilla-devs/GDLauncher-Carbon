@@ -1,3 +1,4 @@
+import { dbRecoveryCategory, type DbRecoveryCategory } from "./dbRecovery"
 import { StringDecoder } from "node:string_decoder"
 import { redactCoreIdentity } from "./accountIdentity"
 
@@ -11,7 +12,12 @@ export type CoreStartup =
       result: { port: number; apiToken: string }
       logs: CoreLog[]
     }
-  | { type: "error"; logs: CoreLog[]; snapshotPath?: string }
+  | {
+      type: "error"
+      logs: CoreLog[]
+      snapshotPath?: string
+      dbRecovery?: DbRecoveryCategory
+    }
   | { type: "backwardsMigration"; logs: CoreLog[] }
 export const MAX_CORE_RECORD = 65536
 export const MAX_STARTUP_CAPTURE = 1024 * 1024
@@ -89,6 +95,7 @@ export function createCoreOutput(sinks: {
         capture({ type: "error", message: `Database error: ${event}` })
         finish({
           type: "error",
+          dbRecovery: dbRecoveryCategory(event, payload),
           snapshotPath: event === "DB_DOWNGRADE_FAILED" ? payload : undefined
         } as CoreStartup)
       } else sinks.progress(event)

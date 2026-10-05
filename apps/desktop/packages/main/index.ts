@@ -49,6 +49,7 @@ import {
   removedPartialCopy,
   runtimeTargetRefusal,
   selectRuntimePath,
+  unsupportedRuntimeEntries,
   validateRuntimeDestination,
   type RuntimePathValidation
 } from "./utils/runtimeRelocation"
@@ -84,9 +85,14 @@ import {
   type ShutdownPromptText
 } from "./utils/shutdownPrompt"
 import {
+  DatabaseRefusal,
   assertDatabaseRestoreReadySync,
+  recoverInterruptedRestore,
   restoreDatabaseSnapshot
 } from "./utils/databaseRestore"
+import { RECOVERY_COPY_DAYS, type DbRecoveryCategory } from "./utils/dbRecovery"
+import { resetDatabaseAndRestart } from "./utils/databaseReset"
+import { pruneRecoveryCopies } from "./utils/databaseRecoveryBundles"
 import {
   interruptRuntimeOperation,
   interruptibleUntilCommitted,
@@ -425,6 +431,7 @@ export type CoreModule = () => Promise<
       // Present only for `DB_DOWNGRADE_FAILED`: the pre-downgrade snapshot the
       // failure screen can offer to restore.
       snapshotPath?: string
+      dbRecovery?: DbRecoveryCategory
     }
   | {
       type: "backwardsMigration"
@@ -442,37 +449,15 @@ const DEV_API_TOKEN = "dev-mode-only-do-not-use-in-production"
 // core promise via the timeout below while the process itself stays alive.
 let coreProcessHandle: ChildProcessWithoutNullStreams | null = null
 
-// Terminate the core (if still running) and wait, briefly, for it to exit.
-// Recovery must release the database file before deleting or overwriting it;
-// on Windows the holding process has to have exited first.
-async function killCoreProcess(timeoutMs = 5000): Promise<void> {
-  const proc = coreProcessHandle
-  if (!proc) {
-    return
-  }
-  if (proc.exitCode !== null || proc.signalCode !== null) {
-    return
-  }
-  await new Promise<void>((resolve) => {
-    let settled = false
-    const finish = () => {
-      if (settled) {
-        return
-      }
-      settled = true
-      resolve()
-    }
-    proc.once("exit", finish)
-    const timer = setTimeout(finish, timeoutMs)
-    if (typeof timer.unref === "function") {
-      timer.unref()
-    }
-    try {
-      proc.kill()
-    } catch {
-      finish()
-    }
-  })
+// Restart shares ordinary shutdown/game-survival when a READY owned core exists.
+// A nondeleting development restart remains supported; reset separately refuses it.
+async function killCoreProcess(): Promise<void> {
+  const core = await coreModule
+  const owned = coreProcessHandle
+  if (!owned) return
+  if (core.type === "success")
+    await stopCoreForShutdown({ ...core.result, process: owned }, "quit")
+  else await terminateAndObserveCoreExit(owned)
 }
 
 const loadCoreModule: CoreModule = async () => {
@@ -485,7 +470,13 @@ const loadCoreModule: CoreModule = async () => {
   try {
     assertDatabaseRestoreReadySync(CURRENT_RUNTIME_PATH!)
   } catch (error) {
-    return { type: "error", logs: [{ type: "error", message: String(error) }] }
+    return {
+      type: "error",
+      logs: [{ type: "error", message: String(error) }],
+      // The screen offers the way out of this one (recoverInterruptedRestore).
+      dbRecovery:
+        error instanceof DatabaseRefusal ? "interrupted_restore" : undefined
+    }
   }
   return new Promise((resolve) => {
     console.log("Loading core module...")
@@ -628,7 +619,7 @@ const loadCoreModule: CoreModule = async () => {
     coreModule.on("exit", (code) => {
       const keptAlive = lifecycle.endCore(identitySession)
       coreOutput.end()
-      coreProcessHandle = null
+      // Retain this launcher-owned handle: its observed exit is recovery evidence.
       coreOutput.fail(
         `Core module exited unexpectedly with code ${code} before READY`
       )
@@ -963,43 +954,53 @@ ipcMain.handle("relaunch", async () =>
 )
 /** Keep GDLauncher open on a reset or restore: nothing was changed. */
 const keptBeforeDatabaseChange = () =>
-  new Error(
+  new DatabaseRefusal(
     "GDLauncher was kept open, so the database was not changed. Close what is still running and try again."
   )
 
+/** A recovery's restart notice, attached to the launcher so it cannot open
+ *  behind it while the screen waits on it. */
+const showRecoveryNotice = (options: Electron.MessageBoxOptions) =>
+  win && !win.isDestroyed()
+    ? dialog.showMessageBox(win, options)
+    : dialog.showMessageBox(options)
 
 ipcMain.handle("deleteDbAndRestart", async () =>
   withRuntimeOperation(async () => {
-    console.log("deleting database and restarting app...")
-
-    // Kill the core FIRST: on Windows, unlinking a file the core still holds
-    // open fails, so the process must exit before we delete the database. This
-    // also covers a startup that hung before READY, where the process is still
-    // alive.
-    await killCoreProcess()
-
-    const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
-
-    // Delete the database, its WAL/SHM sidecars, and any stale pre-downgrade
-    // snapshot — leaving a sidecar behind would let SQLite reconstruct the old
-    // (broken) state on relaunch. Relaunch then lands on the fresh baseline path.
-    const targets = [
-      dbPath,
-      `${dbPath}-wal`,
-      `${dbPath}-shm`,
-      path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.pre-downgrade.db")
-    ]
-    for (const target of targets) {
-      try {
-        await fs.unlink(target)
-        console.log(`deleted ${target}`)
-      } catch {
-        // File might not exist, that's ok
+    console.log("Resetting the database and restarting...")
+    const outcome = await resetDatabaseAndRestart(CURRENT_RUNTIME_PATH!, {
+      // Resolves only once the core's exit was observed, also when the user
+      // chose Reset now: files move only after that.
+      stopCore: async () => {
+        const core = await coreModule
+        const owned = coreProcessHandle
+        if (!owned)
+          throw new Error(
+            "Database reset requires a launcher-owned core exit; external/development core must be stopped and recovered manually"
+          )
+        if (core.type === "success")
+          await stopCoreForShutdown({ ...core.result, process: owned }, "quit")
+        else await terminateAndObserveCoreExit(owned)
+      },
+      restart: async (recoveryPath) => {
+        console.log(`Database reset; recovery files kept in ${recoveryPath}`)
+        await showRecoveryNotice({
+          type: "info",
+          title: "Database reset",
+          message:
+            "Database metadata was reset. A complete recovery copy has been retained.",
+          detail: `Recovery files: ${recoveryPath}\nKeep these files for manual recovery; GDLauncher removes them after ${RECOVERY_COPY_DAYS} days. Instance, world, addon and server directories remain.`,
+          buttons: ["Restart"],
+          defaultId: 0,
+          noLink: true
+        })
+        app.relaunch()
+        app.exit()
       }
-    }
-
-    app.relaunch()
-    app.exit()
+    })
+    if (!outcome.ok)
+      console.error("Database reset did not finish:", outcome.message)
+    return outcome
   })
 )
 
@@ -1007,33 +1008,74 @@ ipcMain.handle(
   "restoreDbSnapshotAndRestart",
   async (_event, snapshotPath: string) =>
     withRuntimeOperation(async () => {
-      return restoreDatabaseSnapshot(CURRENT_RUNTIME_PATH!, snapshotPath, {
-        stopCore: async () => {
-          const core = await coreModule
-          if (core.type === "success")
-            await stopCoreForShutdown(
-              { ...core.result, process: coreProcessHandle },
-              "quit"
+      console.log("Restoring the database snapshot and restarting...")
+      const outcome = await restoreDatabaseSnapshot(
+        CURRENT_RUNTIME_PATH!,
+        snapshotPath,
+        {
+          stopCore: async () => {
+            if ((await ownedShutdown("restore")) === "kept")
+              throw keptBeforeDatabaseChange()
+          },
+          restart: async (recoveryPath) => {
+            console.log(
+              `Database snapshot restored; original files kept in ${recoveryPath}`
             )
-          else if (coreProcessHandle)
-            await terminateAndObserveCoreExit(coreProcessHandle)
-        },
-        restart: async (recoveryPath) => {
-          await dialog.showMessageBox({
-            type: "info",
-            title: "Database snapshot restored",
-            message:
-              "The previous database is restored. Original database files have been retained.",
-            detail: `Recovery files: ${recoveryPath}\nKeep these files until the restored launcher is working.`,
-            buttons: ["Restart"],
-            defaultId: 0,
-            noLink: true
-          })
-          app.relaunch()
-          app.exit()
+            await showRecoveryNotice({
+              type: "info",
+              title: "Database snapshot restored",
+              message:
+                "The previous database is restored. Original database files have been retained.",
+              detail: `Recovery files: ${recoveryPath}\nKeep these files until the restored launcher is working; GDLauncher removes them after ${RECOVERY_COPY_DAYS} days.`,
+              buttons: ["Restart"],
+              defaultId: 0,
+              noLink: true
+            })
+            app.relaunch()
+            app.exit()
+          }
         }
-      })
+      )
+      if (!outcome.ok)
+        console.error(
+          "Database snapshot restore did not finish:",
+          outcome.message
+        )
+      return outcome
     })
+)
+
+// The way out of the startup guard: a core was never started in that state.
+ipcMain.handle("recoverInterruptedDbRestore", async () =>
+  withRuntimeOperation(async () => {
+    console.log("Recovering an interrupted database restore...")
+    const outcome = await recoverInterruptedRestore(CURRENT_RUNTIME_PATH!, {
+      stopCore: async () => {
+        if ((await ownedShutdown("restore")) === "kept")
+          throw keptBeforeDatabaseChange()
+      },
+      restart: async ({ restored, recoveryPath }) => {
+        await showRecoveryNotice({
+          type: "info",
+          title: "Database recovered",
+          message: restored
+            ? "The interrupted restore is finished: the previous database is in use. Original database files have been retained."
+            : "The interrupted restore is undone: your database files are back as they were.",
+          ...(restored && {
+            detail: `Recovery files: ${recoveryPath}\nKeep these files until the restored launcher is working; GDLauncher removes them after ${RECOVERY_COPY_DAYS} days.`
+          }),
+          buttons: ["Restart"],
+          defaultId: 0,
+          noLink: true
+        })
+        app.relaunch()
+        app.exit()
+      }
+    })
+    if (!outcome.ok)
+      console.error("Database recovery did not finish:", outcome.message)
+    return outcome
+  })
 )
 
 ipcMain.handle("getAdSize", async () => {
@@ -1250,6 +1292,7 @@ ipcMain.handle("getCoreModule", async () => {
     // has moved on, since nothing else threads it anywhere observable.
     logs: cm.logs,
     snapshotPath: cm.type === "error" ? cm.snapshotPath : undefined,
+    dbRecovery: cm.type === "error" ? cm.dbRecovery : undefined,
     port: cm.type === "success" ? cm.result.port : undefined,
     apiToken: cm.type === "success" ? cm.result.apiToken : undefined
   }
@@ -1359,7 +1402,15 @@ let shutdownApproved = false
 let coreLoaded: Awaited<typeof coreModule> | undefined
 void coreModule.then((core) => {
   coreLoaded = core
+  // A clean start: old recovery copies of the database have done their job.
   // A quit meanwhile waits for this and then runs.
+  if (core.type === "success" && !runtimeOperationActive())
+    void withRuntimeOperation(
+      () => pruneRecoveryCopies(CURRENT_RUNTIME_PATH!),
+      { brief: true }
+    ).catch((error) =>
+      console.warn("Could not check old database recovery copies:", error)
+    )
 })
 /** Waits for the core to start unless `signal` gives up first. */
 function startedCore(signal: AbortSignal) {
@@ -1378,9 +1429,9 @@ function startedCore(signal: AbortSignal) {
 }
 /**
  * One attempt to stop the launcher-owned core for `action`. An external
- * development core is left running, as before, except for a reset, which
- * must see the exit. A core that never reported READY is only ended for a
- * restart, reset or restore.
+ * development core is left running, as before, except for a reset or restore,
+ * which must see the exit. A core that never reported READY is only ended for
+ * a restart, reset or restore, and one that was never started has nothing to end.
  */
 async function stopOwnedCore(
   action: ShutdownAction,
@@ -1390,8 +1441,9 @@ async function stopOwnedCore(
   const core = await startedCore(signal)
   const owned = coreProcessHandle
   if (!owned) {
-    // Database files only move after an observed exit.
-    if (action === "reset")
+    // Database files only move after an observed exit. A core that ended up
+    // not started has no process to wait for; a running one here is external.
+    if (action === "reset" && core.type === "success")
       throw new ShutdownNotPossibleError(
         "Database reset requires a launcher-owned core exit; external/development core must be stopped and recovered manually"
       )
@@ -1540,12 +1592,15 @@ app.on("before-quit", (event) => {
     (outcome) => {
       if (outcome !== "kept") return app.quit()
       lifecycle.quitFailed()
-      await dialog.showMessageBox({
-        type: "error",
-        title: "Shutdown incomplete",
-        message: String(error)
-      })
-    })
+      revealWindow()
+    },
+    (error) => {
+      // Even SIGKILL could not be seen to end the core. The user chose to
+      // quit, so the launcher still goes.
+      console.error("Quit could not confirm the core exit", error)
+      app.exit()
+    }
+  )
 })
 
 app.on("render-process-gone", (event, webContents, detailed) => {

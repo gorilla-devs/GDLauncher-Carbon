@@ -6,7 +6,12 @@ import ts from "typescript"
 import { createCoreOutput } from "./coreOutput"
 import { AccountIdentityReceiver } from "./accountIdentity"
 import { ProtocolQueue } from "./protocolQueue"
-import { LauncherLifecycle, mainWindowClosed } from "./windowLifecycle"
+import { DatabaseRefusal } from "./databaseRestore"
+import {
+  LauncherLifecycle,
+  mainWindowClosed,
+  userWindows
+} from "./windowLifecycle"
 import { ShutdownPrompts } from "./shutdownPrompt"
 import {
   ShutdownFlow,
@@ -132,8 +137,9 @@ it("Task23 actual core-load guard refuses interrupted restore before any spawn o
     {
       CURRENT_RUNTIME_PATH: "/synthetic",
       assertDatabaseRestoreReadySync: () => {
-        throw Error("database recovery required")
+        throw new DatabaseRefusal("database recovery required")
       },
+      DatabaseRefusal,
       isDev: false,
       spawn: () => {
         throw Error("native launch forbidden")
@@ -143,6 +149,30 @@ it("Task23 actual core-load guard refuses interrupted restore before any spawn o
   const result = await load()
   expect(result.type).toBe("error")
   expect(result.logs[0].message).toContain("recovery")
+  // The startup screen offers Recover Database for this one.
+  expect(result.dbRecovery).toBe("interrupted_restore")
+})
+it("a marker the guard cannot check is not offered as an interrupted restore", async () => {
+  const load = evaluate(
+    initializer(
+      source("apps/desktop/packages/main/index.ts"),
+      "loadCoreModule"
+    ),
+    {
+      CURRENT_RUNTIME_PATH: "/synthetic",
+      assertDatabaseRestoreReadySync: () => {
+        throw Error("EACCES")
+      },
+      DatabaseRefusal,
+      isDev: false,
+      spawn: () => {
+        throw Error("native launch forbidden")
+      }
+    }
+  )
+  const result = await load()
+  expect(result.type).toBe("error")
+  expect(result.dbRecovery).toBeUndefined()
 })
 it("Task23 actual main protocol IPC validates current sender frame before ready and ACK", () => {
   const text = source("apps/desktop/packages/main/index.ts"),

@@ -1,3 +1,4 @@
+import type { DbRecoveryCategory } from "../../main/utils/dbRecovery"
 import type { FEReleaseChannel } from "@gd/core_module/bindings"
 import { BoundsSize } from "./utils/adhelper"
 import type { Log } from "../../main/coreModule"
@@ -12,7 +13,8 @@ declare global {
     fatalError: (
       error: string | Log[],
       moduleName?: string,
-      snapshotPath?: string
+      snapshotPath?: string,
+      dbRecovery?: DbRecoveryCategory
     ) => void
     backwardsMigrationError: () => void
     ipcRenderer: import("electron").IpcRenderer
@@ -55,6 +57,7 @@ declare global {
           type: "error"
           logs: Log[]
           snapshotPath?: string
+          dbRecovery?: DbRecoveryCategory
         }
       | {
           type: "backwardsMigration"

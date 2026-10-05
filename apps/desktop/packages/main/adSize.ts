@@ -29,28 +29,9 @@ const getTitlebarHeight = () => {
   return TITLEBAR_HEIGHT[platform] || 30
 }
 
-/**
- * Get the effective display size accounting for:
- * - Work area (excludes taskbar/dock)
- * - DPI scaling (on Windows, workArea is in physical pixels)
- */
+/** Electron workArea uses DIP coordinates, matching BrowserWindow dimensions. */
 function getEffectiveDisplaySize(display: Display) {
-  const workArea = display.workArea
-  const scaleFactor = display.scaleFactor || 1
-
-  // Windows returns workArea in physical pixels, divide by scaleFactor
-  // macOS/Linux return logical pixels already
-  const isWindows = os.platform() === "win32"
-
-  return {
-    width: isWindows
-      ? Math.floor(workArea.width / scaleFactor)
-      : workArea.width,
-    height: isWindows
-      ? Math.floor(workArea.height / scaleFactor)
-      : workArea.height,
-    scaleFactor
-  }
+  return { width: display.workArea.width, height: display.workArea.height }
 }
 
 export default function getAdSize(display?: Display) {

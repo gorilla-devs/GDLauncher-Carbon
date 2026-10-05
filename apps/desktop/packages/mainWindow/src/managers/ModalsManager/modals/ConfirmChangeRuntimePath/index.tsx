@@ -238,8 +238,8 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
           <div
             class="z-9999 fixed inset-0 flex flex-col items-center justify-center bg-opacity-65 p-8 backdrop-blur-sm"
             classList={{
-              "bg-black": !migrationError() || !!busy(),
-              "bg-red-900": !!migrationError() && !busy()
+              "bg-black": !migrationError() || !!busy() || notMoved(),
+              "bg-red-900": !!migrationError() && !busy() && !notMoved()
             }}
           >
             <Switch>
@@ -426,28 +426,32 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
               <Match when={migrationError()}>
                 <div class="max-w-2xl text-center">
                   <div class="text-2xl">
-                    {/* A partial copy means nothing was published or removed: say so calmly. */}
-                    <Trans
-                      key={
-                        incompleteTarget()
-                          ? "java:_trn_migration_stopped"
-                          : "java:_trn_migration_errored"
+                    <Show
+                      when={notMoved()}
+                      fallback={
+                        /* A copy that stopped means nothing was published or removed: say so calmly. */
+                        <Trans
+                          key={
+                            incompleteTarget() || copyRemoved()
+                              ? "java:_trn_migration_stopped"
+                              : "java:_trn_migration_errored"
+                          }
+                        >
+                          {""}
+                          <span
+                            class="text-lightSlate-50 hover:text-lightSlate-400 cursor-pointer underline"
+                            onClick={() => {
+                              window.openExternalLink(
+                                "https://gdlauncher.com/docs/troubleshooting/#migration-error"
+                              )
+                            }}
+                          />
+                          {""}
+                        </Trans>
                       }
                     >
-                      {""}
-                      <span
-                        class="text-lightSlate-50 hover:text-lightSlate-400 cursor-pointer underline"
-                        onClick={() => {
-                          window.openExternalLink(
-                            "https://gdlauncher.com/docs/troubleshooting/#migration-error"
-                          )
-                        }}
-                      />
-                      {""}
-                    </Trans>
-                  </div>
-                  <div class="mt-4 text-base opacity-80">
-                    {migrationError()}
+                      <Trans key="java:_trn_runtime_recovery.not_moved_title" />
+                    </Show>
                   </div>
                   <Button
                     type="secondary"

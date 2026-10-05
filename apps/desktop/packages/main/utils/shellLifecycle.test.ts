@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest"
 import fs from "node:fs/promises"
 import path from "node:path"
+import { createHash } from "node:crypto"
 import os from "node:os"
 import {
   createCoreOutput,
@@ -19,6 +20,8 @@ import { subscribeProtocol } from "../../preload/protocolBridge"
 import { subscribeCloseWarning } from "../../preload/closeWarningBridge"
 import { acceptProtocolUrl } from "../../mainWindow/src/utils/protocolAction"
 import {
+  DatabaseRefusal,
+  recoverInterruptedRestore,
   restoreDatabaseSnapshot,
   assertDatabaseRestoreReady,
   assertDatabaseRestoreReadySync
@@ -916,7 +919,7 @@ describe("Task23 data preserving restore and recovery retry", () => {
     await unchanged(value.root)
     expect(value.restarted).toBe(0)
   })
-  it("required sidecar move failure rolls back captured DB, retains recovery bytes and never relaunches", async () => {
+  it("required sidecar move failure renames the captured DB back and never relaunches", async () => {
     const value = await fixture()
     await fs.writeFile(value.snapshot, "snapshot")
     const files = {
@@ -935,9 +938,9 @@ describe("Task23 data preserving restore and recovery retry", () => {
     expect(value.restarted).toBe(0)
     await assertDatabaseRestoreReady(value.root)
     expect(result.recoveryPath).toBeTruthy()
-    expect(
-      await fs.readFile(path.join(result.recoveryPath!, "gdl_conf.db"), "utf8")
-    ).toBe("original")
+    expect(await fs.readdir(result.recoveryPath!)).toEqual([
+      "snapshot-staged.db"
+    ])
   })
   it("publication failure rolls back; copy failure leaves DB and sidecars untouched", async () => {
     const value = await fixture()
@@ -975,9 +978,10 @@ describe("Task23 data preserving restore and recovery retry", () => {
     await unchanged(value.root)
     expect(value.restarted).toBe(0)
   })
-  it("link-unavailable rollback exclusively copies and verifies the original database", async () => {
+  it("rollback on a link-unavailable volume renames, and copies nothing", async () => {
     const value = await fixture()
     await fs.writeFile(value.snapshot, "snapshot")
+    const copied: string[] = []
     const files = {
       ...fs,
       rename: async (from: string, to: string) => {
@@ -986,6 +990,10 @@ describe("Task23 data preserving restore and recovery retry", () => {
       },
       link: async () => {
         throw Object.assign(Error("links unsupported"), { code: "ENOTSUP" })
+      },
+      copyFile: async (from: string, to: string, flags?: number) => {
+        copied.push(path.basename(to))
+        return fs.copyFile(from, to, flags)
       }
     }
     const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
@@ -994,6 +1002,29 @@ describe("Task23 data preserving restore and recovery retry", () => {
     })
     expect(result.ok).toBe(false)
     expect(value.restarted).toBe(0)
+    expect(copied).toEqual(["snapshot-staged.db"])
+    await unchanged(value.root)
+    await assertDatabaseRestoreReady(value.root)
+  })
+  it("rollback falls back to the guarded copy when the rename back is refused", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    const files = {
+      ...fs,
+      rename: async (from: string, to: string) => {
+        if (from.includes("restore-originals-")) throw Error("rename refused")
+        return fs.rename(from, to)
+      },
+      link: async (from: string, to: string) => {
+        if (from.endsWith("snapshot-staged.db")) throw Error("publish failed")
+        return fs.link(from, to)
+      }
+    }
+    const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+      ...value,
+      files: files as typeof fs
+    })
+    expect(result.ok).toBe(false)
     await unchanged(value.root)
     await assertDatabaseRestoreReady(value.root)
   })
@@ -1064,6 +1095,13 @@ describe("Task23 data preserving restore and recovery retry", () => {
       "needs recovery"
     )
     expect(value.restarted).toBe(0)
+  })
+  it("the guard's refusal also works on the screen that does not show Recover Database yet", async () => {
+    const value = await fixture()
+    await fs.writeFile(path.join(value.root, ".gdl-db-restore.json"), "{}")
+    await expect(assertDatabaseRestoreReady(value.root)).rejects.toThrow(
+      "Restart GDLauncher if you do not see Recover Database on this screen"
+    )
   })
   it("thrown IPC and unsafe failure text are handled via textContent and Retry", async () => {
     const button = {
@@ -1146,7 +1184,13 @@ it("Task23 exclusive publication refuses occupied destination without overwritin
   expect(await fs.readFile(path.join(value.root, "gdl_conf.db"), "utf8")).toBe(
     "foreign"
   )
-  await unchanged(result.recoveryPath!)
+  // Only the original with nowhere to go stays in the bundle.
+  expect(
+    await fs.readFile(path.join(result.recoveryPath!, "gdl_conf.db"), "utf8")
+  ).toBe("original")
+  expect(
+    await fs.readFile(path.join(value.root, "gdl_conf.db-wal"), "utf8")
+  ).toBe("wal")
   await expect(assertDatabaseRestoreReady(value.root)).rejects.toThrow(
     "needs recovery"
   )
@@ -1176,12 +1220,17 @@ it("Task23 partial exclusive copy retains original bundle and guards startup", a
   expect(await fs.readFile(path.join(value.root, "gdl_conf.db"), "utf8")).toBe(
     "partial"
   )
-  await unchanged(result.recoveryPath!)
+  expect(
+    await fs.readFile(path.join(result.recoveryPath!, "gdl_conf.db"), "utf8")
+  ).toBe("original")
+  expect(
+    await fs.readFile(path.join(value.root, "gdl_conf.db-wal"), "utf8")
+  ).toBe("wal")
   await expect(assertDatabaseRestoreReady(value.root)).rejects.toThrow(
     "needs recovery"
   )
 })
-it("Task23 permission/link IO errors never use fallback; failed rollback preserves guarded originals", async () => {
+it("Task23 permission/link IO errors never use fallback; rollback renames the originals back", async () => {
   const value = await fixture()
   await fs.writeFile(value.snapshot, "snapshot")
   let fallback = 0
@@ -1201,10 +1250,644 @@ it("Task23 permission/link IO errors never use fallback; failed rollback preserv
   })
   expect(result.ok).toBe(false)
   expect(fallback).toBe(0)
-  await unchanged(result.recoveryPath!)
-  await expect(assertDatabaseRestoreReady(value.root)).rejects.toThrow(
-    "needs recovery"
+  await unchanged(value.root)
+  await assertDatabaseRestoreReady(value.root)
+  expect(value.restarted).toBe(0)
+})
+describe("restore on a volume without hard links", () => {
+  it.each(["EPERM", "EISDIR", "EINVAL"])(
+    "%s from the hard link restores through the guarded copy",
+    async (code) => {
+      const value = await fixture()
+      await fs.writeFile(value.snapshot, "snapshot")
+      const files = {
+        ...fs,
+        link: async () => {
+          throw Object.assign(Error("no hard links here"), { code })
+        }
+      }
+      const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+        ...value,
+        files: files as typeof fs
+      })
+      expect(result.ok).toBe(true)
+      expect(value.restarted).toBe(1)
+      expect(
+        await fs.readFile(path.join(value.root, "gdl_conf.db"), "utf8")
+      ).toBe("snapshot")
+      await unchanged(result.recoveryPath!)
+      await assertDatabaseRestoreReady(value.root)
+    }
   )
+  it("a failed restore puts the originals back and leaves the launcher able to start", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    const files = {
+      ...fs,
+      link: async () => {
+        throw Object.assign(Error("no hard links here"), { code: "EPERM" })
+      },
+      copyFile: async (from: string, to: string, flags?: number) => {
+        // The staged copy of the snapshot works; its publication does not.
+        if (from.endsWith("snapshot-staged.db"))
+          throw Object.assign(Error("disk trouble"), { code: "EIO" })
+        return fs.copyFile(from, to, flags)
+      }
+    }
+    const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+      ...value,
+      files: files as typeof fs
+    })
+    expect(result.ok).toBe(false)
+    if (result.ok) throw Error("must fail")
+    expect(result.message).toContain("Current database files were retained")
+    expect(result.message).toContain("disk trouble")
+    await unchanged(value.root)
+    await assertDatabaseRestoreReady(value.root)
+    expect(value.restarted).toBe(0)
+  })
+  it("a moved original with a new file number still rolls back by its bytes", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    // Windows FAT volumes number a file again when it moves to another folder.
+    const lstat = async (file: string) => {
+      const stat = await fs.lstat(file)
+      if (file.includes("restore-originals-"))
+        Object.defineProperty(stat, "ino", { value: stat.ino + 1 })
+      return stat
+    }
+    const files = {
+      ...fs,
+      lstat,
+      link: async (from: string, to: string) => {
+        if (from.endsWith("snapshot-staged.db")) throw Error("publish failed")
+        return fs.link(from, to)
+      }
+    }
+    const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+      ...value,
+      files: files as unknown as typeof fs
+    })
+    expect(result.ok).toBe(false)
+    await unchanged(value.root)
+    await assertDatabaseRestoreReady(value.root)
+  })
+})
+describe("restore refusals say why", () => {
+  it("keeping the launcher open is reported as that, not as a snapshot problem", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+      ...value,
+      stopCore: async () => {
+        throw new DatabaseRefusal("GDLauncher was kept open")
+      }
+    })
+    expect(result).toEqual({
+      ok: false,
+      recoveryPath: undefined,
+      message: "GDLauncher was kept open"
+    })
+    await unchanged(value.root)
+  })
+  it("a pending restore names the way out", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    await fs.writeFile(path.join(value.root, ".gdl-db-restore.json"), "{}")
+    const result = await restoreDatabaseSnapshot(
+      value.root,
+      value.snapshot,
+      value
+    )
+    expect(result.ok ? "" : result.message).toContain("Recover Database")
+    expect(value.stopped).toBe(0)
+  })
+  it("a data folder that cannot be reached is named, with what to do", async () => {
+    const value = await fixture()
+    const gone = path.join(value.root, "unplugged")
+    const result = await restoreDatabaseSnapshot(
+      gone,
+      path.join(gone, "gdl_conf.pre-downgrade.db"),
+      value
+    )
+    expect(result.ok ? "" : result.message).toContain(gone)
+    expect(result.ok ? "" : result.message).toContain("reconnect")
+    expect(value.stopped).toBe(0)
+  })
+  it("a snapshot too large for the drive is refused before the core is stopped", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    const files = {
+      ...fs,
+      statfs: async () => ({ blocks: 100, bavail: 0, bsize: 4096 })
+    }
+    const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+      ...value,
+      files: files as unknown as typeof fs
+    })
+    expect(result.ok ? "" : result.message).toContain("Free up some space")
+    expect(value.stopped).toBe(0)
+    await unchanged(value.root)
+  })
+  // The snapshot is 8 bytes and the drive has room for it, but not for it twice.
+  const roomForOneCopy = {
+    statfs: async () => ({ blocks: 100, bavail: 10, bsize: 1 })
+  }
+  it("a volume without hard links needs room for a second copy, and is told before anything moves", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+      ...value,
+      files: {
+        ...fs,
+        ...roomForOneCopy,
+        link: async () => {
+          throw Object.assign(Error("no hard links here"), { code: "EPERM" })
+        }
+      } as unknown as typeof fs
+    })
+    expect(result.ok ? "" : result.message).toContain("Free up some space")
+    expect(value.stopped).toBe(0)
+    await unchanged(value.root)
+    // Nothing stays behind from asking: no staged copy, no scratch file.
+    expect((await fs.readdir(value.root)).sort()).toEqual(
+      [
+        "gdl_conf.db",
+        "gdl_conf.db-shm",
+        "gdl_conf.db-wal",
+        "gdl_conf.pre-downgrade.db"
+      ].sort()
+    )
+  })
+  it("a volume with hard links only needs room for the one copy", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+      ...value,
+      files: { ...fs, ...roomForOneCopy } as unknown as typeof fs
+    })
+    expect(result).toMatchObject({ ok: true })
+    expect(
+      (await fs.readdir(value.root)).filter((name) => name.includes("probe"))
+    ).toEqual([])
+  })
+  it("a hard link failing for another reason is found before any original moves", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+      ...value,
+      files: {
+        ...fs,
+        link: async () => {
+          throw Object.assign(Error("disk trouble"), { code: "EIO" })
+        }
+      } as typeof fs
+    })
+    expect(result.ok ? "" : result.message).toContain("disk trouble")
+    expect(result.recoveryPath).toBeUndefined()
+    expect(value.stopped).toBe(0)
+    await unchanged(value.root)
+    await assertDatabaseRestoreReady(value.root)
+  })
+})
+describe("restore on a linked data folder", () => {
+  it.each(["the link", "the real folder, as the core reports it"])(
+    "restores a snapshot named through %s",
+    async (named) => {
+      const value = await fixture()
+      await fs.writeFile(value.snapshot, "snapshot")
+      const linked = await fs.mkdtemp(path.join(os.tmpdir(), "task23-link-"))
+      const link = path.join(linked, "data")
+      await fs.symlink(value.root, link, "junction")
+      const result = await restoreDatabaseSnapshot(
+        link,
+        named === "the link"
+          ? path.join(link, "gdl_conf.pre-downgrade.db")
+          : value.snapshot,
+        value
+      )
+      expect(result).toMatchObject({ ok: true })
+      expect(value.restarted).toBe(1)
+      expect(await fs.readFile(path.join(link, "gdl_conf.db"), "utf8")).toBe(
+        "snapshot"
+      )
+      expect((await fs.lstat(link)).isSymbolicLink()).toBe(true)
+    }
+  )
+  it("still refuses a snapshot from another folder", async () => {
+    const value = await fixture()
+    const other = await fs.mkdtemp(path.join(os.tmpdir(), "task23-other-"))
+    await fs.writeFile(path.join(other, "gdl_conf.pre-downgrade.db"), "foreign")
+    const result = await restoreDatabaseSnapshot(
+      value.root,
+      path.join(other, "gdl_conf.pre-downgrade.db"),
+      value
+    )
+    expect(result.ok).toBe(false)
+    expect(value.stopped).toBe(0)
+    await unchanged(value.root)
+  })
+  it("a database file that is a link stays refused", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    const other = await fs.mkdtemp(path.join(os.tmpdir(), "task23-other-"))
+    await fs.writeFile(path.join(other, "wal"), "elsewhere")
+    await fs.unlink(path.join(value.root, "gdl_conf.db-wal"))
+    await fs.symlink(
+      path.join(other, "wal"),
+      path.join(value.root, "gdl_conf.db-wal")
+    )
+    const result = await restoreDatabaseSnapshot(
+      value.root,
+      value.snapshot,
+      value
+    )
+    expect(result.ok).toBe(false)
+    expect(value.stopped).toBe(0)
+  })
+})
+describe("Recover Database after an interrupted restore", () => {
+  const INTENT = ".gdl-db-restore.json"
+  const sha = (bytes: string) =>
+    createHash("sha256").update(bytes).digest("hex")
+  const recorded = (bytes: string) => ({
+    dev: 1,
+    ino: 1,
+    size: Buffer.byteLength(bytes),
+    sha256: sha(bytes)
+  })
+  /** What a restore leaves when it stops with `moved` in its bundle. */
+  async function interrupted(moved: string[]) {
+    const value = await fixture()
+    const bundle = path.join(value.root, "gdl_conf.restore-originals-fixture")
+    await fs.mkdir(bundle)
+    await fs.writeFile(path.join(bundle, "snapshot-staged.db"), "snapshot")
+    for (const name of moved)
+      await fs.rename(path.join(value.root, name), path.join(bundle, name))
+    await fs.writeFile(
+      path.join(value.root, INTENT),
+      JSON.stringify({
+        version: 1,
+        bundle: path.basename(bundle),
+        originals: {
+          "gdl_conf.db": recorded("original"),
+          "gdl_conf.db-wal": recorded("wal"),
+          "gdl_conf.db-shm": recorded("shm")
+        }
+      })
+    )
+    return Object.assign(value, { bundle })
+  }
+  const allMoved = ["gdl_conf.db", "gdl_conf.db-wal", "gdl_conf.db-shm"]
+  it("puts back originals a crash left in the bundle, and the launcher can start", async () => {
+    const value = await interrupted(["gdl_conf.db", "gdl_conf.db-wal"])
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result).toMatchObject({ ok: true, restored: false })
+    await unchanged(value.root)
+    await assertDatabaseRestoreReady(value.root)
+    expect(value.restarted).toBe(1)
+    expect(value.stopped).toBe(1)
+  })
+  it("finishes a restore that only had its marker left to remove", async () => {
+    const value = await interrupted(allMoved)
+    await fs.link(
+      path.join(value.bundle, "snapshot-staged.db"),
+      path.join(value.root, "gdl_conf.db")
+    )
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result).toMatchObject({ ok: true, restored: true })
+    expect(
+      await fs.readFile(path.join(value.root, "gdl_conf.db"), "utf8")
+    ).toBe("snapshot")
+    await unchanged(value.bundle)
+    await assertDatabaseRestoreReady(value.root)
+    expect(value.restarted).toBe(1)
+  })
+  it("finishes the restore whose marker removal failed, end to end", async () => {
+    const value = await fixture()
+    await fs.writeFile(value.snapshot, "snapshot")
+    const outcome = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+      ...value,
+      files: {
+        ...fs,
+        unlink: async (file: string) => {
+          if (file.endsWith(INTENT)) throw Error("intent busy")
+          return fs.unlink(file)
+        }
+      } as typeof fs
+    })
+    expect(outcome.ok).toBe(false)
+    expect(outcome.ok ? "" : outcome.message).toContain("Recover Database")
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result).toMatchObject({ ok: true, restored: true })
+    expect(
+      await fs.readFile(path.join(value.root, "gdl_conf.db"), "utf8")
+    ).toBe("snapshot")
+    await assertDatabaseRestoreReady(value.root)
+  })
+  it("removes a partial copy of the snapshot and puts the originals back", async () => {
+    const value = await interrupted(allMoved)
+    await fs.writeFile(path.join(value.root, "gdl_conf.db"), "snap")
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result).toMatchObject({ ok: true, restored: false })
+    await unchanged(value.root)
+    await assertDatabaseRestoreReady(value.root)
+  })
+  it.each([
+    ["a foreign database", "gdl_conf.db", "foreign"],
+    ["a foreign sidecar", "gdl_conf.db-wal", "foreign"]
+  ])("changes nothing when %s holds the path", async (_label, name, bytes) => {
+    const value = await interrupted(allMoved)
+    await fs.writeFile(path.join(value.root, name), bytes)
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result.ok).toBe(false)
+    expect(result.ok ? "" : result.message).toContain("Discord")
+    expect(await fs.readFile(path.join(value.root, name), "utf8")).toBe(bytes)
+    await unchanged(value.bundle)
+    await expect(assertDatabaseRestoreReady(value.root)).rejects.toThrow(
+      "needs recovery"
+    )
+    expect(value.restarted).toBe(0)
+  })
+  it("changes nothing when a preserved original no longer matches its record", async () => {
+    const value = await interrupted(allMoved)
+    await fs.writeFile(path.join(value.bundle, "gdl_conf.db"), "tampered")
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result.ok).toBe(false)
+    expect(
+      await fs.readFile(path.join(value.bundle, "gdl_conf.db"), "utf8")
+    ).toBe("tampered")
+    expect(
+      await fs.readFile(path.join(value.bundle, "gdl_conf.db-wal"), "utf8")
+    ).toBe("wal")
+    await expect(assertDatabaseRestoreReady(value.root)).rejects.toThrow(
+      "needs recovery"
+    )
+  })
+  it("a marker cut short before anything moved is cleared when the database is there", async () => {
+    const value = await fixture()
+    await fs.writeFile(path.join(value.root, INTENT), '{"version":1,"bun')
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result).toMatchObject({ ok: true, restored: false })
+    await unchanged(value.root)
+    await assertDatabaseRestoreReady(value.root)
+  })
+  it.each([
+    ["an unreadable marker and no database", '{"version":1,"bun', true],
+    ["a marker of another version", '{"version":2}', false],
+    [
+      "a bundle outside the data folder",
+      '{"version":1,"bundle":"../elsewhere","originals":{}}',
+      false
+    ]
+  ])("refuses %s", async (_label, intent, removeDatabase) => {
+    const value = await fixture()
+    await fs.writeFile(path.join(value.root, INTENT), intent)
+    if (removeDatabase) await fs.unlink(path.join(value.root, "gdl_conf.db"))
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result.ok).toBe(false)
+    await expect(assertDatabaseRestoreReady(value.root)).rejects.toThrow(
+      "needs recovery"
+    )
+    expect(value.restarted).toBe(0)
+  })
+  it.each(["EBUSY", "EIO", "EACCES"])(
+    "a marker that fails to read with %s changes nothing, however the files look, and says to retry",
+    async (code) => {
+      const value = await interrupted(allMoved)
+      await fs.writeFile(path.join(value.root, "gdl_conf.db"), "snap")
+      const files = {
+        ...fs,
+        readFile: async (file: string, options?: unknown) => {
+          if (String(file).endsWith(INTENT))
+            throw Object.assign(Error("marker busy"), { code })
+          return (fs.readFile as any)(file, options)
+        }
+      } as typeof fs
+      const result = await recoverInterruptedRestore(value.root, {
+        ...value,
+        files
+      })
+      expect(result.ok).toBe(false)
+      expect(result.ok ? "" : result.message).toContain(
+        "then choose Recover Database again"
+      )
+      expect(value.restarted).toBe(0)
+      expect(
+        await fs.readFile(path.join(value.root, "gdl_conf.db"), "utf8")
+      ).toBe("snap")
+      await unchanged(value.bundle)
+      await expect(assertDatabaseRestoreReady(value.root)).rejects.toThrow(
+        "needs recovery"
+      )
+      // The way out: once the read works, the same click undoes the restore.
+      expect(await recoverInterruptedRestore(value.root, value)).toMatchObject({
+        ok: true,
+        restored: false
+      })
+      await unchanged(value.root)
+    }
+  )
+  it("a garbled marker with an original in a bundle is refused: something did move", async () => {
+    const value = await interrupted(allMoved)
+    await fs.writeFile(path.join(value.root, "gdl_conf.db"), "snap")
+    await fs.writeFile(path.join(value.root, INTENT), "\u0000\u0000garbage")
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result.ok).toBe(false)
+    expect(result.ok ? "" : result.message).toContain("Discord")
+    await unchanged(value.bundle)
+    await expect(assertDatabaseRestoreReady(value.root)).rejects.toThrow(
+      "needs recovery"
+    )
+    expect(value.restarted).toBe(0)
+  })
+  it("a garbled marker is cleared when the bundle only holds the staged snapshot", async () => {
+    const value = await interrupted([])
+    await fs.writeFile(path.join(value.root, INTENT), '{"version":1,"bun')
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result).toMatchObject({ ok: true, restored: false })
+    await unchanged(value.root)
+    await assertDatabaseRestoreReady(value.root)
+  })
+  it.each(["gdl_conf.db", "gdl_conf.db-wal", "gdl_conf.db-shm"])(
+    "removes the part of %s a crashed rollback copied, and puts the original back",
+    async (name) => {
+      const value = await interrupted(allMoved)
+      const whole = await fs.readFile(path.join(value.bundle, name))
+      await fs.writeFile(path.join(value.root, name), whole.subarray(0, 2))
+      const result = await recoverInterruptedRestore(value.root, value)
+      expect(result).toMatchObject({ ok: true, restored: false })
+      await unchanged(value.root)
+      await assertDatabaseRestoreReady(value.root)
+    }
+  )
+  it("recognises an interrupted copy at full size with the rest still zero, as Windows leaves it", async () => {
+    const value = await interrupted(allMoved)
+    await fs.writeFile(
+      path.join(value.root, "gdl_conf.db"),
+      Buffer.concat([Buffer.from("snap"), Buffer.alloc(4)])
+    )
+    await fs.writeFile(
+      path.join(value.root, "gdl_conf.db-wal"),
+      Buffer.from([0x77, 0, 0])
+    )
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result).toMatchObject({ ok: true, restored: false })
+    await unchanged(value.root)
+  })
+  it("a file with its own bytes after the shared start is not a partial copy", async () => {
+    const value = await interrupted(allMoved)
+    await fs.writeFile(path.join(value.root, "gdl_conf.db-wal"), "wax")
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result.ok).toBe(false)
+    expect(
+      await fs.readFile(path.join(value.root, "gdl_conf.db-wal"), "utf8")
+    ).toBe("wax")
+    await unchanged(value.bundle)
+  })
+  it.each([
+    ["the bundle", (bundle: string) => fs.rm(bundle, { recursive: true })],
+    [
+      "the staged snapshot",
+      (bundle: string) => fs.unlink(path.join(bundle, "snapshot-staged.db"))
+    ]
+  ])(
+    "with every original in place, %s is not needed to clear the marker",
+    async (_label, tidy) => {
+      const value = await interrupted([])
+      await tidy(value.bundle)
+      const result = await recoverInterruptedRestore(value.root, value)
+      expect(result).toMatchObject({ ok: true, restored: false })
+      await unchanged(value.root)
+      await assertDatabaseRestoreReady(value.root)
+      expect(value.restarted).toBe(1)
+    }
+  )
+  it.each([
+    ["an original that changed", "gdl_conf.db", "changed"],
+    ["a file the restore never recorded", "gdl_conf.pre-downgrade.db", null]
+  ])("without the bundle, %s is still refused", async (_label, name, bytes) => {
+    const value = await interrupted([])
+    await fs.rm(value.bundle, { recursive: true })
+    if (bytes) await fs.writeFile(path.join(value.root, name), bytes)
+    else {
+      // The marker says there was no WAL; one is there now.
+      const marker = JSON.parse(
+        await fs.readFile(path.join(value.root, INTENT), "utf8")
+      )
+      delete marker.originals["gdl_conf.db-wal"]
+      await fs.writeFile(path.join(value.root, INTENT), JSON.stringify(marker))
+    }
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result.ok).toBe(false)
+    expect(value.restarted).toBe(0)
+    await expect(assertDatabaseRestoreReady(value.root)).rejects.toThrow(
+      "needs recovery"
+    )
+  })
+  describe("interrupted itself, then run again", () => {
+    /** `fs` that fails its Nth call, before or after doing the work. */
+    function failingAt(call: number, when: "before" | "after") {
+      let calls = 0
+      const files = new Proxy(fs, {
+        get(target, name) {
+          const value = Reflect.get(target, name)
+          if (typeof value !== "function") return value
+          return async (...args: unknown[]) => {
+            const fails = ++calls === call
+            const crash = () => {
+              throw Object.assign(Error("crash"), { code: "EIO" })
+            }
+            if (fails && when === "before") crash()
+            const result = await value.apply(target, args)
+            if (fails) {
+              // A crashed process leaves no file open.
+              if (typeof result?.close === "function") await result.close()
+              crash()
+            }
+            return result
+          }
+        }
+      })
+      return { files, reached: () => calls >= call }
+    }
+    const partialSnapshot = async () => {
+      const value = await interrupted(allMoved)
+      await fs.writeFile(path.join(value.root, "gdl_conf.db"), "snap")
+      return value
+    }
+    const wholeSnapshot = async () => {
+      const value = await interrupted(allMoved)
+      await fs.writeFile(path.join(value.root, "gdl_conf.db"), "snapshot")
+      return value
+    }
+    const partialOriginal = async () => {
+      const value = await interrupted(allMoved)
+      await fs.writeFile(path.join(value.root, "gdl_conf.db-wal"), "wa")
+      return value
+    }
+    it.each([
+      ["some originals moved", () => interrupted(["gdl_conf.db"]), "original"],
+      ["a partial snapshot", partialSnapshot, "original"],
+      ["a partial original", partialOriginal, "original"],
+      ["a whole snapshot", wholeSnapshot, "snapshot"]
+    ] as const)(
+      "%s ends up whole, wherever it was cut off",
+      async (_label, state, database) => {
+        for (const when of ["before", "after"] as const) {
+          for (let call = 1; ; call++) {
+            const value = await state()
+            const { files, reached } = failingAt(call, when)
+            await recoverInterruptedRestore(value.root, { ...value, files })
+            const done = !reached()
+            const again = await recoverInterruptedRestore(value.root, value)
+            expect(again.ok).toBe(true)
+            expect(
+              await fs.readFile(path.join(value.root, "gdl_conf.db"), "utf8")
+            ).toBe(database)
+            await (database === "original"
+              ? unchanged(value.root)
+              : unchanged(value.bundle))
+            await assertDatabaseRestoreReady(value.root)
+            if (done) {
+              expect(call).toBeGreaterThan(5)
+              break
+            }
+          }
+        }
+      },
+      60_000
+    )
+  })
+  it("works through a linked data folder", async () => {
+    const value = await interrupted(allMoved)
+    const linked = await fs.mkdtemp(path.join(os.tmpdir(), "task23-link-"))
+    const link = path.join(linked, "data")
+    await fs.symlink(value.root, link, "junction")
+    const result = await recoverInterruptedRestore(link, value)
+    expect(result).toMatchObject({ ok: true, restored: false })
+    await unchanged(value.root)
+  })
+  it("with no marker left there is nothing to do but restart", async () => {
+    const value = await fixture()
+    const result = await recoverInterruptedRestore(value.root, value)
+    expect(result).toEqual({ ok: true, restored: false })
+    await unchanged(value.root)
+    expect(value.restarted).toBe(1)
+  })
+  it("a core that could not be stopped leaves every file as it is", async () => {
+    const value = await interrupted(["gdl_conf.db"])
+    const result = await recoverInterruptedRestore(value.root, {
+      ...value,
+      stopCore: async () => {
+        throw Error("exit was not confirmed")
+      }
+    })
+    expect(result.ok).toBe(false)
+    await expect(
+      fs.lstat(path.join(value.root, "gdl_conf.db"))
+    ).rejects.toMatchObject({ code: "ENOENT" })
+  })
 })
 
 it("Task23 asynchronous actual closed event retains launch purpose; canceled unload retains handle and user warning", () => {
@@ -1319,10 +2002,12 @@ describe("Task23 round01 restore namespace and close settlement", () => {
     const value = await absent()
     const files = {
       ...fs,
-      link: async () => {
-        throw Object.assign(Error("publish failed before entry"), {
-          code: "EIO"
-        })
+      link: async (from: string, to: string) => {
+        if (from.endsWith("snapshot-staged.db"))
+          throw Object.assign(Error("publish failed before entry"), {
+            code: "EIO"
+          })
+        return fs.link(from, to)
       }
     }
     const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
@@ -1376,9 +2061,6 @@ describe("Task23 round01 restore namespace and close settlement", () => {
     expect(
       await fs.readFile(path.join(value.root, "gdl_conf.db-wal"), "utf8")
     ).toBe("foreign sidecar")
-    expect(
-      await fs.readFile(path.join(result.recoveryPath!, "gdl_conf.db"), "utf8")
-    ).toBe("original")
   })
   it("round01 changed unmoved original cannot retire intent after another file rolls back", async () => {
     const value = await fixture()

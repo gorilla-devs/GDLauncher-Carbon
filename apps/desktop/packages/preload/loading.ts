@@ -1,4 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron"
+import {
+  dbRecoveryAdvice,
+  RESET_WARNING,
+  type DbRecoveryCategory
+} from "../main/utils/dbRecovery"
+import { resetDatabaseClick } from "./resetButton"
 import { restoreSnapshotClick } from "./restoreButton"
 import { domReady } from "./utils"
 
@@ -22,7 +28,8 @@ function useLoading() {
     async fatalError(
       error: string | Log[],
       moduleName: string,
-      snapshotPath?: string
+      snapshotPath?: string,
+      dbRecovery?: DbRecoveryCategory
     ) {
       const runtimePath = await ipcRenderer.invoke("getRuntimePath")
       const isString = typeof error === "string"
@@ -60,6 +67,27 @@ function useLoading() {
           </div>`
         : ""
 
+      // Only for the startup guard of an interrupted restore, which nothing else
+      // on this screen can clear.
+      const recoverStepHtml =
+        dbRecovery === "interrupted_restore"
+          ? `
+          <!-- Step: Recover Database -->
+          <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--green-600)); text-align: left;">
+            <div style="font-size: 0.7rem; font-weight: 700; color: rgb(var(--lightSlate-500)); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Recommended</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+              <div style="text-align: left;">
+                <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 2px;">Recover Database</div>
+                <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400));">Finishes the interrupted restore, or puts your database files back as they were before it, then restarts.</div>
+              </div>
+              <button id="recover-restore-btn" data-testid="recovery-recover-restore-button" style="padding: 8px 16px; background: rgb(var(--green-500)); color: white; border: none; border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.8rem; transition: all 0.2s; white-space: nowrap; flex-shrink: 0;">
+                Recover
+              </button>
+            </div>
+            <div id="recover-restore-error" role="alert" style="margin-top: 8px; color: rgb(var(--red-400));"></div>
+          </div>`
+          : ""
+
       oDiv.innerHTML = `
       <div data-testid="recovery-fatal-screen" style="height: 100vh; overflow-y: auto; padding: 16px 20px; text-align: left;">
         <div style="max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
@@ -85,6 +113,7 @@ function useLoading() {
             <div id="error-detail-content" data-testid="recovery-error-detail" style="font-size: 0.75rem; font-weight: 300; background: rgb(var(--darkSlate-900)); max-height: 120px; overflow-y: auto; padding: 10px; text-align: left; border-radius: 6px; overflow-wrap: break-word; white-space: pre-wrap; font-family: 'Ubuntu Mono', monospace; border: 1px solid rgb(var(--darkSlate-600)); line-height: 1.4;"></div>
           </div>
 
+          <div id="db-recovery-advice" style="margin-bottom: 16px; text-align: left;"></div>
           <!-- Step 1: Restart -->
           <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--darkSlate-600)); text-align: left;">
             <div style="font-size: 0.7rem; font-weight: 700; color: rgb(var(--lightSlate-500)); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px;">Step 1</div>
@@ -125,15 +154,16 @@ function useLoading() {
           <div id="update-progress-text" style="display: none;"></div>
           <button id="update-action-btn" style="display: none;"></button>
           ${restoreStepHtml}
+          ${recoverStepHtml}
 
-          <!-- Step 3: Reset Database (Highlighted) -->
+          <!-- Step 3: Last-resort metadata reset -->
           <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--amber-600)); text-align: left;">
             <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
               <span style="font-size: 0.7rem; font-weight: 700; color: rgb(var(--lightSlate-500)); text-transform: uppercase; letter-spacing: 0.5px;">Step 3</span>
-              <span style="font-size: 0.65rem; font-weight: 600; color: rgb(var(--amber-400)); background: rgba(251, 191, 36, 0.15); padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;">Most common fix</span>
+              <span style="font-size: 0.65rem; font-weight: 600; color: rgb(var(--amber-400)); background: rgba(251, 191, 36, 0.15); padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;">Last resort</span>
             </div>
             <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 4px;">Reset Database</div>
-            <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400)); margin-bottom: 12px;">This fixes most launch issues. You'll need to sign in again and your settings return to defaults, but <strong style="color: rgb(var(--lightSlate-200));">your instances and their files on disk are NOT affected</strong>.</div>
+            <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400)); margin-bottom: 12px;">${RESET_WARNING}</div>
             <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
               <code style="flex: 1; min-width: 180px; background: rgb(var(--darkSlate-800)); padding: 8px 10px; border-radius: 6px; font-size: 0.7rem; font-family: 'Ubuntu Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-400)); text-align: left;">
                 ${dbPath}
@@ -147,6 +177,7 @@ function useLoading() {
             </div>
           </div>
 
+          <div id="reset-db-error" role="alert" style="white-space: pre-wrap;"></div>
           <!-- Discord Help -->
           <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--brands-discord)); text-align: left;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
@@ -162,6 +193,9 @@ function useLoading() {
 
         </div>
       </div>`
+
+      document.querySelector<HTMLElement>("#db-recovery-advice")!.textContent =
+        dbRecoveryAdvice(dbRecovery)
 
       // The core's log text is untrusted (it echoes external error strings), so
       // it is written as text, never interpolated into the screen's HTML.
@@ -397,12 +431,14 @@ function useLoading() {
         }, 2000)
       })
 
-      resetDbBtn.addEventListener("click", async () => {
-        resetDbBtn.textContent = "Resetting..."
-        resetDbBtn.disabled = true
-        resetDbBtn.style.opacity = "0.6"
-        await ipcRenderer.invoke("deleteDbAndRestart")
-      })
+      resetDbBtn.addEventListener(
+        "click",
+        resetDatabaseClick(
+          resetDbBtn,
+          document.querySelector<HTMLElement>("#reset-db-error")!,
+          () => ipcRenderer.invoke("deleteDbAndRestart")
+        )
+      )
 
       if (snapshotPath) {
         const restoreSnapshotBtn: HTMLButtonElement | null =
@@ -419,6 +455,20 @@ function useLoading() {
             )
           )
         }
+      }
+
+      const recoverRestoreBtn: HTMLButtonElement | null =
+        document.querySelector("#recover-restore-btn")
+      if (recoverRestoreBtn) {
+        addHoverEffect(recoverRestoreBtn)
+        recoverRestoreBtn.addEventListener(
+          "click",
+          recoverRestoreClick(
+            recoverRestoreBtn,
+            document.querySelector<HTMLElement>("#recover-restore-error")!,
+            () => ipcRenderer.invoke("recoverInterruptedDbRestore")
+          )
+        )
       }
 
       copyErrorDetailBtn.addEventListener("click", async () => {
@@ -514,7 +564,7 @@ function useLoading() {
 
           <!-- Reassurance -->
           <div style="font-size: 1rem; color: rgb(var(--green-400)); font-weight: 500; margin-bottom: 40px;">
-            Your instances and mods will NOT be affected.
+            Your instance, world, addon and server directories on disk remain. Use a compatible launcher version before choosing a last-resort metadata reset.
           </div>
 
           <!-- Button -->
@@ -524,9 +574,10 @@ function useLoading() {
 
           <!-- Note -->
           <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-500)); margin-top: 16px;">
-            You will need to re-login and reconfigure settings like theme and Java paths.
+            ${RESET_WARNING}
           </div>
 
+          <div id="reset-db-error" role="alert" style="white-space: pre-wrap;"></div>
           <!-- Version -->
           <div style="font-size: 0.7rem; color: rgb(var(--lightSlate-600)); margin-top: auto; padding-top: 32px;">
             v${__APP_VERSION__}
@@ -544,12 +595,14 @@ function useLoading() {
         resetDbBtn.style.filter = "brightness(1)"
       })
 
-      resetDbBtn.addEventListener("click", async () => {
-        resetDbBtn.textContent = "Resetting..."
-        resetDbBtn.disabled = true
-        resetDbBtn.style.opacity = "0.6"
-        await ipcRenderer.invoke("deleteDbAndRestart")
-      })
+      resetDbBtn.addEventListener(
+        "click",
+        resetDatabaseClick(
+          resetDbBtn,
+          document.querySelector<HTMLElement>("#reset-db-error")!,
+          () => ipcRenderer.invoke("deleteDbAndRestart")
+        )
+      )
     }
   }
 }

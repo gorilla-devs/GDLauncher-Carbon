@@ -85,7 +85,8 @@ render(() => {
           window.fatalError(
             coreModule.logs,
             "CoreModule",
-            coreModule.snapshotPath
+            coreModule.snapshotPath,
+            coreModule.dbRecovery
           )
         } else {
           console.error("CoreModule errored with no logs", coreModule)

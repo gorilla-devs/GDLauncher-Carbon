@@ -25,6 +25,8 @@ import {
   LEFT_BEHIND_SHOWN,
   MIGRATION_MARKER
 } from "../runtimeRelocation"
+import { resetDatabaseAndRestart } from "../databaseReset"
+import { restoreDatabaseSnapshot } from "../databaseRestore"
 import { withRuntimeOperation } from "../runtimeOperation"
 
 // Execute the actual IPC callbacks without importing Electron or starting an app.
@@ -112,6 +114,10 @@ async function fixture() {
     coreProcessHandle: {},
     checkRelocation: check,
     stopCoreForRelocation: stop,
+    stopCoreForShutdown: stop,
+    terminateAndObserveCoreExit: stop,
+    resetDatabaseAndRestart,
+    restoreDatabaseSnapshot,
     fs,
     fss,
     fse,
@@ -125,7 +131,11 @@ async function fixture() {
     dialog,
     app: { getPath: () => root, relaunch, exit: vi.fn() },
     win: null,
-    killCoreProcess: stop
+    showRecoveryNotice: dialog.showMessageBox,
+    ownedShutdown: async () => {
+      await stop()
+      return "stopped"
+    }
   }
   return {
     root,

@@ -39,10 +39,10 @@
  * outcome, not only `"error"`, specifically to close this gap for
  * `DB_DOWNGRADED` (see below) — the one status this file needs that is
  * otherwise not observable once startup has moved on.
- * `launchApp`'s `stdout` capture is still used, later in this file, for the
- * two tests that click a real button: by then the app has been fully up for
- * some time and the listener has long since attached, so the race does not
- * apply — confirmed empirically for both lines it is used for.
+ * `launchApp`'s `stdout` capture is still used, later in this file, by the
+ * Restart test: by then the app has been fully up for some time and the
+ * listener has long since attached, so the race does not apply — confirmed
+ * empirically for the line it is used for.
  *
  * **This screen is not the SolidJS app.** `fatalError`/
  * `backwardsMigrationError` build raw `innerHTML` from template strings in
@@ -107,7 +107,9 @@
  * (`waitForRelaunchSibling` — the log line `ipcMain`'s handler prints before
  * calling `app.relaunch()` is not, by itself, proof the relaunch ran), and
  * cleans up the resulting sibling process itself (Linux/macOS `pgrep`,
- * best-effort — see `cleanupRelaunchSiblings`'s own comment).
+ * best-effort — see `cleanupRelaunchSiblings`'s own comment). The reset
+ * test relaunches the same way once more, after its "Database reset"
+ * dialog, since that path reaches the relaunch only through the dialog.
  */
 
 import fs from "node:fs"
@@ -190,8 +192,7 @@ function stdoutText(launched: Launched): string {
 
 /**
  * Polls the already-captured stdout (see the module doc comment — reliable
- * for these two lines specifically, both logged well after the app is fully
- * up) for `needle`. Bounded so a line that never arrives is a real,
+ * for a line logged well after the app is fully up) for `needle`. Bounded so a line that never arrives is a real,
  * diagnosable timeout rather than eating the whole 15-minute test ceiling.
  *
  * A hand-rolled poll rather than `expect.poll` deliberately: Playwright's
@@ -723,6 +724,27 @@ async function cleanupRelaunchSiblings(
       // Already gone by the time we got here — fine.
     }
   }
+
+  // A relaunch that finds a healthy (fresh) database starts a core that never
+  // exits on its own, and it can start just after the settle window above. It
+  // outlives the killed main (its parent-death keepalive is off), so sweep the
+  // core once more, still only by this harness's runtime path.
+  const coreDeadline = Date.now() + 3_000
+  while (Date.now() < coreDeadline) {
+    for (const pid of pidsForBinary(getCoreModulePath())) {
+      if (before.has(pid) || !isPidAlive(pid)) continue
+      if (!pidRuntimePathMatches(pid, runtimePath)) continue
+      try {
+        process.kill(pid, "SIGKILL")
+        console.log(
+          `cleanupRelaunchSiblings: killed relaunched core pid ${pid}`
+        )
+      } catch {
+        // Already gone — fine.
+      }
+    }
+    await new Promise((resolve) => setTimeout(resolve, 250))
+  }
 }
 
 // eslint-disable-next-line no-empty-pattern
@@ -791,6 +813,63 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
   }
 })
 
+interface ResetDialog {
+  title?: string
+  message: string
+  detail: string
+  buttons: string[]
+}
+
+/**
+ * A completed reset ends on a native "Database reset" message box that names
+ * the recovery folder and relaunches once the user presses its only button,
+ * Restart. Playwright cannot press a native dialog, so for this app only the
+ * main process's `dialog.showMessageBox` records what it was asked to show
+ * and holds Restart until `pressResetDialogRestart`.
+ */
+async function stubResetDialog(app: ElectronApplication) {
+  await app.evaluate(({ dialog }) => {
+    const shown: unknown[] = []
+    let press!: () => void
+    const pressed = new Promise<void>((resolve) => (press = resolve))
+    Object.assign(globalThis, {
+      __e2eResetDialogs: shown,
+      __e2ePressResetDialog: press
+    })
+    dialog.showMessageBox = (async (...args: unknown[]) => {
+      // `(options)` or `(window, options)`.
+      const options = args[args.length - 1] as Record<string, unknown>
+      shown.push({
+        title: options.title,
+        message: options.message,
+        detail: options.detail,
+        buttons: options.buttons
+      })
+      await pressed
+      return { response: 0, checkboxChecked: false }
+    }) as typeof dialog.showMessageBox
+  })
+}
+
+function resetDialogs(app: ElectronApplication): Promise<ResetDialog[]> {
+  return app.evaluate(
+    () =>
+      ((globalThis as { __e2eResetDialogs?: unknown[] }).__e2eResetDialogs ??
+        []) as ResetDialog[]
+  )
+}
+
+/** Presses Restart just after this call returns, so the evaluate's answer
+ *  arrives before the app exits. */
+async function pressResetDialogRestart(app: ElectronApplication) {
+  await app.evaluate(() => {
+    const press = (globalThis as { __e2ePressResetDialog?: () => void })
+      .__e2ePressResetDialog
+    if (!press) throw new Error("the reset dialog stub is not installed")
+    setTimeout(press, 100)
+  })
+}
+
 // eslint-disable-next-line no-empty-pattern
 test('"Reset Database & Restart" deletes the database file for real, on its own throwaway runtime path', async ({}, testInfo) => {
   expect(isCoreModulePresent()).toBeTruthy()
@@ -821,21 +900,46 @@ test('"Reset Database & Restart" deletes the database file for real, on its own 
     await expect(resetButton).toBeVisible({ timeout: 60_000 })
     await expect(resetButton).toBeEnabled()
 
+    const seeded = fs.readFileSync(dbPath)
+    await stubResetDialog(launched.app)
+
     await resetButton.click()
 
-    // `ipcMain.handle("deleteDbAndRestart", ...)` logs this before deleting
-    // the database and its sidecars and relaunching — same "prove the real
-    // handler ran" reasoning as the retry test above.
-    await waitForStdout(launched, "deleting database and restarting app...")
-
-    // The real, on-disk proof: the corrupt file this test seeded is gone.
-    // `deleteDbAndRestart` kills the core first (a no-op here — the core
-    // already exited on its own after emitting `_STATUS_:DB_CORRUPT`, see
-    // the module doc comment) before unlinking, so the delete should land
-    // promptly; poll rather than assume synchronous-from-here timing.
+    // `deleteDbAndRestart` (`main/index.ts`, via `utils/databaseReset.ts`)
+    // stops the core (already exited here after `_STATUS_:DB_CORRUPT`),
+    // copies every database file into a recovery folder, removes them, and
+    // only then asks for this dialog. So the dialog being asked for proves
+    // the click reached the real handler and the reset completed.
     await expect
-      .poll(() => fs.existsSync(dbPath), { timeout: 15_000 })
-      .toBe(false)
+      .poll(async () => (await resetDialogs(launched!.app)).length, {
+        timeout: 30_000
+      })
+      .toBe(1)
+    const [shown] = await resetDialogs(launched.app)
+    expect(shown.title).toBe("Database reset")
+    expect(shown.buttons).toEqual(["Restart"])
+    const recoveryPath = /^Recovery files: (.+)$/m.exec(shown.detail)?.[1]
+    expect(recoveryPath, "the dialog names the recovery folder").toBeTruthy()
+
+    // The real, on-disk proof: the corrupt file this test seeded is gone from
+    // the runtime path, and the folder the dialog names, inside that same
+    // runtime path, keeps it byte for byte.
+    expect(fs.existsSync(dbPath)).toBe(false)
+    expect(path.dirname(recoveryPath!)).toBe(harness.runtimePath)
+    expect(
+      fs.readFileSync(path.join(recoveryPath!, "gdl_conf.db")).equals(seeded),
+      "the recovery folder keeps the database exactly as it was"
+    ).toBe(true)
+
+    // Pressing Restart then genuinely relaunches, as the retry test proves
+    // for the Restart step.
+    const attempt = captureRelaunchAttempt(launched.app.process(), harness)
+    try {
+      await pressResetDialogRestart(launched.app)
+      await waitForRelaunchMain(attempt)
+    } finally {
+      attempt.dispose()
+    }
   } finally {
     if (launched) {
       await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(

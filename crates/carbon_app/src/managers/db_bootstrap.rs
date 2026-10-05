@@ -61,6 +61,48 @@ enum DbStatus {
     DowngradeFailed(Option<String>),
     Corrupt,
     MigrationFailed,
+    OpenFailed(DbRecoveryCause),
+}
+
+/// Recovery guidance uses SQLite primary codes and typed refusals, never
+/// error text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DbRecoveryCause {
+    Locked,
+    Access,
+    Storage,
+    /// A 2024 (Prisma-era) migration history this build refuses to convert:
+    /// restarting or updating cannot change it.
+    History,
+}
+impl DbRecoveryCause {
+    fn wire(&self) -> &'static str {
+        match self {
+            Self::Locked => "locked",
+            Self::Access => "access",
+            Self::Storage => "storage",
+            Self::History => "history",
+        }
+    }
+}
+fn recovery_cause(err: &DbError) -> Option<DbRecoveryCause> {
+    let error = match err {
+        DbError::LegacyHistory(_) => return Some(DbRecoveryCause::History),
+        DbError::Sqlite(rusqlite::Error::SqliteFailure(error, _)) => error,
+        _ => return None,
+    };
+    match error.code {
+        rusqlite::ErrorCode::DatabaseBusy | rusqlite::ErrorCode::DatabaseLocked => {
+            Some(DbRecoveryCause::Locked)
+        }
+        rusqlite::ErrorCode::CannotOpen
+        | rusqlite::ErrorCode::ReadOnly
+        | rusqlite::ErrorCode::PermissionDenied => Some(DbRecoveryCause::Access),
+        rusqlite::ErrorCode::DiskFull | rusqlite::ErrorCode::SystemIoFailure => {
+            Some(DbRecoveryCause::Storage)
+        }
+        _ => None,
+    }
 }
 
 impl DbStatus {
@@ -78,6 +120,7 @@ impl DbStatus {
             DbStatus::DowngradeFailed(None) => "_STATUS_:DB_DOWNGRADE_FAILED".to_string(),
             DbStatus::Corrupt => "_STATUS_:DB_CORRUPT".to_string(),
             DbStatus::MigrationFailed => "_STATUS_:DB_MIGRATION_FAILED".to_string(),
+            DbStatus::OpenFailed(cause) => format!("_STATUS_:DB_MIGRATION_FAILED|{}", cause.wire()),
         }
     }
 
@@ -90,7 +133,7 @@ impl DbStatus {
             DbStatus::Diverged(v) => DatabaseError::Diverged(v).into(),
             DbStatus::DowngradeFailed(p) => DatabaseError::DowngradeFailed(p).into(),
             DbStatus::Corrupt => DatabaseError::Corrupt.into(),
-            DbStatus::MigrationFailed | DbStatus::Downgraded => {
+            DbStatus::MigrationFailed | DbStatus::OpenFailed(_) | DbStatus::Downgraded => {
                 DatabaseError::MigrationFailed.into()
             }
         }
@@ -121,13 +164,15 @@ fn classify_open(result: DbResult<OpenVerdict>) -> Result<Option<DbStatus>, DbSt
             DbStatus::DowngradeFailed(snapshot_path.map(|p| p.display().to_string())),
         ),
         Err(e) if is_corruption(&e) => Err(DbStatus::Corrupt),
-        Err(_) => Err(DbStatus::MigrationFailed),
+        Err(e) => Err(recovery_cause(&e)
+            .map(DbStatus::OpenFailed)
+            .unwrap_or(DbStatus::MigrationFailed)),
     }
 }
 
 /// True when a rusqlite error is SQLite reporting a corrupt file or a
-/// non-database file — the only errors that map to `DB_CORRUPT` rather than the
-/// generic `DB_MIGRATION_FAILED`.
+/// non-database file. Other primary codes can supply non-corruption recovery
+/// guidance on `DB_MIGRATION_FAILED`; unknown errors keep its bare legacy form.
 fn is_corruption(err: &DbError) -> bool {
     matches!(
         err,
@@ -501,6 +546,94 @@ mod test {
             },
             Some("simulated".to_string()),
         ))
+    }
+
+    #[test]
+    fn task24_db_recovery_noncorruption_causes_have_structured_status() {
+        for (code, category) in [
+            (rusqlite::ErrorCode::DatabaseBusy, "locked"),
+            (rusqlite::ErrorCode::DatabaseLocked, "locked"),
+            (rusqlite::ErrorCode::CannotOpen, "access"),
+            (rusqlite::ErrorCode::ReadOnly, "access"),
+            (rusqlite::ErrorCode::PermissionDenied, "access"),
+            (rusqlite::ErrorCode::DiskFull, "storage"),
+            (rusqlite::ErrorCode::SystemIoFailure, "storage"),
+        ] {
+            let status = classify_open(Err(corrupt_sqlite_error(code))).unwrap_err();
+            assert_eq!(
+                status.status_line(),
+                format!("_STATUS_:DB_MIGRATION_FAILED|{category}")
+            );
+            assert!(
+                status
+                    .into_error()
+                    .downcast_ref::<DatabaseError>()
+                    .unwrap()
+                    .is_emitted_db_status()
+            );
+        }
+    }
+
+    #[test]
+    fn task24_db_recovery_real_cannot_open_preserves_snapshot() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("gdl_conf.db");
+        std::fs::create_dir(&path).unwrap();
+        let snapshot = snapshot_path_for(&path);
+        std::fs::write(&snapshot, b"synthetic previous snapshot").unwrap();
+        let status =
+            classify_open(migrate_db(&path, &carbon_repos::get_migrations().0)).unwrap_err();
+        assert_eq!(status.status_line(), "_STATUS_:DB_MIGRATION_FAILED|access");
+        assert_eq!(
+            std::fs::read(snapshot).unwrap(),
+            b"synthetic previous snapshot"
+        );
+        assert!(path.is_dir());
+    }
+
+    #[test]
+    fn task24_db_recovery_real_persistent_lock_preserves_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("gdl_conf.db");
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch("PRAGMA journal_mode=WAL; CREATE TABLE kept(value TEXT); INSERT INTO kept VALUES('synthetic'); BEGIN IMMEDIATE").unwrap();
+        let snapshot = snapshot_path_for(&path);
+        std::fs::write(&snapshot, b"prior snapshot").unwrap();
+        let status =
+            classify_open(migrate_db(&path, &carbon_repos::get_migrations().0)).unwrap_err();
+        assert_eq!(status.status_line(), "_STATUS_:DB_MIGRATION_FAILED|locked");
+        assert_eq!(
+            conn.query_row("SELECT value FROM kept", [], |r| r.get::<_, String>(0))
+                .unwrap(),
+            "synthetic"
+        );
+        assert_eq!(std::fs::read(snapshot).unwrap(), b"prior snapshot");
+        conn.execute_batch("ROLLBACK").unwrap();
+    }
+
+    #[test]
+    fn task24_db_recovery_transient_lock_uses_existing_busy_tolerance() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("gdl_conf.db");
+        let conn = rusqlite::Connection::open(&path).unwrap();
+        conn.execute_batch("PRAGMA journal_mode=WAL; BEGIN IMMEDIATE")
+            .unwrap();
+        let unlock = std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(100));
+            conn.execute_batch("ROLLBACK").unwrap();
+        });
+        assert_eq!(
+            classify_open(migrate_db(&path, &carbon_repos::get_migrations().0)),
+            Ok(None)
+        );
+        unlock.join().unwrap();
+        let current = rusqlite::Connection::open(&path).unwrap();
+        assert_eq!(
+            current
+                .query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            carbon_repos::get_migrations().0.count()
+        );
     }
 
     #[test]
