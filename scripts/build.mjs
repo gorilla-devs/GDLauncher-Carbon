@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process"
+import { pathToFileURL } from "node:url"
 
 /**
  * Platform build driver.
@@ -57,53 +58,30 @@ function isEnabled(value) {
   return value !== "0" && value.toLowerCase() !== "false"
 }
 
-function exec(command, extraEnv = {}) {
-  console.log(`\n> ${command}`)
-  const result = spawnSync(command, {
-    stdio: "inherit",
-    shell: true,
-    env: { ...process.env, ...extraEnv }
-  })
-
-  if (result.error) {
-    console.error(`Failed to start: ${command}\n${result.error.message}`)
-    process.exit(1)
+/** @param {string | undefined} name
+ * @param {Record<string, string | undefined>} env
+ * @param {(command: string, options: import("node:child_process").SpawnSyncOptions) => {status?: number | null, error?: Error}} spawn
+ * @param {{log(message: string): void}} output */
+export function runBuild(name, env, spawn = spawnSync, output = console) {
+  const target = TARGETS[name]
+  if (!target) throw new Error(name ? `Unknown build target "${name}"` : "Missing build target")
+  const e2e = isEnabled(env.GDL_E2E)
+  const features = e2e ? " --features e2e" : ""
+  function exec(command, extraEnv = {}) {
+    output.log(`> ${command}`)
+    const result = spawn(command, { stdio: "inherit", shell: true, env: { ...env, ...extraEnv } })
+    if (result.error) throw result.error
+    if (result.status !== 0) throw Object.assign(new Error(`Build step failed: ${command}`), { exitCode: result.status ?? 1 })
   }
-
-  if (result.status !== 0) {
-    // A signal-terminated child reports `status: null`; treat that as failure
-    // rather than letting `null` fall through as a success exit code.
-    process.exit(result.status ?? 1)
+  for (const step of target.steps) {
+    if (step.cargo) exec(`cargo build -p carbon_app --release${features} --target ${step.cargo}`)
+    else exec(`pnpm run ${step.run}`)
   }
+  exec(`pnpm exec turbo run build --env-mode=loose --filter !@gd/website -- ${target.electron} -- --release`,
+    { GDL_E2E_BUILD: String(e2e) })
 }
 
-const name = process.argv[2]
-const target = TARGETS[name]
-
-if (!target) {
-  const known = Object.keys(TARGETS).join(", ")
-  console.error(
-    name
-      ? `Unknown build target "${name}". Known targets: ${known}`
-      : `Missing build target. Known targets: ${known}`
-  )
-  process.exit(1)
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try { runBuild(process.argv[2], process.env) }
+  catch (error) { console.error(error.message); process.exit(error.exitCode ?? 1) }
 }
-
-const e2e = isEnabled(process.env.GDL_E2E)
-const features = e2e ? " --features e2e" : ""
-
-console.log(`Building ${name}${e2e ? " (e2e)" : ""}`)
-
-for (const step of target.steps) {
-  if (step.cargo) {
-    exec(`cargo build -p carbon_app --release${features} --target ${step.cargo}`)
-  } else {
-    exec(`pnpm run ${step.run}`)
-  }
-}
-
-exec(
-  `pnpm exec turbo run build --env-mode=loose --filter !@gd/website -- ${target.electron} -- --release`,
-  e2e ? { GDL_E2E_BUILD: "true" } : {}
-)

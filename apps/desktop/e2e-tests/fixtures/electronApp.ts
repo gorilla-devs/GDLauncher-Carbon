@@ -1,3 +1,4 @@
+import type { ChildProcess } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
@@ -178,6 +179,7 @@ export async function launchApp(opts: LaunchOptions): Promise<{
       throw error
     })
 
+  rememberElectronProcess(app)
   app.on("console", (msg) => console.log(msg.text()))
   const stdout: string[] = []
   app.process().stdout?.on("data", (data) => {
@@ -286,6 +288,64 @@ export async function waitForPidExit(
   }
 }
 
+/** Each app's main process, kept from launch: once an ElectronApplication
+ *  closes, Playwright drops the object behind `app.process()`, which then
+ *  throws instead of returning the exited process. */
+const electronProcesses = new WeakMap<ElectronApplication, ChildProcess>()
+
+/** Keeps `app`'s main process for `electronProcess`. Safe to call again. */
+export function rememberElectronProcess(app: ElectronApplication): void {
+  if (electronProcesses.has(app)) return
+  try {
+    electronProcesses.set(app, app.process())
+  } catch {
+    // Already closed, or a test double without a process.
+  }
+}
+
+/** `app`'s main process, also after the app has closed. */
+export function electronProcess(app: ElectronApplication): ChildProcess {
+  return electronProcesses.get(app) ?? app.process()
+}
+
+/**
+ * Waits (bounded) for the Electron main process to exit and returns how it
+ * exited. `app.close()` resolves after the exit, so this normally returns at
+ * once.
+ */
+export async function electronExitStatus(
+  app: ElectronApplication,
+  timeoutMs = 30_000
+): Promise<{ code: number | null; signal: NodeJS.Signals | null }> {
+  const child = electronProcess(app)
+  if (child.exitCode === null && child.signalCode === null) {
+    await new Promise<void>((resolve) => {
+      const timer = setTimeout(resolve, timeoutMs)
+      child.once("exit", () => {
+        clearTimeout(timer)
+        resolve()
+      })
+    })
+  }
+  return { code: child.exitCode, signal: child.signalCode }
+}
+
+/** Fails unless Electron exited with code 0. The harness runs with
+ *  `--gdl_disable_sentry`, so an uncaught main-process exception reaches
+ *  `handleUncaughtException`, which exits with 1. */
+export function assertCleanElectronExit(status: {
+  code: number | null
+  signal: NodeJS.Signals | null
+}): void {
+  if (status.code === 0) return
+  throw new Error(
+    `Electron exited with code ${status.code}` +
+      (status.signal ? ` (signal ${status.signal})` : "") +
+      " instead of 0. An uncaught main-process exception exits with 1; " +
+      'look for "Uncaught Exception" in main.log.'
+  )
+}
+
 /**
  * The launcher window that shows `page`, for closing it the way the window
  * manager's X does and for reading whether it is shown.
@@ -367,7 +427,7 @@ export async function quitLauncherMidGame(
   current: { app: ElectronApplication; page: Page },
   { timeoutMs = 60_000 } = {}
 ): Promise<void> {
-  const electronPid = current.app.process().pid
+  const electronPid = electronProcess(current.app).pid
   if (electronPid == null) {
     throw new Error(
       "quitLauncherMidGame: Playwright reported no pid for the Electron process"

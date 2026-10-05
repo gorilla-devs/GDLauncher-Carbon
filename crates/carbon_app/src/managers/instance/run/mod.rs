@@ -1444,34 +1444,15 @@ impl ManagerRef<'_, InstanceManager> {
             .launcher_action_on_game_launch;
         let _operation = self.lock_instance(instance_id).await;
         let mut instances = self.instances.write().await;
-        let instance = instances
-            .get_mut(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?;
-        let owned = match &instance.data()?.state {
-            LaunchState::Queued(task) | LaunchState::Preparing(task) => *task == expected_task,
-            LaunchState::Running(running) => running.task_id == Some(expected_task),
-            _ => false,
-        };
-        if !owned {
-            bail!("stale worker cannot change current instance state");
-        }
-
-        match &state {
-            LaunchState::Inactive { .. } => {
-                // println to stdout is used by the launcher to detect when the game is closed
-                info!("_INSTANCE_STATE_:GAME_CLOSED|{action_to_take}");
-                println!("_INSTANCE_STATE_:GAME_CLOSED|{action_to_take}");
-            }
-            LaunchState::Running(_) => {
-                // println to stdout is used by the launcher to detect when the game is closed
-                info!("_INSTANCE_STATE_:GAME_LAUNCHED|{action_to_take}");
-                println!("_INSTANCE_STATE_:GAME_LAUNCHED|{action_to_take}");
-            }
-            LaunchState::Queued(_) | LaunchState::Preparing(_) | LaunchState::Deleting => (),
-        };
-
-        debug!("changing state of instance {instance_id} to {state:?}");
-        instance.data_mut()?.state = state;
+        self.running_publication.change(
+            &mut instances,
+            instance_id,
+            expected_task,
+            state,
+            &action_to_take.to_string(),
+            &mut |record| println!("{record}"),
+        )?;
+        drop(instances);
         self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
@@ -1575,7 +1556,10 @@ impl ManagerRef<'_, InstanceManager> {
             }
 
             data.state = LaunchState::Inactive { failed_task: None };
-            instance.shortpath.clone()
+            let shortpath = instance.shortpath.clone();
+            self.running_publication
+                .publish(&instances, &mut |record| println!("{record}"));
+            shortpath
         };
 
         let root = self
@@ -2128,7 +2112,7 @@ impl Debug for LaunchState {
 }
 
 pub struct RunningInstance {
-    task_id: Option<VisualTaskId>,
+    pub(super) task_id: Option<VisualTaskId>,
     process_id: u32,
     /// `None` when the game was adopted: there is no spawning task to signal,
     /// so stopping goes through the pid instead (`kill_instance`).
@@ -2459,6 +2443,113 @@ mod tests {
             modpack_update_modrinth: None,
             icon_revision: None,
         }
+    }
+
+    #[test]
+    fn task23_running_publication_follows_real_mutation_and_suppresses_preparation_exit() {
+        let publication = super::super::running_publication::RunningPublication::default();
+        let mut instances = std::collections::HashMap::new();
+        for id in [1, 2] {
+            instances.insert(
+                InstanceId(id),
+                Instance {
+                    shortpath: format!("fixture-{id}"),
+                    type_: InstanceType::Valid(instance_data_with_state(LaunchState::Preparing(
+                        VisualTaskId(id),
+                    ))),
+                },
+            );
+        }
+        let mut records = Vec::new();
+        let mut running = RunningInstance::adopted(11, 100, Utc::now(), Utc::now());
+        running.task_id = Some(VisualTaskId(1));
+        publication
+            .change(
+                &mut instances,
+                InstanceId(1),
+                VisualTaskId(1),
+                LaunchState::Running(running),
+                "none",
+                &mut |r| records.push(r),
+            )
+            .unwrap();
+        assert!(records[0].contains("\"instances\":[1]"));
+        assert!(matches!(
+            instances[&InstanceId(1)].data().unwrap().state,
+            LaunchState::Running(_)
+        ));
+        publication
+            .change(
+                &mut instances,
+                InstanceId(2),
+                VisualTaskId(2),
+                LaunchState::Inactive { failed_task: None },
+                "closeWindow",
+                &mut |r| records.push(r),
+            )
+            .unwrap();
+        assert_eq!(records.len(), 3);
+        assert!(records[2].contains("\"instances\":[1]"));
+        publication
+            .change(
+                &mut instances,
+                InstanceId(1),
+                VisualTaskId(1),
+                LaunchState::Inactive { failed_task: None },
+                "none",
+                &mut |r| records.push(r),
+            )
+            .unwrap();
+        assert!(records[3].contains("\"instances\":[]"));
+        assert_eq!(records[4], "_INSTANCE_STATE_:GAME_CLOSED|1|1|none");
+        let revisions: Vec<u64> = records
+            .iter()
+            .filter_map(|r| r.strip_prefix("_INSTANCE_RUNNING_:"))
+            .map(|p| {
+                serde_json::from_str::<serde_json::Value>(p).unwrap()["revision"]
+                    .as_u64()
+                    .unwrap()
+            })
+            .collect();
+        assert_eq!(revisions, [1, 2, 3]);
+    }
+
+    #[test]
+    fn task23_adopted_snapshot_rescan_release_preserves_keyed_running_sessions() {
+        let publication = super::super::running_publication::RunningPublication::default();
+        let mut instances = std::collections::HashMap::new();
+        let mut records = Vec::new();
+        publication.publish(&instances, &mut |r| records.push(r));
+        for id in [1, 2] {
+            instances.insert(
+                InstanceId(id),
+                Instance {
+                    shortpath: format!("fixture-{id}"),
+                    type_: InstanceType::Valid(instance_data_with_state(LaunchState::Running(
+                        RunningInstance::adopted(id as u32, 100, Utc::now(), Utc::now()),
+                    ))),
+                },
+            );
+        }
+        publication.publish(&instances, &mut |r| records.push(r));
+        publication.publish(&instances, &mut |r| records.push(r));
+        instances
+            .get_mut(&InstanceId(1))
+            .unwrap()
+            .data_mut()
+            .unwrap()
+            .state = LaunchState::Inactive { failed_task: None };
+        publication.publish(&instances, &mut |r| records.push(r));
+        assert!(records[3].contains("\"instances\":[2]"));
+        instances
+            .get_mut(&InstanceId(2))
+            .unwrap()
+            .data_mut()
+            .unwrap()
+            .state = LaunchState::Inactive { failed_task: None };
+        publication.publish(&instances, &mut |r| records.push(r));
+        assert!(records[4].contains("\"instances\":[]"));
+        assert!(records.iter().all(|r| r.starts_with("_INSTANCE_RUNNING_:")));
     }
 
     #[tokio::test]

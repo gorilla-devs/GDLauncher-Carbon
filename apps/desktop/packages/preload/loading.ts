@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron"
+import { restoreSnapshotClick } from "./restoreButton"
 import { domReady } from "./utils"
 
 export interface Log {
@@ -55,6 +56,7 @@ function useLoading() {
                 Restore
               </button>
             </div>
+            <div id="restore-snapshot-error" role="alert" style="margin-top: 8px; color: rgb(var(--red-400));"></div>
           </div>`
         : ""
 
@@ -212,7 +214,9 @@ function useLoading() {
         | "downloading"
         | "ready"
         | "error"
-        | "no-update" = "idle"
+        | "no-update"
+        | "unsupported"
+        | "manual-update" = "idle"
 
       const setUpdateState = (state: typeof updateState, data?: any) => {
         updateState = state
@@ -236,6 +240,15 @@ function useLoading() {
             checkUpdatesBtn.textContent = "Checking..."
             checkUpdatesBtn.disabled = true
             checkUpdatesBtn.style.opacity = "0.6"
+            break
+
+          case "manual-update":
+            updateInfo = data
+            updateStatusText.textContent = `Update v${data?.version || "..."} available. Copy the download link to update manually.`
+            updateProgressContainer.style.display = "none"
+            checkUpdatesBtn.textContent = "Copy Link"
+            checkUpdatesBtn.disabled = false
+            checkUpdatesBtn.style.opacity = "1"
             break
 
           case "downloading":
@@ -284,6 +297,7 @@ function useLoading() {
             break
           }
 
+          case "unsupported":
           case "error":
             updateStatusText.textContent =
               data?.message || "Update check failed"
@@ -332,7 +346,15 @@ function useLoading() {
             // Use stable channel if settings unavailable
           }
 
-          await ipcRenderer.invoke("checkForUpdates", releaseChannel)
+          const result = await ipcRenderer.invoke(
+            "checkForUpdates",
+            releaseChannel
+          )
+          if (result?.status === "snapshot-version")
+            setUpdateState("unsupported", {
+              message: "Snapshot builds do not support update checks."
+            })
+          else if (result?.currentState) receiveUpdateState(result.currentState)
         } catch (error) {
           console.error("Update check failed:", error)
           setUpdateState("error", { message: "Failed to check for updates" })
@@ -343,9 +365,12 @@ function useLoading() {
         if (
           updateState === "idle" ||
           updateState === "error" ||
-          updateState === "no-update"
+          updateState === "no-update" ||
+          updateState === "unsupported"
         ) {
           await checkForUpdates()
+        } else if (updateState === "manual-update" && updateInfo?.downloadUrl) {
+          await navigator.clipboard.writeText(updateInfo.downloadUrl)
         } else if (updateState === "ready") {
           await ipcRenderer.invoke("installUpdate")
         }
@@ -384,15 +409,15 @@ function useLoading() {
           document.querySelector("#restore-snapshot-btn")
         if (restoreSnapshotBtn) {
           addHoverEffect(restoreSnapshotBtn)
-          restoreSnapshotBtn.addEventListener("click", async () => {
-            restoreSnapshotBtn.textContent = "Restoring..."
-            restoreSnapshotBtn.disabled = true
-            restoreSnapshotBtn.style.opacity = "0.6"
-            await ipcRenderer.invoke(
-              "restoreDbSnapshotAndRestart",
-              snapshotPath
+          const restoreError = document.querySelector<HTMLElement>(
+            "#restore-snapshot-error"
+          )!
+          restoreSnapshotBtn.addEventListener(
+            "click",
+            restoreSnapshotClick(restoreSnapshotBtn, restoreError, () =>
+              ipcRenderer.invoke("restoreDbSnapshotAndRestart", snapshotPath)
             )
-          })
+          )
         }
       }
 
@@ -407,74 +432,52 @@ function useLoading() {
         }, 2000)
       })
 
-      ipcRenderer.on("gd-update-state-changed", (_, stateData: any) => {
-        switch (stateData.state) {
-          case "idle":
-            setUpdateState("idle")
-            break
-
-          case "checking":
-            setUpdateState("checking")
-            break
-
-          case "downloading": {
-            const percent = Math.round(stateData.progress || 0)
-            updateProgressBar.style.width = `${percent}%`
-
-            if (stateData.updateInfo && updateState !== "downloading") {
-              setUpdateState("downloading", stateData.updateInfo)
-            }
-            break
-          }
-
-          case "downloaded":
-            if (stateData.updateInfo) {
-              updateInfo = stateData.updateInfo
-            }
-            setUpdateState("ready")
-            break
-
-          case "no-update":
-            setUpdateState("no-update")
-            break
-
-          case "error":
-            setUpdateState("error", stateData.error)
-            break
+      let lastUpdateRevision = -1
+      const receiveUpdateState = (
+        stateData: import("../main/utils/updateState").UpdateStateData
+      ) => {
+        if (
+          !Number.isSafeInteger(stateData.revision) ||
+          stateData.revision <= lastUpdateRevision
+        )
+          return
+        lastUpdateRevision = stateData.revision
+        if (
+          !["downloading", "downloaded", "manual-update"].includes(
+            stateData.state
+          )
+        ) {
+          updateInfo = null
+          updateProgressBar.style.width = "0%"
         }
-      })
-
-      const currentState = await ipcRenderer.invoke("getUpdateState")
-      if (currentState?.state === "idle") {
-        checkForUpdates()
-      } else if (currentState) {
-        switch (currentState.state) {
-          case "checking":
-            setUpdateState("checking")
+        switch (stateData.state) {
+          case "downloaded":
+            updateInfo = stateData.updateInfo
+            setUpdateState("ready")
             break
           case "downloading":
-            if (currentState.updateInfo) {
-              updateInfo = currentState.updateInfo
-            }
-            setUpdateState("downloading", currentState.updateInfo)
-            if (currentState.progress) {
-              updateProgressBar.style.width = `${Math.round(currentState.progress)}%`
-            }
+            updateInfo = stateData.updateInfo
+            setUpdateState("downloading", updateInfo)
+            updateProgressBar.style.width = `${Math.round(stateData.progress || 0)}%`
             break
-          case "downloaded":
-            if (currentState.updateInfo) {
-              updateInfo = currentState.updateInfo
-            }
-            setUpdateState("ready")
-            break
-          case "no-update":
-            setUpdateState("no-update")
+          case "manual-update":
+            setUpdateState("manual-update", stateData.updateInfo)
             break
           case "error":
-            setUpdateState("error", currentState.error)
+          case "unsupported":
+            setUpdateState(stateData.state, stateData.error)
+            break
+          default:
+            setUpdateState(stateData.state)
             break
         }
       }
+      ipcRenderer.on("gd-update-state-changed", (_, stateData) =>
+        receiveUpdateState(stateData)
+      )
+      const currentState = await ipcRenderer.invoke("getUpdateState")
+      if (currentState?.state === "idle") await checkForUpdates()
+      else if (currentState) receiveUpdateState(currentState)
     },
 
     async backwardsMigrationError() {

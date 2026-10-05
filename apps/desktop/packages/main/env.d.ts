@@ -16,3 +16,8 @@ interface ImportMeta {
 }
 
 declare const __APP_VERSION__: string
+
+// Narrow signature for the already installed, bundled semver dependency.
+declare module "semver" {
+  export function gt(left: string, right: string): boolean
+}

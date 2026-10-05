@@ -1,21 +1,7 @@
 import { FEReleaseChannel } from "@gd/core_module/bindings"
 import { contextBridge, ipcRenderer, IpcRendererEvent } from "electron"
-import type { UpdateInfo } from "electron-updater"
 
-type UpdateState =
-  | "idle"
-  | "checking"
-  | "downloading"
-  | "downloaded"
-  | "error"
-  | "no-update"
-
-interface UpdateStateData {
-  state: UpdateState
-  updateInfo: (UpdateInfo & { downloadUrl: string }) | null
-  progress: number
-  error: { message: string; details: string } | null
-}
+import type { UpdateStateData } from "../main/utils/updateState"
 
 contextBridge.exposeInMainWorld(
   "checkForUpdates",

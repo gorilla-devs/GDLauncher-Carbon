@@ -359,26 +359,33 @@ const General = () => {
               ]}
               itemComponent={(props) => (
                 <SelectItem item={props.item}>
-                  {props.item.rawValue === "none" &&
-                    t("settings:_trn_launcher_action_on_game_launch_none")}
-                  {props.item.rawValue === "minimizeWindow" &&
-                    t(
-                      "settings:_trn_launcher_action_on_game_launch_minimize_window"
-                    )}
-                  {props.item.rawValue === "closeWindow" &&
-                    t(
-                      "settings:_trn_launcher_action_on_game_launch_close_window"
-                    )}
-                  {props.item.rawValue === "hideWindow" &&
-                    t(
-                      "settings:_trn_launcher_action_on_game_launch_hide_window"
-                    )}
-                  {props.item.rawValue === "quitApp" &&
-                    t("settings:_trn_launcher_action_on_game_launch_quit_app")}
+                  <span
+                    data-testid="settings-launch-action-option"
+                    data-action={props.item.rawValue}
+                  >
+                    {props.item.rawValue === "none" &&
+                      t("settings:_trn_launcher_action_on_game_launch_none")}
+                    {props.item.rawValue === "minimizeWindow" &&
+                      t(
+                        "settings:_trn_launcher_action_on_game_launch_minimize_window"
+                      )}
+                    {props.item.rawValue === "closeWindow" &&
+                      t(
+                        "settings:_trn_launcher_action_on_game_launch_close_window"
+                      )}
+                    {props.item.rawValue === "hideWindow" &&
+                      t(
+                        "settings:_trn_launcher_action_on_game_launch_hide_window"
+                      )}
+                    {props.item.rawValue === "quitApp" &&
+                      t(
+                        "settings:_trn_launcher_action_on_game_launch_quit_app"
+                      )}
+                  </span>
                 </SelectItem>
               )}
             >
-              <SelectTrigger>
+              <SelectTrigger data-testid="settings-launch-action-select">
                 <SelectValue<string>>
                   {(state) => {
                     const val = state.selectedOption()

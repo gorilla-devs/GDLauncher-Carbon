@@ -64,6 +64,7 @@ pub mod modpack;
 mod mods;
 pub use mods::KeptAddonCopy;
 pub mod run;
+mod running_publication;
 mod schema;
 pub mod shader_loader;
 
@@ -72,6 +73,7 @@ pub struct InstanceManager {
     #[cfg(test)]
     test_hooks: lifecycle_tests::Hooks,
     pub(crate) instances: RwLock<HashMap<InstanceId, Instance>>,
+    running_publication: running_publication::RunningPublication,
     index_lock: Mutex<()>,
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
@@ -277,6 +279,7 @@ impl InstanceManager {
                 drop(any_instance_running.send_replace(count != 0))
             }),
             origin_checks: RwLock::new(HashMap::new()),
+            running_publication: running_publication::RunningPublication::default(),
         }
     }
 }
@@ -475,6 +478,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         if let Err(e) = self.scan_instances().await {
             error!("failed to scan instances: {e:?}");
             self.app.runtime_lifecycle.reconciliation_finished(Err(e));
+            let instances = self.instances.read().await;
+            self.running_publication
+                .publish(&instances, &mut |record| println!("{record}"));
         }
         self.import_manager().launch_background_tasks();
     }
@@ -702,6 +708,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 }
 
                 instances.insert(instance_id, instance);
+                self.running_publication
+                    .publish(&instances, &mut |record| println!("{record}"));
                 drop(instances);
                 drop(path_admission);
                 drop(_operation);
@@ -763,6 +771,11 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
 
+        {
+            let instances = self.instances.read().await;
+            self.running_publication
+                .publish(&instances, &mut |record| println!("{record}"));
+        }
         if !adopted_ids.is_empty() {
             self.watch_adopted_instances(adopted_ids);
         }

@@ -1,7 +1,7 @@
 // Intentionally putting this on top to catch any potential error in dependencies as well
 
 declare const __SHOWCASE_MODE__: boolean
-/** True only in builds produced by the `build:*-e2e` scripts — the Electron
+/** True only in builds produced by the public `GDL_E2E` build switch — the Electron
  *  counterpart of the core's `e2e` cargo feature. See this file's use of it
  *  and `packages/main/vite.config.mjs`. */
 declare const __E2E_BUILD__: boolean
@@ -31,11 +31,14 @@ import type { ChildProcessWithoutNullStreams } from "child_process"
 import { spawn } from "child_process"
 import crypto from "crypto"
 import log from "electron-log/main"
+import { AccountIdentityReceiver } from "./utils/accountIdentity"
+import { createCoreOutput } from "./utils/coreOutput"
 import {
-  AccountIdentityReceiver,
-  CoreOutputLines,
-  redactCoreIdentity
-} from "./utils/accountIdentity"
+  LauncherLifecycle,
+  mainWindowClosed,
+  userWindows
+} from "./utils/windowLifecycle"
+import { ProtocolQueue, isSupportedProtocol } from "./utils/protocolQueue"
 import { buildCoreModuleArgs } from "./utils/coreArgs.js"
 import {
   IncompleteMigrationError,
@@ -62,8 +65,26 @@ import {
   forceTerminateCore,
   relocationLeaseHeld,
   stopCoreForRelocation,
-  stopCoreForShutdown
+  stopCoreForShutdown,
+  terminateAndObserveCoreExit
 } from "./utils/coreShutdown"
+import {
+  ShutdownFlow,
+  ShutdownNotPossibleError,
+  type ShutdownAction,
+  type ShutdownOutcome,
+  type ShutdownView
+} from "./utils/shutdownFlow"
+import {
+  ShutdownPrompts,
+  nativeShutdownDialog,
+  shutdownPromptText,
+  type ShutdownPromptText
+} from "./utils/shutdownPrompt"
+import {
+  assertDatabaseRestoreReadySync,
+  restoreDatabaseSnapshot
+} from "./utils/databaseRestore"
 import {
   runtimeOperationActive,
   runtimeOperationBrief,
@@ -80,10 +101,6 @@ import getAdSize from "./adSize"
 import handleUncaughtException from "./handleUncaughtException"
 import initAutoUpdater from "./autoUpdater"
 import "./appMenu"
-import {
-  CoreModuleStatus,
-  FELauncherActionOnGameLaunch
-} from "@gd/core_module/bindings"
 
 console.log("Modules imported successfully")
 
@@ -114,7 +131,38 @@ const getWin = () => {
   return win
 }
 
-let isGameRunning = false
+const lifecycle = new LauncherLifecycle<BrowserWindow>({
+  current: () => win,
+  clear: (window) => {
+    if (win === window) win = null
+  },
+  create: () => createWindow(),
+  quit: () => app.quit()
+})
+const protocolQueue = new ProtocolQueue<BrowserWindow["webContents"]>(
+  (sender, delivery) => sender.send("protocol-url", delivery)
+)
+ipcMain.handle("protocol-consumer-generation", (event) =>
+  event.senderFrame === event.sender.mainFrame
+    ? protocolQueue.session(event.sender)
+    : null
+)
+ipcMain.on("protocol-consumer-ready", (event, value) => {
+  if (event.senderFrame === event.sender.mainFrame)
+    protocolQueue.ready(event.sender, value?.subscription, value?.generation)
+})
+ipcMain.on("protocol-consumer-ack", (event, delivery) => {
+  if (event.senderFrame === event.sender.mainFrame)
+    protocolQueue.ack(event.sender, delivery)
+})
+ipcMain.on("protocol-consumer-revoke", (event, subscription) => {
+  if (event.senderFrame === event.sender.mainFrame)
+    protocolQueue.unsubscribe(event.sender, subscription)
+})
+ipcMain.on("close-warning-receiver", (event, ready) => {
+  if (event.senderFrame === event.sender.mainFrame)
+    lifecycle.warningReceiver(event.sender, ready === true)
+})
 let showAppCloseWarning = true
 
 app.enableSandbox()
@@ -335,23 +383,7 @@ export type CoreModule = () => Promise<
         apiToken: string
         kill: () => void
       }
-      // The core's own stdout/stderr up to and including `_STATUS_:READY`.
-      // The listeners that populate this stop appending once `started`
-      // flips true (see `loadCoreModule`), bounding this array from that
-      // point on; every fatal path bounds it too, for a different reason —
-      // the core process itself has exited, so no further `data` events
-      // fire regardless of `started`. Bounded on every path except one: the
-      // hung-startup timeout (`setTimeout` below) resolves with `started`
-      // still false while the core stays alive by design
-      // (`coreProcessHandle`'s own comment), so this buffer keeps growing
-      // there for as long as the core does. The listeners themselves stay
-      // attached in every case to keep handling later events
-      // (`_INSTANCE_STATE_`, account email, ...). `main.tsx` ignores this on
-      // the success path, but it is the only record of a *non-fatal* status
-      // line — `DB_DOWNGRADED` chief among them — that startup otherwise
-      // never surfaces anywhere observable once the app is up. Exposed so
-      // `getCoreModule` can answer "what did the core actually report"
-      // regardless of outcome, not only on failure.
+      // Sanitized startup capture bounded to 1MiB, frozen at the first outcome.
       logs: Log[]
     }
   | {
@@ -410,8 +442,19 @@ async function killCoreProcess(timeoutMs = 5000): Promise<void> {
   })
 }
 
-const loadCoreModule: CoreModule = () =>
-  new Promise((resolve, _) => {
+const loadCoreModule: CoreModule = async () => {
+  // Nothing here may await before the spawn below. Called while this module
+  // loads, the core starts before Chromium launches any child process, as in
+  // 2.0.40. Spawned later, it inherits Chromium's IPC sockets (Node passes
+  // every descriptor not marked close-on-exec) and keeps a child's end open:
+  // a GPU process that then exits is never noticed, no fallback starts, and
+  // the window never paints.
+  try {
+    assertDatabaseRestoreReadySync(CURRENT_RUNTIME_PATH!)
+  } catch (error) {
+    return { type: "error", logs: [{ type: "error", message: String(error) }] }
+  }
+  return new Promise((resolve) => {
     console.log("Loading core module...")
     if (isDev) {
       resolve({
@@ -426,8 +469,6 @@ const loadCoreModule: CoreModule = () =>
       console.log("Core module loaded in development mode")
       return
     }
-
-    let started = false
 
     const coreModulePath = path.resolve(
       __dirname,
@@ -448,6 +489,7 @@ const loadCoreModule: CoreModule = () =>
 
     const identitySession = crypto.randomUUID()
     accountIdentity.beginCore(identitySession)
+    lifecycle.beginCore(identitySession)
     try {
       coreModule = spawn(coreModulePath, args, {
         shell: false,
@@ -487,309 +529,80 @@ const loadCoreModule: CoreModule = () =>
       return
     }
 
-    coreModule.on("error", function (err) {
-      console.error(`[CORE] Spawn error: ${err}`)
-
-      logs.push({
-        type: "error",
-        message: err.toString()
-      })
-
-      resolve({
-        type: "error",
-        logs
-      })
-
-      return
-    })
-
-    const coreOutputLines = new CoreOutputLines()
-    coreModule.stdout.on("data", (data) => {
-      const completeLines = coreOutputLines.push(data.toString())
-      if (!completeLines.length) return
-      const dataString = completeLines.join("\n")
-
-      // Strip sensitive payloads before lines reach the user-facing buffer
-      // or main.log:
-      //   - `_STATUS_:READY|<port>|<api-token>` — the core API token. The
-      //     user can already read it from disk, but log dumps shared via
-      //     Discord / GitHub should not leak it.
-      //   - `_GDL_ACCOUNT_EMAIL_:<email>` — the signed-in user's email,
-      //     forwarded to Overwolf for ad personalisation. PII; must not
-      //     end up in shared support logs.
-      // IPC parsing below uses the raw `dataString`, so redaction here only
-      // affects what gets persisted/displayed.
-      const sanitized = redactCoreIdentity(dataString).replace(
-        /(_STATUS_:READY\|\d+\|)[^\s|]+/g,
-        "$1<redacted>"
-      )
-
-      console.log(`[CORE] Message: ${sanitized}`)
-
-      const rows = dataString.split(/\r?\n|\r|\n/g)
-
-      // Bounds `logs` to output observed no later than `_STATUS_:READY` on
-      // the success path, or no later than the core's own exit on every
-      // fatal path (see the `CoreModule` type's own comment on `logs` for
-      // why those are the only two cases this bounds — the hung-startup
-      // timeout does not). This buffer is exposed over IPC via
-      // `getCoreModule`, unconditionally, on every call, so once one of
-      // those two things has happened it must not keep accumulating for the
-      // rest of the process's life. The dispatch loop below still runs
-      // unconditionally after this, since `_INSTANCE_STATE_`/account-email/
-      // close-warning handling must keep working for as long as the core
-      // runs.
-      if (!started) {
-        logs.push({
-          type: "info",
-          message: sanitized
-        })
-      }
-
-      for (const row of rows) {
-        if (row.startsWith("_STATUS_:")) {
-          // Strip only the `_STATUS_:` prefix rather than splitting on every
-          // colon: a payload may itself contain a colon (a Windows snapshot
-          // path like `C:\...` in `DB_DOWNGRADE_FAILED|C:\...`).
-          const rightPart = row.slice("_STATUS_:".length)
-          const parts = rightPart.split("|")
-          const event = parts[0]
-          const port: number = parts[1] as unknown as number
-          const apiToken: string | undefined = parts[2]
-          console.log(`[CORE] Event: ${event}, Port: ${port}`)
-
-          if (event === "READY") {
-            if (!apiToken) {
-              console.error("[CORE] _STATUS_:READY missing api token")
-              resolve({
-                type: "error",
-                logs: [
-                  ...logs,
-                  {
-                    type: "error",
-                    message: "Core module did not provide an api token"
-                  }
-                ]
-              })
-              return
-            }
-            started = true
-            resolve({
-              type: "success",
-              result: {
-                port,
-                apiToken,
-                kill: () => coreModule?.kill()
-              },
-              logs
-            })
-          } else if (event === "BACKWARDS_MIGRATION") {
-            console.log("[CORE] Backwards migration detected")
-            resolve({
-              type: "backwardsMigration",
-              logs
-            })
-          } else if (event === "DB_DOWNGRADED") {
-            // A newer database was stepped back to this build's version and
-            // verified. Non-fatal: startup continues to READY.
-            console.log("[CORE] Database downgraded to this version")
-          } else if (
-            event === "DB_MIGRATION_FAILED" ||
-            event === "DB_DIVERGED" ||
-            event === "DB_CORRUPT" ||
-            event === "DB_DOWNGRADE_FAILED"
-          ) {
-            // Fatal database outcomes. The core emits exactly one of
-            // these then exits; surface the failure screen with the recovery
-            // ladder. `DB_DOWNGRADE_FAILED` carries a pre-downgrade snapshot
-            // path, which unlocks the "Restore snapshot" step.
-            const snapshotPath =
-              event === "DB_DOWNGRADE_FAILED" ? parts[1] : undefined
-            console.error(
-              `[CORE] Fatal database error: ${event}${snapshotPath ? ` (snapshot: ${snapshotPath})` : ""}`
-            )
-            resolve({
-              type: "error",
-              logs: [
-                ...logs,
-                {
-                  type: "error",
-                  message: `Database error: ${event}`
-                }
-              ],
-              snapshotPath
-            })
-          } else {
-            let progress = 0
-            switch (event as CoreModuleStatus) {
-              case "VerifyingTermsAndPrivacy":
-                progress = 10
-                break
-              case "LoadAndMigrate":
-                progress = 20
-                break
-              case "RefreshMSAuth":
-                progress = 35
-                break
-              case "XboxAuth":
-                progress = 50
-                break
-              case "McLogin":
-                progress = 65
-                break
-              case "MCEntitlements":
-                progress = 77
-                break
-              case "McProfile":
-                progress = 88
-                break
-              case "AccountRefreshComplete":
-                progress = 95
-                break
-              case "LaunchBackgroundTasks":
-                progress = 100
-                break
-            }
-
-            lastCoreModuleProgress = progress
-            const w = getWin()
-            if (w && !w.isDestroyed()) {
-              w.webContents.send("coreModuleProgress", progress)
-            }
-          }
-        } else if (row.startsWith("_INSTANCE_STATE_:")) {
-          const rightPart = row.split(":")[1]
-          const event = rightPart.split("|")[0]
-          const action = rightPart.split("|")[1] as FELauncherActionOnGameLaunch
-
-          if (event === "GAME_LAUNCHED") {
-            isGameRunning = true
-            console.log("Game launched, action:", action)
-            switch (action) {
-              case "closeWindow":
-                if (win && !win.isDestroyed()) {
-                  win.close()
-                }
-                win = null
-                break
-              case "hideWindow":
-                if (win && !win.isDestroyed()) {
-                  win.hide()
-                }
-                break
-              case "minimizeWindow":
-                if (win && !win.isDestroyed()) {
-                  win.minimize()
-                }
-                break
-              case "none":
-                break
-              case "quitApp":
-                showAppCloseWarning = false
-                app.quit()
-                break
-            }
-          } else if (event === "GAME_CLOSED") {
-            isGameRunning = false
-            console.log("Game closed, action:", action)
-            switch (action) {
-              case "closeWindow":
-                if (!win || win.isDestroyed()) {
-                  createWindow()
-                }
-                break
-              case "hideWindow":
-              case "minimizeWindow":
-                if (win && !win.isDestroyed()) {
-                  win?.show()
-                  win?.focus()
-                } else {
-                  createWindow()
-                }
-                break
-              case "none":
-                break
-              case "quitApp":
-                // There's nothing we can do
-                break
-            }
-          }
-        } else if (row.startsWith("_SHOW_APP_CLOSE_WARNING_:")) {
-          const rightPart = row.split(":")[1]
-          showAppCloseWarning = rightPart === "true"
-          console.log("Show app close warning:", showAppCloseWarning)
-        } else if (row.startsWith("_GDL_ACCOUNT_EMAIL_:")) {
+    const coreOutput = createCoreOutput({
+      log: (entry) => console.log(`[CORE] Message: ${entry.message}`),
+      settle: (result) => {
+        clearTimeout(startupTimer)
+        if (result.type === "success")
+          resolve({
+            ...result,
+            result: { ...result.result, kill: () => coreModule?.kill() }
+          })
+        else resolve(result)
+      },
+      progress: (event) => {
+        const progress: Record<string, number> = {
+          VerifyingTermsAndPrivacy: 10,
+          LoadAndMigrate: 20,
+          RefreshMSAuth: 35,
+          XboxAuth: 50,
+          McLogin: 65,
+          MCEntitlements: 77,
+          McProfile: 88,
+          AccountRefreshComplete: 95,
+          LaunchBackgroundTasks: 100
+        }
+        lastCoreModuleProgress = progress[event] ?? 0
+        const window = getWin()
+        if (window && !window.isDestroyed())
+          window.webContents.send("coreModuleProgress", lastCoreModuleProgress)
+      },
+      record: (row) => {
+        if (row.startsWith("_INSTANCE_RUNNING_:"))
+          lifecycle.snapshot(
+            row.slice("_INSTANCE_RUNNING_:".length),
+            identitySession
+          )
+        else if (row.startsWith("_INSTANCE_STATE_:"))
+          lifecycle.event(
+            row.slice("_INSTANCE_STATE_:".length),
+            identitySession
+          )
+        else if (row.startsWith("_SHOW_APP_CLOSE_WARNING_:"))
+          showAppCloseWarning =
+            row.slice("_SHOW_APP_CLOSE_WARNING_:".length) === "true"
+        else if (row.startsWith("_GDL_ACCOUNT_EMAIL_:"))
           accountIdentity.acceptPayload(
             row.slice("_GDL_ACCOUNT_EMAIL_:".length)
           )
-        }
       }
     })
-
-    coreModule.stderr.on("data", (data) => {
-      // Same READY boundary as the stdout listener above, but unlike it,
-      // nothing here is redacted before being pushed to `logs` (exposed over
-      // IPC on every outcome, including success — see the `CoreModule` type
-      // comment). This is deliberately not the same risk as the stdout
-      // listener's redaction: `tracing` writes to the release build's file
-      // appender, never to stderr (`logger.rs`'s `setup_logger`), so nothing
-      // this process prints to its own stdout ever reaches this listener by
-      // construction. What can land here pre-READY is Rust's own panic
-      // output (a `RUST_BACKTRACE=full` backtrace, since `loadCoreModule`
-      // sets that env var) and `logger.rs`'s `cleanup_old_logs`, which
-      // `eprintln!`s directly on a failed old-log deletion — neither carries
-      // anything more sensitive than a local file path or Rust source
-      // location, nothing user-identifying, so no redaction is needed here
-      // the way the READY token and account email are on the stdout side.
-      if (!started) {
-        logs.push({
-          type: "error",
-          message: data.toString()
-        })
-      }
-      console.error(`[CORE] Error: ${data.toString()}`)
-    })
-
-    coreModule.on("exit", (code) => {
-      console.log(`[CORE] Exit with code: ${code}`)
-      coreProcessHandle = null
-
-      // If we get here without `started` being true, the core module exited
-      // before emitting `_STATUS_:READY`. That's always an error condition,
-      // even if the exit code is 0.
-      if (started) {
-        return
-      }
-      resolve({
-        type: "error",
-        logs: [
-          ...logs,
-          {
-            type: "error",
-            message: `Core module exited unexpectedly with code ${code} before READY`
-          }
-        ]
-      })
-    })
-
-    setTimeout(
+    const startupTimer = setTimeout(
       () => {
-        if (coreModule?.killed || started) {
-          return
-        }
-
-        console.error(`[CORE] Took too long to start`)
-
+        if (coreOutput.settled) return
         Sentry.captureException(new Error("Core module took too long to start"))
-
-        resolve({
-          type: "error",
-          logs
-        })
+        coreOutput.fail("Core module took too long to start")
       },
       60 * 5 * 1000
     )
+    coreModule.on("error", (err) => coreOutput.fail(String(err)))
+    coreModule.stdout.on("data", (data) => coreOutput.push(data))
+    coreModule.stdout.on("end", () => coreOutput.end())
+    coreModule.stderr.on("data", (data) => {
+      coreOutput.stderr(data.toString())
+      console.error(`[CORE] Error: ${data.toString()}`)
+    })
+    coreModule.on("exit", (code) => {
+      const keptAlive = lifecycle.endCore(identitySession)
+      coreOutput.end()
+      coreProcessHandle = null
+      coreOutput.fail(
+        `Core module exited unexpectedly with code ${code} before READY`
+      )
+      if (keptAlive) quitAfterCoreExit()
+    })
   })
+}
 
 const coreModule = loadCoreModule()
 
@@ -821,22 +634,9 @@ let adSizeFallbackTimeout: NodeJS.Timeout | null = null
 
 let isSpawningWindow = false
 
-// Queue for protocol URLs received before window is ready
-let pendingProtocolUrl: string | null = null
-
-// Helper to check if a URL is a supported protocol
-const isSupportedProtocol = (url: string) =>
-  url.startsWith("gdlauncher://") ||
-  url.startsWith("curseforge://") ||
-  url.startsWith("modrinth://")
-
-// On Windows/Linux cold-start, the protocol URL arrives in process.argv.
-// macOS uses `open-url` instead; `second-instance` covers already-running launches.
-const initialProtocolUrl = process.argv.find(isSupportedProtocol)
-if (initialProtocolUrl) {
-  console.log("Protocol URL received via process.argv:", initialProtocolUrl)
-  pendingProtocolUrl = initialProtocolUrl
-}
+// Every ingress is queued even while the loading window exists.
+for (const url of process.argv.filter(isSupportedProtocol))
+  protocolQueue.enqueue(url)
 
 async function createWindow(): Promise<BrowserWindow> {
   console.log("Creating window...")
@@ -845,17 +645,32 @@ async function createWindow(): Promise<BrowserWindow> {
     return win!
   }
 
-  isSpawningWindow = true
+  // A live window is reused rather than replaced. A destroyed one is only a
+  // stale handle: close() and nearly every other method throw on it, so it is
+  // dropped without being touched.
+  if (win && !win.isDestroyed()) {
+    if (win.isMinimized()) win.restore()
+    win.focus()
+    return win
+  }
+  win = null
 
+  isSpawningWindow = true
+  try {
+    return spawnWindow()
+  } catch (error) {
+    // Not `finally`: on success the flag must stay set until 'ready-to-show'.
+    // On failure that event never comes, and a stuck flag would block every
+    // later window and the quit.
+    isSpawningWindow = false
+    throw error
+  }
+}
+
+function spawnWindow(): BrowserWindow {
   const currentDisplay = screen.getPrimaryDisplay()
   lastDisplay = currentDisplay
   const { minWidth, minHeight, height, width } = getAdSize(currentDisplay)
-
-  if (!win || win.isDestroyed()) {
-    win?.close()
-    win?.destroy()
-    win = null
-  }
 
   win = new BrowserWindow({
     title: "GDLauncher Carbon",
@@ -877,14 +692,42 @@ async function createWindow(): Promise<BrowserWindow> {
     }
   })
 
-  win.on("closed", () => {
-    win = null
-    pendingDisplayChange = false
-
-    if (adSizeFallbackTimeout) {
-      clearTimeout(adSizeFallbackTimeout)
-      adSizeFallbackTimeout = null
-    }
+  const createdWindow = win
+  // Captured now: once the window is destroyed (already the case when
+  // 'closed' fires), its webContents getter throws "Object has been destroyed".
+  const contents = createdWindow.webContents
+  protocolQueue.bind(contents)
+  // A reload or renderer crash replaces the App, taking its protocol
+  // subscription and close-warning acknowledgement with it; the next App
+  // gives both again once it mounts. 'did-navigate' fires only when a
+  // main-frame, cross-document navigation commits. Not 'did-start-navigation':
+  // that also fires for every link click will-navigate below cancels, which
+  // the App survives without subscribing again, so every later deep link
+  // would wait in the queue until a restart.
+  const documentReplaced = () => {
+    protocolQueue.revoke(contents)
+    lifecycle.warningReceiver(contents, false)
+    shutdownPrompts.receiver(contents, false)
+  }
+  contents.on("did-navigate", documentReplaced)
+  contents.on("render-process-gone", documentReplaced)
+  createdWindow.on("closed", () => {
+    shutdownPrompts.receiver(contents, false)
+    mainWindowClosed(createdWindow, contents, {
+      current: () => win,
+      release: () => {
+        // 'ready-to-show' never fires for a window closed before it, and a
+        // stuck flag would block every later window and the quit.
+        isSpawningWindow = false
+        pendingDisplayChange = false
+        if (adSizeFallbackTimeout) {
+          clearTimeout(adSizeFallbackTimeout)
+          adSizeFallbackTimeout = null
+        }
+      },
+      lifecycle,
+      protocol: protocolQueue
+    })
   })
 
   const applyAdLayoutForCurrentDisplay = () => {
@@ -980,16 +823,35 @@ async function createWindow(): Promise<BrowserWindow> {
     }
   })
 
-  win.on("close", (e) => {
-    if (!isGameRunning) {
+  createdWindow.on("close", (e) => {
+    lifecycle.close(createdWindow, e, showAppCloseWarning)
+    if (e.defaultPrevented || shutdownApproved) return
+    // A prompt about a quit, restart or update is waiting for an answer.
+    if (shutdownPrompts.open) {
+      e.preventDefault()
       return
     }
-
-    if (showAppCloseWarning) {
+    // Closing the last window quits. It is hidden rather than destroyed, so
+    // a quit that cannot finish has a window to say why in and to come back
+    // to. A move keeps its own close handling (quitUnlessKeptAlive).
+    if (
+      !runtimeOperationActive() &&
+      lifecycle.quitsOnClose(
+        createdWindow,
+        e,
+        userWindows(BrowserWindow.getAllWindows(), win).filter(
+          (w) => w !== createdWindow
+        ).length
+      )
+    ) {
       e.preventDefault()
-      win?.webContents.send("showAppCloseWarning")
+      createdWindow.hide()
+      app.quit()
     }
   })
+  contents.on("will-prevent-unload", () =>
+    lifecycle.cancelLaunchClose(createdWindow)
+  )
 
   win.webContents.on("will-navigate", (e, url) => {
     if (win && !win.isDestroyed() && url !== win.webContents.getURL()) {
@@ -1036,16 +898,6 @@ async function createWindow(): Promise<BrowserWindow> {
   win.on("ready-to-show", () => {
     isSpawningWindow = false
     console.log("Window is ready to show")
-
-    // Send any pending protocol URL that was received before window was ready
-    if (pendingProtocolUrl) {
-      console.log("Sending pending protocol URL:", pendingProtocolUrl)
-      // Small delay to ensure renderer is fully initialized
-      setTimeout(() => {
-        win?.webContents.send("protocol-url", pendingProtocolUrl)
-        pendingProtocolUrl = null
-      }, 500)
-    }
 
     if (import.meta.env.DEV && !__SHOWCASE_MODE__) {
       win?.webContents.openDevTools()
@@ -1122,62 +974,32 @@ ipcMain.handle(
   "restoreDbSnapshotAndRestart",
   async (_event, snapshotPath: string) =>
     withRuntimeOperation(async () => {
-      console.log(`restoring database from snapshot ${snapshotPath}...`)
-
-      // Kill the core FIRST so the database file is not held open while we
-      // overwrite it (same Windows open-file constraint as the reset path). This
-      // also covers a startup that hung before READY.
-      await killCoreProcess()
-
-      const dbPath = path.join(CURRENT_RUNTIME_PATH!, "gdl_conf.db")
-
-      // Only the core-emitted pre-downgrade snapshot beside the database may be
-      // restored. Reject any other path so a compromised renderer cannot copy an
-      // arbitrary file over the database.
-      const expectedSnapshot = path.join(
-        CURRENT_RUNTIME_PATH!,
-        "gdl_conf.pre-downgrade.db"
-      )
-      if (path.resolve(snapshotPath) !== path.resolve(expectedSnapshot)) {
-        console.error(
-          `refusing to restore from unexpected snapshot path: ${snapshotPath}`
-        )
-        return
-      }
-
-      const tmpPath = `${dbPath}.restore-tmp`
-      try {
-        // Copy to a sibling temp file, then atomically rename it over the
-        // database. A crash or error mid-copy then leaves the original database
-        // intact rather than a half-written one whose sidecars we're about to
-        // drop below.
-        await fs.copyFile(snapshotPath, tmpPath)
-        await fs.rename(tmpPath, dbPath)
-        console.log("snapshot restored over gdl_conf.db")
-      } catch (e) {
-        console.error("failed to restore snapshot:", e)
-        try {
-          await fs.unlink(tmpPath)
-        } catch {
-          // best effort — the temp file may not have been created
+      return restoreDatabaseSnapshot(CURRENT_RUNTIME_PATH!, snapshotPath, {
+        stopCore: async () => {
+          const core = await coreModule
+          if (core.type === "success")
+            await stopCoreForShutdown(
+              { ...core.result, process: coreProcessHandle },
+              "quit"
+            )
+          else if (coreProcessHandle)
+            await terminateAndObserveCoreExit(coreProcessHandle)
+        },
+        restart: async (recoveryPath) => {
+          await dialog.showMessageBox({
+            type: "info",
+            title: "Database snapshot restored",
+            message:
+              "The previous database is restored. Original database files have been retained.",
+            detail: `Recovery files: ${recoveryPath}\nKeep these files until the restored launcher is working.`,
+            buttons: ["Restart"],
+            defaultId: 0,
+            noLink: true
+          })
+          app.relaunch()
+          app.exit()
         }
-        // Leave the existing database and its sidecars untouched rather than
-        // relaunching onto a half-restored file.
-        return
-      }
-
-      // Drop the WAL/SHM sidecars so the restored file is opened as-is rather
-      // than replayed against the pre-restore log.
-      for (const suffix of ["-wal", "-shm"]) {
-        try {
-          await fs.unlink(`${dbPath}${suffix}`)
-        } catch {
-          // File might not exist, that's ok
-        }
-      }
-
-      app.relaunch()
-      app.exit()
+      })
     })
 )
 
@@ -1247,10 +1069,7 @@ ipcMain.handle("isCMPWindowAvailable", async () => {
   return !!app.overwolf?.openCMPWindow
 })
 
-ipcMain.handle("closeWindow", async () => {
-  win?.close()
-  win?.destroy()
-})
+ipcMain.handle("closeWindow", async () => lifecycle.confirmQuit())
 
 ipcMain.handle("getUserData", async () => {
   return app.getPath("userData")
@@ -1433,34 +1252,18 @@ app.whenReady().then(async () => {
   session.defaultSession.webRequest.onHeadersReceived(handleHeadersReceived)
 
   app.on("second-instance", (_e, argv) => {
-    // Handle protocol URLs on Windows (passed as command line arguments)
-    const protocolUrl = argv.find((arg) => isSupportedProtocol(arg))
-
+    for (const url of argv.filter(isSupportedProtocol))
+      protocolQueue.enqueue(url)
     if (win && !win.isDestroyed()) {
-      // Focus on the main window if the user tried to open another
       if (win.isMinimized()) win.restore()
       win.focus()
-
-      // Forward protocol URL if present
-      if (protocolUrl) {
-        console.log("Protocol URL received via second-instance:", protocolUrl)
-        win.webContents.send("protocol-url", protocolUrl)
-      }
-    } else {
-      // Store URL and create window
-      if (protocolUrl) {
-        pendingProtocolUrl = protocolUrl
-      }
-      createWindow()
-    }
+    } else createWindow()
   })
 
   // During a quit that is still finishing, the hidden window comes back
   // with its prompt instead of a second window being created.
   app.on("activate", () => {
-    if (!win || win.isDestroyed()) {
-      createWindow()
-    }
+    if (shutdownInFlight || !win || win.isDestroyed()) revealWindow()
   })
 
   await createWindow()
@@ -1529,6 +1332,7 @@ async function prepareOwnedShutdown(purpose: "quit" | "update"): Promise<void> {
         purpose
       )
     shutdownApproved = true
+    lifecycle.approveQuit()
   })()
   shutdownFlow = flow
   shutdownInFlight = run
@@ -1540,10 +1344,53 @@ async function prepareOwnedShutdown(purpose: "quit" | "update"): Promise<void> {
   void run.then(done, done)
   return run
 }
-app.on("window-all-closed", () => {
-  if (runtimeOperationActive() || isSpawningWindow) return
+/** A quit or window close ended a move before the core was stopped. */
+function closedBeforeMove() {
+  return new Error(
+    "GDLauncher was closed before the move started; nothing was moved"
+  )
+}
+/** Quits once no window is left, unless something still needs the launcher
+ *  without one. */
+function quitUnlessKeptAlive() {
+  if (runtimeOperationActive()) {
+    // No window shows the operation any more. A move that has not stopped
+    // the core yet ends here with nothing moved; anything further along
+    // finishes first. Either way the launcher then quits instead of staying
+    // on without a window.
+    interruptRuntimeOperation(closedBeforeMove())
+    whenRuntimeOperationIdle(quitIfStillWindowless)
+    return
+  }
+  if (isSpawningWindow || lifecycle.keepAliveWithoutWindows()) return
   app.quit()
-})
+}
+function quitIfStillWindowless() {
+  if (userWindows(BrowserWindow.getAllWindows(), win).length === 0)
+    quitUnlessKeptAlive()
+}
+function quitAgain() {
+  app.quit()
+}
+app.on("window-all-closed", quitUnlessKeptAlive)
+/**
+ * The core exited while its Close Window games kept the launcher from
+ * quitting once windowless, so it could reopen when they exit. A dead core
+ * cannot report that, so a launcher without a window would stay invisible
+ * for good: take the quit decision 'window-all-closed' deferred. It quits
+ * only when no window is left (a relaunch during the game may have opened
+ * one) and no quit, restart or update is already under way. The games keep
+ * running, and the next launch starts a fresh core that adopts them.
+ */
+function quitAfterCoreExit() {
+  if (
+    shutdownApproved ||
+    shutdownInFlight ||
+    userWindows(BrowserWindow.getAllWindows(), win).length > 0
+  )
+    return
+  quitUnlessKeptAlive()
+}
 app.on("before-quit", (event) => {
   if (shutdownApproved) return
   event.preventDefault()
@@ -1551,6 +1398,7 @@ app.on("before-quit", (event) => {
   void prepareOwnedShutdown("quit")
     .then(() => app.quit())
     .catch(async (error) => {
+      lifecycle.quitFailed()
       await dialog.showMessageBox({
         type: "error",
         title: "Shutdown incomplete",
@@ -1569,23 +1417,11 @@ app.on("render-process-gone", (event, webContents, detailed) => {
 // as 'second-instance' does, instead of reaching a hidden window or a new one
 // the quit then closes.
 app.on("open-url", (event, url) => {
-  console.log("Protocol URL received:", url)
-
-  // Handle gdlauncher://, curseforge://, and modrinth:// protocol URLs
-  if (isSupportedProtocol(url)) {
-    event.preventDefault()
-
-    // Focus the window if minimized
-    if (win && !win.isDestroyed()) {
-      if (win.isMinimized()) win.restore()
-      win.focus()
-
-      // Forward the protocol URL to the renderer process
-      win.webContents.send("protocol-url", url)
-    } else {
-      // Window not ready yet, store the URL for later
-      console.log("Window not ready, storing protocol URL for later")
-      pendingProtocolUrl = url
-    }
-  }
+  if (!isSupportedProtocol(url)) return
+  event.preventDefault()
+  protocolQueue.enqueue(url)
+  if (win && !win.isDestroyed()) {
+    if (win.isMinimized()) win.restore()
+    win.focus()
+  } else if (app.isReady()) createWindow()
 })

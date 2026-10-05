@@ -118,6 +118,29 @@ export function showPendingUpdateToast() {
 
 let isShowingDownloadToast = false
 
+async function restartAfterFailedInstall() {
+  try {
+    await window.relaunch()
+  } catch (error) {
+    console.error("Restart after a failed update install failed:", error)
+    toast.error(i18n.t("settings:_trn_restart_failed"))
+  }
+}
+/** The core was stopped for an install that did not go through and nothing
+ *  starts it again, so the launcher cannot be used until it restarts. */
+function showRestartRequired() {
+  toast.error(i18n.t("app:_trn_update_failed"), {
+    id: TOAST_ID_CHECKING,
+    description: t("app:_trn_update_restart_required_description"),
+    duration: Infinity,
+    closeButton: true,
+    action: {
+      label: i18n.t("settings:_trn_restart_app"),
+      onClick: restartAfterFailedInstall
+    }
+  })
+}
+
 function DownloadProgress() {
   return (
     <div class="flex flex-col gap-2 w-full">
@@ -132,12 +155,35 @@ function DownloadProgress() {
 let lastChannel: FEReleaseChannel | null = null
 let updateCheckInterval: ReturnType<typeof setInterval> | null = null
 
-;(async () => {
-  const os = await window.getCurrentOS()
-  setSupportsAutoUpdate(os.supportsAutoUpdate)
+const updateCapability = (async () => {
+  try {
+    const os = await window.getCurrentOS()
+    setSupportsAutoUpdate(os.supportsAutoUpdate)
+  } catch {
+    setSupportsAutoUpdate(false)
+  }
 })()
 
-window.onUpdateStateChanged((_, stateData) => {
+let lastUpdateRevision = -1
+const receiveUpdateState = (
+  stateData: import("../../../main/utils/updateState").UpdateStateData
+) => {
+  if (
+    !Number.isSafeInteger(stateData.revision) ||
+    stateData.revision <= lastUpdateRevision
+  )
+    return
+  lastUpdateRevision = stateData.revision
+  if (
+    !["downloading", "downloaded", "manual-update"].includes(stateData.state)
+  ) {
+    setHasPendingUpdate(false)
+    setPendingUpdateVersion(null)
+    setDownloadingVersion("...")
+    setDownloadProgress(0)
+    toast.dismiss(TOAST_ID_DOWNLOADING)
+    toast.dismiss(TOAST_ID_MANUAL_UPDATE)
+  }
   switch (stateData.state) {
     case "idle":
       setIsCheckingForUpdates(false)
@@ -168,15 +214,18 @@ window.onUpdateStateChanged((_, stateData) => {
       setDownloadProgress(0)
       break
 
+    case "manual-update":
     case "downloading": {
       setIsCheckingForUpdates(false)
-      toast.dismiss(TOAST_ID_CHECKING)
+      // A restart notice stays: a later download does not bring the core back.
+      if (!stateData.restartRequired) toast.dismiss(TOAST_ID_CHECKING)
+      setIsManualCheck(false)
 
       const version = stateData.updateInfo?.version || "..."
       setDownloadingVersion(version)
       setDownloadProgress(stateData.progress)
 
-      if (supportsAutoUpdate()) {
+      if (stateData.state === "downloading" && supportsAutoUpdate()) {
         // Add class to suppress animation on updates (not initial creation)
         const isUpdate = isShowingDownloadToast
         isShowingDownloadToast = true
@@ -190,7 +239,7 @@ window.onUpdateStateChanged((_, stateData) => {
           closeButton: false,
           className: isUpdate ? "toast-no-animate" : undefined
         })
-      } else if (stateData.updateInfo && !isShowingDownloadToast) {
+      } else if (stateData.updateInfo?.downloadUrl && !isShowingDownloadToast) {
         // For builds without auto-update, show manual download link
         isShowingDownloadToast = true
         toast(<ManualUpdateTitle />, {
@@ -202,7 +251,7 @@ window.onUpdateStateChanged((_, stateData) => {
             onClick: async () => {
               try {
                 await navigator.clipboard.writeText(
-                  stateData.updateInfo!.downloadUrl
+                  stateData.updateInfo!.downloadUrl!
                 )
                 toast.success(i18n.t("app:_trn_update_link_copied"), {
                   duration: 3000
@@ -224,7 +273,7 @@ window.onUpdateStateChanged((_, stateData) => {
     }
 
     case "downloaded":
-      toast.dismiss(TOAST_ID_CHECKING)
+      if (!stateData.restartRequired) toast.dismiss(TOAST_ID_CHECKING)
       setIsCheckingForUpdates(false)
       isShowingDownloadToast = false
 
@@ -236,11 +285,16 @@ window.onUpdateStateChanged((_, stateData) => {
       }
       break
 
+    case "unsupported":
     case "error":
       setIsCheckingForUpdates(false)
       isShowingDownloadToast = false
       setIsManualCheck(false)
 
+      if (stateData.restartRequired) {
+        showRestartRequired()
+        break
+      }
       toast.error(i18n.t("app:_trn_update_failed"), {
         id: TOAST_ID_CHECKING,
         description:
@@ -250,7 +304,16 @@ window.onUpdateStateChanged((_, stateData) => {
       })
       break
   }
+}
+window.onUpdateStateChanged((_, stateData) => {
+  void updateCapability.then(() => receiveUpdateState(stateData))
 })
+void updateCapability
+  .then(() => window.getUpdateState())
+  .then((state) => {
+    if (state) receiveUpdateState(state)
+  })
+  .catch(() => {})
 
 export const checkForUpdates = async () => {
   const settings = rspc.createQuery(() => ({
@@ -310,6 +373,7 @@ export const manualCheckForUpdates = async (
       showPendingUpdateToast()
       return
     }
+    if (currentState?.restartRequired) return
   } catch (error) {
     console.error("Failed to get update state:", error)
   }
@@ -325,6 +389,16 @@ export const manualCheckForUpdates = async (
 
   try {
     const result = await window.checkForUpdates(releaseChannel)
+
+    if (
+      result &&
+      ["unsupported", "manual-update", "no-update", "error"].includes(
+        result.status
+      )
+    ) {
+      receiveUpdateState(result.currentState)
+      return
+    }
 
     if (result?.status === "busy") {
       setIsManualCheck(false)

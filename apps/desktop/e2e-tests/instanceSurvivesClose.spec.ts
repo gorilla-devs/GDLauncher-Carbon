@@ -44,6 +44,7 @@ import { expect, test } from "@playwright/test"
 import type { ElectronApplication, Page } from "playwright"
 import {
   attachCoreLogOnFailure,
+  electronProcess,
   isCoreModulePresent,
   launchApp,
   quitLauncherMidGame,
@@ -208,7 +209,7 @@ test.describe("running game outlives the launcher", () => {
       if (current) {
         // `app.close()` never returns while the app still owns a running
         // game, and bounding it alone leaves a launcher the next spec trips on.
-        const electronPid = current.app.process().pid
+        const electronPid = electronProcess(current.app).pid
         await Promise.race([
           current.app.close().catch(() => {}),
           new Promise((resolve) => setTimeout(resolve, 15_000))

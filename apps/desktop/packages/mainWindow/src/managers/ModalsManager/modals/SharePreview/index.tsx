@@ -16,7 +16,7 @@ function SharePreview(props: ModalProps) {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
-      <div class="w-140 flex flex-col gap-4">
+      <div class="w-140 flex flex-col gap-4" data-testid="share-preview">
         <SharePreviewContent
           shareCode={data()?.shareCode || ""}
           onImportSuccess={() => {

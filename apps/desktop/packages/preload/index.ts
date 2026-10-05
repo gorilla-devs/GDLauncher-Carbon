@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron"
+import { subscribeProtocol } from "./protocolBridge"
+import { subscribeCloseWarning } from "./closeWarningBridge"
 
 import "./loading"
 import "./core_module_loader"
@@ -24,8 +26,8 @@ if (isDev || skipIntroAnimation) {
   )
 }
 
-contextBridge.exposeInMainWorld("onShowWindowCloseModal", async (cb: any) =>
-  ipcRenderer.on("showAppCloseWarning", cb)
+contextBridge.exposeInMainWorld("onShowWindowCloseModal", (cb: () => void) =>
+  subscribeCloseWarning(ipcRenderer, cb)
 )
 
 contextBridge.exposeInMainWorld("closeWindow", async () =>
@@ -55,9 +57,6 @@ contextBridge.exposeInMainWorld(
 )
 
 // Protocol URL handler (curseforge://, modrinth://, gdlauncher://)
-contextBridge.exposeInMainWorld(
-  "onProtocolUrl",
-  (cb: (url: string) => void) => {
-    ipcRenderer.on("protocol-url", (_event, url) => cb(url))
-  }
+contextBridge.exposeInMainWorld("onProtocolUrl", (cb: (url: string) => void) =>
+  subscribeProtocol(ipcRenderer, cb)
 )

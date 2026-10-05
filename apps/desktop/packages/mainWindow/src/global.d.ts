@@ -1,27 +1,11 @@
 import type { FEReleaseChannel } from "@gd/core_module/bindings"
 import { BoundsSize } from "./utils/adhelper"
-import type { UpdateInfo } from "electron-updater"
 import type { Log } from "../../main/coreModule"
 
-type UpdateState =
-  | "idle"
-  | "checking"
-  | "downloading"
-  | "downloaded"
-  | "error"
-  | "no-update"
-
-interface UpdateStateData {
-  state: UpdateState
-  updateInfo: (UpdateInfo & { downloadUrl: string }) | null
-  progress: number
-  error: { message: string; details: string } | null
-}
-
-interface CheckForUpdatesResult {
-  status: "checking" | "busy" | "snapshot-version"
-  currentState: UpdateStateData
-}
+import type {
+  UpdateStateData,
+  CheckForUpdatesResult
+} from "../../main/utils/updateState"
 
 declare global {
   interface Window {
@@ -102,7 +86,7 @@ declare global {
       cb: (event: Electron.IpcRendererEvent, progress: number) => void
     ) => void
     getCurrentProgress: () => Promise<number | null>
-    onProtocolUrl: (cb: (url: string) => void) => void
+    onProtocolUrl: (cb: (url: string) => void) => () => void
   }
 }
 

@@ -11,7 +11,7 @@ import initThemes from "./utils/theme"
 import { rspc } from "@/utils/rspcClient"
 import { useModal } from "./managers/ModalsManager"
 import { useGDNavigate } from "./managers/NavigationManager"
-import { parseSearchQuery } from "./utils/searchQueryParser"
+import { acceptProtocolUrl } from "./utils/protocolAction"
 import { checkForUpdates } from "./utils/updater"
 import { windowCloseWarningAcquireLock } from "./managers/ModalsManager/modals/WindowCloseWarning"
 import { ACCOUNT_BANNED_EVENT } from "./utils/bannedEventBridge"
@@ -34,13 +34,16 @@ const App = (props: Props) => {
 
   props.createInvalidateQuery()
 
-  window.onShowWindowCloseModal(() => {
+  // While subscribed, main holds a close with a running game open for this
+  // warning; unsubscribing lets the close go ahead instead.
+  const stopCloseWarning = window.onShowWindowCloseModal(() => {
     if (windowCloseWarningAcquireLock) {
       modalsContext?.openModal({
         name: "windowCloseWarning"
       })
     }
   })
+  onCleanup(() => stopCloseWarning?.())
 
   initThemes()
 
@@ -62,20 +65,15 @@ const App = (props: Props) => {
   // sharePreview modal — NavigationManager is above the modal provider and
   // useModal() returns undefined there.
   onMount(() => {
-    window.onProtocolUrl?.((url) => {
-      const parsed = parseSearchQuery(url)
-      if (parsed.mode !== "direct" || parsed.items.length === 0) return
-
-      const firstItem = parsed.items[0]
-      if (firstItem.type === "gdlauncher_share") {
-        modalsContext?.openModal(
-          { name: "sharePreview" },
-          { shareCode: firstItem.shareCode }
-        )
-      } else {
-        navigate.navigate(`/search?q=${encodeURIComponent(url)}`)
-      }
-    })
+    const unsubscribe = window.onProtocolUrl?.((url) =>
+      acceptProtocolUrl(url, {
+        share: (shareCode) => {
+          modalsContext?.openModal({ name: "sharePreview" }, { shareCode })
+        },
+        navigate: (route) => navigate.navigate(route)
+      })
+    )
+    onCleanup(() => unsubscribe?.())
   })
 
   // Every start from the new data folder after a move names what stayed in the old

@@ -177,6 +177,12 @@ export const TEST_IDS = Object.freeze({
   // no side effect beyond a CSS class (no RPC connection attempt, no close
   // dialog to accidentally gate other flows on).
   settingsReducedMotionToggle: "settings-reduced-motion-toggle",
+  // Settings > General's "Launcher Action on Game Launch" dropdown trigger,
+  // and one option in its listbox (on a `<span>` inside `SelectItem`, per
+  // hazard 1, carrying the action as `data-action`). Used by
+  // `gameLaunch.spec.ts` to drive the Close Window launch action.
+  settingsLaunchActionSelect: "settings-launch-action-select",
+  settingsLaunchActionOption: "settings-launch-action-option",
 
   // The confirm control on `WindowCloseWarning`, the modal raised when the
   // launcher is closed while a game is running. Clicking it is the only way
@@ -194,6 +200,12 @@ export const TEST_IDS = Object.freeze({
   // frontend's whole observable answer to "was this instance adopted" — a
   // plain `<div>`, so neither hazard in this file's header applies.
   instanceAdoptedNoLiveLog: "instance-adopted-no-live-log",
+
+  // The body of the share preview modal (`modals/SharePreview/index.tsx`),
+  // which a gdlauncher://share/<code> link opens. Rendered as soon as the
+  // modal opens, before the share itself loads or fails to, so it shows that
+  // the link reached the App. A plain `<div>`, so neither hazard applies.
+  sharePreview: "share-preview",
 
   // The DB recovery ladder (`packages/preload/loading.ts`'s `fatalError`/
   // `backwardsMigrationError`, rendered into `#appFatalCrash` by
@@ -420,6 +432,16 @@ export function byAddonVersionRow(fileId: string): string {
  */
 export function byModpackVersionOption(versionId: string): string {
   return `[data-testid="${TEST_IDS.modpackVersionOption}"][data-version-id="${versionId}"]`
+}
+
+/**
+ * One option in Settings > General's launch-action listbox, located by the
+ * action value ("none", "minimizeWindow", "closeWindow", "hideWindow",
+ * "quitApp"). The listbox must be open — click
+ * `TEST_IDS.settingsLaunchActionSelect` first.
+ */
+export function byLaunchActionOption(action: string): string {
+  return `[data-testid="${TEST_IDS.settingsLaunchActionOption}"][data-action="${action}"]`
 }
 
 /**
