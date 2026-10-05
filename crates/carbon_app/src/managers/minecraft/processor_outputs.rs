@@ -154,28 +154,55 @@ fn is_structurally_complete(path: &Path) -> bool {
     has_zip_end_of_central_directory(path, metadata.len())
 }
 
-/// Scans the tail of `path` for the ZIP end-of-central-directory signature,
-/// which a complete archive always carries within its last 64KiB (22 bytes of
-/// record plus a comment of at most `u16::MAX`).
+/// Parse the complete EOCD (including comments/ZIP64) and every declared
+/// central-directory entry. A signature in partial output is not a directory.
 fn has_zip_end_of_central_directory(path: &Path, len: u64) -> bool {
     use std::io::{Read, Seek, SeekFrom};
-
-    const EOCD_SIGNATURE: [u8; 4] = [0x50, 0x4b, 0x05, 0x06];
-    const MAX_EOCD_SPAN: u64 = 22 + u16::MAX as u64;
-
     let Ok(mut file) = std::fs::File::open(path) else {
         return false;
     };
-    let span = len.min(MAX_EOCD_SPAN);
-    if file.seek(SeekFrom::End(-(span as i64))).is_err() {
+    let tail_len = len.min(22 + u16::MAX as u64);
+    if file.seek(SeekFrom::End(-(tail_len as i64))).is_err() {
         return false;
     }
-    let mut tail = Vec::with_capacity(span as usize);
-    if file.take(span).read_to_end(&mut tail).is_err() {
+    let mut tail = vec![0; tail_len as usize];
+    if file.read_exact(&mut tail).is_err() {
         return false;
     }
-    tail.windows(EOCD_SIGNATURE.len())
-        .any(|w| w == EOCD_SIGNATURE)
+    let Some(end) = (0..tail.len().saturating_sub(21)).rev().find(|&i| {
+        tail[i..].starts_with(b"PK\x05\x06")
+            && i + 22 + u16::from_le_bytes([tail[i + 20], tail[i + 21]]) as usize == tail.len()
+    }) else {
+        return false;
+    };
+    let end_offset = len - tail_len + end as u64;
+    let size = u32::from_le_bytes(tail[end + 12..end + 16].try_into().unwrap());
+    let offset = u32::from_le_bytes(tail[end + 16..end + 20].try_into().unwrap());
+    // ZIP64's complete locator/directory are parsed by zip below. Ordinary
+    // directory bounds must also fit: zip accepts some impossible empty offsets.
+    if size != u32::MAX && offset != u32::MAX && u64::from(size) + u64::from(offset) > end_offset {
+        return false;
+    }
+    let Ok(mut archive) = zip::ZipArchive::new(file) else {
+        return false;
+    };
+    let directory = archive.central_directory_start();
+    if directory > end_offset {
+        return false;
+    }
+    for index in 0..archive.len() {
+        let Ok(entry) = archive.by_index_raw(index) else {
+            return false;
+        };
+        if entry
+            .data_start()
+            .checked_add(entry.compressed_size())
+            .is_none_or(|end| end > directory)
+        {
+            return false;
+        }
+    }
+    true
 }
 
 /// Returns the required files that are not on disk. With `verify_hashes`
@@ -185,8 +212,17 @@ fn has_zip_end_of_central_directory(path: &Path, len: u64) -> bool {
 /// differently across environments (e.g. zlib-ng native compression), so
 /// hash mismatches are only acted on in the explicit repair flow.
 pub async fn missing_files(required: &[RequiredFile], verify_hashes: bool) -> Vec<PathBuf> {
+    missing_files_reserved(required, verify_hashes, None).await
+}
+
+pub async fn missing_files_reserved(
+    required: &[RequiredFile],
+    verify_hashes: bool,
+    reservation: Option<std::sync::Arc<tokio::sync::OwnedSemaphorePermit>>,
+) -> Vec<PathBuf> {
     let owned = required.to_vec();
     let handle = tokio::task::spawn_blocking(move || {
+        let _reservation = reservation;
         let mut missing = Vec::new();
         for file in &owned {
             if !file.path.is_file() {
@@ -729,6 +765,148 @@ mod tests {
              required_files_matches_committed_golden, review the diff, update \
              apps/desktop/e2e-tests/helpers/processorOutputs.test.ts's port to \
              match, and commit both together."
+        );
+    }
+}
+
+#[cfg(test)]
+mod task18_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task18_processor_zip_rejects_incomplete_records_and_directories() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("processor.jar");
+        let mut eocd = vec![0; 22];
+        eocd[..4].copy_from_slice(b"PK\x05\x06");
+        let mut invalid: Vec<Vec<u8>> = (4..22).map(|len| eocd[..len].to_vec()).collect();
+        let mut comment = eocd.clone();
+        comment[20] = 8;
+        invalid.push(comment);
+        let mut directory = eocd.clone();
+        directory[8] = 1;
+        directory[10] = 1;
+        directory[12] = 46;
+        invalid.push(directory);
+        for (case, bytes) in invalid.iter().enumerate() {
+            std::fs::write(&path, bytes).unwrap();
+            for deep in [false, true] {
+                let missing = missing_files(
+                    &[RequiredFile {
+                        path: path.clone(),
+                        expected_sha1: None,
+                    }],
+                    deep,
+                )
+                .await;
+                assert_eq!(
+                    missing,
+                    vec![path.clone()],
+                    "incomplete ZIP case {case}, deep={deep}"
+                );
+                assert_eq!(
+                    std::fs::read(&path).unwrap(),
+                    *bytes,
+                    "structure check must retain inputs"
+                );
+            }
+        }
+    }
+    #[tokio::test]
+    async fn task18_processor_zip_rejects_out_of_bounds_directory() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("bounds.jar");
+        for field in [12, 16] {
+            let mut eocd = vec![0; 22];
+            eocd[..4].copy_from_slice(b"PK\x05\x06");
+            eocd[field..field + 4].copy_from_slice(&4000u32.to_le_bytes());
+            std::fs::write(&path, eocd).unwrap();
+            assert_eq!(
+                missing_files(
+                    &[RequiredFile {
+                        path: path.clone(),
+                        expected_sha1: None
+                    }],
+                    false
+                )
+                .await,
+                vec![path.clone()],
+                "EOCD field {field} must fit actual file"
+            );
+        }
+    }
+    #[tokio::test]
+    async fn task18_processor_zip_accepts_empty_and_comment_signature() {
+        let root = tempfile::tempdir().unwrap();
+        for comment in [b"".as_slice(), b"comment PK\x05\x06 trailing".as_slice()] {
+            let path = root.path().join("valid.zip");
+            let mut eocd = vec![0; 22];
+            eocd[..4].copy_from_slice(b"PK\x05\x06");
+            eocd[20..22].copy_from_slice(&(comment.len() as u16).to_le_bytes());
+            eocd.extend_from_slice(comment);
+            std::fs::write(&path, eocd).unwrap();
+            assert!(
+                missing_files(
+                    &[RequiredFile {
+                        path,
+                        expected_sha1: None
+                    }],
+                    false
+                )
+                .await
+                .is_empty()
+            );
+        }
+    }
+    #[tokio::test]
+    async fn task18_processor_zip_accepts_regular_and_zip64_empty_controls() {
+        use std::io::Write;
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("regular.jar");
+        let mut writer = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+        writer
+            .start_file(
+                "nested/data",
+                zip::write::SimpleFileOptions::default().large_file(true),
+            )
+            .unwrap();
+        writer.write_all(b"actual data").unwrap();
+        writer.finish().unwrap();
+        assert!(
+            missing_files(
+                &[RequiredFile {
+                    path: path.clone(),
+                    expected_sha1: None
+                }],
+                false
+            )
+            .await
+            .is_empty()
+        );
+        let mut bytes = vec![0; 56];
+        bytes[..4].copy_from_slice(b"PK\x06\x06");
+        bytes[4..12].copy_from_slice(&44u64.to_le_bytes());
+        bytes[12..14].copy_from_slice(&45u16.to_le_bytes());
+        bytes[14..16].copy_from_slice(&45u16.to_le_bytes());
+        bytes.extend_from_slice(b"PK\x06\x07");
+        bytes.extend_from_slice(&0u32.to_le_bytes());
+        bytes.extend_from_slice(&0u64.to_le_bytes());
+        bytes.extend_from_slice(&1u32.to_le_bytes());
+        let mut eocd = vec![0; 22];
+        eocd[..4].copy_from_slice(b"PK\x05\x06");
+        eocd[8..20].fill(255);
+        bytes.extend_from_slice(&eocd);
+        std::fs::write(&path, bytes).unwrap();
+        assert!(
+            missing_files(
+                &[RequiredFile {
+                    path,
+                    expected_sha1: None
+                }],
+                false
+            )
+            .await
+            .is_empty(),
+            "complete ZIP64 empty directory is usable"
         );
     }
 }

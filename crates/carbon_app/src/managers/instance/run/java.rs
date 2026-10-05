@@ -62,6 +62,7 @@ pub async fn check_and_install(
     auto_manage_java_system_profiles: bool,
     log: Option<&watch::Sender<GameLog>>,
     mut file: Option<&mut File>,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<JavaComponent> {
     let java_profile = daedalus::minecraft::MinecraftJavaProfile::try_from(
         version_info
@@ -113,7 +114,7 @@ pub async fn check_and_install(
                     trace!("Java path override: {:?}", value);
                     Some(
                         RealJavaChecker::get_bin_info(
-                            &RealJavaChecker,
+                            &RealJavaChecker::new(app.runtime_lifecycle.clone()),
                             &PathBuf::from(value),
                             JavaComponentType::Custom,
                         )
@@ -193,11 +194,11 @@ pub async fn check_and_install(
             java_component_override?
         } else {
             let instance_manager = app.instance_manager();
-            let _guard = instance_manager
-                .persistence_manager
-                .java_check_lock
-                .lock()
-                .await;
+            let _guard = tokio::select! {
+                biased;
+                _ = cancel.cancelled() => anyhow::bail!("Java preparation cancelled while queued"),
+                guard = instance_manager.persistence_manager.java_check_lock.lock() => guard,
+            };
 
             let usable_java = app
                 .java_manager()
@@ -263,11 +264,11 @@ pub async fn check_and_install(
                             true,
                             Some(progress_watch_tx),
                         )
-                        .await?;
+                        .await;
 
                     completion.await?;
 
-                    match path {
+                    match path? {
                         Some(path) => path,
                         None => bail!("No usable java found after installation attempt"),
                     }

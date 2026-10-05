@@ -242,6 +242,7 @@ type ProgressCallback<'a> = Box<dyn Fn(u32, u32) + Send + Sync + 'a>;
 #[cfg_attr(clippy, allow(clippy::too_many_arguments))]
 pub async fn execute_processors<'callback>(
     lifecycle: &std::sync::Arc<crate::managers::runtime_lifecycle::RuntimeLifecycle>,
+    reservation: std::sync::Arc<tokio::sync::OwnedSemaphorePermit>,
     processors: &Vec<Processor>,
     data: &HashMap<String, SidedDataEntry>,
     java_binary: PathBuf,
@@ -297,13 +298,15 @@ pub async fn execute_processors<'callback>(
             })?;
         let arguments = get_processor_arguments(&libraries_path.to_path(), &processor.args, &data)?;
 
-        let child = crate::managers::runtime_lifecycle::tracked_output(
+        let child = crate::managers::runtime_lifecycle::tracked_output_reserved(
             lifecycle,
             Command::new(java_binary.to_string_lossy().to_string())
                 .arg("-cp")
                 .arg(classpath)
                 .arg(main_class)
                 .args(arguments),
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
+            Some(reservation.clone()),
         )
         .await
         .map_err(|err| anyhow::anyhow!("Could not execute processor {}: {}", processor.jar, err))?;

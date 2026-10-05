@@ -158,7 +158,9 @@ pub async fn download_mrpack(
     mrpack_file: &VersionFile,
     target_path: &Path,
     progress_percentage_sender: tokio::sync::watch::Sender<UpdateValue<(u64, u64)>>,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<()> {
+    anyhow::ensure!(!cancel.is_cancelled(), "Archive download cancelled");
     let _pack_download_url = mrpack_file.url.clone();
 
     // generate uuid
@@ -181,7 +183,7 @@ pub async fn download_mrpack(
     let (download_progress_sender, mut download_progress_recv) =
         tokio::sync::watch::channel(Progress::new());
 
-    tokio::spawn(async move {
+    let progress_task = tokio::spawn(async move {
         while download_progress_recv.borrow_mut().changed().await.is_ok() {
             let p = download_progress_recv.borrow();
             progress_percentage_sender
@@ -191,12 +193,9 @@ pub async fn download_mrpack(
         Ok::<_, anyhow::Error>(progress_percentage_sender)
     });
 
-    carbon_net::download_multiple(
+    let result = carbon_net::download_multiple(
         &[file_downloadable],
-        DownloadOptions::builder()
-            .concurrency(1)
-            .progress_sender(download_progress_sender)
-            .build(),
+        operation_download_options(cancel, download_progress_sender),
     )
     .await
     .with_context(|| {
@@ -204,7 +203,11 @@ pub async fn download_mrpack(
             "Failed to download modrinth modpack from url: {}",
             mrpack_file.url
         )
-    })?;
+    });
+    let progress_result = progress_task.await;
+    result?;
+    progress_result??;
+    anyhow::ensure!(!cancel.is_cancelled(), "Archive publication cancelled");
 
     file.try_rename_or_move(target_path).await?;
     Ok(())
@@ -219,20 +222,43 @@ pub async fn prepare_modpack_from_mrpack(
     packinfo: Option<&PackInfo>,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
+    prepare_modpack_from_mrpack_cancellable(
+        app,
+        mrpack_path,
+        instance_path,
+        skip_overlays,
+        packinfo,
+        progress_percentage_sender,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+}
+
+pub async fn prepare_modpack_from_mrpack_cancellable(
+    app: &App,
+    mrpack_path: &Path,
+    instance_path: &InstancePath,
+    skip_overlays: bool,
+    packinfo: Option<&PackInfo>,
+    progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
+    cancel: &tokio_util::sync::CancellationToken,
+) -> anyhow::Result<ModpackInfo> {
     let _ = app;
-    prepare_mrpack(
+    prepare_mrpack_cancellable(
         mrpack_path,
         instance_path,
         skip_overlays,
         packinfo,
         progress_percentage_sender,
         MAX_EXTRACTED_OVERRIDE_BYTES,
+        cancel,
         #[cfg(test)]
         None,
     )
     .await
 }
 
+#[cfg(test)]
 async fn prepare_mrpack(
     mrpack_path: &Path,
     instance_path: &InstancePath,
@@ -242,18 +268,45 @@ async fn prepare_mrpack(
     extraction_budget: u64,
     #[cfg(test)] extraction_progress_observer: Option<Box<dyn Fn() + Send>>,
 ) -> anyhow::Result<ModpackInfo> {
-    let file_path_clone = mrpack_path.to_path_buf();
-    let (mut archive, index) = spawn_blocking(move || {
-        let file = std::fs::File::open(file_path_clone)?;
-        let mut archive = zip::ZipArchive::new(file)?;
-        let index: ModpackIndex = {
-            let file = archive.by_name("modrinth.index.json")?;
-            serde_json::from_reader(file)?
-        };
+    prepare_mrpack_cancellable(
+        mrpack_path,
+        instance_path,
+        skip_overlays,
+        packinfo,
+        progress_percentage_sender,
+        extraction_budget,
+        &tokio_util::sync::CancellationToken::new(),
+        extraction_progress_observer,
+    )
+    .await
+}
 
-        Ok::<_, anyhow::Error>((archive, index))
-    })
-    .await??;
+async fn prepare_mrpack_cancellable(
+    mrpack_path: &Path,
+    instance_path: &InstancePath,
+    skip_overlays: bool,
+    packinfo: Option<&PackInfo>,
+    progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
+    extraction_budget: u64,
+    cancel: &tokio_util::sync::CancellationToken,
+    #[cfg(test)] extraction_progress_observer: Option<Box<dyn Fn() + Send>>,
+) -> anyhow::Result<ModpackInfo> {
+    let file_path_clone = mrpack_path.to_path_buf();
+    let (mut archive, index) =
+        crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async move {
+            spawn_blocking(move || {
+                let file = std::fs::File::open(file_path_clone)?;
+                let mut archive = zip::ZipArchive::new(file)?;
+                let index: ModpackIndex = {
+                    let file = archive.by_name("modrinth.index.json")?;
+                    serde_json::from_reader(file)?
+                };
+
+                Ok::<_, anyhow::Error>((archive, index))
+            })
+            .await?
+        })
+        .await?;
 
     let required_files: Vec<_> = index
         .files
@@ -283,7 +336,11 @@ async fn prepare_mrpack(
         let files_len = required_files.len() as u64;
 
         let data_path = instance_path.get_data_path();
-        tokio::fs::create_dir_all(&data_path).await?;
+        crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async {
+            tokio::fs::create_dir_all(&data_path).await?;
+            Ok(())
+        })
+        .await?;
 
         let instance_path = instance_path.clone();
 
@@ -333,81 +390,85 @@ async fn prepare_mrpack(
     if !skip_overlays {
         let data_path = instance_path.get_data_path();
 
-        spawn_blocking(move || {
-            // Work counts archive entries inspected across both ordered passes,
-            // including ignored entries. Use one coordinate and denominator so
-            // archive order cannot make the client pass move progress backward.
-            let entries_per_pass = archive.len() as u64;
-            let total_extraction_work = entries_per_pass * 2;
-            let report_progress = |completed| -> anyhow::Result<()> {
-                progress_percentage_sender.send(ProgressState::ExtractingPackOverrides(
-                    completed,
-                    total_extraction_work,
-                ))?;
-                // Per-call observation keeps tests deterministic without global
-                // hooks, sleeps, or changing the production watch channel.
-                #[cfg(test)]
-                if let Some(observe) = &extraction_progress_observer {
-                    observe();
-                }
-                Ok(())
-            };
-            // Cumulative across the whole pass, not per entry: without this, many
-            // entries each just under a per-entry cap could still add up to an
-            // unbounded amount written to disk.
-            let mut extracted_bytes: u64 = 0;
-            for (pass, overrides_folder_name) in
-                ["overrides", "client-overrides"].into_iter().enumerate()
-            {
-                for i in 0..archive.len() {
-                    let mut file = archive.by_index(i)?;
-                    if !(file.name().starts_with(overrides_folder_name)) {
-                        continue;
+        crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async move {
+            spawn_blocking(move || {
+                // Work counts archive entries inspected across both ordered passes,
+                // including ignored entries. Use one coordinate and denominator so
+                // archive order cannot make the client pass move progress backward.
+                let entries_per_pass = archive.len() as u64;
+                let total_extraction_work = entries_per_pass * 2;
+                let report_progress = |completed| -> anyhow::Result<()> {
+                    progress_percentage_sender.send(ProgressState::ExtractingPackOverrides(
+                        completed,
+                        total_extraction_work,
+                    ))?;
+                    // Per-call observation keeps tests deterministic without global
+                    // hooks, sleeps, or changing the production watch channel.
+                    #[cfg(test)]
+                    if let Some(observe) = &extraction_progress_observer {
+                        observe();
                     }
-
-                    let out_path = match file.enclosed_name() {
-                        Some(path) => match path.strip_prefix(overrides_folder_name) {
-                            Ok(stripped) => secure_path_join(Path::new(&data_path), stripped)?,
-                            // The name begins with the prefix string but is not inside the
-                            // overrides directory (e.g. "overrides-extra/..."); skip it instead
-                            // of panicking on the non-matching path component.
-                            Err(_) => continue,
-                        },
-                        None => continue,
-                    };
-
-                    if file.name().ends_with('/') {
-                        continue;
-                    } else if is_symlink_mode(file.unix_mode()) {
-                        // A symlink entry materialized as a regular file would end up
-                        // containing the link's target path text instead of real data.
-                        tracing::warn!(
-                            "Skipping modrinth override entry `{}`: symlinks are not extracted",
-                            file.name()
-                        );
-                        continue;
-                    } else {
-                        if let Some(parent) = out_path.parent() {
-                            if !parent.exists() {
-                                std::fs::create_dir_all(parent)?;
-                            }
+                    Ok(())
+                };
+                // Cumulative across the whole pass, not per entry: without this, many
+                // entries each just under a per-entry cap could still add up to an
+                // unbounded amount written to disk.
+                let mut extracted_bytes: u64 = 0;
+                for (pass, overrides_folder_name) in
+                    ["overrides", "client-overrides"].into_iter().enumerate()
+                {
+                    for i in 0..archive.len() {
+                        let mut file = archive.by_index(i)?;
+                        if !(file.name().starts_with(overrides_folder_name)) {
+                            continue;
                         }
-                        let mut out_file = std::fs::File::create(&out_path)?;
 
-                        let remaining_budget = extraction_budget.saturating_sub(extracted_bytes);
-                        extracted_bytes +=
-                            copy_bounded(&mut file, &mut out_file, remaining_budget)?;
+                        let out_path = match file.enclosed_name() {
+                            Some(path) => match path.strip_prefix(overrides_folder_name) {
+                                Ok(stripped) => secure_path_join(Path::new(&data_path), stripped)?,
+                                // The name begins with the prefix string but is not inside the
+                                // overrides directory (e.g. "overrides-extra/..."); skip it instead
+                                // of panicking on the non-matching path component.
+                                Err(_) => continue,
+                            },
+                            None => continue,
+                        };
+
+                        if file.name().ends_with('/') {
+                            continue;
+                        } else if is_symlink_mode(file.unix_mode()) {
+                            // A symlink entry materialized as a regular file would end up
+                            // containing the link's target path text instead of real data.
+                            tracing::warn!(
+                                "Skipping modrinth override entry `{}`: symlinks are not extracted",
+                                file.name()
+                            );
+                            continue;
+                        } else {
+                            if let Some(parent) = out_path.parent() {
+                                if !parent.exists() {
+                                    std::fs::create_dir_all(parent)?;
+                                }
+                            }
+                            let mut out_file = std::fs::File::create(&out_path)?;
+
+                            let remaining_budget =
+                                extraction_budget.saturating_sub(extracted_bytes);
+                            extracted_bytes +=
+                                copy_bounded(&mut file, &mut out_file, remaining_budget)?;
+                        }
+
+                        report_progress(pass as u64 * entries_per_pass + i as u64 + 1)?;
                     }
-
-                    report_progress(pass as u64 * entries_per_pass + i as u64 + 1)?;
                 }
-            }
-            // Account for an ignored tail or an archive with no eligible files.
-            // Errors above never reach this successful completion update.
-            report_progress(total_extraction_work)?;
-            Ok::<(), anyhow::Error>(())
+                // Account for an ignored tail or an archive with no eligible files.
+                // Errors above never reach this successful completion update.
+                report_progress(total_extraction_work)?;
+                Ok::<(), anyhow::Error>(())
+            })
+            .await?
         })
-        .await??;
+        .await?;
     }
 
     Ok(ModpackInfo {
@@ -509,3 +570,130 @@ mod test {
 
 #[cfg(test)]
 mod task09_tests;
+
+fn operation_download_options(
+    cancel: &tokio_util::sync::CancellationToken,
+    progress: tokio::sync::watch::Sender<carbon_net::Progress>,
+) -> carbon_net::DownloadOptions {
+    DownloadOptions::builder()
+        .concurrency(1)
+        .progress_sender(progress)
+        .cancel_token(cancel.clone())
+        .build()
+}
+
+#[cfg(test)]
+mod task18_r1_download_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task18_r1_operation_token_reaches_download_supervisor() {
+        let cancel = tokio_util::sync::CancellationToken::new();
+        cancel.cancel();
+        let (tx, _rx) = tokio::sync::watch::channel(carbon_net::Progress::new());
+        // Empty batch: run_downloads has no file worker or request to execute.
+        let result =
+            carbon_net::download_multiple(&[], operation_download_options(&cancel, tx)).await;
+        assert!(
+            matches!(result, Err(carbon_net::DownloadError::Cancelled)),
+            "operation cancellation was lost: {result:?}"
+        );
+        let (tx, _rx) = tokio::sync::watch::channel(carbon_net::Progress::new());
+        assert_eq!(
+            carbon_net::download_multiple(
+                &[],
+                operation_download_options(&tokio_util::sync::CancellationToken::new(), tx)
+            )
+            .await
+            .unwrap(),
+            false
+        );
+    }
+}
+
+#[cfg(test)]
+mod task18_r2_phase_tests {
+    use super::*;
+    use std::io::Write;
+    fn fixture(root: &Path) -> (PathBuf, InstancePath) {
+        let path = root.join("fixture.mrpack");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+        let options = zip::write::SimpleFileOptions::default();
+        zip.start_file("modrinth.index.json", options).unwrap();
+        serde_json::to_writer(&mut zip, &serde_json::json!({"formatVersion":1,"game":"minecraft","versionId":"v1","name":"fixture","files":[],"dependencies":{}})).unwrap();
+        for (name, bytes) in [
+            ("overrides/first.txt", b"first".as_slice()),
+            ("overrides/last.txt", b"last".as_slice()),
+        ] {
+            zip.start_file(name, options).unwrap();
+            zip.write_all(bytes).unwrap();
+        }
+        zip.finish().unwrap();
+        (path, InstancePath::new(root.join("staging")))
+    }
+    #[tokio::test]
+    async fn task18_r2_cancel_before_mr_preparation_refuses_real_callee() {
+        let root = tempfile::tempdir().unwrap();
+        let (path, target) = fixture(root.path());
+        let cancel = tokio_util::sync::CancellationToken::new();
+        cancel.cancel();
+        let (tx, _rx) = tokio::sync::watch::channel(ProgressState::Idle);
+        let result = prepare_mrpack_cancellable(
+            &path,
+            &target,
+            false,
+            None,
+            tx,
+            MAX_EXTRACTED_OVERRIDE_BYTES,
+            &cancel,
+            None,
+        )
+        .await;
+        assert!(
+            result.is_err(),
+            "already-cancelled preparation entered archive work"
+        );
+        assert!(!target.get_data_path().exists());
+    }
+    #[tokio::test]
+    async fn task18_r2_entered_mr_extraction_settles_despite_cancellation() {
+        let root = tempfile::tempdir().unwrap();
+        let (path, target) = fixture(root.path());
+        let output = target.get_data_path();
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let token = cancel.clone();
+        let (entered, wait_entered) = tokio::sync::oneshot::channel();
+        let (release, wait_release) = std::sync::mpsc::channel();
+        let gate = std::sync::Mutex::new(Some((entered, wait_release)));
+        let observe = Box::new(move || {
+            if let Some((entered, release)) = gate.lock().unwrap().take() {
+                entered.send(()).unwrap();
+                release.recv().unwrap();
+            }
+        });
+        let (tx, _rx) = tokio::sync::watch::channel(ProgressState::Idle);
+        let worker = tokio::spawn(async move {
+            prepare_mrpack_cancellable(
+                &path,
+                &target,
+                false,
+                None,
+                tx,
+                MAX_EXTRACTED_OVERRIDE_BYTES,
+                &token,
+                Some(observe),
+            )
+            .await
+        });
+        wait_entered.await.unwrap();
+        cancel.cancel();
+        tokio::task::yield_now().await;
+        assert!(
+            !worker.is_finished(),
+            "an entered extractor must settle before its caller returns"
+        );
+        release.send(()).unwrap();
+        worker.await.unwrap().unwrap();
+        assert_eq!(std::fs::read(output.join("first.txt")).unwrap(), b"first");
+        assert_eq!(std::fs::read(output.join("last.txt")).unwrap(), b"last");
+    }
+}

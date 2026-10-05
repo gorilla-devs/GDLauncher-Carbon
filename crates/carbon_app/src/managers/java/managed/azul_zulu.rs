@@ -23,9 +23,155 @@ use tokio::{
 };
 use tracing::{instrument, trace};
 
-#[derive(Debug, Default)]
+#[cfg(test)]
+mod task18_r1_tests {
+    use super::*;
+    use crate::managers::runtime_lifecycle::{RuntimeLifecycle, ShutdownPurpose};
+    struct Checker(&'static str, Arc<RuntimeLifecycle>);
+    #[async_trait::async_trait]
+    impl JavaChecker for Checker {
+        async fn get_bin_info(
+            &self,
+            _: &Path,
+            _: crate::domain::java::JavaComponentType,
+        ) -> anyhow::Result<crate::domain::java::JavaComponent> {
+            match self.0 {
+                "freeze" => {
+                    let owner = crate::managers::java::java_checker::admit_probe(&self.1)?;
+                    owner.finish();
+                    unreachable!()
+                }
+                "cancel" => Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "controlled reaped cancellation",
+                )
+                .into()),
+                "unknown" => Err(crate::managers::runtime_lifecycle::ChildSettlementUnknown.into()),
+                "bookkeeping" => {
+                    Err(crate::managers::runtime_lifecycle::tests_support::bookkeeping_error())
+                }
+                _ => anyhow::bail!("controlled ordinary invalid Java"),
+            }
+        }
+    }
+    async fn cleanup_case(mode: &'static str) {
+        let root = tempfile::tempdir().unwrap();
+        let db_path = root.path().join("java.db");
+        let mut conn = rusqlite::Connection::open(&db_path).unwrap();
+        carbon_repos::get_migrations()
+            .0
+            .to_latest(&mut conn)
+            .unwrap();
+        drop(conn);
+        let db = Db::open(&db_path, 2, true).unwrap();
+        let install = root.path().join("existing-java");
+        std::fs::create_dir(&install).unwrap();
+        let binary = install.join("java");
+        std::fs::write(&binary, b"existing healthy bytes").unwrap();
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        // Actual entered worker IO settles before a now-frozen probe admission.
+        let work_path = install.join("extracted");
+        let (entered, wait_entered) = tokio::sync::oneshot::channel();
+        let (release, wait_release) = std::sync::mpsc::channel();
+        let write = tokio::task::spawn_blocking(move || {
+            entered.send(()).unwrap();
+            wait_release.recv().unwrap();
+            std::fs::write(work_path, b"settled extraction").unwrap();
+        });
+        wait_entered.await.unwrap();
+        if mode == "freeze" {
+            lifecycle
+                .begin_shutdown("controlled", ShutdownPurpose::Quit)
+                .unwrap();
+        }
+        release.send(()).unwrap();
+        write.await.unwrap();
+        assert!(
+            validate_managed_install(&db, &Checker(mode, lifecycle), &binary, &install)
+                .await
+                .is_err()
+        );
+        if mode == "invalid" {
+            assert!(
+                !install.exists(),
+                "ordinary invalid validation still cleans installation"
+            );
+        } else {
+            assert_eq!(
+                std::fs::read(&binary).unwrap(),
+                b"existing healthy bytes",
+                "inconclusive validation must preserve installation"
+            );
+        }
+    }
+    #[tokio::test]
+    async fn task18_r1_managed_frozen_probe_preserves_existing_install() {
+        cleanup_case("freeze").await;
+    }
+    #[tokio::test]
+    async fn task18_r1_managed_cancelled_probe_preserves_existing_install() {
+        cleanup_case("cancel").await;
+    }
+    #[tokio::test]
+    async fn task18_r1_managed_unknown_and_invalid_cleanup_controls() {
+        cleanup_case("unknown").await;
+        cleanup_case("invalid").await;
+    }
+    #[tokio::test]
+    async fn managed_probe_bookkeeping_failure_preserves_existing_install() {
+        cleanup_case("bookkeeping").await;
+    }
+}
+
+#[derive(Debug, Default, Clone)]
 pub struct AzulZulu {
     versions: Arc<RwLock<ManagedJavaOsMap>>,
+}
+
+async fn validate_managed_install<G: JavaChecker>(
+    db: &Db,
+    java_checker: &G,
+    main_binary_path: &Path,
+    install_root: &Path,
+) -> anyhow::Result<String> {
+    let java_component = match java_checker
+        .get_bin_info(
+            &main_binary_path,
+            crate::domain::java::JavaComponentType::Managed,
+        )
+        .await
+    {
+        Ok(component) => component,
+        Err(e) => {
+            // A partially or incorrectly extracted JRE would otherwise persist and
+            // fail every launch — the size-based skip in the extraction loop never
+            // re-writes an existing same-size file, so it can't self-heal. Remove
+            // the install directory to force a clean re-download on the next try.
+            if crate::managers::java::java_checker::validation_inconclusive(&e) {
+                return Err(e)
+                    .context("Managed Java validation is inconclusive; installation retained");
+            }
+            if let Err(rm) = std::fs::remove_dir_all(&install_root) {
+                tracing::warn!(
+                    "Could not clean up unusable managed JRE at {:?}: {}",
+                    install_root,
+                    rm
+                );
+            }
+
+            return Err(e).with_context(|| {
+                format!(
+                    "Could not get bin info for main binary: {:?}",
+                    &main_binary_path
+                )
+            });
+        }
+    };
+
+    let java_id = upsert_java_component_to_db(db, java_component).await?;
+
+    Ok(java_id)
 }
 
 #[async_trait::async_trait]
@@ -92,18 +238,24 @@ impl Managed for AzulZulu {
         });
 
         let result = {
-            carbon_net::download_multiple(
+            let download_result = carbon_net::download_multiple(
                 &[downloadable.clone()],
                 DownloadOptions::builder()
+                    .cancel_token(java_checker.cancellation().unwrap_or_default())
                     .concurrency(1)
                     .progress_sender(p_sender)
                     .build(),
             )
-            .await?;
-
-            trace!("Download complete");
-
+            .await;
             progress_proxy.await??;
+            download_result?;
+            anyhow::ensure!(
+                !java_checker
+                    .cancellation()
+                    .is_some_and(|c| c.is_cancelled()),
+                "Managed Java setup cancelled"
+            );
+            trace!("Download complete");
 
             let file_handle = std::fs::File::open(&downloadable.path).with_context(|| {
                 format!("Could not open downloaded file: {:?}", &downloadable.path)
@@ -264,39 +416,7 @@ impl Managed for AzulZulu {
             Err(_) => main_binary_path,
         };
 
-        let java_component = match java_checker
-            .get_bin_info(
-                &main_binary_path,
-                crate::domain::java::JavaComponentType::Managed,
-            )
-            .await
-        {
-            Ok(component) => component,
-            Err(e) => {
-                // A partially or incorrectly extracted JRE would otherwise persist and
-                // fail every launch — the size-based skip in the extraction loop never
-                // re-writes an existing same-size file, so it can't self-heal. Remove
-                // the install directory to force a clean re-download on the next try.
-                if let Err(rm) = std::fs::remove_dir_all(&install_root) {
-                    tracing::warn!(
-                        "Could not clean up unusable managed JRE at {:?}: {}",
-                        install_root,
-                        rm
-                    );
-                }
-
-                return Err(e).with_context(|| {
-                    format!(
-                        "Could not get bin info for main binary: {:?}",
-                        &main_binary_path
-                    )
-                });
-            }
-        };
-
-        let java_id = upsert_java_component_to_db(db, java_component).await?;
-
-        Ok(java_id)
+        validate_managed_install(db, java_checker, &main_binary_path, &install_root).await
     }
 
     async fn fetch_all_versions(&self) -> anyhow::Result<ManagedJavaOsMap> {

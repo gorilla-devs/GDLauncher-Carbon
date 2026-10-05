@@ -19,6 +19,7 @@ const blockerLabel = {
   server: "java:_trn_runtime_relocation_busy.server",
   install: "java:_trn_runtime_relocation_busy.install",
   deletion: "java:_trn_runtime_relocation_busy.deletion",
+  hook: "java:_trn_runtime_relocation_busy.hook",
   task: "java:_trn_runtime_relocation_busy.task",
   unconfirmed: "java:_trn_runtime_relocation_busy.unconfirmed",
   previousGame: "java:_trn_runtime_relocation_busy.previous_game",
@@ -45,6 +46,7 @@ const closable = new Set<string>([
   "server",
   "install",
   "deletion",
+  "hook",
   "task",
   "previousGame"
 ])
@@ -68,6 +70,7 @@ const hiddenName = new Set<string>([
   "server",
   "install",
   "deletion",
+  "hook",
   "task",
   "unconfirmed",
   "startupCheckPending",

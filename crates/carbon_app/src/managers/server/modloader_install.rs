@@ -193,7 +193,7 @@ async fn install_quilt(
     }
 
     info!("Running Quilt installer...");
-    let output = crate::managers::runtime_lifecycle::tracked_output(
+    let output = crate::managers::runtime_lifecycle::tracked_output_reserved(
         lifecycle,
         tokio::process::Command::new(java_path)
             .arg("-jar")
@@ -204,6 +204,8 @@ async fn install_quilt(
             .arg(loader_version)
             .arg(format!("--install-dir={}", data_path.display()))
             .current_dir(&data_path),
+        crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
+        None,
     )
     .await
     .context("Failed to run Quilt installer")?;
@@ -493,95 +495,48 @@ async fn run_installer_with_progress(
     jar_name: &str,
     progress: Option<&Subtask>,
 ) -> Result<()> {
-    use tokio::io::{AsyncBufReadExt, BufReader};
-    use tokio::process::Command;
-
-    // Rough initial estimate — most Forge/NeoForge installers run 30-60 processors.
-    // We auto-expand if we go over.
-    let initial_estimate: u32 = 50;
-
-    if let Some(p) = progress {
-        p.update_items(0, initial_estimate);
+    use crate::managers::runtime_lifecycle::{
+        ActivityPolicy, ChildProgress, tracked_output_observed,
+    };
+    if let Some(progress) = progress {
+        progress.update_items(0, 50);
     }
-
-    let mut ownership = lifecycle.admit("server installer child")?;
-    ownership.external_child()?;
-    let child_result = Command::new(java_path)
+    let (sender, mut receiver) = tokio::sync::watch::channel(ChildProgress::default());
+    let mut command = tokio::process::Command::new(java_path);
+    command
         .arg("-jar")
         .arg(jar_name)
         .arg("--installServer")
-        .current_dir(data_path)
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .spawn();
-    let mut child = match child_result {
-        Ok(child) => child,
-        Err(error) => {
-            ownership.finish();
-            return Err(error).context("Failed to spawn installer");
+        .current_dir(data_path);
+    let output = tracked_output_observed(
+        lifecycle,
+        &mut command,
+        ActivityPolicy::Installer,
+        None,
+        Some(sender),
+    );
+    tokio::pin!(output);
+    let mut total_estimate = 50;
+    let output = loop {
+        tokio::select! {
+            result = &mut output => break result.context("Installer supervision failed")?,
+            changed = receiver.changed() => {
+                if changed.is_err() { break output.await.context("Installer supervision failed")?; }
+                let seen = receiver.borrow().processors;
+                if seen > total_estimate { total_estimate = seen.saturating_add(10); }
+                if let Some(progress) = progress { progress.update_items(seen, total_estimate); }
+            }
         }
     };
-    ownership.record_child_pid(child.id())?;
-
-    let stdout = child
-        .stdout
-        .take()
-        .context("Failed to capture installer stdout")?;
-    let stderr = child
-        .stderr
-        .take()
-        .context("Failed to capture installer stderr")?;
-
-    // Read stderr to buffer in case of failure
-    let stderr_handle = tokio::spawn(async move {
-        let mut reader = BufReader::new(stderr);
-        let mut buf = String::new();
-        let mut full = String::new();
-        while reader.read_line(&mut buf).await.unwrap_or(0) > 0 {
-            full.push_str(&buf);
-            buf.clear();
-        }
-        full
-    });
-
-    // Read stdout line by line, updating progress on "Processing:" lines.
-    // Also keep a tail of recent lines so we can include context in error messages.
-    let mut reader = BufReader::new(stdout).lines();
-    let mut processors_seen: u32 = 0;
-    let mut total_estimate: u32 = initial_estimate;
-    let mut stdout_tail: std::collections::VecDeque<String> =
-        std::collections::VecDeque::with_capacity(30);
-    while let Some(line) = reader
-        .next_line()
-        .await
-        .context("Error reading installer stdout")?
-    {
-        // Forge: "Processing: <library>"
-        // NeoForge: also uses "Processing: <library>"
-        if line.starts_with("Processing:")
-            || line.starts_with("  Processing:")
-            || line.contains("] Processing:")
-        {
-            processors_seen += 1;
-            if processors_seen > total_estimate {
-                total_estimate = processors_seen + 10;
-            }
-            if let Some(p) = progress {
-                p.update_items(processors_seen, total_estimate);
-            }
-        }
-
-        // Keep the last 30 lines of stdout for error context
-        if stdout_tail.len() >= 30 {
-            stdout_tail.pop_front();
-        }
-        stdout_tail.push_back(line);
-    }
-
-    let status = child.wait().await.context("Failed to wait for installer")?;
-    ownership.finish();
-    let stderr_output = stderr_handle.await.unwrap_or_default();
-
+    let status = output.status;
+    let stderr_output = String::from_utf8_lossy(&output.stderr);
+    let stdout_tail: Vec<_> = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .rev()
+        .take(30)
+        .map(str::to_owned)
+        .collect();
+    let stdout_tail: Vec<_> = stdout_tail.into_iter().rev().collect();
     if !status.success() {
         let stdout_tail_str: String = stdout_tail.iter().cloned().collect::<Vec<_>>().join("\n");
         let stderr_trimmed = stderr_output.trim();

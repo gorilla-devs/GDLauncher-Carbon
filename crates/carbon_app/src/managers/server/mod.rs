@@ -1291,7 +1291,39 @@ impl ManagerRef<'_, ServerManager> {
         modloader_type: Option<String>,
         modloader_version: Option<String>,
     ) -> anyhow::Result<ServerId> {
-        let mut runtime_activity = self.app.runtime_lifecycle.admit("server create_server")?;
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            "server create_server",
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
+        )?;
+        let app = self.app.clone();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| {
+            Box::pin(async move {
+                app.server_manager()
+                    .create_server_owned(
+                        group_id,
+                        name,
+                        game_version,
+                        port,
+                        modloader_type,
+                        modloader_version,
+                        activity,
+                    )
+                    .await
+            })
+        })
+        .await?
+    }
+
+    async fn create_server_owned(
+        self,
+        group_id: ServerGroupId,
+        name: String,
+        game_version: String,
+        port: Option<i32>,
+        modloader_type: Option<String>,
+        modloader_version: Option<String>,
+        runtime_activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
+    ) -> anyhow::Result<ServerId> {
         use crate::api::translation::Translation;
         use crate::managers::vtask::VisualTask;
 
@@ -1415,9 +1447,11 @@ impl ManagerRef<'_, ServerManager> {
 
         // Do the heavy work (jar download, modloader install) in background
         let app = self.app.clone();
+        let mut runtime_activity = runtime_activity.take().unwrap();
         runtime_activity.external();
         tokio::spawn(async move {
             let _runtime_activity = runtime_activity;
+            let cancel = _runtime_activity.cancellation();
             let runtime_path = &app.settings_manager().runtime_path;
             let server_path = runtime_path.get_servers().get_server_path(&shortpath);
 
@@ -1435,16 +1469,22 @@ impl ManagerRef<'_, ServerManager> {
                 .await;
 
             let install_result: anyhow::Result<()> = async {
+                anyhow::ensure!(!cancel.is_cancelled(), "Server installation cancelled");
                 // Download server jar
                 jars::download_vanilla_server_jar(
                     &app.reqwest_client,
                     &game_version,
                     &server_path,
                     Some(&t_download_jar),
+                    &cancel,
                 )
                 .await
                 .context("Failed to download server jar")?;
 
+                anyhow::ensure!(
+                    !cancel.is_cancelled(),
+                    "Server installation cancelled after jar download"
+                );
                 // Write initial server.properties
                 let props_content = properties::generate_properties(
                     port,
@@ -1474,6 +1514,10 @@ impl ManagerRef<'_, ServerManager> {
                         ml_type, ml_version, server_id.0
                     );
 
+                    anyhow::ensure!(
+                        !cancel.is_cancelled(),
+                        "Server installation cancelled before loader"
+                    );
                     let launch_config = modloader_install::install_modloader(
                         &app.runtime_lifecycle,
                         &app.reqwest_client,
@@ -1534,10 +1578,37 @@ impl ManagerRef<'_, ServerManager> {
         port: Option<i32>,
         icon_url: Option<String>,
     ) -> anyhow::Result<ServerId> {
-        let runtime_activity = self
-            .app
-            .runtime_lifecycle
-            .admit("server create_server_from_modpack")?;
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            "server create_server_from_modpack",
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
+        )?;
+        let app = self.app.clone();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| {
+            Box::pin(async move {
+                app.server_manager()
+                    .create_server_from_modpack_owned(
+                        group_id,
+                        name,
+                        modpack_source,
+                        port,
+                        icon_url,
+                        activity,
+                    )
+                    .await
+            })
+        })
+        .await?
+    }
+
+    async fn create_server_from_modpack_owned(
+        self,
+        group_id: ServerGroupId,
+        name: String,
+        modpack_source: modpack::ServerModpackSource,
+        port: Option<i32>,
+        icon_url: Option<String>,
+        runtime_activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
+    ) -> anyhow::Result<ServerId> {
         use crate::api::translation::Translation;
         use crate::managers::vtask::VisualTask;
 
@@ -1697,7 +1768,7 @@ impl ManagerRef<'_, ServerManager> {
             modpack_source,
             task,
             task_id,
-            runtime_activity,
+            runtime_activity.take().unwrap(),
         );
 
         Ok(server_id)
@@ -1723,6 +1794,7 @@ impl ManagerRef<'_, ServerManager> {
         runtime_activity.external();
         tokio::spawn(async move {
             let _runtime_activity = runtime_activity;
+            let cancel = _runtime_activity.cancellation();
             let runtime_path = &app.settings_manager().runtime_path;
             let server_path = runtime_path.get_servers().get_server_path(&shortpath);
 
@@ -1740,6 +1812,7 @@ impl ManagerRef<'_, ServerManager> {
                 .await;
 
             let result: anyhow::Result<()> = async {
+                anyhow::ensure!(!cancel.is_cancelled(), "Server installation cancelled");
                 let pack_result = match modpack_source {
                     modpack::ServerModpackSource::Curseforge {
                         project_id,
@@ -1752,6 +1825,7 @@ impl ManagerRef<'_, ServerManager> {
                             project_id,
                             server_pack_file_id,
                             &task,
+                            &cancel,
                         )
                         .await?
                     }
@@ -1765,11 +1839,13 @@ impl ManagerRef<'_, ServerManager> {
                             &project_id,
                             &version_id,
                             &task,
+                            &cancel,
                         )
                         .await?
                     }
                 };
 
+                anyhow::ensure!(!cancel.is_cancelled(), "Server installation cancelled after pack IO settled");
                 // Download vanilla server jar only if not already present (CF server packs
                 // usually bundle it, Modrinth mrpacks don't). Either way, complete the
                 // pre-created subtask so its weight is accounted for.
@@ -1779,6 +1855,7 @@ impl ManagerRef<'_, ServerManager> {
                         &pack_result.game_version,
                         &server_path,
                         Some(&t_download_jar),
+                        &cancel,
                     )
                     .await
                     .context("Failed to download vanilla server jar")?;
@@ -1786,6 +1863,7 @@ impl ManagerRef<'_, ServerManager> {
                     t_download_jar.complete_opaque();
                 }
 
+                anyhow::ensure!(!cancel.is_cancelled(), "Server installation cancelled after jar download");
                 // Install the modloader if one was detected. Complete the
                 // pre-created subtask either way to reach 100%.
                 if let Some(ml_type) = &pack_result.modloader_type {
@@ -1905,10 +1983,26 @@ impl ManagerRef<'_, ServerManager> {
     /// while a server is installing or running would corrupt the active task
     /// or the live process.
     pub async fn reinstall_server_from_modpack(self, id: ServerId) -> anyhow::Result<VisualTaskId> {
-        let runtime_activity = self
-            .app
-            .runtime_lifecycle
-            .admit("server reinstall_server_from_modpack")?;
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            "server reinstall_server_from_modpack",
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
+        )?;
+        let app = self.app.clone();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| {
+            Box::pin(async move {
+                app.server_manager()
+                    .reinstall_server_from_modpack_owned(id, activity)
+                    .await
+            })
+        })
+        .await?
+    }
+
+    async fn reinstall_server_from_modpack_owned(
+        self,
+        id: ServerId,
+        runtime_activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
+    ) -> anyhow::Result<VisualTaskId> {
         use crate::api::translation::Translation;
         use crate::managers::vtask::VisualTask;
 
@@ -2045,7 +2139,7 @@ impl ManagerRef<'_, ServerManager> {
             modpack_source,
             task,
             task_id,
-            runtime_activity,
+            runtime_activity.take().unwrap(),
         );
 
         Ok(task_id)
@@ -4637,6 +4731,281 @@ mod tests {
         tokio::time::timeout(std::time::Duration::from_secs(1), drain)
             .await
             .unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn quitting_while_a_server_takes_20_seconds_to_save_commits_on_the_first_attempt() {
+        use crate::managers::runtime_lifecycle::{
+            ActivityPolicy, RuntimeLifecycle, ShutdownPhase, ShutdownPurpose,
+        };
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        // The run as start_server_impl and LocalServerProvider::start leave it.
+        let mut run = lifecycle.admit("server start_server_impl").unwrap();
+        run.external();
+        run.spawn(ActivityPolicy::Server, || Ok(())).unwrap();
+        let ownership = Arc::new(std::sync::Mutex::new(Some(run)));
+
+        let (kill_tx, mut kill_rx) = mpsc::channel(1);
+        let (stdin_tx, mut stdin_rx) = mpsc::channel(1);
+        let (exited_tx, exited) = provider::exit_signal();
+        let supervised = ownership.clone();
+        let save = std::time::Duration::from_secs(20);
+        let supervisor = tokio::spawn(async move {
+            let command = stdin_rx.recv().await;
+            // A large world: the save after 'stop' outlasts the 15 s
+            // operation budget but not the 30 s graceful stop.
+            tokio::time::sleep(save).await;
+            if let Some(activity) = supervised.lock().unwrap().as_ref() {
+                activity.settling();
+            }
+            exited_tx.send(true).unwrap();
+            command
+        });
+
+        let manager = Arc::new(ServerManager::new());
+        manager.servers.write().await.insert(
+            ServerId(1),
+            ServerData {
+                shortpath: "fixture".into(),
+                state: ServerState::Running {
+                    start_time: Utc::now(),
+                    log_id: ServerLogId(1),
+                    process_id: 4242,
+                },
+                handle: Some(ServerHandle {
+                    generation: uuid::Uuid::new_v4(),
+                    log_drained: None,
+                    marker_root: None,
+                    runtime_activity: ownership,
+                    process_id: 4242,
+                    kill_tx,
+                    stdin_tx,
+                    exited,
+                }),
+                last_log_id: None,
+            },
+        );
+
+        let draining = manager.clone();
+        let started = tokio::time::Instant::now();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(60),
+            lifecycle.prepare_shutdown_and_commit("quit", ShutdownPurpose::Quit, async move {
+                draining.shutdown_running().await
+            }),
+        )
+        .await
+        .expect("the drain is bounded")
+        .expect("the first quit attempt commits once the server has saved and stopped");
+
+        assert!(started.elapsed() >= save);
+        assert_eq!(supervisor.await.unwrap().as_deref(), Some("stop"));
+        assert!(
+            kill_rx.try_recv().is_err(),
+            "a server that saved in time is not killed"
+        );
+        assert_eq!(
+            lifecycle
+                .shutdown_status("quit", ShutdownPurpose::Quit)
+                .unwrap()
+                .phase,
+            ShutdownPhase::Committed
+        );
+        let servers = manager.servers.read().await;
+        assert!(servers[&ServerId(1)].handle.is_none());
+        assert!(matches!(
+            servers[&ServerId(1)].state,
+            ServerState::Stopped { failed_task: None }
+        ));
+    }
+
+    /// A run as the drain sees it, with the channels its supervisor reads.
+    fn supervised_run(
+        process_id: u32,
+    ) -> (
+        ServerData,
+        mpsc::Receiver<String>,
+        mpsc::Receiver<()>,
+        watch::Sender<bool>,
+    ) {
+        let (kill_tx, kill_rx) = mpsc::channel(1);
+        let (stdin_tx, stdin_rx) = mpsc::channel(1);
+        let (exited_tx, exited) = provider::exit_signal();
+        let data = ServerData {
+            shortpath: format!("fixture-{process_id}"),
+            state: ServerState::Running {
+                start_time: Utc::now(),
+                log_id: ServerLogId(1),
+                process_id,
+            },
+            handle: Some(ServerHandle {
+                generation: uuid::Uuid::new_v4(),
+                log_drained: None,
+                marker_root: None,
+                runtime_activity: Default::default(),
+                process_id,
+                kill_tx,
+                stdin_tx,
+                exited,
+            }),
+            last_log_id: None,
+        };
+        (data, stdin_rx, kill_rx, exited_tx)
+    }
+
+    /// A quit while another server's gate is held (its addon scan, its
+    /// deletion, its start) still asks every running server to stop at once,
+    /// so one that is saving when the user picks Quit now already got 'stop'.
+    /// Once the user keeps GDLauncher open instead, the drain still waiting
+    /// on that gate leaves alone every server it has not asked yet, including
+    /// one started after the cancel.
+    #[tokio::test]
+    async fn a_quit_asks_running_servers_first_and_a_cancelled_one_asks_no_more() {
+        use crate::managers::runtime_lifecycle::{RuntimeLifecycle, ShutdownPurpose};
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        let manager = Arc::new(ServerManager::new());
+        let (running, mut running_stdin, mut running_kill, running_exit) = supervised_run(4242);
+        manager.servers.write().await.insert(ServerId(1), running);
+        // Server 2 is being scanned: its gate is held for the whole scan.
+        let scan = manager.op_lock(ServerId(2)).lock_owned().await;
+
+        lifecycle
+            .begin_shutdown("quit-1", ShutdownPurpose::Quit)
+            .unwrap();
+        let drain = lifecycle.shutdown_drain("quit-1");
+        let draining = manager.clone();
+        let mut drained = tokio::spawn(async move { draining.shutdown_running_for(&drain).await });
+        let asked = tokio::time::timeout(std::time::Duration::from_secs(2), running_stdin.recv())
+            .await
+            .expect("a running server is asked to stop before the held gate is free");
+        assert_eq!(asked.as_deref(), Some("stop"));
+        assert!(
+            lifecycle
+                .shutdown_status("quit-1", ShutdownPurpose::Quit)
+                .unwrap()
+                .servers_stopped
+        );
+
+        // Keep GDLauncher open, then a server is started again.
+        lifecycle.cancel_shutdown("quit-1").unwrap();
+        let (later, mut later_stdin, mut later_kill, _later_exit) = supervised_run(4343);
+        manager.servers.write().await.insert(ServerId(3), later);
+        drop(scan);
+        // The server that was asked still finishes stopping.
+        running_exit.send(true).unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), &mut drained)
+            .await
+            .expect("the drain ends once the asked server exited")
+            .unwrap()
+            .unwrap();
+        assert!(running_kill.try_recv().is_err());
+        assert!(
+            later_stdin.try_recv().is_err(),
+            "the new server keeps running"
+        );
+        assert!(later_kill.try_recv().is_err());
+        let servers = manager.servers.read().await;
+        assert!(matches!(
+            servers[&ServerId(1)].state,
+            ServerState::Stopped { failed_task: None }
+        ));
+        assert!(matches!(
+            servers[&ServerId(3)].state,
+            ServerState::Running { .. }
+        ));
+        assert!(servers[&ServerId(3)].handle.is_some());
+    }
+
+    /// A start that was under way when the quit began publishes its server
+    /// once its gate is free; the drain asks that one to stop as well.
+    #[tokio::test]
+    async fn a_start_under_way_is_asked_to_stop_once_its_gate_is_free() {
+        let manager = Arc::new(ServerManager::new());
+        let start = manager.op_lock(ServerId(5)).lock_owned().await;
+        let draining = manager.clone();
+        let mut drained = tokio::spawn(async move { draining.shutdown_running().await });
+        tokio::task::yield_now().await;
+        let (started, mut stdin, _kill, exit) = supervised_run(4545);
+        manager.servers.write().await.insert(ServerId(5), started);
+        drop(start);
+        let asked = tokio::time::timeout(std::time::Duration::from_secs(2), stdin.recv())
+            .await
+            .expect("the started server is asked to stop");
+        assert_eq!(asked.as_deref(), Some("stop"));
+        exit.send(true).unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(2), &mut drained)
+            .await
+            .unwrap()
+            .unwrap()
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn finalize_run_completes_a_confirmed_exit_whose_console_never_drains() {
+        let manager = ServerManager::new();
+        let mut data = running_server_with_handle();
+        let handle = data.handle.as_mut().unwrap();
+        let (exited_tx, exited) = provider::exit_signal();
+        exited_tx.send(true).unwrap();
+        handle.exited = exited;
+        // A console sender that is never released, so the log collector never
+        // reports the output as drained.
+        let (log_drained_tx, log_drained) = provider::exit_signal();
+        handle.log_drained = Some(log_drained);
+        let handle = handle.clone();
+        manager.servers.write().await.insert(ServerId(1), data);
+
+        let unexpected = tokio::time::timeout(
+            SERVER_LOG_DRAIN_GRACE + std::time::Duration::from_secs(2),
+            manager.finalize_run(ServerId(1), &handle),
+        )
+        .await
+        .expect("console publication is bounded")
+        .expect("a confirmed exit is finalized even if its console never drains");
+        assert!(
+            unexpected,
+            "the run was still Running, so the exit was a crash"
+        );
+        let servers = manager.servers.read().await;
+        assert!(servers[&ServerId(1)].handle.is_none());
+        assert!(matches!(
+            servers[&ServerId(1)].state,
+            ServerState::Stopped { failed_task: None }
+        ));
+        drop(log_drained_tx);
+    }
+
+    #[tokio::test]
+    async fn shutdown_running_finalizes_a_server_whose_supervisor_already_published_its_exit() {
+        // Between the supervisor publishing the exit (and closing the stdin
+        // and kill channels) and the exit watcher clearing the handle, a quit
+        // must finalize the run rather than fail with "exit Unknown".
+        let manager = ServerManager::new();
+        let mut data = running_server_with_handle();
+        let handle = data.handle.as_mut().unwrap();
+        let (exited_tx, exited) = provider::exit_signal();
+        exited_tx.send(true).unwrap();
+        drop(exited_tx);
+        handle.exited = exited;
+        handle.stdin_tx = mpsc::channel(1).0;
+        handle.kill_tx = mpsc::channel(1).0;
+        manager.servers.write().await.insert(ServerId(1), data);
+
+        tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            manager.shutdown_running(),
+        )
+        .await
+        .expect("nothing left to wait for")
+        .unwrap();
+        let servers = manager.servers.read().await;
+        assert!(servers[&ServerId(1)].handle.is_none());
+        assert!(matches!(
+            servers[&ServerId(1)].state,
+            ServerState::Stopped { failed_task: None }
+        ));
     }
 
     #[tokio::test]

@@ -4297,9 +4297,24 @@ impl ResourceInstaller for Task10PlanningResource {
         DependencyIterator::new(vec![getter].into_iter())
     }
 }
+/// Dependency planning settles like the rest of an addon install:
+/// - "abort": abort drains it, and the install reports the cancellation.
+/// - "drop-request", "drop-request-quit": since the install is retained by the
+///   runtime (b8e8cf7af), a caller that stops waiting for `install` does not
+///   abandon the planning. It keeps running under the retained owner, with a
+///   known settlement, until abort or quitting the app drains it.
+/// - "drop-admission": dropping the admission future itself drops the planning
+///   and leaves its settlement unknown, so abort refuses to certify it.
 #[tokio::test]
 async fn task10_planning_uses_existing_admission_settlement_and_unknown() {
-    for drop_admission in [false, true] {
+    use crate::managers::runtime_lifecycle::{ShutdownPhase, ShutdownPurpose};
+    use std::sync::atomic::Ordering::SeqCst;
+    for mode in [
+        "abort",
+        "drop-request",
+        "drop-request-quit",
+        "drop-admission",
+    ] {
         let app = crate::setup_managers_for_test().await;
         let (id, _, _) = super::super::mods::tests::addon_fixture(
             &app,
@@ -4317,23 +4332,65 @@ async fn task10_planning_uses_existing_admission_settlement_and_unknown() {
         })));
         let worker = installer.clone();
         let owned_app = app.clone();
-        let admission =
-            tokio::spawn(async move { worker.install(&owned_app, id, true, None).await });
+        let admission = tokio::spawn(async move {
+            if mode == "drop-admission" {
+                worker.install_owned(&owned_app, id, true, None).await
+            } else {
+                worker.install(&owned_app, id, true, None).await
+            }
+        });
         tokio::time::timeout(Duration::from_secs(10), entered.notified())
             .await
             .unwrap();
-        if drop_admission {
-            admission.abort();
-            assert!(admission.await.unwrap_err().is_cancelled());
-        } else {
+        if mode == "abort" {
             installer.abort(None).await.unwrap();
             assert!(admission.await.unwrap().is_err());
+            assert!(dropped.load(SeqCst), "{mode}");
+            continue;
         }
-        assert!(dropped.load(std::sync::atomic::Ordering::SeqCst));
-        if drop_admission {
+        admission.abort();
+        assert!(admission.await.unwrap_err().is_cancelled());
+        if mode == "drop-admission" {
+            assert!(dropped.load(SeqCst), "{mode}");
             let error = installer.abort(None).await.unwrap_err();
             assert!(format!("{error:#}").contains("settlement unknown"));
+            continue;
         }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        assert!(
+            !dropped.load(SeqCst),
+            "{mode}: the retained install still owns its planning"
+        );
+        if mode == "drop-request" {
+            installer.abort(None).await.unwrap();
+            assert!(dropped.load(SeqCst), "{mode}");
+            continue;
+        }
+        app.runtime_lifecycle
+            .prepare_shutdown("planning", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while app
+                .runtime_lifecycle
+                .shutdown_status("planning", ShutdownPurpose::Quit)
+                .unwrap()
+                .phase
+                == ShutdownPhase::Draining
+            {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .unwrap();
+        assert!(dropped.load(SeqCst), "{mode}: quitting drains the planning");
+        assert_eq!(
+            app.runtime_lifecycle
+                .shutdown_status("planning", ShutdownPurpose::Quit)
+                .unwrap()
+                .phase,
+            ShutdownPhase::Ready,
+            "{mode}: the retained planning settles, so quitting is not blocked"
+        );
     }
 }
 
@@ -4498,4 +4555,134 @@ fn task10_required_catalogue_normal_loader_empty_and_unknown_controls() {
         .is_err()
     );
     assert!(select_dependency(&versions, None, false, ModChannel::Stable, describe).is_err());
+}
+
+#[tokio::test]
+async fn task18_addon_runtime_cancel_waits_for_tree_io_and_preserves_normal_completion() {
+    use crate::managers::runtime_lifecycle::{
+        ActivityPolicy, RuntimeLifecycle, ShutdownPhase, ShutdownPurpose, spawn_retained,
+    };
+    for cancelled in [false, true] {
+        let installer = cf("fixture.jar", b"fixture", curseforge::ClassId::Mods).into_installer();
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        let activity = lifecycle
+            .admit_owned("addon tree", ActivityPolicy::Installer)
+            .unwrap();
+        let cancel = activity.cancellation();
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("settled");
+        let worker_path = path.clone();
+        let (arrive, arrived) = tokio::sync::oneshot::channel();
+        let (release, released) = tokio::sync::oneshot::channel();
+        installer
+            .abort_handle
+            .lock()
+            .await
+            .spawn(move |cancel| async move {
+                if cancelled {
+                    cancel.cancelled().await;
+                }
+                arrive.send(()).unwrap();
+                released.await.unwrap();
+                tokio::fs::write(worker_path, b"tree mutation and rollback settled")
+                    .await
+                    .unwrap();
+            });
+        let ownership = installer.ownership.clone();
+        let worker = spawn_retained(activity, move |slot| {
+            Box::pin(async move {
+                ownership.settle_runtime(slot, cancel).await;
+            })
+        });
+        if cancelled {
+            lifecycle
+                .prepare_shutdown("addon", ShutdownPurpose::Quit, async { Ok(()) })
+                .unwrap();
+        }
+        arrived.await.unwrap();
+        assert!(!worker.is_finished());
+        assert!(!path.exists());
+        if cancelled {
+            assert!(
+                lifecycle
+                    .commit_prepared_shutdown("addon", ShutdownPurpose::Quit)
+                    .is_err()
+            );
+        }
+        release.send(()).unwrap();
+        worker.await.unwrap();
+        assert_eq!(
+            std::fs::read(path).unwrap(),
+            b"tree mutation and rollback settled"
+        );
+        if cancelled {
+            tokio::time::timeout(Duration::from_secs(1), async {
+                while lifecycle
+                    .shutdown_status("addon", ShutdownPurpose::Quit)
+                    .unwrap()
+                    .phase
+                    != ShutdownPhase::Ready
+                {
+                    tokio::task::yield_now().await;
+                }
+            })
+            .await
+            .unwrap();
+        } else {
+            lifecycle.begin_relocation("normal").unwrap();
+        }
+    }
+}
+
+#[tokio::test]
+async fn task18_addon_lost_tree_ack_retains_runtime_unknown() {
+    use crate::managers::runtime_lifecycle::{
+        ActivityPolicy, RuntimeLifecycle, ShutdownPhase, ShutdownPurpose, spawn_retained,
+    };
+    let installer = cf("fixture.jar", b"fixture", curseforge::ClassId::Mods).into_installer();
+    let (sender, receiver) = watch::channel(false);
+    drop(sender);
+    installer.abort_handle.lock().await.completion = Some(receiver);
+    let lifecycle = Arc::new(RuntimeLifecycle::default());
+    lifecycle.reconciliation_finished(Ok(()));
+    let activity = lifecycle
+        .admit_owned("unknown addon tree", ActivityPolicy::Installer)
+        .unwrap();
+    let cancel = activity.cancellation();
+    let ownership = installer.ownership.clone();
+    spawn_retained(activity, move |slot| {
+        Box::pin(async move {
+            ownership.settle_runtime(slot, cancel).await;
+        })
+    })
+    .await
+    .unwrap();
+    lifecycle
+        .prepare_shutdown("unknown-addon", ShutdownPurpose::Quit, async { Ok(()) })
+        .unwrap();
+    tokio::time::timeout(Duration::from_secs(1), async {
+        while lifecycle
+            .shutdown_status("unknown-addon", ShutdownPurpose::Quit)
+            .unwrap()
+            .phase
+            == ShutdownPhase::Draining
+        {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
+    assert_eq!(
+        lifecycle
+            .shutdown_status("unknown-addon", ShutdownPurpose::Quit)
+            .unwrap()
+            .phase,
+        ShutdownPhase::Unresolved
+    );
+    assert!(
+        lifecycle
+            .commit_prepared_shutdown("unknown-addon", ShutdownPurpose::Quit)
+            .is_err()
+    );
 }

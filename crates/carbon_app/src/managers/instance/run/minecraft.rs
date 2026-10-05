@@ -61,6 +61,7 @@ pub async fn process_minecraft(
     log: Option<&watch::Sender<GameLog>>,
     file: Option<&mut File>,
     downloads: &mut Vec<Downloadable>,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<(LibraryGroup, AssetsDir, VersionInfo)> {
     let runtime_path = app.settings_manager().runtime_path.clone();
     let instance_path = runtime_path
@@ -211,6 +212,7 @@ pub async fn process_minecraft(
     let download_required = carbon_net::download_multiple(
         &downloads[..],
         DownloadOptions::builder()
+            .cancel_token(cancel.clone())
             .concurrency(concurrency as usize)
             .progress_sender(progress_watch_tx)
             .deep_check(deep_check)
@@ -218,9 +220,9 @@ pub async fn process_minecraft(
             .build(),
     )
     .await
-    .with_context(|| format!("Failed to verify instance files for instance {instance_id}"))?;
-
+    .with_context(|| format!("Failed to verify instance files for instance {instance_id}"));
     completion.await?;
+    let download_required = download_required?;
 
     if download_required {
         let (progress_watch_tx, mut progress_watch_rx) =
@@ -246,18 +248,19 @@ pub async fn process_minecraft(
             t_subtasks_clone.t_download_files.complete_opaque();
         });
 
-        carbon_net::download_multiple(
+        let download_result = carbon_net::download_multiple(
             &downloads[..],
             DownloadOptions::builder()
+                .cancel_token(cancel.clone())
                 .concurrency(concurrency as usize)
                 .deep_check(deep_check)
                 .progress_sender(progress_watch_tx)
                 .build(),
         )
         .await
-        .with_context(|| format!("Failed to download instance files for instance {instance_id}"))?;
-
+        .with_context(|| format!("Failed to download instance files for instance {instance_id}"));
         completion.await?;
+        download_result?;
     }
 
     if !download_required {
@@ -265,6 +268,7 @@ pub async fn process_minecraft(
         t_subtasks.t_reconstruct_assets.set_weight(10.0);
     }
 
+    anyhow::ensure!(!cancel.is_cancelled(), "Minecraft preparation cancelled");
     t_subtasks.t_extract_natives.start_opaque();
     managers::minecraft::minecraft::extract_natives(
         &runtime_path,
@@ -341,15 +345,24 @@ pub async fn process_minecraft(
                         t_forge_processors.start_opaque();
 
                         let instance_manager = app.instance_manager();
-                        let _lock = instance_manager
-                            .persistence_manager
-                            .loader_install_lock
-                            .acquire()
-                            .await
-                            .unwrap();
+                        let reservation = Arc::new(
+                            crate::managers::runtime_lifecycle::wait_or_cancel(
+                                cancel,
+                                instance_manager
+                                    .persistence_manager
+                                    .loader_install_lock
+                                    .clone()
+                                    .acquire_owned(),
+                            )
+                            .await??,
+                        );
 
-                        let missing_under_lock =
-                            processor_outputs::missing_files(&required, deep_check).await;
+                        let missing_under_lock = processor_outputs::missing_files_reserved(
+                            &required,
+                            deep_check,
+                            Some(reservation.clone()),
+                        )
+                        .await;
 
                         if is_setup || !missing_under_lock.is_empty() {
                             if missing_under_lock.is_empty() {
@@ -365,6 +378,7 @@ pub async fn process_minecraft(
                             if let Some(processors) = &version_info.processors {
                                 managers::minecraft::forge::execute_processors(
                                     &app.runtime_lifecycle,
+                                    reservation.clone(),
                                     processors,
                                     version_info
                                         .data
@@ -382,8 +396,12 @@ pub async fn process_minecraft(
                                 .await?;
                             }
 
-                            let still_missing =
-                                processor_outputs::missing_files(&required, false).await;
+                            let still_missing = processor_outputs::missing_files_reserved(
+                                &required,
+                                false,
+                                Some(reservation.clone()),
+                            )
+                            .await;
                             if !still_missing.is_empty() {
                                 tracing::warn!(
                                     "Processor outputs still missing after regeneration, \
@@ -431,15 +449,24 @@ pub async fn process_minecraft(
                         t_neoforge_processors.start_opaque();
 
                         let instance_manager = app.instance_manager();
-                        let _lock = instance_manager
-                            .persistence_manager
-                            .loader_install_lock
-                            .acquire()
-                            .await
-                            .unwrap();
+                        let reservation = Arc::new(
+                            crate::managers::runtime_lifecycle::wait_or_cancel(
+                                cancel,
+                                instance_manager
+                                    .persistence_manager
+                                    .loader_install_lock
+                                    .clone()
+                                    .acquire_owned(),
+                            )
+                            .await??,
+                        );
 
-                        let missing_under_lock =
-                            processor_outputs::missing_files(&required, deep_check).await;
+                        let missing_under_lock = processor_outputs::missing_files_reserved(
+                            &required,
+                            deep_check,
+                            Some(reservation.clone()),
+                        )
+                        .await;
 
                         if is_setup || !missing_under_lock.is_empty() {
                             if missing_under_lock.is_empty() {
@@ -455,6 +482,7 @@ pub async fn process_minecraft(
                             if let Some(processors) = &version_info.processors {
                                 managers::minecraft::neoforge::execute_processors(
                                     &app.runtime_lifecycle,
+                                    reservation.clone(),
                                     processors,
                                     version_info
                                         .data
@@ -472,8 +500,12 @@ pub async fn process_minecraft(
                                 .await?;
                             }
 
-                            let still_missing =
-                                processor_outputs::missing_files(&required, false).await;
+                            let still_missing = processor_outputs::missing_files_reserved(
+                                &required,
+                                false,
+                                Some(reservation.clone()),
+                            )
+                            .await;
                             if !still_missing.is_empty() {
                                 tracing::warn!(
                                     "Processor outputs still missing after regeneration, \

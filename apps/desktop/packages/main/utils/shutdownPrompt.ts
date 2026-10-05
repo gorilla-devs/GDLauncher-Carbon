@@ -208,10 +208,13 @@ export const SHUTDOWN_PROMPT_ENGLISH = {
   blocker_deletion: "An instance or server is still being deleted",
   blocker_task:
     "A launcher task, such as an import, export, copy or scan, is still running",
+  blocker_hook: "A Pre-Launch or Post-Exit Hook script is still running",
   blocker_unconfirmed:
     "A task or local server did not confirm that it finished, so GDLauncher can't tell when it will be done",
   deletion_warning:
     "Stopping now can leave an instance or server that is being deleted only partly deleted. Delete it again after GDLauncher starts.",
+  hook_warning:
+    "Stopping now can leave a Pre-Launch or Post-Exit Hook script, such as a backup, unfinished.",
   force_note:
     "Stopping now ends GDLauncher's background service right away. Downloads and installs that did not finish can be retried later. Servers that are still stopping will finish in the background.",
   servers_stopped:
@@ -250,10 +253,14 @@ const blockerKeys = new Set([
   "server",
   "install",
   "deletion",
+  "hook",
   "task",
   "unconfirmed"
 ])
-/** Work a quit, restart or update cancels as soon as it begins. */
+/**
+ * Work a quit, restart or update cancels as soon as it begins. A hook is
+ * the user's own script: it is left to finish.
+ */
 const cancelledKinds = new Set(["install", "game", "task"])
 /**
  * What a prompt for `view` says, as text keys: the renderer translates them
@@ -297,6 +304,9 @@ export function shutdownPromptLines(view: ShutdownView) {
     ...(view.finishing ? (["too_late_to_keep"] as const) : []),
     ...(view.blockers.some((blocker) => blocker.kind === "deletion")
       ? (["deletion_warning"] as const)
+      : []),
+    ...(view.blockers.some((blocker) => blocker.kind === "hook")
+      ? (["hook_warning"] as const)
       : []),
     "force_note",
     // The quit cancelled them as it began, and keeping GDLauncher open does

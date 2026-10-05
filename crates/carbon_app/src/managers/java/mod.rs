@@ -143,9 +143,13 @@ impl ManagerRef<'_, JavaManager> {
             return Ok(false);
         }
 
-        let java = RealJavaChecker::get_bin_info(&RealJavaChecker, p, JavaComponentType::Custom)
-            .await
-            .is_ok();
+        let java = RealJavaChecker::get_bin_info(
+            &RealJavaChecker::new(self.app.runtime_lifecycle.clone()),
+            p,
+            JavaComponentType::Custom,
+        )
+        .await
+        .is_ok();
 
         Ok(java)
     }
@@ -213,8 +217,24 @@ impl ManagerRef<'_, JavaManager> {
     }
 
     pub async fn create_custom_java_version(&self, path: String) -> anyhow::Result<()> {
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            "custom Java registration",
+            crate::managers::runtime_lifecycle::ActivityPolicy::JavaProbe,
+        )?;
+        let app = self.app.clone();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |_| {
+            Box::pin(async move {
+                app.java_manager()
+                    .create_custom_java_version_owned(path)
+                    .await
+            })
+        })
+        .await?
+    }
+
+    async fn create_custom_java_version_owned(&self, path: String) -> anyhow::Result<()> {
         let java = RealJavaChecker::get_bin_info(
-            &RealJavaChecker,
+            &RealJavaChecker::new(self.app.runtime_lifecycle.clone()),
             Path::new(&path),
             JavaComponentType::Custom,
         )
@@ -298,6 +318,25 @@ impl ManagerRef<'_, JavaManager> {
         self,
         target_profile: SystemJavaProfileName,
     ) -> anyhow::Result<Option<JavaComponent>> {
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            "Java profile probe and publication",
+            crate::managers::runtime_lifecycle::ActivityPolicy::JavaProbe,
+        )?;
+        let app = self.app.clone();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |_| {
+            Box::pin(async move {
+                app.java_manager()
+                    .get_usable_java_for_profile_name_owned(target_profile)
+                    .await
+            })
+        })
+        .await?
+    }
+
+    async fn get_usable_java_for_profile_name_owned(
+        self,
+        target_profile: SystemJavaProfileName,
+    ) -> anyhow::Result<Option<JavaComponent>> {
         let target_name = target_profile.to_string();
         let profile = java_repo::get_profile(&self.app.db, &target_name)
             .await?
@@ -312,7 +351,7 @@ impl ManagerRef<'_, JavaManager> {
         let java = match java {
             Some(java) => {
                 let bin_result = RealJavaChecker::get_bin_info(
-                    &RealJavaChecker,
+                    &RealJavaChecker::new(self.app.runtime_lifecycle.clone()),
                     Path::new(&java.path),
                     (&*java.r#type).try_into()?,
                 )
@@ -321,6 +360,12 @@ impl ManagerRef<'_, JavaManager> {
                 match bin_result {
                     Ok(bin_info) => Some(bin_info),
                     Err(err) => {
+                        // Shutdown/cancel/unknown is not evidence that an installed Java is invalid.
+                        if self.app.runtime_lifecycle.admission_frozen()
+                            || java_checker::validation_inconclusive(&err)
+                        {
+                            return Err(err);
+                        }
                         tracing::warn!(
                             "Java {} is not usable: {}. Cleaning it up from db",
                             java.id,
@@ -381,8 +426,40 @@ impl ManagerRef<'_, JavaManager> {
         update_target_profile: bool,
         progress: Option<watch::Sender<Step>>,
     ) -> anyhow::Result<Option<JavaComponent>> {
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            "Java installation and profile publication",
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
+        )?;
+        let app = self.app.clone();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |slot| {
+            Box::pin(async move {
+                let cancel = slot.as_ref().unwrap().cancellation();
+                app.java_manager()
+                    .require_java_install_owned(
+                        target_profile,
+                        update_target_profile,
+                        progress,
+                        cancel,
+                    )
+                    .await
+            })
+        })
+        .await?
+    }
+
+    async fn require_java_install_owned(
+        self,
+        target_profile: SystemJavaProfileName,
+        update_target_profile: bool,
+        progress: Option<watch::Sender<Step>>,
+        cancel: tokio_util::sync::CancellationToken,
+    ) -> anyhow::Result<Option<JavaComponent>> {
         static LOCK: Mutex<()> = Mutex::const_new(());
-        let _guard = LOCK.lock().await;
+        let _guard = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => anyhow::bail!("Java installation cancelled while queued"),
+            guard = LOCK.lock() => guard,
+        };
 
         let versions = self
             .app
@@ -423,12 +500,12 @@ impl ManagerRef<'_, JavaManager> {
 
         let java = match java {
             Some(java) => RealJavaChecker::get_bin_info(
-                &RealJavaChecker,
+                &RealJavaChecker::new(self.app.runtime_lifecycle.clone()),
                 Path::new(&java.path),
                 (&*java.r#type).try_into()?,
             )
             .await
-            .map_err(|_| anyhow::anyhow!("downloaded java was not runnable"))?,
+            .map_err(|error| error.context("downloaded java was not runnable"))?,
             None => anyhow::bail!("downloaded java was not present in db"),
         };
 

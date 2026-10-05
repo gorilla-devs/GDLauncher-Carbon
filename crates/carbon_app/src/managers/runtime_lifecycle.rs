@@ -23,6 +23,7 @@ const OPERATION_SETTLE_BUDGET: std::time::Duration = std::time::Duration::from_s
 const FOLLOWER_SETTLE_BUDGET: std::time::Duration = std::time::Duration::from_secs(5);
 /// How many cancelled or replaced shutdown request ids are remembered.
 const RETIRED_SHUTDOWNS_KEPT: usize = 32;
+
 #[derive(Debug)]
 pub struct RuntimeLifecycle {
     state: Mutex<State>,
@@ -72,6 +73,8 @@ pub enum ActivityPolicy {
     /// Shuts down like CoreWork; a blocked quit or move names it as a
     /// deletion, which can take a while when files go to the Recycle Bin.
     Deletion,
+    /// A user-configured pre-launch or post-exit command. A quit, restart
+    /// or update never cancels it; a blocked quit or move names it as a hook.
     Hook,
     JavaProbe,
 }
@@ -88,6 +91,14 @@ struct ActivityEntry {
     policy: ActivityPolicy,
     phase: ActivityPhase,
     cancel: tokio_util::sync::CancellationToken,
+    settlement: tokio::sync::watch::Sender<Settlement>,
+    reservation: Option<Arc<tokio::sync::OwnedSemaphorePermit>>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Settlement {
+    Pending,
+    Complete,
+    Unknown,
 }
 /// Relocation is not a shutdown purpose: it goes through the refuse-first
 /// `begin_relocation` lease, which never freezes, cancels or drains anything.
@@ -167,6 +178,7 @@ pub struct RuntimeActivity {
     id: u64,
     retain_on_drop: bool,
     record: Option<std::path::PathBuf>,
+    detached_game: bool,
 }
 impl RuntimeActivity {
     /// Final no-await spawn authorization shares the freeze mutex. The caller
@@ -184,6 +196,7 @@ impl RuntimeActivity {
         }
         let result = spawn();
         if result.is_ok() {
+            self.owns_child = true;
             let entry = state.activities.get_mut(&self.id).expect("owned activity");
             entry.policy = policy;
             entry.phase = ActivityPhase::Running;
@@ -206,9 +219,40 @@ impl RuntimeActivity {
             .activities
             .get_mut(&self.id)
             .context("Preparation ownership disappeared")?;
-        own.policy = ActivityPolicy::Game;
+        // The game may survive ordinary shutdown. Its enclosing worker still
+        // owns readers, playtime and publication and must acknowledge settlement.
+        own.policy = ActivityPolicy::CoreWork;
         own.phase = ActivityPhase::Running;
         own.follows = Some(child.id);
+        Ok(())
+    }
+    pub fn unknown(&self, reason: String) {
+        if let Some(entry) = self
+            .lifecycle
+            .state
+            .lock()
+            .unwrap()
+            .activities
+            .get_mut(&self.id)
+        {
+            tracing::error!("{}: {reason}", entry.owner);
+            entry.phase = ActivityPhase::Unknown;
+            entry.settlement.send_replace(Settlement::Unknown);
+        }
+    }
+    /// Detachment preserves Game/Running and durable recovery evidence. It is
+    /// neither child exit nor permission to run exit-only cleanup.
+    pub fn detach_surviving_game(mut self) -> Result<()> {
+        let state = self.lifecycle.state.lock().unwrap();
+        let entry = state
+            .activities
+            .get(&self.id)
+            .context("Game owner missing")?;
+        anyhow::ensure!(
+            entry.policy == ActivityPolicy::Game && entry.phase == ActivityPhase::Running,
+            "Cannot detach unproven game"
+        );
+        self.detached_game = true;
         Ok(())
     }
     pub fn cancellation(&self) -> tokio_util::sync::CancellationToken {
@@ -254,6 +298,7 @@ impl RuntimeActivity {
             }
         }
         self.external();
+        self.owns_child = true;
         Ok(())
     }
     pub fn record_child_pid(&self, pid: Option<u32>) -> Result<()> {
@@ -279,9 +324,37 @@ impl RuntimeActivity {
     pub fn finish(mut self) {
         self.retain_on_drop = false;
     }
+    /// Settles this activity once the worker that owned it panicked and
+    /// unwound. If it never started a child process, or got ready to, the
+    /// unwinding dropped everything it was doing, so it completes like a
+    /// worker that returned an error: one panic must not leave an
+    /// unconfirmed task that holds up every quit and refuses data folder
+    /// moves until GDLauncher restarts. One that did start a child, or was
+    /// already unconfirmed, stays unconfirmed: that process may still run.
+    fn settle_after_panic(self) {
+        let (owner, unknown) = {
+            let state = self.lifecycle.state.lock().unwrap();
+            match state.activities.get(&self.id) {
+                Some(entry) => (entry.owner.clone(), entry.phase == ActivityPhase::Unknown),
+                None => return,
+            }
+        };
+        if self.owns_child || unknown {
+            tracing::error!(
+                "{owner} panicked; a program it started may still run, so its end stays unconfirmed"
+            );
+            // Dropping it unacknowledged keeps it Unknown.
+        } else {
+            tracing::error!("{owner} panicked; it started no program, so it is settled");
+            self.finish();
+        }
+    }
 }
 impl Drop for RuntimeActivity {
     fn drop(&mut self) {
+        if self.detached_game {
+            return;
+        }
         if self.retain_on_drop {
             if let Some(entry) = self
                 .lifecycle
@@ -292,6 +365,7 @@ impl Drop for RuntimeActivity {
                 .get_mut(&self.id)
             {
                 entry.phase = ActivityPhase::Unknown;
+                entry.settlement.send_replace(Settlement::Unknown);
             }
         } else {
             if let Some(record) = &self.record {
@@ -303,12 +377,16 @@ impl Drop for RuntimeActivity {
                     }
                 }
             }
-            self.lifecycle
+            if let Some(entry) = self
+                .lifecycle
                 .state
                 .lock()
                 .unwrap()
                 .activities
-                .remove(&self.id);
+                .remove(&self.id)
+            {
+                entry.settlement.send_replace(Settlement::Complete);
+            }
         }
     }
 }
@@ -567,6 +645,8 @@ impl RuntimeLifecycle {
                 policy: ActivityPolicy::CoreWork,
                 phase: ActivityPhase::Preparing,
                 cancel: tokio_util::sync::CancellationToken::new(),
+                settlement: tokio::sync::watch::channel(Settlement::Pending).0,
+                reservation: None,
             },
         );
         Ok(RuntimeActivity {
@@ -574,6 +654,7 @@ impl RuntimeLifecycle {
             id,
             retain_on_drop: false,
             record: None,
+            detached_game: false,
         })
     }
     /// [`Self::admit`] for work a blocked quit or move names by `policy`
@@ -685,7 +766,9 @@ impl RuntimeLifecycle {
     /// their session workers and the watcher of games from an earlier
     /// session: those are cancelled only once everything else has settled
     /// (`release_followers_or_settle`), so an attempt that ends unresolved or is
-    /// cancelled never stops tracking a running game.
+    /// cancelled never stops tracking a running game. Pre-launch and
+    /// post-exit hooks are not cancelled at all: they run to their end (or
+    /// their own timeout) and are named as hooks until then.
     ///
     /// The same request re-joins its own attempt, and retries it once it is
     /// unresolved. A new request of either purpose takes the place of an
@@ -734,7 +817,7 @@ impl RuntimeLifecycle {
             cancel: tokio_util::sync::CancellationToken::new(),
         });
         for entry in state.activities.values() {
-            if !entry.running_game() && !entry.session_follower() {
+            if entry.cancelled_by_shutdown() {
                 entry.cancel.cancel();
             }
         }
@@ -753,12 +836,121 @@ impl RuntimeLifecycle {
             let owned = self.clone();
             let request = request.to_owned();
             tokio::spawn(async move {
-                let result = drain.await;
-                owned.refresh_adopted();
-                let _ = owned.settle_shutdown(&request, result);
+                // Only the drain's own outcome is passed on. The operation wait
+                // is a bounded grace period; settle_shutdown re-checks every
+                // live activity under the mutex afterwards, so anything still
+                // running or Unknown is still named.
+                let (server, ()) = tokio::join!(tokio::spawn(drain), owned.wait_for_operations());
+                let result = server.map_err(anyhow::Error::from).and_then(|r| r);
+                // A request cancelled or replaced meanwhile matches nothing.
+                if let Some(followers) = owned.release_followers_or_settle(&request, result) {
+                    wait_for_settlement(followers, FOLLOWER_SETTLE_BUDGET).await;
+                    let _ = owned.settle_shutdown(&request, Ok(()));
+                }
             });
         }
         self.shutdown_status(request, purpose)
+    }
+    /// Gives in-flight operations up to [`OPERATION_SETTLE_BUDGET`] to settle
+    /// while the drain runs. Returns early once every watched activity is
+    /// Complete, or as soon as one turns Unknown or loses its sender, since the
+    /// final check will report it anyway. Running games may survive and are not
+    /// watched, and neither are their session workers or the watcher of games
+    /// from an earlier session, which are not cancelled yet. Server runs are
+    /// not watched either: the drain stops, kills and finalizes them within
+    /// its own bound and fails if an exit stays unconfirmed, and a save can
+    /// legitimately take longer than this budget.
+    async fn wait_for_operations(&self) {
+        let (receivers, budget) = {
+            let state = self.state.lock().unwrap();
+            #[cfg(test)]
+            let budget = state.settle_budget.unwrap_or(OPERATION_SETTLE_BUDGET);
+            #[cfg(not(test))]
+            let budget = OPERATION_SETTLE_BUDGET;
+            let receivers: Vec<_> = state
+                .activities
+                .values()
+                .filter(|entry| {
+                    entry.policy != ActivityPolicy::Server
+                        && !entry.running_game()
+                        && !entry.session_follower()
+                })
+                .map(|entry| entry.settlement.subscribe())
+                .collect();
+            (receivers, budget)
+        };
+        wait_for_settlement(receivers, budget).await;
+    }
+    /// Ends the drain of `request`. Once the drain succeeded and nothing but
+    /// running games, their session workers and the watcher of games from an
+    /// earlier session is left of this core's work, it cancels those workers
+    /// and the watcher and returns their settlements: the caller waits for
+    /// them and then settles. Otherwise it settles right away, under the same
+    /// lock as the check, so the attempt ends unresolved with every running
+    /// game still tracked. A request cancelled or replaced meanwhile matches
+    /// nothing and is left alone.
+    fn release_followers_or_settle(
+        &self,
+        request: &str,
+        drain_result: Result<()>,
+    ) -> Option<Vec<tokio::sync::watch::Receiver<Settlement>>> {
+        let mut state = self.state.lock().unwrap();
+        let draining = state
+            .shutdown
+            .as_ref()
+            .is_some_and(|s| s.request_id == request && s.phase == ShutdownPhase::Draining);
+        if !draining {
+            return None;
+        }
+        let only_followers_left = state
+            .activities
+            .values()
+            .all(|entry| entry.running_game() || entry.session_follower());
+        let has_followers = state
+            .activities
+            .values()
+            .any(|entry| entry.session_follower());
+        if drain_result.is_ok() && only_followers_left && has_followers {
+            let followers = state
+                .activities
+                .values()
+                .filter(|entry| entry.session_follower())
+                .map(|entry| {
+                    entry.cancel.cancel();
+                    entry.settlement.subscribe()
+                })
+                .collect();
+            state.shutdown.as_mut().unwrap().released = true;
+            return Some(followers);
+        }
+        Self::settle_locked(&mut state, drain_result);
+        None
+    }
+    pub async fn prepare_shutdown_and_commit<F>(
+        self: &Arc<Self>,
+        request: &str,
+        purpose: ShutdownPurpose,
+        drain: F,
+    ) -> Result<()>
+    where
+        F: std::future::Future<Output = Result<()>> + Send + 'static,
+    {
+        self.prepare_shutdown(request, purpose, drain)?;
+        loop {
+            let status = self.shutdown_status(request, purpose)?;
+            match status.phase {
+                ShutdownPhase::Ready | ShutdownPhase::Committed => {
+                    return self.commit_prepared_shutdown(request, purpose);
+                }
+                ShutdownPhase::Unresolved => bail!(
+                    "Shutdown unresolved; supervision retained: {:?}",
+                    status.blockers
+                ),
+                ShutdownPhase::Draining => {
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await
+                }
+            }
+        }
     }
     pub fn shutdown_status(
         &self,
@@ -782,8 +974,8 @@ impl RuntimeLifecycle {
         }
         Ok(status)
     }
-    /// Task18 must replace the explicit pending component with its reviewed
-    /// producer settlement. A zero child snapshot cannot implement that participant.
+    /// Final blocker check follows retained operation ACKs and server drain.
+    /// Child absence alone never acknowledges a producer or its entered writes.
     pub fn settle_shutdown(
         &self,
         request: &str,
@@ -818,12 +1010,6 @@ impl RuntimeLifecycle {
         if blockers.is_empty() {
             blockers = followers;
         }
-        if purpose != ShutdownPurpose::Relocation {
-            blockers.push(
-                "Installer shutdown participant pending Task18 (including Java probes and hooks)"
-                    .into(),
-            );
-        }
         let status = state.shutdown.as_mut().unwrap();
         status.phase = if blockers.is_empty() {
             ShutdownPhase::Ready
@@ -835,6 +1021,16 @@ impl RuntimeLifecycle {
     }
     pub fn commit_prepared_shutdown(&self, request: &str, purpose: ShutdownPurpose) -> Result<()> {
         let mut state = self.state.lock().unwrap();
+        let current_blockers = state.activities.values().any(|entry| {
+            purpose == ShutdownPurpose::Relocation
+                || entry.policy != ActivityPolicy::Game
+                || entry.phase != ActivityPhase::Running
+        }) || state.adopted.keys().any(|key| {
+            purpose == ShutdownPurpose::Relocation || !state.adopted_games.contains(key)
+        });
+        if current_blockers {
+            bail!("Runtime ownership changed or remains unsettled before shutdown commit");
+        }
         let status = state
             .shutdown
             .as_mut()
@@ -858,6 +1054,10 @@ impl RuntimeLifecycle {
             .adopted_games
             .insert((pid, start));
     }
+    pub fn admission_frozen(&self) -> bool {
+        let state = self.state.lock().unwrap();
+        state.shutdown.is_some() || state.relocation.is_some()
+    }
     pub fn shutdown_committed(&self) -> bool {
         let state = self.state.lock().unwrap();
         state
@@ -879,16 +1079,16 @@ impl RuntimeLifecycle {
         request: &str,
     ) -> std::result::Result<(), CancelRelocationError> {
         let mut state = self.state.lock().unwrap();
-        if state
-            .relocation
-            .as_ref()
-            .is_some_and(|(id, shutdown)| id == request && !shutdown)
-        {
-            state.relocation = None;
-            Ok(())
-        } else {
-            bail!("No matching cancellable relocation")
-        }
+        let result = match &state.relocation {
+            Some((id, true)) if id == request => return Err(CancelRelocationError::Committed),
+            Some((id, false)) if id == request => {
+                state.relocation = None;
+                Ok(())
+            }
+            _ => Err(CancelRelocationError::Missing),
+        };
+        state.retire_relocation(request);
+        result
     }
     pub fn commit_shutdown(&self, request: &str) -> Result<()> {
         let mut state = self.state.lock().unwrap();
@@ -1029,35 +1229,249 @@ impl RuntimeLifecycle {
     }
 }
 
+/// Borrowed setup cannot be moved into a retained worker. Only a returned future
+/// acknowledges its IO/destructors; abandonment conservatively retains Unknown.
+/// A panic settles the activity unless it started a child process
+/// ([`RuntimeActivity::settle_after_panic`]), then carries on unwinding.
+pub async fn run_borrowed_owned<T>(
+    activity: RuntimeActivity,
+    work: impl std::future::Future<Output = T>,
+) -> T {
+    let outcome = futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(work)).await;
+    match outcome {
+        Ok(result) => {
+            activity.finish();
+            result
+        }
+        Err(panic) => {
+            activity.settle_after_panic();
+            std::panic::resume_unwind(panic)
+        }
+    }
+}
+
+/// Cancellation is selected only while waiting to enter a gate/permit. Once
+/// entered, callers keep ownership until actual writes and cleanup return.
+pub async fn wait_or_cancel<T>(
+    cancel: &tokio_util::sync::CancellationToken,
+    wait: impl std::future::Future<Output = T>,
+) -> Result<T> {
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => bail!("Runtime operation cancelled while queued"),
+        result = wait => Ok(result),
+    }
+}
+
+/// A lookup that writes nothing the user keeps (a platform API call whose
+/// only write is the HTTP cache) is dropped as soon as its operation is
+/// cancelled, so a stalled network never holds up a quit, restart or update.
+/// An already cancelled operation never starts it. Work that writes files
+/// stays behind [`run_owned_phase`].
+pub async fn lookup_or_cancel<T>(
+    cancel: &tokio_util::sync::CancellationToken,
+    lookup: impl std::future::Future<Output = Result<T>>,
+) -> Result<T> {
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => bail!("Runtime operation cancelled while waiting for a reply"),
+        result = lookup => result,
+    }
+}
+
+/// A lazy next-phase boundary inside an already-owned operation. Once started,
+/// this future must settle; cancellation must never drop its entered IO.
+pub async fn run_owned_phase<T, F, W>(
+    cancel: &tokio_util::sync::CancellationToken,
+    start: F,
+) -> Result<T>
+where
+    F: FnOnce() -> W,
+    W: std::future::Future<Output = Result<T>>,
+{
+    anyhow::ensure!(
+        !cancel.is_cancelled(),
+        "Runtime operation cancelled before next phase"
+    );
+    start().await
+}
+
+/// Retain the SAME admitted operation across requester loss. The factory may
+/// transfer its activity slot to the next retained worker; otherwise its normal
+/// return (including handled errors) explicitly acknowledges complete owned work.
+/// A panic settles an activity still in the slot unless it started a child
+/// process ([`RuntimeActivity::settle_after_panic`]); the task still ends in
+/// that panic. A raw abort drops an unacknowledged owner and retains Unknown.
+pub fn spawn_retained<T, F>(mut activity: RuntimeActivity, work: F) -> tokio::task::JoinHandle<T>
+where
+    T: Send + 'static,
+    F: Send
+        + 'static
+        + for<'a> FnOnce(
+            &'a mut Option<RuntimeActivity>,
+        )
+            -> std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send + 'a>>,
+{
+    activity.external();
+    tokio::spawn(async move {
+        let mut activity = Some(activity);
+        // The work, and its borrow of the slot, is dropped by the end of
+        // this statement, also when it panicked.
+        let outcome =
+            futures::FutureExt::catch_unwind(std::panic::AssertUnwindSafe(work(&mut activity)))
+                .await;
+        match outcome {
+            Ok(result) => {
+                if let Some(activity) = activity {
+                    activity.finish();
+                }
+                result
+            }
+            Err(panic) => {
+                if let Some(activity) = activity {
+                    activity.settle_after_panic();
+                }
+                std::panic::resume_unwind(panic)
+            }
+        }
+    })
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct ChildProgress {
+    pub processors: u32,
+}
+
+#[derive(Debug, thiserror::Error)]
+#[error("Temporary child cleanup is unconfirmed; preserve installation and ownership evidence")]
+pub struct ChildSettlementUnknown;
+
+pub fn child_settlement_unknown(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause.downcast_ref::<ChildSettlementUnknown>().is_some()
+            || cause
+                .downcast_ref::<std::io::Error>()
+                .and_then(|e| e.get_ref())
+                .is_some_and(|e| e.is::<ChildSettlementUnknown>())
+    })
+}
+
+/// The launcher's own record of a child process could not be kept in the
+/// data folder: the ownership record before the spawn, or the started
+/// child's identity after it. It says nothing about the program, so a caller
+/// must never read it as a verdict on that program (a Java probe that fails
+/// this way is inconclusive, not proof of a broken Java).
+#[derive(Debug, thiserror::Error)]
+#[error(
+    "{stage}. Check that the drive holding the GDLauncher data folder is writable and has free space"
+)]
+pub struct ChildBookkeepingFailed {
+    stage: &'static str,
+    #[source]
+    source: anyhow::Error,
+}
+
+impl ChildBookkeepingFailed {
+    fn before_spawn(source: impl Into<anyhow::Error>) -> Self {
+        Self {
+            stage: "GDLauncher could not write its process record to the data folder before starting the program",
+            source: source.into(),
+        }
+    }
+    fn after_spawn(source: impl Into<anyhow::Error>) -> Self {
+        Self {
+            stage: "GDLauncher could not record the started program in the data folder",
+            source: source.into(),
+        }
+    }
+}
+
+/// Whether `error` comes from [`ChildBookkeepingFailed`], directly or carried
+/// in the `io::Error` that [`tracked_output`] returns.
+pub fn child_bookkeeping_failed(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        cause.is::<ChildBookkeepingFailed>()
+            || cause
+                .downcast_ref::<std::io::Error>()
+                .and_then(|e| e.get_ref())
+                .is_some_and(|e| e.is::<ChildBookkeepingFailed>())
+    })
+}
+
 /// Owns an external command independently of the future invoking it. Cancellation
 /// or wait failure leaves an explicit uncertain writer; timeout/kill is not reap.
 pub async fn tracked_output(
     lifecycle: &Arc<RuntimeLifecycle>,
     command: &mut tokio::process::Command,
 ) -> std::io::Result<std::process::Output> {
+    tracked_output_reserved(lifecycle, command, ActivityPolicy::TemporaryChild, None).await
+}
+
+pub async fn tracked_output_reserved(
+    lifecycle: &Arc<RuntimeLifecycle>,
+    command: &mut tokio::process::Command,
+    policy: ActivityPolicy,
+    reservation: Option<Arc<tokio::sync::OwnedSemaphorePermit>>,
+) -> std::io::Result<std::process::Output> {
+    tracked_output_observed(lifecycle, command, policy, reservation, None).await
+}
+
+pub async fn tracked_output_observed(
+    lifecycle: &Arc<RuntimeLifecycle>,
+    command: &mut tokio::process::Command,
+    policy: ActivityPolicy,
+    reservation: Option<Arc<tokio::sync::OwnedSemaphorePermit>>,
+    progress: Option<tokio::sync::watch::Sender<ChildProgress>>,
+) -> std::io::Result<std::process::Output> {
     let mut activity = lifecycle
-        .admit("installer or hook child")
+        .admit_owned("temporary child", policy)
         .map_err(std::io::Error::other)?;
+    lifecycle
+        .state
+        .lock()
+        .unwrap()
+        .activities
+        .get_mut(&activity.id)
+        .unwrap()
+        .reservation = reservation;
+    // No caller feeds input. An inherited stdin is the core's own, a pipe
+    // the launcher never writes to or closes, so a hook that pauses or asks
+    // for input (`pause`, `set /p`, `read`) would wait there until its
+    // timeout; an empty one answers at once.
     command
+        .stdin(std::process::Stdio::null())
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-    activity.external_child().map_err(std::io::Error::other)?;
-    let child = match activity.spawn(ActivityPolicy::TemporaryChild, || command.spawn()) {
+        .stderr(std::process::Stdio::piped())
+        .kill_on_drop(true);
+    if let Err(error) = activity.external_child() {
+        // No spawn was attempted; cleanup of a partial intent is proven safe.
+        activity.finish();
+        return Err(std::io::Error::other(error));
+    }
+    let child = match activity.spawn(policy, || command.spawn()) {
         Ok(child) => child,
         Err(error) => {
             activity.finish();
             return Err(error);
         }
     };
-    activity
+    let record_result = activity
         .record_child_pid(child.id())
-        .map_err(std::io::Error::other)?;
-    let result = child.wait_with_output().await;
-    if result.is_ok() {
-        activity.finish();
+        .map_err(std::io::Error::other);
+    if record_result.is_err() {
+        activity.cancellation().cancel();
     }
-    result
+    let output =
+        temporary_child::collect_observed(activity, temporary_child::NativeChild(child), progress)
+            .await;
+    // Preserve an unconfirmed-cleanup error so installation owners cannot mistake
+    // a record-write failure for permission to delete a still-owned directory.
+    let output = output?;
+    record_result?;
+    Ok(output)
 }
+
+mod temporary_child;
 
 #[cfg(test)]
 pub(crate) mod tests_support {
@@ -1099,6 +1513,7 @@ pub(crate) mod tests_support {
             .context("Cannot execute java checker command")
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1130,12 +1545,10 @@ mod tests {
         assert!(l.cancel_relocation("stale").is_err());
         drop(activity);
         let result = l.settle_shutdown("quit", Ok(())).unwrap();
-        assert_eq!(result.phase, ShutdownPhase::Unresolved);
-        assert!(result.blockers.iter().any(|b| b.contains("Task18")));
-        assert!(
-            l.commit_prepared_shutdown("quit", ShutdownPurpose::Quit)
-                .is_err()
-        );
+        assert_eq!(result.phase, ShutdownPhase::Ready);
+        assert!(result.blockers.is_empty());
+        l.commit_prepared_shutdown("quit", ShutdownPurpose::Quit)
+            .unwrap();
     }
     #[test]
     fn task07_game_survival_is_proven_at_spawn_and_finalization_blocks() {
@@ -1152,7 +1565,10 @@ mod tests {
         // attempt that ends here still tracks the game.
         assert!(!preparation.cancellation().is_cancelled());
         let result = l.settle_shutdown("quit", Ok(())).unwrap();
-        assert_eq!(result.blockers.len(), 1); // only the explicit missing Task18 participant
+        assert_eq!(result.phase, ShutdownPhase::Unresolved);
+        assert_eq!(result.blockers.len(), 1);
+        assert!(result.blockers[0].contains("game preparation"));
+        assert!(preparation.cancellation().is_cancelled());
         child.finish();
         preparation.settling();
         assert_eq!(
@@ -1205,6 +1621,69 @@ mod tests {
         assert!(activity.external_child().is_err());
         drop(activity);
         lifecycle.begin_relocation("move").unwrap();
+    }
+
+    /// A process record that cannot be written is the launcher's own
+    /// failure. tracked_output says so with a typed error, before it spawns
+    /// anything, so callers never read it as a verdict on the program.
+    #[tokio::test]
+    async fn pre_spawn_record_failure_is_a_typed_bookkeeping_error() {
+        let root = tempfile::tempdir().unwrap();
+        std::fs::write(root.path().join("__gdl_runtime_writers"), "not a directory").unwrap();
+        let lifecycle = Arc::new(RuntimeLifecycle::with_runtime_path(root.path()));
+        lifecycle.reconciliation_finished(Ok(()));
+        let ran = root.path().join("ran");
+        let mut command = if cfg!(windows) {
+            let mut command = tokio::process::Command::new("cmd");
+            command
+                .arg("/C")
+                .arg(format!("type nul > \"{}\"", ran.display()));
+            command
+        } else {
+            let mut command = tokio::process::Command::new("sh");
+            command.arg("-c").arg(format!("touch '{}'", ran.display()));
+            command
+        };
+        let error =
+            tracked_output_reserved(&lifecycle, &mut command, ActivityPolicy::JavaProbe, None)
+                .await
+                .unwrap_err();
+        let error = anyhow::Error::from(error);
+        assert!(child_bookkeeping_failed(&error), "{error:#}");
+        assert!(!child_settlement_unknown(&error));
+        assert!(format!("{error:#}").contains("data folder"), "{error:#}");
+        assert!(!ran.exists(), "nothing is spawned without a record");
+
+        let mut activity = lifecycle.admit("test").unwrap();
+        let error = anyhow::Error::from(activity.external_child().unwrap_err());
+        assert!(child_bookkeeping_failed(&error), "{error:#}");
+        drop(activity);
+        lifecycle.begin_relocation("move").unwrap();
+        assert!(!child_bookkeeping_failed(&anyhow::Error::from(
+            std::io::Error::other("ordinary spawn failure")
+        )));
+    }
+
+    /// A started child whose identity cannot be recorded is the same
+    /// bookkeeping failure.
+    #[test]
+    fn post_spawn_record_failure_is_a_typed_bookkeeping_error() {
+        let root = tempfile::tempdir().unwrap();
+        let lifecycle = Arc::new(RuntimeLifecycle::with_runtime_path(root.path()));
+        lifecycle.reconciliation_finished(Ok(()));
+        let mut activity = lifecycle.admit("test").unwrap();
+        activity.external_child().unwrap();
+        let record = activity.record.clone().unwrap();
+        std::fs::remove_file(&record).unwrap();
+        std::fs::create_dir(&record).unwrap();
+        let error = activity
+            .record_child_pid(Some(std::process::id()))
+            .unwrap_err();
+        assert!(child_bookkeeping_failed(&anyhow::Error::from(
+            std::io::Error::other(error)
+        )));
+        std::fs::remove_dir(&record).unwrap();
+        activity.finish();
     }
 
     /// A data folder on a volume that does not sync folders (a VirtualBox
@@ -1536,9 +2015,11 @@ mod task07_request_tests {
         let status = lifecycle
             .shutdown_status("quit", ShutdownPurpose::Quit)
             .unwrap();
-        assert_eq!(status.phase, ShutdownPhase::Unresolved);
-        assert_eq!(status.blockers.len(), 1);
-        assert!(status.blockers[0].contains("Task18"));
+        assert_eq!(status.phase, ShutdownPhase::Ready);
+        assert!(status.blockers.is_empty());
+        lifecycle
+            .commit_prepared_shutdown("quit", ShutdownPurpose::Quit)
+            .unwrap();
         assert!(
             lifecycle
                 .state
@@ -1622,5 +2103,457 @@ mod task07_request_tests {
                 .phase,
             ShutdownPhase::Committed
         );
+    }
+}
+
+#[cfg(test)]
+mod task18_settlement_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task18_shutdown_waits_for_whole_operation_then_readies() {
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        let operation = lifecycle
+            .admit_owned("paused real writer", ActivityPolicy::Installer)
+            .unwrap();
+        let cancel = operation.cancellation();
+        lifecycle
+            .prepare_shutdown("quit18", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        tokio::task::yield_now().await;
+        assert!(cancel.is_cancelled());
+        assert_eq!(
+            lifecycle
+                .shutdown_status("quit18", ShutdownPurpose::Quit)
+                .unwrap()
+                .phase,
+            ShutdownPhase::Draining
+        );
+        assert!(
+            lifecycle
+                .commit_prepared_shutdown("quit18", ShutdownPurpose::Quit)
+                .is_err()
+        );
+        operation.finish();
+        for _ in 0..10 {
+            tokio::task::yield_now().await;
+        }
+        assert_eq!(
+            lifecycle
+                .shutdown_status("quit18", ShutdownPurpose::Quit)
+                .unwrap()
+                .phase,
+            ShutdownPhase::Ready
+        );
+    }
+    #[tokio::test]
+    async fn task18_running_game_keeps_core_writer_blocking() {
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        let operation = lifecycle
+            .admit_owned("game core writer", ActivityPolicy::CoreWork)
+            .unwrap();
+        let mut game = lifecycle
+            .admit_owned("proven game", ActivityPolicy::Game)
+            .unwrap();
+        game.spawn(ActivityPolicy::Game, || Ok(())).unwrap();
+        operation.follow_spawned_game(&game).unwrap();
+        lifecycle
+            .begin_shutdown("quit18", ShutdownPurpose::Quit)
+            .unwrap();
+        assert!(!game.cancellation().is_cancelled());
+        assert!(
+            operation.cancellation().is_cancelled(),
+            "core logging/finalization needs its own cancellation and settlement"
+        );
+    }
+    async fn phase(
+        lifecycle: &RuntimeLifecycle,
+        request: &str,
+        purpose: ShutdownPurpose,
+        expected: ShutdownPhase,
+    ) {
+        tokio::time::timeout(std::time::Duration::from_secs(1), async {
+            loop {
+                if lifecycle
+                    .shutdown_status(request, purpose)
+                    .is_ok_and(|status| status.phase == expected)
+                {
+                    break;
+                }
+                tokio::task::yield_now().await;
+            }
+        })
+        .await
+        .expect("controlled lifecycle phase");
+    }
+    fn ready() -> Arc<RuntimeLifecycle> {
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle
+    }
+    #[tokio::test]
+    async fn task18_retained_handoff_waiter_loss_keeps_same_owner_gate_and_real_writes() {
+        let lifecycle = ready();
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("session");
+        let worker_path = path.clone();
+        let gate = Arc::new(tokio::sync::Mutex::new(()));
+        let guard = gate.clone().lock_owned().await;
+        let activity = lifecycle
+            .admit_owned("retained producer", ActivityPolicy::CoreWork)
+            .unwrap();
+        let identity = activity.id;
+        let (arrive, arrived) = tokio::sync::oneshot::channel();
+        let (handoff, handed) = tokio::sync::oneshot::channel();
+        let (worker_arrive, worker_arrived) = tokio::sync::oneshot::channel();
+        let (release, released) = tokio::sync::oneshot::channel();
+        let producer = spawn_retained(activity, move |slot| {
+            Box::pin(async move {
+                tokio::fs::write(&worker_path, b"Preparing").await.unwrap();
+                arrive.send(()).unwrap();
+                handed.await.unwrap();
+                let worker = spawn_retained(slot.take().unwrap(), move |slot| {
+                    Box::pin(async move {
+                        assert_eq!(slot.as_ref().unwrap().id, identity);
+                        assert!(slot.as_ref().unwrap().cancellation().is_cancelled());
+                        worker_arrive.send(()).unwrap();
+                        released.await.unwrap();
+                        tokio::fs::write(worker_path, b"Committed").await.unwrap();
+                    })
+                });
+                drop(guard); // actual producer gate releases immediately after worker spawn
+                drop(worker); // requester loss never aborts the retained owner
+            })
+        });
+        arrived.await.unwrap();
+        drop(producer);
+        assert!(gate.try_lock().is_err());
+        lifecycle
+            .prepare_shutdown("handoff", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        assert!(lifecycle.admit("fresh work").is_err());
+        handoff.send(()).unwrap();
+        worker_arrived.await.unwrap();
+        assert!(gate.try_lock().is_ok());
+        assert_eq!(lifecycle.state.lock().unwrap().activities.len(), 1);
+        assert!(
+            lifecycle
+                .state
+                .lock()
+                .unwrap()
+                .activities
+                .contains_key(&identity)
+        );
+        assert_eq!(std::fs::read(&path).unwrap(), b"Preparing");
+        assert!(
+            lifecycle
+                .commit_prepared_shutdown("handoff", ShutdownPurpose::Quit)
+                .is_err()
+        );
+        release.send(()).unwrap();
+        phase(
+            &lifecycle,
+            "handoff",
+            ShutdownPurpose::Quit,
+            ShutdownPhase::Ready,
+        )
+        .await;
+        assert_eq!(std::fs::read(path).unwrap(), b"Committed");
+        assert!(
+            lifecycle
+                .commit_prepared_shutdown("handoff", ShutdownPurpose::Update)
+                .is_err()
+        );
+        lifecycle
+            .commit_prepared_shutdown("handoff", ShutdownPurpose::Quit)
+            .unwrap();
+    }
+    #[tokio::test]
+    async fn task18_surviving_game_detaches_only_after_core_io_and_preserves_evidence() {
+        let root = tempfile::tempdir().unwrap();
+        let lifecycle = Arc::new(RuntimeLifecycle::with_runtime_path(root.path()));
+        lifecycle.reconciliation_finished(Ok(()));
+        let core = lifecycle
+            .admit_owned("game core", ActivityPolicy::CoreWork)
+            .unwrap();
+        let mut game = lifecycle
+            .admit_owned("proven game", ActivityPolicy::Game)
+            .unwrap();
+        game.external_child().unwrap();
+        let record = game.record.clone().unwrap();
+        std::fs::write(&record, b"controlled recovery identity").unwrap();
+        game.spawn(ActivityPolicy::Game, || Ok(())).unwrap();
+        core.follow_spawned_game(&game).unwrap();
+        let game_id = game.id;
+        let game_cancel = game.cancellation();
+        let output = root.path().join("playtime");
+        let worker_output = output.clone();
+        let (arrive, arrived) = tokio::sync::oneshot::channel();
+        let (release, released) = tokio::sync::oneshot::channel();
+        drop(spawn_retained(core, move |slot| {
+            Box::pin(async move {
+                slot.as_ref().unwrap().cancellation().cancelled().await;
+                arrive.send(()).unwrap();
+                released.await.unwrap();
+                tokio::fs::write(worker_output, b"settled playtime and logs")
+                    .await
+                    .unwrap();
+                game.detach_surviving_game().unwrap();
+            })
+        }));
+        lifecycle
+            .prepare_shutdown("quit-game", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        arrived.await.unwrap();
+        assert!(!game_cancel.is_cancelled());
+        assert!(!output.exists());
+        assert!(
+            lifecycle
+                .commit_prepared_shutdown("quit-game", ShutdownPurpose::Quit)
+                .is_err()
+        );
+        release.send(()).unwrap();
+        phase(
+            &lifecycle,
+            "quit-game",
+            ShutdownPurpose::Quit,
+            ShutdownPhase::Ready,
+        )
+        .await;
+        assert_eq!(std::fs::read(output).unwrap(), b"settled playtime and logs");
+        assert_eq!(
+            std::fs::read(record).unwrap(),
+            b"controlled recovery identity"
+        );
+        assert_eq!(
+            lifecycle.state.lock().unwrap().activities[&game_id].phase,
+            ActivityPhase::Running
+        );
+        lifecycle
+            .commit_prepared_shutdown("quit-game", ShutdownPurpose::Quit)
+            .unwrap();
+        // Same surviving game remains a relocation blocker in a separately owned request.
+        lifecycle.state.lock().unwrap().shutdown = None;
+        lifecycle
+            .prepare_shutdown("move-game", ShutdownPurpose::Relocation, async { Ok(()) })
+            .unwrap();
+        phase(
+            &lifecycle,
+            "move-game",
+            ShutdownPurpose::Relocation,
+            ShutdownPhase::Unresolved,
+        )
+        .await;
+    }
+    #[tokio::test]
+    async fn task18_unknown_worker_and_late_game_transition_block_commit() {
+        let lifecycle = ready();
+        let activity = lifecycle
+            .admit_owned("lost worker", ActivityPolicy::CoreWork)
+            .unwrap();
+        let (send, received) = tokio::sync::oneshot::channel();
+        let worker = spawn_retained(activity, move |_| {
+            Box::pin(async move {
+                send.send(()).unwrap();
+                std::future::pending::<()>().await;
+            })
+        });
+        received.await.unwrap();
+        worker.abort();
+        assert!(worker.await.is_err());
+        lifecycle
+            .prepare_shutdown("lost", ShutdownPurpose::Update, async { Ok(()) })
+            .unwrap();
+        phase(
+            &lifecycle,
+            "lost",
+            ShutdownPurpose::Update,
+            ShutdownPhase::Unresolved,
+        )
+        .await;
+        assert!(
+            lifecycle
+                .commit_prepared_shutdown("lost", ShutdownPurpose::Update)
+                .is_err()
+        );
+        let lifecycle = ready();
+        let mut game = lifecycle.admit_owned("game", ActivityPolicy::Game).unwrap();
+        game.spawn(ActivityPolicy::Game, || Ok(())).unwrap();
+        lifecycle
+            .prepare_shutdown("late", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        phase(
+            &lifecycle,
+            "late",
+            ShutdownPurpose::Quit,
+            ShutdownPhase::Ready,
+        )
+        .await;
+        game.settling(); // natural-exit finalization after the ready snapshot
+        assert!(
+            lifecycle
+                .commit_prepared_shutdown("late", ShutdownPurpose::Quit)
+                .is_err()
+        );
+        game.finish();
+        lifecycle
+            .commit_prepared_shutdown("late", ShutdownPurpose::Quit)
+            .unwrap();
+    }
+    #[tokio::test]
+    async fn task18_signal_commit_waiter_loss_and_failed_drain_never_commit_early() {
+        let lifecycle = ready();
+        let owner = lifecycle
+            .admit_owned("entered write", ActivityPolicy::CoreWork)
+            .unwrap();
+        let child = lifecycle.clone();
+        let waiter = tokio::spawn(async move {
+            child
+                .prepare_shutdown_and_commit("signal", ShutdownPurpose::Quit, async { Ok(()) })
+                .await
+        });
+        phase(
+            &lifecycle,
+            "signal",
+            ShutdownPurpose::Quit,
+            ShutdownPhase::Draining,
+        )
+        .await;
+        waiter.abort();
+        let _ = waiter.await;
+        owner.finish();
+        phase(
+            &lifecycle,
+            "signal",
+            ShutdownPurpose::Quit,
+            ShutdownPhase::Ready,
+        )
+        .await;
+        assert!(!lifecycle.shutdown_committed());
+        lifecycle
+            .prepare_shutdown_and_commit("signal", ShutdownPurpose::Quit, async {
+                panic!("repeat drain must not start")
+            })
+            .await
+            .unwrap();
+        assert!(lifecycle.shutdown_committed());
+        let lifecycle = ready();
+        assert!(
+            lifecycle
+                .prepare_shutdown_and_commit("failure", ShutdownPurpose::Update, async {
+                    anyhow::bail!("controlled server drain failure")
+                })
+                .await
+                .is_err()
+        );
+        assert!(!lifecycle.shutdown_committed());
+    }
+
+    #[tokio::test]
+    async fn task18_borrowed_setup_normal_error_drop_waits_destructors_and_unknown_blocks() {
+        for fail in [false, true] {
+            let lifecycle = ready();
+            let root = tempfile::tempdir().unwrap();
+            let temporary = carbon_rt_path::TempPath::new(root.path().into())
+                .maketmpdir()
+                .await
+                .unwrap();
+            let path = temporary.to_path_buf();
+            let owner = lifecycle
+                .admit_owned("borrowed setup", ActivityPolicy::CoreWork)
+                .unwrap();
+            let result = run_borrowed_owned(owner, async move {
+                let temporary = temporary;
+                tokio::fs::write(temporary.join("entered"), b"settled write").await?;
+                if fail {
+                    tokio::fs::write(&*temporary, b"directory rejects file IO").await?;
+                }
+                Ok::<_, anyhow::Error>(())
+            })
+            .await;
+            assert_eq!(result.is_err(), fail);
+            assert!(
+                !path.exists(),
+                "synchronous TempEntry destructor must precede ACK"
+            );
+            lifecycle.begin_relocation("settled").unwrap();
+        }
+        let lifecycle = ready();
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("entered-write");
+        let worker_path = path.clone();
+        let owner = lifecycle
+            .admit_owned("abandoned borrowed setup", ActivityPolicy::CoreWork)
+            .unwrap();
+        let (arrive, arrived) = tokio::sync::oneshot::channel();
+        let (release, released) = std::sync::mpsc::channel();
+        let (done, finished) = tokio::sync::oneshot::channel();
+        let requester = tokio::spawn(run_borrowed_owned(owner, async move {
+            tokio::task::spawn_blocking(move || {
+                std::fs::write(&worker_path, b"entered").unwrap();
+                arrive.send(()).unwrap();
+                released.recv().unwrap();
+                std::fs::write(worker_path, b"actually settled").unwrap();
+                done.send(()).unwrap();
+            })
+            .await
+            .unwrap();
+        }));
+        arrived.await.unwrap();
+        requester.abort();
+        let _ = requester.await;
+        lifecycle
+            .prepare_shutdown("abandoned", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        phase(
+            &lifecycle,
+            "abandoned",
+            ShutdownPurpose::Quit,
+            ShutdownPhase::Unresolved,
+        )
+        .await;
+        assert_eq!(std::fs::read(&path).unwrap(), b"entered");
+        release.send(()).unwrap();
+        finished.await.unwrap();
+        assert_eq!(std::fs::read(path).unwrap(), b"actually settled");
+        assert!(
+            lifecycle
+                .commit_prepared_shutdown("abandoned", ShutdownPurpose::Quit)
+                .is_err(),
+            "lost borrowed ACK cannot be manufactured after the fact"
+        );
+    }
+    #[tokio::test]
+    async fn task18_queued_cancellation_does_not_wait_for_unrelated_permit() {
+        let lifecycle = ready();
+        let semaphore = Arc::new(tokio::sync::Semaphore::new(1));
+        let held = semaphore.clone().acquire_owned().await.unwrap();
+        let waiting = semaphore.clone();
+        let activity = lifecycle
+            .admit_owned("queued preparation", ActivityPolicy::CoreWork)
+            .unwrap();
+        let task = spawn_retained(activity, move |slot| {
+            Box::pin(async move {
+                let cancel = slot.as_ref().unwrap().cancellation();
+                wait_or_cancel(&cancel, waiting.acquire_owned()).await
+            })
+        });
+        lifecycle
+            .prepare_shutdown("queue", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        assert!(task.await.unwrap().is_err());
+        assert_eq!(semaphore.available_permits(), 0);
+        phase(
+            &lifecycle,
+            "queue",
+            ShutdownPurpose::Quit,
+            ShutdownPhase::Ready,
+        )
+        .await;
+        lifecycle
+            .commit_prepared_shutdown("queue", ShutdownPurpose::Quit)
+            .unwrap();
+        drop(held);
     }
 }

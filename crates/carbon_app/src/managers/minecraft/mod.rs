@@ -192,7 +192,6 @@ impl ManagerRef<'_, MinecraftManager> {
             &self.app.db,
             self.app.reqwest_client.clone(),
             &version_info.asset_index,
-            runtime_path.get_assets().get_indexes_path(),
         )
         .await?;
 
@@ -272,7 +271,7 @@ mod tests {
 
         let app = crate::setup_managers_for_test().await;
 
-        let java_component = RealJavaChecker
+        let java_component = RealJavaChecker::new(app.runtime_lifecycle.clone())
             .get_bin_info(
                 &PathBuf::from("java"),
                 crate::domain::java::JavaComponentType::Local,
@@ -400,6 +399,12 @@ mod tests {
         if let Some(processors) = &version_info.processors {
             execute_processors(
                 &app.runtime_lifecycle,
+                std::sync::Arc::new(
+                    std::sync::Arc::new(tokio::sync::Semaphore::new(1))
+                        .acquire_owned()
+                        .await
+                        .unwrap(),
+                ),
                 processors,
                 version_info
                     .data

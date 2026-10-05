@@ -90,7 +90,9 @@ pub async fn process_curseforge_server_pack(
     project_id: u32,
     server_pack_file_id: u32,
     task: &VisualTask,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<ServerPackResult> {
+    anyhow::ensure!(!cancel.is_cancelled(), "Server pack preparation cancelled");
     // Create all subtasks upfront so the total weight is fixed and progress
     // only moves forward. The display_name isn't known yet — use a placeholder
     // that we'll replace once we've fetched the file info.
@@ -103,15 +105,17 @@ pub async fn process_curseforge_server_pack(
     t_extract.set_weight(3.0);
 
     // Fetch the server pack file info
-    let file_info = app
-        .modplatforms_manager
-        .curseforge
-        .get_mod_file(ModFileParameters {
-            mod_id: project_id as i32,
-            file_id: server_pack_file_id as i32,
-        })
-        .await
-        .context("Failed to fetch server pack file info")?;
+    let file_info = crate::managers::runtime_lifecycle::wait_or_cancel(cancel, async {
+        app.modplatforms_manager
+            .curseforge
+            .get_mod_file(ModFileParameters {
+                mod_id: project_id as i32,
+                file_id: server_pack_file_id as i32,
+            })
+            .await
+            .context("Failed to fetch server pack file info")
+    })
+    .await??;
 
     let download_url = file_info
         .data
@@ -128,11 +132,11 @@ pub async fn process_curseforge_server_pack(
 
     info!("Downloading CurseForge server pack from {}", download_url);
 
-    let temp_dir = std::env::temp_dir().join(format!("gdl-server-pack-{}", uuid::Uuid::new_v4()));
-    tokio::fs::create_dir_all(&temp_dir)
-        .await
-        .context("Failed to create temp directory")?;
-    let zip_path = temp_dir.join(&file_info.data.file_name);
+    anyhow::ensure!(!cancel.is_cancelled(), "Server archive download cancelled");
+    let temp_dir = tempfile::Builder::new()
+        .prefix("gdl-server-pack-")
+        .tempdir()?;
+    let zip_path = temp_dir.path().join(&file_info.data.file_name);
 
     let mut request = app.reqwest_client.get(download_url);
     // CurseForge rejects unauthenticated CDN downloads; this fetch streams directly
@@ -141,10 +145,13 @@ pub async fn process_curseforge_server_pack(
         request = request.header("x-api-key", api_key);
     }
 
-    let response = request
-        .send()
-        .await
-        .context("Failed to download server pack")?;
+    let response = crate::managers::runtime_lifecycle::wait_or_cancel(cancel, async {
+        request
+            .send()
+            .await
+            .context("Failed to download server pack")
+    })
+    .await??;
 
     if !response.status().is_success() {
         bail!("Failed to download server pack: HTTP {}", response.status());
@@ -157,30 +164,24 @@ pub async fn process_curseforge_server_pack(
         None => t_download.start_opaque(),
     }
 
-    let mut downloaded: u32 = 0;
+    let downloaded: u32;
     let mut last_reported: u32 = 0;
     let report_threshold = total_size.map(|t| (t / 200).max(64 * 1024)).unwrap_or(0);
     let mut file = tokio::fs::File::create(&zip_path)
         .await
         .context("Failed to create temp file")?;
 
-    use tokio::io::AsyncWriteExt;
-    let mut response = response;
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .context("Error reading download chunk")?
-    {
-        file.write_all(&chunk).await?;
-        downloaded += chunk.len() as u32;
+    let mut stream = response.bytes_stream();
+    downloaded = copy_archive_stream(&mut stream, &mut file, cancel, |bytes| {
         if let Some(total) = total_size {
-            if downloaded - last_reported >= report_threshold {
-                t_download.update_download(downloaded, total, false);
-                last_reported = downloaded;
+            if bytes - last_reported >= report_threshold {
+                t_download.update_download(bytes, total, false);
+                last_reported = bytes;
             }
         }
-    }
-    file.flush().await?;
+    })
+    .await?;
+    drop(file);
     match total_size {
         Some(_) => t_download.complete_download(),
         None => t_download.complete_opaque(),
@@ -191,6 +192,7 @@ pub async fn process_curseforge_server_pack(
         downloaded
     );
 
+    anyhow::ensure!(!cancel.is_cancelled(), "Server pack extraction cancelled");
     // --- Extract server pack (subtask already created upfront) ---
     t_extract.start_opaque();
 
@@ -201,11 +203,22 @@ pub async fn process_curseforge_server_pack(
 
     let zip_path_clone = zip_path.clone();
     let data_path_clone = data_path.clone();
-    tokio::task::spawn_blocking(move || extract_zip_to_dir(&zip_path_clone, &data_path_clone))
-        .await?
-        .context("Failed to extract server pack")?;
+    let skipped_links =
+        crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async move {
+            tokio::task::spawn_blocking(move || {
+                extract_zip_to_dir(&zip_path_clone, &data_path_clone)
+            })
+            .await?
+            .context("Failed to extract server pack")
+        })
+        .await?;
+    warn_skipped_links(task, skipped_links);
     t_extract.complete_opaque();
 
+    anyhow::ensure!(
+        !cancel.is_cancelled(),
+        "Server pack preparation cancelled after extraction settled"
+    );
     // Detect game version from extracted files
     let game_version =
         detect_game_version_from_files(&data_path, &file_info.data.game_versions).await;
@@ -233,9 +246,11 @@ pub async fn process_modrinth_server_pack(
     project_id: &str,
     version_id: &str,
     task: &VisualTask,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<ServerPackResult> {
     use carbon_platforms::modrinth::search::VersionID;
 
+    anyhow::ensure!(!cancel.is_cancelled(), "Server pack preparation cancelled");
     // Create all subtasks upfront so the total weight is fixed from the start
     // and progress only moves forward. Use a placeholder name for now.
     let t_download_mrpack = task.subtask(Translation::ServerTaskDownloadServerPack {
@@ -248,12 +263,14 @@ pub async fn process_modrinth_server_pack(
     let t_extract = task.subtask(Translation::ServerTaskExtractModpackOverrides);
 
     // Fetch version info
-    let version = app
-        .modplatforms_manager
-        .modrinth
-        .get_version(VersionID(version_id.to_string()))
-        .await
-        .context("Failed to fetch Modrinth version info")?;
+    let version = crate::managers::runtime_lifecycle::wait_or_cancel(cancel, async {
+        app.modplatforms_manager
+            .modrinth
+            .get_version(VersionID(version_id.to_string()))
+            .await
+            .context("Failed to fetch Modrinth version info")
+    })
+    .await??;
 
     // Find the primary file (the .mrpack)
     let mrpack_file = version
@@ -272,18 +289,18 @@ pub async fn process_modrinth_server_pack(
 
     info!("Downloading Modrinth mrpack from {}", mrpack_file.url);
 
-    let temp_dir = std::env::temp_dir().join(format!("gdl-mrpack-{}", uuid::Uuid::new_v4()));
-    tokio::fs::create_dir_all(&temp_dir)
-        .await
-        .context("Failed to create temp directory")?;
-    let mrpack_path = temp_dir.join(&mrpack_file.filename);
+    anyhow::ensure!(!cancel.is_cancelled(), "Server archive download cancelled");
+    let temp_dir = tempfile::Builder::new().prefix("gdl-mrpack-").tempdir()?;
+    let mrpack_path = temp_dir.path().join(&mrpack_file.filename);
 
-    let response = app
-        .reqwest_client
-        .get(&mrpack_file.url)
-        .send()
-        .await
-        .context("Failed to download mrpack")?;
+    let response = crate::managers::runtime_lifecycle::wait_or_cancel(cancel, async {
+        app.reqwest_client
+            .get(&mrpack_file.url)
+            .send()
+            .await
+            .context("Failed to download mrpack")
+    })
+    .await??;
 
     if !response.status().is_success() {
         bail!("Failed to download mrpack: HTTP {}", response.status());
@@ -296,30 +313,24 @@ pub async fn process_modrinth_server_pack(
         None => t_download_mrpack.start_opaque(),
     }
 
-    let mut downloaded: u32 = 0;
+    let downloaded: u32;
     let mut last_reported: u32 = 0;
     let report_threshold = total_size.map(|t| (t / 200).max(64 * 1024)).unwrap_or(0);
     let mut file = tokio::fs::File::create(&mrpack_path)
         .await
         .context("Failed to create temp file")?;
 
-    use tokio::io::AsyncWriteExt;
-    let mut response = response;
-    while let Some(chunk) = response
-        .chunk()
-        .await
-        .context("Error reading mrpack download chunk")?
-    {
-        file.write_all(&chunk).await?;
-        downloaded += chunk.len() as u32;
+    let mut stream = response.bytes_stream();
+    downloaded = copy_archive_stream(&mut stream, &mut file, cancel, |bytes| {
         if let Some(total) = total_size {
-            if downloaded - last_reported >= report_threshold {
-                t_download_mrpack.update_download(downloaded, total, false);
-                last_reported = downloaded;
+            if bytes - last_reported >= report_threshold {
+                t_download_mrpack.update_download(bytes, total, false);
+                last_reported = bytes;
             }
         }
-    }
-    file.flush().await?;
+    })
+    .await?;
+    drop(file);
     match total_size {
         Some(_) => t_download_mrpack.complete_download(),
         None => t_download_mrpack.complete_opaque(),
@@ -332,6 +343,10 @@ pub async fn process_modrinth_server_pack(
         .await
         .context("Failed to create server data directory")?;
 
+    anyhow::ensure!(
+        !cancel.is_cancelled(),
+        "Server pack index preparation cancelled"
+    );
     // Read the modrinth.index.json from the archive
     let mrpack_path_clone = mrpack_path.clone();
     let index: carbon_platforms::modrinth::version::ModpackIndex =
@@ -346,6 +361,10 @@ pub async fn process_modrinth_server_pack(
         .await?
         .context("Failed to read modrinth.index.json")?;
 
+    anyhow::ensure!(
+        !cancel.is_cancelled(),
+        "Server pack preparation cancelled after index read settled"
+    );
     // Filter files for server compatibility, and refuse anything aimed at a
     // world/save path. A well-formed mrpack should never list save data, but
     // we don't trust the input — the cost of being wrong here is a destroyed
@@ -416,17 +435,19 @@ pub async fn process_modrinth_server_pack(
         t_download_files.complete_opaque();
     });
 
-    carbon_net::download_multiple(
+    let download_result = carbon_net::download_multiple(
         &downloadables,
         carbon_net::DownloadOptions::builder()
+            .cancel_token(cancel.clone())
             .concurrency(concurrency as usize)
             .progress_sender(progress_tx)
             .build(),
     )
     .await
-    .context("Failed to download modpack files")?;
-
-    let _ = progress_task.await;
+    .context("Failed to download modpack files");
+    progress_task.await?;
+    download_result?;
+    anyhow::ensure!(!cancel.is_cancelled(), "Server pack preparation cancelled");
 
     // --- Extract overrides (subtask already created upfront) ---
     t_extract.start_opaque();
@@ -1744,5 +1765,326 @@ mod task07r2_operator_tests {
             std::fs::read(root.path().join("SERVER.PROPERTIES")).unwrap(),
             BUNDLED
         );
+    }
+}
+
+/// Shared direct archive writer. The owner retains entered writes and flushes.
+
+#[cfg(test)]
+mod task18_r1_stream_tests {
+    use super::*;
+    use std::{
+        pin::Pin,
+        task::{Context, Poll},
+    };
+    use tokio::io::AsyncWrite;
+    struct PausedWriter {
+        file: tokio::fs::File,
+        entered: Option<tokio::sync::oneshot::Sender<()>>,
+        release: Option<tokio::sync::oneshot::Receiver<()>>,
+    }
+    impl AsyncWrite for PausedWriter {
+        fn poll_write(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+            bytes: &[u8],
+        ) -> Poll<std::io::Result<usize>> {
+            if let Some(entered) = self.entered.take() {
+                let _ = entered.send(());
+            }
+            if let Some(release) = self.release.as_mut() {
+                use std::future::Future;
+                if Pin::new(release).poll(cx).is_pending() {
+                    return Poll::Pending;
+                }
+                self.release = None;
+            }
+            Pin::new(&mut self.file).poll_write(cx, bytes)
+        }
+        fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+            Pin::new(&mut self.file).poll_flush(cx)
+        }
+        fn poll_shutdown(
+            mut self: Pin<&mut Self>,
+            cx: &mut Context<'_>,
+        ) -> Poll<std::io::Result<()>> {
+            Pin::new(&mut self.file).poll_shutdown(cx)
+        }
+    }
+    fn stream(
+        rx: tokio::sync::mpsc::Receiver<Result<Vec<u8>, std::io::Error>>,
+    ) -> Pin<Box<dyn futures::Stream<Item = Result<Vec<u8>, std::io::Error>> + Send>> {
+        Box::pin(futures::stream::unfold(rx, |mut rx| async {
+            rx.recv().await.map(|item| (item, rx))
+        }))
+    }
+    #[tokio::test]
+    async fn task18_r1_archive_pending_body_cancels_without_new_phase() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("archive");
+        let mut file = tokio::fs::File::create(&path).await.unwrap();
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let token = cancel.clone();
+        let mut worker = tokio::spawn(async move {
+            copy_archive_stream(&mut stream(rx), &mut file, &token, |_| {}).await
+        });
+        tokio::task::yield_now().await;
+        cancel.cancel();
+        let result = tokio::time::timeout(std::time::Duration::from_millis(100), &mut worker).await;
+        if result.is_err() {
+            drop(tx);
+            let _ = worker.await;
+            panic!("cancelled archive remained waiting for its next chunk");
+        }
+        assert!(
+            result.unwrap().unwrap().is_err(),
+            "cancelled archive must not authorize extraction"
+        );
+        assert!(std::fs::read(path).unwrap().is_empty());
+    }
+    #[tokio::test]
+    async fn task18_r1_archive_cancel_awaits_entered_real_write_and_flush() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("archive");
+        let file = tokio::fs::File::create(&path).await.unwrap();
+        let (entered, wait_entered) = tokio::sync::oneshot::channel();
+        let (release, wait_release) = tokio::sync::oneshot::channel();
+        let mut writer = PausedWriter {
+            file,
+            entered: Some(entered),
+            release: Some(wait_release),
+        };
+        let (tx, rx) = tokio::sync::mpsc::channel(1);
+        tx.send(Ok(b"entered archive bytes".to_vec()))
+            .await
+            .unwrap();
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let token = cancel.clone();
+        let mut worker = tokio::spawn(async move {
+            copy_archive_stream(&mut stream(rx), &mut writer, &token, |_| {}).await
+        });
+        wait_entered.await.unwrap();
+        cancel.cancel();
+        tokio::task::yield_now().await;
+        assert!(
+            !worker.is_finished(),
+            "entered write must settle before cancellation returns"
+        );
+        release.send(()).unwrap();
+        let result = tokio::time::timeout(std::time::Duration::from_millis(150), &mut worker).await;
+        if result.is_err() {
+            drop(tx);
+            let _ = worker.await;
+            panic!("completed entered write then ignored cancellation at next chunk boundary");
+        }
+        assert!(result.unwrap().unwrap().is_err());
+        assert_eq!(std::fs::read(path).unwrap(), b"entered archive bytes");
+    }
+    #[tokio::test]
+    async fn task18_r1_archive_healthy_completion_retains_bytes_and_progress() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("archive");
+        let mut file = tokio::fs::File::create(&path).await.unwrap();
+        let mut progress = Vec::new();
+        let mut stream = futures::stream::iter([
+            Ok::<_, std::io::Error>(b"first".to_vec()),
+            Ok(b"second".to_vec()),
+        ]);
+        assert_eq!(
+            copy_archive_stream(
+                &mut stream,
+                &mut file,
+                &tokio_util::sync::CancellationToken::new(),
+                |n| progress.push(n)
+            )
+            .await
+            .unwrap(),
+            11
+        );
+        drop(file);
+        assert_eq!(std::fs::read(path).unwrap(), b"firstsecond");
+        assert_eq!(progress, vec![5, 11]);
+    }
+}
+
+async fn copy_archive_stream<S, B, E, W>(
+    stream: &mut S,
+    file: &mut W,
+    cancel: &tokio_util::sync::CancellationToken,
+    mut progress: impl FnMut(u32),
+) -> anyhow::Result<u32>
+where
+    S: futures::Stream<Item = Result<B, E>> + Unpin,
+    B: AsRef<[u8]>,
+    E: Into<anyhow::Error>,
+    W: tokio::io::AsyncWrite + Unpin,
+{
+    use futures::StreamExt;
+    use tokio::io::AsyncWriteExt;
+    let result: anyhow::Result<u32> = async {
+        let mut downloaded = 0u32;
+        loop {
+            // Only pending transport waits are cancelable. An entered write is
+            // always awaited before observing cancellation at the next boundary.
+            let chunk =
+                crate::managers::runtime_lifecycle::wait_or_cancel(cancel, stream.next()).await?;
+            let Some(chunk) = chunk else {
+                break;
+            };
+            let chunk = chunk.map_err(Into::into)?;
+            file.write_all(chunk.as_ref()).await?;
+            downloaded =
+                downloaded.saturating_add(chunk.as_ref().len().try_into().unwrap_or(u32::MAX));
+            progress(downloaded);
+        }
+        Ok(downloaded)
+    }
+    .await;
+    // Drain entered file work before returning cancellation/error; caller drops
+    // the handle before its owned private archive directory is cleaned up.
+    let flushed = file.flush().await;
+    let closed = file.shutdown().await;
+    let downloaded = result?;
+    flushed?;
+    closed?;
+    Ok(downloaded)
+}
+
+#[cfg(test)]
+mod task18_r2_phase_tests {
+    use super::*;
+    use crate::managers::runtime_lifecycle::{
+        ActivityPolicy, RuntimeLifecycle, ShutdownPurpose, run_owned_phase, spawn_retained,
+    };
+    use std::io::{Read, Write};
+    use std::sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    };
+    async fn phase_case(hash: bool, cancel_during_io: bool) {
+        let root = tempfile::tempdir().unwrap();
+        let zip_path = root.path().join("pack.zip");
+        let target = root.path().join("data");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
+        for (name, bytes) in [
+            ("first.txt", b"first".as_slice()),
+            ("second.txt", b"second".as_slice()),
+        ] {
+            zip.start_file(name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(bytes).unwrap();
+        }
+        zip.finish().unwrap();
+        let source = root.path().join("archive-to-hash");
+        std::fs::write(&source, b"real hash input across a controlled boundary").unwrap();
+        let expected = {
+            use sha2::Digest;
+            sha2::Sha512::digest(std::fs::read(&source).unwrap()).to_vec()
+        };
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        let owner = lifecycle
+            .admit_owned("pack phase fixture", ActivityPolicy::CoreWork)
+            .unwrap();
+        let cancel = owner.cancellation();
+        let (entered, wait_entered) = tokio::sync::oneshot::channel();
+        let (release, wait_release) = std::sync::mpsc::channel();
+        let phases = Arc::new(AtomicUsize::new(0));
+        let observed = phases.clone();
+        let data = target.clone();
+        let worker = spawn_retained(owner, move |_| {
+            Box::pin(async move {
+                let prep_target = data.clone();
+                let digest = run_owned_phase(&cancel, || async move {
+                    tokio::task::spawn_blocking(move || -> anyhow::Result<Vec<u8>> {
+                        if hash {
+                            use sha2::Digest;
+                            let mut file = std::fs::File::open(source)?;
+                            let mut first = [0u8; 4];
+                            file.read_exact(&mut first)?;
+                            let mut digest = sha2::Sha512::new();
+                            digest.update(first);
+                            entered.send(()).unwrap();
+                            wait_release.recv().unwrap();
+                            std::io::copy(&mut file, &mut digest)?;
+                            Ok(digest.finalize().to_vec())
+                        } else {
+                            std::fs::create_dir_all(&prep_target)?;
+                            entered.send(()).unwrap();
+                            wait_release.recv().unwrap();
+                            std::fs::create_dir_all(prep_target.join("settled-mkdir"))?;
+                            Ok(Vec::new())
+                        }
+                    })
+                    .await?
+                })
+                .await?;
+                if hash {
+                    assert_eq!(
+                        digest, expected,
+                        "entered complete hash must settle even when cancelled"
+                    );
+                }
+                run_owned_phase(&cancel, || async move {
+                    observed.fetch_add(1, Ordering::SeqCst);
+                    tokio::fs::create_dir_all(&data).await?;
+                    tokio::task::spawn_blocking(move || extract_zip_to_dir(&zip_path, &data))
+                        .await?
+                        .map(drop)
+                })
+                .await
+            })
+        });
+        wait_entered.await.unwrap();
+        if cancel_during_io {
+            lifecycle
+                .prepare_shutdown("phase", ShutdownPurpose::Quit, async { Ok(()) })
+                .unwrap();
+        }
+        tokio::task::yield_now().await;
+        assert!(
+            !worker.is_finished(),
+            "entered preparatory IO must remain owned"
+        );
+        if cancel_during_io {
+            assert!(
+                lifecycle
+                    .commit_prepared_shutdown("phase", ShutdownPurpose::Quit)
+                    .is_err()
+            );
+        }
+        release.send(()).unwrap();
+        let result = worker.await.unwrap();
+        if cancel_during_io {
+            assert_eq!(
+                phases.load(Ordering::SeqCst),
+                0,
+                "cancelled preparatory IO admitted a new extraction phase"
+            );
+            assert!(result.is_err());
+            assert!(!target.join("first.txt").exists());
+        } else {
+            result.unwrap();
+            assert_eq!(phases.load(Ordering::SeqCst), 1);
+            assert_eq!(std::fs::read(target.join("first.txt")).unwrap(), b"first");
+            assert_eq!(std::fs::read(target.join("second.txt")).unwrap(), b"second");
+        }
+        if !hash {
+            assert!(target.join("settled-mkdir").is_dir());
+        }
+    }
+    #[tokio::test]
+    async fn task18_r2_cancel_during_hash_refuses_next_extraction() {
+        phase_case(true, true).await;
+    }
+    #[tokio::test]
+    async fn task18_r2_cancel_during_directory_io_refuses_next_extraction() {
+        phase_case(false, true).await;
+    }
+    #[tokio::test]
+    async fn task18_r2_healthy_hash_directory_and_extraction_complete() {
+        phase_case(true, false).await;
+        phase_case(false, false).await;
     }
 }

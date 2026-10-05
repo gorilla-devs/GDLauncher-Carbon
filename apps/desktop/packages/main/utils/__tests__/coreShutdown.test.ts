@@ -233,6 +233,48 @@ it("installer pending outcome remains visible and retry keeps its ID", async () 
   expect(new Set(ids).size).toBe(1)
   expect(child.kill).not.toHaveBeenCalled()
 })
+it("waits out a 40 s server drain and quits on the first attempt", async () => {
+  // The core's worst case is about 42 s: 30 s for the server to save after
+  // 'stop', then a kill, then its last log lines. That must fit the deadline.
+  vi.useFakeTimers()
+  const { child, proc } = processFixture()
+  child.kill.mockImplementation(() => {
+    child.emit("exit", 0)
+    return true
+  })
+  const calls: string[] = []
+  const startedAt = Date.now()
+  const transport = vi.fn(async (url, options) => {
+    const body = JSON.parse(options.body)
+    const endpoint = String(url).split("/").at(-1)!
+    calls.push(endpoint)
+    const phase =
+      endpoint === "shutdown-status" && Date.now() - startedAt >= 40000
+        ? "ready"
+        : "draining"
+    return {
+      ok: true,
+      json: async () => ({
+        ...body,
+        runtimePath: process.cwd(),
+        status: { ...body, phase, blockers: [] }
+      })
+    }
+  })
+  const quit = expect(
+    stopCoreForShutdown(
+      { port: 1, apiToken: "fixture", process: proc },
+      "quit",
+      transport as any
+    )
+  ).resolves.toBeUndefined()
+  await vi.advanceTimersByTimeAsync(41000)
+  await quit
+  expect(calls[0]).toBe("prepare-shutdown")
+  expect(calls.filter((call) => call === "prepare-shutdown")).toHaveLength(1)
+  expect(calls.at(-1)).toBe("shutdown")
+  expect(child.kill).toHaveBeenCalledOnce()
+})
 
 it("waits out a 42 s server drain followed by the hand-over of running games", async () => {
   // After the drain the core cancels the session workers of running games

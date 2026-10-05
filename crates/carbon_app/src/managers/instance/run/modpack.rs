@@ -154,11 +154,12 @@ fn staging_apply_already_promoted(apply_started: bool, packinfo_exists: bool) ->
 ///
 /// When it's done, it creates the staging-packinfo.json and packinfo.json file and marks the modpack as installed through
 /// the modpack-complete disk flag.
+#[cfg(test)]
 pub async fn process_modpack(
     app: Arc<AppInner>,
     instance_id: InstanceId,
     deep_check: bool,
-    mut config: Instance,
+    config: Instance,
     instance_shortpath: String,
     task: &VisualTask,
     has_callback_task: bool,
@@ -169,6 +170,37 @@ pub async fn process_modpack(
     Option<RepairMarkerFile>,
     Option<disk_scan::DiskScan>,
 )> {
+    process_modpack_cancellable(
+        app,
+        instance_id,
+        deep_check,
+        config,
+        instance_shortpath,
+        task,
+        has_callback_task,
+        session_owner,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+}
+
+pub async fn process_modpack_cancellable(
+    app: Arc<AppInner>,
+    instance_id: InstanceId,
+    deep_check: bool,
+    mut config: Instance,
+    instance_shortpath: String,
+    task: &VisualTask,
+    has_callback_task: bool,
+    session_owner: &mut Option<Owner>,
+    cancel: &tokio_util::sync::CancellationToken,
+) -> anyhow::Result<(
+    TSubtasks,
+    Option<StandardVersion>,
+    Option<RepairMarkerFile>,
+    Option<disk_scan::DiskScan>,
+)> {
+    anyhow::ensure!(!cancel.is_cancelled(), "Modpack preparation cancelled");
     let installed_snapshot = config.clone();
     let mut version: Option<StandardVersion> = None;
 
@@ -543,15 +575,18 @@ pub async fn process_modpack(
                 Some(Modplatform::GDLPack)
             }
             (false, false, false, Some(Modpack::Curseforge(modpack))) => {
-                let file = app
-                    .modplatforms_manager()
-                    .curseforge
-                    .get_mod_file(ModFileParameters {
-                        file_id: modpack.file_id as i32,
-                        mod_id: modpack.project_id as i32,
-                    })
-                    .await?
-                    .data;
+                // A lookup: a quit drops it rather than wait on a stalled network.
+                let file = crate::managers::runtime_lifecycle::lookup_or_cancel(
+                    cancel,
+                    app.modplatforms_manager()
+                        .curseforge
+                        .get_mod_file(ModFileParameters {
+                            file_id: modpack.file_id as i32,
+                            mod_id: modpack.project_id as i32,
+                        }),
+                )
+                .await?
+                .data;
 
                 t_request.complete_opaque();
 
@@ -576,29 +611,37 @@ pub async fn process_modpack(
                     t_download_packfile.complete_opaque();
                 });
 
-                curseforge::download_modpack_zip(&app, &file, &cffile_path, modpack_progress_tx)
-                    .await?;
-
+                let result = curseforge::download_modpack_zip(
+                    &app,
+                    &file,
+                    &cffile_path,
+                    modpack_progress_tx,
+                    &cancel,
+                )
+                .await;
                 completion.await?;
+                result?;
 
                 Some(Modplatform::Curseforge)
             }
             (false, false, false, Some(Modpack::Modrinth(modpack))) => {
-                let file = app
-                    .modplatforms_manager()
-                    .modrinth
-                    .get_version(VersionID(modpack.version_id.clone()))
-                    .await?
-                    .files
-                    .into_iter()
-                    .reduce(|a, b| if b.primary { b } else { a })
-                    .ok_or_else(|| {
-                        anyhow!(
-                            "Modrinth project '{}' version '{}' does not have a file",
-                            modpack.project_id,
-                            modpack.version_id
-                        )
-                    })?;
+                let file = crate::managers::runtime_lifecycle::lookup_or_cancel(
+                    cancel,
+                    app.modplatforms_manager()
+                        .modrinth
+                        .get_version(VersionID(modpack.version_id.clone())),
+                )
+                .await?
+                .files
+                .into_iter()
+                .reduce(|a, b| if b.primary { b } else { a })
+                .ok_or_else(|| {
+                    anyhow!(
+                        "Modrinth project '{}' version '{}' does not have a file",
+                        modpack.project_id,
+                        modpack.version_id
+                    )
+                })?;
 
                 t_request.complete_opaque();
 
@@ -624,14 +667,25 @@ pub async fn process_modpack(
                     t_download_packfile.complete_opaque();
                 });
 
-                modrinth::download_mrpack(&app, &file, &mrfile_path, modpack_progress_tx).await?;
-
+                let result = modrinth::download_mrpack(
+                    &app,
+                    &file,
+                    &mrfile_path,
+                    modpack_progress_tx,
+                    &cancel,
+                )
+                .await;
                 completion.await?;
+                result?;
 
                 Some(Modplatform::Modrinth)
             }
         };
 
+        anyhow::ensure!(
+            !cancel.is_cancelled(),
+            "Modpack preparation cancelled after archive download settled"
+        );
         let archive_name = match file {
             Some(Modplatform::Curseforge) => Some("curseforge"),
             Some(Modplatform::Modrinth) => Some("modrinth"),
@@ -647,9 +701,12 @@ pub async fn process_modpack(
             Some(name) => Some(session::Archive {
                 name: name.into(),
                 sha512: hex::encode(
-                    crate::managers::instance::modpack::origin_check::hash_file_sha512(
-                        &setup_path.join(name),
-                    )
+                    crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async {
+                        crate::managers::instance::modpack::origin_check::hash_file_sha512(
+                            &setup_path.join(name),
+                        )
+                        .await
+                    })
                     .await?,
                 ),
             }),
@@ -659,7 +716,11 @@ pub async fn process_modpack(
         };
 
         // Temporarily create a staging directory and download the modpack files there
-        tokio::fs::create_dir_all(&staging_dir.join("instance")).await?;
+        crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async {
+            tokio::fs::create_dir_all(&staging_dir.join("instance")).await?;
+            Ok(())
+        })
+        .await?;
         let instance_prep_path = InstancePath::new(staging_dir.clone());
 
         let mut skipped_mods = Vec::new();
@@ -694,7 +755,7 @@ pub async fn process_modpack(
                     t_extract_files.complete_opaque();
                 });
 
-                let modpack_info = curseforge::prepare_modpack_from_zip(
+                let modpack_info = curseforge::prepare_modpack_from_zip_cancellable(
                     &app,
                     &cffile_path,
                     &instance_prep_path,
@@ -702,14 +763,16 @@ pub async fn process_modpack(
                     preparation_oracle.as_ref(),
                     t_addon_metadata,
                     modpack_progress_tx,
+                    cancel,
                 )
                 .await
                 .map_err(|e| {
                     tracing::error!("Error preparing modpack: {:?}", e);
                     e
-                })?;
+                });
 
                 completion.await?;
+                let modpack_info = modpack_info?;
 
                 tokio::fs::create_dir_all(skip_overrides_path).await?;
 
@@ -762,17 +825,19 @@ pub async fn process_modpack(
                     t_extract_files.complete_opaque();
                 });
 
-                let modpack_info = modrinth::prepare_modpack_from_mrpack(
+                let modpack_info = modrinth::prepare_modpack_from_mrpack_cancellable(
                     &app,
                     &mrfile_path,
                     &instance_prep_path,
                     skip_overrides,
                     preparation_oracle.as_ref(),
                     modpack_progress_tx,
+                    cancel,
                 )
-                .await?;
+                .await;
 
                 completion.await?;
+                let modpack_info = modpack_info?;
 
                 tokio::fs::create_dir_all(skip_overrides_path).await?;
 
@@ -841,9 +906,10 @@ pub async fn process_modpack(
                     preparation_oracle.as_ref(),
                     modpack_progress_tx,
                 )
-                .await?;
+                .await;
 
                 completion.await?;
+                let modpack_info = modpack_info?;
 
                 tokio::fs::create_dir_all(skip_overrides_path).await?;
 
@@ -858,6 +924,12 @@ pub async fn process_modpack(
             }
             None => None,
         };
+
+        let concurrency = app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .concurrent_downloads;
 
         let (progress_watch_tx, mut progress_watch_rx) =
             tokio::sync::watch::channel(carbon_net::Progress::new());
@@ -882,12 +954,6 @@ pub async fn process_modpack(
             t_download_modpack_files.complete_opaque();
         });
 
-        let concurrency = app
-            .settings_manager()
-            .get_settings()
-            .await?
-            .concurrent_downloads;
-
         #[cfg(test)]
         if !modpack_downloads.is_empty() {
             app.instance_manager
@@ -896,9 +962,10 @@ pub async fn process_modpack(
                 .await;
         }
         // Actually downloads the modpack files
-        carbon_net::download_multiple(
+        let download_result = carbon_net::download_multiple(
             &modpack_downloads[..],
             DownloadOptions::builder()
+                .cancel_token(cancel.clone())
                 .concurrency(concurrency as usize)
                 .progress_sender(progress_watch_tx)
                 .deep_check(deep_check || reused > 0)
@@ -907,9 +974,9 @@ pub async fn process_modpack(
         .await
         .with_context(|| {
             format!("Failed to download modpack instance files for instance {instance_id}")
-        })?;
-
+        });
         completion.await?;
+        download_result?;
 
         if let Some(v) = v {
             tracing::info!("Modpack version: {v:?}");

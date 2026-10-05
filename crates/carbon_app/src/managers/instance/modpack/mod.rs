@@ -189,11 +189,17 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         modpack: Modpack,
     ) -> anyhow::Result<VisualTaskId> {
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            format!("instance {instance_id} setup producer"),
+            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+        )?;
         let app = self.app.clone();
-        tokio::spawn(async move {
-            app.instance_manager()
-                .change_modpack_owned(instance_id, modpack)
-                .await
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| {
+            Box::pin(async move {
+                app.instance_manager()
+                    .change_modpack_owned(instance_id, modpack, activity)
+                    .await
+            })
         })
         .await?
     }
@@ -214,14 +220,23 @@ impl ManagerRef<'_, InstanceManager> {
         self,
         instance_id: InstanceId,
         modpack: Modpack,
+        runtime_activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
     ) -> anyhow::Result<VisualTaskId> {
         use super::run::LaunchState;
-
-        let runtime_activity = self
-            .app
-            .runtime_lifecycle
-            .admit(format!("instance {instance_id} setup producer"))?;
-        let operation = self.lock_instance(instance_id).await;
+        // A check can download a whole pack archive and hash every file, so
+        // the player can stop it, and a quit never waits for it. Stoppable
+        // from the start, as the request may first wait for the gate.
+        let cancel = runtime_activity
+            .as_ref()
+            .context("version change lost its runtime activity")?
+            .cancellation()
+            .child_token();
+        let check = VersionChangeCheck::begin(&self.version_change_checks, instance_id, &cancel);
+        let operation = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Err(ChangeVersionRefusal::Cancelled.into()),
+            operation = self.lock_instance(instance_id) => operation,
+        };
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -292,7 +307,7 @@ impl ManagerRef<'_, InstanceManager> {
         self.run_prepare_with_setup_cleanup(
             instance_id,
             operation,
-            runtime_activity,
+            runtime_activity.take().unwrap(),
             session::Request {
                 producer: session::Producer::Change,
                 kind: session::Kind::Pack,
@@ -332,14 +347,32 @@ impl ManagerRef<'_, InstanceManager> {
     pub async fn repair_modpack(
         self,
         instance_id: InstanceId,
+        options: RepairMarkerFile,
+        expected_pending: Option<String>,
+    ) -> anyhow::Result<VisualTaskId> {
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            format!("instance {instance_id} repair producer"),
+            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+        )?;
+        let app = self.app.clone();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| {
+            Box::pin(async move {
+                app.instance_manager()
+                    .repair_modpack_owned(instance_id, options, expected_pending, activity)
+                    .await
+            })
+        })
+        .await?
+    }
+
+    async fn repair_modpack_owned(
+        self,
+        instance_id: InstanceId,
         mut options: RepairMarkerFile,
+        expected_pending: Option<String>,
+        runtime_activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
     ) -> anyhow::Result<VisualTaskId> {
         use super::run::LaunchState;
-
-        let runtime_activity = self
-            .app
-            .runtime_lifecycle
-            .admit(format!("instance {instance_id} setup producer"))?;
         let operation = self.lock_instance(instance_id).await;
         let instances = self.instances.read().await;
         let instance = instances
@@ -448,7 +481,7 @@ impl ManagerRef<'_, InstanceManager> {
         self.run_prepare_with_setup_cleanup(
             instance_id,
             operation,
-            runtime_activity,
+            runtime_activity.take().unwrap(),
             session::Request {
                 producer: session::Producer::Repair,
                 kind: session::Kind::Pack,

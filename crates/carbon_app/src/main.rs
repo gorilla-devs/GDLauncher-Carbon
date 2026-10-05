@@ -297,7 +297,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         auto_manage_java_system_profiles,
         &app.db,
         &RealDiscovery::new(app.settings_manager().runtime_path.clone()),
-        &RealJavaChecker,
+        &RealJavaChecker::new(app.runtime_lifecycle.clone()),
     )
     .await
     .expect("Failed to scan and sync java system profiles");
@@ -347,22 +347,16 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
             }
             let request = format!("core-termination-signal-{}", uuid::Uuid::new_v4());
             let purpose = managers::runtime_lifecycle::ShutdownPurpose::Quit;
-            match app2.runtime_lifecycle.begin_shutdown(request, purpose) {
-                Ok(true) => {
-                    let result = app2.server_manager().shutdown_running().await;
-                    match app2.runtime_lifecycle.settle_shutdown(request, result) {
-                        Ok(status) => {
-                            tracing::error!("Shutdown unresolved; core retained: {:?}", status)
-                        }
-                        Err(error) => {
-                            tracing::error!("Shutdown unresolved; core retained: {error:#}")
-                        }
-                    }
-                }
-                Ok(false) => tracing::error!(
-                    "Shutdown is still owned by the previous request; retry authenticated status"
-                ),
-                Err(error) => tracing::error!("Shutdown refused; core retained: {error:#}"),
+            let draining_app = app2.clone();
+            match app2
+                .runtime_lifecycle
+                .prepare_shutdown_and_commit(request, purpose, async move {
+                    draining_app.server_manager().shutdown_running().await
+                })
+                .await
+            {
+                Ok(()) => logger::flush_and_exit(0),
+                Err(error) => tracing::error!("Shutdown unresolved; core retained: {error:#}"),
             }
         }
     });

@@ -1,4 +1,5 @@
 pub mod datapacks;
+mod deletion;
 use self::export::InstanceExportManager;
 use self::importer::InstanceImportManager;
 use self::log::GameLog;
@@ -348,6 +349,49 @@ fn path_length(path: &Path) -> usize {
 #[cfg(not(windows))]
 fn path_length(path: &Path) -> usize {
     path.as_os_str().len()
+}
+
+async fn stage_instance_icon(
+    root: &Path,
+    icon: Option<(String, Vec<u8>)>,
+) -> anyhow::Result<InstanceIcon> {
+    match icon {
+        Some((name, data)) => {
+            // The caller's basename is metadata, never a staging destination.
+            // Keep recognized formats without decoding or restricting image bytes.
+            let extension = Path::new(&name)
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(str::to_ascii_lowercase)
+                .filter(|s| {
+                    matches!(
+                        s.as_str(),
+                        "png"
+                            | "jpg"
+                            | "jpeg"
+                            | "gif"
+                            | "webp"
+                            | "svg"
+                            | "avif"
+                            | "ico"
+                            | "bmp"
+                            | "tif"
+                            | "tiff"
+                            | "apng"
+                            | "heic"
+                            | "heif"
+                            | "jxl"
+                    )
+                })
+                .unwrap_or_else(|| "png".into());
+            let path = format!("icon.{extension}");
+            tokio::fs::write(root.join(&path), data)
+                .await
+                .context("saving instance icon")?;
+            Ok(InstanceIcon::RelativePath(path))
+        }
+        None => Ok(InstanceIcon::Default),
+    }
 }
 
 /// Characters illegal in a Windows filename — and unsafe or meaningless in a
@@ -2161,10 +2205,41 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         F: FnOnce(PathBuf) -> I,
         I: Future<Output = anyhow::Result<()>>,
     {
-        let _runtime_activity = self
-            .app
-            .runtime_lifecycle
-            .admit("create/import instance setup")?;
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            "borrowed create/import instance setup",
+            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+        )?;
+        crate::managers::runtime_lifecycle::run_borrowed_owned(
+            activity,
+            self.create_instance_ext_owned(
+                group,
+                name,
+                icon,
+                seconds_played,
+                last_played,
+                version,
+                notes,
+                initializer,
+            ),
+        )
+        .await
+    }
+
+    async fn create_instance_ext_owned<F, I>(
+        self,
+        group: GroupId,
+        name: String,
+        icon: Option<(String, Vec<u8>)>,
+        seconds_played: Option<u32>,
+        last_played: Option<DateTime<Utc>>,
+        version: InstanceVersionSource,
+        notes: String,
+        initializer: F,
+    ) -> anyhow::Result<InstanceId>
+    where
+        F: FnOnce(PathBuf) -> I,
+        I: Future<Output = anyhow::Result<()>>,
+    {
         trace!("Creating instance");
 
         let tmpdir = self
@@ -2177,16 +2252,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         tokio::fs::create_dir(tmpdir.join("instance")).await?;
 
-        let icon = match icon {
-            Some((path, data)) => {
-                tokio::fs::write(tmpdir.join(&path), data)
-                    .await
-                    .context("saving instance icon")?;
-
-                InstanceIcon::RelativePath(path)
-            }
-            None => InstanceIcon::Default,
-        };
+        let icon = stage_instance_icon(&tmpdir, icon).await?;
 
         let (version, modpack, pack_locked) = match version {
             InstanceVersionSource::Version(version) => (Some(version), None, false),
@@ -2344,10 +2410,26 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self,
         update: domain::InstanceSettingsUpdate,
     ) -> anyhow::Result<Option<VisualTaskId>> {
-        let runtime_activity = self
-            .app
-            .runtime_lifecycle
-            .admit(format!("instance {} settings", update.instance_id))?;
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            format!("instance {} settings", update.instance_id),
+            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+        )?;
+        let app = self.app.clone();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| {
+            Box::pin(async move {
+                app.instance_manager()
+                    .update_instance_owned(update, activity)
+                    .await
+            })
+        })
+        .await?
+    }
+
+    async fn update_instance_owned(
+        self,
+        update: domain::InstanceSettingsUpdate,
+        runtime_activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
+    ) -> anyhow::Result<Option<VisualTaskId>> {
         let _instance_guard = self.lock_instance(update.instance_id).await;
 
         // Snapshot only after taking ownership; disk writes never hold the map.
@@ -2706,7 +2788,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     None,
                     true,
                     _instance_guard,
-                    runtime_activity,
+                    runtime_activity.take().unwrap(),
                     Some(request),
                 )
                 .await?;
@@ -2871,25 +2953,26 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     })
                 };
 
-                // Surface the error to the UI so the caller realizes the
-                // instance still exists.
-                app.invalidate(GET_GROUPS, None);
-                app.invalidate(GET_ALL_INSTANCES, None);
-                app.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
+                    // Surface the error to the UI so the caller realizes the
+                    // instance still exists.
+                    app.invalidate(GET_GROUPS, None);
+                    app.invalidate(GET_ALL_INSTANCES, None);
+                    app.invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
-                // Push a dedicated failure event so the frontend can show a
-                // toast (the rspc call already returned Ok before the spawned
-                // deletion ran, so the caller's onError never fires).
-                app.invalidate(
-                    DELETE_INSTANCE_FAILED,
-                    Some(serde_json::json!({
-                        "instanceId": instance_id.0,
-                        "instanceName": instance_name,
-                        "error": format!("{e:#}"),
-                    })),
-                );
-            }
-        });
+                    // Push a dedicated failure event so the frontend can show a
+                    // toast (the rspc call already returned Ok before the spawned
+                    // deletion ran, so the caller's onError never fires).
+                    app.invalidate(
+                        DELETE_INSTANCE_FAILED,
+                        Some(serde_json::json!({
+                            "instanceId": instance_id.0,
+                            "instanceName": instance_name,
+                            "error": format!("{e:#}"),
+                        })),
+                    );
+                }
+            },
+        )?;
 
         Ok(())
     }
@@ -3259,6 +3342,20 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
     /// Delete an instance group and all instances it contains.
     pub async fn delete_group_with_instances(self, group: GroupId) -> anyhow::Result<()> {
+        let app = self.app.clone();
+        deletion::spawn_deletion(
+            &self.app.runtime_lifecycle,
+            format!("delete instance group {group}"),
+            async move {
+                app.instance_manager()
+                    ._delete_group_with_instances(group)
+                    .await
+            },
+        )?
+        .await?
+    }
+
+    async fn _delete_group_with_instances(self, group: GroupId) -> anyhow::Result<()> {
         // Get all instances in the group
         let group_id = *group;
         let instances_in_group =
@@ -5360,5 +5457,86 @@ mod test {
 
         assert_eq!(icon_filename(None, Some("image/png")), "icon.png");
         assert_eq!(icon_filename(None, None), "icon.png");
+    }
+}
+
+#[cfg(test)]
+mod task18_icon_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task18_icon_staging_control_names_are_owned_paths() {
+        for basename in [
+            ".setup",
+            "instance.json",
+            "icon.png",
+            "noext",
+            "embedded.png",
+        ] {
+            let root = tempfile::tempdir().unwrap();
+            let url =
+                reqwest::Url::parse(&format!("https://fixture.invalid/{basename}?size=64#icon"))
+                    .unwrap();
+            let supplied = icon_filename(icon_filename_from_url(&url), Some("image/png"));
+            let bytes = hex::decode("89504e470d0a1a0a0000000d4948445200000001000000010804000000b51c0c020000000b4944415478da63fcff1f0003030200efa79a1f0000000049454e44ae426082").unwrap();
+            let icon = stage_instance_icon(root.path(), Some((supplied, bytes.to_vec())))
+                .await
+                .unwrap();
+            let info = info::Instance {
+                name: "fixture".into(),
+                icon: icon.clone(),
+                date_created: Utc::now(),
+                date_updated: Utc::now(),
+                last_played: None,
+                seconds_played: 0,
+                modpack: None,
+                game_configuration: info::GameConfig {
+                    version: None,
+                    global_java_args: true,
+                    extra_java_args: None,
+                    memory: None,
+                    java_override: None,
+                    game_resolution: None,
+                },
+                pre_launch_hook: None,
+                post_exit_hook: None,
+                wrapper_command: None,
+                mod_sources: None,
+                notes: String::new(),
+            };
+            let json = schema::make_instance_config(info).unwrap();
+            std::fs::write(root.path().join("instance.json"), &json).unwrap();
+            std::fs::create_dir(root.path().join(".setup")).unwrap();
+            let InstanceIcon::RelativePath(path) = icon else {
+                panic!("missing icon")
+            };
+            assert_eq!(
+                std::fs::read(root.path().join(&path)).unwrap(),
+                bytes,
+                "{basename}"
+            );
+            assert_ne!(path, "instance.json");
+            assert_ne!(path, ".setup");
+            assert_eq!(
+                std::fs::read_to_string(root.path().join("instance.json")).unwrap(),
+                json
+            );
+        }
+    }
+    #[tokio::test]
+    async fn task18_icon_missing_and_supported_svg_keep_usable_storage() {
+        let root = tempfile::tempdir().unwrap();
+        assert!(matches!(
+            stage_instance_icon(root.path(), None).await.unwrap(),
+            InstanceIcon::Default
+        ));
+        let svg = br#"<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"><rect width="1" height="1"/></svg>"#;
+        let icon = stage_instance_icon(root.path(), Some(("embedded.svg".into(), svg.to_vec())))
+            .await
+            .unwrap();
+        let InstanceIcon::RelativePath(path) = icon else {
+            panic!("missing SVG")
+        };
+        assert_eq!(path, "icon.svg");
+        assert_eq!(std::fs::read(root.path().join(path)).unwrap(), svg);
     }
 }

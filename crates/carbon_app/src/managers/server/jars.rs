@@ -50,7 +50,9 @@ pub async fn download_vanilla_server_jar(
     game_version: &str,
     server_path: &ServerPath,
     progress: Option<&Subtask>,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> Result<()> {
+    anyhow::ensure!(!cancel.is_cancelled(), "Server jar download cancelled");
     let jar_path = server_path.get_server_jar_path();
 
     // Ensure data directory exists
@@ -61,14 +63,18 @@ pub async fn download_vanilla_server_jar(
 
     // Fetch version manifest
     let manifest_url = "https://piston-meta.mojang.com/mc/game/version_manifest_v2.json";
-    let manifest: serde_json::Value = client
-        .get(manifest_url)
-        .send()
-        .await
-        .context("Failed to fetch version manifest")?
-        .json()
-        .await
-        .context("Failed to parse version manifest")?;
+    let manifest: serde_json::Value =
+        crate::managers::runtime_lifecycle::wait_or_cancel(cancel, async {
+            client
+                .get(manifest_url)
+                .send()
+                .await
+                .context("Failed to fetch version manifest")?
+                .json()
+                .await
+                .context("Failed to parse version manifest")
+        })
+        .await??;
 
     // Find the version entry
     let versions = manifest["versions"]
@@ -85,14 +91,18 @@ pub async fn download_vanilla_server_jar(
         .context("Version entry missing URL")?;
 
     // Fetch version details
-    let version_details: serde_json::Value = client
-        .get(version_url)
-        .send()
-        .await
-        .context("Failed to fetch version details")?
-        .json()
-        .await
-        .context("Failed to parse version details")?;
+    let version_details: serde_json::Value =
+        crate::managers::runtime_lifecycle::wait_or_cancel(cancel, async {
+            client
+                .get(version_url)
+                .send()
+                .await
+                .context("Failed to fetch version details")?
+                .json()
+                .await
+                .context("Failed to parse version details")
+        })
+        .await??;
 
     let server_download = &version_details["downloads"]["server"];
     let downloadable = server_jar_downloadable(server_download, &jar_path)?;
@@ -135,10 +145,7 @@ pub async fn download_vanilla_server_jar(
     let downloadables = [downloadable];
     let download = carbon_net::download_multiple(
         &downloadables,
-        DownloadOptions::builder()
-            .concurrency(1)
-            .progress_sender(progress_tx)
-            .build(),
+        operation_download_options(cancel, progress_tx),
     );
 
     let (result, ()) = tokio::join!(download, forward_progress);
@@ -215,5 +222,44 @@ mod tests {
         let server_download = serde_json::json!({ "size": 123 });
 
         assert!(server_jar_downloadable(&server_download, Path::new("/tmp/server.jar")).is_err());
+    }
+}
+
+fn operation_download_options(
+    cancel: &tokio_util::sync::CancellationToken,
+    progress: tokio::sync::watch::Sender<carbon_net::Progress>,
+) -> carbon_net::DownloadOptions {
+    DownloadOptions::builder()
+        .concurrency(1)
+        .progress_sender(progress)
+        .cancel_token(cancel.clone())
+        .build()
+}
+
+#[cfg(test)]
+mod task18_r1_download_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task18_r1_operation_token_reaches_download_supervisor() {
+        let cancel = tokio_util::sync::CancellationToken::new();
+        cancel.cancel();
+        let (tx, _rx) = tokio::sync::watch::channel(carbon_net::Progress::new());
+        // Empty batch: run_downloads has no file worker or request to execute.
+        let result =
+            carbon_net::download_multiple(&[], operation_download_options(&cancel, tx)).await;
+        assert!(
+            matches!(result, Err(carbon_net::DownloadError::Cancelled)),
+            "operation cancellation was lost: {result:?}"
+        );
+        let (tx, _rx) = tokio::sync::watch::channel(carbon_net::Progress::new());
+        assert_eq!(
+            carbon_net::download_multiple(
+                &[],
+                operation_download_options(&tokio_util::sync::CancellationToken::new(), tx)
+            )
+            .await
+            .unwrap(),
+            false
+        );
     }
 }

@@ -89,7 +89,7 @@ impl crate::error::FeErrorCode for InsufficientMemoryError {
 #[derive(Debug)]
 pub struct PersistenceManager {
     pub(super) instance_download_lock: Semaphore,
-    loader_install_lock: Semaphore,
+    loader_install_lock: Arc<Semaphore>,
     java_check_lock: Mutex<()>,
 }
 
@@ -97,7 +97,7 @@ impl PersistenceManager {
     pub fn new() -> Self {
         Self {
             instance_download_lock: Semaphore::new(1),
-            loader_install_lock: Semaphore::new(1),
+            loader_install_lock: Arc::new(Semaphore::new(1)),
             java_check_lock: Mutex::new(()),
         }
     }
@@ -165,23 +165,22 @@ impl ManagerRef<'_, InstanceManager> {
         callback_task: Option<InstanceCallback>,
         deep_check: bool,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
-        let runtime_activity = self
-            .app
-            .runtime_lifecycle
-            .admit(format!("instance {instance_id} preparation/session"))?;
-        #[cfg(test)]
-        self.test_hooks.pause("runtime_admitted", instance_id).await;
-        let operation = self.lock_instance(instance_id).await;
-        self.prepare_game_admitted(
-            instance_id,
-            launch_account,
-            callback_task,
-            deep_check,
-            operation,
-            runtime_activity,
-            None,
-        )
-        .await
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            format!("instance {instance_id} preparation/session"),
+            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+        )?;
+        let app = self.app.clone();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| Box::pin(async move {
+            let manager = app.instance_manager();
+            #[cfg(test)]
+            manager.test_hooks.pause("runtime_admitted", instance_id).await;
+            let cancel = activity.as_ref().unwrap().cancellation();
+            let operation = tokio::select! {
+                _ = cancel.cancelled() => bail!("Instance preparation cancelled while waiting for ownership"),
+                operation = manager.lock_instance(instance_id) => operation,
+            };
+            manager.prepare_game_owned(instance_id, launch_account, callback_task, deep_check, operation, activity, None).await
+        })).await?
     }
 
     pub(super) async fn prepare_game_admitted(
@@ -198,18 +197,20 @@ impl ManagerRef<'_, InstanceManager> {
         // an atomic session publication is still running on the blocking pool. Keep its
         // existing gate and lifecycle activity until setup settles and the worker owns it.
         let app = self.app.clone();
-        tokio::spawn(async move {
-            app.instance_manager()
-                .prepare_game_owned(
-                    instance_id,
-                    launch_account,
-                    callback_task,
-                    deep_check,
-                    operation,
-                    runtime_activity,
-                    setup_request,
-                )
-                .await
+        crate::managers::runtime_lifecycle::spawn_retained(runtime_activity, move |activity| {
+            Box::pin(async move {
+                app.instance_manager()
+                    .prepare_game_owned(
+                        instance_id,
+                        launch_account,
+                        callback_task,
+                        deep_check,
+                        operation,
+                        activity,
+                        setup_request,
+                    )
+                    .await
+            })
         })
         .await
         .context("admitted preparation producer failed")?
@@ -222,7 +223,7 @@ impl ManagerRef<'_, InstanceManager> {
         callback_task: Option<InstanceCallback>,
         deep_check: bool,
         operation: super::InstanceOperationGuard,
-        runtime_activity: crate::managers::runtime_lifecycle::RuntimeActivity,
+        runtime_activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
         setup_request: Option<super::modpack::session::Request>,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
         use super::modpack::session::Session;
@@ -546,7 +547,7 @@ impl ManagerRef<'_, InstanceManager> {
         // Capture datetime once to ensure log entry and file name match exactly
         let now = Local::now();
 
-        let (log_id, log) = if launch_account.is_some() {
+        let (log_id, mut log) = if launch_account.is_some() {
             let (id, sender) = app
                 .instance_manager()
                 .create_log(instance_id, Some(now))
@@ -645,138 +646,179 @@ impl ManagerRef<'_, InstanceManager> {
         self.test_hooks
             .pause("producer_before_handoff", instance_id)
             .await;
-        let installation_task = tokio::spawn(async move {
-            let _runtime_activity = runtime_activity;
-            let mut game_activity = None;
-            let mut time_at_start = None;
+        let worker_activity = runtime_activity.take().unwrap();
+        let installation_task = crate::managers::runtime_lifecycle::spawn_retained(
+            worker_activity,
+            move |activity| {
+                Box::pin(async move {
+                    let _runtime_activity = activity.as_ref().unwrap();
+                    let cancel = _runtime_activity.cancellation();
+                    let mut game_activity = None;
+                    let mut time_at_start = None;
 
-            let instance_root = instance_path.get_root();
-            let setup_path = instance_root.join(".setup");
-            let is_setup = setup_path.is_dir();
+                    let instance_root = instance_path.get_root();
+                    let setup_path = instance_root.join(".setup");
+                    let is_setup = setup_path.is_dir();
 
-            // Acquire semaphore FIRST - this is where queuing happens
-            // Instance stays in Queued state until we get the lock
-            let instance_manager = app.instance_manager();
-            let download_guard = instance_manager
-                .persistence_manager
-                .instance_download_lock
-                .acquire()
-                .await
-                .expect("Semaphore should not be closed");
+                    // Acquire semaphore FIRST - this is where queuing happens
+                    // Instance stays in Queued state until we get the lock
+                    let instance_manager = app.instance_manager();
+                    let mut download_guard = None;
+                    let try_result: anyhow::Result<_> = async {
+                        download_guard = Some(
+                            crate::managers::runtime_lifecycle::wait_or_cancel(
+                                &cancel,
+                                instance_manager
+                                    .persistence_manager
+                                    .instance_download_lock
+                                    .acquire(),
+                            )
+                            .await??,
+                        );
+                        anyhow::ensure!(!cancel.is_cancelled(), "Instance preparation cancelled");
+                        app.instance_manager()
+                            .change_launch_state(instance_id, id, LaunchState::Preparing(id))
+                            .await?;
+                        if let Some(owner) = &session_owner {
+                            Session::require(&instance_root, owner).await?;
+                        }
+                        let mut downloads = Vec::new();
 
-            let try_result: anyhow::Result<_> = async {
-                app.instance_manager()
-                    .change_launch_state(instance_id, id, LaunchState::Preparing(id))
-                    .await?;
-                if let Some(owner) = &session_owner {
-                    Session::require(&instance_root, owner).await?;
-                }
-                let mut downloads = Vec::new();
+                        let (t_subtasks, modpack_version, repair_options, oracle_disk_scan) =
+                            modpack::process_modpack_cancellable(
+                                Arc::clone(&app),
+                                instance_id.clone(),
+                                deep_check,
+                                config,
+                                instance_shortpath.clone(),
+                                &task,
+                                callback_task.is_some(),
+                                &mut session_owner,
+                                &cancel,
+                            )
+                            .await?;
+                        anyhow::ensure!(
+                            !cancel.is_cancelled(),
+                            "Instance preparation cancelled before apply"
+                        );
+                        modpack::process_modpack_staging(
+                            Arc::clone(&app),
+                            instance_id,
+                            instance_shortpath.clone(),
+                            &t_subtasks,
+                            repair_options,
+                            oracle_disk_scan,
+                            session_owner.as_ref(),
+                        )
+                        .await?;
+                        #[cfg(test)]
+                        app.instance_manager()
+                            .test_hooks
+                            .pause("setup_staged", instance_id)
+                            .await;
 
-                let (t_subtasks, modpack_version, repair_options, oracle_disk_scan) =
-                    modpack::process_modpack(
-                        Arc::clone(&app),
-                        instance_id.clone(),
-                        deep_check,
-                        config,
-                        instance_shortpath.clone(),
-                        &task,
-                        callback_task.is_some(),
-                        &mut session_owner,
-                    )
-                    .await?;
-                modpack::process_modpack_staging(
-                    Arc::clone(&app),
-                    instance_id,
-                    instance_shortpath.clone(),
-                    &t_subtasks,
-                    repair_options,
-                    oracle_disk_scan,
-                    session_owner.as_ref(),
-                )
-                .await?;
+                        anyhow::ensure!(
+                            !cancel.is_cancelled(),
+                            "Instance preparation cancelled after settled apply"
+                        );
+                        let version = if modpack_version.is_some() {
+                            modpack_version
+                        } else {
+                            version
+                        };
 
-                let version = if modpack_version.is_some() {
-                    modpack_version
-                } else {
-                    version
-                };
+                        let version = match version {
+                            Some(v) => v,
+                            None => bail!(
+                                "Instance has no associated game version and cannot be launched"
+                            ),
+                        };
 
-                let version = match version {
-                    Some(v) => v,
-                    None => bail!("Instance has no associated game version and cannot be launched"),
-                };
+                        t_subtasks.t_request_version_info.start_opaque();
 
-                t_subtasks.t_request_version_info.start_opaque();
+                        // A lookup: a quit drops it rather than wait on a
+                        // stalled network.
+                        let mut version_info = crate::managers::runtime_lifecycle::lookup_or_cancel(
+                            &cancel,
+                            app.minecraft_manager()
+                                .get_minecraft_version(&version.release),
+                        )
+                        .await
+                        .map_err(|e| {
+                            anyhow::anyhow!("Error getting minecraft version: {:?}", e)
+                        })?;
 
-                let mut version_info = app
-                    .minecraft_manager()
-                    .get_minecraft_version(&version.release)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Error getting minecraft version: {:?}", e))?;
+                        t_subtasks.t_request_version_info.complete_opaque();
 
-                t_subtasks.t_request_version_info.complete_opaque();
+                        let java = java::check_and_install(
+                            Arc::clone(&app),
+                            &version_info,
+                            &t_subtasks,
+                            &version,
+                            java_override,
+                            auto_manage_java_system_profiles,
+                            log.as_ref(),
+                            file.as_mut(),
+                            &cancel,
+                        )
+                        .await?;
 
-                let java = java::check_and_install(
-                    Arc::clone(&app),
-                    &version_info,
-                    &t_subtasks,
-                    &version,
-                    java_override,
-                    auto_manage_java_system_profiles,
-                    log.as_ref(),
-                    file.as_mut(),
-                )
-                .await?;
+                        let (lwjgl_group, assets_dir, version_info) = minecraft::process_minecraft(
+                            Arc::clone(&app),
+                            instance_id,
+                            deep_check,
+                            instance_shortpath,
+                            &t_subtasks,
+                            version_info,
+                            &version,
+                            &java,
+                            log.as_ref(),
+                            file.as_mut(),
+                            &mut downloads,
+                            &cancel,
+                        )
+                        .await?;
 
-                let (lwjgl_group, assets_dir, version_info) = minecraft::process_minecraft(
-                    Arc::clone(&app),
-                    instance_id,
-                    deep_check,
-                    instance_shortpath,
-                    &t_subtasks,
-                    version_info,
-                    &version,
-                    &java,
-                    log.as_ref(),
-                    file.as_mut(),
-                    &mut downloads,
-                )
-                .await?;
+                        // If the setup path exists, let's delete it because installation is now complete
+                        if setup_path.try_exists()? {
+                            let manager = app.instance_manager();
+                            let _operation = manager.lock_instance(instance_id).await;
+                            let owner = session_owner
+                                .as_ref()
+                                .context("unbound setup cannot be disposed")?;
+                            // Every setup this one replaced is settled now: their
+                            // downloads go, their records stay.
+                            super::modpack::session::dispose(&instance_root, owner).await?;
+                        }
 
-                // If the setup path exists, let's delete it because installation is now complete
-                if setup_path.try_exists()? {
-                    let manager = app.instance_manager();
-                    let _operation = manager.lock_instance(instance_id).await;
-                    let owner = session_owner
-                        .as_ref()
-                        .context("unbound setup cannot be disposed")?;
-                    let session = Session::require(&instance_root, owner).await?;
-                    if session.phase != Phase::Committed {
-                        bail!("uncommitted setup cannot be disposed");
-                    }
-                    tokio::fs::remove_dir_all(&setup_path).await?;
-                }
+                        anyhow::ensure!(
+                            !cancel.is_cancelled(),
+                            "Instance preparation cancelled before launch"
+                        );
+                        match launch_account {
+                            Some(account) => {
+                                if let Some(pre_launch_hook) =
+                                    pre_launch_hook.filter(|v| !v.is_empty())
+                                {
+                                    let mut split = split_hook_command(&pre_launch_hook)
+                                        .ok_or_else(|| {
+                                            anyhow::anyhow!("Failed to parse pre-launch hook")
+                                        })?
+                                        .into_iter();
 
-                match launch_account {
-                    Some(account) => {
-                        if let Some(pre_launch_hook) = pre_launch_hook.filter(|v| !v.is_empty()) {
-                            let mut split = split_hook_command(&pre_launch_hook)
-                                .ok_or_else(|| anyhow::anyhow!("Failed to parse pre-launch hook"))?
-                                .into_iter();
+                                    let main_command = split.next().ok_or_else(|| {
+                                        anyhow::anyhow!("Pre-launch hook is empty")
+                                    })?;
 
-                            let main_command = split
-                                .next()
-                                .ok_or_else(|| anyhow::anyhow!("Pre-launch hook is empty"))?;
-
-                            let pre_launch_command = tokio::time::timeout(
+                                    let pre_launch_command = tokio::time::timeout(
                                 HOOK_TIMEOUT,
-                                crate::managers::runtime_lifecycle::tracked_output(
+                                crate::managers::runtime_lifecycle::tracked_output_reserved(
                                     &app.runtime_lifecycle,
                                     tokio::process::Command::new(main_command)
                                         .args(split)
                                         .current_dir(instance_path.get_data_path())
                                         .kill_on_drop(true),
+                                    crate::managers::runtime_lifecycle::ActivityPolicy::Hook, None,
                                 ),
                             )
                             .await
@@ -786,270 +828,294 @@ impl ManagerRef<'_, InstanceManager> {
                                 )
                             })?
                             .map_err(|e| {
-                                anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
+                                if e.kind() == std::io::ErrorKind::Interrupted {
+                                    anyhow::anyhow!("Pre-launch hook was stopped before it finished: {:?}", e)
+                                } else {
+                                    anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
+                                }
                             })?;
 
-                            if !pre_launch_command.status.success() {
-                                return Err(anyhow::anyhow!(
-                                    "Pre-launch hook failed with status: {:?} \n{}",
-                                    pre_launch_command.status,
-                                    String::from_utf8(pre_launch_command.stderr)
-                                        .unwrap_or_default()
-                                ));
-                            }
-
-                            tracing::info!(
-                                "Pre-launch hook completed successfully {}",
-                                String::from_utf8(pre_launch_command.stdout).unwrap_or_default()
-                            );
-                        }
-
-                        let mut ownership =
-                            app.runtime_lifecycle.admit(format!("game {instance_id}"))?;
-                        ownership.external_child()?;
-                        game_activity = Some(ownership);
-                        let launched = managers::minecraft::minecraft::launch_minecraft(
-                            java,
-                            account,
-                            xmx_memory,
-                            xms_memory,
-                            game_resolution,
-                            &extra_java_args,
-                            &runtime_path,
-                            version_info,
-                            &lwjgl_group,
-                            instance_path.clone(),
-                            assets_dir,
-                            wrapper_command,
-                            game_activity.as_mut().expect("game ownership"),
-                        )
-                        .await;
-                        if let Ok(child) = &launched {
-                            if let Some(ownership) = &game_activity {
-                                ownership.record_child_pid(child.id())?;
-                                _runtime_activity.follow_spawned_game(ownership)?;
-                            }
-                        } else if let Some(ownership) = game_activity.take() {
-                            ownership.finish();
-                        }
-                        Ok(Some(launched?))
-                    }
-                    None => {
-                        if let Some(callback_task) = callback_task {
-                            let t_subtasks = t_subtasks.t_finalize_import.as_ref();
-                            callback_task(
-                                t_subtasks
-                                    .expect("If callback_task is Some, subtask will also be Some"),
-                            )
-                            .await?;
-                        }
-
-                        let _ = app
-                            .instance_manager()
-                            .change_launch_state(
-                                instance_id,
-                                id,
-                                LaunchState::Inactive { failed_task: None },
-                            )
-                            .await;
-
-                        Ok(None)
-                    }
-                }
-            }
-            .await;
-
-            // Downloading, installing and spawning the process are done; release the global
-            // download permit before the game-session wait so other instances can be prepared
-            // and launched concurrently instead of queuing behind an already-running game.
-            drop(download_guard);
-
-            match try_result {
-                Err(e) => {
-                    task.fail(e).await;
-
-                    let _ = app
-                        .instance_manager()
-                        .change_launch_state(
-                            instance_id,
-                            id,
-                            LaunchState::Inactive {
-                                failed_task: Some(id),
-                            },
-                        )
-                        .await;
-                }
-                Ok(None) => {}
-                Ok(Some(mut child)) => {
-                    drop(task);
-
-                    let _liveness_watch = app.instance_manager().instance_running_tracker.marker();
-
-                    let _ = app
-                        .rich_presence_manager()
-                        .update_activity("Playing Minecraft".to_string())
-                        .await;
-
-                    let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
-
-                    let start_time = Utc::now();
-
-                    let Some(process_id) = child.id() else {
-                        // Process exited before we could capture its PID.
-                        // Surface as a launch error rather than panicking the
-                        // task (which would leave the instance stuck in
-                        // Preparing).
-                        tracing::error!(
-                            "Process exited before PID could be captured (instance {})",
-                            *instance_id
-                        );
-                        let _ = app
-                            .instance_manager()
-                            .change_launch_state(
-                                instance_id,
-                                id,
-                                LaunchState::Inactive {
-                                    failed_task: Some(id),
-                                },
-                            )
-                            .await;
-                        return;
-                    };
-
-                    // Record the pid and its start time so a future
-                    // `InstanceManager::scan_instances` pass can prove this is
-                    // still the same game JVM and adopt it, if the core exits
-                    // without going through the kill_rx/child.wait() path
-                    // below — the user closing the launcher, a crash, a
-                    // force-quit, Windows TerminateProcess. Best-effort: never
-                    // blocks or fails the launch on write failure. If the
-                    // process has already exited by the time its start time is
-                    // looked up, the pidfile is skipped entirely rather than
-                    // written without one — an unverifiable pidfile could
-                    // later be matched against an unrelated process that
-                    // reused the pid, which is worse than leaving no pidfile
-                    // at all.
-                    let mut system = System::new();
-                    system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(process_id)]));
-                    match orphan_pid::process_start_time(&system, process_id) {
-                        Some(process_start_time) => {
-                            orphan_pid::write_pid_file(
-                                &instance_path.get_root(),
-                                super::PID_FILE_NAME,
-                                process_id,
-                                process_start_time,
-                            )
-                            .await;
-                        }
-                        None => {
-                            tracing::warn!(
-                                "Could not determine start time for instance {} process (pid {}); not writing a pidfile for it",
-                                *instance_id,
-                                process_id
-                            );
-                        }
-                    }
-
-                    let Some(running_log_id) = log_id else {
-                        tracing::error!("log_id missing when launching instance {}", *instance_id);
-                        let _ = app
-                            .instance_manager()
-                            .change_launch_state(
-                                instance_id,
-                                id,
-                                LaunchState::Inactive {
-                                    failed_task: Some(id),
-                                },
-                            )
-                            .await;
-                        return;
-                    };
-
-                    let _ = app
-                        .instance_manager()
-                        .change_launch_state(
-                            instance_id,
-                            id,
-                            LaunchState::Running(RunningInstance {
-                                task_id: Some(id),
-                                process_id,
-                                kill_tx: Some(kill_tx),
-                                // This core owns the process and stops it
-                                // through the real child handle (`kill_tx`
-                                // above), never by re-resolving the pid — so
-                                // there is nothing here that ever needs to
-                                // re-verify it against a start time.
-                                process_start_time: None,
-                                start_time,
-                                log: Some(running_log_id),
-                                // This core owns the process, so the loop
-                                // below keeps its own `last_stored_time` and
-                                // banks against a real `child.wait()`.
-                                playtime: None,
-                            }),
-                        )
-                        .await;
-
-                    let (Some(stdout), Some(stderr)) = (child.stdout.take(), child.stderr.take())
-                    else {
-                        tracing::error!(
-                            "Failed to capture stdout/stderr from child process for instance {}",
-                            *instance_id
-                        );
-                        let _ = app
-                            .instance_manager()
-                            .change_launch_state(
-                                instance_id,
-                                id,
-                                LaunchState::Inactive {
-                                    failed_task: Some(id),
-                                },
-                            )
-                            .await;
-                        return;
-                    };
-
-                    let mut last_stored_time = start_time;
-                    let update_playtime = async {
-                        loop {
-                            tokio::time::sleep(Duration::from_secs(60)).await;
-                            let elapsed = elapsed_secs_clamped(last_stored_time);
-                            last_stored_time = Utc::now();
-                            let r = app
-                                .instance_manager()
-                                .update_playtime(instance_id, elapsed)
-                                .await;
-                            if let Err(e) = r {
-                                tracing::error!({ error = ?e }, "error updating instance playtime");
-                            }
-                        }
-                    };
-
-                    time_at_start = Some(Utc::now());
-
-                    let (stop_reads, stop_rx) = watch::channel(false);
-                    let (exit_result, incomplete_drain) = supervise_logs(
-                        async {
-                            tokio::select! {
-                                _ = child.wait() => {
-                                    tracing::debug!("Instance waited");
-                                },
-                                Some(()) = kill_rx.recv() => {
-                                    tracing::debug!("Instance killed");
-                                    if let Err(e) = child.kill().await {
-                                        tracing::warn!(
-                                            "Failed to kill child process for instance {}: {}",
-                                            *instance_id,
-                                            e
-                                        );
+                                    if !pre_launch_command.status.success() {
+                                        return Err(anyhow::anyhow!(
+                                            "Pre-launch hook failed with status: {:?} \n{}",
+                                            pre_launch_command.status,
+                                            String::from_utf8(pre_launch_command.stderr)
+                                                .unwrap_or_default()
+                                        ));
                                     }
-                                },
-                                _ = update_playtime => {
-                                    tracing::debug!("Instance updated playtime");
+
+                                    tracing::info!(
+                                        "Pre-launch hook completed successfully {}",
+                                        String::from_utf8(pre_launch_command.stdout)
+                                            .unwrap_or_default()
+                                    );
+                                    // A quit lets the hook finish but not the
+                                    // launch it was preparing.
+                                    anyhow::ensure!(
+                                        !cancel.is_cancelled(),
+                                        "Instance preparation cancelled while the pre-launch hook ran"
+                                    );
+                                }
+
+                                let mut ownership =
+                                    app.runtime_lifecycle.admit(format!("game {instance_id}"))?;
+                                ownership.external_child()?;
+                                game_activity = Some(ownership);
+                                let launched = managers::minecraft::minecraft::launch_minecraft(
+                                    java,
+                                    account,
+                                    xmx_memory,
+                                    xms_memory,
+                                    game_resolution,
+                                    &extra_java_args,
+                                    &runtime_path,
+                                    version_info,
+                                    &lwjgl_group,
+                                    instance_path.clone(),
+                                    assets_dir,
+                                    wrapper_command,
+                                    game_activity.as_mut().expect("game ownership"),
+                                )
+                                .await;
+                                if let Ok(child) = &launched {
+                                    if let Some(ownership) = &game_activity {
+                                        // The game runs from here on: a record
+                                        // that cannot be written must not drop
+                                        // it untracked.
+                                        ownership.record_spawned_child(child.id());
+                                        _runtime_activity.follow_spawned_game(ownership)?;
+                                    }
+                                } else if let Some(ownership) = game_activity.take() {
+                                    ownership.finish();
+                                }
+                                Ok(Some(launched?))
+                            }
+                            None => {
+                                if let Some(callback_task) = callback_task {
+                                    let t_subtasks = t_subtasks.t_finalize_import.as_ref();
+                                    callback_task(t_subtasks.expect(
+                                        "If callback_task is Some, subtask will also be Some",
+                                    ))
+                                    .await?;
+                                }
+
+                                let _ = app
+                                    .instance_manager()
+                                    .change_launch_state(
+                                        instance_id,
+                                        id,
+                                        LaunchState::Inactive { failed_task: None },
+                                    )
+                                    .await;
+
+                                Ok(None)
+                            }
+                        }
+                    }
+                    .await;
+
+                    // Downloading, installing and spawning the process are done; release the global
+                    // download permit before the game-session wait so other instances can be prepared
+                    // and launched concurrently instead of queuing behind an already-running game.
+                    drop(download_guard);
+
+                    match try_result {
+                        Err(e) => {
+                            task.fail(e).await;
+
+                            let _ = app
+                                .instance_manager()
+                                .change_launch_state(
+                                    instance_id,
+                                    id,
+                                    LaunchState::Inactive {
+                                        failed_task: Some(id),
+                                    },
+                                )
+                                .await;
+                        }
+                        Ok(None) => {}
+                        Ok(Some(mut child)) => {
+                            drop(task);
+
+                            let _liveness_watch =
+                                app.instance_manager().instance_running_tracker.marker();
+
+                            let _ = app
+                                .rich_presence_manager()
+                                .update_activity("Playing Minecraft".to_string())
+                                .await;
+
+                            let (kill_tx, mut kill_rx) = mpsc::channel::<()>(1);
+
+                            let start_time = Utc::now();
+
+                            let Some(process_id) = child.id() else {
+                                // Process exited before we could capture its PID.
+                                // Surface as a launch error rather than panicking the
+                                // task (which would leave the instance stuck in
+                                // Preparing).
+                                tracing::error!(
+                                    "Process exited before PID could be captured (instance {})",
+                                    *instance_id
+                                );
+                                let _ = app
+                                    .instance_manager()
+                                    .change_launch_state(
+                                        instance_id,
+                                        id,
+                                        LaunchState::Inactive {
+                                            failed_task: Some(id),
+                                        },
+                                    )
+                                    .await;
+                                return;
+                            };
+
+                            // Record the pid and its start time so a future
+                            // `InstanceManager::scan_instances` pass can prove this is
+                            // still the same game JVM and adopt it, if the core exits
+                            // without going through the kill_rx/child.wait() path
+                            // below — the user closing the launcher, a crash, a
+                            // force-quit, Windows TerminateProcess. Best-effort: never
+                            // blocks or fails the launch on write failure. If the
+                            // process has already exited by the time its start time is
+                            // looked up, the pidfile is skipped entirely rather than
+                            // written without one — an unverifiable pidfile could
+                            // later be matched against an unrelated process that
+                            // reused the pid, which is worse than leaving no pidfile
+                            // at all.
+                            let mut system = System::new();
+                            system.refresh_processes(ProcessesToUpdate::Some(&[Pid::from_u32(
+                                process_id,
+                            )]));
+                            match orphan_pid::process_start_time(&system, process_id) {
+                                Some(process_start_time) => {
+                                    orphan_pid::write_pid_file(
+                                        &instance_path.get_root(),
+                                        super::PID_FILE_NAME,
+                                        process_id,
+                                        process_start_time,
+                                    )
+                                    .await;
+                                }
+                                None => {
+                                    tracing::warn!(
+                                        "Could not determine start time for instance {} process (pid {}); not writing a pidfile for it",
+                                        *instance_id,
+                                        process_id
+                                    );
                                 }
                             }
 
-                            child.wait().await
+                            let Some(running_log_id) = log_id else {
+                                tracing::error!(
+                                    "log_id missing when launching instance {}",
+                                    *instance_id
+                                );
+                                let _ = app
+                                    .instance_manager()
+                                    .change_launch_state(
+                                        instance_id,
+                                        id,
+                                        LaunchState::Inactive {
+                                            failed_task: Some(id),
+                                        },
+                                    )
+                                    .await;
+                                return;
+                            };
+
+                            let _ = app
+                                .instance_manager()
+                                .change_launch_state(
+                                    instance_id,
+                                    id,
+                                    LaunchState::Running(RunningInstance {
+                                        task_id: Some(id),
+                                        process_id,
+                                        kill_tx: Some(kill_tx),
+                                        // This core owns the process and stops it
+                                        // through the real child handle (`kill_tx`
+                                        // above), never by re-resolving the pid — so
+                                        // there is nothing here that ever needs to
+                                        // re-verify it against a start time.
+                                        process_start_time: None,
+                                        start_time,
+                                        log: Some(running_log_id),
+                                        // This core owns the process, so the loop
+                                        // below keeps its own `last_stored_time` and
+                                        // banks against a real `child.wait()`.
+                                        playtime: None,
+                                    }),
+                                )
+                                .await;
+
+                            let (Some(stdout), Some(stderr)) =
+                                (child.stdout.take(), child.stderr.take())
+                            else {
+                                tracing::error!(
+                                    "Failed to capture stdout/stderr from child process for instance {}",
+                                    *instance_id
+                                );
+                                let _ = app
+                                    .instance_manager()
+                                    .change_launch_state(
+                                        instance_id,
+                                        id,
+                                        LaunchState::Inactive {
+                                            failed_task: Some(id),
+                                        },
+                                    )
+                                    .await;
+                                return;
+                            };
+
+                            let mut last_stored_time = start_time;
+                            let game_core_stop = tokio_util::sync::CancellationToken::new();
+                            let update_playtime = async {
+                                loop {
+                                    tokio::select! {
+                                        _ = game_core_stop.cancelled() => break,
+                                        _ = tokio::time::sleep(Duration::from_secs(60)) => {},
+                                    }
+                                    let elapsed = elapsed_secs_clamped(last_stored_time);
+                                    last_stored_time = Utc::now();
+                                    if let Err(error) = app
+                                        .instance_manager()
+                                        .update_playtime(instance_id, elapsed)
+                                        .await
+                                    {
+                                        tracing::error!(
+                                            "error updating instance playtime: {error:#}"
+                                        );
+                                    }
+                                }
+                            };
+                            time_at_start = Some(Utc::now());
+                            let (stop_reads, stop_rx) = watch::channel(false);
+                            let detach_reads = stop_reads.clone();
+                            let (exit_result, incomplete_drain) = supervise_logs(
+                        async {
+                            let supervise_game = async {
+                                let outcome = tokio::select! {
+                                    // Cancellation detaches the proven game. It never
+                                    // calls kill or waits for the surviving lifetime.
+                                    _ = cancel.cancelled() => {
+                                        detach_reads.send_replace(true);
+                                        Ok(None)
+                                    },
+                                    result = child.wait() => result.map(Some),
+                                    Some(()) = kill_rx.recv() => {
+                                        if let Err(error) = child.start_kill() { tracing::warn!("Failed to request game stop: {error}"); }
+                                        child.wait().await.map(Some)
+                                    },
+                                };
+                                game_core_stop.cancel();
+                                outcome
+                            };
+                            let (outcome, ()) = tokio::join!(supervise_game, update_playtime);
+                            outcome
                         },
                         read_logs(
                             log.as_ref().expect("log must exist when launching game"),
@@ -1062,219 +1128,301 @@ impl ManagerRef<'_, InstanceManager> {
                         || tokio::time::sleep(POST_EXIT_LOG_GRACE),
                     )
                     .await;
-                    if incomplete_drain {
-                        let message = "Log drain timed out after game exit; inherited pipes remained open and later output may be incomplete";
-                        tracing::warn!("{message}");
-                        if let Some(log) = log.as_ref() {
-                            log.send_modify(|log| log.add_entry(LogEntry::system_message(message)));
-                        }
-                        if let Some(file) = file.as_mut() {
-                            let _ = file
-                                .write_all(format_message_as_log4j_event(message).as_bytes())
-                                .await;
-                        }
-                    }
-
-                    _runtime_activity.settling();
-                    tracing::debug!("Instance exited");
-
-                    let r = app
-                        .instance_manager()
-                        .update_playtime(instance_id, elapsed_secs_clamped(last_stored_time))
-                        .await;
-
-                    if let Err(e) = r {
-                        tracing::error!({ error = ?e }, "error updating instance playtime");
-                    }
-
-                    _runtime_activity.settling();
-                    if let Ok(exitcode) = exit_result {
-                        if let Some(ownership) = game_activity.take() {
-                            ownership.finish();
-                        }
-                        let msg = format!("{exitcode}");
-
-                        if let Some(file) = file.as_mut() {
-                            if let Some(log) = log.as_ref() {
-                                // TODO: not sure how to handle an error in here
-                                log.send_modify(|log| {
-                                    log.add_entry(LogEntry::system_message(msg.clone()))
-                                });
+                            if incomplete_drain {
+                                let message = "Log drain timed out after game exit; inherited pipes remained open and later output may be incomplete";
+                                tracing::warn!("{message}");
+                                if let Some(log) = log.as_ref() {
+                                    log.send_modify(|log| {
+                                        log.add_entry(LogEntry::system_message(message))
+                                    });
+                                }
+                                if let Some(file) = file.as_mut() {
+                                    let _ = file
+                                        .write_all(
+                                            format_message_as_log4j_event(message).as_bytes(),
+                                        )
+                                        .await;
+                                }
                             }
-                            let _ = file
-                                .write_all(format_message_as_log4j_event(&msg).as_bytes())
+
+                            _runtime_activity.settling();
+                            tracing::debug!("Game core supervision settled");
+
+                            let r = app
+                                .instance_manager()
+                                .update_playtime(
+                                    instance_id,
+                                    elapsed_secs_clamped(last_stored_time),
+                                )
                                 .await;
-                        }
-                    }
 
-                    // The game process has exited by this point regardless of
-                    // whether the select above resolved via a natural exit or a
-                    // kill signal — `child.wait()` above blocks until it has.
-                    // The pidfile no longer refers to anything a future startup
-                    // reap needs to clean up. Best-effort, removed exactly once
-                    // here on both paths.
-                    orphan_pid::remove_pid_file(&instance_path.get_root(), super::PID_FILE_NAME)
-                        .await;
+                            if let Err(e) = r {
+                                tracing::error!({ error = ?e }, "error updating instance playtime");
+                            }
 
-                    let _ = app.rich_presence_manager().stop_activity().await;
+                            if matches!(exit_result, Ok(None)) {
+                                if let Some(ownership) = game_activity.take() {
+                                    if let Err(error) = ownership.detach_surviving_game() {
+                                        tracing::error!("Game detachment unresolved: {error:#}");
+                                    }
+                                }
+                                tracing::info!(
+                                    "Core detached from surviving instance {}; running state and PID evidence retained",
+                                    *instance_id
+                                );
+                                drop(log.take());
+                                if let Some(mut output) = file.take() {
+                                    let _ = output.flush().await;
+                                }
+                                return;
+                            }
+                            if let Err(error) = &exit_result {
+                                tracing::error!(
+                                    "Game wait remains unconfirmed; retaining running/PID evidence: {error}"
+                                );
+                                if let Some(mut output) = file.take() {
+                                    let _ = output.flush().await;
+                                }
+                                return;
+                            }
+                            _runtime_activity.settling();
+                            if let Ok(Some(exitcode)) = exit_result {
+                                if let Some(ownership) = game_activity.take() {
+                                    ownership.finish();
+                                }
+                                let msg = format!("{exitcode}");
 
-                    if let Some(post_exit_hook) = post_exit_hook.filter(|v| !v.is_empty()) {
-                        match split_hook_command(&post_exit_hook)
-                            .ok_or_else(|| anyhow::anyhow!("Failed to parse post-exit hook"))
-                            .map(|v| v.into_iter())
-                        {
-                            Ok(mut split) => match split.next() {
-                                Some(main_command) => {
-                                    let post_exit_command = tokio::time::timeout(
+                                if let Some(file) = file.as_mut() {
+                                    if let Some(log) = log.as_ref() {
+                                        // TODO: not sure how to handle an error in here
+                                        log.send_modify(|log| {
+                                            log.add_entry(LogEntry::system_message(msg.clone()))
+                                        });
+                                    }
+                                    let _ = file
+                                        .write_all(format_message_as_log4j_event(&msg).as_bytes())
+                                        .await;
+                                }
+                            }
+
+                            // The game process has exited by this point regardless of
+                            // whether the select above resolved via a natural exit or a
+                            // kill signal — `child.wait()` above blocks until it has.
+                            // The pidfile no longer refers to anything a future startup
+                            // reap needs to clean up. Best-effort, removed exactly once
+                            // here on both paths.
+                            orphan_pid::remove_pid_file(
+                                &instance_path.get_root(),
+                                super::PID_FILE_NAME,
+                            )
+                            .await;
+
+                            let _ = app.rich_presence_manager().stop_activity().await;
+
+                            if cancel.is_cancelled()
+                                && post_exit_hook.as_ref().is_some_and(|v| !v.is_empty())
+                            {
+                                tracing::warn!(
+                                    "Post-exit hook skipped because runtime shutdown froze external spawn admission"
+                                );
+                            }
+                            if let Some(post_exit_hook) =
+                                post_exit_hook.filter(|v| !v.is_empty() && !cancel.is_cancelled())
+                            {
+                                match split_hook_command(&post_exit_hook)
+                                    .ok_or_else(|| {
+                                        anyhow::anyhow!("Failed to parse post-exit hook")
+                                    })
+                                    .map(|v| v.into_iter())
+                                {
+                                    Ok(mut split) => match split.next() {
+                                        Some(main_command) => {
+                                            let post_exit_command = tokio::time::timeout(
                                         HOOK_TIMEOUT,
-                                        crate::managers::runtime_lifecycle::tracked_output(
+                                        crate::managers::runtime_lifecycle::tracked_output_reserved(
                                             &app.runtime_lifecycle,
                                             tokio::process::Command::new(main_command)
                                                 .args(split)
                                                 .current_dir(instance_path.get_data_path())
                                                 .kill_on_drop(true),
+                                            crate::managers::runtime_lifecycle::ActivityPolicy::Hook, None,
                                         ),
                                     )
                                     .await;
 
-                                    match post_exit_command {
-                                        Err(_) => {
-                                            tracing::warn!(
-                                                "Post-exit hook did not finish within {HOOK_TIMEOUT:?}; killed it"
-                                            );
-                                        }
-                                        Ok(Ok(post_exit_command)) => {
-                                            if !post_exit_command.status.success() {
-                                                tracing::error!(
-                                                    "Post-exit hook failed with status: {:?} \n{}",
-                                                    post_exit_command.status,
-                                                    String::from_utf8(post_exit_command.stderr)
-                                                        .unwrap_or_default()
-                                                );
-                                            } else {
-                                                tracing::info!(
-                                                    "Post-exit hook completed successfully {}",
-                                                    String::from_utf8(post_exit_command.stdout)
-                                                        .unwrap_or_default()
-                                                );
+                                            match post_exit_command {
+                                                Err(_) => {
+                                                    tracing::warn!(
+                                                        "Post-exit hook did not finish within {HOOK_TIMEOUT:?}; cleanup requested and supervision retained"
+                                                    );
+                                                }
+                                                Ok(Ok(post_exit_command)) => {
+                                                    if !post_exit_command.status.success() {
+                                                        tracing::error!(
+                                                            "Post-exit hook failed with status: {:?} \n{}",
+                                                            post_exit_command.status,
+                                                            String::from_utf8(
+                                                                post_exit_command.stderr
+                                                            )
+                                                            .unwrap_or_default()
+                                                        );
+                                                    } else {
+                                                        tracing::info!(
+                                                            "Post-exit hook completed successfully {}",
+                                                            String::from_utf8(
+                                                                post_exit_command.stdout
+                                                            )
+                                                            .unwrap_or_default()
+                                                        );
+                                                    }
+                                                }
+                                                Ok(Err(e))
+                                                    if e.kind()
+                                                        == std::io::ErrorKind::Interrupted =>
+                                                {
+                                                    tracing::error!(
+                                                        "Post-exit hook was stopped before it finished: {:?}",
+                                                        e
+                                                    );
+                                                }
+                                                Ok(Err(e)) => {
+                                                    tracing::error!(
+                                                        "Post-exit hook failed to start: {:?}",
+                                                        e
+                                                    );
+                                                }
                                             }
                                         }
-                                        Ok(Err(e)) => {
-                                            tracing::error!(
-                                                "Post-exit hook failed to start: {:?}",
-                                                e
-                                            );
+                                        None => {
+                                            tracing::error!("Post-exit hook is empty");
                                         }
+                                    },
+                                    Err(e) => {
+                                        tracing::error!("Post-exit hook failed to parse: {:?}", e);
                                     }
                                 }
-                                None => {
-                                    tracing::error!("Post-exit hook is empty");
-                                }
-                            },
-                            Err(e) => {
-                                tracing::error!("Post-exit hook failed to parse: {:?}", e);
                             }
+
+                            let _ = app
+                                .instance_manager()
+                                .change_launch_state(
+                                    instance_id,
+                                    id,
+                                    LaunchState::Inactive { failed_task: None },
+                                )
+                                .await;
                         }
                     }
 
-                    let _ = app
-                        .instance_manager()
-                        .change_launch_state(
-                            instance_id,
-                            id,
-                            LaunchState::Inactive { failed_task: None },
-                        )
-                        .await;
-                }
-            }
+                    // Drop the log sender so the receiver sees the channel as closed
+                    // This must happen BEFORE invalidation so the frontend sees active: false
+                    drop(log);
 
-            // Drop the log sender so the receiver sees the channel as closed
-            // This must happen BEFORE invalidation so the frontend sees active: false
-            drop(log);
+                    // Flush and close the log file before invalidation so file size is accurate
+                    if let Some(mut f) = file.take() {
+                        let _ = f.flush().await;
+                        drop(f);
+                    }
 
-            // Flush and close the log file before invalidation so file size is accurate
-            if let Some(mut f) = file.take() {
-                let _ = f.flush().await;
-                drop(f);
-            }
+                    app.invalidate(GET_LOGS, Some(instance_id.0.into()));
+                    // Launch telemetry only reads the instance and posts an event.
+                    // A quit that hands this worker over drops it rather than wait
+                    // on a slow network, and a cancelled worker never starts it.
+                    let report = async {
+                        let now = Utc::now();
+                        let offset_in_sec = Local::now().offset().local_minus_utc();
 
-            app.invalidate(GET_LOGS, Some(instance_id.0.into()));
+                        let mods = app
+                            .instance_manager()
+                            .list_mods(instance_id, None)
+                            .await
+                            .unwrap_or_default()
+                            .len();
 
-            let now = Utc::now();
-            let offset_in_sec = Local::now().offset().local_minus_utc();
+                        let Ok(instance_details) =
+                            app.instance_manager().instance_details(instance_id).await
+                        else {
+                            return;
+                        };
 
-            let mods = app
-                .instance_manager()
-                .list_mods(instance_id, None)
-                .await
-                .unwrap_or_default()
-                .len();
+                        if is_setup {
+                            let res = app
+                                .metrics_manager()
+                                .track_event(GDLMetricsEvent::InstanceInstalled {
+                                    mods_count: mods as u32,
+                                    modloader_name: instance_details
+                                        .modloaders
+                                        .get(0)
+                                        .cloned()
+                                        .map(|v| v.type_.to_string()),
+                                    modloader_version: instance_details
+                                        .modloaders
+                                        .get(0)
+                                        .cloned()
+                                        .map(|v| v.version),
+                                    modplatform: instance_details
+                                        .modpack
+                                        .map(|v| v.modpack.to_string()),
+                                    version: instance_details
+                                        .version
+                                        .unwrap_or(String::from("unknown")),
+                                    seconds_taken: (now - initial_time).num_seconds() as u32,
+                                })
+                                .await;
 
-            let Ok(instance_details) = app.instance_manager().instance_details(instance_id).await
-            else {
-                return;
-            };
+                            if let Err(e) = res {
+                                tracing::error!({ error = ?e }, "failed to track instance installed event");
+                            }
+                        } else {
+                            let Some(time_at_start) = time_at_start else {
+                                tracing::error!(
+                                    "time_at_start is None even though this is not the first run"
+                                );
+                                return;
+                            };
 
-            if is_setup {
-                let res = app
-                    .metrics_manager()
-                    .track_event(GDLMetricsEvent::InstanceInstalled {
-                        mods_count: mods as u32,
-                        modloader_name: instance_details
-                            .modloaders
-                            .get(0)
-                            .cloned()
-                            .map(|v| v.type_.to_string()),
-                        modloader_version: instance_details
-                            .modloaders
-                            .get(0)
-                            .cloned()
-                            .map(|v| v.version),
-                        modplatform: instance_details.modpack.map(|v| v.modpack.to_string()),
-                        version: instance_details.version.unwrap_or(String::from("unknown")),
-                        seconds_taken: (now - initial_time).num_seconds() as u32,
-                    })
-                    .await;
+                            let res = app
+                                .metrics_manager()
+                                .track_event(GDLMetricsEvent::InstanceLaunched {
+                                    mods_count: mods as u32,
+                                    modloader_name: instance_details
+                                        .modloaders
+                                        .get(0)
+                                        .cloned()
+                                        .map(|v| v.type_.to_string()),
+                                    modloader_version: instance_details
+                                        .modloaders
+                                        .get(0)
+                                        .cloned()
+                                        .map(|v| v.version),
+                                    modplatform: instance_details
+                                        .modpack
+                                        .map(|v| v.modpack.to_string()),
+                                    version: instance_details
+                                        .version
+                                        .unwrap_or(String::from("unknown")),
+                                    xmx_memory: xmx_memory as u32,
+                                    xms_memory: xms_memory as u32,
+                                    time_to_start_secs: (now - time_at_start).num_seconds() as u64,
+                                    timestamp_start: initial_time.timestamp(),
+                                    timestamp_end: now.timestamp(),
+                                    timezone_offset: offset_in_sec / 60 / 60,
+                                })
+                                .await;
 
-                if let Err(e) = res {
-                    tracing::error!({ error = ?e }, "failed to track instance installed event");
-                }
-            } else {
-                let Some(time_at_start) = time_at_start else {
-                    tracing::error!("time_at_start is None even though this is not the first run");
-                    return;
-                };
-
-                let res = app
-                    .metrics_manager()
-                    .track_event(GDLMetricsEvent::InstanceLaunched {
-                        mods_count: mods as u32,
-                        modloader_name: instance_details
-                            .modloaders
-                            .get(0)
-                            .cloned()
-                            .map(|v| v.type_.to_string()),
-                        modloader_version: instance_details
-                            .modloaders
-                            .get(0)
-                            .cloned()
-                            .map(|v| v.version),
-                        modplatform: instance_details.modpack.map(|v| v.modpack.to_string()),
-                        version: instance_details.version.unwrap_or(String::from("unknown")),
-                        xmx_memory: xmx_memory as u32,
-                        xms_memory: xms_memory as u32,
-                        time_to_start_secs: (now - time_at_start).num_seconds() as u64,
-                        timestamp_start: initial_time.timestamp(),
-                        timestamp_end: now.timestamp(),
-                        timezone_offset: offset_in_sec / 60 / 60,
-                    })
-                    .await;
-
-                if let Err(e) = res {
-                    tracing::error!({ error = ?e }, "failed to track instance installed event");
-                }
-            }
-        });
+                            if let Err(e) = res {
+                                tracing::error!({ error = ?e }, "failed to track instance installed event");
+                            }
+                        }
+                    };
+                    tokio::select! {
+                        biased;
+                        _ = cancel.cancelled() => {}
+                        () = report => {}
+                    }
+                })
+            },
+        );
 
         // The worker now owns the same activity; release the gate before its long run.
         drop(operation);
@@ -1481,18 +1629,27 @@ impl ManagerRef<'_, InstanceManager> {
     /// it); for a game that exited on its own they differ by up to one poll
     /// interval, and that interval is dropped rather than credited.
     async fn bank_adopted_playtime(self, instance_id: InstanceId) {
+        self.bank_adopted_playtime_session(instance_id, None).await;
+    }
+
+    async fn bank_adopted_playtime_session(
+        self,
+        instance_id: InstanceId,
+        expected: Option<(u32, Option<u64>)>,
+    ) {
         let seconds = {
             let mut instances = self.instances.write().await;
-            let Some(playtime) = adopted_playtime_mut(&mut instances, instance_id) else {
+            let Some(instance) = instances.get_mut(&instance_id) else {
                 return;
             };
-
-            let up_to = playtime.last_alive_at;
-            let seconds = adopted_playtime_secs(playtime.banked_at, up_to);
-            playtime.banked_at = up_to;
-            seconds
+            let InstanceType::Valid(data) = &mut instance.type_ else {
+                return;
+            };
+            let LaunchState::Running(running) = &mut data.state else {
+                return;
+            };
+            take_adopted_bank(running, expected)
         };
-
         self.write_adopted_playtime(instance_id, seconds).await;
     }
 
@@ -1500,13 +1657,12 @@ impl ManagerRef<'_, InstanceManager> {
     /// `update_playtime` takes that same lock itself, and it is what rewrites
     /// `instance.json`.
     async fn write_adopted_playtime(self, instance_id: InstanceId, seconds: u32) {
-        if seconds == 0 {
-            return;
-        }
-
-        if let Err(e) = self.update_playtime(instance_id, seconds).await {
-            warn!("error banking playtime for adopted instance {instance_id}: {e:?}");
-        }
+        write_adopted_seconds(seconds, |seconds| async move {
+            if let Err(e) = self.update_playtime(instance_id, seconds).await {
+                warn!("error banking playtime for adopted instance {instance_id}: {e:?}");
+            }
+        })
+        .await;
     }
 
     /// Watch adopted instances until every one of them has exited.
@@ -1524,29 +1680,33 @@ impl ManagerRef<'_, InstanceManager> {
         let app = self.app.clone();
         let liveness = self.instance_running_tracker.marker();
 
-        tokio::spawn(async move {
-            // Moved in rather than dropped when this function returns: it has
-            // to live exactly as long as the loop below, which is exactly as
-            // long as some adopted instance is still running. Without it,
-            // work that backs off during a game — mod-metadata caching, off
-            // `any_instance_running` — would keep running through an adopted
-            // session, competing with the game the user is actually playing.
-            // A normally-launched game holds the equivalent marker in its own
-            // run task.
-            let _liveness = liveness;
-            let mut remaining = instance_ids;
-
-            loop {
-                tokio::time::sleep(ADOPTED_POLL_INTERVAL).await;
-
-                // Re-read the map each tick rather than trusting the list:
-                // the user may have stopped one through `kill_instance` in
-                // the meantime, and it is no longer adopted (or no longer
-                // running) if so.
-                let still_adopted: Vec<(InstanceId, u32, Option<u64>)> = {
+        let activity = match app.runtime_lifecycle.admit_owned(
+            "adopted game core watcher",
+            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+        ) {
+            Ok(activity) => activity,
+            Err(error) => {
+                tracing::warn!("Adopted game watcher not started: {error:#}");
+                return;
+            }
+        };
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |slot| {
+            Box::pin(async move {
+                let cancel = slot.as_ref().unwrap().cancellation();
+                // Moved in rather than dropped when this function returns: it has
+                // to live exactly as long as the loop below, which is exactly as
+                // long as some adopted instance is still running. Without it,
+                // work that backs off during a game — mod-metadata caching, off
+                // `any_instance_running` — would keep running through an adopted
+                // session, competing with the game the user is actually playing.
+                // A normally-launched game holds the equivalent marker in its own
+                // run task.
+                let _liveness = liveness;
+                // Capture the adopted session identity before the cancellation boundary.
+                let mut remaining: Vec<(InstanceId, u32, Option<u64>)> = {
                     let manager = app.instance_manager();
                     let instances = manager.instances.read().await;
-                    remaining
+                    instance_ids
                         .iter()
                         .filter_map(|id| {
                             let instance = instances.get(id)?;
@@ -1556,60 +1716,260 @@ impl ManagerRef<'_, InstanceManager> {
                             let LaunchState::Running(running) = &data.state else {
                                 return None;
                             };
-                            running
-                                .is_adopted()
-                                .then(|| (*id, running.process_id, running.process_start_time))
+                            running.is_adopted().then_some((
+                                *id,
+                                running.process_id,
+                                running.process_start_time,
+                            ))
                         })
                         .collect()
                 };
 
-                if still_adopted.is_empty() {
-                    break;
-                }
-
-                let pids: Vec<Pid> = still_adopted
-                    .iter()
-                    .map(|(_, pid, _)| Pid::from_u32(*pid))
-                    .collect();
-                let mut system = System::new();
-                system.refresh_processes(ProcessesToUpdate::Some(&pids));
-
-                let observed_at = Utc::now();
-
-                remaining.clear();
-                for (instance_id, pid, expected_start_time) in still_adopted {
-                    // Released back to Inactive unless the pid is still
-                    // verifiably the same live java process it was adopted
-                    // as. A bare liveness check is not enough here: the game
-                    // can have exited and had its pid recycled by an
-                    // unrelated process between two polls, and passing that
-                    // unverified would keep the instance Running (accruing
-                    // playtime, offering a Stop that would kill the
-                    // stranger's JVM) for a game that is actually long gone.
-                    if !orphan_pid::is_verified_live_java_process(&system, pid, expected_start_time)
+                loop {
+                    if !adopted_watcher_tick(&cancel, async {
+                        for (id, pid, start) in &remaining {
+                            app.instance_manager()
+                                .bank_adopted_playtime_session(*id, Some((*pid, *start)))
+                                .await;
+                        }
+                    })
+                    .await
                     {
-                        info!(
-                            "adopted game process {pid} for instance {instance_id} has exited, or is no longer verifiably the same process; instance is inactive again"
-                        );
-                        // Banked up to the last tick that saw it alive, not to
-                        // now: it died at some unknowable point in between.
-                        // Must run before the release, which drops the
-                        // bookkeeping along with the rest of the running state.
-                        app.instance_manager()
-                            .bank_adopted_playtime(instance_id)
-                            .await;
-                        app.instance_manager()
-                            .release_adopted_instance(instance_id, pid)
-                            .await;
-                    } else {
-                        app.instance_manager()
-                            .observe_adopted_alive(instance_id, observed_at)
-                            .await;
-                        remaining.push(instance_id);
+                        break;
+                    }
+
+                    // Re-read the map each tick rather than trusting the list:
+                    // the user may have stopped one through `kill_instance` in
+                    // the meantime, and it is no longer adopted (or no longer
+                    // running) if so.
+                    let still_adopted: Vec<(InstanceId, u32, Option<u64>)> = {
+                        let manager = app.instance_manager();
+                        let instances = manager.instances.read().await;
+                        remaining
+                            .iter()
+                            .filter_map(|(id, expected_pid, expected_start)| {
+                                let instance = instances.get(id)?;
+                                let InstanceType::Valid(data) = &instance.type_ else {
+                                    return None;
+                                };
+                                let LaunchState::Running(running) = &data.state else {
+                                    return None;
+                                };
+                                running
+                                    .is_adopted()
+                                    .then_some(())
+                                    .filter(|_| {
+                                        running.process_id == *expected_pid
+                                            && running.process_start_time == *expected_start
+                                    })
+                                    .map(|_| (*id, running.process_id, running.process_start_time))
+                            })
+                            .collect()
+                    };
+
+                    if still_adopted.is_empty() {
+                        break;
+                    }
+
+                    let pids: Vec<Pid> = still_adopted
+                        .iter()
+                        .map(|(_, pid, _)| Pid::from_u32(*pid))
+                        .collect();
+                    let mut system = System::new();
+                    system.refresh_processes(ProcessesToUpdate::Some(&pids));
+
+                    let observed_at = Utc::now();
+
+                    remaining.clear();
+                    for (instance_id, pid, expected_start_time) in still_adopted {
+                        // Released back to Inactive unless the pid is still
+                        // verifiably the same live java process it was adopted
+                        // as. A bare liveness check is not enough here: the game
+                        // can have exited and had its pid recycled by an
+                        // unrelated process between two polls, and passing that
+                        // unverified would keep the instance Running (accruing
+                        // playtime, offering a Stop that would kill the
+                        // stranger's JVM) for a game that is actually long gone.
+                        if !orphan_pid::is_verified_live_java_process(
+                            &system,
+                            pid,
+                            expected_start_time,
+                        ) {
+                            info!(
+                                "adopted game process {pid} for instance {instance_id} has exited, or is no longer verifiably the same process; instance is inactive again"
+                            );
+                            // Banked up to the last tick that saw it alive, not to
+                            // now: it died at some unknowable point in between.
+                            // Must run before the release, which drops the
+                            // bookkeeping along with the rest of the running state.
+                            app.instance_manager()
+                                .bank_adopted_playtime(instance_id)
+                                .await;
+                            app.instance_manager()
+                                .release_adopted_instance(instance_id, pid)
+                                .await;
+                        } else {
+                            app.instance_manager()
+                                .observe_adopted_alive(instance_id, observed_at)
+                                .await;
+                            remaining.push((instance_id, pid, expected_start_time));
+                        }
                     }
                 }
-            }
+            })
         });
+    }
+}
+
+#[cfg(test)]
+mod task18_r1_adopted_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task18_r1_adopted_detach_banks_observed_time_before_owner_ack() {
+        use crate::managers::runtime_lifecycle::{
+            ActivityPolicy, RuntimeLifecycle, ShutdownPurpose, spawn_retained,
+        };
+        let root = tempfile::tempdir().unwrap();
+        let config = root.path().join("instance.json");
+        std::fs::write(&config, b"0").unwrap();
+        let pidfile = root.path().join("pid");
+        std::fs::write(&pidfile, b"controlled adoption evidence").unwrap();
+        let at = DateTime::<Utc>::from_timestamp(1_700_000_000, 0).unwrap();
+        let mut running = RunningInstance::adopted(4242, 123, at, at);
+        running.playtime.as_mut().unwrap().last_alive_at = at + chrono::Duration::seconds(55);
+        let running = Arc::new(tokio::sync::Mutex::new(running));
+        let owned_running = running.clone();
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        let owner = lifecycle
+            .admit_owned("adopted banking fixture", ActivityPolicy::CoreWork)
+            .unwrap();
+        let cancel = owner.cancellation();
+        let path = config.clone();
+        let (entered, wait_entered) = tokio::sync::oneshot::channel();
+        let (release, wait_release) = tokio::sync::oneshot::channel();
+        let mut worker = spawn_retained(owner, move |_| {
+            Box::pin(async move {
+                adopted_watcher_tick(&cancel, async move {
+                    let seconds = take_adopted_bank(
+                        &mut *owned_running.lock().await,
+                        Some((4242, Some(123))),
+                    );
+                    write_adopted_seconds(seconds, |seconds| async move {
+                        entered.send(()).unwrap();
+                        wait_release.await.unwrap();
+                        tokio::fs::write(path, seconds.to_string()).await.unwrap();
+                    })
+                    .await;
+                })
+                .await
+            })
+        });
+        lifecycle
+            .prepare_shutdown("detach", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        let entered = tokio::select! {
+            signal = wait_entered => signal.is_ok(),
+            result = &mut worker => { assert!(!result.unwrap()); false },
+        };
+        if !entered {
+            assert_eq!(
+                std::fs::read(&config).unwrap(),
+                b"55",
+                "watcher acknowledged detachment without banking observed time"
+            );
+            return;
+        }
+        assert!(!worker.is_finished());
+        assert!(
+            lifecycle
+                .commit_prepared_shutdown("detach", ShutdownPurpose::Quit)
+                .is_err()
+        );
+        release.send(()).unwrap();
+        assert!(!worker.await.unwrap());
+        assert_eq!(std::fs::read(config).unwrap(), b"55");
+        assert_eq!(
+            std::fs::read(pidfile).unwrap(),
+            b"controlled adoption evidence"
+        );
+        let mut running = running.lock().await;
+        assert!(running.is_adopted());
+        assert_eq!(running.process_id, 4242);
+        assert_eq!(running.process_start_time, Some(123));
+        assert_eq!(
+            running.playtime.as_ref().unwrap().last_alive_at,
+            at + chrono::Duration::seconds(55)
+        );
+        assert_eq!(
+            take_adopted_bank(&mut running, Some((4242, Some(123)))),
+            0,
+            "no double bank"
+        );
+    }
+    #[tokio::test]
+    async fn task18_r1_adopted_normal_exit_zero_and_replaced_session_controls() {
+        let root = tempfile::tempdir().unwrap();
+        let path = root.path().join("banked");
+        std::fs::write(&path, b"0").unwrap();
+        let at = DateTime::<Utc>::from_timestamp(1_700_000_000, 0).unwrap();
+        let mut running = RunningInstance::adopted(4242, 123, at, at);
+        running.playtime.as_mut().unwrap().last_alive_at = at + chrono::Duration::seconds(55);
+        assert_eq!(take_adopted_bank(&mut running, Some((4242, Some(999)))), 0);
+        assert_eq!(take_adopted_bank(&mut running, Some((9999, Some(123)))), 0);
+        assert_eq!(running.playtime.as_ref().unwrap().banked_at, at);
+        let seconds = take_adopted_bank(&mut running, None);
+        assert_eq!(seconds, 55);
+        let write_path = path.clone();
+        write_adopted_seconds(seconds, |seconds| async move {
+            tokio::fs::write(write_path, seconds.to_string())
+                .await
+                .unwrap();
+        })
+        .await;
+        write_adopted_seconds(take_adopted_bank(&mut running, None), |_| async {
+            panic!("zero-time banking entered writer");
+        })
+        .await;
+        assert_eq!(std::fs::read(path).unwrap(), b"55");
+    }
+}
+
+// Shared watcher boundary: await already-observed banking on cancellation,
+// without polling process state or inferring an exit.
+async fn adopted_watcher_tick(
+    cancel: &tokio_util::sync::CancellationToken,
+    finish: impl std::future::Future<Output = ()>,
+) -> bool {
+    tokio::select! {
+        biased;
+        _ = cancel.cancelled() => { finish.await; false },
+        _ = tokio::time::sleep(ADOPTED_POLL_INTERVAL) => true,
+    }
+}
+fn take_adopted_bank(running: &mut RunningInstance, expected: Option<(u32, Option<u64>)>) -> u32 {
+    if !running.is_adopted()
+        || expected.is_some_and(|(pid, start)| {
+            running.process_id != pid || running.process_start_time != start
+        })
+    {
+        return 0;
+    }
+    let Some(playtime) = running.playtime.as_mut() else {
+        return 0;
+    };
+    let up_to = playtime.last_alive_at;
+    let seconds = adopted_playtime_secs(playtime.banked_at, up_to);
+    playtime.banked_at = up_to;
+    seconds
+}
+async fn write_adopted_seconds<F, W>(seconds: u32, write: F)
+where
+    F: FnOnce(u32) -> W,
+    W: std::future::Future<Output = ()>,
+{
+    if seconds != 0 {
+        write(seconds).await;
     }
 }
 

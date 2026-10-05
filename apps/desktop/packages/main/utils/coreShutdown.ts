@@ -125,6 +125,7 @@ export interface RuntimeBlocker {
     | "server"
     | "install"
     | "deletion"
+    | "hook"
     | "task"
     | "unconfirmed"
     | "previousGame"

@@ -605,9 +605,23 @@ pub(super) async fn install(
     id: ServerId,
     selection: Selection,
 ) -> anyhow::Result<VisualTaskId> {
-    let mut activity = app
-        .runtime_lifecycle
-        .admit(format!("server {} addon installation", id.0))?;
+    let activity = app.runtime_lifecycle.admit_owned(
+        format!("server {} addon installation", id.0),
+        crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
+    )?;
+    let app = app.clone();
+    crate::managers::runtime_lifecycle::spawn_retained(activity, move |slot| {
+        Box::pin(async move { install_owned(&app, id, selection, slot).await })
+    })
+    .await?
+}
+
+async fn install_owned(
+    app: &Arc<AppInner>,
+    id: ServerId,
+    selection: Selection,
+    activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
+) -> anyhow::Result<VisualTaskId> {
     let server = server_repo::get_server(&app.db, id.0)
         .await?
         .context("Server not found")?;
@@ -668,204 +682,227 @@ pub(super) async fn install(
         },
     );
     let task_id = app.task_manager().spawn_task(&task).await;
-    activity.external(); // completion belongs to the detached producer, not RPC Drop
+    let activity = activity.take().unwrap();
     let app = app.clone();
-    tokio::spawn(async move {
-        let _reservation = reservation;
-        let result = async {
-            let artifacts = plan(&app, &server, selection).await?;
-            let root = app.settings_manager().runtime_path.to_path_buf();
-            let staging = tempfile::Builder::new()
-                .prefix(".server-addon-")
-                .tempdir_in(root)?
-                .keep();
-            let server_path = app
-                .settings_manager()
-                .runtime_path
-                .get_servers()
-                .get_server_path(&server.shortpath);
-            let data = server_path.get_data_path();
-            let mut prepared = Vec::new();
-            {
+    crate::managers::runtime_lifecycle::spawn_retained(activity, move |slot| {
+        Box::pin(async move {
+            let cancel = slot.as_ref().unwrap().cancellation();
+            let _reservation = reservation;
+            let result = async {
+                anyhow::ensure!(
+                    !cancel.is_cancelled(),
+                    "Server addon installation cancelled"
+                );
+                let artifacts = plan(&app, &server, selection).await?;
+                let root = app.settings_manager().runtime_path.to_path_buf();
+                let staging = tempfile::Builder::new()
+                    .prefix(".server-addon-")
+                    .tempdir_in(root)?
+                    .keep();
+                let server_path = app
+                    .settings_manager()
+                    .runtime_path
+                    .get_servers()
+                    .get_server_path(&server.shortpath);
+                let data = server_path.get_data_path();
+                let mut prepared = Vec::new();
+                {
+                    let gate = app.server_manager().get_op_lock(id);
+                    let _guard = gate.lock().await;
+                    app.server_manager()
+                        .ensure_addon_publication(id, &server_path.get_root())
+                        .await?;
+                    let cached = mfcdb::get_server_mods_full(&app.db, id.0).await?;
+                    for (index, artifact) in artifacts.into_iter().enumerate() {
+                        let folder = server_addon_dir(&server_path, &artifact.filename)?;
+                        let location = folder
+                            .join(&artifact.filename)
+                            .strip_prefix(&data)?
+                            .to_str()
+                            .context("Invalid addon path")?
+                            .replace(std::path::MAIN_SEPARATOR, "/");
+                        let kind = if artifact.filename.to_ascii_lowercase().ends_with(".zip") {
+                            "datapacks"
+                        } else {
+                            "mods"
+                        };
+                        let stage_path = staging.join(format!("{index}-{}", artifact.filename));
+                        if let Some(item) = prepare_artifact(
+                            &data,
+                            &folder,
+                            artifact,
+                            location,
+                            &cached,
+                            &stage_path,
+                        )
+                        .await?
+                        {
+                            prepared.push(item);
+                        }
+                    }
+                }
+                for item in &prepared {
+                    if let Some(source) = &item.reuse {
+                        tokio::fs::copy(source, &item.download.path)
+                            .await
+                            .context("Satisfied bytes changed while staging")?;
+                    }
+                }
+                let downloads: Vec<_> = prepared
+                    .iter()
+                    .filter(|item| !item.satisfied && item.reuse.is_none())
+                    .map(|item| item.download.clone())
+                    .collect();
+                carbon_net::download_multiple(
+                    &downloads,
+                    DownloadOptions::builder()
+                        .concurrency(4)
+                        .cancel_token(cancel.clone())
+                        .build(),
+                )
+                .await
+                .with_context(|| {
+                    format!(
+                        "Addon download failed; staged evidence retained at {}",
+                        staging.display()
+                    )
+                })?;
                 let gate = app.server_manager().get_op_lock(id);
                 let _guard = gate.lock().await;
                 app.server_manager()
                     .ensure_addon_publication(id, &server_path.get_root())
                     .await?;
-                let cached = mfcdb::get_server_mods_full(&app.db, id.0).await?;
-                for (index, artifact) in artifacts.into_iter().enumerate() {
-                    let folder = server_addon_dir(&server_path, &artifact.filename)?;
-                    let location = folder
-                        .join(&artifact.filename)
+                anyhow::ensure!(
+                    !cancel.is_cancelled(),
+                    "Server addon installation cancelled before publication"
+                );
+                let current = server_repo::get_server(&app.db, id.0)
+                    .await?
+                    .context("Server was deleted during download")?;
+                if current.shortpath != server.shortpath
+                    || current.game_version != server.game_version
+                    || current.modloader_type != server.modloader_type
+                {
+                    bail!("Server owner or version changed during download");
+                }
+                validate_plan(
+                    &data,
+                    &prepared,
+                    &mfcdb::get_server_mods_full(&app.db, id.0).await?,
+                )
+                .await?;
+                for (index, item) in prepared.into_iter().enumerate() {
+                    if item.satisfied {
+                        continue;
+                    }
+                    if !matches_download(&item.download.path, &item.download).await? {
+                        bail!("Staged server addon failed verification");
+                    }
+                    let folder = server_addon_dir(&server_path, &item.artifact.filename)?;
+                    let current_location = folder
+                        .join(&item.artifact.filename)
                         .strip_prefix(&data)?
                         .to_str()
                         .context("Invalid addon path")?
                         .replace(std::path::MAIN_SEPARATOR, "/");
-                    let kind = if artifact.filename.to_ascii_lowercase().ends_with(".zip") {
+                    if current_location != item.location {
+                        bail!("Selected world changed during download");
+                    }
+                    let mut old_path = None;
+                    let mut enabled = true;
+                    if let Some((row, hash)) = &item.old {
+                        let now = mfcdb::get_server_mod_file_cache_by_id(&app.db, &row.id)
+                            .await?
+                            .context("Replacement owner disappeared")?;
+                        if now.server_id != id.0
+                            || now.location != row.location
+                            || now.addon_type != row.addon_type
+                        {
+                            bail!("Replacement owner changed");
+                        }
+                        let physical = world::owned_addon(
+                            &data,
+                            &row.addon_type,
+                            &row.location,
+                            &row.filename,
+                        )?;
+                        if digest(&physical).await? != *hash {
+                            bail!("Old addon changed during download");
+                        }
+                        enabled = !physical.to_string_lossy().ends_with(".disabled");
+                        if item.artifact.required && !enabled {
+                            bail!("Required dependency was disabled during download");
+                        }
+                        old_path = Some(physical);
+                    }
+                    let kind = if item
+                        .artifact
+                        .filename
+                        .to_ascii_lowercase()
+                        .ends_with(".zip")
+                    {
                         "datapacks"
                     } else {
                         "mods"
                     };
-                    let stage_path = staging.join(format!("{index}-{}", artifact.filename));
-                    if let Some(item) =
-                        prepare_artifact(&data, &folder, artifact, location, &cached, &stage_path)
+                    selected_source(&item.artifact)?; // source feasibility before retiring any live bytes
+                    let metadata_id = app
+                        .meta_cache_manager()
+                        .prepare_server_addon_metadata(&item.download.path, &item.artifact.filename)
+                        .await?;
+                    let identity_artifact = item.artifact.clone();
+                    let location = item.location.clone();
+                    let retired = item
+                        .old
+                        .as_ref()
+                        .filter(|(row, _)| row.location != item.location)
+                        .map(|(row, _)| row.id.clone());
+                    let backup = staging.join(format!("previous-{index}"));
+                    let db = &app.db;
+                    publish_with_metadata(
+                        &item.download,
+                        &folder,
+                        &item.artifact.filename,
+                        old_path.as_deref(),
+                        item.old.as_ref().map(|(_, hash)| hash.as_slice()),
+                        enabled,
+                        &backup,
+                        async move {
+                            db.write(move |mut conn| {
+                                Ok(publish_selection(
+                                    &mut conn,
+                                    id.0,
+                                    kind,
+                                    &location,
+                                    enabled,
+                                    &metadata_id,
+                                    &identity_artifact,
+                                    retired.as_deref(),
+                                ))
+                            })
                             .await?
-                    {
-                        prepared.push(item);
-                    }
-                }
-            }
-            for item in &prepared {
-                if let Some(source) = &item.reuse {
-                    tokio::fs::copy(source, &item.download.path)
-                        .await
-                        .context("Satisfied bytes changed while staging")?;
-                }
-            }
-            let downloads: Vec<_> = prepared
-                .iter()
-                .filter(|item| !item.satisfied && item.reuse.is_none())
-                .map(|item| item.download.clone())
-                .collect();
-            carbon_net::download_multiple(
-                &downloads,
-                DownloadOptions::builder().concurrency(4).build(),
-            )
-            .await
-            .with_context(|| {
-                format!(
-                    "Addon download failed; staged evidence retained at {}",
-                    staging.display()
-                )
-            })?;
-            let gate = app.server_manager().get_op_lock(id);
-            let _guard = gate.lock().await;
-            app.server_manager()
-                .ensure_addon_publication(id, &server_path.get_root())
-                .await?;
-            let current = server_repo::get_server(&app.db, id.0)
-                .await?
-                .context("Server was deleted during download")?;
-            if current.shortpath != server.shortpath
-                || current.game_version != server.game_version
-                || current.modloader_type != server.modloader_type
-            {
-                bail!("Server owner or version changed during download");
-            }
-            validate_plan(
-                &data,
-                &prepared,
-                &mfcdb::get_server_mods_full(&app.db, id.0).await?,
-            )
-            .await?;
-            for (index, item) in prepared.into_iter().enumerate() {
-                if item.satisfied {
-                    continue;
-                }
-                if !matches_download(&item.download.path, &item.download).await? {
-                    bail!("Staged server addon failed verification");
-                }
-                let folder = server_addon_dir(&server_path, &item.artifact.filename)?;
-                let current_location = folder
-                    .join(&item.artifact.filename)
-                    .strip_prefix(&data)?
-                    .to_str()
-                    .context("Invalid addon path")?
-                    .replace(std::path::MAIN_SEPARATOR, "/");
-                if current_location != item.location {
-                    bail!("Selected world changed during download");
-                }
-                let mut old_path = None;
-                let mut enabled = true;
-                if let Some((row, hash)) = &item.old {
-                    let now = mfcdb::get_server_mod_file_cache_by_id(&app.db, &row.id)
-                        .await?
-                        .context("Replacement owner disappeared")?;
-                    if now.server_id != id.0
-                        || now.location != row.location
-                        || now.addon_type != row.addon_type
-                    {
-                        bail!("Replacement owner changed");
-                    }
-                    let physical =
-                        world::owned_addon(&data, &row.addon_type, &row.location, &row.filename)?;
-                    if digest(&physical).await? != *hash {
-                        bail!("Old addon changed during download");
-                    }
-                    enabled = !physical.to_string_lossy().ends_with(".disabled");
-                    if item.artifact.required && !enabled {
-                        bail!("Required dependency was disabled during download");
-                    }
-                    old_path = Some(physical);
-                }
-                let kind = if item
-                    .artifact
-                    .filename
-                    .to_ascii_lowercase()
-                    .ends_with(".zip")
-                {
-                    "datapacks"
-                } else {
-                    "mods"
-                };
-                selected_source(&item.artifact)?; // source feasibility before retiring any live bytes
-                let metadata_id = app
-                    .meta_cache_manager()
-                    .prepare_server_addon_metadata(&item.download.path, &item.artifact.filename)
+                        },
+                    )
                     .await?;
-                let identity_artifact = item.artifact.clone();
-                let location = item.location.clone();
-                let retired = item
-                    .old
-                    .as_ref()
-                    .filter(|(row, _)| row.location != item.location)
-                    .map(|(row, _)| row.id.clone());
-                let backup = staging.join(format!("previous-{index}"));
-                let db = &app.db;
-                publish_with_metadata(
-                    &item.download,
-                    &folder,
-                    &item.artifact.filename,
-                    old_path.as_deref(),
-                    item.old.as_ref().map(|(_, hash)| hash.as_slice()),
-                    enabled,
-                    &backup,
-                    async move {
-                        db.write(move |mut conn| {
-                            Ok(publish_selection(
-                                &mut conn,
-                                id.0,
-                                kind,
-                                &location,
-                                enabled,
-                                &metadata_id,
-                                &identity_artifact,
-                                retired.as_deref(),
-                            ))
-                        })
-                        .await?
-                    },
-                )
-                .await?;
-                if item.old.is_some() {
-                    tokio::fs::remove_file(&backup).await?;
+                    if item.old.is_some() {
+                        tokio::fs::remove_file(&backup).await?;
+                    }
                 }
+                tokio::fs::remove_dir(&staging).await?;
+                Ok::<_, anyhow::Error>(())
             }
-            tokio::fs::remove_dir(&staging).await?;
-            Ok::<_, anyhow::Error>(())
-        }
-        .await;
-        if result.is_ok() {
-            app.meta_cache_manager()
-                .queue_caching(
-                    crate::managers::metadata::cache::CacheEntityId::Server(id.0),
-                    true,
-                )
-                .await;
-        }
-        retain_outcome(task, result).await;
-        app.invalidate(GET_SERVER_ADDONS, None);
-        activity.finish();
+            .await;
+            if result.is_ok() {
+                app.meta_cache_manager()
+                    .queue_caching(
+                        crate::managers::metadata::cache::CacheEntityId::Server(id.0),
+                        true,
+                    )
+                    .await;
+            }
+            retain_outcome(task, result).await;
+            app.invalidate(GET_SERVER_ADDONS, None);
+        })
     });
     Ok(task_id)
 }
@@ -4696,8 +4733,6 @@ mod dependency_tests {
             .await
             .unwrap()
             .unwrap()
-            .remove(0);
-        (conn, row)
     }
 
     // (h) A downloaded dependency the server already has as a copy no

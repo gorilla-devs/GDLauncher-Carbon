@@ -104,8 +104,10 @@ winreg = { workspace = true }
 openssl = { workspace = true }
 wayland-sys = { workspace = true } # dlopen feature for runtime loading
 
-[target.'cfg(target_vendor = "apple")'.dependencies]
-libc = "0.2" # plain fsync; std's sync_all is F_FULLFSYNC there
+[target.'cfg(unix)'.dependencies]
+# Apple: plain fsync, since std's sync_all is F_FULLFSYNC there. All unix:
+# geteuid, which names the account's own Java checker folder in /tmp.
+libc = "0.2"
 
 [build-dependencies]
 serde_json = { workspace = true }
@@ -119,6 +121,8 @@ tracing-test = { workspace = true }
 mockito = { workspace = true }
 rsa = { version = "0.9", features = ["pem"] }
 rand = "0.8"
+# Paused-clock tests (#[tokio::test(start_paused = true)]) for shutdown timing.
+tokio = { workspace = true, features = ["test-util"] }
 
 [features]
 production = ["iridium"]

@@ -48,7 +48,9 @@ pub async fn download_modpack_zip(
     cf_addon: &File,
     target_path: &Path,
     progress_percentage_sender: tokio::sync::watch::Sender<UpdateValue<(u64, u64)>>,
+    cancel: &tokio_util::sync::CancellationToken,
 ) -> anyhow::Result<()> {
+    anyhow::ensure!(!cancel.is_cancelled(), "Archive download cancelled");
     let modpack_download_url = cf_addon
         .download_url
         .clone()
@@ -74,7 +76,7 @@ pub async fn download_modpack_zip(
     let (download_progress_sender, mut download_progress_recv) =
         tokio::sync::watch::channel(Progress::new());
 
-    tokio::spawn(async move {
+    let progress_task = tokio::spawn(async move {
         while download_progress_recv.borrow_mut().changed().await.is_ok() {
             let p = download_progress_recv.borrow();
             progress_percentage_sender
@@ -84,12 +86,9 @@ pub async fn download_modpack_zip(
         Ok::<_, anyhow::Error>(progress_percentage_sender)
     });
 
-    carbon_net::download_multiple(
+    let result = carbon_net::download_multiple(
         &[file_downloadable],
-        DownloadOptions::builder()
-            .concurrency(1)
-            .progress_sender(download_progress_sender)
-            .build(),
+        operation_download_options(cancel, download_progress_sender),
     )
     .await
     .with_context(|| {
@@ -97,7 +96,11 @@ pub async fn download_modpack_zip(
             "Failed to download curseforge modpack zip: {:?}",
             cf_addon.download_url
         )
-    })?;
+    });
+    let progress_result = progress_task.await;
+    result?;
+    progress_result??;
+    anyhow::ensure!(!cancel.is_cancelled(), "Archive publication cancelled");
 
     file.try_rename_or_move(target_path).await?;
     Ok(())
@@ -116,6 +119,10 @@ async fn preparation_metadata(
 ) -> anyhow::Result<PreparationMetadata> {
     #[cfg(test)]
     if let Some(value) = preparation_fixture::get(_zip_path) {
+        if value == preparation_fixture::STALLED {
+            // A connection that is accepted but never answered.
+            std::future::pending::<()>().await;
+        }
         return Ok((
             serde_json::from_value(value["minecraft"].clone())?,
             serde_json::from_value(value["classes"].clone())?,
@@ -187,6 +194,9 @@ pub(crate) mod preparation_fixture {
             VALUES.lock().unwrap().remove(&self.0);
         }
     }
+    /// Makes the metadata lookups for `path` wait forever, like a stalled
+    /// network, when set as its value.
+    pub(crate) const STALLED: &str = "stalled";
     pub(crate) fn set(path: PathBuf, value: serde_json::Value) -> Guard {
         VALUES.lock().unwrap().insert(path.clone(), value);
         Guard(path)
@@ -208,22 +218,55 @@ pub async fn prepare_modpack_from_zip(
     t_addon_metadata: Subtask,
     progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
+    prepare_modpack_from_zip_cancellable(
+        app,
+        zip_path,
+        instance_path,
+        skip_overrides,
+        packinfo,
+        t_addon_metadata,
+        progress_percentage_sender,
+        &tokio_util::sync::CancellationToken::new(),
+    )
+    .await
+}
+
+pub async fn prepare_modpack_from_zip_cancellable(
+    app: &App,
+    zip_path: &Path,
+    instance_path: &InstancePath,
+    skip_overrides: bool,
+    packinfo: Option<&PackInfo>,
+    t_addon_metadata: Subtask,
+    progress_percentage_sender: tokio::sync::watch::Sender<ProgressState>,
+    cancel: &tokio_util::sync::CancellationToken,
+) -> anyhow::Result<ModpackInfo> {
     let progress_percentage_sender = Arc::new(progress_percentage_sender);
 
     let file_path_clone = zip_path.to_path_buf();
-    let (mut archive, manifest) = spawn_blocking(move || {
-        let file = std::fs::File::open(file_path_clone)?;
-        let mut archive = zip::ZipArchive::new(file)?;
-        let manifest: curseforge::manifest::Manifest = {
-            let file = archive.by_name("manifest.json")?;
-            serde_json::from_reader(file)?
-        };
+    let (mut archive, manifest) =
+        crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async move {
+            spawn_blocking(move || {
+                let file = std::fs::File::open(file_path_clone)?;
+                let mut archive = zip::ZipArchive::new(file)?;
+                let manifest: curseforge::manifest::Manifest = {
+                    let file = archive.by_name("manifest.json")?;
+                    serde_json::from_reader(file)?
+                };
 
-        Ok::<_, anyhow::Error>((archive, manifest))
-    })
-    .await??;
+                Ok::<_, anyhow::Error>((archive, manifest))
+            })
+            .await?
+        })
+        .await?;
 
-    let (mc_manifest, addons, all_addons) = preparation_metadata(app, &manifest, zip_path).await?;
+    // Platform lookups only: a quit drops them rather than wait on a
+    // stalled network.
+    let (mc_manifest, addons, all_addons) = crate::managers::runtime_lifecycle::lookup_or_cancel(
+        cancel,
+        preparation_metadata(app, &manifest, zip_path),
+    )
+    .await?;
     let mc_manifest = Arc::new(mc_manifest);
     let mc_version = manifest.minecraft.version.clone();
     let downloadables = {
@@ -313,64 +356,71 @@ pub async fn prepare_modpack_from_zip(
     if !skip_overrides {
         let override_folder_name = manifest.overrides.clone();
         let override_full_path = instance_path.get_data_path();
-        tokio::fs::create_dir_all(&override_full_path).await?;
-        spawn_blocking(move || {
-            let total_archive_files = archive.len() as u64;
-            // Cumulative across the whole pass, not per entry: without this, many
-            // entries each just under a per-entry cap could still add up to an
-            // unbounded amount written to disk.
-            let mut extracted_bytes: u64 = 0;
-            for i in 0..archive.len() {
-                let mut file = archive.by_index(i)?;
+        crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async {
+            tokio::fs::create_dir_all(&override_full_path).await?;
+            Ok(())
+        })
+        .await?;
+        crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async move {
+            spawn_blocking(move || {
+                let total_archive_files = archive.len() as u64;
+                // Cumulative across the whole pass, not per entry: without this, many
+                // entries each just under a per-entry cap could still add up to an
+                // unbounded amount written to disk.
+                let mut extracted_bytes: u64 = 0;
+                for i in 0..archive.len() {
+                    let mut file = archive.by_index(i)?;
 
-                if !(*file.name()).starts_with(&override_folder_name) {
-                    continue;
-                }
-
-                let outpath = match file.enclosed_name() {
-                    Some(path) => match path.strip_prefix(&override_folder_name) {
-                        Ok(stripped) => Path::new(&override_full_path).join(stripped),
-                        // The name begins with the prefix string but is not inside the
-                        // overrides directory (e.g. "overrides-extra/..."); skip it instead
-                        // of panicking on the non-matching path component.
-                        Err(_) => continue,
-                    },
-                    None => continue,
-                };
-
-                if (*file.name()).ends_with('/') {
-                    continue;
-                } else if is_symlink_mode(file.unix_mode()) {
-                    // A symlink entry materialized as a regular file would end up
-                    // containing the link's target path text instead of real data.
-                    tracing::warn!(
-                        "Skipping curseforge override entry `{}`: symlinks are not extracted",
-                        file.name()
-                    );
-                    continue;
-                } else {
-                    if let Some(p) = outpath.parent() {
-                        if !p.exists() {
-                            std::fs::create_dir_all(p)?;
-                        }
+                    if !(*file.name()).starts_with(&override_folder_name) {
+                        continue;
                     }
 
-                    let mut outfile = std::fs::File::create(&outpath)?;
-                    let remaining_budget =
-                        MAX_EXTRACTED_OVERRIDE_BYTES.saturating_sub(extracted_bytes);
-                    extracted_bytes += copy_bounded(&mut file, &mut outfile, remaining_budget)?;
+                    let outpath = match file.enclosed_name() {
+                        Some(path) => match path.strip_prefix(&override_folder_name) {
+                            Ok(stripped) => Path::new(&override_full_path).join(stripped),
+                            // The name begins with the prefix string but is not inside the
+                            // overrides directory (e.g. "overrides-extra/..."); skip it instead
+                            // of panicking on the non-matching path component.
+                            Err(_) => continue,
+                        },
+                        None => continue,
+                    };
+
+                    if (*file.name()).ends_with('/') {
+                        continue;
+                    } else if is_symlink_mode(file.unix_mode()) {
+                        // A symlink entry materialized as a regular file would end up
+                        // containing the link's target path text instead of real data.
+                        tracing::warn!(
+                            "Skipping curseforge override entry `{}`: symlinks are not extracted",
+                            file.name()
+                        );
+                        continue;
+                    } else {
+                        if let Some(p) = outpath.parent() {
+                            if !p.exists() {
+                                std::fs::create_dir_all(p)?;
+                            }
+                        }
+
+                        let mut outfile = std::fs::File::create(&outpath)?;
+                        let remaining_budget =
+                            MAX_EXTRACTED_OVERRIDE_BYTES.saturating_sub(extracted_bytes);
+                        extracted_bytes += copy_bounded(&mut file, &mut outfile, remaining_budget)?;
+                    }
+
+                    progress_percentage_sender.send_modify(|progress| {
+                        progress
+                            .extract_addon_overrides
+                            .set((i as u64 + 1, total_archive_files));
+                    });
                 }
 
-                progress_percentage_sender.send_modify(|progress| {
-                    progress
-                        .extract_addon_overrides
-                        .set((i as u64 + 1, total_archive_files));
-                });
-            }
-
-            Ok::<(), anyhow::Error>(())
+                Ok::<(), anyhow::Error>(())
+            })
+            .await?
         })
-        .await??;
+        .await?;
     }
 
     Ok(ModpackInfo {
@@ -415,3 +465,105 @@ pub async fn prepare_modpack_from_zip(
 //         assert!(!result.downloadables.is_empty())
 //     }
 // }
+
+fn operation_download_options(
+    cancel: &tokio_util::sync::CancellationToken,
+    progress: tokio::sync::watch::Sender<carbon_net::Progress>,
+) -> carbon_net::DownloadOptions {
+    DownloadOptions::builder()
+        .concurrency(1)
+        .progress_sender(progress)
+        .cancel_token(cancel.clone())
+        .build()
+}
+
+#[cfg(test)]
+mod task18_r1_download_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task18_r1_operation_token_reaches_download_supervisor() {
+        let cancel = tokio_util::sync::CancellationToken::new();
+        cancel.cancel();
+        let (tx, _rx) = tokio::sync::watch::channel(carbon_net::Progress::new());
+        // Empty batch: run_downloads has no file worker or request to execute.
+        let result =
+            carbon_net::download_multiple(&[], operation_download_options(&cancel, tx)).await;
+        assert!(
+            matches!(result, Err(carbon_net::DownloadError::Cancelled)),
+            "operation cancellation was lost: {result:?}"
+        );
+        let (tx, _rx) = tokio::sync::watch::channel(carbon_net::Progress::new());
+        assert_eq!(
+            carbon_net::download_multiple(
+                &[],
+                operation_download_options(&tokio_util::sync::CancellationToken::new(), tx)
+            )
+            .await
+            .unwrap(),
+            false
+        );
+    }
+}
+
+#[cfg(test)]
+mod stalled_lookup_tests {
+    use super::*;
+    use crate::api::translation::Translation;
+    use crate::managers::vtask::VisualTask;
+    use std::io::Write;
+    use std::time::Duration;
+
+    /// A setup whose platform lookups stall (a captive portal, a route that
+    /// drops packets) stops as soon as a quit cancels it, rather than hold
+    /// the quit up until the request times out minutes later.
+    #[tokio::test]
+    async fn a_cancelled_setup_stops_waiting_for_stalled_pack_metadata() {
+        let app = crate::setup_managers_for_test().await;
+        let root = tempfile::tempdir().unwrap();
+        let zip_path = root.path().join("curseforge");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&zip_path).unwrap());
+        zip.start_file("manifest.json", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(&serde_json::to_vec(&serde_json::json!({
+            "minecraft":{"version":"1.20.1","modLoaders":[]},"manifestType":"minecraftModpack","manifestVersion":1,
+            "name":"stalled CF","version":"A","author":"fixture","overrides":"overrides",
+            "files":[{"projectID":100,"fileID":1000,"required":true}]
+        })).unwrap())
+        .unwrap();
+        zip.finish().unwrap();
+        let _stalled = preparation_fixture::set(
+            zip_path.clone(),
+            serde_json::json!(preparation_fixture::STALLED),
+        );
+        let target = InstancePath::new(root.path().join("staging"));
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let task = VisualTask::new(Translation::Test);
+        let (progress, _progress) = tokio::sync::watch::channel(ProgressState::new());
+        let preparation = prepare_modpack_from_zip_cancellable(
+            &app,
+            &zip_path,
+            &target,
+            false,
+            None,
+            task.subtask(Translation::Test),
+            progress,
+            &cancel,
+        );
+        tokio::pin!(preparation);
+        assert!(
+            tokio::time::timeout(Duration::from_millis(300), &mut preparation)
+                .await
+                .is_err(),
+            "the lookup is still waiting"
+        );
+        cancel.cancel();
+        let result = tokio::time::timeout(Duration::from_secs(5), preparation)
+            .await
+            .expect("a cancelled setup stops waiting on its lookups at once");
+        assert!(result.is_err());
+        assert!(
+            !target.get_data_path().exists(),
+            "nothing was extracted for a cancelled setup"
+        );
+    }
+}

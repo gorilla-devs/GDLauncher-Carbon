@@ -1175,7 +1175,7 @@ mod tests {
 
         let instance_id = InstancePath::new(PathBuf::from("something"));
 
-        let java_component = RealJavaChecker
+        let java_component = RealJavaChecker::new(app.runtime_lifecycle.clone())
             .get_bin_info(
                 &PathBuf::from("java"),
                 crate::domain::java::JavaComponentType::Local,

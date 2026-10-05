@@ -284,6 +284,7 @@ impl InstallerRollbackContext {
     }
 }
 
+#[derive(Clone)]
 pub struct Installer {
     pub(super) required_enabled: Option<super::shader_loader::ShaderLoaderVerification>,
     #[cfg(test)]
@@ -339,6 +340,22 @@ impl Drop for AdmissionRecord {
     }
 }
 impl InstallOwnership {
+    async fn settle_runtime(
+        &self,
+        activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
+        cancel: CancellationToken,
+    ) {
+        let result = tokio::select! {
+            result = self.wait() => result,
+            _ = cancel.cancelled() => self.settle().await,
+        };
+        if let Err(error) = result {
+            let owner = activity.take().expect("retained addon operation");
+            owner.unknown(format!("Addon tree settlement unconfirmed: {error:#}"));
+            // Drop retains Unknown; no rollback or new admission is authorized.
+        }
+    }
+
     // Observe normal completion without cancelling healthy siblings. The same
     // admission/ACK authority as settle applies, including Unknown rejection.
     #[async_recursion::async_recursion]
@@ -512,6 +529,44 @@ impl Installer {
         install_deps: bool,
         replaces_mod_id: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
+        let activity = app.runtime_lifecycle.admit_owned(
+            "addon installation tree",
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
+        )?;
+        let installer = self.clone();
+        let app = app.clone();
+        let (send, receive) = tokio::sync::oneshot::channel();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |slot| {
+            Box::pin(async move {
+                let cancel = slot.as_ref().unwrap().cancellation();
+                let admission =
+                    installer.install_owned(&app, instance_id, install_deps, replaces_mod_id);
+                tokio::pin!(admission);
+                let result = tokio::select! {
+                    result = &mut admission => result,
+                    _ = cancel.cancelled() => {
+                        installer.ownership.cancel.cancel();
+                        admission.await
+                    }
+                };
+                // Preserve the existing API's task-id timing, while the retained
+                // operation continues through the existing tree ACK/rollback authority.
+                let _ = send.send(result);
+                installer.ownership.settle_runtime(slot, cancel).await;
+            })
+        });
+        receive
+            .await
+            .context("Addon admission owner ended without result")?
+    }
+
+    async fn install_owned(
+        &self,
+        app: &Arc<AppInner>,
+        instance_id: InstanceId,
+        install_deps: bool,
+        replaces_mod_id: Option<String>,
+    ) -> anyhow::Result<VisualTaskId> {
         if let Some(id) = replaces_mod_id.as_deref() {
             app.instance_manager()
                 .get_owned_mod_file(instance_id, id)
@@ -524,7 +579,6 @@ impl Installer {
             .await?
             .download_dependencies;
 
-        let _activity = app.runtime_lifecycle.admit("addon install admission")?;
         let manager = app.instance_manager();
         let operation = manager.lock_instance(instance_id).await;
         manager.ensure_modpack_not_locked(instance_id).await?;
@@ -830,7 +884,6 @@ impl Installer {
         if owner.handle.is_some() {
             return Ok(());
         }
-        let activity = app.runtime_lifecycle.admit("addon graph finalization")?;
         let context = self
             .rollback_context
             .lock()
@@ -842,7 +895,6 @@ impl Installer {
         let app = app.clone();
         graph.retain_finalizer();
         owner.spawn(move |cancel| async move {
-            let _activity = activity;
             // This worker owns the root ACK. Only wait for descendants, never
             // for our own ACK or admission guard.
             let result = async {
@@ -1012,9 +1064,6 @@ impl Installer {
         };
 
         let required_enabled = self.required_enabled.clone();
-        let activity = app
-            .runtime_lifecycle
-            .admit("addon download and publication")?;
         #[cfg(test)]
         let download_fixture = self.download_fixture.clone();
         let instance_path = instance_path.clone();
@@ -1037,8 +1086,7 @@ impl Installer {
             }
             {
                 abort_handle.spawn(move |cancel| async move {
-                    let _activity = activity;
-                    // Preserve failed private staging for recovery. Explicit cancellation
+                            // Preserve failed private staging for recovery. Explicit cancellation
                     // settles download and publication IO before rollback can inspect it.
                     let staging = tempfile::Builder::new()
                         .prefix(publication::STAGING_PREFIX)

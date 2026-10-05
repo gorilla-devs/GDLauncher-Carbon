@@ -329,6 +329,44 @@ it("Keep GDLauncher open says the installs, launches and tasks it lists were alr
   expect(exit.notes).not.toContain("work_cancelled")
 })
 
+it("a running Pre-Launch or Post-Exit Hook is named as one, is not called stopped, and Quit now warns it can cut the script short", () => {
+  const waiting = shutdownPromptLines(
+    view({
+      stage: "waiting",
+      reason: null,
+      blockers: [{ kind: "hook", name: "temporary child" }],
+      serversStopped: false
+    })
+  )
+  expect(waiting.rows).toEqual(["blocker_hook"])
+  expect(waiting.notes).toContain("hook_warning")
+  // The quit leaves the script running, so it was not asked to stop.
+  expect(waiting.notes).not.toContain("work_cancelled")
+  expect(waiting.buttons.map((button) => button.choice)).toEqual([
+    "wait",
+    "force",
+    "keep"
+  ])
+  const dialog = nativeShutdownDialog(
+    view({
+      blockers: [
+        { kind: "hook", name: "temporary child" },
+        { kind: "install", name: "modpack 3" }
+      ]
+    })
+  )
+  expect(dialog.options.detail).toContain(SHUTDOWN_PROMPT_ENGLISH.blocker_hook)
+  expect(dialog.options.detail).toContain(SHUTDOWN_PROMPT_ENGLISH.hook_warning)
+  expect(dialog.options.detail).toContain(
+    SHUTDOWN_PROMPT_ENGLISH.blocker_install
+  )
+  expect(dialog.options.detail).not.toContain(
+    SHUTDOWN_PROMPT_ENGLISH.blocker_task
+  )
+  // No hook, no warning about one.
+  expect(shutdownPromptLines(view()).notes).not.toContain("hook_warning")
+})
+
 it("the native dialog uses the text the App sent, and only known keys of it", () => {
   const text = shutdownPromptText({
     force_quit: "Esci ora",

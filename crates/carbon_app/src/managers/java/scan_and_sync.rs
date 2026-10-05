@@ -111,6 +111,7 @@ where
 
     let used_java_paths = java_paths_used_in_profiles(db).await?;
 
+    let mut inconclusive_paths = HashSet::new();
     for local_java in &local_javas {
         trace!("Analyzing local java: {:?}", local_java);
         let t_probe = std::time::Instant::now();
@@ -156,6 +157,12 @@ where
                 trace!("Java is valid: {:?}", java_component);
                 upsert_java_component_to_db(db, java_component).await?;
             }
+            (Err(err), _) if super::java_checker::validation_inconclusive(&err) => {
+                inconclusive_paths.insert(resolved_java_path.display().to_string());
+                warn!(
+                    "Local Java validation inconclusive; preserving row and profile intent: {err:#}"
+                );
+            }
             // If it isn't valid, check whether it's in the DB
             (Err(err), db_entry) => {
                 trace!("Java is invalid due to: {:?}", err);
@@ -186,9 +193,10 @@ where
             "Checking if java {} has been scanned",
             local_java_from_db.path
         );
-        let has_been_scanned = local_javas
-            .iter()
-            .any(|local_java| local_java_from_db.path == local_java.display().to_string());
+        let has_been_scanned = inconclusive_paths.contains(&local_java_from_db.path)
+            || local_javas
+                .iter()
+                .any(|local_java| local_java_from_db.path == local_java.display().to_string());
 
         if has_been_scanned {
             continue;
@@ -223,8 +231,18 @@ where
             )
             .await;
 
-        if java_bin_info.is_err() {
-            update_java_component_in_db_to_invalid(db, custom_java.path).await?;
+        match java_bin_info {
+            Ok(component) => {
+                upsert_java_component_to_db(db, component).await?;
+            }
+            Err(err) if super::java_checker::validation_inconclusive(&err) => {
+                warn!(
+                    "Custom Java validation inconclusive; preserving row and profile intent: {err:#}"
+                );
+            }
+            Err(_) => {
+                update_java_component_in_db_to_invalid(db, custom_java.path).await?;
+            }
         }
     }
 
@@ -266,6 +284,11 @@ where
             (Ok(java_component), false) => {
                 upsert_java_component_to_db(db, java_component).await?;
             }
+            (Err(err), _) if super::java_checker::validation_inconclusive(&err) => {
+                warn!(
+                    "Managed Java validation inconclusive; preserving row and profile intent: {err:#}"
+                );
+            }
             (Err(_), true) => {
                 if is_java_used_in_profile {
                     update_java_component_in_db_to_invalid(db, managed_java.path.clone()).await?;
@@ -294,8 +317,14 @@ where
             .get_bin_info(&java_path, JavaComponentType::Managed)
             .await;
 
-        if let Ok(java_component) = java_bin_info {
-            upsert_java_component_to_db(db, java_component).await?;
+        match java_bin_info {
+            Ok(java_component) => {
+                upsert_java_component_to_db(db, java_component).await?;
+            }
+            Err(err) if super::java_checker::validation_inconclusive(&err) => {
+                warn!("New managed Java validation inconclusive: {err:#}")
+            }
+            Err(_) => {}
         }
     }
 
@@ -322,12 +351,22 @@ pub async fn sync_system_java_profiles(db: &Db) -> anyhow::Result<()> {
             })?
             .java_id;
 
-        if java_in_profile.is_some() {
-            trace!(
-                "Java system profile {} already has a java",
-                profile.to_string()
-            );
-            continue;
+        if let Some(id) = &java_in_profile {
+            if let Some(java) = all_javas.iter().find(|java| &java.id == id) {
+                let version = JavaVersion::try_from(java.full_version.as_str())?;
+                let arch = JavaArch::try_from(java.arch.as_str())?;
+                let arch_allowed = !matches!(arch, JavaArch::X86_32 | JavaArch::Arm32) || is32bit;
+                // A Java that only failed its last check keeps its link, as
+                // in 2.0.40: one failed startup check (a drive not mounted
+                // yet, an antivirus block) must not re-point the profile for
+                // good. Play checks it again and unlinks it if it still fails.
+                if profile.is_java_version_compatible(&version) && arch_allowed {
+                    continue;
+                }
+            }
+            // This function is called only under automatic system-profile management.
+            // Preserve the runtime row and every custom profile's explicit assignment.
+            java_repo::set_profile_java(db, &profile_name, None).await?;
         }
 
         // Scan for a compatible java
@@ -806,5 +845,409 @@ mod test {
         let java_component = JavaComponent::try_from(java_components[0].clone()).unwrap();
 
         assert_eq!(java_component, new_component);
+    }
+}
+
+#[cfg(test)]
+mod task18_tests {
+    use super::*;
+
+    struct OutcomeChecker(&'static str);
+    #[async_trait::async_trait]
+    impl JavaChecker for OutcomeChecker {
+        async fn get_bin_info(
+            &self,
+            _: &std::path::Path,
+            _: JavaComponentType,
+        ) -> anyhow::Result<JavaComponent> {
+            match self.0 {
+                "unknown" => Err(crate::managers::runtime_lifecycle::ChildSettlementUnknown.into()),
+                "bookkeeping" => {
+                    Err(crate::managers::runtime_lifecycle::tests_support::bookkeeping_error())
+                }
+                "cancel" => Err(std::io::Error::new(
+                    std::io::ErrorKind::Interrupted,
+                    "controlled confirmed cancellation",
+                )
+                .into()),
+                "freeze" => {
+                    let lifecycle = std::sync::Arc::new(
+                        crate::managers::runtime_lifecycle::RuntimeLifecycle::default(),
+                    );
+                    lifecycle.reconciliation_finished(Ok(()));
+                    lifecycle.begin_shutdown(
+                        "fixture",
+                        crate::managers::runtime_lifecycle::ShutdownPurpose::Quit,
+                    )?;
+                    let owner = super::super::java_checker::admit_probe(&lifecycle)?;
+                    owner.finish();
+                    unreachable!()
+                }
+                _ => anyhow::bail!("ordinary invalid Java"),
+            }
+        }
+    }
+    struct SelectedDiscovery(Vec<std::path::PathBuf>);
+    #[async_trait::async_trait]
+    impl Discovery for SelectedDiscovery {
+        fn new(_: carbon_rt_path::RuntimePath) -> Self {
+            Self(vec![])
+        }
+        async fn find_java_paths(&self) -> Vec<std::path::PathBuf> {
+            self.0.clone()
+        }
+        async fn find_managed_java_paths(&self) -> Vec<std::path::PathBuf> {
+            vec![]
+        }
+    }
+    async fn uncertain_scan(kind: JavaComponentType) {
+        for mode in ["unknown", "bookkeeping", "cancel", "freeze"] {
+            let (root, db) = fixture().await;
+            let path = root.path().join("java");
+            std::fs::write(&path, b"existing installed bytes").unwrap();
+            // Scans store and look up canonical paths. A temp dir often isn't
+            // one (8.3 names on Windows, /var -> /private/var on macOS).
+            let path = dunce::canonicalize(&path).unwrap();
+            let component = JavaComponent {
+                path: path.display().to_string(),
+                version: JavaVersion::from_major(17),
+                _type: kind.clone(),
+                arch: JavaArch::X86_64,
+                os: JavaOs::Linux,
+                vendor: "preserved".into(),
+            };
+            let id = upsert_java_component_to_db(&db, component).await.unwrap();
+            java_repo::insert_profile(&db, "intent", &id).await.unwrap();
+            let discovery = SelectedDiscovery(vec![path.clone()]);
+            match kind {
+                JavaComponentType::Local => {
+                    scan_and_sync_local(&db, &discovery, &OutcomeChecker(mode))
+                        .await
+                        .unwrap()
+                }
+                JavaComponentType::Custom => scan_and_sync_custom(&db, &OutcomeChecker(mode))
+                    .await
+                    .unwrap(),
+                JavaComponentType::Managed => {
+                    scan_and_sync_managed(&db, &discovery, &OutcomeChecker(mode))
+                        .await
+                        .unwrap()
+                }
+            }
+            let row = java_repo::get_java_by_id(&db, &id)
+                .await
+                .unwrap()
+                .expect("inconclusive scan must retain row identity");
+            assert!(row.is_valid, "{kind:?} {mode} is not proof of invalidity");
+            assert_eq!(row.vendor, "preserved");
+            assert_eq!(
+                java_repo::get_profile(&db, "intent")
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .java_id,
+                Some(id.clone())
+            );
+            match kind {
+                JavaComponentType::Local => {
+                    scan_and_sync_local(&db, &discovery, &OutcomeChecker("invalid"))
+                        .await
+                        .unwrap()
+                }
+                JavaComponentType::Custom => scan_and_sync_custom(&db, &OutcomeChecker("invalid"))
+                    .await
+                    .unwrap(),
+                JavaComponentType::Managed => {
+                    scan_and_sync_managed(&db, &discovery, &OutcomeChecker("invalid"))
+                        .await
+                        .unwrap()
+                }
+            }
+            assert!(
+                !java_repo::get_java_by_id(&db, &id)
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .is_valid,
+                "ordinary invalid still invalidates referenced row"
+            );
+        }
+    }
+    #[tokio::test]
+    async fn task18_r1_local_scan_preserves_inconclusive_and_invalidates_proven_failure() {
+        uncertain_scan(JavaComponentType::Local).await;
+    }
+    #[tokio::test]
+    async fn task18_r1_custom_scan_preserves_inconclusive_and_invalidates_proven_failure() {
+        uncertain_scan(JavaComponentType::Custom).await;
+    }
+    #[tokio::test]
+    async fn task18_r1_managed_scan_preserves_inconclusive_and_invalidates_proven_failure() {
+        uncertain_scan(JavaComponentType::Managed).await;
+    }
+
+    use crate::domain::java::JavaOs;
+    struct Checker {
+        major: u8,
+        fail: bool,
+    }
+    #[async_trait::async_trait]
+    impl JavaChecker for Checker {
+        async fn get_bin_info(
+            &self,
+            path: &std::path::Path,
+            kind: JavaComponentType,
+        ) -> anyhow::Result<JavaComponent> {
+            if self.fail {
+                anyhow::bail!("controlled missing binary");
+            }
+            Ok(JavaComponent {
+                path: path.display().to_string(),
+                version: JavaVersion::from_major(self.major as u16),
+                _type: kind,
+                arch: JavaArch::X86_64,
+                os: JavaOs::Linux,
+                vendor: "refreshed".into(),
+            })
+        }
+    }
+    async fn fixture() -> (tempfile::TempDir, Db) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("java.db");
+        let mut conn = rusqlite::Connection::open(&path).unwrap();
+        carbon_repos::get_migrations()
+            .0
+            .to_latest(&mut conn)
+            .unwrap();
+        drop(conn);
+        let db = Db::open(&path, 2, true).unwrap();
+        (dir, db)
+    }
+    #[tokio::test]
+    async fn task18_custom_java_refresh_preserves_identity_and_custom_link() {
+        let (_root, db) = fixture().await;
+        let component = JavaComponent {
+            path: "fixture-java".into(),
+            version: JavaVersion::from_major(17),
+            _type: JavaComponentType::Custom,
+            arch: JavaArch::X86_32,
+            os: JavaOs::Linux,
+            vendor: "old".into(),
+        };
+        let id = upsert_java_component_to_db(&db, component).await.unwrap();
+        java_repo::insert_profile(&db, "custom-user", &id)
+            .await
+            .unwrap();
+        java_repo::set_java_validity(&db, &id, false).await.unwrap();
+        scan_and_sync_custom(
+            &db,
+            &Checker {
+                major: 21,
+                fail: false,
+            },
+        )
+        .await
+        .unwrap();
+        let row = java_repo::get_java_by_path(&db, "fixture-java")
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(row.is_valid);
+        assert_eq!(row.id, id);
+        assert_eq!(row.major, 21);
+        assert_eq!(row.arch, JavaArch::X86_64.to_string());
+        assert_eq!(row.vendor, "refreshed");
+        assert_eq!(row.r#type, JavaComponentType::Custom.to_string());
+        assert_eq!(
+            java_repo::get_profile(&db, "custom-user")
+                .await
+                .unwrap()
+                .unwrap()
+                .java_id,
+            Some(id.clone())
+        );
+        scan_and_sync_custom(
+            &db,
+            &Checker {
+                major: 21,
+                fail: false,
+            },
+        )
+        .await
+        .unwrap();
+        scan_and_sync_custom(
+            &db,
+            &Checker {
+                major: 21,
+                fail: true,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(
+            !java_repo::get_java_by_path(&db, "fixture-java")
+                .await
+                .unwrap()
+                .unwrap()
+                .is_valid
+        );
+        assert_eq!(
+            java_repo::get_profile(&db, "custom-user")
+                .await
+                .unwrap()
+                .unwrap()
+                .java_id,
+            Some(id)
+        );
+    }
+    #[tokio::test]
+    async fn task18_custom_java_reconsiders_only_incompatible_system_links() {
+        let (_root, db) = fixture().await;
+        for profile in SystemJavaProfileName::iter() {
+            java_repo::upsert_profile(&db, &profile.to_string(), true)
+                .await
+                .unwrap();
+        }
+        let component = JavaComponent {
+            path: "changed-java".into(),
+            version: JavaVersion::from_major(21),
+            _type: JavaComponentType::Custom,
+            arch: JavaArch::X86_64,
+            os: JavaOs::Linux,
+            vendor: "fixture".into(),
+        };
+        let id = upsert_java_component_to_db(&db, component).await.unwrap();
+        let profile = SystemJavaProfileName::iter()
+            .find(|p| !p.is_java_version_compatible(&JavaVersion::from_major(21)))
+            .unwrap();
+        java_repo::set_profile_java(&db, &profile.to_string(), Some(&id))
+            .await
+            .unwrap();
+        sync_system_java_profiles(&db).await.unwrap();
+        assert_eq!(
+            java_repo::get_profile(&db, &profile.to_string())
+                .await
+                .unwrap()
+                .unwrap()
+                .java_id,
+            None
+        );
+    }
+    /// A Java that failed one check (a drive not mounted yet at startup)
+    /// keeps its system profile link, as in 2.0.40, even with another valid
+    /// compatible Java installed: Play checks it again.
+    #[tokio::test]
+    async fn java_that_failed_one_check_keeps_its_system_profile_link() {
+        let (_root, db) = fixture().await;
+        for profile in SystemJavaProfileName::iter() {
+            java_repo::upsert_profile(&db, &profile.to_string(), true)
+                .await
+                .unwrap();
+        }
+        let java = |path: &str| JavaComponent {
+            path: path.into(),
+            version: JavaVersion::from_major(21),
+            _type: JavaComponentType::Local,
+            arch: JavaArch::X86_64,
+            os: JavaOs::Linux,
+            vendor: "fixture".into(),
+        };
+        upsert_java_component_to_db(&db, java("valid-alternative"))
+            .await
+            .unwrap();
+        let failed_once = upsert_java_component_to_db(&db, java("failed-once"))
+            .await
+            .unwrap();
+        java_repo::set_java_validity(&db, &failed_once, false)
+            .await
+            .unwrap();
+        let profile = SystemJavaProfileName::iter()
+            .find(|p| p.is_java_version_compatible(&JavaVersion::from_major(21)))
+            .unwrap();
+        java_repo::set_profile_java(&db, &profile.to_string(), Some(&failed_once))
+            .await
+            .unwrap();
+
+        sync_system_java_profiles(&db).await.unwrap();
+
+        assert_eq!(
+            java_repo::get_profile(&db, &profile.to_string())
+                .await
+                .unwrap()
+                .unwrap()
+                .java_id,
+            Some(failed_once)
+        );
+    }
+    struct EmptyDiscovery;
+    #[async_trait::async_trait]
+    impl Discovery for EmptyDiscovery {
+        fn new(_: carbon_rt_path::RuntimePath) -> Self {
+            Self
+        }
+        async fn find_java_paths(&self) -> Vec<std::path::PathBuf> {
+            vec![]
+        }
+        async fn find_managed_java_paths(&self) -> Vec<std::path::PathBuf> {
+            vec![]
+        }
+    }
+    #[tokio::test]
+    async fn task18_java_auto_management_off_preserves_assignment_and_compatible_control() {
+        let (_root, db) = fixture().await;
+        for profile in SystemJavaProfileName::iter() {
+            java_repo::upsert_profile(&db, &profile.to_string(), true)
+                .await
+                .unwrap();
+        }
+        let component = JavaComponent {
+            path: "custom-fixture".into(),
+            version: JavaVersion::from_major(17),
+            _type: JavaComponentType::Custom,
+            arch: JavaArch::X86_64,
+            os: JavaOs::Linux,
+            vendor: "fixture".into(),
+        };
+        let id = upsert_java_component_to_db(&db, component).await.unwrap();
+        let incompatible = SystemJavaProfileName::iter()
+            .find(|p| !p.is_java_version_compatible(&JavaVersion::from_major(21)))
+            .unwrap();
+        java_repo::set_profile_java(&db, &incompatible.to_string(), Some(&id))
+            .await
+            .unwrap();
+        super::super::JavaManager::scan_and_sync(
+            false,
+            &db,
+            &EmptyDiscovery,
+            &Checker {
+                major: 21,
+                fail: false,
+            },
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            java_repo::get_profile(&db, &incompatible.to_string())
+                .await
+                .unwrap()
+                .unwrap()
+                .java_id,
+            Some(id.clone())
+        );
+        let compatible = SystemJavaProfileName::iter()
+            .find(|p| p.is_java_version_compatible(&JavaVersion::from_major(21)))
+            .unwrap();
+        java_repo::set_profile_java(&db, &compatible.to_string(), Some(&id))
+            .await
+            .unwrap();
+        sync_system_java_profiles(&db).await.unwrap();
+        assert_eq!(
+            java_repo::get_profile(&db, &compatible.to_string())
+                .await
+                .unwrap()
+                .unwrap()
+                .java_id,
+            Some(id)
+        );
     }
 }

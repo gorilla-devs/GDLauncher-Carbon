@@ -116,10 +116,14 @@ impl ManagerRef<'_, InstanceImportManager> {
         let (tx, rx) = mpsc::channel(10);
         let app = self.app.clone();
 
-        let handle = tokio::spawn(async move {
-            // The public request handle may be aborted on disconnect. Its owned
-            // worker settles storage creation and IO before releasing runtime use.
-            tokio::spawn(async move {
+        let activity = app.runtime_lifecycle.admit_owned(
+            "share import operation",
+            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+        )?;
+        // The public handle only awaits this already retained producer.
+        let worker = crate::managers::runtime_lifecycle::spawn_retained(activity, move |slot| {
+            Box::pin(async move {
+                let runtime_cancel = slot.as_ref().unwrap().cancellation();
                 // 0-5%: Get presigned URL
                 let _ = tx.send(ImportShareCodeProgress::Progress(0)).await;
 
@@ -131,7 +135,10 @@ impl ManagerRef<'_, InstanceImportManager> {
                 let _ = tx.send(ImportShareCodeProgress::Progress(5)).await;
 
                 anyhow::ensure!(!cancel_token.is_cancelled(), "Import cancelled");
-                let runtime_activity = app.runtime_lifecycle.admit("share import archive")?;
+                anyhow::ensure!(
+                    !runtime_cancel.is_cancelled(),
+                    "Import cancelled by runtime shutdown"
+                );
                 let tmpdir = app
                     .settings_manager()
                     .runtime_path
@@ -139,16 +146,16 @@ impl ManagerRef<'_, InstanceImportManager> {
                     .maketmpdir()
                     .await?;
 
-                with_share_archive(tmpdir, share_code, move |file_path| async move {
-                    let _runtime_activity = runtime_activity;
-                    let mut file = File::create(&file_path).await?;
+                with_share_archive(slot.take().unwrap(), tmpdir, share_code, move |file_path| async move {
+            let mut file = File::create(&file_path).await?;
 
-                    let downloaded = async {
+            let downloaded = async {
             // 5-90%: Download file with progress
             let client = reqwest::Client::new();
             let response = tokio::select! {
                 biased;
                 _ = cancel_token.cancelled() => return Err(anyhow!("Import cancelled")),
+                _ = runtime_cancel.cancelled() => return Err(anyhow!("Import cancelled by runtime shutdown")),
                 response = client.get(&presigned_url).send() => response?.error_for_status()?,
             };
 
@@ -161,9 +168,10 @@ impl ManagerRef<'_, InstanceImportManager> {
                 let chunk_result = tokio::select! {
                     biased;
                     _ = cancel_token.cancelled() => return Err(anyhow!("Import cancelled")),
+                _ = runtime_cancel.cancelled() => return Err(anyhow!("Import cancelled by runtime shutdown")),
                     chunk = stream.next() => match chunk { Some(chunk) => chunk, None => break },
                 };
-                if cancel_token.is_cancelled() {
+                if cancel_token.is_cancelled() || runtime_cancel.is_cancelled() {
                     return Err(anyhow!("Import cancelled"));
                 }
 
@@ -189,6 +197,7 @@ impl ManagerRef<'_, InstanceImportManager> {
                     let progress = progress.min(90);
                     tokio::select! {
                         _ = cancel_token.cancelled() => return Err(anyhow!("Import cancelled")),
+                _ = runtime_cancel.cancelled() => return Err(anyhow!("Import cancelled by runtime shutdown")),
                         _ = tx.send(ImportShareCodeProgress::Progress(progress)) => {},
                     }
                 }
@@ -197,29 +206,28 @@ impl ManagerRef<'_, InstanceImportManager> {
             file.flush().await?;
             Ok::<_, anyhow::Error>(())
             }.await;
-                    drop(file.into_std().await);
-                    downloaded?;
-                    anyhow::ensure!(!cancel_token.is_cancelled(), "Import cancelled");
+            drop(file.into_std().await);
+            downloaded?;
+            anyhow::ensure!(!cancel_token.is_cancelled() && !runtime_cancel.is_cancelled(), "Import cancelled");
 
-                    // 90-95%: Scan archive
-                    let _ = tx.send(ImportShareCodeProgress::Progress(90)).await;
+            // 90-95%: Scan archive
+            let _ = tx.send(ImportShareCodeProgress::Progress(90)).await;
 
-                    let scanner = Entity::GDLPack.create_importer()?;
-                    scanner.scan(&app, file_path).await?;
+            let scanner = Entity::GDLPack.create_importer()?;
+            scanner.scan(&app, file_path).await?;
 
-                    let _ = tx.send(ImportShareCodeProgress::Progress(95)).await;
+            let _ = tx.send(ImportShareCodeProgress::Progress(95)).await;
 
-                    // 95-100%: Begin import
-                    let _ = scanner.begin_import(&app, 0, None).await?;
+            // 95-100%: Begin import
+            let _ = scanner.begin_import(&app, 0, None).await?;
 
-                    let _ = tx.send(ImportShareCodeProgress::Progress(100)).await;
+            let _ = tx.send(ImportShareCodeProgress::Progress(100)).await;
 
-                    Ok(())
-                })
-                .await
+            Ok(())
+            }).await
             })
-            .await?
         });
+        let handle = tokio::spawn(async move { worker.await? });
 
         Ok((rx, handle))
     }
@@ -262,17 +270,22 @@ impl ManagerRef<'_, InstanceImportManager> {
         index: u32,
         name: Option<String>,
     ) -> anyhow::Result<VisualTaskId> {
-        let scanner = self.manager.selected_scanner(&session).await?;
-        let runtime_activity = self
-            .app
-            .runtime_lifecycle
-            .admit("accepted instance import")?;
+        let runtime_activity = self.app.runtime_lifecycle.admit_owned(
+            "accepted instance import",
+            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+        )?;
+        let scanner = match self.manager.selected_scanner(&session).await {
+            Ok(scanner) => scanner,
+            Err(error) => {
+                runtime_activity.finish();
+                return Err(error);
+            }
+        };
         let app = self.app.clone();
         // Admission captures an immutable, completed scanner. Closing the modal
         // revokes new requests, but cannot drop an accepted import's private IO.
-        tokio::spawn(async move {
-            let _runtime_activity = runtime_activity;
-            scanner.begin_import(&app, index, name).await
+        crate::managers::runtime_lifecycle::spawn_retained(runtime_activity, move |_| {
+            Box::pin(async move { scanner.begin_import(&app, index, name).await })
         })
         .await?
     }
@@ -909,6 +922,7 @@ mod task13_watch_tests {
 
 /// Retain temporary storage through outstanding IO even if the request is dropped.
 async fn with_share_archive<T, F, Fut>(
+    activity: crate::managers::runtime_lifecycle::RuntimeActivity,
     tmpdir: carbon_rt_path::TempEntry<carbon_rt_path::tempentry::Folder>,
     share_code: String,
     work: F,
@@ -918,18 +932,34 @@ where
     F: FnOnce(PathBuf) -> Fut + Send + 'static,
     Fut: std::future::Future<Output = anyhow::Result<T>> + Send + 'static,
 {
-    tokio::spawn(
-        async move {
-            let file_path = tmpdir.join(format!("{share_code}.gdlpack"));
-            info!(
-                "downloading instance share code {share_code} to {file_path:?} ({:?})",
-                &*tmpdir
-            );
-            work(file_path).await
-        }
-        .with_current_subscriber(),
-    )
+    let dispatcher = tracing::dispatcher::get_default(Clone::clone);
+    crate::managers::runtime_lifecycle::spawn_retained(activity, move |_| {
+        Box::pin(
+            async move {
+                let file_path = tmpdir.join(format!("{share_code}.gdlpack"));
+                info!(
+                    "downloading instance share code {share_code} to {file_path:?} ({:?})",
+                    &*tmpdir
+                );
+                let result = work(file_path).await;
+                drop(tmpdir); // synchronous archive cleanup precedes the operation ACK
+                result
+            }
+            .with_subscriber(dispatcher),
+        )
+    })
     .await?
+}
+
+#[cfg(test)]
+fn test_import_activity() -> crate::managers::runtime_lifecycle::RuntimeActivity {
+    let lifecycle = Arc::new(crate::managers::runtime_lifecycle::RuntimeLifecycle::default());
+    lifecycle
+        .admit_owned(
+            "fixture import",
+            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+        )
+        .unwrap()
 }
 
 #[cfg(test)]
@@ -948,10 +978,15 @@ mod task13_temp_tests {
             .with_max_level(tracing::Level::INFO)
             .with_writer(std::io::sink)
             .finish();
-        let task = with_share_archive(tmp, "synthetic".into(), |path| async move {
-            tokio::fs::write(path, b"synthetic archive").await?;
-            Ok(())
-        })
+        let task = with_share_archive(
+            test_import_activity(),
+            tmp,
+            "synthetic".into(),
+            |path| async move {
+                tokio::fs::write(path, b"synthetic archive").await?;
+                Ok(())
+            },
+        )
         .with_subscriber(subscriber);
         task.await.unwrap();
         assert!(
@@ -1054,6 +1089,7 @@ mod task13_session_tests {
         let (release, pending) = tokio::sync::oneshot::channel();
         let (finished, done) = tokio::sync::oneshot::channel();
         let request = tokio::spawn(with_share_archive(
+            test_import_activity(),
             tmp,
             "synthetic".into(),
             move |file| async move {
