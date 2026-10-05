@@ -65,6 +65,11 @@ export function ListItem(props: SearchResultItemProps) {
           props.onItemClick(props.result.id, props.result.platform)
         }
       >
+        <Show when={props.result.requestedVersionId}>
+          <span class="text-xs">
+            Selected version: {props.result.requestedVersionId}
+          </span>
+        </Show>
         <div
           class="absolute inset-0 z-0 bg-cover bg-center opacity-20 transition-opacity duration-100 group-hover:opacity-30"
           classList={{
@@ -144,6 +149,7 @@ export function ListItem(props: SearchResultItemProps) {
                     <div class="flex items-center">
                       <ModpackDownloadButton
                         addon={props.result}
+                        fileId={props.result.requestedVersionId ?? undefined}
                         splitPosition={
                           props.result.serverPackFileId ? "left" : undefined
                         }
@@ -152,6 +158,7 @@ export function ListItem(props: SearchResultItemProps) {
                         <div class="w-px self-stretch bg-primary-700 shrink-0" />
                         <ServerPackDownloadButton
                           addon={props.result}
+                          fileId={props.result.requestedVersionId ?? undefined}
                           splitPosition="right"
                         />
                       </Show>
@@ -164,6 +171,7 @@ export function ListItem(props: SearchResultItemProps) {
                       selectedServerAddons={props.serverAddons}
                       selectedServerId={props.serverId}
                       addon={props.result}
+                      fileId={props.result.requestedVersionId ?? undefined}
                       onDropdownOpenChange={(isOpen) => {
                         if (isOpen) {
                           setIsHoverActive(true)

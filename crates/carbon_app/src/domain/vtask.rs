@@ -10,8 +10,8 @@ pub struct Task {
     pub id: VisualTaskId,
     pub name: Translation,
     pub progress: Progress,
-    pub downloaded: u32,
-    pub download_total: u32,
+    pub downloaded: u64,
+    pub download_total: u64,
     pub active_subtasks: Vec<Subtask>,
 }
 
@@ -30,7 +30,7 @@ pub struct Subtask {
 
 #[derive(Debug, PartialEq)]
 pub enum SubtaskProgress {
-    Download { downloaded: u32, total: u32 },
+    Download { downloaded: u64, total: u64 },
     Item { current: u32, total: u32 },
     Opaque,
 }

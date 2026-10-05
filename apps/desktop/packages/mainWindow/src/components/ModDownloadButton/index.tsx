@@ -20,6 +20,7 @@ import { InstallButton } from "./components/InstallButton"
 import { toast } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
 import { worldVersionCopy } from "./worldVersionCopy"
+import { findInstalledAddon, isInstalledArtifact } from "@/utils/installedAddon"
 
 interface ModDownloadButtonProps {
   fileId?: number | string
@@ -166,78 +167,21 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     }
   })
 
-  const installedMod = createMemo(() => {
-    if (!props.addon) return undefined
-
-    // Check server addons first (when browsing for a server)
-    const serverAddons = props.selectedServerAddons
-    if (serverAddons && serverAddons.length > 0) {
-      // Match by platform project ID (reliable, from metadata)
-      const byId = serverAddons.find((addon) => {
-        if (props.addon!.platform === "curseforge") {
-          return (
-            addon.curseforgeProjectId !== null &&
-            addon.curseforgeProjectId.toString() === props.addon!.id.toString()
-          )
-        } else if (props.addon!.platform === "modrinth") {
-          return addon.modrinthProjectId === props.addon!.id.toString()
-        }
-        return false
-      })
-      if (byId) return { id: byId.id } as any
-
-      // Fallback: match by slug against display name
-      const slug = props.addon.slug?.toLowerCase()
-      if (slug) {
-        const bySlug = serverAddons.find((addon) => {
-          const name = addon.displayName.toLowerCase()
-          return name === slug || name.startsWith(slug + "-")
-        })
-        if (bySlug) return { id: bySlug.id } as any
-      }
-
-      return undefined
-    }
-
-    // Check instance mods
-    const mods = props.selectedInstanceMods || []
-    const found = mods.find((mod) => {
-      if (props.addon!.platform === "curseforge") {
-        return (
-          mod.curseforge?.project_id ===
-          parseInt(props.addon!.id.toString(), 10)
+  const installedMod = createMemo(() =>
+    props.addon
+      ? findInstalledAddon(
+          props.addon,
+          props.selectedServerId
+            ? { kind: "server", addons: props.selectedServerAddons ?? [] }
+            : { kind: "instance", addons: props.selectedInstanceMods ?? [] },
+          props.fileId
         )
-      } else if (props.addon!.platform === "modrinth") {
-        return mod.modrinth?.project_id === props.addon!.id.toString()
-      }
-      return false
-    })
+      : undefined
+  )
 
-    return found
-  })
-
-  const isInstalled = createMemo(() => {
-    const localInstalledMod = installedMod()
-
-    if (!localInstalledMod || !props.addon) return false
-
-    if (!props.fileId) {
-      // Installing latest version - just check if mod exists
-      return !!localInstalledMod
-    } else {
-      // Installing specific version - check if exact version matches
-      if (props.addon.platform === "curseforge") {
-        return (
-          localInstalledMod.curseforge!.file_id ===
-          parseInt(props.fileId.toString(), 10)
-        )
-      } else {
-        return (
-          localInstalledMod.modrinth!.version_id === props.fileId.toString()
-        )
-      }
-    }
-  })
+  const isInstalled = createMemo(() =>
+    isInstalledArtifact(installedMod(), props.fileId)
+  )
 
   const handleDownload = async () => {
     if (!props.addon) return

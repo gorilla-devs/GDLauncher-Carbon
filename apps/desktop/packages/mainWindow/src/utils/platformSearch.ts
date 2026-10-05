@@ -1,3 +1,4 @@
+import { createPlatformSearchQuery } from "./platformSearchQuery"
 import {
   FEUnifiedBatchRequest,
   FEUnifiedModLoaderType,
@@ -16,6 +17,7 @@ import {
   onCleanup
 } from "solid-js"
 import { rspc } from "./rspcClient"
+import { extractErrorDisplay } from "./rspcErrorText"
 import { createAsyncEffect } from "./asyncEffect"
 import { createInfiniteQuery } from "@tanstack/solid-query"
 import { VirtualizerHandle } from "virtua/lib/solid"
@@ -240,17 +242,11 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     ? decodeURIComponent(String(searchParams.q))
     : ""
 
-  const [searchQuery, _setSearchQuery] =
-    createSignal<FEUnifiedSearchParameters>(
-      {
-        ...defaultSearchQuery,
-        ...opts.defaultSearchQuery,
-        ...(initialSearchText ? { searchQuery: initialSearchText } : {})
-      },
-      {
-        equals: false
-      }
-    )
+  const [searchQuery, _setSearchQuery] = createPlatformSearchQuery({
+    ...defaultSearchQuery,
+    ...opts.defaultSearchQuery,
+    ...(initialSearchText ? { searchQuery: initialSearchText } : {})
+  })
 
   // Clear the q param from URL after reading (one-time use)
   if (searchParams.q) {
@@ -746,6 +742,12 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     sidebarReady,
     // Direct search mode
     isDirectMode,
+    directErrors: () =>
+      isDirectMode()
+        ? directSearchQuery.error
+          ? [extractErrorDisplay(directSearchQuery.error)]
+          : (directSearchQuery.data?.errors ?? [])
+        : [],
     parsedQuery,
     // Share mode
     isShareMode,

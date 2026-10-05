@@ -50,8 +50,8 @@ interface Props {
 interface ProgressState {
   percentage: number
   subTasks: FESubtask[] | undefined
-  downloaded: number
-  totalDownload: number
+  downloaded: string
+  totalDownload: string
 }
 
 const ServerTile = (props: Props) => {
@@ -64,8 +64,8 @@ const ServerTile = (props: Props) => {
   const [progress, setProgress] = createStore<ProgressState>({
     percentage: 0,
     subTasks: undefined,
-    downloaded: 0,
-    totalDownload: 0
+    downloaded: "0",
+    totalDownload: "0"
   })
 
   const startServerMutation = rspc.createMutation(() => ({
@@ -143,8 +143,8 @@ const ServerTile = (props: Props) => {
       setProgress({
         percentage: 0,
         subTasks: undefined,
-        downloaded: 0,
-        totalDownload: 0
+        downloaded: "0",
+        totalDownload: "0"
       })
     }
   })

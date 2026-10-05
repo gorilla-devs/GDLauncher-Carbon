@@ -1,3 +1,4 @@
+import { validatedRequestedVersion } from "@/utils/requestedVersion"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
@@ -126,6 +127,7 @@ const AddonExplore = (props: { children?: any }) => {
   const [searchParams] = useSearchParams<{
     instanceId: string
     serverId: string
+    requestedVersionId: string
   }>()
 
   const selectedInstanceId = () => {
@@ -152,6 +154,34 @@ const AddonExplore = (props: { children?: any }) => {
 
   // Use the hoisted project query from context
   const project = useContext(AddonContext)!
+
+  const requestedVersion = () =>
+    platform() === "modrinth" ? searchParams.requestedVersionId : undefined
+  const versionQuery = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.modrinth.getVersion", requestedVersion() || ""],
+    enabled: !!requestedVersion()
+  }))
+  const selection = createMemo(() => {
+    try {
+      return {
+        id: validatedRequestedVersion(
+          requestedVersion(),
+          project.data?.id,
+          versionQuery.data
+        ),
+        error: versionQuery.error?.message
+      }
+    } catch (error) {
+      return {
+        id: undefined,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Selected version is unavailable"
+      }
+    }
+  })
+  const selectionReady = () => !requestedVersion() || !!selection().id
 
   const isFetching = () => project.isLoading
 
@@ -447,46 +477,69 @@ const AddonExplore = (props: { children?: any }) => {
                     </div>
                   </div>
                   <div class="mt-0 flex items-center gap-2">
-                    <Switch fallback={<></>}>
-                      <Match
-                        when={
-                          project.data?.type && project.data?.type === "modpack"
-                        }
-                      >
-                        <div class="flex items-center">
-                          <ModpackDownloadButton
-                            addon={project.data}
-                            splitPosition={
-                              project.data?.serverPackFileId
-                                ? "left"
-                                : undefined
-                            }
-                            testId="modpack-download-button"
-                          />
-                          <Show when={project.data?.serverPackFileId}>
-                            <div class="bg-primary-700 w-px shrink-0 self-stretch" />
-                            <ServerPackDownloadButton
-                              addon={project.data}
-                              splitPosition="right"
-                            />
+                    <Show
+                      when={selectionReady()}
+                      fallback={
+                        <div role="alert">
+                          {selection().error || "Loading selected version…"}
+                          <Show when={selection().error}>
+                            <button onClick={() => versionQuery.refetch()}>
+                              Retry selected version
+                            </button>
                           </Show>
                         </div>
-                      </Match>
-                      <Match
-                        when={
-                          project.data?.type && project.data?.type !== "modpack"
-                        }
-                      >
-                        <ModDownloadButton
-                          addon={project.data}
-                          selectedInstanceId={selectedInstanceId()}
-                          selectedInstanceMods={instanceMods.data ?? undefined}
-                          selectedServerAddons={serverAddons.data ?? undefined}
-                          selectedServerId={selectedServerId()}
-                          testId="addon-install-button"
-                        />
-                      </Match>
-                    </Switch>
+                      }
+                    >
+                      <Switch fallback={<></>}>
+                        <Match
+                          when={
+                            project.data?.type &&
+                            project.data?.type === "modpack"
+                          }
+                        >
+                          <div class="flex items-center">
+                            <ModpackDownloadButton
+                              addon={project.data}
+                              fileId={selection().id}
+                              splitPosition={
+                                project.data?.serverPackFileId
+                                  ? "left"
+                                  : undefined
+                              }
+                              testId="modpack-download-button"
+                            />
+                            <Show when={project.data?.serverPackFileId}>
+                              <div class="bg-primary-700 w-px shrink-0 self-stretch" />
+                              <ServerPackDownloadButton
+                                addon={project.data}
+                                fileId={selection().id}
+                                splitPosition="right"
+                              />
+                            </Show>
+                          </div>
+                        </Match>
+                        <Match
+                          when={
+                            project.data?.type &&
+                            project.data?.type !== "modpack"
+                          }
+                        >
+                          <ModDownloadButton
+                            addon={project.data}
+                            fileId={selection().id}
+                            selectedInstanceId={selectedInstanceId()}
+                            selectedInstanceMods={
+                              instanceMods.data ?? undefined
+                            }
+                            selectedServerAddons={
+                              serverAddons.data ?? undefined
+                            }
+                            selectedServerId={selectedServerId()}
+                            testId="addon-install-button"
+                          />
+                        </Match>
+                      </Switch>
+                    </Show>
                   </div>
                 </div>
               </div>
@@ -552,56 +605,76 @@ const AddonExplore = (props: { children?: any }) => {
                     "w-0 ml-0 opacity-0": !isSticky()
                   }}
                 >
-                  <Switch fallback={<></>}>
-                    <Match
-                      when={
-                        project.data?.type && project.data?.type === "modpack"
-                      }
-                    >
-                      <div class="flex items-center">
-                        {/* Sticky-header duplicate of the button above, for
+                  <Show
+                    when={selectionReady()}
+                    fallback={
+                      <div role="alert">
+                        {selection().error || "Loading selected version…"}
+                        <Show when={selection().error}>
+                          <button onClick={() => versionQuery.refetch()}>
+                            Retry selected version
+                          </button>
+                        </Show>
+                      </div>
+                    }
+                  >
+                    <Switch fallback={<></>}>
+                      <Match
+                        when={
+                          project.data?.type && project.data?.type === "modpack"
+                        }
+                      >
+                        <div class="flex items-center">
+                          {/* Sticky-header duplicate of the button above, for
                             the same addon — deliberately not given a
                             `testId`, since both are mounted at once (only
                             toggled via width/opacity as the header sticks) and
                             a shared anchor would give tests two matches. */}
-                        <ModpackDownloadButton
-                          addon={project.data}
-                          size="small"
-                          iconOnly
-                          splitPosition={
-                            project.data?.serverPackFileId ? "left" : undefined
-                          }
-                        />
-                        <Show when={project.data?.serverPackFileId}>
-                          <div class="bg-primary-700 w-px shrink-0 self-stretch" />
-                          <ServerPackDownloadButton
+                          <ModpackDownloadButton
                             addon={project.data}
+                            fileId={selection().id}
                             size="small"
-                            splitPosition="right"
+                            iconOnly
+                            splitPosition={
+                              project.data?.serverPackFileId
+                                ? "left"
+                                : undefined
+                            }
                           />
-                        </Show>
-                      </div>
-                    </Match>
-                    <Match
-                      when={
-                        project.data?.type && project.data?.type !== "modpack"
-                      }
-                    >
-                      {/* Sticky-header duplicate of the button above, for
+                          <Show when={project.data?.serverPackFileId}>
+                            <div class="bg-primary-700 w-px shrink-0 self-stretch" />
+                            <ServerPackDownloadButton
+                              addon={project.data}
+                              fileId={selection().id}
+                              size="small"
+                              splitPosition="right"
+                            />
+                          </Show>
+                        </div>
+                      </Match>
+                      <Match
+                        when={
+                          project.data?.type && project.data?.type !== "modpack"
+                        }
+                      >
+                        {/* Sticky-header duplicate of the button above, for
                           the same addon — deliberately not given a
                           `testId`, since both are mounted at once (only
                           toggled via width/opacity as the header sticks) and
                           a shared anchor would give tests two matches. */}
-                      <ModDownloadButton
-                        addon={project.data}
-                        selectedInstanceId={selectedInstanceId()}
-                        selectedInstanceMods={instanceMods.data ?? undefined}
-                        selectedServerId={selectedServerId()}
-                        size="small"
-                        iconOnly
-                      />
-                    </Match>
-                  </Switch>
+                        <ModDownloadButton
+                          addon={project.data}
+                          fileId={selection().id}
+                          selectedInstanceId={selectedInstanceId()}
+                          selectedInstanceMods={instanceMods.data ?? undefined}
+                          selectedServerId={selectedServerId()}
+                          size="small"
+                          selectedServerAddons={serverAddons.data ?? undefined}
+                          iconOnly
+                        />
+                      </Match>
+                    </Switch>
+                  </Show>
                 </div>
               </div>
               <Show

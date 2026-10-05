@@ -1,4 +1,6 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
+import { resolvePackVersion } from "@/utils/resolvePackVersion"
+import { TranslatedError, errorDescription } from "@/utils/translatedError"
 import { rspc } from "@/utils/rspcClient"
 import { FEUnifiedSearchResult, Modpack } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -64,8 +66,8 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     fileId?: number | string,
     projectId?: number | string
   ) => {
-    if (!props.addon?.mainFileId) {
-      throw new Error("No main file ID found")
+    if (!props.addon || !fileId) {
+      throw new Error("No selected pack version found")
     }
 
     const request =
@@ -75,7 +77,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
             value: {
               file_id:
                 Number.parseInt(fileId?.toString() || "", 10) ||
-                Number.parseInt(props.addon.mainFileId),
+                Number.parseInt(props.addon.mainFileId || "0"),
               project_id:
                 Number.parseInt(projectId?.toString() || "", 10) ||
                 Number.parseInt(props.addon.id)
@@ -85,7 +87,7 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
             type: "modrinth",
             value: {
               project_id: projectId?.toString() || props.addon.id,
-              version_id: fileId?.toString()! || props.addon.mainFileId
+              version_id: fileId.toString()
             }
           } satisfies Modpack)
 
@@ -96,26 +98,39 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
     runWithOwner(owner, async () => {
       setLoading(true)
 
-      let fileVersion = props.fileId
-      if (!fileVersion && props.addon?.platform === "modrinth") {
-        const mrVersions = await rspcContext.client.query([
-          "modplatforms.modrinth.getProjectVersions",
-          {
-            project_id: props.addon.id.toString()
-          }
-        ])
-        fileVersion = mrVersions[0].id
-      }
+      try {
+        if (!props.addon)
+          throw new Error("Pack details are unavailable. Retry.")
+        const fileVersion = await resolvePackVersion(
+          props.addon,
+          props.fileId,
+          (projectId) =>
+            rspcContext.client.query([
+              "modplatforms.modrinth.getProjectVersions",
+              { project_id: projectId }
+            ])
+        )
 
-      createInstanceMutation.mutate({
-        use_loaded_icon: false,
-        icon_url: props.addon?.imageUrl ?? null,
-        notes: "",
-        name: props.name || props.addon?.title!,
-        version: {
-          Modpack: instanceCreationObj(fileVersion, props.addon?.id)
-        }
-      })
+        createInstanceMutation.mutate({
+          use_loaded_icon: false,
+          icon_url: props.addon?.imageUrl ?? null,
+          notes: "",
+          name: props.name || props.addon?.title!,
+          version: {
+            Modpack: instanceCreationObj(fileVersion, props.addon?.id)
+          }
+        })
+      } catch (error) {
+        setLoading(false)
+        console.error("[ModpackDownloadButton] No pack version:", error)
+        toast.error(t("notifications:_trn_pack_version_failed"), {
+          description: errorDescription(
+            t,
+            error,
+            "notifications:_trn_pack_version_retry"
+          )
+        })
+      }
     })
   }
 

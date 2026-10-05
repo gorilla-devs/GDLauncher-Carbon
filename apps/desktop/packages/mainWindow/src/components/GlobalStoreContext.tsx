@@ -1,3 +1,4 @@
+import { mergeUnifiedCategories } from "@/utils/categoryResults"
 import { rspc } from "@/utils/rspcClient"
 import {
   AccountEntry,
@@ -154,7 +155,8 @@ export const GlobalStoreProvider = (props: { children: JSX.Element }) => {
   }))
 
   const categories = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.getUnifiedCategories"]
+    queryKey: ["modplatforms.getUnifiedCategories"],
+    structuralSharing: mergeUnifiedCategories
   }))
 
   const modloaders = rspc.createQuery(() => ({

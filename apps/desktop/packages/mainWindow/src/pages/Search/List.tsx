@@ -2,7 +2,7 @@ import { ListItem } from "./ListItem"
 import { VList } from "@/components/VirtuaWrapper"
 import useSearchContext from "@/components/SearchInputContext"
 import { Skeleton } from "@gd/ui"
-import { Show, createEffect, createMemo, Match, Switch } from "solid-js"
+import { Show, createEffect, Match, Switch } from "solid-js"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useParams } from "@solidjs/router"
@@ -13,6 +13,7 @@ import { Grid } from "./Grid"
 import SharePreviewContent from "@/components/SharePreviewContent"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
+import { isAddonInstalled } from "@/utils/installedAddon"
 
 export function List() {
   const searchContext = useSearchContext()
@@ -69,53 +70,11 @@ export function List() {
     enabled: !isNaN(instanceId()) && instanceId() > 0
   }))
 
-  // For servers: check if a search result matches any installed server addon
-  // Uses project IDs from metadata (for newly installed mods) and
-  // slug-based filename matching as fallback (for pre-existing mods)
-  const isServerAddonInstalled = (resultId: string, slug?: string) => {
-    const addons = serverAddons()?.data
-    if (!addons) return false
-
-    // Check by platform project ID (reliable, from metadata)
-    for (const addon of addons) {
-      if (addon.curseforgeProjectId?.toString() === resultId) return true
-      if (addon.modrinthProjectId === resultId) return true
-    }
-
-    // Fallback: check if any addon filename starts with the slug
-    if (slug) {
-      const slugLower = slug.toLowerCase()
-      for (const addon of addons) {
-        const name = addon.displayName.toLowerCase()
-        if (name === slugLower || name.startsWith(slugLower + "-")) return true
-      }
-    }
-
-    return false
-  }
-
-  const lookupTableInstalledMods = createMemo(() => {
-    const curseforgeMods =
-      installedMods.data?.reduce((acc: string[], mod) => {
-        if (mod.curseforge?.project_id) {
-          acc.push(mod.curseforge.project_id.toString())
-        }
-        return acc
-      }, []) || []
-
-    const modrinthMods =
-      installedMods.data?.reduce((acc: string[], mod) => {
-        if (mod.modrinth?.project_id) {
-          acc.push(mod.modrinth.project_id)
-        }
-        return acc
-      }, []) || []
-
-    return new Set([...curseforgeMods, ...modrinthMods])
-  })
-
   return (
     <div class="flex h-full flex-col overflow-hidden">
+      <Show when={searchContext?.directErrors().length}>
+        <div role="alert">{searchContext?.directErrors().join("; ")}</div>
+      </Show>
       <div class="flex-1 overflow-hidden">
         <Show when={searchContext?.isShareMode() && searchContext?.shareCode()}>
           <div class="flex h-full justify-center overflow-auto px-6 pt-6">
@@ -233,14 +192,18 @@ export function List() {
                           instanceId={instanceId()}
                           serverId={serverId()}
                           result={result.value!}
-                          isInstalled={
+                          isInstalled={isAddonInstalled(
+                            result.value!,
                             !isNaN(serverId()) && serverId() > 0
-                              ? isServerAddonInstalled(
-                                  result.value!.id,
-                                  result.value!.slug
-                                )
-                              : lookupTableInstalledMods().has(result.value!.id)
-                          }
+                              ? {
+                                  kind: "server",
+                                  addons: serverAddons()?.data ?? []
+                                }
+                              : {
+                                  kind: "instance",
+                                  addons: installedMods.data ?? []
+                                }
+                          )}
                           onItemClick={() => {
                             const sid = serverId()
                             const iid = instanceId()
@@ -249,7 +212,7 @@ export function List() {
                                 ? `serverId=${sid}`
                                 : `instanceId=${iid}`
                             navigator.navigate(
-                              `/addon/${result.value!.id}/${result.value!.platform}?${idParam}`
+                              `/addon/${result.value!.id}/${result.value!.platform}?${idParam}${result.value!.requestedVersionId ? `&requestedVersionId=${encodeURIComponent(result.value!.requestedVersionId)}` : ""}`
                             )
                           }}
                         />

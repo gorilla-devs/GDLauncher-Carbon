@@ -196,11 +196,9 @@ pub async fn process_minecraft(
         while progress_watch_rx.changed().await.is_ok() {
             {
                 let progress = progress_watch_rx.borrow();
-                t_subtasks_clone.t_scan_files.update_download(
-                    progress.current_size as u32,
-                    progress.total_size as u32,
-                    false,
-                );
+                t_subtasks_clone
+                    .t_scan_files
+                    .update_download_progress(&progress, false);
             }
 
             tokio::time::sleep(Duration::from_millis(200)).await;
@@ -235,11 +233,9 @@ pub async fn process_minecraft(
             while progress_watch_rx.changed().await.is_ok() {
                 {
                     let progress = progress_watch_rx.borrow();
-                    t_subtasks_clone.t_download_files.update_download(
-                        progress.current_size as u32,
-                        progress.total_size as u32,
-                        false,
-                    );
+                    t_subtasks_clone
+                        .t_download_files
+                        .update_download_progress(&progress, false);
                 }
 
                 tokio::time::sleep(Duration::from_millis(200)).await;

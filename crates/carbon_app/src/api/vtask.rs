@@ -282,8 +282,8 @@ pub struct FETask {
     id: FETaskId,
     name: Translation,
     progress: Progress,
-    downloaded: u32,
-    download_total: u32,
+    downloaded: String,
+    download_total: String,
     active_subtasks: Vec<FESubtask>,
 }
 
@@ -304,7 +304,7 @@ pub struct FESubtask {
 #[derive(Type, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub enum FESubtaskProgress {
-    Download { downloaded: u32, total: u32 },
+    Download { downloaded: String, total: String },
     Item { current: u32, total: u32 },
     Opaque,
 }
@@ -315,8 +315,8 @@ impl From<domain::Task> for FETask {
             id: value.id.into(),
             name: value.name.into(),
             progress: value.progress.into(),
-            downloaded: value.downloaded,
-            download_total: value.download_total,
+            downloaded: value.downloaded.to_string(),
+            download_total: value.download_total.to_string(),
             active_subtasks: value
                 .active_subtasks
                 .into_iter()
@@ -348,11 +348,96 @@ impl From<domain::Subtask> for FESubtask {
 impl From<domain::SubtaskProgress> for FESubtaskProgress {
     fn from(value: domain::SubtaskProgress) -> Self {
         match value {
-            domain::SubtaskProgress::Download { downloaded, total } => {
-                Self::Download { downloaded, total }
-            }
+            domain::SubtaskProgress::Download { downloaded, total } => Self::Download {
+                downloaded: downloaded.to_string(),
+                total: total.to_string(),
+            },
             domain::SubtaskProgress::Item { current, total } => Self::Item { current, total },
             domain::SubtaskProgress::Opaque => Self::Opaque,
+        }
+    }
+}
+
+#[cfg(test)]
+mod task21_wire_tests {
+    use super::*;
+    #[test]
+    fn task21_bytes_wire_is_decimal_strings() {
+        let task = domain::Task {
+            id: domain::VisualTaskId(1),
+            name: Translation::Test,
+            progress: domain::Progress::Known(0.5),
+            downloaded: 50,
+            download_total: 100,
+            active_subtasks: vec![domain::Subtask {
+                name: Translation::Test,
+                progress: domain::SubtaskProgress::Download {
+                    downloaded: 50,
+                    total: 100,
+                },
+            }],
+        };
+        let wire = serde_json::to_value(FETask::from(task)).unwrap();
+        assert_eq!(wire["downloaded"], "50");
+        assert_eq!(wire["download_total"], "100");
+        assert_eq!(
+            wire["active_subtasks"][0]["progress"]["download"]["downloaded"],
+            "50"
+        );
+    }
+}
+
+#[cfg(test)]
+mod task21_boundary_tests {
+    use super::*;
+    #[test]
+    fn task21_bytes_api_boundaries_are_lossless_strings() {
+        for n in [
+            5_368_709_120u64,
+            9_007_199_254_740_991,
+            9_007_199_254_740_993,
+            u64::MAX,
+        ] {
+            let task = domain::Task {
+                id: domain::VisualTaskId(1),
+                name: Translation::Test,
+                progress: domain::Progress::Known(0.5),
+                downloaded: n,
+                download_total: n,
+                active_subtasks: vec![domain::Subtask {
+                    name: Translation::Test,
+                    progress: domain::SubtaskProgress::Download {
+                        downloaded: n,
+                        total: n,
+                    },
+                }],
+            };
+            let value: serde_json::Value =
+                serde_json::from_str(&serde_json::to_string(&FETask::from(task)).unwrap()).unwrap();
+            assert_eq!(
+                value["downloaded"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap(),
+                n
+            );
+            assert_eq!(
+                value["download_total"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap(),
+                n
+            );
+            assert_eq!(
+                value["active_subtasks"][0]["progress"]["download"]["total"]
+                    .as_str()
+                    .unwrap()
+                    .parse::<u64>()
+                    .unwrap(),
+                n
+            );
         }
     }
 }

@@ -1129,9 +1129,7 @@ impl Installer {
                             let progress = async move {
                                 while progress_watch_rx.changed().await.is_ok() {
                                     let progress = progress_watch_rx.borrow_and_update();
-                                    t_download_file.update_download(
-                                        progress.current_size as u32, progress.total_size as u32, false,
-                                    );
+                                    t_download_file.update_download_progress(&progress, false);
                                 }
                                 t_download_file
                             };

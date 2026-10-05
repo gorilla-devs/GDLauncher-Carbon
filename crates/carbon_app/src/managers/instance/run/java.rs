@@ -231,9 +231,9 @@ pub async fn check_and_install(
                             }
 
                             match *step {
-                                Step::Downloading(downloaded, total) => t_subtasks_clone
-                                    .t_download_java
-                                    .update_download(downloaded as u32, total as u32, true),
+                                Step::Downloading(..) => {
+                                    forward_java_download(&t_subtasks_clone.t_download_java, &step)
+                                }
                                 Step::Extracting(count, total) => {
                                     if !dl_completed {
                                         t_subtasks_clone.t_download_java.complete_opaque();
@@ -316,4 +316,27 @@ pub async fn check_and_install(
     }
 
     Ok(java)
+}
+
+fn forward_java_download(task: &Subtask, step: &Step) {
+    if let Step::Downloading(current, total) = step {
+        task.update_download(*current, *total, true);
+    }
+}
+#[cfg(test)]
+mod task21_java_progress_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task21_java_progress_retains_u64_step_bytes() {
+        let task = VisualTask::new(Translation::Test);
+        let subtask = task.subtask(Translation::Test);
+        forward_java_download(&subtask, &Step::Downloading(4_294_967_296, 5_368_709_120));
+        assert_eq!(
+            task.downloaded_bytes().await,
+            (4_294_967_296, 5_368_709_120)
+        );
+        assert!((task.progress_float().await - 0.8).abs() < 0.00001);
+        forward_java_download(&subtask, &Step::Downloading(5_368_709_120, 5_368_709_120));
+        assert_eq!(task.progress_float().await, 1.0);
+    }
 }

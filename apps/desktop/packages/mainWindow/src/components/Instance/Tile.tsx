@@ -43,8 +43,8 @@ interface Props {
   version: string | undefined | null
   img: string | undefined
   isInvalid?: boolean
-  downloaded?: number
-  totalDownload?: number
+  downloaded?: string
+  totalDownload?: string
   isRunning?: boolean
   isQueued?: boolean
   isPreparing?: boolean

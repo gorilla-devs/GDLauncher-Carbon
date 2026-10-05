@@ -152,6 +152,18 @@ const CREATE_MIGRATIONS_TABLE: &str = "CREATE TABLE IF NOT EXISTS _migrations (\
     data_down TEXT NOT NULL DEFAULT 'full', \
     applied_at INTEGER NOT NULL)";
 
+/// The checksum Prisma recorded for `20240120134904_init` on databases that
+/// 2.0.0-beta builds created before e1e55175a (2024-01-29) edited that script
+/// (`concurrentDownloads DEFAULT 8` became 10, plus whitespace). Prisma never
+/// re-checks applied scripts, so those databases kept updating and 2.0.40
+/// opened them; migration 2 redefines `AppConfiguration`, so their schema is
+/// the current one. Accepted as an alias of the current checksum for that one
+/// migration only; the schema-equality gate still decides.
+const PRE_EDIT_INIT: (&str, &str) = (
+    "20240120134904_init",
+    "51757b54d124de3e2cbcd9859ac0428a08a319b82626ec6887c2e34f30eee8ee",
+);
+
 const MIGRATION_ROW_COLUMNS: &str = "_migrations (version, name, checksum, kind, down_sql, data_down, applied_at) \
     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)";
 
@@ -228,6 +240,118 @@ impl MigrationSet {
         self.backfill_applied(conn, user_version)?;
         self.apply_pending(conn, user_version, count)?;
         Ok(OpenVerdict::Proceed)
+    }
+
+    /// Convert attempt history only when its completed names prove the actual
+    /// contiguous schema prefix. Metadata, version and history retirement commit
+    /// together; WAL configuration belongs to the caller outside this transaction.
+    pub fn convert_legacy_history(&self, conn: &mut Connection) -> DbResult<()> {
+        let exists: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='_prisma_migrations')", [], |r| r.get(0))?;
+        if !exists {
+            return Ok(());
+        }
+        let tx = conn.transaction_with_behavior(rusqlite::TransactionBehavior::Immediate)?;
+        let reject = |reason: String| {
+            DbError::LegacyHistory(format!(
+                "Legacy migration history cannot be converted: {reason}. Original history retained; contact support for recovery."
+            ))
+        };
+        let columns: Vec<String> = tx
+            .prepare("PRAGMA table_info(_prisma_migrations)")?
+            .query_map([], |r| r.get(1))?
+            .collect::<Result<_, _>>()?;
+        if ["migration_name", "finished_at", "rolled_back_at"]
+            .iter()
+            .any(|name| !columns.iter().any(|c| c == name))
+        {
+            return Err(reject("required attempt columns are missing".into()));
+        }
+        let has_checksum = columns.iter().any(|c| c == "checksum");
+        // The attempt state is a presence test, never a decode: Prisma's engine
+        // wrote `finished_at` / `rolled_back_at` into DATETIME columns as INTEGER
+        // `timestamp_millis()`, so reading them as text fails on every real
+        // Prisma-era history. Prisma's own rule is the same presence test: an
+        // attempt is applied when `finished_at` is set and `rolled_back_at` is not.
+        let sql = if has_checksum {
+            "SELECT migration_name, finished_at IS NOT NULL, rolled_back_at IS NOT NULL, checksum \
+             FROM _prisma_migrations"
+        } else {
+            "SELECT migration_name, finished_at IS NOT NULL, rolled_back_at IS NOT NULL, NULL \
+             FROM _prisma_migrations"
+        };
+        let attempts: Vec<(String, bool, bool, Option<String>)> = tx
+            .prepare(sql)?
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+            .collect::<Result<_, _>>()?;
+        let mut completed = HashSet::new();
+        for (name, finished, rolled_back, checksum) in attempts {
+            if !finished || rolled_back {
+                continue;
+            }
+            let Some(index) = self.migrations.iter().position(|d| d.name == name) else {
+                return Err(reject(format!("unknown completed migration '{name}'")));
+            };
+            if !completed.insert(index) {
+                return Err(reject(format!("duplicate completed migration '{name}'")));
+            }
+            let recorded = checksum.as_deref();
+            let known = recorded == Some(self.checksum(index as i32 + 1).as_str())
+                || (name == PRE_EDIT_INIT.0 && recorded == Some(PRE_EDIT_INIT.1));
+            if has_checksum && !known {
+                return Err(reject(format!("checksum mismatch for '{name}'")));
+            }
+        }
+        let prefix = completed.len() as i32;
+        if (0..prefix as usize).any(|i| !completed.contains(&i)) {
+            return Err(reject(
+                "completed migrations do not form a contiguous prefix".into(),
+            ));
+        }
+        if dump_schema(&tx)? != self.reference_schema(prefix)? {
+            return Err(reject(format!(
+                "schema does not match completed prefix {prefix}"
+            )));
+        }
+        let version = read_user_version(&tx)?;
+        if version != 0 && version != prefix {
+            return Err(reject(format!(
+                "user_version {version} contradicts prefix {prefix}"
+            )));
+        }
+        let owned: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='_migrations')",
+            [],
+            |r| r.get(0),
+        )?;
+        if owned {
+            let rows: Vec<(i32, String, String, String, Option<String>)> = tx
+                .prepare("SELECT version,name,checksum,kind,down_sql FROM _migrations")?
+                .query_map([], |r| {
+                    Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?, r.get(4)?))
+                })?
+                .collect::<Result<_, _>>()?;
+            for (v, name, checksum, kind, down) in rows {
+                if v < 1 || v > prefix {
+                    return Err(reject(format!(
+                        "owned metadata version {v} contradicts prefix"
+                    )));
+                }
+                let def = self.migrations[(v - 1) as usize];
+                if name != def.name
+                    || checksum != self.checksum(v)
+                    || kind != def.kind.as_str()
+                    || down.as_deref() != def.down_sql
+                {
+                    return Err(reject(format!("owned metadata disagrees at version {v}")));
+                }
+            }
+        }
+        ensure_migrations_table(&tx)?;
+        self.backfill_applied(&tx, prefix)?;
+        tx.pragma_update(None, "user_version", prefix)?;
+        tx.execute("DROP TABLE _prisma_migrations", [])?;
+        tx.commit()?;
+        Ok(())
     }
 
     /// Records `_migrations` rows for migrations `1..=upto` that are already

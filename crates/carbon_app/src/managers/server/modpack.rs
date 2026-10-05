@@ -158,34 +158,20 @@ pub async fn process_curseforge_server_pack(
     }
 
     // Stream download with progress tracking (throttled to avoid flooding WS invalidation)
-    let total_size = response.content_length().map(|v| v as u32);
-    match total_size {
-        Some(total) => t_download.update_download(0, total, false),
-        None => t_download.start_opaque(),
-    }
-
-    let downloaded: u32;
-    let mut last_reported: u32 = 0;
-    let report_threshold = total_size.map(|t| (t / 200).max(64 * 1024)).unwrap_or(0);
+    let total_size = response.content_length();
+    let mut progress = ArchiveProgress::new(&t_download, total_size);
+    let downloaded: u64;
     let mut file = tokio::fs::File::create(&zip_path)
         .await
         .context("Failed to create temp file")?;
 
     let mut stream = response.bytes_stream();
     downloaded = copy_archive_stream(&mut stream, &mut file, cancel, |bytes| {
-        if let Some(total) = total_size {
-            if bytes - last_reported >= report_threshold {
-                t_download.update_download(bytes, total, false);
-                last_reported = bytes;
-            }
-        }
+        progress.report(bytes);
     })
     .await?;
     drop(file);
-    match total_size {
-        Some(_) => t_download.complete_download(),
-        None => t_download.complete_opaque(),
-    }
+    progress.finish(downloaded);
 
     info!(
         "Server pack downloaded ({} bytes), extracting...",
@@ -307,34 +293,20 @@ pub async fn process_modrinth_server_pack(
     }
 
     // Stream download with progress (throttled)
-    let total_size = response.content_length().map(|v| v as u32);
-    match total_size {
-        Some(total) => t_download_mrpack.update_download(0, total, false),
-        None => t_download_mrpack.start_opaque(),
-    }
-
-    let downloaded: u32;
-    let mut last_reported: u32 = 0;
-    let report_threshold = total_size.map(|t| (t / 200).max(64 * 1024)).unwrap_or(0);
+    let total_size = response.content_length();
+    let mut progress = ArchiveProgress::new(&t_download_mrpack, total_size);
+    let downloaded: u64;
     let mut file = tokio::fs::File::create(&mrpack_path)
         .await
         .context("Failed to create temp file")?;
 
     let mut stream = response.bytes_stream();
     downloaded = copy_archive_stream(&mut stream, &mut file, cancel, |bytes| {
-        if let Some(total) = total_size {
-            if bytes - last_reported >= report_threshold {
-                t_download_mrpack.update_download(bytes, total, false);
-                last_reported = bytes;
-            }
-        }
+        progress.report(bytes);
     })
     .await?;
     drop(file);
-    match total_size {
-        Some(_) => t_download_mrpack.complete_download(),
-        None => t_download_mrpack.complete_opaque(),
-    }
+    progress.finish(downloaded);
 
     info!("Mrpack downloaded ({} bytes), processing...", downloaded);
 
@@ -424,11 +396,7 @@ pub async fn process_modrinth_server_pack(
         while progress_rx.changed().await.is_ok() {
             {
                 let progress = progress_rx.borrow();
-                t_download_files.update_download(
-                    progress.current_size as u32,
-                    progress.total_size as u32,
-                    false,
-                );
+                t_download_files.update_download_progress(&progress, false);
             }
             tokio::time::sleep(std::time::Duration::from_millis(200)).await;
         }
@@ -1912,8 +1880,8 @@ async fn copy_archive_stream<S, B, E, W>(
     stream: &mut S,
     file: &mut W,
     cancel: &tokio_util::sync::CancellationToken,
-    mut progress: impl FnMut(u32),
-) -> anyhow::Result<u32>
+    mut progress: impl FnMut(u64),
+) -> anyhow::Result<u64>
 where
     S: futures::Stream<Item = Result<B, E>> + Unpin,
     B: AsRef<[u8]>,
@@ -1922,8 +1890,8 @@ where
 {
     use futures::StreamExt;
     use tokio::io::AsyncWriteExt;
-    let result: anyhow::Result<u32> = async {
-        let mut downloaded = 0u32;
+    let result: anyhow::Result<u64> = async {
+        let mut downloaded = 0u64;
         loop {
             // Only pending transport waits are cancelable. An entered write is
             // always awaited before observing cancellation at the next boundary.
@@ -1934,8 +1902,9 @@ where
             };
             let chunk = chunk.map_err(Into::into)?;
             file.write_all(chunk.as_ref()).await?;
-            downloaded =
-                downloaded.saturating_add(chunk.as_ref().len().try_into().unwrap_or(u32::MAX));
+            downloaded = downloaded
+                .checked_add(chunk.as_ref().len() as u64)
+                .context("Server archive byte count exceeds u64")?;
             progress(downloaded);
         }
         Ok(downloaded)
@@ -2086,5 +2055,67 @@ mod task18_r2_phase_tests {
     async fn task18_r2_healthy_hash_directory_and_extraction_complete() {
         phase_case(true, false).await;
         phase_case(false, false).await;
+    }
+}
+
+/// Byte counter publication is separate from stream IO and preserves its final flush.
+struct ArchiveProgress<'a> {
+    task: &'a crate::managers::vtask::Subtask,
+    total: Option<u64>,
+    last_reported: u64,
+    threshold: u64,
+}
+impl<'a> ArchiveProgress<'a> {
+    fn new(task: &'a crate::managers::vtask::Subtask, total: Option<u64>) -> Self {
+        match total {
+            Some(total) => task.update_download(0, total, false),
+            None => task.start_opaque(),
+        }
+        Self {
+            task,
+            total,
+            last_reported: 0,
+            threshold: total.map(|n| (n / 200).max(64 * 1024)).unwrap_or(0),
+        }
+    }
+    fn report(&mut self, current: u64) {
+        if let Some(total) = self.total {
+            if current.saturating_sub(self.last_reported) >= self.threshold {
+                self.task.update_download(current, total, false);
+                self.last_reported = current;
+            }
+        }
+    }
+    fn finish(self, current: u64) {
+        match self.total {
+            Some(total) => {
+                self.task.update_download(current, total, false);
+                self.task.complete_download();
+            }
+            None => self.task.complete_opaque(),
+        }
+    }
+}
+#[cfg(test)]
+mod task21_stream_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task21_stream_progress_native_width_final_flush_and_opaque() {
+        let task = VisualTask::new(Translation::Test);
+        let download = task.subtask(Translation::Test);
+        let mut progress = ArchiveProgress::new(&download, Some(5_368_709_120));
+        progress.report(4_294_967_296);
+        assert_eq!(
+            task.downloaded_bytes().await,
+            (4_294_967_296, 5_368_709_120)
+        );
+        progress.finish(4_294_967_297);
+        assert_eq!(task.downloaded_bytes().await.0, 4_294_967_297);
+        assert_eq!(task.progress_float().await, 1.0);
+        let mut unknown = ArchiveProgress::new(&download, None);
+        unknown.report(5_368_709_120);
+        assert_eq!(task.progress_float().await, 0.0);
+        unknown.finish(5_368_709_120);
+        assert_eq!(task.progress_float().await, 1.0);
     }
 }

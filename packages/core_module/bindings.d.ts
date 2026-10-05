@@ -553,7 +553,9 @@ export type FEUnifiedSearchParameters = { searchQuery: string | null; categories
 
 export type GameLogId = number
 
-export type FEUnifiedSearchResultWithDescription = ({ title: string; slug: string; description: string; imageUrl: string | null; highResImageUrl: string | null; downloadsCount: number; id: string; releaseDate: string; lastUpdated: string; platform: FEUnifiedPlatform; type: FEUnifiedSearchType; authors: FEUnifiedAuthor[]; websiteUrl: string | null; categories: FEUnifiedCategoryId[]; screenshotUrls: string[]; minecraftVersions: string[]; loaders?: FEUnifiedModLoaderType[]; versions: string[] | null; mainFileId: string | null; serverPackFileId: string | null }) & { fullDescriptionBody: string }
+export type ImportEntitySelectionType = "file" | "directory"
+
+export type Announcement = { title: string; content: string; type: AnnouncementType; version_req: string | null; start_date: string | null; end_date: string | null }
 
 export type CFFEMod = { id: number; gameId: number; name: string; slug: string; links: CFFEModLinks; summary: string; status: CFFEModStatus; downloadCount: number; isFeatured: boolean; primaryCategoryId: number; categories: CFFECategory[]; classId: CFFEClassId | null; authors: CFFEModAuthor[]; logo: CFFEModAsset | null; screenshots: CFFEModAsset[]; mainFileId: number; latestFiles: CFFEFile[]; latestFilesIndexes: CFFEFileIndex[]; dateCreated: string; dateModified: string; dateReleased: string; allowModDistribution: boolean | null; gamePopularityRank: number; isAvailable: boolean; thumbsUpCount: number }
 
@@ -651,9 +653,7 @@ export type ListInstance = { id: FEInstanceId; group_id: FEGroupId; index: numbe
 
 export type FEUnifiedCategoryIcon = { type: "url"; value: string } | { type: "embedded"; value: string }
 
-export type FEUnifiedSearchResult = { title: string; slug: string; description: string; imageUrl: string | null; highResImageUrl: string | null; downloadsCount: number; id: string; releaseDate: string; lastUpdated: string; platform: FEUnifiedPlatform; type: FEUnifiedSearchType; authors: FEUnifiedAuthor[]; websiteUrl: string | null; categories: FEUnifiedCategoryId[]; screenshotUrls: string[]; minecraftVersions: string[]; loaders?: FEUnifiedModLoaderType[]; versions: string[] | null; mainFileId: string | null; serverPackFileId: string | null }
-
-export type InstallMod = { instance_id: FEInstanceId; mod_source: ModSource; install_deps: boolean; replaces_mod: string | null }
+export type PendingSetupStatus = { pending: boolean; operation: string | null; installed_version: string | null; pending_version: string | null; can_cancel: boolean; reason: string | null; repair_version: string | null; preview_withheld: boolean; can_resume: boolean; busy: boolean; discard_token: string | null }
 
 export type ProfileVerificationOutcome = "complete" | "retryable" | "loginRequired"
 
@@ -695,7 +695,7 @@ export type CFFEModParameters = { modId: number }
 
 export type FEUnifiedCategoryId = number | string
 
-export type FESubtaskProgress = { download: { downloaded: number; total: number } } | { item: { current: number; total: number } } | "opaque"
+export type FESubtaskProgress = { download: { downloaded: string; total: string } } | { item: { current: number; total: number } } | "opaque"
 
 export type BannedIpEntry = { ip: string; created: string; source: string; expires: string; reason: string }
 
@@ -753,7 +753,7 @@ export type ModChannelWithUsage = { channel: ModChannel; allow_updates: boolean 
  */
 export type InstancesSortBy = "name" | "lastPlayed" | "lastUpdated" | "created" | "gameVersion" | "mostPlayed"
 
-export type FEUnifiedCategories = { modrinth: { [key: string]: FEUnifiedCategory }; curseforge: { [key: number]: FEUnifiedCategory } }
+export type FEUnifiedCategories = { modrinth: { [key: string]: FEUnifiedCategory }; curseforge: { [key: number]: FEUnifiedCategory }; curseforgeError: string | null; modrinthError: string | null }
 
 export type CFFEModFileChangelogParameters = { modId: number; fileId: number }
 
@@ -807,7 +807,7 @@ export type FESettings = { theme: string; language: string; reducedMotion: boole
 
 export type MRFEDependency = { version_id: string | null; project_id: string | null; file_name: string | null; dependency_type: MRFEDependencyType }
 
-export type FETask = { id: FETaskId; name: Translation; progress: Progress; downloaded: number; download_total: number; active_subtasks: FESubtask[] }
+export type FETask = { id: FETaskId; name: Translation; progress: Progress; downloaded: string; download_total: string; active_subtasks: FESubtask[] }
 export type FETaskOutcome = { type: "Running"; value: FETask } | { type: "Failed"; value: FETask } | { type: "Succeeded" } | { type: "Dismissed" } | { type: "Unavailable" }
 
 export type MRFEVersion = { name: string; version_number: string; changelog: string | null; dependencies: MRFEDependency[]; game_versions: string[]; version_type: MRFEVersionType; loaders: string[]; featured: boolean; status: MRFEStatus | null; requested_status: MRFERequestedVersionStatus | null; id: string; project_id: string; author_id: string; date_published: string; downloads: number; files: MRFEVersionFile[] }
@@ -945,11 +945,6 @@ export type MRFETeamResponse = MRFETeamMember[]
 export type ModChannel = "Alpha" | "Beta" | "Stable"
 
 export type FEUnifiedEnvironment = "server" | "client"
-
-/**
- * Batch request for fetching multiple projects by ID or slug
- */
-export type FEUnifiedBatchRequest = { curseforgeIds: number[]; slugs: string[]; modrinthOnlyIds: string[]; curseforgeOnlySlugs: string[] }
 
 export type CFFEModSearchParametersQuery = { gameId: number; searchFilter: string | null; gameVersion: string | null; categoryIds: number[] | null; sortOrder: CFFEModSearchSortOrder | null; sortField: CFFEModSearchSortField | null; classId: CFFEClassId | null; modLoaderTypes: CFFEModLoaderType[] | null; gameVersionTypeId: number | null; authorId: number | null; slug: string | null; index: number | null; pageSize: number | null }
 

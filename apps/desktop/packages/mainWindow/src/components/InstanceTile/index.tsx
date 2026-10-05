@@ -12,12 +12,11 @@ import { ListInstance, FESubtask } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { createStore } from "solid-js/store"
-import { bytesToMB } from "@/utils/helpers"
 import { useGlobalStore } from "../GlobalStoreContext"
 
 interface InstanceDownloadProgress {
-  totalDownload: number
-  downloaded: number
+  totalDownload: string
+  downloaded: string
   percentage: number
   subTasks: FESubtask[] | undefined
 }
@@ -46,8 +45,8 @@ const InstanceTile = (props: {
   const [isLoading, setIsLoading] = createSignal(false)
   const [failError, setFailError] = createSignal("")
   const [progress, setProgress] = createStore<InstanceDownloadProgress>({
-    totalDownload: 0,
-    downloaded: 0,
+    totalDownload: "0",
+    downloaded: "0",
     percentage: 0,
     subTasks: undefined
   })
@@ -108,8 +107,8 @@ const InstanceTile = (props: {
     } else {
       setIsLoading(false)
       setProgress({
-        totalDownload: 0,
-        downloaded: 0,
+        totalDownload: "0",
+        downloaded: "0",
         percentage: 0,
         subTasks: undefined
       })
@@ -189,8 +188,8 @@ const InstanceTile = (props: {
       selected={props.selected}
       isLoading={isLoading()}
       percentage={progress.percentage * 100}
-      totalDownload={bytesToMB(progress.totalDownload)}
-      downloaded={bytesToMB(progress.downloaded)}
+      totalDownload={progress.totalDownload}
+      downloaded={progress.downloaded}
       subTasks={progress.subTasks}
       isMultiSelected={props.isMultiSelected}
       onToggleSelection={props.onToggleSelection}

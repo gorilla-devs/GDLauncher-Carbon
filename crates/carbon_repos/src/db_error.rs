@@ -8,6 +8,10 @@ pub enum DbError {
     Closed,
     #[error("row conversion failed: {0}")]
     Conversion(String),
+    /// The `_prisma_migrations` history a 2024 build left cannot be converted
+    /// safely. The database and that history are left as they were.
+    #[error("{0}")]
+    LegacyHistory(String),
 }
 
 impl DbError {

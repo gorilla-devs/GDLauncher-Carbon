@@ -82,6 +82,11 @@ export function GridItem(props: GridItemProps) {
           "group-hover:h-[70%]": true
         }}
       >
+        <Show when={props.result.requestedVersionId}>
+          <span class="text-xs">
+            Selected version: {props.result.requestedVersionId}
+          </span>
+        </Show>
         <div class="flex flex-1 flex-col p-3">
           {/* Title */}
           <p class="truncate text-base font-bold text-white">
@@ -161,6 +166,7 @@ export function GridItem(props: GridItemProps) {
               <div class="flex items-center">
                 <ModpackDownloadButton
                   addon={props.result}
+                  fileId={props.result.requestedVersionId ?? undefined}
                   splitPosition={
                     props.result.serverPackFileId ? "left" : undefined
                   }
@@ -169,6 +175,7 @@ export function GridItem(props: GridItemProps) {
                   <div class="w-px self-stretch bg-primary-700 shrink-0" />
                   <ServerPackDownloadButton
                     addon={props.result}
+                    fileId={props.result.requestedVersionId ?? undefined}
                     splitPosition="right"
                   />
                 </Show>
@@ -181,6 +188,7 @@ export function GridItem(props: GridItemProps) {
                 selectedServerAddons={props.serverAddons}
                 selectedServerId={props.serverId}
                 addon={props.result}
+                fileId={props.result.requestedVersionId ?? undefined}
                 onDropdownOpenChange={(isOpen) => {
                   setIsHoverActive(isOpen)
                 }}

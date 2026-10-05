@@ -1,3 +1,4 @@
+import { mergeUnifiedCategories } from "@/utils/categoryResults"
 import {
   DropdownMenuCheckboxItem,
   DropdownMenuGroup,
@@ -107,14 +108,15 @@ export function SearchApiDropdown() {
 export function SearchCategoryDropdown(_props: DropdownProps) {
   const searchResults = useSearchContext()
   const categories = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.getUnifiedCategories"]
+    queryKey: ["modplatforms.getUnifiedCategories"],
+    structuralSharing: mergeUnifiedCategories
   }))
 
-  const curseforgeCategories = categories.data?.curseforge
-  const modrinthCategories = categories.data?.modrinth
+  const curseforgeCategories = () => categories.data?.curseforge
+  const modrinthCategories = () => categories.data?.modrinth
 
   const getCurseforgeCategories = () => {
-    return Object.values(curseforgeCategories ?? {})
+    return Object.values(curseforgeCategories() ?? {})
       ?.filter(
         (v) => v.projectType === searchResults?.searchQuery().projectType
       )
@@ -126,7 +128,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
   }
 
   const getModrinthCategories = () => {
-    return Object.values(modrinthCategories ?? {})
+    return Object.values(modrinthCategories() ?? {})
       ?.filter(
         (v) => v.projectType === searchResults?.searchQuery().projectType
       )
@@ -172,6 +174,27 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
+                <Show when={categories.data?.curseforgeError}>
+                  {(error) => (
+                    <div
+                      role="alert"
+                      class="flex flex-col items-start gap-1 text-sm"
+                    >
+                      <span>
+                        <Trans key="search:_trn_categories_load_failed" />
+                      </span>
+                      <span class="text-lightSlate-500 break-words text-xs">
+                        {error()}
+                      </span>
+                      <button
+                        class="underline"
+                        onClick={() => categories.refetch()}
+                      >
+                        <Trans key="general:_trn_retry" />
+                      </button>
+                    </div>
+                  )}
+                </Show>
                 <Switch>
                   <Match when={getCurseforgeCategories()?.length}>
                     <For each={getCurseforgeCategories()}>
@@ -201,7 +224,12 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
                       )}
                     </For>
                   </Match>
-                  <Match when={!getCurseforgeCategories()?.length}>
+                  <Match
+                    when={
+                      !getCurseforgeCategories()?.length &&
+                      !categories.data?.curseforgeError
+                    }
+                  >
                     <div class="text-lightSlate-900 text-sm">
                       <Trans key="search:_trn_no_categories_found" />
                     </div>
@@ -227,6 +255,27 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <DropdownMenuSubContent class="max-h-[300px] overflow-y-auto">
+                <Show when={categories.data?.modrinthError}>
+                  {(error) => (
+                    <div
+                      role="alert"
+                      class="flex flex-col items-start gap-1 text-sm"
+                    >
+                      <span>
+                        <Trans key="search:_trn_categories_load_failed" />
+                      </span>
+                      <span class="text-lightSlate-500 break-words text-xs">
+                        {error()}
+                      </span>
+                      <button
+                        class="underline"
+                        onClick={() => categories.refetch()}
+                      >
+                        <Trans key="general:_trn_retry" />
+                      </button>
+                    </div>
+                  )}
+                </Show>
                 <Switch>
                   <Match when={getModrinthCategories()?.length}>
                     <For each={getModrinthCategories()}>
@@ -256,7 +305,12 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
                       )}
                     </For>
                   </Match>
-                  <Match when={!getModrinthCategories()?.length}>
+                  <Match
+                    when={
+                      !getModrinthCategories()?.length &&
+                      !categories.data?.modrinthError
+                    }
+                  >
                     <div class="text-lightSlate-900 text-sm">
                       <Trans key="search:_trn_no_categories_found" />
                     </div>
@@ -272,6 +326,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
 }
 
 export function SearchModloaderDropdown(_props: DropdownProps) {
+  const [t] = useTransContext()
   const globalStore = useGlobalStore()
   const searchResults = useSearchContext()
   const [searchQuery, setSearchQuery] = createSignal("")
@@ -357,7 +412,7 @@ export function SearchModloaderDropdown(_props: DropdownProps) {
             <div style={{ height: "32px" }}>
               <Input
                 ref={inputRef}
-                placeholder="Search modloaders..."
+                placeholder={t("search:_trn_search_modloaders_placeholder")}
                 value={searchQuery()}
                 onInput={(e) => {
                   setSearchQuery(e.target.value)
@@ -665,7 +720,7 @@ export function ModrinthFiltersDropdown(_props: DropdownProps) {
 export function SearchGameVersionDropdown(_props: DropdownProps) {
   const globalStore = useGlobalStore()
   const searchResults = useSearchContext()
-  const [_t] = useTransContext()
+  const [t] = useTransContext()
   const [searchQuery, setSearchQuery] = createSignal("")
   const [debouncedQuery, setDebouncedQuery] = createSignal("")
   let inputRef: HTMLInputElement | undefined
@@ -803,7 +858,7 @@ export function SearchGameVersionDropdown(_props: DropdownProps) {
             <div style={{ height: "32px" }}>
               <Input
                 ref={inputRef}
-                placeholder="Search versions..."
+                placeholder={t("search:_trn_search_versions_placeholder")}
                 value={searchQuery()}
                 onInput={(e) => {
                   setSearchQuery(e.target.value)

@@ -1,5 +1,6 @@
+import { toggleGameVersion } from "@/utils/platformSearchQuery"
 import { Collapsable } from "@gd/ui"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import { Show, createMemo } from "solid-js"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import useSearchContext from "@/components/SearchInputContext"
@@ -7,6 +8,7 @@ import { FilterWarning } from "./shared"
 import { SearchableCheckboxList } from "./SearchableCheckboxList"
 
 export function GameVersionsFilter() {
+  const [t] = useTransContext()
   const globalStore = useGlobalStore()
   const searchResults = useSearchContext()
 
@@ -23,24 +25,9 @@ export function GameVersionsFilter() {
 
   const handleToggle = (value: string | number, checked: boolean) => {
     const stringValue = typeof value === "number" ? String(value) : value
-    searchResults?.setSearchQuery((prev) => {
-      const prevGameVersions = prev.gameVersions || []
-      if (checked) {
-        if (!prevGameVersions.includes(stringValue)) {
-          return {
-            ...prev,
-            gameVersions: [...prevGameVersions, stringValue]
-          }
-        }
-      } else {
-        const filtered = prevGameVersions.filter((v) => v !== stringValue)
-        return {
-          ...prev,
-          gameVersions: filtered.length === 0 ? null : filtered
-        }
-      }
-      return prev
-    })
+    searchResults?.setSearchQuery((prev) =>
+      toggleGameVersion(prev, stringValue, checked)
+    )
   }
 
   return (
@@ -65,11 +52,16 @@ export function GameVersionsFilter() {
         <Show when={!!searchResults?.selectedInstanceId()}>
           <FilterWarning />
         </Show>
+        <Show when={searchResults?.searchQuery().searchApi !== "modrinth"}>
+          <p class="text-lightSlate-400 text-xs">
+            <Trans key="search:_trn_curseforge_single_version" />
+          </p>
+        </Show>
         <SearchableCheckboxList
           items={versions()}
           selectedValues={() => searchResults?.searchQuery().gameVersions || []}
           onToggle={handleToggle}
-          searchPlaceholder="Search versions..."
+          searchPlaceholder={t("search:_trn_search_versions_placeholder")}
           maxHeight={250}
           emptyMessage={<Trans key="content:_trn_common.no_versions_found" />}
         />

@@ -20,8 +20,8 @@ const taskWith = (progress: Progress): FETask =>
     id: 1,
     name: { type: "Literal", value: "test" } as never,
     progress,
-    downloaded: 0,
-    download_total: 0,
+    downloaded: "0",
+    download_total: "0",
     active_subtasks: []
   }) as unknown as FETask
 

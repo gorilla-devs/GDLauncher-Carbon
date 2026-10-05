@@ -143,6 +143,8 @@ impl FEUnifiedSearchResponse {
 pub struct FEUnifiedCategories {
     pub modrinth: HashMap<String, FEUnifiedCategory>,
     pub curseforge: HashMap<i32, FEUnifiedCategory>,
+    pub curseforge_error: Option<String>,
+    pub modrinth_error: Option<String>,
 }
 
 #[derive(Type, Debug, Deserialize, Serialize)]
@@ -387,6 +389,9 @@ pub struct FEUnifiedSearchResult {
     pub loaders: Vec<FEUnifiedModLoaderType>,
     pub versions: Option<Vec<String>>,
     pub main_file_id: Option<String>,
+    /// Exact version selected by a typed version link; distinct from defaults.
+    #[serde(default)]
+    pub requested_version_id: Option<String>,
     pub server_pack_file_id: Option<String>,
 }
 
@@ -443,6 +448,7 @@ impl From<Mod> for FEUnifiedSearchResult {
             title: value.name,
             description: value.summary,
             slug: value.slug.clone(),
+            requested_version_id: None,
             main_file_id: Some(value.main_file_id.to_string()),
             image_url: value.logo.as_ref().map(|logo| logo.thumbnail_url.clone()),
             high_res_image_url: value.logo.as_ref().map(|logo| logo.url.clone()),
@@ -546,6 +552,7 @@ impl From<Project> for FEUnifiedSearchResult {
             title: value.title,
             description: value.description,
             slug: value.slug.clone(),
+            requested_version_id: None,
             main_file_id: value.versions.first().cloned(),
             image_url: value.icon_url.as_ref().map(|url| url.clone()),
             high_res_image_url: value.icon_url.map(|url| url),
@@ -607,6 +614,7 @@ impl FEUnifiedSearchResult {
             title: value.title,
             description: value.description,
             slug: value.slug.clone(),
+            requested_version_id: None,
             main_file_id: value.versions.first().cloned(),
             image_url: value.icon_url.as_ref().map(|url| url.clone()),
             high_res_image_url: value.icon_url.map(|url| url),
@@ -661,6 +669,7 @@ impl From<ProjectSearchResult> for FEUnifiedSearchResult {
             title: value.title,
             description: value.description,
             slug: value.slug.clone(),
+            requested_version_id: None,
             main_file_id: value.latest_version,
             image_url: value.icon_url.as_ref().map(|url| url.clone()),
             high_res_image_url: value.icon_url.map(|url| url),

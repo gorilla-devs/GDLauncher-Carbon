@@ -12,6 +12,7 @@ import {
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { queryClient, rspc } from "@/utils/rspcClient"
+import { extractErrorDisplay } from "@/utils/rspcErrorText"
 import { formatBytes } from "@/utils/formatBytes"
 import { setCleanupRunning } from "./state"
 
@@ -44,12 +45,26 @@ const ClickableRow = (props: {
 
 type Phase = "select" | "running" | "done" | "failed"
 
+/** The backend's own failure text is shown as-is; the dialog's fallbacks are
+ *  translation keys, rendered in the user's language. */
+type FailureText =
+  | { raw: string }
+  | {
+      key:
+        | "modals:_trn_cache_cleanup.failed_generic"
+        | "modals:_trn_cache_cleanup.outcome_unavailable"
+        | "modals:_trn_cache_cleanup.retry_failed"
+    }
+
 const CacheCleanup = (props: ModalProps) => {
   const modalsContext = useModal()
+  const rpc = rspc.useContext()
 
   const [phase, setPhase] = createSignal<Phase>("select")
   const [taskId, setTaskId] = createSignal<number | null>(null)
-  const [failedMessage, setFailedMessage] = createSignal("")
+  const [failedMessage, setFailedMessage] = createSignal<FailureText | null>(
+    null
+  )
   // The two-tier selection. The GDLauncher cache is on by default — it's
   // the safe wipe and the reason most people open this dialog. The
   // Minecraft cache is opt-in because clearing it forces a multi-GB
@@ -71,7 +86,8 @@ const CacheCleanup = (props: ModalProps) => {
       : undefined
 
   const vtask = rspc.createQuery(() => ({
-    queryKey: ["vtask.getTask", taskId()]
+    queryKey: ["vtask.getTaskOutcome", taskId()],
+    enabled: taskId() !== null
   }))
 
   const startMutation = rspc.createMutation(() => ({
@@ -81,34 +97,74 @@ const CacheCleanup = (props: ModalProps) => {
       setPhase("running")
     },
     onError: (err) => {
-      setFailedMessage(err.message)
+      setFailedMessage({ raw: extractErrorDisplay(err) })
       setPhase("failed")
     }
   }))
 
   const canSubmit = () => gdlauncher() || minecraft()
 
-  // Detect task completion. Backend drops the task from the manager when
-  // it finishes; vtask.data flips to null at that point.
-  createEffect(() => {
-    if (phase() !== "running") return
+  const failureKey = () => {
+    const failure = failedMessage()
+    return failure && "key" in failure ? failure.key : undefined
+  }
+  const failureRaw = () => {
+    const failure = failedMessage()
+    return failure && "raw" in failure ? failure.raw : undefined
+  }
 
-    if (vtask.data === null && taskId() !== null) {
-      // Many derived views (instance mods, mod search, version lists)
-      // depend on what we just wiped. Rather than enumerate every key,
-      // nuke the TanStack cache — the next access refills as needed.
+  const activeTask = () => {
+    const outcome = vtask.data
+    return outcome?.type === "Running" || outcome?.type === "Failed"
+      ? outcome.value
+      : undefined
+  }
+  createEffect(() => {
+    if (phase() !== "running" || taskId() === null) return
+    const outcome = vtask.data
+    if (outcome?.type === "Succeeded") {
       queryClient.invalidateQueries()
       setPhase("done")
-      return
-    }
-
-    if (vtask.data?.progress.type === "Failed") {
+    } else if (outcome?.type === "Failed") {
+      queryClient.invalidateQueries()
+      const progress = outcome.value.progress
       setFailedMessage(
-        vtask.data.progress.value.cause[1]?.display ?? "Unknown error"
+        progress.type === "Failed"
+          ? { raw: progress.value.cause.map((c) => c.display).join("; ") }
+          : { key: "modals:_trn_cache_cleanup.failed_generic" }
       )
+      setPhase("failed")
+    } else if (
+      outcome?.type === "Dismissed" ||
+      outcome?.type === "Unavailable"
+    ) {
+      setFailedMessage({ key: "modals:_trn_cache_cleanup.outcome_unavailable" })
       setPhase("failed")
     }
   })
+  const retry = async () => {
+    const oldTaskId = taskId()
+    const acknowledge = vtask.data?.type === "Failed"
+    setTaskId(null)
+    setFailedMessage(null)
+    setPhase("running")
+    try {
+      if (oldTaskId !== null && acknowledge) {
+        await rpc.client.mutation(["vtask.dismissTask", oldTaskId])
+      }
+      startMutation.mutate({ gdlauncher: gdlauncher(), minecraft: minecraft() })
+    } catch (error) {
+      setTaskId(oldTaskId)
+      const display =
+        error instanceof Error ? extractErrorDisplay(error).trim() : ""
+      setFailedMessage(
+        display
+          ? { raw: display }
+          : { key: "modals:_trn_cache_cleanup.retry_failed" }
+      )
+      setPhase("failed")
+    }
+  }
 
   // Mirror the running phase into the module-level signal the
   // ModalsManager reads when deciding whether backdrop clicks close.
@@ -128,7 +184,7 @@ const CacheCleanup = (props: ModalProps) => {
   // (90%) with the VACUUM subtask (10%) into a single 0..1 number.
   // Before that point the bar stays indeterminate.
   const progressPercent = () => {
-    const p = vtask.data?.progress
+    const p = activeTask()?.progress
     return p?.type === "Known" ? p.value * 100 : undefined
   }
 
@@ -281,8 +337,13 @@ const CacheCleanup = (props: ModalProps) => {
                 <Trans key="modals:_trn_cache_cleanup.failed_title" />
               </div>
               <div class="text-lightSlate-400 max-w-96 break-words text-center text-sm">
-                {failedMessage()}
+                <Show when={failureKey()} keyed fallback={failureRaw()}>
+                  {(key) => <Trans key={key} />}
+                </Show>
               </div>
+              <Button type="primary" onClick={retry}>
+                <Trans key="modals:_trn_cache_cleanup.retry" />
+              </Button>
               <Button
                 type="secondary"
                 onClick={() => modalsContext?.closeModal()}

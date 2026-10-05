@@ -284,8 +284,22 @@ impl From<FEUnifiedSearchParameters> for ProjectSearchParameters {
     }
 }
 
-impl From<FEUnifiedSearchParameters> for ModSearchParameters {
-    fn from(value: FEUnifiedSearchParameters) -> Self {
+impl TryFrom<FEUnifiedSearchParameters> for ModSearchParameters {
+    type Error = anyhow::Error;
+    fn try_from(value: FEUnifiedSearchParameters) -> anyhow::Result<Self> {
+        let mut versions: Vec<String> = value
+            .game_versions
+            .clone()
+            .unwrap_or(Or(Vec::new()))
+            .into_iter()
+            .filter(|v| !v.trim().is_empty())
+            .collect();
+        versions.sort();
+        versions.dedup();
+        anyhow::ensure!(
+            versions.len() <= 1,
+            "CurseForge supports one Minecraft version. Select one version or search Modrinth only."
+        );
         // Extract Curseforge-specific sorting from platform filters, default to TotalDownloads DESC
         let (sort_field, sort_order) = match &value.platform_filters {
             Some(FEPlatformFilters::Curseforge {
@@ -301,11 +315,11 @@ impl From<FEUnifiedSearchParameters> for ModSearchParameters {
             ), // Default to TotalDownloads DESC
         };
 
-        ModSearchParameters {
+        Ok(ModSearchParameters {
             query: ModSearchParametersQuery {
                 game_id: 432,
                 search_filter: value.search_query,
-                game_version: value.game_versions.and_then(|vers| vers.into_iter().next()),
+                game_version: versions.into_iter().next(),
                 category_ids: value.categories.map(|cat_groups| {
                     cat_groups
                         .into_iter()
@@ -334,7 +348,7 @@ impl From<FEUnifiedSearchParameters> for ModSearchParameters {
                 index: value.index.map(|index| index as i32),
                 page_size: value.page_size.map(|page_size| page_size as i32),
             },
-        }
+        })
     }
 }
 
@@ -362,6 +376,9 @@ pub struct FEUnifiedBatchRequest {
     pub slugs: Vec<String>,
     /// Modrinth-specific IDs (from modrinth:// protocol or URL)
     pub modrinth_only_ids: Vec<String>,
+    /// Explicit Modrinth version IDs, never sent to the project endpoint.
+    #[serde(default)]
+    pub modrinth_version_ids: Vec<String>,
     /// CurseForge-specific slugs (from CF URLs)
     pub curseforge_only_slugs: Vec<String>,
 }
@@ -372,4 +389,34 @@ pub struct FEUnifiedBatchRequest {
 pub struct FEUnifiedBatchResponse {
     pub results: Vec<super::responses::FEUnifiedSearchResult>,
     pub errors: Vec<String>,
+}
+
+#[cfg(test)]
+mod task21_filter_tests {
+    use super::*;
+    fn params(versions: serde_json::Value) -> FEUnifiedSearchParameters {
+        serde_json::from_value(serde_json::json!({"gameVersions":versions})).unwrap()
+    }
+    #[test]
+    fn task21_cf_distinct_versions_reject_before_provider_dispatch() {
+        let converted: Result<ModSearchParameters, _> =
+            params(serde_json::json!(["1.20.1", "1.21.1"])).try_into();
+        assert!(
+            converted.is_err(),
+            "CurseForge supports one Minecraft version; API must not silently truncate"
+        );
+    }
+    #[test]
+    fn task21_cf_single_none_and_mr_or_controls() {
+        let single: ModSearchParameters = params(serde_json::json!(["1.20.1"])).try_into().unwrap();
+        assert_eq!(single.query.game_version.as_deref(), Some("1.20.1"));
+        let none: ModSearchParameters = params(serde_json::Value::Null).try_into().unwrap();
+        assert_eq!(none.query.game_version, None);
+        let mr: ProjectSearchParameters = params(serde_json::json!(["1.20.1", "1.21.1"])).into();
+        let facets = serde_json::to_value(mr.facets.unwrap()).unwrap();
+        assert_eq!(
+            facets,
+            serde_json::json!([["versions:1.20.1", "versions:1.21.1"]])
+        );
+    }
 }

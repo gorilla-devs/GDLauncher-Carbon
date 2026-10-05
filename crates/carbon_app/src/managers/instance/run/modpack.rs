@@ -646,11 +646,7 @@ async fn prepare_modpack(
                     while modpack_progress_rx.changed().await.is_ok() {
                         {
                             let (downloaded, total) = modpack_progress_rx.borrow().0;
-                            t_download_packfile.update_download(
-                                downloaded as u32,
-                                total as u32,
-                                true,
-                            );
+                            t_download_packfile.update_download(downloaded, total, true);
                         }
 
                         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -702,11 +698,7 @@ async fn prepare_modpack(
                     while modpack_progress_rx.changed().await.is_ok() {
                         {
                             let (downloaded, total) = modpack_progress_rx.borrow().0;
-                            t_download_packfile.update_download(
-                                downloaded as u32,
-                                total as u32,
-                                true,
-                            );
+                            t_download_packfile.update_download(downloaded, total, true);
                         }
 
                         tokio::time::sleep(Duration::from_millis(200)).await;
@@ -997,11 +989,7 @@ async fn prepare_modpack(
             while progress_watch_rx.changed().await.is_ok() {
                 {
                     let progress = progress_watch_rx.borrow();
-                    t_download_modpack_files.update_download(
-                        progress.current_size as u32,
-                        progress.total_size as u32,
-                        false,
-                    );
+                    t_download_modpack_files.update_download_progress(&progress, false);
                 }
 
                 tokio::time::sleep(Duration::from_millis(200)).await;

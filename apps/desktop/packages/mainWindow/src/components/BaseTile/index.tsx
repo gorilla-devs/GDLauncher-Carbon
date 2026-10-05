@@ -1,3 +1,4 @@
+import { bytePercent, formatByteUnit } from "@/utils/formatBytes"
 import { For, JSX, Show, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { getTaskTranslationKey } from "@gd/i18n/helpers"
@@ -44,8 +45,8 @@ export interface BaseTileProps {
   // Progress
   percentage?: number
   subTasks?: FESubtask[]
-  downloaded?: number
-  totalDownload?: number
+  downloaded?: string
+  totalDownload?: string
 
   // Selection
   isMultiSelected: boolean
@@ -109,7 +110,7 @@ const BaseTile = (props: BaseTileProps) => {
     if (typeof progress === "string") return 0
     if ("download" in progress) {
       const d = progress.download
-      return d.total > 0 ? (d.downloaded / d.total) * 100 : 0
+      return bytePercent(d.downloaded, d.total)
     }
     if ("item" in progress) {
       const i = progress.item
@@ -125,8 +126,8 @@ const BaseTile = (props: BaseTileProps) => {
     if (typeof progress === "string") return ""
     if ("download" in progress) {
       const d = progress.download
-      const dlMB = (d.downloaded / 1_048_576).toFixed(1)
-      const totMB = (d.total / 1_048_576).toFixed(1)
+      const dlMB = formatByteUnit(d.downloaded, 1048576n, 1)
+      const totMB = formatByteUnit(d.total, 1048576n, 1)
       return `${dlMB} / ${totMB} MB`
     }
     if ("item" in progress) {

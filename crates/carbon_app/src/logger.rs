@@ -105,27 +105,103 @@ fn generate_logs_filters() -> String {
 /// Reused by the cache-cleanup dialog so the launcher's "don't blanket-
 /// wipe logs" policy is enforced from a single place.
 pub fn cleanup_old_logs(logs_path: &Path, keep_count: usize) {
-    let Ok(read_dir) = std::fs::read_dir(logs_path) else {
-        return;
+    for error in cleanup_old_logs_report(logs_path, keep_count) {
+        eprintln!("{error}");
+    }
+}
+/// Reporting form for selected cache cleanup; startup retains best effort.
+pub fn cleanup_old_logs_report(logs_path: &Path, keep_count: usize) -> Vec<String> {
+    let mut errors = Vec::new();
+    let entries = match std::fs::read_dir(logs_path) {
+        Ok(entries) => entries,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return errors,
+        Err(error) => return vec![format!("{}: {error}", logs_path.display())],
     };
-
-    let mut entries: Vec<_> = read_dir
-        .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().map_or(false, |ext| ext == "log"))
-        .collect();
-
-    // Sort by modified time, newest first
-    entries.sort_by(|a, b| {
-        let time_a = a.metadata().ok().and_then(|m| m.modified().ok());
-        let time_b = b.metadata().ok().and_then(|m| m.modified().ok());
-        time_b.cmp(&time_a)
-    });
-
-    // Delete all but the newest `keep_count` files
-    for entry in entries.into_iter().skip(keep_count) {
-        if let Err(e) = std::fs::remove_file(entry.path()) {
-            eprintln!("Failed to delete old log file {:?}: {}", entry.path(), e);
+    let mut logs = Vec::new();
+    for entry in entries {
+        let entry = match entry {
+            Ok(entry) => entry,
+            Err(error) => {
+                errors.push(format!("{}: {error}", logs_path.display()));
+                continue;
+            }
+        };
+        let path = entry.path();
+        if path.extension().is_some_and(|e| e == "log") {
+            match entry.metadata().and_then(|m| m.modified()) {
+                Ok(time) => logs.push((time, path)),
+                Err(error) => errors.push(format!("{}: {error}", path.display())),
+            }
         }
+    }
+    // Unknown modification times cannot authorize retirement of recent logs.
+    if !errors.is_empty() {
+        return errors;
+    }
+    logs.sort_by(|a, b| b.0.cmp(&a.0).then_with(|| a.1.cmp(&b.1)));
+    for (_, path) in logs.into_iter().skip(keep_count) {
+        if let Err(error) = std::fs::remove_file(&path) {
+            if error.kind() != std::io::ErrorKind::NotFound {
+                errors.push(format!("{}: {error}", path.display()));
+            }
+        }
+    }
+    errors
+}
+
+#[cfg(test)]
+mod task21_log_cleanup_tests {
+    use super::*;
+
+    fn logs(root: &Path) {
+        for index in 0..13 {
+            let file = std::fs::File::create(root.join(format!("{index}.log"))).unwrap();
+            file.set_times(
+                std::fs::FileTimes::new()
+                    .set_modified(std::time::UNIX_EPOCH + std::time::Duration::from_secs(index)),
+            )
+            .unwrap();
+        }
+        std::fs::write(root.join("keep.txt"), b"unrelated").unwrap();
+    }
+
+    #[test]
+    fn task21_log_cleanup_keeps_newest_ten_and_unrelated_files() {
+        let root = tempfile::tempdir().unwrap();
+        logs(root.path());
+        assert!(cleanup_old_logs_report(root.path(), 10).is_empty());
+        for index in 0..13 {
+            assert_eq!(
+                root.path().join(format!("{index}.log")).exists(),
+                index >= 3
+            );
+        }
+        assert_eq!(
+            std::fs::read(root.path().join("keep.txt")).unwrap(),
+            b"unrelated"
+        );
+        assert!(cleanup_old_logs_report(&root.path().join("missing"), 10).is_empty());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn task21_log_cleanup_reports_effective_denials_without_retiring_recent_logs() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = tempfile::tempdir().unwrap();
+        logs(root.path());
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o555)).unwrap();
+        let probe = std::fs::remove_file(root.path().join("0.log"));
+        let errors = cleanup_old_logs_report(root.path(), 10);
+        std::fs::set_permissions(root.path(), std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(
+            probe.unwrap_err().kind(),
+            std::io::ErrorKind::PermissionDenied
+        );
+        assert_eq!(errors.len(), 3);
+        for index in 0..13 {
+            assert!(root.path().join(format!("{index}.log")).exists());
+        }
+        assert!(errors.iter().all(|error| error.contains(".log")));
     }
 }
 

@@ -274,30 +274,9 @@ fn migrate_db(db_path: &Path, migration_set: &MigrationSet) -> DbResult<OpenVerd
         }
     }
 
-    // Installs created before the switch to the owned runner recorded their
-    // applied migrations in a `_prisma_migrations` table and left `user_version`
-    // at 0. Read that count to seed `user_version` so the runner resumes where
-    // the legacy install left off instead of replaying every migration against a
-    // populated database. A missing table (the normal case) errors and yields
-    // `None`.
-    let already_existing_migration_count: Option<i32> = conn
-        .query_row("SELECT COUNT(*) FROM _prisma_migrations", [], |row| {
-            row.get(0)
-        })
-        .ok();
-
-    debug!(
-        "Found {:?} applied migrations in the legacy migration table",
-        already_existing_migration_count
-    );
-
+    // Journal-mode changes cannot run inside the atomic history conversion.
     conn.pragma_update(None, "journal_mode", &"WAL")?;
-
-    if let Some(count) = already_existing_migration_count {
-        conn.pragma_update(None, "user_version", &count)?;
-    }
-
-    let _ = conn.execute("DROP TABLE IF EXISTS _prisma_migrations", []);
+    migration_set.convert_legacy_history(&mut conn)?;
 
     debug!("Running bidirectional migration runner");
 
@@ -602,6 +581,13 @@ mod test {
         assert_eq!(
             classify_open(Err(DbError::Conversion("boom".to_string()))),
             Err(DbStatus::MigrationFailed)
+        );
+        // A refused Prisma-era history has its own cause, never the unknown one.
+        let history = classify_open(Err(DbError::LegacyHistory("refused".to_string())));
+        assert_eq!(history, Err(DbStatus::OpenFailed(DbRecoveryCause::History)));
+        assert_eq!(
+            history.unwrap_err().status_line(),
+            "_STATUS_:DB_MIGRATION_FAILED|history"
         );
         // A non-corruption sqlite failure is a generic migration failure.
         assert_eq!(
@@ -910,11 +896,11 @@ mod task15_bootstrap_tests {
              INSERT INTO ModFileCache(id,instanceId,filename,filesize,enabled,addonType,metadataId) VALUES('file',1,'mod.jar',4,0,'mods','physical');
              DROP TABLE _migrations;").unwrap();
                 if prisma {
-                    c.execute_batch("CREATE TABLE _prisma_migrations(id TEXT PRIMARY KEY,finished_at TEXT);PRAGMA user_version=0").unwrap();
-                    for i in 0..25 {
+                    c.execute_batch("CREATE TABLE _prisma_migrations(id TEXT PRIMARY KEY,migration_name TEXT,finished_at TEXT,rolled_back_at TEXT);PRAGMA user_version=0").unwrap();
+                    for (i, migration) in old.migrations.iter().enumerate() {
                         c.execute(
-                            "INSERT INTO _prisma_migrations VALUES(?1,'fixture-success')",
-                            [i.to_string()],
+                            "INSERT INTO _prisma_migrations VALUES(?1,?2,'fixture-success',NULL)",
+                            rusqlite::params![i.to_string(), migration.name],
                         )
                         .unwrap();
                     }
@@ -960,6 +946,752 @@ mod task15_bootstrap_tests {
                     .next()
                     .unwrap()
                     .is_none()
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod task21_legacy_tests {
+    use super::*;
+    fn fixture(prefix: usize) -> (tempfile::TempDir, PathBuf, MigrationSet) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("legacy.db");
+        let (current, _) = carbon_repos::get_migrations();
+        let mut old = carbon_repos::get_migrations().0;
+        old.migrations.truncate(prefix);
+        let mut conn = rusqlite::Connection::open(&path).unwrap();
+        old.to_latest(&mut conn).unwrap();
+        conn.execute_batch("DROP TABLE _migrations; PRAGMA user_version=0;
+            CREATE TABLE _prisma_migrations(id TEXT PRIMARY KEY,migration_name TEXT,finished_at TEXT,rolled_back_at TEXT);
+            INSERT INTO InstanceGroup(id,name,groupIndex) VALUES(77,'kept',0);").unwrap();
+        for (i, def) in old.migrations.iter().enumerate() {
+            conn.execute(
+                "INSERT INTO _prisma_migrations VALUES(?1,?2,'completed',NULL)",
+                rusqlite::params![i.to_string(), def.name],
+            )
+            .unwrap();
+        }
+        (dir, path, current)
+    }
+    fn version(path: &Path) -> i32 {
+        rusqlite::Connection::open(path)
+            .unwrap()
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap()
+    }
+    fn history(path: &Path) -> i32 {
+        rusqlite::Connection::open(path)
+            .unwrap()
+            .query_row("SELECT count(*) FROM _prisma_migrations", [], |r| r.get(0))
+            .unwrap()
+    }
+    #[test]
+    fn task21_legacy_rolled_back_and_failed_attempts_add_no_slots() {
+        for prefix in [24, 25] {
+            let (_dir, path, current) = fixture(prefix);
+            let c = rusqlite::Connection::open(&path).unwrap();
+            c.execute(
+                "INSERT INTO _prisma_migrations VALUES('retry',?1,NULL,'rolled-back')",
+                [current.migrations[24].name],
+            )
+            .unwrap();
+            c.execute(
+                "INSERT INTO _prisma_migrations VALUES('unfinished',?1,NULL,NULL)",
+                [current.migrations[24].name],
+            )
+            .unwrap();
+            c.execute("INSERT INTO _prisma_migrations VALUES('finished-rolled-back',?1,'completed','rolled-back')",[current.migrations[24].name]).unwrap();
+            drop(c);
+            assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
+            let c = rusqlite::Connection::open(&path).unwrap();
+            assert!(
+                c.prepare("SELECT modpackPlatform FROM Server").is_ok(),
+                "pending migration25 must actually run"
+            );
+            assert_eq!(version(&path), current.count());
+            assert_eq!(
+                c.query_row("SELECT name FROM InstanceGroup WHERE id=77", [], |r| r
+                    .get::<_, String>(
+                    0
+                ))
+                .unwrap(),
+                "kept"
+            );
+            assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
+        }
+    }
+    #[test]
+    fn task21_legacy_malformed_history_is_retained() {
+        let (_dir, path, current) = fixture(25);
+        let c = rusqlite::Connection::open(&path).unwrap();
+        c.execute_batch("DROP TABLE _prisma_migrations;CREATE TABLE _prisma_migrations(id TEXT,finished_at TEXT);INSERT INTO _prisma_migrations VALUES('bad','done')").unwrap();
+        let before = carbon_repos::schema_dump::dump_schema(&c).unwrap();
+        let history_schema: String = c
+            .query_row(
+                "SELECT sql FROM sqlite_master WHERE name='_prisma_migrations'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        let error = migrate_db(&path, &current).unwrap_err().to_string();
+        assert!(
+            error.contains("required attempt columns")
+                && error.contains("Original history retained")
+                && error.contains("contact support"),
+            "{error}"
+        );
+        assert_eq!(history(&path), 1);
+        assert_eq!(version(&path), 0);
+        assert_eq!(
+            c.query_row(
+                "SELECT sql FROM sqlite_master WHERE name='_prisma_migrations'",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            history_schema
+        );
+        assert_eq!(
+            c.query_row(
+                "SELECT id||':'||finished_at FROM _prisma_migrations",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "bad:done"
+        );
+        assert_eq!(
+            c.query_row("SELECT name FROM InstanceGroup WHERE id=77", [], |r| r
+                .get::<_, String>(
+                0
+            ))
+            .unwrap(),
+            "kept"
+        );
+        assert_eq!(
+            c.query_row(
+                "SELECT COUNT(*) FROM sqlite_master WHERE name='_migrations'",
+                [],
+                |r| r.get::<_, i32>(0)
+            )
+            .unwrap(),
+            0
+        );
+        assert_eq!(carbon_repos::schema_dump::dump_schema(&c).unwrap(), before);
+    }
+    #[test]
+    fn task21_legacy_gap_unknown_duplicate_and_schema_mismatch_refuse_without_mutation() {
+        for case in ["gap", "unknown", "duplicate", "schema"] {
+            let (_dir, path, current) = fixture(25);
+            let c = rusqlite::Connection::open(&path).unwrap();
+            match case {
+                "gap" => {
+                    c.execute("DELETE FROM _prisma_migrations WHERE id='3'", [])
+                        .unwrap();
+                }
+                "unknown" => {
+                    c.execute_batch("INSERT INTO _prisma_migrations VALUES('unknown','unknown-name','done',NULL)").unwrap();
+                }
+                "duplicate" => {
+                    c.execute(
+                        "INSERT INTO _prisma_migrations VALUES('duplicate',?1,'done',NULL)",
+                        [current.migrations[24].name],
+                    )
+                    .unwrap();
+                }
+                _ => {
+                    c.execute_batch("ALTER TABLE Server DROP COLUMN modpackPlatform")
+                        .unwrap();
+                }
+            }
+            let before = carbon_repos::schema_dump::dump_schema(&c).unwrap();
+            let rows = history(&path);
+            assert!(migrate_db(&path, &current).is_err(), "{case}");
+            assert_eq!(history(&path), rows);
+            assert_eq!(version(&path), 0);
+            assert_eq!(carbon_repos::schema_dump::dump_schema(&c).unwrap(), before);
+        }
+    }
+    #[test]
+    fn task21_legacy_metadata_write_failure_rolls_conversion_back() {
+        let (_dir, path, current) = fixture(25);
+        let mut c = rusqlite::Connection::open(&path).unwrap();
+        let mut prefix = carbon_repos::get_migrations().0;
+        prefix.migrations.truncate(25);
+        // Create the actual metadata shape without changing legacy schema/history.
+        c.execute_batch("PRAGMA user_version=25").unwrap();
+        prefix.to_latest(&mut c).unwrap();
+        c.execute_batch("DELETE FROM _migrations;PRAGMA user_version=0;
+            CREATE TEMP TRIGGER reject_second BEFORE INSERT ON _migrations WHEN NEW.version=2 BEGIN SELECT RAISE(ABORT,'synthetic late metadata failure');END;").unwrap();
+        assert!(current.convert_legacy_history(&mut c).is_err());
+        assert_eq!(
+            c.query_row("SELECT count(*) FROM _migrations", [], |r| r
+                .get::<_, i32>(0))
+                .unwrap(),
+            0
+        );
+        assert_eq!(history(&path), 25);
+        assert_eq!(version(&path), 0);
+        c.execute_batch("DROP TRIGGER reject_second").unwrap();
+        current.convert_legacy_history(&mut c).unwrap();
+        assert_eq!(version(&path), 25);
+        assert_eq!(
+            c.query_row(
+                "SELECT checksum FROM _migrations WHERE version=25",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            current.checksum(25)
+        );
+        assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
+    }
+    #[test]
+    fn task21_legacy_valid_checksum_and_contradictory_owned_metadata() {
+        for bad in [false, true] {
+            let (_dir, path, current) = fixture(25);
+            let c = rusqlite::Connection::open(&path).unwrap();
+            c.execute_batch("ALTER TABLE _prisma_migrations ADD COLUMN checksum TEXT")
+                .unwrap();
+            for i in 0..25 {
+                c.execute(
+                    "UPDATE _prisma_migrations SET checksum=?1 WHERE id=?2",
+                    rusqlite::params![current.checksum(i + 1), i.to_string()],
+                )
+                .unwrap();
+            }
+            if bad {
+                c.execute_batch("UPDATE _prisma_migrations SET checksum='changed' WHERE id='24'")
+                    .unwrap();
+            }
+            let result = migrate_db(&path, &current);
+            if bad {
+                assert!(result.is_err());
+                assert_eq!(history(&path), 25);
+                assert_eq!(version(&path), 0);
+            } else {
+                assert_eq!(result.unwrap(), OpenVerdict::Proceed);
+            }
+        }
+        let (_dir, path, current) = fixture(25);
+        let c = rusqlite::Connection::open(&path).unwrap();
+        c.execute_batch("PRAGMA user_version=24").unwrap();
+        assert!(migrate_db(&path, &current).is_err());
+        assert_eq!(history(&path), 25);
+        assert_eq!(version(&path), 24);
+    }
+    #[test]
+    fn task21_legacy_conversion_does_not_promise_pending_upgrade_atomicity() {
+        let (_dir, path, mut current) = fixture(25);
+        current.migrations.push(carbon_repos::compat::MigrationDef {
+            name: "synthetic_pending_failure",
+            up_sql: "SELECT nonexistent_function();",
+            down_sql: None,
+            kind: carbon_repos::compat::MigrationKind::Additive,
+            data_down: "full",
+        });
+        assert!(migrate_db(&path, &current).is_err());
+        assert_eq!(version(&path), 29);
+        let c = rusqlite::Connection::open(&path).unwrap();
+        assert_eq!(
+            c.query_row(
+                "SELECT count(*) FROM sqlite_master WHERE name='_prisma_migrations'",
+                [],
+                |r| r.get::<_, i32>(0)
+            )
+            .unwrap(),
+            0
+        );
+        current.migrations.pop();
+        assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
+    }
+    #[test]
+    fn task21_legacy_absent_history_fresh_and_clean_prefix_controls() {
+        let dir = tempfile::tempdir().unwrap();
+        let fresh = dir.path().join("fresh.db");
+        let current = carbon_repos::get_migrations().0;
+        assert_eq!(migrate_db(&fresh, &current).unwrap(), OpenVerdict::Proceed);
+        assert_eq!(version(&fresh), 29);
+        for prefix in [24, 25] {
+            let (_dir, path, current) = fixture(prefix);
+            assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
+            let c = rusqlite::Connection::open(&path).unwrap();
+            assert!(
+                c.prepare("PRAGMA foreign_key_check")
+                    .unwrap()
+                    .query([])
+                    .unwrap()
+                    .next()
+                    .unwrap()
+                    .is_none()
+            );
+            assert_eq!(
+                c.query_row("SELECT count(*) FROM _migrations", [], |r| r
+                    .get::<_, i32>(0))
+                    .unwrap(),
+                29
+            );
+        }
+    }
+}
+
+/// Legacy conversion against the history table Prisma's engine really wrote
+/// (2.0.0-2.0.9, before 2.0.11-beta dropped it): Prisma's exact SQLite DDL,
+/// DATETIME columns holding INTEGER `timestamp_millis()`, sha256 checksums of
+/// the migration scripts. The task15/task21 fixtures above use a reduced table
+/// with TEXT timestamps and never reach the decode path real users take.
+#[cfg(test)]
+mod prisma_era_history_tests {
+    use super::*;
+    use carbon_repos::compat::sha256_hex;
+    use rusqlite::Connection;
+
+    /// prisma-engines (pcr-0.6.5) SQLite flavour `_prisma_migrations` DDL.
+    const PRISMA_MIGRATIONS_DDL: &str = r#"CREATE TABLE "_prisma_migrations" ("id" TEXT PRIMARY KEY NOT NULL, "checksum" TEXT NOT NULL, "finished_at" DATETIME, "migration_name" TEXT NOT NULL, "logs" TEXT, "rolled_back_at" DATETIME, "started_at" DATETIME NOT NULL DEFAULT current_timestamp, "applied_steps_count" INTEGER UNSIGNED NOT NULL DEFAULT 0)"#;
+
+    /// 2024-03-31: when the last Prisma-era builds were writing these rows.
+    const BASE_MILLIS: i64 = 1_711_900_000_000;
+
+    /// The number of migrations the last Prisma-era build (2.0.9) shipped.
+    const PRISMA_ERA_COUNT: usize = 11;
+
+    /// One `_prisma_migrations` row, bound the way quaint bound it: every
+    /// timestamp as an i64 of milliseconds.
+    struct Attempt<'a> {
+        id: String,
+        name: &'a str,
+        checksum: String,
+        started: i64,
+        finished: Option<i64>,
+        rolled_back: Option<i64>,
+        logs: Option<&'a str>,
+        steps: i64,
+    }
+
+    fn insert(conn: &Connection, a: Attempt) {
+        conn.execute(
+            "INSERT INTO _prisma_migrations \
+             (id, checksum, finished_at, migration_name, logs, rolled_back_at, started_at, applied_steps_count) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            rusqlite::params![
+                a.id,
+                a.checksum,
+                a.finished,
+                a.name,
+                a.logs,
+                a.rolled_back,
+                a.started,
+                a.steps
+            ],
+        )
+        .unwrap();
+    }
+
+    fn completed<'a>(id: &str, def: &'a carbon_repos::compat::MigrationDef, i: i64) -> Attempt<'a> {
+        let started = BASE_MILLIS + i * 60_000;
+        Attempt {
+            id: id.to_string(),
+            name: def.name,
+            checksum: sha256_hex(def.up_sql.as_bytes()),
+            started,
+            finished: Some(started + 250),
+            rolled_back: None,
+            logs: None,
+            steps: 1,
+        }
+    }
+
+    /// A gdl_conf.db as a Prisma-era build left it: Prisma created its history
+    /// table, then applied each of the first `prefix` real migration scripts
+    /// and recorded one completed attempt per script. Prisma never set
+    /// `user_version` and never created `_migrations`. Carries a signed-in
+    /// account plus the user data an upgrade must keep: settings and an
+    /// instance in a group.
+    fn prisma_era_db(prefix: usize) -> (tempfile::TempDir, PathBuf, MigrationSet) {
+        prisma_era_db_from(prefix, None)
+    }
+
+    /// [`prisma_era_db`], with `init` as the script Prisma applied (and
+    /// checksummed) for the first migration instead of today's.
+    fn prisma_era_db_from(
+        prefix: usize,
+        init: Option<&'static str>,
+    ) -> (tempfile::TempDir, PathBuf, MigrationSet) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("gdl_conf.db");
+        let (current, _) = carbon_repos::get_migrations();
+        let conn = Connection::open(&path).unwrap();
+        conn.pragma_update(None, "foreign_keys", "OFF").unwrap();
+        conn.execute_batch(PRISMA_MIGRATIONS_DDL).unwrap();
+        for (i, def) in current.migrations.iter().take(prefix).enumerate() {
+            let applied = match init {
+                Some(script) if i == 0 => carbon_repos::compat::MigrationDef {
+                    up_sql: script,
+                    ..*def
+                },
+                _ => *def,
+            };
+            conn.execute_batch(applied.up_sql).unwrap();
+            insert(
+                &conn,
+                completed(&format!("completed-{i}"), &applied, i as i64),
+            );
+        }
+        conn.execute(
+            "INSERT INTO Account (uuid, username, tokenExpires, lastUsed) VALUES ('prisma-era-uuid', 'PrismaEraUser', ?1, ?1)",
+            [BASE_MILLIS],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO AppConfiguration (id, releaseChannel, xmx, activeAccountUuid, randomUserUuid, secret, metricsEnabledLastUpdate) \
+             VALUES (0, 'stable', 4096, 'prisma-era-uuid', 'prisma-era-random', x'01', ?1)",
+            [BASE_MILLIS],
+        )
+        .unwrap();
+        conn.execute_batch(
+            "INSERT INTO InstanceGroup (id, name, groupIndex) VALUES (1, 'Prisma era group', 0);
+             INSERT INTO Instance (id, name, shortpath, \"index\", groupId) VALUES (1, 'Prisma era instance', 'prisma-era', 0, 1);",
+        )
+        .unwrap();
+        assert_eq!(version(&path), 0);
+        (dir, path, current)
+    }
+
+    /// Fails the fixture if it ever drifts back to TEXT timestamps: every
+    /// timestamp Prisma wrote is stored as an INTEGER.
+    fn assert_integer_millis(path: &Path) {
+        let conn = Connection::open(path).unwrap();
+        let (finished, not_integer): (i64, i64) = conn
+            .query_row(
+                "SELECT \
+                   (SELECT COUNT(*) FROM _prisma_migrations WHERE typeof(finished_at) = 'integer'), \
+                   (SELECT COUNT(*) FROM _prisma_migrations WHERE typeof(started_at) <> 'integer' \
+                      OR typeof(finished_at) NOT IN ('integer', 'null') \
+                      OR typeof(rolled_back_at) NOT IN ('integer', 'null'))",
+                [],
+                |r| Ok((r.get(0)?, r.get(1)?)),
+            )
+            .unwrap();
+        assert!(finished > 0, "fixture has no completed attempt");
+        assert_eq!(not_integer, 0, "fixture stores a timestamp as non-INTEGER");
+    }
+
+    fn version(path: &Path) -> i32 {
+        Connection::open(path)
+            .unwrap()
+            .query_row("PRAGMA user_version", [], |r| r.get(0))
+            .unwrap()
+    }
+
+    fn has_history(path: &Path) -> bool {
+        Connection::open(path)
+            .unwrap()
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE name = '_prisma_migrations')",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap()
+    }
+
+    /// Every `_prisma_migrations` row, in a stable order, with storage classes.
+    fn history_rows(path: &Path) -> Vec<String> {
+        Connection::open(path)
+            .unwrap()
+            .prepare(
+                "SELECT id || '|' || migration_name || '|' || checksum || '|' || \
+                 ifnull(finished_at, '') || ':' || typeof(finished_at) || '|' || \
+                 ifnull(rolled_back_at, '') || ':' || typeof(rolled_back_at) \
+                 FROM _prisma_migrations ORDER BY id",
+            )
+            .unwrap()
+            .query_map([], |r| r.get(0))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+
+    /// `(version, name, checksum)` of every `_migrations` row, in order.
+    fn recorded(path: &Path) -> Vec<(i32, String, String)> {
+        Connection::open(path)
+            .unwrap()
+            .prepare("SELECT version, name, checksum FROM _migrations ORDER BY version")
+            .unwrap()
+            .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?)))
+            .unwrap()
+            .collect::<Result<_, _>>()
+            .unwrap()
+    }
+
+    fn expected_rows(current: &MigrationSet, upto: i32) -> Vec<(i32, String, String)> {
+        (1..=upto)
+            .map(|v| {
+                (
+                    v,
+                    current.migrations[(v - 1) as usize].name.to_string(),
+                    current.checksum(v),
+                )
+            })
+            .collect()
+    }
+
+    /// Checks one Prisma-era history twice on fresh copies: the conversion on
+    /// its own must record exactly `expected` migrations, and the whole startup
+    /// path (`migrate_db`) must then carry the database to this build's latest
+    /// version with the user's data intact.
+    fn assert_converts_to(
+        prefix: usize,
+        expected: i32,
+        extra: impl Fn(&Connection, &MigrationSet),
+    ) {
+        assert_converts_from(None, prefix, expected, extra)
+    }
+
+    /// [`assert_converts_to`] for a history whose first script was `init`.
+    fn assert_converts_from(
+        init: Option<&'static str>,
+        prefix: usize,
+        expected: i32,
+        extra: impl Fn(&Connection, &MigrationSet),
+    ) {
+        let (_dir, path, current) = prisma_era_db_from(prefix, init);
+        extra(&Connection::open(&path).unwrap(), &current);
+        assert_integer_millis(&path);
+        let mut conn = Connection::open(&path).unwrap();
+        current.convert_legacy_history(&mut conn).unwrap();
+        drop(conn);
+        assert_eq!(version(&path), expected);
+        assert!(!has_history(&path));
+        assert_eq!(recorded(&path), expected_rows(&current, expected));
+
+        let (_dir, path, current) = prisma_era_db_from(prefix, init);
+        extra(&Connection::open(&path).unwrap(), &current);
+        assert_integer_millis(&path);
+        assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
+        assert_eq!(version(&path), current.count());
+        assert!(!has_history(&path));
+        assert_eq!(recorded(&path), expected_rows(&current, current.count()));
+        let conn = Connection::open(&path).unwrap();
+        assert_eq!(
+            conn.query_row(
+                "SELECT releaseChannel || ':' || xmx FROM AppConfiguration WHERE id = 0",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "stable:4096"
+        );
+        assert_eq!(
+            conn.query_row(
+                "SELECT g.name || ':' || i.name FROM Instance i JOIN InstanceGroup g ON g.id = i.groupId WHERE i.id = 1",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "Prisma era group:Prisma era instance"
+        );
+        // 20241124163738_gdl_accounts signs every account out on purpose (the
+        // Microsoft app id changed), exactly as it did for this cohort on
+        // 2.0.11-2.0.40: proof that the forward chain really ran past it.
+        assert_eq!(
+            conn.query_row(
+                "SELECT (SELECT COUNT(*) FROM Account) || ':' || \
+                 ifnull((SELECT activeAccountUuid FROM AppConfiguration WHERE id = 0), 'none')",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            "0:none"
+        );
+        assert!(
+            conn.prepare("PRAGMA foreign_key_check")
+                .unwrap()
+                .query([])
+                .unwrap()
+                .next()
+                .unwrap()
+                .is_none()
+        );
+        drop(conn);
+        assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
+        assert_eq!(version(&path), current.count());
+    }
+
+    #[test]
+    fn prisma_era_history_with_integer_millis_converts_and_migrates_to_latest() {
+        assert_converts_to(PRISMA_ERA_COUNT, PRISMA_ERA_COUNT as i32, |_, _| {});
+    }
+
+    #[test]
+    fn prisma_era_failed_and_rolled_back_attempts_before_a_retry_are_not_counted() {
+        // Migration 10 failed (Prisma logged it, no `finished_at`), was marked
+        // rolled back, then a retry succeeded: the fixture's completed row.
+        // Migration 11 also carries an attempt that finished and was later
+        // marked rolled back, so both INTEGER `rolled_back_at` and INTEGER
+        // `finished_at` on a skipped row go through the decode. A count of
+        // rows would say 13; only the 11 completed names apply.
+        assert_converts_to(
+            PRISMA_ERA_COUNT,
+            PRISMA_ERA_COUNT as i32,
+            |conn, current| {
+                let tenth = &current.migrations[9];
+                let started = BASE_MILLIS + 9 * 60_000 - 30_000;
+                insert(
+                    conn,
+                    Attempt {
+                        id: "failed-9".to_string(),
+                        name: tenth.name,
+                        checksum: sha256_hex(tenth.up_sql.as_bytes()),
+                        started,
+                        finished: None,
+                        rolled_back: Some(started + 10_000),
+                        logs: Some("Database error: database is locked"),
+                        steps: 0,
+                    },
+                );
+                let mut rolled_back = completed("rolled-back-10", &current.migrations[10], 9);
+                rolled_back.rolled_back = Some(BASE_MILLIS + 9 * 60_000 + 5_000);
+                insert(conn, rolled_back);
+                let rows: i64 = conn
+                    .query_row("SELECT COUNT(*) FROM _prisma_migrations", [], |r| r.get(0))
+                    .unwrap();
+                assert_eq!(rows, PRISMA_ERA_COUNT as i64 + 2);
+            },
+        );
+    }
+
+    /// `20240120134904_init` as 2.0.0-beta builds before e1e55175a
+    /// (2024-01-29) applied it: `concurrentDownloads DEFAULT 8`, and the
+    /// checksum Prisma recorded for those databases.
+    const PRE_EDIT_INIT: &str = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/fixtures/prisma_beta_init/20240120134904_init.sql"
+    ));
+
+    #[test]
+    fn prisma_era_early_beta_init_checksum_converts_and_migrates_to_latest() {
+        assert_eq!(
+            sha256_hex(PRE_EDIT_INIT.as_bytes()),
+            "51757b54d124de3e2cbcd9859ac0428a08a319b82626ec6887c2e34f30eee8ee"
+        );
+        assert_converts_from(
+            Some(PRE_EDIT_INIT),
+            PRISMA_ERA_COUNT,
+            PRISMA_ERA_COUNT as i32,
+            |conn, current| {
+                let recorded: String = conn
+                    .query_row(
+                        "SELECT checksum FROM _prisma_migrations WHERE id = 'completed-0'",
+                        [],
+                        |r| r.get(0),
+                    )
+                    .unwrap();
+                assert_eq!(recorded, sha256_hex(PRE_EDIT_INIT.as_bytes()));
+                assert_ne!(recorded, current.checksum(1));
+            },
+        );
+    }
+
+    #[test]
+    fn prisma_era_early_beta_init_still_goes_through_the_schema_gate() {
+        let (_dir, path, current) = prisma_era_db_from(PRISMA_ERA_COUNT, Some(PRE_EDIT_INIT));
+        let conn = Connection::open(&path).unwrap();
+        conn.execute_batch(r#"ALTER TABLE "AppConfiguration" DROP COLUMN "lastAppVersion""#)
+            .unwrap();
+        let rows = history_rows(&path);
+        let error = migrate_db(&path, &current).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("schema does not match completed prefix 11"),
+            "{error}"
+        );
+        assert_eq!(history_rows(&path), rows);
+        assert_eq!(version(&path), 0);
+        // The alias is for that one script: the same checksum on another
+        // migration is still a mismatch.
+        let (_dir, path, current) = prisma_era_db(PRISMA_ERA_COUNT);
+        Connection::open(&path)
+            .unwrap()
+            .execute(
+                "UPDATE _prisma_migrations SET checksum = ?1 WHERE id = 'completed-1'",
+                [sha256_hex(PRE_EDIT_INIT.as_bytes())],
+            )
+            .unwrap();
+        let error = migrate_db(&path, &current).unwrap_err().to_string();
+        assert!(error.contains("checksum mismatch for"), "{error}");
+        assert_eq!(version(&path), 0);
+    }
+
+    #[test]
+    fn prisma_era_two_point_zero_point_one_prefix_converts_and_migrates_forward() {
+        assert_converts_to(9, 9, |_, _| {});
+    }
+
+    #[test]
+    fn prisma_era_inconsistent_history_is_refused_at_its_gate_without_mutation() {
+        for (case, reason) in [
+            ("gap", "do not form a contiguous prefix"),
+            ("unknown", "unknown completed migration 'unknown-name'"),
+            ("duplicate", "duplicate completed migration"),
+            ("checksum", "checksum mismatch for"),
+            ("schema", "schema does not match completed prefix 11"),
+        ] {
+            let (_dir, path, current) = prisma_era_db(PRISMA_ERA_COUNT);
+            let conn = Connection::open(&path).unwrap();
+            let last = &current.migrations[PRISMA_ERA_COUNT - 1];
+            match case {
+                "gap" => {
+                    conn.execute(
+                        "DELETE FROM _prisma_migrations WHERE id = 'completed-2'",
+                        [],
+                    )
+                    .unwrap();
+                }
+                "unknown" => {
+                    let mut attempt = completed("unknown", last, 20);
+                    attempt.name = "unknown-name";
+                    insert(&conn, attempt);
+                }
+                "duplicate" => insert(&conn, completed("duplicate", last, 20)),
+                "checksum" => {
+                    conn.execute(
+                        "UPDATE _prisma_migrations SET checksum = 'changed' WHERE id = ?1",
+                        [format!("completed-{}", PRISMA_ERA_COUNT - 1)],
+                    )
+                    .unwrap();
+                }
+                // The history claims migration 11 completed, but the column it
+                // adds is missing from the schema.
+                _ => {
+                    conn.execute_batch(
+                        r#"ALTER TABLE "AppConfiguration" DROP COLUMN "lastAppVersion""#,
+                    )
+                    .unwrap();
+                }
+            }
+            assert_integer_millis(&path);
+            let schema = carbon_repos::schema_dump::dump_schema(&conn).unwrap();
+            let rows = history_rows(&path);
+
+            let error = migrate_db(&path, &current).unwrap_err();
+            let message = error.to_string();
+            assert!(
+                message.contains(reason) && message.contains("Original history retained"),
+                "{case}: {message}"
+            );
+            assert_eq!(
+                classify_open(Err(error)).unwrap_err().status_line(),
+                "_STATUS_:DB_MIGRATION_FAILED|history",
+                "{case}"
+            );
+            assert_eq!(history_rows(&path), rows, "{case}");
+            assert_eq!(version(&path), 0, "{case}");
+            assert_eq!(
+                carbon_repos::schema_dump::dump_schema(&conn).unwrap(),
+                schema,
+                "{case}"
             );
         }
     }

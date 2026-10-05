@@ -537,7 +537,7 @@ impl VisualTask {
             .sum()
     }
 
-    pub async fn downloaded_bytes(&self) -> (u32, u32) {
+    pub async fn downloaded_bytes(&self) -> (u64, u64) {
         self.subtasks
             .lock()
             .expect("this mutex can never witness a panic")
@@ -548,7 +548,9 @@ impl VisualTask {
                 } => (downloaded, total),
                 _ => (0, 0),
             })
-            .fold((0, 0), |(ad, at), (d, t)| (ad + d, at + t))
+            .fold((0u64, 0u64), |(ad, at), (d, t)| {
+                (ad.saturating_add(d), at.saturating_add(t))
+            })
     }
 
     pub async fn make_domain_task(&self, id: VisualTaskId) -> domain::Task {
@@ -610,12 +612,25 @@ impl Subtask {
 
     // complete_on_match is an explicit parameter instead of a following call to make sure
     // a conscious decision is made on a case by case basis.
-    pub fn update_download(&self, downloaded: u32, total: u32, complete_on_match: bool) {
+    pub fn update_download(&self, downloaded: u64, total: u64, complete_on_match: bool) {
         self.update_progress(Progress::Download {
             downloaded,
             total,
             complete: complete_on_match && downloaded >= total,
         });
+    }
+
+    /// Native download snapshots retain exact u64 bytes; item units stay u32.
+    pub fn update_download_progress(
+        &self,
+        progress: &carbon_net::Progress,
+        complete_on_match: bool,
+    ) {
+        self.update_download(
+            progress.current_size,
+            progress.total_size,
+            complete_on_match,
+        );
     }
 
     pub fn update_items(&self, current: u32, total: u32) {
@@ -701,8 +716,8 @@ pub enum Progress {
     // Download progress numbers are added to the overall task downloaded number,
     // shown after the subtask text as `(<downloaded>/<total>)` in mb.
     Download {
-        downloaded: u32,
-        total: u32,
+        downloaded: u64,
+        total: u64,
         complete: bool,
     },
 
@@ -1020,5 +1035,71 @@ mod task10_tests {
         );
         app.task_manager().dismiss_task(id).await.unwrap();
         assert!(app.task_manager().get_task(id).await.is_none());
+    }
+}
+
+#[cfg(test)]
+mod task21_bytes_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn task21_bytes_five_gib_preserve_ratio_and_weights() {
+        let task = VisualTask::new(Translation::Test);
+        let download = task.subtask(Translation::Test);
+        let _pending = task.subtask(Translation::Test);
+        download.update_download(1_073_741_824u64 as _, 5_368_709_120u64 as _, false);
+        assert!((task.progress_float().await - 0.1).abs() < 0.00001);
+        download.update_download(4_294_967_296u64 as _, 5_368_709_120u64 as _, false);
+        assert!((task.progress_float().await - 0.4).abs() < 0.00001);
+        assert_eq!(task.downloaded_bytes().await.0 as u64, 4_294_967_296);
+    }
+
+    #[tokio::test]
+    async fn task21_bytes_aggregate_does_not_wrap_or_poison() {
+        let task = VisualTask::new(Translation::Test);
+        task.subtask(Translation::Test)
+            .update_download(3_000_000_000, 3_000_000_000, false);
+        task.subtask(Translation::Test)
+            .update_download(2_000_000_000, 2_000_000_000, false);
+        let (current, total) = task.downloaded_bytes().await;
+        assert_eq!(
+            (current as u64, total as u64),
+            (5_000_000_000, 5_000_000_000)
+        );
+        assert_eq!(task.downloaded_bytes().await.0 as u64, 5_000_000_000);
+    }
+
+    #[tokio::test]
+    async fn task21_bytes_small_complete_and_items_controls() {
+        let task = VisualTask::new(Translation::Test);
+        let download = task.subtask(Translation::Test);
+        download.update_download(50, 100, false);
+        assert_eq!(task.progress_float().await, 0.5);
+        download.update_download(0, 0, false);
+        assert_eq!(task.progress_float().await, 0.0);
+        download.complete_download();
+        assert_eq!(task.progress_float().await, 1.0);
+        assert!(
+            task.make_domain_task(VisualTaskId(1))
+                .await
+                .active_subtasks
+                .is_empty()
+        );
+        download.update_items(1, 2);
+        assert_eq!(task.progress_float().await, 0.5);
+    }
+}
+
+#[cfg(test)]
+mod task21_saturation_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task21_bytes_native_aggregate_saturates_both_fields() {
+        let task = VisualTask::new(Translation::Test);
+        task.subtask(Translation::Test)
+            .update_download(u64::MAX, u64::MAX, false);
+        task.subtask(Translation::Test).update_download(1, 2, false);
+        assert_eq!(task.downloaded_bytes().await, (u64::MAX, u64::MAX));
+        assert_eq!(task.downloaded_bytes().await, (u64::MAX, u64::MAX));
     }
 }

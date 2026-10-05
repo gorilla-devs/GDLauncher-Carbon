@@ -26,7 +26,7 @@ pub(crate) struct SettingsManager {
     pub latest_consent_checksum: Option<String>,
     /// Set while a cache cleanup is executing. Prevents concurrent cleanups
     /// from both trying to VACUUM or racing on table DELETEs.
-    cleanup_running: AtomicBool,
+    cleanup_running: Arc<AtomicBool>,
 }
 
 impl SettingsManager {
@@ -41,7 +41,7 @@ impl SettingsManager {
             terms_and_privacy: TermsAndPrivacy::new(http_client, gdl_base_api_url.clone()),
             gdl_base_api_url,
             latest_consent_checksum,
-            cleanup_running: AtomicBool::new(false),
+            cleanup_running: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -320,6 +320,7 @@ impl ManagerRef<'_, SettingsManager> {
         }
 
         let task = VisualTask::new(Translation::CacheCleanup);
+        task.require_explicit_completion();
         let task_id = self.app.task_manager().spawn_task(&task).await;
 
         // ---- Subtasks (created BEFORE the mutation returns) ----
@@ -350,206 +351,239 @@ impl ManagerRef<'_, SettingsManager> {
 
         let app = self.app.clone();
         let runtime_path = self.runtime_path.clone();
+        let cleanup_running = self.cleanup_running.clone();
 
         tokio::spawn(async move {
             info!("Starting cache cleanup with selection: {selection:?}");
 
-            // Release the guard no matter how we exit the task.
-            struct ReleaseGuard(std::sync::Arc<crate::managers::AppInner>);
-            impl Drop for ReleaseGuard {
-                fn drop(&mut self) {
-                    self.0
-                        .settings_manager()
-                        .cleanup_running
-                        .store(false, Ordering::SeqCst);
-                }
-            }
-            let _guard = ReleaseGuard(app.clone());
+            let _guard = CleanupLease(cleanup_running);
 
-            // Trim launcher logs to the last LOGS_KEEP entries before
-            // anything else. This is intentionally NOT routed through the
-            // wholesale disk-wipe path: recent logs are useful for
-            // debugging the previous few launches, so we keep them
-            // regardless of which caches the user picked. The
-            // op is bounded (a handful of small files) so it doesn't
-            // need progress reporting.
-            const LOGS_KEEP: usize = 10;
-            if selection.gdlauncher {
-                let logs_path = runtime_path.join("__gdl_logs__");
-                tokio::task::spawn_blocking(move || {
-                    crate::logger::cleanup_old_logs(&logs_path, LOGS_KEEP)
-                })
-                .await
-                .ok();
-            }
-
-            // Build disk job list. Order matters only for the user-visible
-            // log; per-job execution is sequential so progress increments
-            // monotonically rather than racing.
-            let mut disk_jobs: Vec<(&'static str, PathBuf)> = Vec::new();
-            if selection.gdlauncher {
-                disk_jobs.push(("temp files", runtime_path.get_temp().to_path()));
-            }
-            if selection.minecraft {
-                disk_jobs.push(("Minecraft assets", runtime_path.get_assets().to_path()));
-                disk_jobs.push((
-                    "Minecraft libraries",
-                    runtime_path.get_libraries().to_path(),
-                ));
-                disk_jobs.push(("native libraries", runtime_path.join("natives")));
-            }
-
-            // Tables to wipe on `gdlauncher`. Listed leaf-to-root so cascade-
-            // or-not behaves the same regardless of `PRAGMA foreign_keys`.
-            // ModMetadata is deliberately NOT here: it backs installed
-            // mods and wiping it would break instance state.
-            const TABLES: &[&str] = &[
-                "HTTPCache",
-                "CurseForgeModImageCache",
-                "ModrinthModImageCache",
-                "LocalModImageCache",
-                "CurseForgeModpackImageCache",
-                "ModrinthModpackImageCache",
-                "CurseForgeModCache",
-                "ModrinthModCache",
-                "CurseForgeModpackCache",
-                "ModrinthModpackCache",
-                "VersionInfoCache",
-                "PartialVersionInfoCache",
-                "LwjglMetaCache",
-                "AssetsMetaCache",
-            ];
-
-            // ---- Pre-count work units ----
-            // One walk per disk dir, one COUNT per table. Both scan only
-            // metadata pages (file entries, rowid index), not row payloads.
-            let mut disk_total: u64 = 0;
-            for (_, path) in &disk_jobs {
-                disk_total = disk_total.saturating_add(count_files_blocking(path.clone()).await);
-            }
-            let mut db_total: u64 = 0;
-            if selection.gdlauncher {
-                for table in TABLES {
-                    db_total = db_total.saturating_add(count_table(&app.db, table).await);
-                }
-            }
-            let total_units = disk_total + db_total;
-
-            // Cap to u32 for the Subtask wire format. >4B units would
-            // mean 4B+ files or rows which we'd never realistically hit;
-            // saturating_as keeps the math sane if it ever does.
-            let total_u32: u32 = total_units.try_into().unwrap_or(u32::MAX);
-            // Replace the placeholder denominator with the real total now
-            // that pre-count is done.
-            work.update_items(0, total_u32);
-
-            let progress = Arc::new(AtomicU64::new(0));
-
-            // ---- Disk phase ----
-            // Sequential per dir. Progress increments per-file, throttled
-            // inside the helper so we don't spam the watch channel on
-            // big trees.
-            for (label, path) in disk_jobs {
-                if let Err(e) =
-                    clear_dir_with_progress(path.clone(), progress.clone(), work.clone(), total_u32)
-                        .await
-                {
-                    warn!("Failed to clear {label} at {path:?}: {e}");
-                }
-            }
-
-            // ---- DB phase ----
-            if selection.gdlauncher {
-                // Chunk size picked to balance per-statement overhead
-                // (~1 ms parse/plan + WAL commit) against progress
-                // granularity. 200 rows ≈ 10–20 ms per chunk on heavily
-                // indexed tables — frequent enough that the bar never
-                // appears frozen on multi-million-row HTTPCache wipes,
-                // small enough that the extra parse cost is in the noise.
-                const CHUNK: u32 = 200;
-
-                for table in TABLES {
-                    let sql = format!(
-                        "DELETE FROM {table} WHERE rowid IN (SELECT rowid FROM {table} LIMIT {CHUNK})"
-                    );
-                    loop {
-                        let dq = carbon_repos::registry::DynamicQuery {
-                            sql: sql.clone(),
-                            params: vec![],
-                        };
-                        match app.db.write(move |conn| Ok(dq.execute(&conn)?)).await {
-                            Ok(0) => break,
-                            Ok(n) => {
-                                let new =
-                                    progress.fetch_add(n as u64, Ordering::Relaxed) + n as u64;
-                                work.update_items(new.try_into().unwrap_or(u32::MAX), total_u32);
-                            }
-                            Err(e) => {
-                                warn!("Failed to clear {table}: {e}");
-                                break;
-                            }
-                        }
-                    }
-                }
-                work.complete_items();
-
-                // VACUUM reclaims the freelist pages the DELETEs created.
-                // Without it the file stays its current size on disk.
-                if let Some(vs) = vacuum_subtask.as_ref() {
-                    vs.start_opaque();
-                }
-                if let Err(e) = app
-                    .db
-                    .write(|conn| {
-                        use carbon_repos::db_exec::WriteAccess;
-                        Ok(conn.execute_batch("VACUUM")?)
-                    })
-                    .await
-                {
-                    error!("VACUUM failed: {e}");
-                    task.fail(anyhow!("Failed to reclaim cache space: {e}"))
-                        .await;
-                    return;
-                }
-                if let Some(vs) = vacuum_subtask.as_ref() {
-                    vs.complete_opaque();
-                }
-            } else {
-                // No DB phase: pin the work bar to 100% so the modal
-                // doesn't briefly show stale "0%" between disk-done and
-                // task-drop.
-                work.complete_items();
-            }
-
-            info!("Cache cleanup complete");
+            let result =
+                run_cache_cleanup(&app.db, &runtime_path, &selection, work, vacuum_subtask).await;
+            // Partial changes are real changes: refresh sizes on every outcome.
             app.invalidate(GET_DB_SIZE, None);
+            app.invalidate(GET_CACHE_SIZES, None);
+            finish_cache_cleanup(task, result).await;
         });
 
         Ok(task_id)
     }
 }
 
-/// COUNT(*) on a cache table. Uses the rowid index, so it scales with
-/// row count not byte count — fast even on a multi-GB HTTPCache.
-async fn count_table(db: &carbon_repos::db_exec::Db, table: &str) -> u64 {
-    let sql = format!("SELECT COUNT(*) FROM {table}");
-    let table = table.to_string();
-    let dq = carbon_repos::registry::DynamicQuery {
-        sql,
-        params: vec![],
-    };
-    match db.read(move |conn| Ok(dq.query_scalar_i64(&conn)?)).await {
-        Ok(n) => n.max(0) as u64,
-        Err(e) => {
-            warn!("Failed to count `{table}`: {e}");
-            0
-        }
+struct CleanupLease(Arc<AtomicBool>);
+impl Drop for CleanupLease {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::SeqCst);
     }
 }
 
-/// Count files (recursively) under `path`. Reads directory entries +
-/// metadata only — bounded by file count, not file size. Missing dirs
-/// return 0 silently.
+#[derive(Default, Debug)]
+struct CleanupFailures {
+    count: usize,
+    preview: Vec<String>,
+}
+impl CleanupFailures {
+    fn record(&mut self, context: impl std::fmt::Display, error: impl std::fmt::Display) {
+        self.count += 1;
+        if self.preview.len() < 20 {
+            self.preview.push(format!("{context}: {error}"));
+        }
+    }
+    fn record_io(&mut self, context: impl std::fmt::Display, error: std::io::Error) {
+        if let Some(nested) = error
+            .get_ref()
+            .and_then(|e| e.downcast_ref::<CleanupFailures>())
+        {
+            self.count += nested.count;
+            for preview in &nested.preview {
+                if self.preview.len() < 20 {
+                    self.preview.push(format!("{context}: {preview}"));
+                }
+            }
+        } else {
+            self.record(context, error);
+        }
+    }
+    fn result(self) -> anyhow::Result<()> {
+        if self.count == 0 {
+            Ok(())
+        } else {
+            Err(anyhow::Error::new(self))
+        }
+    }
+}
+impl std::fmt::Display for CleanupFailures {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "Cache cleanup had {} failure(s); retry the selected scopes after resolving access or database errors. {}",
+            self.count,
+            self.preview.join("; ")
+        )
+    }
+}
+impl std::error::Error for CleanupFailures {}
+const CLEANUP_TABLES: &[&str] = &[
+    "HTTPCache",
+    "ModrinthUpdateCache",
+    "CurseForgeModImageCache",
+    "ModrinthModImageCache",
+    "LocalModImageCache",
+    "CurseForgeModpackImageCache",
+    "ModrinthModpackImageCache",
+    "CurseForgeModCache",
+    "ModrinthModCache",
+    "CurseForgeModpackCache",
+    "ModrinthModpackCache",
+    "VersionInfoCache",
+    "PartialVersionInfoCache",
+    "LwjglMetaCache",
+    "AssetsMetaCache",
+];
+async fn run_cache_cleanup(
+    db: &carbon_repos::db_exec::Db,
+    runtime: &carbon_rt_path::RuntimePath,
+    selection: &CacheCleanupSelection,
+    work: Arc<Subtask>,
+    vacuum: Option<Subtask>,
+) -> anyhow::Result<()> {
+    let mut failures = CleanupFailures::default();
+    if selection.gdlauncher {
+        let logs = runtime.join("__gdl_logs__");
+        match tokio::task::spawn_blocking(move || crate::logger::cleanup_old_logs_report(&logs, 10))
+            .await
+        {
+            Ok(errors) => {
+                for error in errors {
+                    failures.record("old log cleanup", error);
+                }
+            }
+            Err(error) => failures.record("old log cleanup worker", error),
+        }
+    }
+    let mut paths = Vec::new();
+    if selection.gdlauncher {
+        paths.push(runtime.get_temp().to_path());
+    }
+    if selection.minecraft {
+        paths.extend([
+            runtime.get_assets().to_path(),
+            runtime.get_libraries().to_path(),
+            runtime.join("natives"),
+        ]);
+    }
+    let mut total = 0u64;
+    let mut count_complete = true;
+    for path in &paths {
+        match count_files_blocking(path.clone()).await {
+            Ok(count) => total = total.saturating_add(count),
+            Err(error) => {
+                count_complete = false;
+                failures.record(format!("count {}", path.display()), error);
+            }
+        }
+    }
+    if selection.gdlauncher {
+        for table in CLEANUP_TABLES {
+            match try_count_table(db, table).await {
+                Ok(count) => total = total.saturating_add(count),
+                Err(error) => {
+                    count_complete = false;
+                    failures.record(format!("count table {table}"), error);
+                }
+            }
+        }
+    }
+    let total = count_complete.then(|| total.try_into().unwrap_or(u32::MAX));
+    publish_cleanup_progress(&work, 0, total);
+    let progress = Arc::new(AtomicU64::new(0));
+    for path in paths {
+        if let Err(error) =
+            clear_dir_with_progress(path.clone(), progress.clone(), work.clone(), total).await
+        {
+            failures.record_io(format!("clear {}", path.display()), error);
+        }
+    }
+    if selection.gdlauncher {
+        for table in CLEANUP_TABLES {
+            let sql =
+                format!("DELETE FROM {table} WHERE rowid IN (SELECT rowid FROM {table} LIMIT 200)");
+            loop {
+                let query = carbon_repos::registry::DynamicQuery {
+                    sql: sql.clone(),
+                    params: vec![],
+                };
+                match db.write(move |conn| Ok(query.execute(&conn)?)).await {
+                    Ok(0) => break,
+                    Ok(count) => {
+                        let current =
+                            progress.fetch_add(count as u64, Ordering::Relaxed) + count as u64;
+                        publish_cleanup_progress(
+                            &work,
+                            current.try_into().unwrap_or(u32::MAX),
+                            total,
+                        );
+                    }
+                    Err(error) => {
+                        failures.record(format!("delete table {table}"), error);
+                        break;
+                    }
+                }
+            }
+        }
+        if let Some(vacuum) = vacuum.as_ref() {
+            vacuum.start_opaque();
+        }
+        match db
+            .write(|conn| {
+                use carbon_repos::db_exec::WriteAccess;
+                Ok(conn.execute_batch("VACUUM")?)
+            })
+            .await
+        {
+            Ok(()) => {
+                if let Some(vacuum) = vacuum {
+                    vacuum.complete_opaque();
+                }
+            }
+            Err(error) => failures.record("VACUUM reclaim cache space", error),
+        }
+    }
+    if failures.count == 0 {
+        work.complete_items();
+    }
+    failures.result()
+}
+/// A failed count leaves required work unknown, even after all counted units are removed.
+/// Keep real removal counts internally without publishing a complete partial ratio.
+fn publish_cleanup_progress(subtask: &Subtask, current: u32, total: Option<u32>) {
+    match total {
+        Some(total) => subtask.update_items(current, total),
+        None => subtask.start_opaque(),
+    }
+}
+async fn finish_cache_cleanup(task: VisualTask, result: anyhow::Result<()>) {
+    match result {
+        Ok(()) => task.complete(),
+        Err(error) => task.fail(error).await,
+    }
+}
+async fn try_count_table(
+    db: &carbon_repos::db_exec::Db,
+    table: &str,
+) -> carbon_repos::db_error::DbResult<u64> {
+    let query = carbon_repos::registry::DynamicQuery {
+        sql: format!("SELECT COUNT(*) FROM {table}"),
+        params: vec![],
+    };
+    db.read(move |conn| Ok(query.query_scalar_i64(&conn)?.max(0) as u64))
+        .await
+}
+#[cfg(test)]
+async fn count_table(db: &carbon_repos::db_exec::Db, table: &str) -> u64 {
+    try_count_table(db, table).await.unwrap()
+}
+
 /// Sync recursive walk that sums file byte sizes under `path`. Caller is
 /// responsible for running this on a blocking thread (e.g., inside
 /// `tokio::task::spawn_blocking`) — the FS calls are blocking.
@@ -574,80 +608,114 @@ fn dir_size_blocking(path: PathBuf) -> u64 {
     if path.exists() { walk(&path) } else { 0 }
 }
 
-async fn count_files_blocking(path: PathBuf) -> u64 {
+async fn count_files_blocking(path: PathBuf) -> std::io::Result<u64> {
     tokio::task::spawn_blocking(move || {
-        fn walk(p: &Path) -> u64 {
-            let Ok(entries) = std::fs::read_dir(p) else {
-                return 0;
+        fn walk(path: &Path) -> std::io::Result<u64> {
+            let entries = match std::fs::read_dir(path) {
+                Ok(entries) => entries,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(0),
+                Err(error) => return Err(error),
             };
-            let mut total = 0u64;
-            for entry in entries.flatten() {
-                let Ok(meta) = entry.metadata() else {
-                    continue;
-                };
-                if meta.is_file() {
-                    total = total.saturating_add(1);
-                } else if meta.is_dir() {
-                    total = total.saturating_add(walk(&entry.path()));
-                }
+            let mut count = 0u64;
+            for entry in entries {
+                let entry = entry?;
+                let kind = entry.file_type()?;
+                count = count.saturating_add(if kind.is_dir() {
+                    walk(&entry.path())?
+                } else {
+                    1
+                });
             }
-            total
+            Ok(count)
         }
-        if path.exists() { walk(&path) } else { 0 }
+        walk(&path)
     })
     .await
-    .unwrap_or(0)
+    .map_err(|e| std::io::Error::other(e.to_string()))?
 }
-
-/// Recursively delete files and subdirectories inside `path`, leaving
-/// the directory itself in place, while incrementing `progress` per
-/// file deleted and pushing throttled `update_items` calls onto
-/// `subtask`. `total` is the same upper bound used to seed `subtask`'s
-/// progress so all reports share a denominator.
+/// Continue independent removals, counting only removed or confirmed-absent
+/// file postconditions. Iterator, metadata and directory failures remain errors.
 async fn clear_dir_with_progress(
     path: PathBuf,
     progress: Arc<AtomicU64>,
     subtask: Arc<Subtask>,
-    total: u32,
+    total: Option<u32>,
 ) -> std::io::Result<()> {
-    if !tokio::fs::try_exists(&path).await.unwrap_or(false) {
-        return Ok(());
-    }
     tokio::task::spawn_blocking(move || {
-        // Update granularity. One notify per file would flood the
-        // watch channel for huge trees; one per 25 keeps the bar
-        // ticking smoothly even when removing a handful of large files
-        // (where 100-file batches would visibly stall) without burning
-        // CPU on assets/ trees with tens of thousands of tiny files.
-        const PROGRESS_BATCH: u64 = 25;
-
-        fn walk_delete(p: &Path, progress: &AtomicU64, subtask: &Subtask, total: u32) {
-            let Ok(entries) = std::fs::read_dir(p) else {
-                return;
+        fn walk(
+            path: &Path,
+            progress: &AtomicU64,
+            subtask: &Subtask,
+            total: Option<u32>,
+            failures: &mut CleanupFailures,
+        ) {
+            let entries = match std::fs::read_dir(path) {
+                Ok(entries) => entries,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+                Err(error) => {
+                    failures.record(path.display(), error);
+                    return;
+                }
             };
-            for entry in entries.flatten() {
-                let pp = entry.path();
-                let Ok(meta) = entry.metadata() else {
-                    continue;
+            for entry in entries {
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(error) => {
+                        failures.record(path.display(), error);
+                        continue;
+                    }
                 };
-                if meta.is_dir() {
-                    walk_delete(&pp, progress, subtask, total);
-                    let _ = std::fs::remove_dir(&pp);
+                let child = entry.path();
+                // Do not traverse symlinked cache directories outside the selected tree.
+                let kind = match entry.file_type() {
+                    Ok(kind) => kind,
+                    Err(error) => {
+                        failures.record(child.display(), error);
+                        continue;
+                    }
+                };
+                if kind.is_dir() {
+                    walk(&child, progress, subtask, total, failures);
+                    if let Err(error) = std::fs::remove_dir(&child) {
+                        if error.kind() != std::io::ErrorKind::NotFound {
+                            failures.record(child.display(), error);
+                        }
+                    }
                 } else {
-                    let _ = std::fs::remove_file(&pp);
-                    let n = progress.fetch_add(1, Ordering::Relaxed) + 1;
-                    if n % PROGRESS_BATCH == 0 {
-                        subtask.update_items(n.try_into().unwrap_or(u32::MAX), total);
+                    match std::fs::remove_file(&child) {
+                        Ok(()) => {}
+                        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                        Err(error) => {
+                            failures.record(child.display(), error);
+                            continue;
+                        }
+                    }
+                    let count = progress.fetch_add(1, Ordering::Relaxed) + 1;
+                    if count % 25 == 0 {
+                        publish_cleanup_progress(
+                            subtask,
+                            count.try_into().unwrap_or(u32::MAX),
+                            total,
+                        );
                     }
                 }
             }
         }
-        walk_delete(&path, &progress, &subtask, total);
-        // Final flush so the bar reflects the tail < PROGRESS_BATCH
-        // worth of files we just removed without notifying about.
-        let n = progress.load(Ordering::Relaxed);
-        subtask.update_items(n.try_into().unwrap_or(u32::MAX), total);
-        Ok::<_, std::io::Error>(())
+        let mut failures = CleanupFailures::default();
+        walk(&path, &progress, &subtask, total, &mut failures);
+        publish_cleanup_progress(
+            &subtask,
+            progress
+                .load(Ordering::Relaxed)
+                .try_into()
+                .unwrap_or(u32::MAX),
+            total,
+        );
+        if failures.count == 0 {
+            Ok(())
+        } else {
+            Err(std::io::Error::other(failures))
+        }
     })
     .await
     .map_err(|e| std::io::Error::other(e.to_string()))?
@@ -759,6 +827,313 @@ mod tests {
                 0,
                 "{table} must remain empty after cleanup"
             );
+        }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod task21_cleanup_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+    #[tokio::test]
+    async fn task21_cleanup_denied_file_is_not_counted_as_removed() {
+        let dir = tempfile::tempdir().unwrap();
+        let denied = dir.path().join("denied");
+        std::fs::create_dir(&denied).unwrap();
+        let file = denied.join("kept.cache");
+        std::fs::write(&file, b"keep").unwrap();
+        std::fs::set_permissions(&denied, std::fs::Permissions::from_mode(0o555)).unwrap();
+        let probe = std::fs::remove_file(&file);
+        assert_eq!(
+            probe.unwrap_err().kind(),
+            std::io::ErrorKind::PermissionDenied,
+            "permission denial must be effective under runner user"
+        );
+        let task = VisualTask::new(Translation::CacheCleanup);
+        let subtask = Arc::new(task.subtask(Translation::CacheCleanup));
+        let progress = Arc::new(AtomicU64::new(0));
+        let result =
+            clear_dir_with_progress(denied.clone(), progress.clone(), subtask.clone(), Some(1))
+                .await;
+        std::fs::set_permissions(&denied, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert!(file.exists());
+        assert!(
+            result.is_err(),
+            "failed unlink must surface the affected path"
+        );
+        assert_eq!(progress.load(Ordering::Relaxed), 0);
+    }
+    fn db_fixture() -> (
+        tempfile::TempDir,
+        carbon_repos::db_exec::Db,
+        carbon_rt_path::RuntimePath,
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("fixture.db");
+        let mut c = rusqlite::Connection::open(&path).unwrap();
+        carbon_repos::get_migrations().0.to_latest(&mut c).unwrap();
+        drop(c);
+        let db = carbon_repos::db_exec::Db::open(&path, 1, true).unwrap();
+        let runtime = carbon_rt_path::RuntimePath::new(dir.path().join("runtime"));
+        (dir, db, runtime)
+    }
+    #[tokio::test]
+    async fn task21_cleanup_partial_db_error_retains_failure_and_retry_preserves_metadata() {
+        use carbon_repos::db_exec::WriteAccess;
+        let (_dir, db, runtime) = db_fixture();
+        db.write(|c|Ok(c.execute_batch("INSERT INTO HTTPCache(url,status_code,data) VALUES('synthetic',200,x'01');
+            INSERT INTO ModMetadata(id,murmur2,sha512,sha1,modloaders) VALUES('kept',1,x'01',x'02','forge');
+            CREATE TRIGGER denied_delete BEFORE DELETE ON HTTPCache BEGIN SELECT RAISE(ABORT,'denied cache table');END;")?)).await.unwrap();
+        let task = VisualTask::new(Translation::CacheCleanup);
+        task.require_explicit_completion();
+        let observer = task.clone();
+        let work = Arc::new(task.subtask(Translation::CacheCleanup));
+        let running = Arc::new(AtomicBool::new(true));
+        let lease = CleanupLease(running.clone());
+        let result = run_cache_cleanup(
+            &db,
+            &runtime,
+            &CacheCleanupSelection {
+                gdlauncher: true,
+                minecraft: false,
+            },
+            work,
+            None,
+        )
+        .await;
+        assert!(
+            result
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains("HTTPCache")
+        );
+        finish_cache_cleanup(task, result).await;
+        drop(lease);
+        assert!(!running.load(Ordering::SeqCst));
+        assert!(matches!(
+            observer.make_domain_task(VisualTaskId(1)).await.progress,
+            crate::domain::vtask::Progress::Failed(_)
+        ));
+        assert_eq!(try_count_table(&db, "HTTPCache").await.unwrap(), 1);
+        assert_eq!(try_count_table(&db, "ModMetadata").await.unwrap(), 1);
+        db.write(|c| Ok(c.execute_batch("DROP TRIGGER denied_delete")?))
+            .await
+            .unwrap();
+        let retry = VisualTask::new(Translation::CacheCleanup);
+        run_cache_cleanup(
+            &db,
+            &runtime,
+            &CacheCleanupSelection {
+                gdlauncher: true,
+                minecraft: false,
+            },
+            Arc::new(retry.subtask(Translation::CacheCleanup)),
+            None,
+        )
+        .await
+        .unwrap();
+        assert_eq!(try_count_table(&db, "HTTPCache").await.unwrap(), 0);
+        assert_eq!(try_count_table(&db, "ModMetadata").await.unwrap(), 1);
+    }
+    #[tokio::test]
+    async fn task21_cleanup_vacuum_failure_and_selected_scope_controls() {
+        use carbon_repos::db_exec::WriteAccess;
+        let (_dir, db, runtime) = db_fixture();
+        let temp = runtime.get_temp().to_path();
+        std::fs::create_dir_all(&temp).unwrap();
+        std::fs::write(temp.join("kept"), b"keep").unwrap();
+        let assets = runtime.get_assets().to_path();
+        std::fs::create_dir_all(&assets).unwrap();
+        std::fs::write(assets.join("deleted"), b"delete").unwrap();
+        let task = VisualTask::new(Translation::CacheCleanup);
+        let work = Arc::new(task.subtask(Translation::CacheCleanup));
+        run_cache_cleanup(
+            &db,
+            &runtime,
+            &CacheCleanupSelection {
+                gdlauncher: false,
+                minecraft: true,
+            },
+            work,
+            None,
+        )
+        .await
+        .unwrap();
+        assert!(temp.join("kept").exists());
+        assert!(!assets.join("deleted").exists());
+        // An actual writer transaction makes SQLite refuse VACUUM.
+        db.write(|c| Ok(c.execute_batch("BEGIN IMMEDIATE")?))
+            .await
+            .unwrap();
+        let task = VisualTask::new(Translation::CacheCleanup);
+        let observed = task.clone();
+        let result = run_cache_cleanup(
+            &db,
+            &runtime,
+            &CacheCleanupSelection {
+                gdlauncher: true,
+                minecraft: false,
+            },
+            Arc::new(task.subtask(Translation::CacheCleanup)),
+            None,
+        )
+        .await;
+        db.write(|c| Ok(c.execute_batch("ROLLBACK")?))
+            .await
+            .unwrap();
+        assert!(result.as_ref().unwrap_err().to_string().contains("VACUUM"));
+        finish_cache_cleanup(task, result).await;
+        assert!(matches!(
+            observed.make_domain_task(VisualTaskId(1)).await.progress,
+            crate::domain::vtask::Progress::Failed(_)
+        ));
+    }
+    #[tokio::test]
+    async fn task21_cleanup_writable_missing_and_mixed_directory_controls() {
+        let dir = tempfile::tempdir().unwrap();
+        let task = VisualTask::new(Translation::CacheCleanup);
+        let work = Arc::new(task.subtask(Translation::CacheCleanup));
+        let progress = Arc::new(AtomicU64::new(0));
+        clear_dir_with_progress(
+            dir.path().join("absent"),
+            progress.clone(),
+            work.clone(),
+            Some(1),
+        )
+        .await
+        .unwrap();
+        let child = dir.path().join("child");
+        std::fs::create_dir(&child).unwrap();
+        std::fs::write(child.join("deleted"), b"delete").unwrap();
+        clear_dir_with_progress(dir.path().to_path_buf(), progress.clone(), work, Some(1))
+            .await
+            .unwrap();
+        assert_eq!(progress.load(Ordering::Relaxed), 1);
+        assert!(!child.exists());
+        assert_eq!(task.progress_float().await, 1.0);
+    }
+
+    async fn failed_count_case(healthy_files: bool, weighted_vacuum: bool) {
+        let (_dir, db, runtime) = db_fixture();
+        let assets = runtime.get_assets().to_path();
+        std::fs::create_dir_all(&assets).unwrap();
+        let kept = assets.join("kept.cache");
+        std::fs::write(&kept, b"keep").unwrap();
+        let libraries = runtime.get_libraries().to_path();
+        if healthy_files {
+            std::fs::create_dir_all(&libraries).unwrap();
+            std::fs::write(libraries.join("removed.cache"), b"remove").unwrap();
+        }
+        std::fs::set_permissions(&assets, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let probe = std::fs::read_dir(&assets);
+        let task = VisualTask::new(Translation::CacheCleanup);
+        task.require_explicit_completion();
+        let work = Arc::new(task.subtask(Translation::CacheCleanup));
+        let vacuum = if weighted_vacuum {
+            work.set_weight(0.9);
+            let vacuum = task.subtask(Translation::CacheCleanup);
+            vacuum.set_weight(0.1);
+            Some(vacuum)
+        } else {
+            None
+        };
+        let result = run_cache_cleanup(
+            &db,
+            &runtime,
+            &CacheCleanupSelection {
+                gdlauncher: weighted_vacuum,
+                minecraft: true,
+            },
+            work,
+            vacuum,
+        )
+        .await;
+        std::fs::set_permissions(&assets, std::fs::Permissions::from_mode(0o755)).unwrap();
+        assert_eq!(
+            probe.unwrap_err().kind(),
+            std::io::ErrorKind::PermissionDenied
+        );
+        assert!(kept.exists());
+        assert!(
+            !libraries.join("removed.cache").exists(),
+            "healthy scope must still be cleaned"
+        );
+        assert!(
+            result
+                .as_ref()
+                .unwrap_err()
+                .to_string()
+                .contains(&assets.display().to_string())
+        );
+        assert!(
+            !task
+                .make_domain_task(VisualTaskId(1))
+                .await
+                .active_subtasks
+                .is_empty(),
+            "an omitted failed count must not complete required work"
+        );
+        assert!(
+            task.progress_float().await < 1.0,
+            "unknown count must not publish 100%"
+        );
+        if weighted_vacuum {
+            assert!(
+                (task.progress_float().await - 0.1).abs() < 0.0001,
+                "successful VACUUM retains only its own weight"
+            );
+        }
+        let observer = task.clone();
+        finish_cache_cleanup(task, result).await;
+        assert!(matches!(
+            observer.make_domain_task(VisualTaskId(1)).await.progress,
+            crate::domain::vtask::Progress::Failed(_)
+        ));
+    }
+    #[tokio::test]
+    async fn task21_r1_failed_count_zero_known_units_stays_incomplete() {
+        failed_count_case(false, false).await;
+    }
+    #[tokio::test]
+    async fn task21_r1_failed_count_with_removed_known_subtotal_stays_incomplete() {
+        failed_count_case(true, false).await;
+    }
+    #[tokio::test]
+    async fn task21_r1_failed_count_preserves_weighted_vacuum() {
+        failed_count_case(true, true).await;
+    }
+    #[tokio::test]
+    async fn task21_r1_empty_and_counted_worker_success_controls() {
+        for populated in [false, true] {
+            let (_dir, db, runtime) = db_fixture();
+            let assets = runtime.get_assets().to_path();
+            if populated {
+                std::fs::create_dir_all(&assets).unwrap();
+                std::fs::write(assets.join("removed.cache"), b"remove").unwrap();
+            }
+            let task = VisualTask::new(Translation::CacheCleanup);
+            let work = Arc::new(task.subtask(Translation::CacheCleanup));
+            run_cache_cleanup(
+                &db,
+                &runtime,
+                &CacheCleanupSelection {
+                    gdlauncher: false,
+                    minecraft: true,
+                },
+                work.clone(),
+                None,
+            )
+            .await
+            .unwrap();
+            assert!(!assets.join("removed.cache").exists());
+            assert!(
+                task.make_domain_task(VisualTaskId(1))
+                    .await
+                    .active_subtasks
+                    .is_empty()
+            );
+            assert_eq!(task.progress_float().await, 1.0);
         }
     }
 }

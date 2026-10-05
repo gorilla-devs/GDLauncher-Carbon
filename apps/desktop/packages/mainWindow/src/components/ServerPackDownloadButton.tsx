@@ -1,4 +1,5 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
+import { resolvePackVersion } from "@/utils/resolvePackVersion"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import {
   FEServerModpackSource,
@@ -66,49 +67,55 @@ const ServerPackDownloadButton = (props: ServerPackDownloadButtonProps) => {
         return
       }
 
-      let modpackSource: FEServerModpackSource
+      try {
+        let modpackSource: FEServerModpackSource
 
-      if (props.addon.platform === "curseforge") {
-        const fileId = props.fileId
-          ? Number.parseInt(props.fileId.toString(), 10)
-          : Number.parseInt(props.addon.mainFileId || "0")
-        const projectId = Number.parseInt(props.addon.id)
-        const spFileId = Number.parseInt(serverPackFileId)
+        if (props.addon.platform === "curseforge") {
+          const fileId = props.fileId
+            ? Number.parseInt(props.fileId.toString(), 10)
+            : Number.parseInt(props.addon.mainFileId || "0")
+          const projectId = Number.parseInt(props.addon.id)
+          const spFileId = Number.parseInt(serverPackFileId)
 
-        modpackSource = {
-          curseforge: {
-            project_id: projectId,
-            file_id: fileId,
-            server_pack_file_id: spFileId
+          modpackSource = {
+            curseforge: {
+              project_id: projectId,
+              file_id: fileId,
+              server_pack_file_id: spFileId
+            }
+          }
+        } else {
+          const versionId = await resolvePackVersion(
+            props.addon,
+            props.fileId,
+            (projectId) =>
+              rspcContext.client.query([
+                "modplatforms.modrinth.getProjectVersions",
+                { project_id: projectId }
+              ])
+          )
+
+          modpackSource = {
+            modrinth: {
+              project_id: props.addon.id,
+              version_id: versionId
+            }
           }
         }
-      } else {
-        // Modrinth
-        let versionId = props.fileId?.toString() || props.addon.mainFileId
 
-        if (!versionId) {
-          const mrVersions = await rspcContext.client.query([
-            "modplatforms.modrinth.getProjectVersions",
-            { project_id: props.addon.id.toString() }
-          ])
-          versionId = mrVersions[0].id
-        }
-
-        modpackSource = {
-          modrinth: {
-            project_id: props.addon.id,
-            version_id: versionId
-          }
-        }
+        createServerMutation.mutate({
+          name: props.addon.title,
+          port: null,
+          group: null,
+          modpackSource: modpackSource,
+          iconUrl: props.addon.imageUrl ?? null
+        })
+      } catch (error) {
+        setLoading(false)
+        toast.error(
+          `Could not resolve pack version: ${error instanceof Error ? error.message : "Retry the download."}`
+        )
       }
-
-      createServerMutation.mutate({
-        name: props.addon.title,
-        port: null,
-        group: null,
-        modpackSource: modpackSource,
-        iconUrl: props.addon.imageUrl ?? null
-      })
     })
   }
 

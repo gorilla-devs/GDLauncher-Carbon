@@ -1,3 +1,4 @@
+import { mergeUnifiedCategories } from "@/utils/categoryResults"
 import { Collapsable } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import { Show, createMemo } from "solid-js"
@@ -12,7 +13,8 @@ import { sanitizeSvgIcon } from "@/utils/modplatformDescriptionConverter"
 export function CategoriesFilter() {
   const searchResults = useSearchContext()
   const categories = rspc.createQuery(() => ({
-    queryKey: ["modplatforms.getUnifiedCategories"]
+    queryKey: ["modplatforms.getUnifiedCategories"],
+    structuralSharing: mergeUnifiedCategories
   }))
 
   const curseforgeCategories = createMemo(() =>
@@ -89,6 +91,27 @@ export function CategoriesFilter() {
                 <Trans key="enums:_trn_curseforge" />
               </span>
             </div>
+            <Show when={categories.data?.curseforgeError}>
+              {(error) => (
+                <div
+                  role="alert"
+                  class="flex flex-col items-start gap-1 text-sm"
+                >
+                  <span>
+                    <Trans key="search:_trn_categories_load_failed" />
+                  </span>
+                  <span class="text-lightSlate-500 break-words text-xs">
+                    {error()}
+                  </span>
+                  <button
+                    class="underline"
+                    onClick={() => categories.refetch()}
+                  >
+                    <Trans key="general:_trn_retry" />
+                  </button>
+                </div>
+              )}
+            </Show>
             <SearchableCheckboxList
               items={curseforgeCategories()}
               selectedValues={() =>
@@ -96,7 +119,11 @@ export function CategoriesFilter() {
               }
               onToggle={toggleCategory}
               showSearch={false}
-              emptyMessage={<Trans key="search:_trn_no_categories_found" />}
+              emptyMessage={
+                categories.data?.curseforgeError ? null : (
+                  <Trans key="search:_trn_no_categories_found" />
+                )
+              }
             />
           </div>
         </Show>
@@ -113,6 +140,27 @@ export function CategoriesFilter() {
                 <Trans key="enums:_trn_modrinth" />
               </span>
             </div>
+            <Show when={categories.data?.modrinthError}>
+              {(error) => (
+                <div
+                  role="alert"
+                  class="flex flex-col items-start gap-1 text-sm"
+                >
+                  <span>
+                    <Trans key="search:_trn_categories_load_failed" />
+                  </span>
+                  <span class="text-lightSlate-500 break-words text-xs">
+                    {error()}
+                  </span>
+                  <button
+                    class="underline"
+                    onClick={() => categories.refetch()}
+                  >
+                    <Trans key="general:_trn_retry" />
+                  </button>
+                </div>
+              )}
+            </Show>
             <SearchableCheckboxList
               items={modrinthCategories()}
               selectedValues={() =>
@@ -120,7 +168,11 @@ export function CategoriesFilter() {
               }
               onToggle={toggleCategory}
               showSearch={false}
-              emptyMessage={<Trans key="search:_trn_no_categories_found" />}
+              emptyMessage={
+                categories.data?.modrinthError ? null : (
+                  <Trans key="search:_trn_no_categories_found" />
+                )
+              }
             />
           </div>
         </Show>

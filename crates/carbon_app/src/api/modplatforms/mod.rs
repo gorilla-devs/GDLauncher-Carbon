@@ -148,7 +148,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
             match search_params.search_api {
                 Some(FEUnifiedPlatform::Curseforge) => {
                     let modplatforms = app.modplatforms_manager();
-                    let curseforge_response = modplatforms.curseforge.search(search_params.into()).await?;
+                    let curseforge_response = modplatforms.curseforge.search(search_params.try_into()?).await?;
                     Ok(responses::FEUnifiedSearchResponse::from(curseforge_response))
                 }
                 Some(FEUnifiedPlatform::Modrinth) => {
@@ -160,8 +160,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     // Search both platforms and merge results
                     let modplatforms = app.modplatforms_manager();
 
+                    let cf_params = search_params.clone().try_into()?;
                     let (cf_response, mr_response) = tokio::try_join!(
-                        modplatforms.curseforge.search(search_params.clone().into()),
+                        modplatforms.curseforge.search(cf_params),
                         modplatforms.modrinth.search(search_params.into())
                     )?;
 
@@ -235,6 +236,8 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     body: ModsParametersBody { mod_ids: request.curseforge_ids.clone() }
                 }).await {
                     Ok(response) => {
+                        let returned: HashSet<i32> = response.data.iter().map(|m|m.id).collect();
+                        for id in &request.curseforge_ids { if !returned.contains(id) { errors.push(format!("CurseForge ID {id} not found")); } }
                         for mod_data in response.data {
                             seen_cf_ids.insert(mod_data.id);
                             results.push(responses::FEUnifiedSearchResult::from(mod_data));
@@ -281,24 +284,16 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 }
             }
 
-            // 3. Fetch Modrinth-only IDs (from MR protocol/URL)
-            if !request.modrinth_only_ids.is_empty() {
-                match modplatforms.modrinth.get_projects(ProjectIDs { ids: request.modrinth_only_ids.clone() }).await {
-                    Ok(projects) => {
-                        for project in projects {
-                            if !seen_mr_ids.contains(&project.id) {
-                                seen_mr_ids.insert(project.id.clone());
-                                results.push(responses::FEUnifiedSearchResult::from(project));
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        for id in &request.modrinth_only_ids {
-                            errors.push(format!("Modrinth ID '{}' not found: {}", id, e));
-                        }
-                    }
-                }
+            // Resolve projects individually so slug aliases and omitted items
+            // have an explicit result; versions use their distinct endpoint.
+            let mr = resolve_modrinth_batch(request.modrinth_only_ids, request.modrinth_version_ids,
+                |id| modplatforms.modrinth.get_project(id.into()),
+                |id| modplatforms.modrinth.get_version(carbon_platforms::modrinth::search::VersionID(id))).await;
+            for item in mr.results {
+                seen_mr_ids.insert(item.id.clone());
+                results.push(item);
             }
+            errors.extend(mr.errors);
 
             // 4. Fetch slugs from BOTH platforms
             for slug in &request.slugs {
@@ -323,22 +318,19 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     }
                 }).await {
                     if let Some(found) = response.data.into_iter().find(|m| m.slug.eq_ignore_ascii_case(slug)) {
+                        found_on_any = true;
                         if !seen_cf_ids.contains(&found.id) {
                             seen_cf_ids.insert(found.id);
                             results.push(responses::FEUnifiedSearchResult::from(found));
-                            found_on_any = true;
                         }
                     }
                 }
 
-                // Try Modrinth (can accept slug as ID)
-                if let Ok(projects) = modplatforms.modrinth.get_projects(ProjectIDs { ids: vec![slug.clone()] }).await {
-                    for project in projects {
-                        if !seen_mr_ids.contains(&project.id) {
-                            seen_mr_ids.insert(project.id.clone());
-                            results.push(responses::FEUnifiedSearchResult::from(project));
-                            found_on_any = true;
-                        }
+                // A returned alias is found even when its canonical row already exists.
+                if let Ok(project) = modplatforms.modrinth.get_project(slug.clone().into()).await {
+                    found_on_any = true;
+                    if seen_mr_ids.insert(project.id.clone()) {
+                        results.push(responses::FEUnifiedSearchResult::from(project));
                     }
                 }
 
@@ -363,23 +355,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
             let curseforge_categories = modplatforms.curseforge.get_categories();
             let modrinth_categories = modplatforms.modrinth.get_categories();
 
-            let (cf_categories, mr_categories) = tokio::try_join!(
-                curseforge_categories,
-                modrinth_categories
-            )?;
-
-            let cf_categories = cf_categories.data.into_iter().map(|category| (category.id, FEUnifiedCategory::from(category))).collect();
-            let mr_categories = mr_categories.into_iter().map(|category| {
-                let fe_type: FEUnifiedSearchType = category.project_type.clone().into();
-                let type_str = serde_plain::to_string(&fe_type).unwrap_or_default();
-                let key = format!("{}:{}", type_str, category.name);
-                (key, FEUnifiedCategory::from(category))
-            }).collect();
-
-            Ok(FEUnifiedCategories {
-                modrinth: mr_categories,
-                curseforge: cf_categories,
-            })
+            resolve_categories(curseforge_categories, modrinth_categories).await
         }
     }
 }
@@ -397,6 +373,271 @@ impl From<carbon_platforms::RemoteVersion> for RemoteVersion {
         match value {
             Other::Curseforge(cf) => Self::Curseforge(cf.into()),
             Other::Modrinth(mr) => Self::Modrinth(mr.into()),
+        }
+    }
+}
+
+// Shared production orchestration boundary; injected futures avoid any provider IO in tests.
+async fn resolve_categories(
+    curseforge_categories: impl std::future::Future<
+        Output = anyhow::Result<
+            carbon_platforms::curseforge::CurseForgeResponse<
+                Vec<carbon_platforms::curseforge::Category>,
+            >,
+        >,
+    >,
+    modrinth_categories: impl std::future::Future<
+        Output = anyhow::Result<carbon_platforms::modrinth::responses::CategoriesResponse>,
+    >,
+) -> anyhow::Result<FEUnifiedCategories> {
+    let (cf, mr) = tokio::join!(curseforge_categories, modrinth_categories);
+    let (curseforge, curseforge_error) = match cf {
+        Ok(response) => (
+            response
+                .data
+                .into_iter()
+                .map(|c| (c.id, FEUnifiedCategory::from(c)))
+                .collect(),
+            None,
+        ),
+        Err(e) => (Default::default(), Some(category_error(e))),
+    };
+    let (modrinth, modrinth_error) = match mr {
+        Ok(response) => (
+            response
+                .into_iter()
+                .map(|category| {
+                    let fe_type: FEUnifiedSearchType = category.project_type.clone().into();
+                    let key = format!(
+                        "{}:{}",
+                        serde_plain::to_string(&fe_type).unwrap_or_default(),
+                        category.name
+                    );
+                    (key, FEUnifiedCategory::from(category))
+                })
+                .collect(),
+            None,
+        ),
+        Err(e) => (Default::default(), Some(category_error(e))),
+    };
+    Ok(FEUnifiedCategories {
+        curseforge,
+        modrinth,
+        curseforge_error,
+        modrinth_error,
+    })
+}
+fn category_error(error: anyhow::Error) -> String {
+    error.to_string().chars().take(400).collect()
+}
+
+async fn resolve_modrinth_batch<P, PF, V, VF>(
+    projects: Vec<String>,
+    versions: Vec<String>,
+    mut get_project: P,
+    mut get_version: V,
+) -> filters::FEUnifiedBatchResponse
+where
+    P: FnMut(String) -> PF,
+    PF: std::future::Future<Output = anyhow::Result<carbon_platforms::modrinth::project::Project>>,
+    V: FnMut(String) -> VF,
+    VF: std::future::Future<Output = anyhow::Result<carbon_platforms::modrinth::version::Version>>,
+{
+    let mut response = filters::FEUnifiedBatchResponse {
+        results: Vec::new(),
+        errors: Vec::new(),
+    };
+    let mut seen = std::collections::HashSet::new();
+    for id in projects {
+        match get_project(id.clone()).await {
+            Ok(project) => {
+                if seen.insert((project.id.clone(), None)) {
+                    response.results.push(project.into());
+                }
+            }
+            Err(e) => response
+                .errors
+                .push(format!("Modrinth project '{id}' not found: {e}")),
+        }
+    }
+    for id in versions {
+        let result = async {
+            let version = get_version(id.clone()).await?;
+            anyhow::ensure!(
+                version.id == id,
+                "version response does not match requested ID"
+            );
+            let project = get_project(version.project_id.clone()).await?;
+            anyhow::ensure!(
+                project.id == version.project_id,
+                "version owner does not match returned project"
+            );
+            Ok::<_, anyhow::Error>(project)
+        }
+        .await;
+        match result {
+            Ok(project) => {
+                if seen.insert((project.id.clone(), Some(id.clone()))) {
+                    let mut row = responses::FEUnifiedSearchResult::from(project);
+                    row.requested_version_id = Some(id);
+                    response.results.push(row);
+                }
+            }
+            Err(e) => response
+                .errors
+                .push(format!("Modrinth version '{id}' not found: {e}")),
+        }
+    }
+    response
+}
+
+#[cfg(test)]
+mod task21_category_tests {
+    use super::*;
+    #[tokio::test]
+    async fn task21_categories_healthy_provider_survives_other_failure() {
+        let cf = carbon_platforms::curseforge::CurseForgeResponse {
+            data: Vec::new(),
+            pagination: None,
+        };
+        let response = resolve_categories(
+            std::future::ready(Ok(cf)),
+            std::future::ready(Err(anyhow::anyhow!("Modrinth offline"))),
+        )
+        .await;
+        assert!(
+            response.is_ok(),
+            "healthy empty dictionary must survive unrelated outage"
+        );
+        let mr = carbon_platforms::modrinth::responses::CategoriesResponse(Vec::new());
+        assert!(
+            resolve_categories(
+                std::future::ready(Err(anyhow::anyhow!("CurseForge offline"))),
+                std::future::ready(Ok(mr))
+            )
+            .await
+            .is_ok()
+        );
+    }
+}
+
+#[cfg(test)]
+mod task21_batch_tests {
+    use super::*;
+    fn project() -> carbon_platforms::modrinth::project::Project {
+        serde_json::from_value(serde_json::json!({"slug":"alias","title":"fixture","description":"fixture","categories":[],"client_side":"required","server_side":"optional","body":"fixture","additional_categories":[],"donation_urls":[],"project_type":"modpack","downloads":1,"id":"owner","team":"team","published":"2026-01-01T00:00:00Z","updated":"2026-01-02T00:00:00Z","followers":1,"status":"approved","license":{"id":"MIT","name":"MIT"},"versions":["historical","chosenA","chosenB"],"game_versions":[],"loaders":[]})).unwrap()
+    }
+    fn version(id: String) -> carbon_platforms::modrinth::version::Version {
+        serde_json::from_value(serde_json::json!({"name":"fixture","version_number":"1","dependencies":[],"game_versions":[],"version_type":"release","loaders":[],"featured":true,"id":id,"project_id":"owner","author_id":"author","date_published":"2026-01-01T00:00:00Z","downloads":1,"files":[]})).unwrap()
+    }
+    #[tokio::test]
+    async fn task21_typed_versions_aliases_missing_items_and_separate_selections() {
+        let calls = std::sync::Mutex::new(Vec::new());
+        let response = resolve_modrinth_batch(
+            vec!["alias".into(), "owner".into(), "missing".into()],
+            vec!["chosenA".into(), "chosenB".into(), "bad-version".into()],
+            |id| {
+                calls.lock().unwrap().push(format!("project:{id}"));
+                std::future::ready(if id == "missing" {
+                    Err(anyhow::anyhow!("missing project"))
+                } else {
+                    Ok(project())
+                })
+            },
+            |id| {
+                calls.lock().unwrap().push(format!("version:{id}"));
+                std::future::ready(if id == "bad-version" {
+                    Err(anyhow::anyhow!("missing version"))
+                } else {
+                    Ok(version(id))
+                })
+            },
+        )
+        .await;
+        assert_eq!(response.results.len(), 3);
+        assert_eq!(
+            response
+                .results
+                .iter()
+                .map(|r| r.requested_version_id.as_deref())
+                .collect::<Vec<_>>(),
+            vec![None, Some("chosenA"), Some("chosenB")]
+        );
+        assert!(response.results.iter().all(|r| r.id == "owner"));
+        assert_eq!(response.errors.len(), 2);
+        assert!(response.errors.iter().any(|e| e.contains("missing")));
+        assert!(response.errors.iter().any(|e| e.contains("bad-version")));
+        assert!(
+            !calls
+                .lock()
+                .unwrap()
+                .iter()
+                .any(|c| c == "project:chosenA" || c == "project:chosenB")
+        );
+    }
+    #[tokio::test]
+    async fn task21_version_owner_mismatch_or_missing_owner_is_explicit() {
+        let result = resolve_modrinth_batch(
+            Vec::new(),
+            vec!["chosen".into()],
+            |_| std::future::ready(Err(anyhow::anyhow!("missing owner"))),
+            |id| std::future::ready(Ok(version(id))),
+        )
+        .await;
+        assert!(result.results.is_empty());
+        assert!(result.errors[0].contains("chosen"));
+        let result = resolve_modrinth_batch(
+            Vec::new(),
+            vec!["chosen".into()],
+            |_| {
+                let mut p = project();
+                p.id = "foreign".into();
+                std::future::ready(Ok(p))
+            },
+            |id| std::future::ready(Ok(version(id))),
+        )
+        .await;
+        assert!(result.results.is_empty());
+        assert!(result.errors[0].contains("owner"));
+    }
+    #[tokio::test]
+    async fn task21_category_maps_and_independent_errors_cover_all_provider_outcomes() {
+        for cf_ok in [false, true] {
+            for mr_ok in [false, true] {
+                let cf: carbon_platforms::curseforge::Category=serde_json::from_value(serde_json::json!({"id":1,"name":"healthy CF","slug":"healthy","url":"synthetic","dateModified":"fixture","classId":4471})).unwrap();
+                let mr = carbon_platforms::modrinth::tag::Category {
+                    icon: None,
+                    name: "healthy MR".into(),
+                    project_type: ProjectType::Modpack,
+                    header: "fixture".into(),
+                };
+                let response = resolve_categories(
+                    std::future::ready(if cf_ok {
+                        Ok(carbon_platforms::curseforge::CurseForgeResponse {
+                            data: vec![cf],
+                            pagination: None,
+                        })
+                    } else {
+                        Err(anyhow::anyhow!("CF offline"))
+                    }),
+                    std::future::ready(if mr_ok {
+                        Ok(carbon_platforms::modrinth::responses::CategoriesResponse(
+                            vec![mr],
+                        ))
+                    } else {
+                        Err(anyhow::anyhow!("MR offline"))
+                    }),
+                )
+                .await
+                .unwrap();
+                assert_eq!(response.curseforge.len(), usize::from(cf_ok));
+                assert_eq!(response.modrinth.len(), usize::from(mr_ok));
+                assert_eq!(response.curseforge_error.is_some(), !cf_ok);
+                assert_eq!(response.modrinth_error.is_some(), !mr_ok);
+                if mr_ok {
+                    assert!(response.modrinth.contains_key("modpack:healthy MR"));
+                }
+            }
         }
     }
 }

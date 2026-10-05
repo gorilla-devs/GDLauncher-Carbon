@@ -1,6 +1,7 @@
 import { Show, Switch, Match, Accessor } from "solid-js"
 import { Trans } from "@gd/i18n"
 import type { worldVersionCopy } from "../worldVersionCopy"
+import type { InstalledArtifact } from "@/utils/installedAddon"
 import {
   Button,
   Tooltip,
@@ -16,7 +17,7 @@ interface InstallButtonProps {
   isInstalled: () => boolean
   instanceLocked: () => boolean
   fileId?: number | string
-  installedMod: () => any
+  installedMod: () => InstalledArtifact | undefined
   onDownload: () => void
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
