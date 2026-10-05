@@ -29,6 +29,8 @@ import RowsContainer from "./components/RowsContainer"
 import { useModal } from "@/managers/ModalsManager"
 import { manualCheckForUpdates, isCheckingForUpdates } from "@/utils/updater"
 import { formatBytes } from "@/utils/formatBytes"
+import { createRestart } from "@/utils/restartApp"
+import { createResolutionDraft } from "./resolutionDraft"
 
 const General = () => {
   const routeData = useSettingsGeneralData()
@@ -50,6 +52,22 @@ const General = () => {
   const settingsMutation = rspc.createMutation(() => ({
     mutationKey: ["settings.setSettings"]
   }))
+  const { queryClient } = rspc.useContext()
+  const resolution = createResolutionDraft({
+    read: () => routeData.data.data?.gameResolution,
+    save: (value) =>
+      settingsMutation.mutateAsync({ gameResolution: { Set: value } }),
+    refresh: async (owns) => {
+      await queryClient.cancelQueries({
+        queryKey: ["settings.getSettings"],
+        exact: true
+      })
+      if (!owns()) return undefined
+      const result = await routeData.data.refetch({ cancelRefetch: true })
+      if (!result.isSuccess || !result.data) throw result.error
+      return result.data.gameResolution
+    }
+  })
 
   // Per-scope cache sizes — gdlauncher (db + temp + logs) and minecraft
   // (assets + libraries + natives). Walks dirs once on the backend; the
@@ -99,10 +117,11 @@ const General = () => {
   }
 
   const gameResolutionDropdownKey = () => {
-    if (!settings.gameResolution) return "default"
+    const value = resolution.draft()
+    if (!value) return "default"
 
-    if (settings.gameResolution.type === "Standard") {
-      const gameResolution = settings.gameResolution.value.join("x")
+    if (value.type === "Standard") {
+      const gameResolution = value.value.join("x")
       return `Standard:${gameResolution}`
     }
 
@@ -234,11 +253,7 @@ const General = () => {
                     }
                   }
 
-                  settingsMutation.mutate({
-                    gameResolution: {
-                      Set: value
-                    }
-                  })
+                  resolution.publish(value)
                 }}
                 options={["default", ...templateGameResolution(), "custom"]}
                 itemComponent={(props) => (
@@ -256,7 +271,7 @@ const General = () => {
                 </SelectTrigger>
                 <SelectContent />
               </Select>
-              <Show when={settings.gameResolution?.type === "Custom"}>
+              <Show when={resolution.draft()?.type === "Custom"}>
                 <div class="flex flex-col gap-4">
                   <div class="flex items-center justify-end gap-4">
                     <div>
@@ -265,19 +280,9 @@ const General = () => {
                     <Input
                       class="w-24"
                       type="number"
-                      value={settings?.gameResolution?.value[0]}
+                      value={resolution.draft()?.value[0]}
                       onChange={(e) => {
-                        settingsMutation.mutate({
-                          gameResolution: {
-                            Set: {
-                              type: "Custom",
-                              value: [
-                                parseInt(e.currentTarget.value, 10),
-                                settings?.gameResolution?.value[1]!
-                              ]
-                            }
-                          }
-                        })
+                        resolution.coordinate(0, e.currentTarget.value)
                       }}
                     />
                   </div>
@@ -288,23 +293,18 @@ const General = () => {
                     <Input
                       class="w-24"
                       type="number"
-                      value={settings?.gameResolution?.value[1]}
+                      value={resolution.draft()?.value[1]}
                       onChange={(e) => {
-                        settingsMutation.mutate({
-                          gameResolution: {
-                            Set: {
-                              type: "Custom",
-                              value: [
-                                settings?.gameResolution?.value[0]!,
-                                parseInt(e.currentTarget.value, 10)
-                              ]
-                            }
-                          }
-                        })
+                        resolution.coordinate(1, e.currentTarget.value)
                       }}
                     />
                   </div>
                 </div>
+              </Show>
+              <Show when={resolution.error()}>
+                <Button disabled={resolution.busy()} onClick={resolution.retry}>
+                  <Trans key="general:_trn_retry" />
+                </Button>
               </Show>
             </div>
           </RightHandSide>

@@ -27,6 +27,11 @@ export class AnimationControllerImpl implements AnimationController {
   private backButtonAnimation: Animation | null = null
   private skipButtonAnimation: Animation | null = null
 
+  private footerIntent = {
+    backButton: { generation: 0, visible: undefined as boolean | undefined },
+    skipButton: { generation: 0, visible: undefined as boolean | undefined }
+  }
+
   constructor(private reducedMotion: boolean) {}
 
   // ============================================================================
@@ -298,133 +303,8 @@ export class AnimationControllerImpl implements AnimationController {
   // ============================================================================
 
   backButton = {
-    /**
-     * Animate back button into view
-     */
-    show: async (): Promise<void> => {
-      // Guard: Already shown or showing
-      if (
-        this.backButtonState === "shown" ||
-        this.backButtonState === "showing"
-      ) {
-        return
-      }
-
-      // Reduced motion still applies the final visible geometry
-      if (this.reducedMotion) {
-        const element = this.refs.backButton
-        if (!element) return
-        this.backButtonAnimation?.cancel()
-        this.backButtonAnimation = null
-        element.style.width = "60%"
-        element.style.margin = "0 1rem 0 0"
-        this.backButtonState = "shown"
-        return
-      }
-
-      await this.waitForRefs()
-
-      const element = this.refs.backButton
-      if (!element) {
-        console.warn("[AnimationController] backButton ref not found")
-        return
-      }
-
-      // Cancel any in-flight animation
-      if (this.backButtonAnimation) {
-        this.backButtonAnimation.cancel()
-        this.backButtonAnimation = null
-      }
-
-      this.backButtonState = "showing"
-
-      this.backButtonAnimation = element.animate(
-        [
-          { width: "0", margin: "0" },
-          { width: "60%", margin: "0 1rem 0 0" }
-        ],
-        {
-          duration: 300,
-          easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-          fill: "forwards"
-        }
-      )
-
-      await this.backButtonAnimation.finished
-        .then(() => {
-          this.backButtonState = "shown"
-          this.backButtonAnimation = null
-        })
-        .catch((err) => {
-          // Animation was cancelled
-          if (err.name === "AbortError") {
-            // Silently handle cancellation
-          }
-          this.backButtonAnimation = null
-        })
-    },
-
-    /**
-     * Animate back button out of view
-     */
-    hide: async (): Promise<void> => {
-      // Guard: Already hidden or hiding
-      if (
-        this.backButtonState === "hidden" ||
-        this.backButtonState === "hiding"
-      ) {
-        return
-      }
-
-      // Guard: Reduced motion
-      if (this.reducedMotion) {
-        const element = this.refs.backButton
-        if (!element) return
-        this.backButtonAnimation?.cancel()
-        this.backButtonAnimation = null
-        element.style.width = "0"
-        element.style.margin = "0"
-        this.backButtonState = "hidden"
-        return
-      }
-
-      await this.waitForRefs()
-
-      const element = this.refs.backButton
-      if (!element) return
-
-      // Cancel any in-flight animation
-      if (this.backButtonAnimation) {
-        this.backButtonAnimation.cancel()
-        this.backButtonAnimation = null
-      }
-
-      this.backButtonState = "hiding"
-
-      this.backButtonAnimation = element.animate(
-        [
-          { width: "60%", margin: "0 1rem 0 0" },
-          { width: "0", margin: "0" }
-        ],
-        {
-          duration: 300,
-          easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-          fill: "forwards"
-        }
-      )
-
-      await this.backButtonAnimation.finished
-        .then(() => {
-          this.backButtonState = "hidden"
-          this.backButtonAnimation = null
-        })
-        .catch((err) => {
-          if (err.name === "AbortError") {
-            // Silently handle cancellation
-          }
-          this.backButtonAnimation = null
-        })
-    }
+    show: (): Promise<void> => this.animateFooter("backButton", true),
+    hide: (): Promise<void> => this.animateFooter("backButton", false)
   }
 
   // ============================================================================
@@ -432,132 +312,93 @@ export class AnimationControllerImpl implements AnimationController {
   // ============================================================================
 
   skipButton = {
-    /**
-     * Animate skip button into view
-     */
-    show: async (): Promise<void> => {
-      // Guard: Already shown or showing
-      if (
-        this.skipButtonState === "shown" ||
-        this.skipButtonState === "showing"
-      ) {
-        return
-      }
+    show: (): Promise<void> => this.animateFooter("skipButton", true),
+    hide: (): Promise<void> => this.animateFooter("skipButton", false)
+  }
 
-      // Reduced motion still applies the final visible geometry
-      if (this.reducedMotion) {
-        const element = this.refs.skipButton
-        if (!element) return
-        this.skipButtonAnimation?.cancel()
-        this.skipButtonAnimation = null
-        element.style.width = "40%"
-        element.style.margin = "0"
-        this.skipButtonState = "shown"
-        return
-      }
+  private async animateFooter(
+    name: "backButton" | "skipButton",
+    visible: boolean
+  ): Promise<void> {
+    const intent = this.footerIntent[name]
+    const stateKey =
+      name === "backButton" ? "backButtonState" : "skipButtonState"
+    const animationKey =
+      name === "backButton" ? "backButtonAnimation" : "skipButtonAnimation"
+    const finalState = visible ? "shown" : "hidden"
+    if (
+      intent.visible === visible ||
+      (intent.visible === undefined && this[stateKey] === finalState)
+    )
+      return
 
-      await this.waitForRefs()
+    // Accept opposing intent before waiting: rendered state alone cannot
+    // establish ownership while an older request is still waiting for refs.
+    const generation = ++intent.generation
+    intent.visible = visible
+    const owns = () =>
+      intent.generation === generation && intent.visible === visible
+    const predecessor = this[animationKey]
+    if (predecessor) {
+      predecessor.cancel()
+      if (owns() && this[animationKey] === predecessor)
+        this[animationKey] = null
+    }
 
-      const element = this.refs.skipButton
+    const width = name === "backButton" ? "60%" : "40%"
+    const margin = name === "backButton" ? "0 1rem 0 0" : "0"
+    if (this.reducedMotion) {
+      const element = this.refs[name]
       if (!element) {
-        console.warn("[AnimationController] skipButton ref not found")
+        if (owns()) intent.visible = undefined
         return
       }
+      element.style.width = visible ? width : "0"
+      element.style.margin = visible ? margin : "0"
+      this[stateKey] = finalState
+      return
+    }
 
-      // Cancel any in-flight animation
-      if (this.skipButtonAnimation) {
-        this.skipButtonAnimation.cancel()
-        this.skipButtonAnimation = null
+    // Revoking a show that never started needs no hide animation.
+    if (this[stateKey] === finalState && !predecessor) return
+    await this.waitForRefs()
+    if (!owns()) return
+    const element = this.refs[name]
+    if (!element) {
+      intent.visible = undefined
+      if (visible) console.warn(`[AnimationController] ${name} ref not found`)
+      return
+    }
+
+    this[stateKey] = visible ? "showing" : "hiding"
+    const animation = element.animate(
+      visible
+        ? [
+            { width: "0", margin: "0" },
+            { width, margin }
+          ]
+        : [
+            { width, margin },
+            { width: "0", margin: "0" }
+          ],
+      {
+        duration: 300,
+        easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+        fill: "forwards"
       }
-
-      this.skipButtonState = "showing"
-
-      this.skipButtonAnimation = element.animate(
-        [
-          { width: "0", margin: "0" },
-          { width: "40%", margin: "0" }
-        ],
-        {
-          duration: 300,
-          easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-          fill: "forwards"
-        }
-      )
-
-      await this.skipButtonAnimation.finished
-        .then(() => {
-          this.skipButtonState = "shown"
-          this.skipButtonAnimation = null
-        })
-        .catch((err) => {
-          // Animation was cancelled
-          if (err.name === "AbortError") {
-            // Silently handle cancellation
-          }
-          this.skipButtonAnimation = null
-        })
-    },
-
-    /**
-     * Animate skip button out of view
-     */
-    hide: async (): Promise<void> => {
-      // Guard: Already hidden or hiding
-      if (
-        this.skipButtonState === "hidden" ||
-        this.skipButtonState === "hiding"
-      ) {
-        return
-      }
-
-      // Guard: Reduced motion
-      if (this.reducedMotion) {
-        const element = this.refs.skipButton
-        if (!element) return
-        this.skipButtonAnimation?.cancel()
-        this.skipButtonAnimation = null
-        element.style.width = "0"
-        element.style.margin = "0"
-        this.skipButtonState = "hidden"
-        return
-      }
-
-      await this.waitForRefs()
-
-      const element = this.refs.skipButton
-      if (!element) return
-
-      // Cancel any in-flight animation
-      if (this.skipButtonAnimation) {
-        this.skipButtonAnimation.cancel()
-        this.skipButtonAnimation = null
-      }
-
-      this.skipButtonState = "hiding"
-
-      this.skipButtonAnimation = element.animate(
-        [
-          { width: "40%", margin: "0" },
-          { width: "0", margin: "0" }
-        ],
-        {
-          duration: 300,
-          easing: "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
-          fill: "forwards"
-        }
-      )
-
-      await this.skipButtonAnimation.finished
-        .then(() => {
-          this.skipButtonState = "hidden"
-          this.skipButtonAnimation = null
-        })
-        .catch((err) => {
-          if (err.name === "AbortError") {
-            // Silently handle cancellation
-          }
-          this.skipButtonAnimation = null
-        })
+    )
+    this[animationKey] = animation
+    const ownsAnimation = () =>
+      intent.generation === generation && this[animationKey] === animation
+    try {
+      await animation.finished
+      if (ownsAnimation()) this[stateKey] = finalState
+    } catch {
+      // Cancellation is expected. Only a current failure releases its intent;
+      // an older AbortError must leave replacement state and handle untouched.
+      if (ownsAnimation()) intent.visible = undefined
+    } finally {
+      if (ownsAnimation()) this[animationKey] = null
     }
   }
 
