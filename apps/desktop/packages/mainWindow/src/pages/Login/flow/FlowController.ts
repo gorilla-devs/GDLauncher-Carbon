@@ -23,7 +23,7 @@ import type { rspc } from "@/utils/rspcClient"
 
 type RSPCContext = ReturnType<typeof rspc.useContext>
 
-function extractErrorDisplay(error: unknown): string {
+export function extractErrorDisplay(error: unknown): string {
   if (!(error instanceof Error)) return "Failed to check account"
   try {
     let parsed = JSON.parse(error.message) as {

@@ -7,60 +7,13 @@ use thiserror::Error;
 
 pub struct SkinManager {}
 
+#[cfg(test)]
+mod task20_tests;
+
 impl ManagerRef<'_, SkinManager> {
     /// Load an account skin from the DB, or download it if not cached.
     pub async fn get_skin(self, uuid: String) -> anyhow::Result<Skin> {
-        use carbon_repos::repos::{account as account_repo, skin as skin_repo};
-
-        let account = account_repo::get_account(&self.app.db, &uuid)
-            .await?
-            .ok_or_else(|| GetSkinError::AccountDoesNotExist(uuid.clone()))?;
-
-        let skin_id = match account.skin_id.as_ref() {
-            Some(x) => x.clone(),
-            None => DefaultSkin::from_uuid(uuid.clone()).skin_id().to_string(),
-        };
-
-        let cached_skin = skin_repo::get_skin(&self.app.db, &skin_id).await?;
-
-        Ok(match cached_skin {
-            Some(skin) => Skin { data: skin.skin },
-            None => {
-                let skin = match account.access_token.as_ref() {
-                    Some(token) => super::api::get_profile(&self.app.reqwest_client, token)
-                        .await
-                        .ok()
-                        .map(Result::ok)
-                        .flatten()
-                        .map(|profile| profile.skin)
-                        // use the default if there is no skin or an error occured.
-                        .flatten()
-                        .unwrap_or_else(|| DefaultSkin::from_uuid(uuid.clone()).make_api_skin()),
-                    None => DefaultSkin::from_uuid(uuid.clone()).make_api_skin(),
-                };
-
-                let skin_data = self
-                    .app
-                    .reqwest_client
-                    .get(&skin.url)
-                    .send()
-                    .await?
-                    .bytes()
-                    .await?;
-
-                skin_repo::replace_skin_and_link_account(
-                    &self.app.db,
-                    skin.id.clone(),
-                    skin_data.to_vec(),
-                    uuid,
-                )
-                .await?;
-
-                Skin {
-                    data: skin_data.to_vec(),
-                }
-            }
-        })
+        get_skin(&self.app.db, &self.app.reqwest_client, uuid).await
     }
 
     pub async fn make_head(self, uuid: String) -> anyhow::Result<Vec<u8>> {
@@ -70,19 +23,126 @@ impl ManagerRef<'_, SkinManager> {
     }
 }
 
-fn stitch_head(image: &[u8]) -> anyhow::Result<Vec<u8>> {
-    use image::imageops::*;
+async fn get_skin(
+    db: &carbon_repos::db_exec::Db,
+    client: &reqwest_middleware::ClientWithMiddleware,
+    uuid: String,
+) -> anyhow::Result<Skin> {
+    use carbon_repos::repos::{account as account_repo, skin as skin_repo};
+    let account = account_repo::get_account(db, &uuid)
+        .await?
+        .ok_or_else(|| GetSkinError::AccountDoesNotExist(uuid.clone()))?;
+    let default = DefaultSkin::from_uuid(uuid.clone());
+    let skin_id = account.skin_id.as_deref().unwrap_or(default.skin_id());
+    if let Some(data) = validated_cache(db, skin_id).await? {
+        return Ok(Skin { data });
+    }
 
-    let reader = image::io::Reader::new(Cursor::new(image))
-        .with_guessed_format()
-        .expect("cursor io cannot fail");
+    let preserve_custom = account
+        .skin_id
+        .as_deref()
+        .is_some_and(|id| id != "STEVE" && id != "ALEX");
+    let selected = match account.access_token.as_ref() {
+        Some(token) => super::api::get_profile(client, token)
+            .await
+            .ok()
+            .and_then(Result::ok)
+            .and_then(|profile| profile.skin),
+        None => None,
+    }
+    .unwrap_or_else(|| default.make_api_skin());
 
-    let image = reader.decode()?;
+    let fetched = match validated_cache(db, &selected.id).await? {
+        Some(data) => Ok(data),
+        None => download_skin(client, &selected).await,
+    };
+    let data = match fetched {
+        Ok(data) => data,
+        // Recovery is display-only. Never relink a custom account to a default
+        // just because its origin is temporarily unavailable.
+        Err(error) if preserve_custom => {
+            let data = match validated_cache(db, default.skin_id()).await? {
+                Some(data) => data,
+                None => match download_skin(client, &default.make_api_skin()).await {
+                    Ok(data) => data,
+                    Err(_) => return Err(error),
+                },
+            };
+            skin_repo::cache_skin(db, default.skin_id(), &data).await?;
+            return Ok(Skin { data });
+        }
+        Err(error) => return Err(error),
+    };
+    if preserve_custom && (selected.id == "STEVE" || selected.id == "ALEX") {
+        skin_repo::cache_skin(db, &selected.id, &data).await?;
+    } else {
+        skin_repo::replace_skin_and_link_account(db, selected.id, data.clone(), uuid).await?;
+    }
+    Ok(Skin { data })
+}
 
+async fn validated_cache(
+    db: &carbon_repos::db_exec::Db,
+    id: &str,
+) -> anyhow::Result<Option<Vec<u8>>> {
+    use carbon_repos::repos::skin;
+    let Some(row) = skin::get_skin(db, id).await? else {
+        return Ok(None);
+    };
+    if validate_skin(&row.skin).await.is_ok() {
+        return Ok(Some(row.skin));
+    }
+    if skin::evict_skin_if_unchanged(db, id, &row.skin).await? == 0 {
+        // Another writer repaired it after our read. Recheck once, never evict
+        // bytes we have not observed and never recurse through damaged defaults.
+        if let Some(current) = skin::get_skin(db, id).await? {
+            if validate_skin(&current.skin).await.is_ok() {
+                return Ok(Some(current.skin));
+            }
+        }
+    }
+    Ok(None)
+}
+
+async fn download_skin(
+    client: &reqwest_middleware::ClientWithMiddleware,
+    skin: &ApiSkin,
+) -> anyhow::Result<Vec<u8>> {
+    let response = client
+        .get(&skin.url)
+        .header("avoid-caching", "true")
+        .send()
+        .await?
+        .error_for_status()?;
+    ensure!(
+        response.status().is_success(),
+        "skin request returned {}",
+        response.status()
+    );
+    let data = response.bytes().await?.to_vec();
+    validate_skin(&data).await?;
+    Ok(data)
+}
+
+async fn validate_skin(data: &[u8]) -> anyhow::Result<()> {
+    carbon_scheduler::cpu_block(|| decode_skin(data).map(|_| ())).await
+}
+
+fn decode_skin(data: &[u8]) -> anyhow::Result<image::DynamicImage> {
+    let image = image::io::Reader::new(Cursor::new(data))
+        .with_guessed_format()?
+        .decode()?;
     ensure!(
         image.width() == 64 && (image.height() == 64 || image.height() == 32),
         "cannot stitch head from unsupported skin image"
     );
+    Ok(image)
+}
+
+fn stitch_head(image: &[u8]) -> anyhow::Result<Vec<u8>> {
+    use image::imageops::*;
+
+    let image = decode_skin(image)?;
 
     let head = image.view(8, 8, 8, 8);
     let hat_front = image.view(40, 8, 8, 8);

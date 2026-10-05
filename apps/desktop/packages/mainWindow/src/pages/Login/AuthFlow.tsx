@@ -30,7 +30,7 @@ import type { AuthFlowConfig, AuthStep, AuthFlowState } from "./flow/types"
 import { WelcomeStep } from "./steps/WelcomeStep"
 import { TermsStep } from "./steps/TermsStep"
 import { AuthMethodStep } from "./steps/AuthMethodStep"
-import { EnrollingStep } from "./steps/EnrollingStep"
+import { EnrollingBranch } from "./steps/EnrollingStep"
 import { ProfileCreationStep } from "./steps/ProfileCreationStep"
 import { GdlAccountStep } from "./steps/GdlAccountStep"
 import { GdlAccountFormStep } from "./steps/GdlAccountFormStep"
@@ -857,9 +857,7 @@ function AuthFlowContent() {
                   <AuthMethodStep />
                 </Match>
 
-                <Match when={getStepAs("enrolling")}>
-                  {(step) => <EnrollingStep step={step()} />}
-                </Match>
+                <EnrollingBranch step={getStepAs("enrolling")} />
 
                 <Match when={getStepAs("profile-creation")}>
                   {(step) => (

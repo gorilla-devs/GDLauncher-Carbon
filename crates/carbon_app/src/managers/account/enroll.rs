@@ -276,8 +276,6 @@ impl EnrollmentTask {
                 }
 
                 // Wait for authorization code (5 minute timeout)
-                let code = oauth_handle.wait_for_code(Duration::from_secs(300)).await?;
-
                 // Exchange authorization code for access token
                 #[derive(serde::Deserialize)]
                 struct TokenResponse {
@@ -287,8 +285,15 @@ impl EnrollmentTask {
                     expires_in: i64,
                 }
 
-                info!("Exchanging authorization code for access token");
-                let token_response = client
+                let ms_auth = exchange_browser_code(
+                    oauth_handle.wait_for_code(Duration::from_secs(300)),
+                    |code| {
+                        let client = &client;
+                        let redirect_uri = &redirect_uri;
+                        let code_verifier = &code_verifier;
+                        async move {
+                            info!("Exchanging authorization code for access token");
+                            let token_response = client
                     .post(endpoints::ms_token_url())
                     .form(&[
                         ("client_id", env!("MS_AUTH_CLIENT_ID")),
@@ -310,12 +315,17 @@ impl EnrollmentTask {
                     .await
                     .map_err(|e| anyhow!("Failed to parse token response: {}", e))?;
 
-                let ms_auth = MsAuth {
-                    access_token: token_response.access_token,
-                    id_token: token_response.id_token,
-                    refresh_token: token_response.refresh_token,
-                    expires_at: Utc::now() + chrono::Duration::seconds(token_response.expires_in),
-                };
+                            Ok(MsAuth {
+                                access_token: token_response.access_token,
+                                id_token: token_response.id_token,
+                                refresh_token: token_response.refresh_token,
+                                expires_at: Utc::now()
+                                    + chrono::Duration::seconds(token_response.expires_in),
+                            })
+                        }
+                    },
+                )
+                .await?;
 
                 // Shutdown the OAuth server
                 oauth_handle.shutdown().await;
@@ -376,15 +386,7 @@ impl EnrollmentTask {
                 Ok(())
             };
 
-            match task().await {
-                Ok(()) => {}
-                Err(EnrollmentErrorOrAnyhow::EnrollmentError(e)) => {
-                    update_status(EnrollmentStatus::Failed(Ok(e))).await
-                }
-                Err(EnrollmentErrorOrAnyhow::Anyhow(e)) => {
-                    update_status(EnrollmentStatus::Failed(Err(e))).await
-                }
-            };
+            publish_browser_result(&task_status, &invalidate, task().await).await;
         };
 
         Self::spawn(status, task).0
@@ -511,6 +513,30 @@ impl EnrollmentTask {
 
         Self::spawn(status, task)
     }
+}
+
+pub(super) async fn exchange_browser_code<W, X, F>(waiter: W, exchange: X) -> anyhow::Result<MsAuth>
+where
+    W: std::future::Future<Output = anyhow::Result<String>>,
+    X: FnOnce(String) -> F,
+    F: std::future::Future<Output = anyhow::Result<MsAuth>>,
+{
+    // A terminal callback error stops here, before constructing a token request.
+    exchange(waiter.await?).await
+}
+
+pub(super) async fn publish_browser_result(
+    status: &RwLock<EnrollmentStatus>,
+    invalidate: &impl InvalidateCtx,
+    result: Result<(), EnrollmentErrorOrAnyhow>,
+) {
+    let failure = match result {
+        Ok(()) => return,
+        Err(EnrollmentErrorOrAnyhow::EnrollmentError(error)) => Ok(error),
+        Err(EnrollmentErrorOrAnyhow::Anyhow(error)) => Err(error),
+    };
+    *status.write().await = EnrollmentStatus::Failed(failure);
+    invalidate.invalidate().await;
 }
 
 impl Drop for EnrollmentTask {

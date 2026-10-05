@@ -435,6 +435,23 @@ impl EnrollmentStatus {
     }
 }
 
+#[cfg(test)]
+mod task20_tests {
+    use super::*;
+    #[test]
+    fn provider_denial_is_a_query_error_with_display_details() {
+        let status = account::EnrollmentStatus::Failed(Err(anyhow::anyhow!(
+            "access_denied: Cancelled by user"
+        )));
+        let Err(error) = EnrollmentStatus::from_backend("synthetic-flow", &status) else {
+            panic!("provider denial unexpectedly became enrollment data");
+        };
+        let json = serde_json::to_string(&error).unwrap();
+        assert!(json.contains("access_denied: Cancelled by user"));
+        assert!(!json.contains("DeviceCodeExpired"));
+    }
+}
+
 impl From<account::api::DeviceCode> for DeviceCode {
     fn from(value: account::api::DeviceCode) -> Self {
         Self {

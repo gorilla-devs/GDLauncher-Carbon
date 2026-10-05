@@ -6,10 +6,10 @@ use axum::{
     routing::get,
 };
 use serde::{Deserialize, Serialize};
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 use tokio::{
     net::TcpListener,
-    sync::{RwLock, oneshot},
+    sync::{oneshot, watch},
     time::{Duration, timeout},
 };
 use tracing::{debug, error, info, warn};
@@ -18,7 +18,7 @@ use tracing::{debug, error, info, warn};
 /// protection) and the slot to receive the authorization code.
 #[derive(Clone)]
 struct CallbackState {
-    code: Arc<RwLock<Option<String>>>,
+    code: watch::Sender<Option<Result<String, ProviderDenied>>>,
     expected_state: String,
 }
 
@@ -27,7 +27,7 @@ struct CallbackState {
 /// Section 7.3 - Loopback Interface Redirection.
 pub struct OAuthCallbackServer {
     /// The authorization code received from the OAuth callback
-    code: Arc<RwLock<Option<String>>>,
+    code: watch::Sender<Option<Result<String, ProviderDenied>>>,
     /// Expected `state` parameter value (RFC 6749 §10.12 CSRF protection)
     expected_state: String,
     /// Sender to signal when the code has been received
@@ -40,7 +40,7 @@ impl OAuthCallbackServer {
     /// compared on callback (CSRF defence).
     pub fn new(expected_state: String) -> Self {
         Self {
-            code: Arc::new(RwLock::new(None)),
+            code: watch::channel(None).0,
             expected_state,
             shutdown_tx: None,
         }
@@ -127,7 +127,7 @@ impl OAuthCallbackServer {
 
 /// Handle to the running OAuth callback server
 pub struct OAuthCallbackHandle {
-    code: Arc<RwLock<Option<String>>>,
+    code: watch::Sender<Option<Result<String, ProviderDenied>>>,
     local_addr: SocketAddr,
     server_task: tokio::task::JoinHandle<()>,
     _shutdown_tx: Option<oneshot::Sender<()>>,
@@ -153,16 +153,14 @@ impl OAuthCallbackHandle {
     ///
     /// Returns Ok(code) if received within timeout, Err otherwise
     pub async fn wait_for_code(&self, timeout_duration: Duration) -> Result<String> {
+        let mut outcome = self.code.subscribe();
         let result = timeout(timeout_duration, async {
-            // Poll for code every 500ms
             loop {
-                {
-                    let code_lock = self.code.read().await;
-                    if let Some(code) = code_lock.as_ref() {
-                        return Ok(code.clone());
-                    }
+                let current = outcome.borrow_and_update().clone();
+                if let Some(result) = current {
+                    return result.map_err(anyhow::Error::from);
                 }
-                tokio::time::sleep(Duration::from_millis(500)).await;
+                outcome.changed().await?;
             }
         })
         .await;
@@ -198,6 +196,26 @@ struct OAuthCallbackQuery {
     error: Option<String>,
     error_description: Option<String>,
     state: Option<String>,
+}
+
+#[derive(Clone, Debug, thiserror::Error)]
+#[error("{error}: {description}")]
+pub(super) struct ProviderDenied {
+    pub error: String,
+    pub description: String,
+}
+
+fn publish_outcome(
+    storage: &watch::Sender<Option<Result<String, ProviderDenied>>>,
+    result: Result<String, ProviderDenied>,
+) {
+    storage.send_if_modified(|current| {
+        if current.is_some() {
+            return false;
+        }
+        *current = Some(result);
+        true
+    });
 }
 
 /// OAuth callback handler - receives the authorization code from Microsoft
@@ -236,13 +254,21 @@ async fn oauth_callback(
             .unwrap_or_else(|| "Unknown error".to_string());
         error!("OAuth callback error: {} - {}", error, description);
 
+        publish_outcome(
+            &code_storage,
+            Err(ProviderDenied {
+                error: error.clone(),
+                description: description.clone(),
+            }),
+        );
+
         return Html(error_page(&error, &description));
     }
 
     // Extract authorization code
     if let Some(code) = params.code {
         // Store the code
-        *code_storage.write().await = Some(code);
+        publish_outcome(&code_storage, Ok(code));
 
         info!("OAuth authorization code received successfully");
         Html(success_page())
@@ -285,6 +311,9 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
     }
     diff == 0
 }
+
+#[cfg(test)]
+mod task20_tests;
 
 #[cfg(test)]
 mod tests {

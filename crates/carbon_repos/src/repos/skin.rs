@@ -14,6 +14,13 @@ pub struct SkinRow {
 queries! {
     fn get_skin(id: &str) -> Option<SkinRow> =
         "SELECT id, skin FROM Skin WHERE id = :id";
+    // A slow corrupt reader must not remove a concurrent healthy replacement.
+    fn evict_skin_if_unchanged(id: &str, observed: &[u8]) -> usize =
+        "DELETE FROM Skin WHERE id = :id AND skin = :observed";
+    // Transient default recovery caches validated bytes without changing the
+    // account's custom skin identity (and therefore without suppressing retry).
+    fn cache_skin(id: &str, skin: &[u8]) -> usize =
+        "INSERT INTO Skin (id, skin) VALUES (:id, :skin) ON CONFLICT(id) DO UPDATE SET skin = excluded.skin";
 }
 
 /// The three statements executed by `replace_skin_and_link_account`, kept as
