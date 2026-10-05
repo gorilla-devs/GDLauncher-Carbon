@@ -19,6 +19,9 @@ export function GdlAccountVerificationStep(
   const [resendCooldown, setResendCooldown] = createSignal(0)
   const [isResending, setIsResending] = createSignal(false)
 
+  let active = true
+  let pollGeneration = 0
+  let resendGeneration = 0
   let abortController: AbortController | null = null
   let cooldownInterval: ReturnType<typeof setInterval> | undefined
 
@@ -31,46 +34,55 @@ export function GdlAccountVerificationStep(
   }))
 
   const startVerificationPolling = async () => {
-    if (abortController) {
-      abortController.abort()
-      abortController = null
-    }
-
-    abortController = new AbortController()
+    if (!active) return
+    // Revoke A before aborting it; its rejection must never clear B's slot.
+    const generation = ++pollGeneration
+    const previous = abortController
+    abortController = null
+    previous?.abort()
+    const controller = new AbortController()
+    abortController = controller
+    const ownsPoll = () =>
+      active &&
+      pollGeneration === generation &&
+      abortController === controller &&
+      !controller.signal.aborted
+    const uuid = props.step.uuid
     setIsVerifying(true)
 
     try {
       const response = await apiFetch(
-        `/account/awaitForAccountVerification?uuid=${encodeURIComponent(props.step.uuid)}`,
-        {
-          signal: abortController.signal
-        }
+        `/account/awaitForAccountVerification?uuid=${encodeURIComponent(uuid)}`,
+        { signal: controller.signal }
       )
-
+      if (!ownsPoll()) return
       if (response.ok) {
         const result = await response.text()
+        if (!ownsPoll()) return
         if (result === "ok") {
-          await saveGdlAccountMutation.mutateAsync(props.step.uuid)
+          // Cleanup can prevent dispatch, but cannot retract a live save that
+          // has already been accepted by the backend.
+          await saveGdlAccountMutation.mutateAsync(uuid)
+          if (!ownsPoll()) return
           toast.success("Email verified successfully!")
           await flow.exitFlow("library", flow.data.isFirstLaunch)
           return
         }
       }
-      setIsVerifying(false)
-      abortController = null
+      if (ownsPoll()) setIsVerifying(false)
     } catch (error) {
-      if ((error as Error).name === "AbortError") {
-        abortController = null
-        return
-      }
+      if (!ownsPoll() || (error as Error).name === "AbortError") return
       console.error("[GdlAccountVerificationStep] Polling error:", error)
       setIsVerifying(false)
-      abortController = null
+    } finally {
+      if (ownsPoll()) abortController = null
     }
   }
 
   const handleResend = async () => {
-    if (resendCooldown() > 0 || isResending()) return
+    if (!active || resendCooldown() > 0 || isResending()) return
+    const generation = ++resendGeneration
+    const ownsResend = () => active && resendGeneration === generation
 
     setIsResending(true)
 
@@ -84,12 +96,14 @@ export function GdlAccountVerificationStep(
         props.step.uuid
       )
 
+      if (!ownsResend()) return
       if (result.status === "success") {
         toast.success("Verification email sent")
         startVerificationPolling()
       } else if (result.status === "failed" && result.value) {
         setResendCooldown(result.value)
         cooldownInterval = setInterval(() => {
+          if (!ownsResend()) return
           setResendCooldown((prev) => {
             if (prev <= 1) {
               if (cooldownInterval) {
@@ -103,10 +117,11 @@ export function GdlAccountVerificationStep(
         }, 1000)
       }
     } catch (error) {
+      if (!ownsResend()) return
       console.error("[GdlAccountVerificationStep] Resend error:", error)
       toast.error("Failed to resend verification email")
     } finally {
-      setIsResending(false)
+      if (ownsResend()) setIsResending(false)
     }
   }
 
@@ -115,6 +130,9 @@ export function GdlAccountVerificationStep(
   })
 
   onCleanup(() => {
+    active = false
+    ++pollGeneration
+    ++resendGeneration
     if (abortController) {
       abortController.abort()
       abortController = null

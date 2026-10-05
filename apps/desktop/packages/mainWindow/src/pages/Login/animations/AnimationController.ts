@@ -310,8 +310,14 @@ export class AnimationControllerImpl implements AnimationController {
         return
       }
 
-      // Guard: Reduced motion - just set state
+      // Reduced motion still applies the final visible geometry
       if (this.reducedMotion) {
+        const element = this.refs.backButton
+        if (!element) return
+        this.backButtonAnimation?.cancel()
+        this.backButtonAnimation = null
+        element.style.width = "60%"
+        element.style.margin = "0 1rem 0 0"
         this.backButtonState = "shown"
         return
       }
@@ -372,6 +378,12 @@ export class AnimationControllerImpl implements AnimationController {
 
       // Guard: Reduced motion
       if (this.reducedMotion) {
+        const element = this.refs.backButton
+        if (!element) return
+        this.backButtonAnimation?.cancel()
+        this.backButtonAnimation = null
+        element.style.width = "0"
+        element.style.margin = "0"
         this.backButtonState = "hidden"
         return
       }
@@ -432,8 +444,14 @@ export class AnimationControllerImpl implements AnimationController {
         return
       }
 
-      // Guard: Reduced motion - just set state
+      // Reduced motion still applies the final visible geometry
       if (this.reducedMotion) {
+        const element = this.refs.skipButton
+        if (!element) return
+        this.skipButtonAnimation?.cancel()
+        this.skipButtonAnimation = null
+        element.style.width = "40%"
+        element.style.margin = "0"
         this.skipButtonState = "shown"
         return
       }
@@ -494,6 +512,12 @@ export class AnimationControllerImpl implements AnimationController {
 
       // Guard: Reduced motion
       if (this.reducedMotion) {
+        const element = this.refs.skipButton
+        if (!element) return
+        this.skipButtonAnimation?.cancel()
+        this.skipButtonAnimation = null
+        element.style.width = "0"
+        element.style.margin = "0"
         this.skipButtonState = "hidden"
         return
       }

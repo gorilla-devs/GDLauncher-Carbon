@@ -136,6 +136,7 @@ function ExpandedPanel(props: {
         </span>
         <div class="flex items-center gap-2">
           <div
+            inert={!props.hasActiveFilters}
             class="transition-opacity duration-150"
             classList={{
               "opacity-100 pointer-events-auto": props.hasActiveFilters,
@@ -285,6 +286,7 @@ export function FilterSidebar() {
 
   return (
     <div
+      inert={!searchResults?.sidebarReady()}
       class="relative shrink-0"
       classList={{
         "opacity-0": !searchResults?.sidebarReady(),
@@ -297,6 +299,7 @@ export function FilterSidebar() {
     >
       {/* === COLLAPSED ICON STRIP (visible when undocked) === */}
       <div
+        inert={isDocked()}
         class="absolute inset-y-0 left-0 border-darkSlate-700/50 h-full w-12 border-r transition-opacity duration-200"
         classList={{
           "opacity-100 pointer-events-auto": !isDocked(),
@@ -310,6 +313,7 @@ export function FilterSidebar() {
 
       {/* === DOCKED PANEL (visible when docked) === */}
       <div
+        inert={!isDocked()}
         class="border-darkSlate-700/50 relative h-full border-r transition-opacity duration-200"
         classList={{
           "opacity-100 pointer-events-auto": isDocked(),
@@ -326,6 +330,7 @@ export function FilterSidebar() {
 
       {/* === FLYOUT OVERLAY (slides in on hover when undocked) === */}
       <div
+        inert={!showOverlay()}
         ref={flyoutRef}
         class="border-darkSlate-700/50 absolute inset-y-0 left-0 z-50 overflow-hidden border-r shadow-xl shadow-black/40 transition-[transform,opacity] duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
         classList={{

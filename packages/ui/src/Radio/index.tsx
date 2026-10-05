@@ -4,7 +4,7 @@ import {
   Switch,
   Match,
   For,
-  splitProps,
+  createUniqueId,
   createSignal
 } from "solid-js"
 import { Button } from "../Button"
@@ -16,6 +16,8 @@ interface Props {
   onChange?: OnChange
   buttonStyle?: ButtonStyle
   allowDeselect?: boolean
+  /** Shared by choices in one logical group; distinct panel copies use distinct names. */
+  name?: string
   children?: JSX.Element
 }
 
@@ -33,19 +35,13 @@ interface GroupProps {
   value?: string | number | string[] | undefined
   buttonStyle?: ButtonStyle
   options: Option[]
+  name?: string
 }
 
-let nextId = 1
-
 const Radio = (props: Props) => {
-  const [local, otherProps] = splitProps(props, [
-    "buttonStyle",
-    "onChange",
-    "allowDeselect"
-  ])
   const [isHovered, setIsHovered] = createSignal(false) // Track hover state
 
-  const id = `radio-${nextId++}`
+  const id = `radio-${createUniqueId()}`
 
   // Determine base and conditional classes based on buttonStyle
   const baseClasses = `relative flex gap-2 items-center w-full rounded-md px-1.5 py-1 ${PRESS_CLASSES_LIGHT}`
@@ -55,32 +51,66 @@ const Radio = (props: Props) => {
     <>
       <input
         type="radio"
-        class="hidden"
-        {...otherProps}
+        class={props.buttonStyle === "button" ? "hidden" : "peer sr-only"}
+        name={props.name ?? id}
+        value={
+          typeof props.value === "string" || typeof props.value === "number"
+            ? props.value
+            : undefined
+        }
         checked={props.checked}
         id={id}
+        onChange={() => {
+          if (props.buttonStyle !== "button") props.onChange?.(props.value)
+        }}
+        onClick={() => {
+          if (
+            props.buttonStyle !== "button" &&
+            props.allowDeselect &&
+            props.checked
+          ) {
+            props.onChange?.(props.value)
+          }
+        }}
+        onKeyDown={(event) => {
+          if (
+            props.buttonStyle !== "button" &&
+            props.allowDeselect &&
+            props.checked &&
+            event.key === " "
+          ) {
+            event.preventDefault()
+            props.onChange?.(props.value)
+          }
+        }}
       />
       <label
         for={id}
-        class={`${baseClasses} cursor-pointer`}
+        class={`${baseClasses} cursor-pointer peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-primary-500`}
         classList={{
           "hover:bg-darkSlate-700": !props.checked,
           "bg-darkSlate-600": props.checked
         }}
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
-        onClick={() => {
-          if (props.allowDeselect || !props.checked) {
-            local?.onChange?.(props.value)
+        onClick={(event) => {
+          if (
+            props.buttonStyle === "button" ||
+            (props.allowDeselect && props.checked)
+          ) {
+            // Prevent the label's forwarded native click from calling twice.
+            event.preventDefault()
+            if (props.allowDeselect || !props.checked)
+              props.onChange?.(props.value)
           }
         }}
       >
-        <Show when={local?.buttonStyle === "button"}>
+        <Show when={props.buttonStyle === "button"}>
           <Button type={props.checked ? "primary" : "secondary"}>
             {props.children}
           </Button>
         </Show>
-        <Show when={local?.buttonStyle !== "button"}>
+        <Show when={props.buttonStyle !== "button"}>
           <div
             class={`flex justify-center items-center box-border transition-colors ${indicatorBaseClasses} ${
               props.checked
@@ -104,6 +134,7 @@ const Radio = (props: Props) => {
 }
 
 const Group = (props: GroupProps) => {
+  const name = `radio-group-${createUniqueId()}`
   return (
     <Switch>
       <Match when={props.buttonStyle === "button"}>
@@ -111,6 +142,7 @@ const Group = (props: GroupProps) => {
           <For each={props.options}>
             {(option) => (
               <Radio
+                name={props.name ?? name}
                 value={option.value}
                 checked={props.value === option.value}
                 onChange={props.onChange}
@@ -126,6 +158,7 @@ const Group = (props: GroupProps) => {
         <For each={props.options}>
           {(option) => (
             <Radio
+              name={props.name ?? name}
               value={option.value}
               checked={props.value === option.value}
               onChange={props.onChange}

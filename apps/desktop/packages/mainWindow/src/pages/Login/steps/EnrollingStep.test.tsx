@@ -50,6 +50,7 @@ afterEach(() => {
   dispose = undefined
   document.body.textContent = ""
   vi.restoreAllMocks()
+  vi.useRealTimers()
 })
 function fixture(method: "browser" | "device-code" = "browser") {
   const waiting = {
@@ -270,5 +271,98 @@ describe("Task20 actual enrollment error presentation", () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(root.textContent).not.toContain("obsolete retry error")
+  })
+})
+
+// Task28 uses the production effects and Task20 query-owner seam with an inert cache.
+describe("Task28 absolute enrollment deadlines", () => {
+  it.each(["browser", "device-code"] as const)(
+    "GPT-0124 %s expires when the clock skips the final window",
+    async (method) => {
+      vi.useFakeTimers()
+      vi.setSystemTime(99000)
+      const { root, setData } = fixture(method)
+      const deadline = new Date(101250).toISOString()
+      setData(
+        method === "browser"
+          ? {
+              waitingForBrowser: {
+                expires_at: deadline,
+                auth_url: "https://synthetic.invalid"
+              }
+            }
+          : {
+              pollingCode: {
+                expiresAt: deadline,
+                userCode: "code",
+                verificationUri: "https://synthetic.invalid"
+              }
+            }
+      )
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+      expect(root.textContent).toContain("0:01")
+      expect(root.textContent).not.toContain("try_again")
+      vi.setSystemTime(101000)
+      vi.advanceTimersByTime(1000)
+      await Promise.resolve()
+      expect(root.textContent).toContain("try_again")
+      expect(root.textContent).not.toContain("-1")
+      setData(
+        method === "browser"
+          ? {
+              waitingForBrowser: {
+                expires_at: new Date(110000).toISOString(),
+                auth_url: "https://synthetic.invalid"
+              }
+            }
+          : {
+              pollingCode: {
+                expiresAt: new Date(110000).toISOString(),
+                userCode: "fresh",
+                verificationUri: "https://synthetic.invalid"
+              }
+            }
+      )
+      await Promise.resolve()
+      expect(root.textContent).not.toContain("try_again")
+    }
+  )
+  it.each([0, 500, -750])(
+    "GPT-0124 known deadline offset %s expires immediately",
+    async (offset) => {
+      vi.useFakeTimers()
+      vi.setSystemTime(100000)
+      const { root, setData } = fixture()
+      setData({
+        waitingForBrowser: {
+          expires_at: new Date(100000 + offset).toISOString(),
+          auth_url: "https://synthetic.invalid"
+        }
+      })
+      await Promise.resolve()
+      expect(root.textContent).toContain("try_again")
+    }
+  )
+  it("non-timed and invalid deadlines do not expire, and disposal revokes timers", async () => {
+    vi.useFakeTimers()
+    const { root, setData } = fixture()
+    setData("xboxAuth")
+    vi.advanceTimersByTime(1000)
+    await Promise.resolve()
+    expect(root.textContent).not.toContain("try_again")
+    setData({
+      waitingForBrowser: {
+        expires_at: "invalid",
+        auth_url: "https://synthetic.invalid"
+      }
+    })
+    vi.advanceTimersByTime(1000)
+    await Promise.resolve()
+    expect(root.textContent).not.toContain("NaN")
+    expect(root.textContent).not.toContain("try_again")
+    dispose!()
+    dispose = undefined
+    expect(vi.getTimerCount()).toBe(0)
   })
 })

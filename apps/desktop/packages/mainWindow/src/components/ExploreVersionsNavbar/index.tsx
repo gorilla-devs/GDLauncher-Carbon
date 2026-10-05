@@ -13,19 +13,10 @@ import {
   SelectItem,
   SelectValue
 } from "@gd/ui"
-import { useSearchParams } from "@solidjs/router"
-import {
-  Match,
-  Show,
-  Switch,
-  createEffect,
-  createMemo,
-  createSignal
-} from "solid-js"
+import { Match, Show, Switch, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
-import { rspc } from "@/utils/rspcClient"
 import { useInfiniteVersionsQuery } from "../InfiniteScrollVersionsQueryWrapper"
-import { getInstanceImageUrl } from "@/utils/instances"
+import { getInstanceImageUrl, getServerImageUrl } from "@/utils/instances"
 import { useGlobalStore } from "../GlobalStoreContext"
 
 const mapTypeToColor = (type: McType) => {
@@ -56,14 +47,6 @@ interface Props {
 }
 
 const ExploreVersionsNavbar = (props: Props) => {
-  const [searchParams, _setSearchParams] = useSearchParams<{
-    instanceId: string
-  }>()
-  const instanceId = (): number | null => {
-    if (!searchParams.instanceId) return null
-    const id = parseInt(searchParams.instanceId, 10)
-    return isNaN(id) ? null : id
-  }
   const globalStore = useGlobalStore()
 
   const infiniteQuery = useInfiniteVersionsQuery()
@@ -77,9 +60,24 @@ const ExploreVersionsNavbar = (props: Props) => {
       : true
   }
 
-  const [overrideEnabled, setOverrideEnabled] = createSignal(
-    instanceId() === null
-  )
+  const filtersDisabled = () =>
+    !infiniteQuery.targetReady || !infiniteQuery.overrideEnabled
+  const filterHandlers = createMemo(() => {
+    const setQuery = infiniteQuery.setQuery
+    return {
+      gameVersion: (val: string | null) =>
+        setQuery({ gameVersion: val || null }),
+      modLoaderType: (val: string | null) =>
+        setQuery({ modLoaderType: val || null })
+    }
+  })
+  const targetImage = () => {
+    const target = infiniteQuery.target
+    if (!target.iconRevision || target.id === undefined) return DefaultImg
+    return target.kind === "server"
+      ? getServerImageUrl(target.id, target.iconRevision)
+      : getInstanceImageUrl(target.id, target.iconRevision)
+  }
 
   const [gameVersionFilters, _setGameVersionFilters] = createStore({
     snapshot: false,
@@ -87,51 +85,33 @@ const ExploreVersionsNavbar = (props: Props) => {
     oldBeta: false
   })
 
-  const instanceDetails = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceDetails", instanceId()]
-  }))
-
   // Supported modloaders in GDLauncher
   const SUPPORTED_MODLOADERS = ["forge", "fabric", "quilt", "neoforge"]
 
   const modloaders = () => {
     // Only offer the loaders the addon actually supports (falling back to all when the
     // addon doesn't report any). The default selection is set in
-    // InfiniteScrollVersionsQueryWrapper based on instance
+    // InfiniteScrollVersionsQueryWrapper based on the current target.
     const supported = props.supportedModloaders
-    if (!supported?.length) return ["", ...SUPPORTED_MODLOADERS]
-
-    return [
-      "",
-      ...SUPPORTED_MODLOADERS.filter((loader) =>
-        supported.includes(loader as FEUnifiedModLoaderType)
-      )
-    ]
+    const options = !supported?.length
+      ? ["", ...SUPPORTED_MODLOADERS]
+      : [
+          "",
+          ...SUPPORTED_MODLOADERS.filter((loader) =>
+            supported.includes(loader as FEUnifiedModLoaderType)
+          )
+        ]
+    const current = infiniteQuery.query.modLoaderType
+    // Keep a target default visible even when the addon has no matching files.
+    return current && !options.includes(current)
+      ? [...options, current]
+      : options
   }
 
   const getModloaderLabel = (value: string | null | undefined) => {
     if (!value) return "All modloaders"
     return value
   }
-
-  // The instance-derived defaults can be unsupported by this addon (e.g. a Forge
-  // instance opening a Fabric-only mod). Left as-is they'd filter every version out
-  // and render a blank selector, so reset such values to "all" once the addon's
-  // supported sets are known.
-  createEffect(() => {
-    const loader = infiniteQuery.query.modLoaderType
-    if (loader && !modloaders().includes(loader)) {
-      infiniteQuery.setQuery({ modLoaderType: null })
-    }
-  })
-
-  createEffect(() => {
-    const supported = props.supportedGameVersions
-    const gameVersion = infiniteQuery.query.gameVersion
-    if (gameVersion && supported?.length && !supported.includes(gameVersion)) {
-      infiniteQuery.setQuery({ gameVersion: null })
-    }
-  })
 
   const filteredGameVersions = createMemo(() => {
     const snapshot = gameVersionFilters.snapshot
@@ -154,7 +134,14 @@ const ExploreVersionsNavbar = (props: Props) => {
   })
 
   const filteredMappedGameVersions = () => {
-    return ["", ...(filteredGameVersions() || []).map((item) => item.id)]
+    const options = [
+      "",
+      ...(filteredGameVersions() || []).map((item) => item.id)
+    ]
+    const current = infiniteQuery.query.gameVersion
+    return current && !options.includes(current)
+      ? [...options, current]
+      : options
   }
 
   const getGameVersionLabel = (versionId: string | null | undefined) => {
@@ -176,35 +163,33 @@ const ExploreVersionsNavbar = (props: Props) => {
   return (
     <div class="mb-4 flex h-12 gap-4">
       <Switch>
-        <Match when={instanceId() !== null}>
+        <Match when={infiniteQuery.target.kind !== "none"}>
           <div class="flex gap-2">
             <div
               class="h-full w-12 flex-1"
               style={{
-                "background-image": instanceDetails.data?.iconRevision
-                  ? `url("${getInstanceImageUrl(
-                      instanceId()!,
-                      instanceDetails.data?.iconRevision
-                    )}")`
-                  : `url("${DefaultImg}")`,
-                "background-size": instanceDetails.data?.iconRevision
+                "background-image": `url("${targetImage()}")`,
+                "background-size": infiniteQuery.target.iconRevision
                   ? "cover"
                   : "120%"
               }}
             />
             <div class="flex flex-col justify-between">
-              <div>{instanceDetails.data?.name}</div>
+              <div>{infiniteQuery.target.name}</div>
               <div class="text-lightSlate-700 flex gap-2">
                 <Checkbox
-                  checked={overrideEnabled()}
-                  onChange={setOverrideEnabled}
+                  checked={infiniteQuery.overrideEnabled}
+                  disabled={!infiniteQuery.targetReady}
+                  onChange={infiniteQuery.setOverrideEnabled}
                 />
                 <Trans key="instances:_trn_rowcontainer.override_filters" />
               </div>
             </div>
           </div>
         </Match>
-        <Match when={props.type === "mod" && instanceId() === null}>
+        <Match
+          when={props.type === "mod" && infiniteQuery.target.kind === "none"}
+        >
           <div class="text-lightSlate-700 flex items-center">
             <Trans key="instances:_trn_rowcontainer.no_instance_selected" />
           </div>
@@ -214,7 +199,7 @@ const ExploreVersionsNavbar = (props: Props) => {
         <Select
           value={infiniteQuery.query.gameVersion || ""}
           options={filteredMappedGameVersions()}
-          disabled={!overrideEnabled()}
+          disabled={filtersDisabled()}
           gutter={4}
           sameWidth={true}
           placement="bottom"
@@ -226,11 +211,7 @@ const ExploreVersionsNavbar = (props: Props) => {
               <Trans key="enums:_trn_minecraft_all_versions" />
             </div>
           }
-          onChange={(val) => {
-            infiniteQuery?.setQuery({
-              gameVersion: val || null
-            })
-          }}
+          onChange={filterHandlers().gameVersion}
           itemComponent={(props) => (
             <SelectItem item={props.item}>
               {getGameVersionLabel(props.item.rawValue)}
@@ -255,7 +236,7 @@ const ExploreVersionsNavbar = (props: Props) => {
           <Select
             value={infiniteQuery.query.modLoaderType || ""}
             options={modloaders()}
-            disabled={!overrideEnabled()}
+            disabled={filtersDisabled()}
             gutter={4}
             sameWidth={true}
             placement="bottom"
@@ -269,11 +250,7 @@ const ExploreVersionsNavbar = (props: Props) => {
                 </span>
               </div>
             }
-            onChange={(val) => {
-              infiniteQuery?.setQuery({
-                modLoaderType: val || null
-              })
-            }}
+            onChange={filterHandlers().modLoaderType}
             itemComponent={(props) => (
               <SelectItem item={props.item}>
                 {getModloaderLabel(props.item.rawValue)}

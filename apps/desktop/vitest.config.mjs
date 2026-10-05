@@ -11,6 +11,8 @@ export default defineConfig({
       "packages/mainWindow/src/pages/Login/steps/EnrollingStep.test.tsx",
       "packages/mainWindow/src/pages/Login/steps/EnrollingStep.queryOwnership.test.tsx",
       "**/*.task21.test.{ts,tsx}",
+      // Controlled Solid/jsdom Task28 entry: vitest.task28.config.mjs.
+      "**/*.task28.test.{ts,tsx}",
       "**/node_modules/**",
       "**/dist/**",
       "e2e-tests/**/*.spec.ts",

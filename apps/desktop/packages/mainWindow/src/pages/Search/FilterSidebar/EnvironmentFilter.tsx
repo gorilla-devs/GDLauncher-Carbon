@@ -1,3 +1,4 @@
+import { createUniqueId } from "solid-js"
 import { Collapsable, Radio } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import useSearchContext from "@/components/SearchInputContext"
@@ -5,6 +6,7 @@ import { capitalize } from "@/utils/helpers"
 
 export function EnvironmentFilter() {
   const searchResults = useSearchContext()
+  const radioName = `environmentfilter-${createUniqueId()}`
 
   const handleSelect = (value: string | number | string[] | undefined) => {
     const env = value as "server" | "client"
@@ -41,6 +43,7 @@ export function EnvironmentFilter() {
     >
       <div class="flex flex-col px-2">
         <Radio
+          name={radioName}
           value="server"
           checked={searchResults?.searchQuery().environment === "server"}
           onChange={handleSelect}
@@ -52,6 +55,7 @@ export function EnvironmentFilter() {
           </div>
         </Radio>
         <Radio
+          name={radioName}
           value="client"
           checked={searchResults?.searchQuery().environment === "client"}
           onChange={handleSelect}

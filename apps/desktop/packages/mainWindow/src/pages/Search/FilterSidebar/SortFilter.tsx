@@ -1,6 +1,6 @@
 import { Collapsable, Radio } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
-import { Show, Switch, Match, For } from "solid-js"
+import { Show, Switch, Match, For, createUniqueId } from "solid-js"
 import useSearchContext from "@/components/SearchInputContext"
 import { capitalize } from "@/utils/helpers"
 
@@ -25,6 +25,7 @@ const MR_SORT_OPTIONS = [
 
 function CurseforgeSortFilter() {
   const searchResults = useSearchContext()
+  const radioName = `sort-${createUniqueId()}`
 
   const currentFilters = () => {
     const filters = searchResults?.searchQuery().platformFilters
@@ -61,6 +62,7 @@ function CurseforgeSortFilter() {
           <For each={CF_SORT_FIELDS}>
             {(option) => (
               <Radio
+                name={`${radioName}-field`}
                 value={option.value}
                 checked={currentFilters().sort_field === option.value}
                 allowDeselect
@@ -91,6 +93,7 @@ function CurseforgeSortFilter() {
           <For each={[...CF_ORDER_OPTIONS]}>
             {(value) => (
               <Radio
+                name={`${radioName}-order`}
                 value={value}
                 checked={currentFilters().sort_order === value}
                 allowDeselect
@@ -114,6 +117,7 @@ function CurseforgeSortFilter() {
 
 function ModrinthSortFilter() {
   const searchResults = useSearchContext()
+  const radioName = `sort-${createUniqueId()}`
 
   const currentFilters = () => {
     const filters = searchResults?.searchQuery().platformFilters
@@ -143,6 +147,7 @@ function ModrinthSortFilter() {
       <For each={MR_SORT_OPTIONS}>
         {(option) => (
           <Radio
+            name={radioName}
             value={option.value}
             checked={currentFilters().sort_index === option.value}
             allowDeselect

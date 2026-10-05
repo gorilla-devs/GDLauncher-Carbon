@@ -2,7 +2,16 @@ import {
   createInfiniteQuery,
   UseInfiniteQueryResult
 } from "@tanstack/solid-query"
-import { createContext, useContext, createSignal, createEffect } from "solid-js"
+import {
+  createContext,
+  useContext,
+  createSignal,
+  createEffect,
+  createMemo,
+  batch,
+  untrack,
+  onCleanup
+} from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { useSearchParams } from "@solidjs/router"
 import useVersionsQuery from "@/pages/Mods/useVersionsQuery"
@@ -16,13 +25,20 @@ const supportsModloader = (type?: FEUnifiedSearchType) => {
   return type ? !noModloaderTypes.includes(type) : true
 }
 
-/** The instance scope a version list is filtered by. `undefined` on either
+/** The target scope a version list is filtered by. `undefined` on either
  *  field means "no filter", which is what an addon page opened outside any
- *  instance legitimately resolves to — distinct from the scope not being
- *  known yet, which `InstanceScope | undefined` carries instead. */
-interface InstanceScope {
+ *  target legitimately resolves to — distinct from the scope not being
+ *  known yet, which `TargetScope | undefined` carries instead. */
+interface TargetScope {
   modLoaderType: string | null | undefined
   gameVersion: string | null | undefined
+}
+
+interface VersionTarget {
+  kind: "none" | "instance" | "server"
+  id?: number
+  name?: string
+  iconRevision?: string | number | null
 }
 
 /** Treats every "no filter" spelling as one value. This module resolves a
@@ -63,6 +79,11 @@ interface InfiniteQueryType {
   infiniteQuery: UseInfiniteQueryResult<any, unknown>
   query: typeof versionsQuery
   isLoading: boolean
+  target: VersionTarget
+  targetReady: boolean
+  defaults: TargetScope | undefined
+  overrideEnabled: boolean
+  setOverrideEnabled: (enabled: boolean) => void
   setQuery: (_newValue: Partial<typeof versionsQuery>) => void
   allRows: () => VersionRowTypeData[]
   ref: () => VirtualizerHandle | null
@@ -87,28 +108,64 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const rspcContext = rspc.useContext()
   const [searchParams, _setSearchParams] = useSearchParams<{
     instanceId: string
+    serverId: string
   }>()
   const searchContext = useSearchContext()
   const [ref, setRef] = createSignal<VirtualizerHandle | null>(null)
 
-  /** The instance scope this page's versions must be filtered by, once known.
+  /** The target scope this page's versions must be filtered by, once known.
    *  Gates the query below — see `enabled`. */
-  const [scope, setScope] = createSignal<InstanceScope | undefined>(undefined)
+  const [scope, setScope] = createSignal<TargetScope | undefined>(undefined)
+  const [defaults, setDefaults] = createSignal<TargetScope>()
+  const [targetDetails, setTargetDetails] = createSignal<VersionTarget>()
+  const [overrideEnabled, setOverrideEnabled] = createSignal(false)
+  const [settledGeneration, setSettledGeneration] = createSignal(0)
+  let generation = 0
+  let active = true
+  let resolutionIdentity: string | undefined
+  let selectedTarget: string | undefined
+  let defaultsResetPending = false
+
+  const selection = createMemo(() => {
+    const parseId = (value: string | undefined) => {
+      const id = parseInt(value ?? "", 10)
+      return Number.isNaN(id) ? undefined : id
+    }
+    const instanceId = parseId(searchParams.instanceId)
+    const serverId =
+      instanceId === undefined ? parseId(searchParams.serverId) : undefined
+    const loaderSupported = supportsModloader(props.addonType)
+    const target: VersionTarget =
+      instanceId !== undefined
+        ? { kind: "instance", id: instanceId }
+        : serverId !== undefined
+          ? { kind: "server", id: serverId }
+          : { kind: "none" }
+    const key = target.kind === "none" ? "none" : `${target.kind}:${target.id}`
+    return {
+      target,
+      instanceId,
+      serverId,
+      loaderSupported,
+      key,
+      identity: `${key}:${loaderSupported}`
+    }
+  })
+  const targetReady = () =>
+    active &&
+    settledGeneration() !== 0 &&
+    settledGeneration() === generation &&
+    selection().identity === resolutionIdentity
+  const canWrite = (owner: number, identity: string) =>
+    targetReady() && owner === generation && identity === selection().identity
+
+  onCleanup(() => {
+    active = false
+    ++generation
+  })
 
   const infiniteQuery = createInfiniteQuery(() => ({
-    /* The scope belongs in the key, not just in the request. `queryFn` filters
-       by the instance's loader and game version, so two instances asking about
-       the same mod get genuinely different answers — but keyed on the mod
-       alone they shared one cache entry. Opening a mod from a 1.12.2 Forge
-       instance after viewing it from a 1.20.1 Fabric one served the Fabric
-       list from cache, and because `enabled` stays false until this instance's
-       scope resolves, no corrected request was in flight behind it: the list
-       a user could click Install on was the other instance's. Keying by scope
-       makes a different instance a different entry, so the worst case is an
-       empty list while the scope resolves rather than a wrong one.
-
-       The `removeQueries` calls below still match: they pass this key's prefix,
-       and TanStack matches prefixes unless told to be exact. */
+    // Target/default and deliberate filter scopes have distinct cache entries.
     queryKey: [
       "modplatforms.versions",
       props.modId,
@@ -116,6 +173,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       scope()
     ],
     queryFn: async (ctx) => {
+      const filters = ctx.queryKey[3] as TargetScope
+
       // Only set index for CurseForge, Modrinth doesn't use pagination
       if (props.modplatform === "curseforge") {
         setVersionsQuery({
@@ -138,8 +197,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
           query: {
             index: versionsQuery.index,
             pageSize: versionsQuery.pageSize,
-            gameVersion: versionsQuery.gameVersion,
-            modLoaderType: versionsQuery.modLoaderType as any
+            gameVersion: filters.gameVersion,
+            modLoaderType: filters.modLoaderType as any
           }
         }
 
@@ -175,12 +234,10 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
 
         const queryParams = {
           project_id: props.modId,
-          game_versions: versionsQuery.gameVersion
-            ? [versionsQuery.gameVersion]
+          game_versions: filters.gameVersion
+            ? [filters.gameVersion]
             : undefined,
-          loaders: versionsQuery.modLoaderType
-            ? [versionsQuery.modLoaderType]
-            : undefined
+          loaders: filters.modLoaderType ? [filters.modLoaderType] : undefined
         }
 
         const response = await rspcContext.client.query([
@@ -229,97 +286,125 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
 
       return (hasNextPage && index + pageSize) || null
     },
-    /* Gated on the resolved scope, not just the id. `queryFn` reads its
-       filters off `versionsQuery` when it runs rather than from the query
-       key, so firing before the instance's loader and game version are known
-       sends an *unfiltered* request — measured live at 1165 versions for
-       Fabric API against an instance that matches 27 — and renders every one
-       of them until a second, scoped request replaces the list underneath
-       whoever is already clicking it. */
-    enabled: !!props.modId && scope() !== undefined
+    // Resolve the current target before exposing an installable version list.
+    enabled: !!props.modId && targetReady() && scope() !== undefined
   }))
 
-  const setQueryWrapper = (newValue: Partial<typeof versionsQuery>) => {
-    setVersionsQuery(newValue)
+  const publishFilters = (
+    newValue: Partial<typeof versionsQuery>,
+    owner: number,
+    identity: string
+  ) => {
+    if (!canWrite(owner, identity)) return
+    batch(() => {
+      setVersionsQuery(newValue)
+      setScope({
+        gameVersion: versionsQuery.gameVersion,
+        modLoaderType: versionsQuery.modLoaderType
+      })
+    })
+    if (!canWrite(owner, identity)) return
     rspcContext.queryClient.removeQueries({
       queryKey: ["modplatforms.versions", props.modId, props.modplatform]
     })
-    infiniteQuery.refetch()
-  }
-
-  /**
-   * Applies the instance scope resolved by the effect below.
-   *
-   * Separate from `setQueryWrapper` — which backs the context's `setQuery`
-   * and runs when a user actually changes a filter — because this runs on
-   * every pass of a reactive effect, and `removeQueries` drops the cached
-   * pages, which unmounts every row. Doing that for a scope that did not
-   * change is what let a click land on a detached row: `props.addonType`
-   * arrives from a query, so the effect below runs at least twice per page
-   * open, and on an addon page opened outside an instance both passes
-   * resolve to the very same empty scope.
-   */
-  const applyScope = (next: InstanceScope) => {
-    const current = scope()
-    if (
-      current &&
-      sameFilter(current.modLoaderType, next.modLoaderType) &&
-      sameFilter(current.gameVersion, next.gameVersion)
-    ) {
-      return
-    }
-
-    // Before `setScope`, so the store `queryFn` reads is already current by
-    // the time flipping `enabled` lets the query run.
-    setVersionsQuery({
-      modLoaderType: next.modLoaderType,
-      gameVersion: next.gameVersion
-    })
-
-    const firstResolution = current === undefined
-    setScope(next)
-
-    // That first resolution flips `enabled` true, which fires the initial
-    // request by itself — refetching here too would duplicate it.
-    if (firstResolution) return
-
-    rspcContext.queryClient.removeQueries({
-      queryKey: ["modplatforms.versions", props.modId, props.modplatform]
-    })
-    infiniteQuery.refetch()
+    if (canWrite(owner, identity)) infiniteQuery.refetch()
   }
 
   createEffect(() => {
-    const _instanceId = parseInt(searchParams.instanceId ?? "", 10)
-    const instanceId = isNaN(_instanceId) ? undefined : _instanceId
-    const addonType = props.addonType
-
+    const { target, instanceId, serverId, loaderSupported, key, identity } =
+      selection()
     searchContext?.setSelectedInstanceId(instanceId)
-
-    if (instanceId !== undefined) {
-      rspcContext.client
-        .query(["instance.getInstanceDetails", instanceId])
-        .then((details) => {
-          applyScope({
-            modLoaderType: supportsModloader(addonType)
-              ? // `?.` on the element: a vanilla instance has no modloaders,
-                // and bare indexing of the empty array would throw straight
-                // into the `catch` below, losing the game-version filter too.
-                details?.modloaders[0]?.type_
-              : undefined,
-            gameVersion: details?.version
+    searchContext?.setSelectedServerId(serverId)
+    if (identity === resolutionIdentity) return
+    const targetChanged = selectedTarget !== key
+    // The selected target owes restoration across superseding lookups.
+    if (targetChanged) defaultsResetPending = true
+    selectedTarget = key
+    resolutionIdentity = identity
+    const owner = ++generation
+    untrack(() => {
+      // A new target must not retain an installable old list while resolving.
+      setSettledGeneration(0)
+      setScope(undefined)
+      setTargetDetails(undefined)
+      // Even an unsettled visit to another target retires deliberate filters.
+      if (targetChanged) setOverrideEnabled(false)
+      const applyScope = (
+        next: TargetScope,
+        details?: Pick<VersionTarget, "name" | "iconRevision">
+      ) => {
+        if (
+          !active ||
+          owner !== generation ||
+          identity !== selection().identity
+        )
+          return
+        const resolvedDefaults = defaults()
+        const changed =
+          defaultsResetPending ||
+          !resolvedDefaults ||
+          !sameFilter(resolvedDefaults.modLoaderType, next.modLoaderType) ||
+          !sameFilter(resolvedDefaults.gameVersion, next.gameVersion)
+        batch(() => {
+          if (changed) {
+            setVersionsQuery(next)
+            setOverrideEnabled(target.kind === "none")
+          }
+          setDefaults(next)
+          setTargetDetails({
+            ...target,
+            name: details?.name,
+            iconRevision: details?.iconRevision
           })
+          // User overrides survive repeat resolution of the same defaults.
+          setScope({
+            modLoaderType: versionsQuery.modLoaderType,
+            gameVersion: versionsQuery.gameVersion
+          })
+          defaultsResetPending = false
+          // Admission is published only after current defaults and filters.
+          setSettledGeneration(owner)
         })
-        .catch((_err) => {
-          // Resolve the scope regardless. It gates the query, so leaving it
-          // unset after a failed lookup would hold the list on its skeleton
-          // forever; an unfiltered list is what this page showed before the
-          // gate existed, and is the right thing to fall back to.
-          applyScope({ modLoaderType: undefined, gameVersion: undefined })
+      }
+      const fallback = () =>
+        applyScope({
+          modLoaderType: undefined,
+          gameVersion: undefined
         })
-    } else {
-      applyScope({ modLoaderType: undefined, gameVersion: undefined })
-    }
+      if (instanceId !== undefined) {
+        rspcContext.client
+          .query(["instance.getInstanceDetails", instanceId])
+          .then((details) =>
+            applyScope(
+              {
+                modLoaderType: loaderSupported
+                  ? details?.modloaders[0]?.type_
+                  : undefined,
+                gameVersion: details?.version
+              },
+              details ?? undefined
+            )
+          )
+          .catch(fallback)
+      } else if (serverId !== undefined) {
+        rspcContext.client
+          .query(["server.getServerDetails", serverId])
+          .then((details) =>
+            applyScope(
+              {
+                modLoaderType: loaderSupported
+                  ? details?.modloaderType
+                  : undefined,
+                gameVersion: details?.gameVersion
+              },
+              details
+            )
+          )
+          .catch(fallback)
+      } else {
+        fallback()
+      }
+    })
   })
 
   const allRows = () =>
@@ -335,9 +420,40 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       // (see `enabled`). Reporting "not loading" there would flash
       // "no versions found" over a list that is about to arrive — the
       // Versions tab picks its skeleton off exactly this flag.
-      return scope() === undefined || infiniteQuery.isLoading
+      return !targetReady() || scope() === undefined || infiniteQuery.isLoading
     },
-    setQuery: setQueryWrapper,
+    get target() {
+      return targetReady() ? targetDetails()! : selection().target
+    },
+    get targetReady() {
+      return targetReady()
+    },
+    get defaults() {
+      return targetReady() ? defaults() : undefined
+    },
+    get overrideEnabled() {
+      return targetReady() && overrideEnabled()
+    },
+    get setQuery() {
+      // Capture authority when a caller obtains its handler. A retained handler
+      // from a pending/previous target cannot acquire a later target's authority.
+      const owner = settledGeneration(),
+        identity = selection().identity
+      return (newValue: Partial<typeof versionsQuery>) => {
+        if (!canWrite(owner, identity) || !overrideEnabled()) return
+        publishFilters(newValue, owner, identity)
+      }
+    },
+    get setOverrideEnabled() {
+      const owner = settledGeneration(),
+        identity = selection().identity
+      return (enabled: boolean) => {
+        if (!canWrite(owner, identity) || selection().target.kind === "none")
+          return
+        setOverrideEnabled(enabled)
+        if (!enabled) publishFilters(defaults()!, owner, identity)
+      }
+    },
     allRows,
     ref,
     setRef

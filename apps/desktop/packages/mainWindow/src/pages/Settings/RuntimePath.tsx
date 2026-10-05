@@ -58,11 +58,29 @@ const RuntimePath = () => {
   })
 
   const [isPathValid] = createResource(
-    () => [runtimePath()] as const,
-    () => {
-      return window.validateRuntimePath(runtimePath()!)
+    () => runtimePath() || false,
+    async (path) => {
+      return { path, classification: await window.validateRuntimePath(path) }
     }
   )
+
+  const currentValidation = () => {
+    // A resource retains its previous value while refreshing. Only a settled,
+    // path-qualified result can authorize this selection.
+    if (isPathValid.state !== "ready") return undefined
+    const result = isPathValid()
+    return result?.path === runtimePath() ? result : undefined
+  }
+  const canApply = () => {
+    const result = currentValidation()
+    return (
+      !!result &&
+      (result.classification === "valid" ||
+        result.classification === "potentially_valid") &&
+      !isChangingRuntimePath() &&
+      currentRuntimePath() !== result.path
+    )
+  }
 
   return (
     <>
@@ -146,26 +164,23 @@ const RuntimePath = () => {
                   class="h-10"
                   size="small"
                   backgroundColor={
-                    isPathValid() === "potentially_valid"
+                    currentValidation()?.classification === "potentially_valid"
                       ? "bg-yellow-900"
                       : undefined
                   }
-                  disabled={
-                    !isPathValid() ||
-                    isPathValid() === "invalid" ||
-                    isChangingRuntimePath() ||
-                    currentRuntimePath() === runtimePath()
-                  }
+                  disabled={!canApply()}
                   loading={isChangingRuntimePath()}
                   onClick={async () => {
+                    if (!canApply()) return
+                    const result = currentValidation()!
                     modalsContext?.openModal(
                       {
                         name: "ConfirmChangeRuntimePath"
                       },
                       {
-                        runtimePath: runtimePath()!,
+                        runtimePath: result.path,
                         isTargetFolderAlreadyUsed:
-                          isPathValid() === "potentially_valid"
+                          result.classification === "potentially_valid"
                       }
                     )
                   }}
@@ -180,13 +195,19 @@ const RuntimePath = () => {
                   </Match>
                   <Match
                     when={
-                      isPathValid() === "valid" ||
-                      isPathValid() === "potentially_valid"
+                      currentValidation()?.classification === "valid" ||
+                      currentValidation()?.classification ===
+                        "potentially_valid"
                     }
                   >
                     <Trans key="ui:_trn_tooltip.apply_and_restart" />
                   </Match>
-                  <Match when={!isPathValid() || isPathValid() === "invalid"}>
+                  <Match
+                    when={
+                      !currentValidation() ||
+                      currentValidation()?.classification === "invalid"
+                    }
+                  >
                     <Trans key="ui:_trn_tooltip.rtp_not_valid" />
                   </Match>
                 </Switch>

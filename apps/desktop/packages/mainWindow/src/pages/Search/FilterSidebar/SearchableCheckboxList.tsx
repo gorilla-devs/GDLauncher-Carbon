@@ -1,6 +1,6 @@
 import { Checkbox } from "@gd/ui"
 import {
-  Index,
+  For,
   Show,
   createSignal,
   createMemo,
@@ -119,9 +119,7 @@ export function SearchableCheckboxList(props: SearchableCheckboxListProps) {
               class="flex flex-col gap-0.5 overflow-y-auto"
               style={{ "max-height": `${maxHeight()}px` }}
             >
-              <Index each={filteredItems()}>
-                {(item) => renderItem(item())}
-              </Index>
+              <For each={filteredItems()}>{renderItem}</For>
             </div>
           }
         >

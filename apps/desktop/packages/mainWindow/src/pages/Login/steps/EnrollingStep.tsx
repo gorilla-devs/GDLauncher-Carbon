@@ -199,45 +199,60 @@ export function EnrollingStep(props: EnrollingStepProps) {
     return s && typeof s === "object" && "pollingCode" in s
   }
 
-  // Timer states - extract expiry based on status variant
-  const expiresAtMs = () => {
-    if (failure()) return 0
+  // A missing deadline is different from a deadline whose remaining time is zero.
+  const expiresAt = () => {
     const s = status()
-    if (!s || typeof s === "string") return 0
-
-    if ("pollingCode" in s) {
-      return new Date(s.pollingCode.expiresAt).getTime() - Date.now()
-    }
-    if ("waitingForBrowser" in s) {
-      return new Date(s.waitingForBrowser.expires_at).getTime() - Date.now()
-    }
-    return 0
+    if (!s || typeof s === "string") return undefined
+    const value =
+      "pollingCode" in s
+        ? s.pollingCode.expiresAt
+        : "waitingForBrowser" in s
+          ? s.waitingForBrowser.expires_at
+          : undefined
+    if (!value) return undefined
+    const deadline = new Date(value).getTime()
+    return Number.isFinite(deadline) ? deadline : undefined
   }
-
-  const minutes = () => msToMinutes(expiresAtMs())
-  const seconds = () => msToSeconds(expiresAtMs())
-  const [countDown, setCountDown] = createSignal(
-    `${minutes()}:${parseTwoDigitNumber(seconds())}`
-  )
+  const [countDown, setCountDown] = createSignal("0:00")
   const [expired, setExpired] = createSignal(false)
 
-  // Reset expired state when expiresAt changes
-  createEffect(() => {
-    const timeRemaining = expiresAtMs()
-    if (timeRemaining > 0) {
-      setExpired(false)
-    }
-  })
-
-  // Update countdown timer
-  const updateExpireTime = () => {
-    const remaining = expiresAtMs()
-    if (remaining > 0 && minutes() <= 0 && seconds() <= 0) {
+  const updateExpireTime = (now = Date.now(), deadline = expiresAt()) => {
+    if (!acceptsStatus()) return
+    const remaining = deadline === undefined ? 0 : Math.max(0, deadline - now)
+    setCountDown(
+      `${msToMinutes(remaining)}:${parseTwoDigitNumber(msToSeconds(remaining))}`
+    )
+    // Preserve the existing final subsecond early-expiry window, including
+    // exact/past deadlines when a backgrounded timer skips that window.
+    if (deadline !== undefined && deadline - now < 1000) setExpired(true)
+    const s = status()
+    if (
+      s &&
+      typeof s === "object" &&
+      "failed" in s &&
+      s.failed.errorType === "deviceCodeExpired"
+    ) {
       setExpired(true)
-    } else {
-      setCountDown(`${minutes()}:${parseTwoDigitNumber(seconds())}`)
     }
   }
+
+  let previousDeadline: number | undefined
+  let previousRevision = ownedRevision()
+  createEffect(() => {
+    const deadline = expiresAt()
+    const revision = ownedRevision()
+    const now = Date.now()
+    if (
+      (deadline !== previousDeadline || revision !== previousRevision) &&
+      deadline !== undefined &&
+      deadline > now
+    ) {
+      setExpired(false)
+    }
+    previousDeadline = deadline
+    previousRevision = revision
+    updateExpireTime(now, deadline)
+  })
 
   // Set up countdown interval
   const interval = setInterval(() => {

@@ -287,6 +287,16 @@ const Changelog = () => {
     if (!routeData.modpackDetails.data) return
     if (!routeData.isCurseforge) {
       if (routeData.modrinthProjectVersions.data) {
+        if (routeData.modrinthProjectVersions.data.length === 0) {
+          // Clearing selection also revokes the previous release's async effect.
+          setFileId(undefined)
+          setChangelog(undefined)
+          setReleaseDate(undefined)
+          setIsLoadingChangelog(false)
+          setOptions([])
+          setOptionLabels({})
+          return
+        }
         setFileId(routeData.modrinthProjectVersions.data[0].id)
         setChangelog(undefined)
         setReleaseDate(undefined)

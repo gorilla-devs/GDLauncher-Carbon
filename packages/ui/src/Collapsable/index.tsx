@@ -77,6 +77,7 @@ const Collapsable = (props: Props) => {
         {props.customHeader?.(toggle, opened)}
       </Show>
       <div
+        inert={!opened()}
         class="grid transition-[grid-template-rows] duration-200 ease-in-out"
         style={{
           "grid-template-rows": opened() ? "1fr" : "0fr"
