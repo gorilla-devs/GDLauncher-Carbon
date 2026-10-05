@@ -449,6 +449,10 @@ pub enum InsertError {
     /// [`MIGRATION_LIST_ANCHOR`] appears more than once — the insertion point
     /// is ambiguous.
     AnchorDuplicated,
+    /// The source/entry is outside the bounded generated migration-list shape.
+    EntryUnrecognized,
+    /// The identity exists, but its complete entry differs or is ambiguous.
+    ExistingEntryConflict { name: String },
 }
 
 impl std::fmt::Display for InsertError {
@@ -464,20 +468,28 @@ impl std::fmt::Display for InsertError {
                 "more than one `{MIGRATION_LIST_ANCHOR}` marker found in lib.rs — the insertion \
                  point is ambiguous; there must be exactly one"
             ),
+            InsertError::EntryUnrecognized => write!(
+                f,
+                "migration list or requested entry is not in the recognized generated shape; \
+                 inspect and update the metadata manually"
+            ),
+            InsertError::ExistingEntryConflict { name } => write!(
+                f,
+                "migration `{name}` already exists but its derived metadata/entry content differs \
+                 or its identity/block is ambiguous or unrecognized; update the existing metadata \
+                 manually (no source was changed)"
+            ),
         }
     }
 }
 
 impl std::error::Error for InsertError {}
 
-/// Inserts `entry` (a fully formatted `MigrationDef { … },` block, indented as
-/// it should appear in the source) directly above [`MIGRATION_LIST_ANCHOR`] in
-/// `lib_src`, returning the updated source. Idempotent: `entry` is identified
-/// by its `name: "…"` line, and if a line with that exact text is already
-/// present in `lib_src`, the source is returned unchanged — rerunning the tool
-/// for the same migration never duplicates the entry. Fails if the anchor is
-/// missing or appears more than once, since there would then be no single
-/// unambiguous insertion point.
+/// Inserts a generated `MigrationDef { … },` block directly above the unique
+/// migration-list anchor. A recognized same-identity rerun succeeds unchanged
+/// only when the complete entry matches (ignoring line indentation and CRLF).
+/// Changed, duplicate or handmade existing definitions refuse without rewriting
+/// source. This is a bounded generated-shape recognizer, not a Rust parser.
 pub fn insert_migration_entry(lib_src: &str, entry: &str) -> Result<String, InsertError> {
     let anchor_count = lib_src.matches(MIGRATION_LIST_ANCHOR).count();
     if anchor_count == 0 {
@@ -487,14 +499,79 @@ pub fn insert_migration_entry(lib_src: &str, entry: &str) -> Result<String, Inse
         return Err(InsertError::AnchorDuplicated);
     }
 
-    if let Some(name_line) = entry
-        .lines()
-        .map(str::trim)
-        .find(|l| l.starts_with("name:"))
-    {
-        if lib_src.lines().any(|l| l.trim() == name_line) {
+    let requested: Vec<&str> = entry.lines().map(str::trim).collect();
+    if !is_generated_entry(&requested) {
+        return Err(InsertError::EntryUnrecognized);
+    }
+    let name = requested[1]
+        .strip_prefix("name: \"")
+        .and_then(|s| s.strip_suffix("\","))
+        .filter(|s| !s.is_empty() && !s.contains(['"', '\\']))
+        .ok_or(InsertError::EntryUnrecognized)?;
+    let conflict = || InsertError::ExistingEntryConflict { name: name.into() };
+
+    // Scope identity checks to the actual anchored vector, never an unrelated
+    // definition elsewhere in lib.rs. Refuse unsupported layouts conservatively.
+    let lines: Vec<&str> = lib_src.lines().map(str::trim).collect();
+    let anchor = lines
+        .iter()
+        .position(|line| *line == MIGRATION_LIST_ANCHOR)
+        .ok_or(InsertError::EntryUnrecognized)?;
+    let open = lines[..anchor]
+        .iter()
+        .rposition(|line| *line == "let migrations = vec![")
+        .ok_or(InsertError::EntryUnrecognized)?;
+    let close = lines[open + 1..]
+        .iter()
+        .position(|line| *line == "];")
+        .map(|i| open + 1 + i)
+        .filter(|i| *i > anchor)
+        .ok_or(InsertError::EntryUnrecognized)?;
+    let list = &lines[open + 1..close];
+    let quoted_name = format!("\"{name}\"");
+    let identities = list
+        .iter()
+        .map(|line| line.matches(&quoted_name).count())
+        .sum::<usize>();
+    if identities != 0 {
+        if identities != 1
+            || list
+                .iter()
+                .any(|line| line.contains("/*") || line.contains("*/"))
+        {
+            return Err(conflict());
+        }
+        // Only top-level generated blocks and the historical macro form can
+        // precede an idempotent rerun. Custom/nested/commented blocks cannot
+        // masquerade as a recognized entry merely by containing matching text.
+        let mut i = 0;
+        let mut matched = false;
+        while i < list.len() {
+            let line = list[i];
+            if line.is_empty() || line.starts_with("//") {
+                i += 1;
+            } else if line.starts_with("historical_migration!(\"") && line.ends_with("\"),") {
+                if line.contains(&quoted_name) {
+                    return Err(conflict());
+                }
+                i += 1;
+            } else if let Some(block) = list.get(i..i + 7).filter(|block| is_generated_entry(block))
+            {
+                if block[1] == requested[1] {
+                    if block != requested.as_slice() {
+                        return Err(conflict());
+                    }
+                    matched = true;
+                }
+                i += 7;
+            } else {
+                return Err(conflict());
+            }
+        }
+        if matched {
             return Ok(lib_src.to_string());
         }
+        return Err(conflict());
     }
 
     let anchor_pos = lib_src
@@ -513,6 +590,20 @@ pub fn insert_migration_entry(lib_src: &str, entry: &str) -> Result<String, Inse
     }
     out.push_str(&lib_src[line_start..]);
     Ok(out)
+}
+
+/// The fixed seven-line block emitted by the authoring tool. Field values
+/// remain part of the complete-content comparison; custom formatting refuses.
+fn is_generated_entry(lines: &[&str]) -> bool {
+    lines.len() == 7
+        && lines[0] == "MigrationDef {"
+        && lines[1].starts_with("name: \"")
+        && lines[1].ends_with("\",")
+        && lines[2].starts_with("up_sql: include_str!(")
+        && lines[3].starts_with("down_sql: Some(include_str!(")
+        && lines[4].starts_with("kind: MigrationKind::")
+        && lines[5].starts_with("data_down: \"")
+        && lines[6] == "},"
 }
 
 /// Analyses `up` (applied after `prev_ups`) for the touchpoints the schema diff
@@ -535,16 +626,16 @@ pub fn detect_dml_on_existing_tables(prev_ups: &[&str], up: &str) -> DbResult<Ve
     let conn = build(prev_ups)?;
     let existing: BTreeSet<String> = read_schema(&conn)?.tables.into_keys().collect();
 
-    // `(op, table)` DML the authorizer attributes to a pre-existing table, and
-    // the set of tables the up drops. `DROP TABLE t` authorizes the implicit
-    // removal of its rows as an `SQLITE_DELETE` on `t`, which is not developer
-    // DML; those deletes are filtered out via the dropped-table set.
+    // Bundled SQLite authorizes DROP TABLE and then its implicit DELETE for
+    // that resolved database/table. Exempt only that immediately paired top-level
+    // deletion, consuming the context on every callback. Explicit DML before or
+    // after a rebuild must survive, including DELETE on the same table.
     let dml: Arc<Mutex<BTreeSet<(String, String)>>> = Arc::new(Mutex::new(BTreeSet::new()));
-    let dropped: Arc<Mutex<BTreeSet<String>>> = Arc::new(Mutex::new(BTreeSet::new()));
     let dml_sink = dml.clone();
-    let dropped_sink = dropped.clone();
     let existing_for_hook = existing.clone();
+    let mut pending_drop: Option<(Option<String>, String)> = None;
     conn.authorizer(Some(move |ctx: AuthContext<'_>| {
+        let drop_context = pending_drop.take();
         match ctx.action {
             AuthAction::Insert { table_name } if existing_for_hook.contains(table_name) => {
                 dml_sink
@@ -552,6 +643,11 @@ pub fn detect_dml_on_existing_tables(prev_ups: &[&str], up: &str) -> DbResult<Ve
                     .map(|mut s| s.insert(("INSERT".into(), table_name.to_string())))
                     .ok();
             }
+            AuthAction::Delete { table_name }
+                if ctx.accessor.is_none()
+                    && drop_context.as_ref().is_some_and(|(db, table)| {
+                        db.as_deref() == ctx.database_name && table == table_name
+                    }) => {}
             AuthAction::Delete { table_name } if existing_for_hook.contains(table_name) => {
                 dml_sink
                     .lock()
@@ -564,11 +660,11 @@ pub fn detect_dml_on_existing_tables(prev_ups: &[&str], up: &str) -> DbResult<Ve
                     .map(|mut s| s.insert(("UPDATE".into(), table_name.to_string())))
                     .ok();
             }
-            AuthAction::DropTable { table_name } => {
-                dropped_sink
-                    .lock()
-                    .map(|mut s| s.insert(table_name.to_string()))
-                    .ok();
+            AuthAction::DropTable { table_name } if ctx.accessor.is_none() => {
+                pending_drop = Some((
+                    ctx.database_name.map(str::to_string),
+                    table_name.to_string(),
+                ));
             }
             _ => {}
         }
@@ -580,12 +676,10 @@ pub fn detect_dml_on_existing_tables(prev_ups: &[&str], up: &str) -> DbResult<Ve
     conn.authorizer(None::<fn(AuthContext<'_>) -> Authorization>)?;
     applied?;
 
-    let dropped = std::mem::take(&mut *dropped.lock().expect("dropped mutex poisoned"));
     let out = dml
         .lock()
         .expect("dml manifest mutex poisoned")
         .iter()
-        .filter(|(_, table)| !dropped.contains(table))
         .map(|(op, table)| format!("{op} {table}"))
         .collect();
     Ok(out)

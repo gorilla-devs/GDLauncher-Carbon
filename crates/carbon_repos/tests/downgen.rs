@@ -331,3 +331,173 @@ fn full_schema_dump_matches_the_committed_baseline() {
         "full_schema_dump drifted from the committed baseline"
     );
 }
+
+// Task16: explicit DML must survive a later nullable-column rebuild.
+const TASK16_PREV: &str = "CREATE TABLE T(id INTEGER PRIMARY KEY, value TEXT);";
+const TASK16_REBUILD: &str = "CREATE TABLE T_new(id INTEGER PRIMARY KEY, value TEXT, extra TEXT);
+    INSERT INTO T_new(id, value) SELECT id, value FROM T;
+    DROP TABLE T;
+    ALTER TABLE T_new RENAME TO T;";
+
+fn task16_assert_dml(up: &str, label: &str) {
+    use carbon_repos::{
+        compat::MigrationKind,
+        manifest::{derive_kind, verify_kind},
+    };
+    let analysis = analyze_up(&[TASK16_PREV], up).unwrap();
+    assert!(!analysis.rename);
+    assert_eq!(analysis.dml_on_existing, vec![label.to_string()]);
+    assert_eq!(
+        analysis.human_actions(),
+        vec![HumanAction::Dml(vec![label.to_string()])]
+    );
+    assert_eq!(
+        derive_kind(&[TASK16_PREV], up).unwrap(),
+        MigrationKind::Breaking
+    );
+    assert!(verify_kind(&[TASK16_PREV], up, MigrationKind::Additive).is_err());
+}
+
+#[test]
+fn task16_update_survives_table_rebuild() {
+    task16_assert_dml(
+        &format!("UPDATE T SET value=lower(value); {TASK16_REBUILD}"),
+        "UPDATE T",
+    );
+}
+
+#[test]
+fn task16_insert_survives_table_rebuild() {
+    task16_assert_dml(
+        &format!("INSERT INTO T(id,value) VALUES(42,'AbC'); {TASK16_REBUILD}"),
+        "INSERT T",
+    );
+}
+
+#[test]
+fn task16_delete_survives_table_rebuild() {
+    for up in [
+        format!("DELETE FROM T WHERE id=42; {TASK16_REBUILD}"),
+        format!("{TASK16_REBUILD} DELETE FROM T WHERE id=42;"),
+        format!("DELETE FROM T WHERE id=42; {TASK16_REBUILD} DELETE FROM T WHERE id=43;"),
+    ] {
+        task16_assert_dml(&up, "DELETE T");
+    }
+}
+
+#[test]
+fn task16_pure_rebuild_and_standalone_update_controls() {
+    use carbon_repos::{compat::MigrationKind, manifest::derive_kind};
+    let analysis = analyze_up(&[TASK16_PREV], TASK16_REBUILD).unwrap();
+    assert!(!analysis.rename);
+    assert!(analysis.dml_on_existing.is_empty());
+    assert!(analysis.human_actions().is_empty());
+    assert_eq!(
+        derive_kind(&[TASK16_PREV], TASK16_REBUILD).unwrap(),
+        MigrationKind::Additive
+    );
+    gen_ok(&[TASK16_PREV], TASK16_REBUILD);
+    task16_assert_dml("UPDATE T SET value=lower(value);", "UPDATE T");
+}
+
+#[test]
+fn task16_schema_inverse_still_discloses_text_loss() {
+    use carbon_repos::manifest::{seeded_lost_fields, verify_data_down};
+    let up = format!("UPDATE T SET value=lower(value); {TASK16_REBUILD}");
+    let down = gen_ok(&[TASK16_PREV], &up);
+    let conn = Connection::open_in_memory().unwrap();
+    conn.execute_batch(TASK16_PREV).unwrap();
+    conn.execute("INSERT INTO T VALUES(7,'AbC')", []).unwrap();
+    conn.execute_batch(&up).unwrap();
+    conn.execute_batch(&down).unwrap();
+    assert_eq!(
+        conn.query_row("SELECT id,value FROM T", [], |r| Ok((
+            r.get::<_, i64>(0)?,
+            r.get::<_, String>(1)?
+        )))
+        .unwrap(),
+        (7, "abc".to_string())
+    );
+    assert_eq!(
+        seeded_lost_fields(&[TASK16_PREV], &up, &down).unwrap(),
+        ["T.value".to_string()].into_iter().collect()
+    );
+    assert!(verify_data_down(&[TASK16_PREV], &up, &down, "full").is_err());
+    verify_data_down(&[TASK16_PREV], &up, &down, "partial:T.value").unwrap();
+}
+
+#[test]
+fn task16_analysis_propagates_sql_errors() {
+    assert!(
+        analyze_up(
+            &[TASK16_PREV],
+            "UPDATE T SET value='x'; SELECT * FROM missing_table;"
+        )
+        .is_err()
+    );
+    task16_assert_dml("UPDATE T SET value=lower(value);", "UPDATE T");
+}
+
+#[test]
+fn task16_insert_refuses_changed_kind_or_data_down() {
+    let once = insert_migration_entry(FIXTURE_LIB_SRC, FIXTURE_ENTRY).unwrap();
+    for changed in [
+        FIXTURE_ENTRY.replace("MigrationKind::Additive", "MigrationKind::Breaking"),
+        FIXTURE_ENTRY.replace("data_down: \"full\"", "data_down: \"partial:Widget.id\""),
+    ] {
+        let err = insert_migration_entry(&once, &changed)
+            .expect_err("same-name changed metadata must refuse");
+        let message = err.to_string();
+        assert!(message.contains("20260501000000_add_widget"), "{message}");
+        assert!(message.contains("manual"), "{message}");
+    }
+    assert_eq!(insert_migration_entry(&once, FIXTURE_ENTRY).unwrap(), once);
+}
+
+#[test]
+fn task16_insert_refuses_duplicate_or_handwritten_identity() {
+    let once = insert_migration_entry(FIXTURE_LIB_SRC, FIXTURE_ENTRY).unwrap();
+    let duplicate = once.replace(
+        MIGRATION_LIST_ANCHOR,
+        &format!("{FIXTURE_ENTRY}{MIGRATION_LIST_ANCHOR}"),
+    );
+    assert!(insert_migration_entry(&duplicate, FIXTURE_ENTRY).is_err());
+    let handwritten = once.replace("kind: MigrationKind::Additive,", "kind: custom_kind(),");
+    assert!(insert_migration_entry(&handwritten, FIXTURE_ENTRY).is_err());
+    let compact = once.replace(
+        FIXTURE_ENTRY,
+        "MigrationDef { name: \"20260501000000_add_widget\", ..custom_definition() },\n",
+    );
+    assert!(insert_migration_entry(&compact, FIXTURE_ENTRY).is_err());
+    let historical = FIXTURE_LIB_SRC.replace("20240120134904_init", "20260501000000_add_widget");
+    assert!(insert_migration_entry(&historical, FIXTURE_ENTRY).is_err());
+}
+
+#[test]
+fn task16_insert_matches_list_entry_not_an_outside_copy() {
+    let outside = format!("fn unrelated() {{\n{FIXTURE_ENTRY}}}\n{FIXTURE_LIB_SRC}");
+    let updated = insert_migration_entry(&outside, FIXTURE_ENTRY).unwrap();
+    assert_eq!(
+        updated
+            .matches("name: \"20260501000000_add_widget\",")
+            .count(),
+        2
+    );
+    assert_eq!(
+        insert_migration_entry(&updated, FIXTURE_ENTRY).unwrap(),
+        updated
+    );
+}
+
+#[test]
+fn task16_insert_accepts_recognized_crlf_and_indentation() {
+    let once = insert_migration_entry(FIXTURE_LIB_SRC, FIXTURE_ENTRY).unwrap();
+    let formatted = once
+        .lines()
+        .map(|line| format!("    {line}\r\n"))
+        .collect::<String>();
+    assert_eq!(
+        insert_migration_entry(&formatted, FIXTURE_ENTRY).unwrap(),
+        formatted
+    );
+}

@@ -335,7 +335,7 @@ fn apply_list_entry(
         Err(e) => {
             eprintln!(
                 "warning: could not auto-insert into {}: {e}\n\
-                 Add this entry to get_migrations() by hand:\n",
+                 Inspect the existing definition and align this derived entry manually:\n",
                 lib_path.display()
             );
             print!("{entry}");
@@ -771,6 +771,68 @@ mod tests {
         );
         // The file is left untouched — no partial/corrupt write.
         assert_eq!(std::fs::read_to_string(&lib_path).unwrap(), no_anchor);
+    }
+
+    #[test]
+    fn task16_apply_list_entry_refuses_changed_same_name_metadata() {
+        use carbon_repos::manifest::verify_kind;
+        let (_dir, lib_path) = scratch_lib_rs();
+        let prev = ["CREATE TABLE Server(id INTEGER PRIMARY KEY);"];
+        let name = "20261006000000_server_flag";
+        let first_up = "ALTER TABLE Server ADD COLUMN flag INTEGER;";
+        let second_up = "ALTER TABLE Server ADD COLUMN flag INTEGER NOT NULL DEFAULT 0;";
+        let first_down = generate_down(&prev, first_up).unwrap();
+        let second_down = generate_down(&prev, second_up).unwrap();
+        verify_round_trip(&prev, first_up, &first_down).unwrap();
+        verify_round_trip(&prev, second_up, &second_down).unwrap();
+        assert_eq!(
+            derive_kind(&prev, first_up).unwrap(),
+            MigrationKind::Additive
+        );
+        assert_eq!(
+            apply_list_entry(&lib_path, name, &prev, first_up, &first_down).unwrap(),
+            ExitCode::SUCCESS
+        );
+        let first = std::fs::read_to_string(&lib_path).unwrap();
+        assert!(first.contains("kind: MigrationKind::Additive,"));
+        assert_eq!(
+            derive_kind(&prev, second_up).unwrap(),
+            MigrationKind::Breaking
+        );
+        assert!(verify_kind(&prev, second_up, MigrationKind::Additive).is_err());
+        verify_kind(&prev, second_up, MigrationKind::Breaking).unwrap();
+        assert_eq!(
+            apply_list_entry(&lib_path, name, &prev, second_up, &second_down).unwrap(),
+            ExitCode::FAILURE
+        );
+        assert_eq!(std::fs::read_to_string(&lib_path).unwrap(), first);
+
+        // The requested Breaking definition is still insertable under a fresh identity.
+        assert_eq!(
+            apply_list_entry(
+                &lib_path,
+                "20261006000001_server_flag",
+                &prev,
+                second_up,
+                &second_down
+            )
+            .unwrap(),
+            ExitCode::SUCCESS
+        );
+        let fresh = std::fs::read_to_string(&lib_path).unwrap();
+        assert!(fresh.contains("kind: MigrationKind::Breaking,"));
+        assert_eq!(
+            apply_list_entry(
+                &lib_path,
+                "20261006000001_server_flag",
+                &prev,
+                second_up,
+                &second_down
+            )
+            .unwrap(),
+            ExitCode::SUCCESS
+        );
+        assert_eq!(std::fs::read_to_string(&lib_path).unwrap(), fresh);
     }
 
     const SCRATCH_CHECKSUMS_SRC: &str = "const FROZEN: &[(&str, &str)] = &[\n\
