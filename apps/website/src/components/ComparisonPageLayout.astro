@@ -55,6 +55,7 @@ function classFor(value: string): { color: string } {
     v === "✓" ||
     v.startsWith("yes") ||
     v.startsWith("sí") ||
+    /^sì(?:$|\s)/.test(v) ||
     v.startsWith("si ") ||
     v.startsWith("oui") ||
     v.startsWith("ja") ||

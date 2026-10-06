@@ -13,7 +13,7 @@ faq:
   - question: "매니페스트를 편집할 수 있나요?"
     answer: "자신의 팩을 만든다면 아카이브 안의 매니페스트를 편집할 수 있습니다. 설치된 인스턴스의 매니페스트는 런처 UI를 통해 편집할 수 없습니다. 어떤 모드가 들어 있는지 바꾸려면 Addons 탭(잠긴 인스턴스라면 먼저 해제). 페어된 팩의 버전을 바꾸려면 인스턴스를 열고 Settings 탭에서 Change Modpack Version을 클릭."
   - question: "팩 용어의 'override'가 뭔가요?"
-    answer: "모드가 아니라 팩이 사전 번들로 제공하는 파일. 기본 설정, 스크립트, 리소스 팩, 가끔 스타터 월드. 팩 설치 시 모드 위에 인스턴스 폴더로 풀어집니다. CurseForge는 overrides 필드로 나열, Modrinth는 env.client=required인 팩 파일을 사용, GDLPack은 overrides 폴더(매니페스트에서 설정 가능)를 사용."
+    answer: "오버라이드는 설정, 스크립트, 리소스 팩, 초기 월드처럼 아카이브에 포함된 파일입니다. CurseForge는 overrides 필드로 폴더를 지정하고 GDLPack은 설정 가능한 폴더를 사용합니다. Modrinth는 overrides/와 client-overrides/에 파일을 포함합니다. 반면 index.files 항목은 URL과 해시로 다운로드를 지정합니다. env.client는 다운로드를 선택하며 아카이브에 포함된 파일의 추출을 지정하지 않습니다."
 ---
 
 # 모드팩 매니페스트 포맷
@@ -323,7 +323,7 @@ mypack.gdlpack/
 | 해결 출처 | CurseForge API | 매니페스트 내 URL | CurseForge **또는** Modrinth (응답한 쪽) |
 | 오프라인 설치 | 불가 (CDN 필요) | 가능 (URL 자체는 CDN 필요할 수 있음) | `Bundle Addons`가 켜져 있으면 가능 |
 | 옵션 기능 | 모드별 `required: false` 플래그 | 파일별 `env` (client/server) | 예약된 스키마; 가져오기 거부 |
-| 오버라이드 폴더 | `overrides/` | 파일별 경로 | `overrides/` (설정 가능) |
+| 오버라이드 폴더 | `overrides/` | `overrides/` + `client-overrides/` | `overrides/` (설정 가능) |
 | 서버 전용 파일 | 별도 팩 | `env.server` | `serverOverrides` 디렉터리 |
 | 아이콘 | 외부 | 외부 | `.gdl/icon.<ext>`에 임베드 |
 | 출처 추적 | 없음 | 없음 | `source` 필드 |
@@ -331,7 +331,7 @@ mypack.gdlpack/
 
 ## 오버라이드 자세히
 
-매니페스트가 오버라이드 폴더나 client-required로 표시된 팩 파일을 참조하면, 런처는 모드 해결 단계 후 그것들을 인스턴스에 풀어 넣습니다. 이렇게 팩이 번들할 수 있는 것들:
+GDLauncher는 `env`가 없거나 `env.client`가 `required`인 Modrinth `index.files` 항목을 `downloads` URL에서 다운로드합니다. 현재 `optional` 항목은 다운로드하지 않고 `unsupported` 항목은 제외합니다. 이 값들은 포함된 파일의 추출을 선택하지 않습니다. 별도로 아카이브의 `overrides/`를 먼저, `client-overrides/`를 나중에 추출합니다. 경로가 같으면 ZIP 순서와 관계없이 클라이언트 파일이 우선합니다. 포함된 오버라이드에는 다음이 들어갈 수 있습니다:
 
 - 기본 모드 설정 (누가 설치해도 같은 초기 경험).
 - KubeJS / CraftTweaker 스크립트.
@@ -339,7 +339,7 @@ mypack.gdlpack/
 - 팩이 활성화 기대하는 리소스 팩.
 - 팩 맞춤 `options.txt`.
 
-오버라이드는 자동 생성 기본값을 이기지만 나중에 플레이어가 수동으로 바꾼 것에는 집니다. GDLPack은 추가로 `serverOverrides`와 `clientOverrides` 디렉터리를 지원해서, 한쪽에만 들어가야 하는 파일에 유용 (일치하는 클라이언트/서버 번들을 함께 배포하려는 팩용).
+오버라이드는 자동 생성 기본값을 이기지만 나중에 플레이어가 수동으로 바꾼 것에는 집니다. Modrinth 클라이언트 가져오기는 `server-overrides/`를 추출하지 않습니다. GDLPack은 설정된 공통 오버라이드와 `clientOverrides` 디렉터리를 추출합니다. `serverOverrides`는 별도이며 클라이언트 인스턴스에 추출되지 않습니다.
 
 ## 매니페스트가 오래됐을 때
 

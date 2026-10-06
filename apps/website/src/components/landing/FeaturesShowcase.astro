@@ -139,6 +139,7 @@ const features = [
   }
 
   function setup() {
+    teardown()
     const videos = document.querySelectorAll<HTMLVideoElement>(
       "video[data-lazy-src]"
     )

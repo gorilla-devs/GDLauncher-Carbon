@@ -13,7 +13,7 @@ faq:
   - question: "Posso editar um manifest?"
     answer: "Você pode editar um dentro de um arquivo se estiver construindo seu próprio pack, mas não dá pra editar o manifest de uma instância instalada pela UI do launcher. Pra mudar quais mods uma instância tem, use a aba Addons (ou destrave uma instância travada antes). Pra mudar a versão de um pack pareado, abra a instância, vá na aba Settings e clique em Change Modpack Version."
   - question: "O que é um 'override' no jargão de packs?"
-    answer: "Arquivos que o pack já vem com, não mods. Configs padrão, scripts, resource packs, às vezes um mundo inicial. São extraídos por cima dos mods na pasta da instância quando o pack instala. CurseForge lista no campo overrides; Modrinth marca arquivos do pack com env.client=required; GDLPack usa uma pasta overrides (configurável via manifest)."
+    answer: "Overrides são arquivos incluídos no arquivo ZIP, como configurações, scripts, resource packs ou um mundo inicial. CurseForge indica a pasta no campo overrides; GDLPack usa uma pasta configurável. Modrinth inclui esses arquivos em overrides/ e client-overrides/. Já as entradas index.files identificam downloads por URL e hash; env.client seleciona downloads, não arquivos incluídos no ZIP."
 ---
 
 # Formato do manifest de um modpack
@@ -323,7 +323,7 @@ Resource packs e shader packs são sempre empacotados, em `overrides/resourcepac
 | Resolve a partir de | API do CurseForge | URL embutida no manifest | CurseForge **ou** Modrinth, qual responder |
 | Instalação offline | Não (precisa de CDN) | Sim (URLs ainda podem precisar de CDN) | Sim quando `Bundle Addons` está ligado |
 | Recursos opcionais | Flag `required: false` por mod | `env` por arquivo (client/server) | Esquema reservado; rejeitado na importação |
-| Pasta de overrides | `overrides/` | caminho por arquivo | `overrides/` (configurável) |
+| Pasta de overrides | `overrides/` | `overrides/` + `client-overrides/` | `overrides/` (configurável) |
 | Arquivos só de servidor | Pack separado | `env.server` | Diretório `serverOverrides` |
 | Ícone | Externo | Externo | Embutido em `.gdl/icon.<ext>` |
 | Rastreamento de origem | Nenhum | Nenhum | Campo `source` |
@@ -331,7 +331,7 @@ Resource packs e shader packs são sempre empacotados, em `overrides/resourcepac
 
 ## Overrides, em detalhe
 
-Quando o manifest referencia uma pasta de overrides ou arquivos de pack marcados como client-required, o launcher os extrai pra dentro da instância após o passo de resolução de mods. É assim que os packs empacotam:
+GDLauncher baixa as entradas Modrinth `index.files` pelos URLs de `downloads` quando `env` está ausente ou `env.client` é `required`. Atualmente não baixa entradas `optional` e exclui as `unsupported`. Esses valores não selecionam arquivos incluídos para extração. Separadamente, extrai primeiro `overrides/` e depois `client-overrides/`; no mesmo caminho, o arquivo do cliente prevalece independentemente da ordem do ZIP. Os overrides incluídos podem conter:
 
 - Configs padrão de mods (pra que o pack jogue igual logo de cara pra todo mundo).
 - Scripts KubeJS ou CraftTweaker.
@@ -339,7 +339,7 @@ Quando o manifest referencia uma pasta de overrides ou arquivos de pack marcados
 - Resource packs que o pack espera ativos.
 - `options.txt` com ajustes de jogo afinados pelo pack.
 
-Overrides vencem padrões autogerados mas perdem pra qualquer coisa que o jogador mude manualmente depois. O GDLPack ainda suporta diretórios `serverOverrides` e `clientOverrides` pra arquivos que devem cair apenas em um lado, útil pra packs feitos pra entregar um bundle de cliente e servidor combinados.
+Overrides vencem padrões autogerados mas perdem pra qualquer coisa que o jogador mude manualmente depois. Importações de cliente Modrinth não extraem `server-overrides/`. GDLPack extrai os diretórios de overrides comuns e `clientOverrides` configurados; `serverOverrides` é separado e não é extraído em instâncias de cliente.
 
 ## Quando manifests ficam desatualizados
 

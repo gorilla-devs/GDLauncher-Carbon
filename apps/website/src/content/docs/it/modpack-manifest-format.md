@@ -13,7 +13,7 @@ faq:
   - question: "Posso modificare un manifest?"
     answer: "Puoi modificarne uno dentro un archivio se stai costruendo il tuo pack, ma non puoi modificare il manifest di un'istanza installata dalla UI del launcher. Per cambiare quali Mod ha un'istanza, usa la tab Addons (o sblocca prima un'istanza bloccata). Per cambiare la versione di un pack accoppiato, apri l'istanza, vai sulla tab Settings e clicca Change Modpack Version."
   - question: "Cos'è un 'override' nella terminologia dei pack?"
-    answer: "File che il pack include preconfezionati, non Mod. Configurazioni di default, script, Resource Pack, a volte una mappa iniziale. Vengono estratti sopra le Mod nella cartella dell'istanza quando il pack si installa. CurseForge li elenca sotto il campo overrides; Modrinth marca i file del pack con env.client=required; GDLPack usa una cartella overrides (configurabile via manifest)."
+    answer: "Gli override sono file inclusi nell’archivio, come configurazioni, script, Resource Pack o una mappa iniziale. CurseForge indica la cartella nel campo overrides; GDLPack usa una cartella configurabile. Modrinth include questi file in overrides/ e client-overrides/. Le entry index.files identificano invece download tramite URL e hash; env.client seleziona i download, non i file inclusi nell’archivio."
 ---
 
 # Formato del manifest dei Modpack
@@ -323,7 +323,7 @@ I Resource Pack e gli Shader vengono sempre inclusi, in `overrides/resourcepacks
 | Risolve da | API CurseForge | URL embedded nel manifest | CurseForge **o** Modrinth, quale risponde |
 | Install offline | No (serve CDN) | Sì (gli URL potrebbero comunque richiedere CDN) | Sì quando `Bundle Addons` è on |
 | Feature opzionali | Flag `required: false` per Mod | `env` per file (client/server) | Schema riservato; import rifiutato |
-| Cartella overrides | `overrides/` | percorso per file | `overrides/` (configurabile) |
+| Cartella overrides | `overrides/` | `overrides/` + `client-overrides/` | `overrides/` (configurabile) |
 | File solo-server | Pack separato | `env.server` | Directory `serverOverrides` |
 | Icona | Esterna | Esterna | Embedded in `.gdl/icon.<ext>` |
 | Tracking della sorgente | Nessuno | Nessuno | Campo `source` |
@@ -331,7 +331,7 @@ I Resource Pack e gli Shader vengono sempre inclusi, in `overrides/resourcepacks
 
 ## Override, in dettaglio
 
-Quando il manifest fa riferimento a una cartella overrides o a file del pack marcati come client-required, il launcher estrae quelli nell'istanza dopo lo step di risoluzione delle Mod. È così che i pack impacchettano:
+GDLauncher scarica le entry Modrinth `index.files` dai loro URL `downloads` quando `env` è assente o `env.client` è `required`. Al momento non scarica le entry `optional` ed esclude quelle `unsupported`. Questi valori non selezionano file inclusi da estrarre. Separatamente, estrae prima `overrides/` e poi `client-overrides/`; a parità di percorso prevale il file client indipendentemente dall’ordine nel ZIP. Gli override inclusi possono contenere:
 
 - Configurazioni di default delle Mod (così il pack si gioca allo stesso modo out of the box per tutti).
 - Script KubeJS o CraftTweaker.
@@ -339,7 +339,7 @@ Quando il manifest fa riferimento a una cartella overrides o a file del pack mar
 - Resource Pack che il pack si aspetta siano attivi.
 - `options.txt` con impostazioni di gioco tarate per il pack.
 
-Gli override vincono sui default auto-generati ma perdono contro qualunque cosa il giocatore cambi successivamente a mano. GDLPack supporta in più le directory `serverOverrides` e `clientOverrides` per file che dovrebbero atterrare solo su un lato, utile per pack pensati per distribuire un bundle client e server abbinato.
+Gli override vincono sui default auto-generati ma perdono contro qualunque cosa il giocatore cambi successivamente a mano. Negli import client Modrinth non viene estratta `server-overrides/`. GDLPack estrae le directory degli override comuni e dei `clientOverrides` configurati; `serverOverrides` è separata e non viene estratta nelle istanze client.
 
 ## Quando i manifest diventano obsoleti
 

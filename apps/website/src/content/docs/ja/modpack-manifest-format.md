@@ -13,7 +13,7 @@ faq:
   - question: "マニフェストを編集できる？"
     answer: "自分でパックを作る場合は .zip 内のものを編集できます。インストール済みインスタンスのマニフェストはランチャー UI から編集できません。Mod を変えるには Addons タブを使用 (またはロックされたインスタンスを先にアンロック)。ペア済みパックのバージョンを変えるには、インスタンスを開いて Settings タブの Change Modpack Version をクリック。"
   - question: "パック用語の「override」とは？"
-    answer: "Mod ではなく、パックが事前同梱するファイル。デフォルト設定、スクリプト、リソースパック、時にはスタートワールドなど。パックインストール時に Mod の上にインスタンスフォルダーへ展開されます。CurseForge は overrides フィールドで列挙、Modrinth は env.client=required のパックファイルを使用、GDLPack は overrides フォルダー (マニフェストで設定可能) を使います。"
+    answer: "オーバーライドは、設定、スクリプト、リソースパック、初期ワールドなど、アーカイブに同梱されたファイルです。CurseForge は overrides フィールドでフォルダーを指定し、GDLPack は設定可能なフォルダーを使います。Modrinth は overrides/ と client-overrides/ に同梱します。一方、index.files のエントリは URL とハッシュでダウンロードを指定します。env.client はダウンロードを選択するもので、同梱ファイルの展開指定ではありません。"
 ---
 
 # Modpack マニフェスト形式
@@ -323,7 +323,7 @@ mypack.gdlpack/
 | 解決元 | CurseForge API | マニフェスト内 URL | CurseForge **か** Modrinth (応答した方) |
 | オフラインインストール | 不可 (CDN 必須) | 可能 (URL 自体は CDN 必須かも) | `Bundle Addons` ON なら可能 |
 | オプション機能 | Mod ごとに `required: false` | ファイルごとに `env` (client/server) | 予約済みスキーマ。インポートは拒否 |
-| オーバーライドフォルダー | `overrides/` | ファイルごとのパス | `overrides/` (設定可) |
+| オーバーライドフォルダー | `overrides/` | `overrides/` + `client-overrides/` | `overrides/` (設定可) |
 | サーバー専用ファイル | 別パック | `env.server` | `serverOverrides` ディレクトリ |
 | アイコン | 外部 | 外部 | `.gdl/icon.<ext>` に埋め込み |
 | ソース追跡 | なし | なし | `source` フィールド |
@@ -331,7 +331,7 @@ mypack.gdlpack/
 
 ## Overrides の詳細
 
-マニフェストが overrides フォルダーや client-required としてマークされたパックファイルを参照すると、ランチャーは Mod 解決ステップ後にそれらをインスタンスへ展開します。パックはこれで以下を同梱できます:
+GDLauncher は `env` がない場合、または `env.client` が `required` の場合に、Modrinth の `index.files` を `downloads` の URL からダウンロードします。現在、`optional` はダウンロードせず、`unsupported` は除外します。これらの値は同梱ファイルの展開を選択しません。それとは別に、アーカイブの `overrides/` を先に、`client-overrides/` を後に展開します。同じパスでは ZIP 内の順序に関係なくクライアント側のファイルが優先されます。同梱できるものは次のとおりです:
 
 - デフォルト Mod 設定 (誰がインストールしても同じ初期体験になる)。
 - KubeJS / CraftTweaker スクリプト。
@@ -339,7 +339,7 @@ mypack.gdlpack/
 - パックが有効化を期待するリソースパック。
 - パック向けに調整された `options.txt`。
 
-Override は自動生成デフォルトより優先されますが、後でプレイヤーが手動で変えたものには負けます。GDLPack はさらに `serverOverrides` と `clientOverrides` ディレクトリをサポートし、片側だけに配置すべきファイル (一致するクライアントとサーバーのバンドルを配布するパック用) に便利です。
+Override は自動生成デフォルトより優先されますが、後でプレイヤーが手動で変えたものには負けます。 Modrinth のクライアントインポートでは `server-overrides/` は展開されません。GDLPack は指定された共通オーバーライドと `clientOverrides` のディレクトリを展開します。`serverOverrides` は別扱いで、クライアントインスタンスには展開されません。
 
 ## マニフェストが古くなるとき
 

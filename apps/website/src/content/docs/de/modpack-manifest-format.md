@@ -13,7 +13,7 @@ faq:
   - question: "Kann ich ein Manifest bearbeiten?"
     answer: "Du kannst eines im Archiv bearbeiten, wenn du dein eigenes Pack baust, aber du kannst das Manifest einer installierten Instanz nicht über die Launcher-UI bearbeiten. Um die Mods einer Instanz zu ändern, nutze den Addons-Tab (oder entsperre vorher eine gesperrte Instanz). Um die Version eines verknüpften Packs zu ändern, öffne die Instanz, gehe zum Settings-Tab und klicke auf Change Modpack Version."
   - question: "Was ist ein 'Override' in der Pack-Terminologie?"
-    answer: "Dateien, die das Pack vorgebündelt mitliefert – keine Mods. Standardkonfigs, Skripte, Resource Packs, manchmal eine Starterwelt. Sie werden bei der Pack-Installation über die Mods hinweg in den Instanzordner extrahiert. CurseForge listet sie im overrides-Feld; Modrinth markiert Pack-Dateien mit env.client=required; GDLPack nutzt einen overrides-Ordner (über das Manifest konfigurierbar)."
+    answer: "Overrides sind im Archiv gebündelte Dateien, etwa Konfigurationen, Skripte, Resource Packs oder eine Starterwelt. CurseForge benennt den Ordner im overrides-Feld; GDLPack nutzt einen konfigurierbaren Overrides-Ordner. Modrinth bündelt diese Dateien in overrides/ und client-overrides/. Die Einträge in index.files beschreiben dagegen Downloads mit URL und Hash; env.client wählt Downloads aus, keine gebündelten Archivdateien."
 ---
 
 # Modpack-Manifest-Format
@@ -323,7 +323,7 @@ Resource Packs und Shader Packs werden immer gebündelt, in `overrides/resourcep
 | Auflösung aus | CurseForge-API | Im Manifest eingebettete URL | CurseForge **oder** Modrinth, je nachdem, welche antwortet |
 | Offline-Installation | Nein (CDN nötig) | Ja (URLs brauchen evtl. noch CDN) | Ja, wenn `Bundle Addons` aktiv |
 | Optionale Features | Pro-Mod-Flag `required: false` | Pro-Datei `env` (client/server) | Reserviertes Schema; Import wird abgelehnt |
-| Overrides-Ordner | `overrides/` | Pfad pro Datei | `overrides/` (konfigurierbar) |
+| Overrides-Ordner | `overrides/` | `overrides/` + `client-overrides/` | `overrides/` (konfigurierbar) |
 | Server-only-Dateien | Eigenes Pack | `env.server` | `serverOverrides`-Verzeichnis |
 | Icon | Extern | Extern | Eingebettet in `.gdl/icon.<ext>` |
 | Quellenverfolgung | Keine | Keine | `source`-Feld |
@@ -331,7 +331,7 @@ Resource Packs und Shader Packs werden immer gebündelt, in `overrides/resourcep
 
 ## Overrides im Detail
 
-Wenn das Manifest auf einen Overrides-Ordner oder als client-required markierte Pack-Dateien verweist, extrahiert der Launcher diese nach dem Mod-Auflöseschritt in die Instanz. So bündeln Packs:
+GDLauncher lädt Modrinth-Einträge aus `index.files` über ihre `downloads`-URLs herunter, wenn `env` fehlt oder `env.client` den Wert `required` hat. `optional`-Einträge werden derzeit nicht heruntergeladen; `unsupported`-Einträge werden ausgeschlossen. Diese Flags wählen keine gebündelten Dateien zur Extraktion aus. Unabhängig davon werden die Archivordner zuerst aus `overrides/`, dann aus `client-overrides/` extrahiert; bei gleichem Pfad gewinnt die Client-Datei unabhängig von der Reihenfolge im ZIP. Gebündelte Overrides können enthalten:
 
 - Standard-Mod-Konfigs (damit das Pack out-of-the-box bei allen gleich spielt).
 - KubeJS- oder CraftTweaker-Skripte.
@@ -339,7 +339,7 @@ Wenn das Manifest auf einen Overrides-Ordner oder als client-required markierte 
 - Resource Packs, die das Pack aktiv erwartet.
 - `options.txt` mit pack-spezifischen Spieleinstellungen.
 
-Overrides schlagen automatisch generierte Defaults, verlieren aber gegen alles, was der Spieler später manuell ändert. GDLPack unterstützt zusätzlich `serverOverrides`- und `clientOverrides`-Verzeichnisse für Dateien, die nur auf einer Seite landen sollen – nützlich für Packs, die einen passenden Client- und Server-Bundle ausliefern.
+Overrides schlagen automatisch generierte Defaults, verlieren aber gegen alles, was der Spieler später manuell ändert. Bei Modrinth-Client-Importen wird `server-overrides/` nicht extrahiert. GDLPack extrahiert die konfigurierten gemeinsamen Overrides und `clientOverrides`; `serverOverrides` ist separat und wird nicht in Client-Instanzen extrahiert.
 
 ## Wenn Manifeste veralten
 

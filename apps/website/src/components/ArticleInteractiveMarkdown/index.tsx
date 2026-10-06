@@ -1,4 +1,6 @@
-import { onMount } from "solid-js";
+import { onCleanup, onMount } from "solid-js";
+
+let retireArticle: (() => void) | undefined;
 
 const getH2s = (item: HTMLHeadingElement) => {
   let currentSibling: HTMLHeadingElement = item;
@@ -24,13 +26,41 @@ const getH2s = (item: HTMLHeadingElement) => {
 
 const ArticleInteractiveMarkdown = () => {
   onMount(async () => {
+    retireArticle?.();
+    const cleanups: Array<() => void> = [];
+    const cleanup = () => {
+      cleanups.splice(0).forEach((retire) => retire());
+      if (retireArticle === cleanup) retireArticle = undefined;
+    };
+    retireArticle = cleanup;
+    onCleanup(cleanup);
+
+    // Retire only nodes and handlers this mount owns. Authored TOC entries
+    // and heading markup survive both repeated mounts and Solid disposal.
+    const ownNode = (node: Element) => cleanups.push(() => node.remove());
+    const rememberHandlers = (heading: HTMLHeadingElement) => {
+      const previous = {
+        enter: heading.onmouseenter, leave: heading.onmouseleave, click: heading.onclick,
+      };
+      return () => {
+        const owned = {
+          enter: heading.onmouseenter, leave: heading.onmouseleave, click: heading.onclick,
+        };
+        cleanups.push(() => {
+          if (heading.onmouseenter === owned.enter) heading.onmouseenter = previous.enter;
+          if (heading.onmouseleave === owned.leave) heading.onmouseleave = previous.leave;
+          if (heading.onclick === owned.click) heading.onclick = previous.click;
+        });
+      };
+    };
     const container = document.querySelector("#articleContainer");
     const tableListTitle = document.querySelector("#tableListSummary");
     const tableList = document.getElementById("tableList");
-    tableList!.style.marginLeft = "10px";
+    if (tableList) tableList.style.marginLeft = "10px";
     if (tableListTitle) (tableListTitle as any).style.cursor = "pointer";
 
     container?.querySelectorAll("h1").forEach((item) => {
+      const remember = rememberHandlers(item);
       item.style.maxWidth = "fit-content";
       item.style.display = "flex";
       item.style.flexDirection = "row-reverse";
@@ -56,6 +86,7 @@ const ArticleInteractiveMarkdown = () => {
       iconSvg.appendChild(iconPath);
 
       const div = document.createElement("div");
+      ownNode(div);
       div.appendChild(iconSvg);
 
       div.style.cursor = "pointer";
@@ -76,6 +107,7 @@ const ArticleInteractiveMarkdown = () => {
       };
 
       const li = document.createElement("li");
+      ownNode(li);
       const a = document.createElement("a");
       const textnode = document.createTextNode(item.textContent || "");
       a.appendChild(textnode);
@@ -96,6 +128,7 @@ const ArticleInteractiveMarkdown = () => {
       const siblings = getH2s(item);
 
       siblings.forEach((subItem) => {
+        const remember = rememberHandlers(subItem);
         const ul = document.createElement("ul");
         const subLi = document.createElement("li");
         const anchorTag = document.createElement("a");
@@ -146,6 +179,7 @@ const ArticleInteractiveMarkdown = () => {
         iconSvg.appendChild(iconPath);
 
         const subDiv = document.createElement("div");
+        ownNode(subDiv);
         subDiv.appendChild(iconSvg);
 
         subDiv.style.cursor = "pointer";
@@ -167,6 +201,7 @@ const ArticleInteractiveMarkdown = () => {
         };
 
         subItem.append(subDiv);
+        remember();
       });
 
       if (li.childNodes.length === 1) {
@@ -190,6 +225,7 @@ const ArticleInteractiveMarkdown = () => {
         const id = item.id;
         history.pushState({}, "", "#" + id);
       };
+      remember();
 
       container?.querySelectorAll("img").forEach((item) => {
         item.style.maxWidth = "100%";

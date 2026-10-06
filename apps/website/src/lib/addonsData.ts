@@ -68,7 +68,8 @@ export function getAddon(
   type: AddonType,
   slug: string,
 ): AddonEntry | undefined {
-  return data[platform]?.[type]?.[slug];
+  const map = data[platform]?.[type];
+  return map && Object.hasOwn(map, slug) ? map[slug] : undefined;
 }
 
 /**

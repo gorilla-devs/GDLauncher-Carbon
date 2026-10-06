@@ -80,15 +80,13 @@ const escapeHtml = (s: string) =>
     .replace(/"/g, "&quot;")
 
 const interp = (s: string, vars: Record<string, string | number>) =>
-  Object.entries(vars).reduce(
-    (acc, [k, v]) => acc.replaceAll(`{${k}}`, String(v)),
-    s,
+  s.replace(/\{([^{}]+)\}/g, (placeholder, key) =>
+    Object.hasOwn(vars, key) ? String(vars[key]) : placeholder,
   )
 
 const interpHtml = (s: string, vars: Record<string, string | number>) =>
-  Object.entries(vars).reduce(
-    (acc, [k, v]) => acc.replaceAll(`{${k}}`, escapeHtml(String(v))),
-    s,
+  s.replace(/\{([^{}]+)\}/g, (placeholder, key) =>
+    Object.hasOwn(vars, key) ? escapeHtml(String(vars[key])) : placeholder,
   )
 
 const authorDisplay = authors?.length ? authors.join(", ") : author || null
