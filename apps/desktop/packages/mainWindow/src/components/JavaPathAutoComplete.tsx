@@ -17,6 +17,14 @@ interface Props {
   updateValueOnlyOnBlur?: boolean
   disabled?: boolean
   inputColor?: string
+  /** Current exact valid selection, including registration pending state. */
+  onSelection?: (_selection: JavaPathSelection) => void
+}
+
+export interface JavaPathSelection {
+  id: string | null
+  path: string
+  pending: boolean
 }
 
 const JavaPathAutoComplete = (props: Props) => {
@@ -126,6 +134,13 @@ const JavaPathAutoComplete = (props: Props) => {
   }
 
   createEffect(() => {
+    const component = javaComponent()
+    const pending = createCustomJavaVersionMutation.isPending
+    props.onSelection?.({
+      id: component?.isValid && !pending ? component.id : null,
+      path: value(),
+      pending
+    })
     if (!props.updateValueOnlyOnBlur) {
       props.updateValue?.(javaComponent()?.id || null, value())
     }

@@ -349,9 +349,7 @@ export const useAddonMutations = (
       {
         instanceId: parseInt(params.id, 10),
         mods: modsWithUpdates,
-        onComplete: () => {
-          refetchAddons()
-        }
+        onComplete: () => refetchAddons()
       }
     )
   }
@@ -369,9 +367,7 @@ export const useAddonMutations = (
       {
         instanceId: parseInt(params.id, 10),
         mods: modsWithUpdates,
-        onComplete: () => {
-          refetchAddons()
-        }
+        onComplete: () => refetchAddons()
       }
     )
   }

@@ -6,3 +6,7 @@ import { createSignal } from "solid-js"
 // mid-migration would orphan files between the old and new runtime path.
 export const [isChangingRuntimePath, setIsChangingRuntimePath] =
   createSignal(false)
+
+// A completed/uncertain shutdown cannot leave normal UI through a dismiss action.
+export const [runtimeRecoveryRequired, setRuntimeRecoveryRequired] =
+  createSignal(false)

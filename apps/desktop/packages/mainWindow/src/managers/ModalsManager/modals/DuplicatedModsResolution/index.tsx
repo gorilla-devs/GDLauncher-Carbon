@@ -39,6 +39,24 @@ const DuplicatedModsResolution = (props: ModalProps) => {
   }))
 
   const [isApplying, setIsApplying] = createSignal(false)
+  const [effects, setEffects] = createSignal<
+    Record<
+      string,
+      { token: string; action: DuplicateAction; acknowledged: boolean }
+    >
+  >({})
+  const artifactKey = (
+    instanceId: number,
+    version: DuplicatedMod["versions"][number]
+  ) => JSON.stringify({ instanceId, version })
+  const affectedIds = () =>
+    duplicatedMods().flatMap((group) =>
+      group.versions
+        .filter((version) => effects()[artifactKey(data().instanceId, version)])
+        .map((version) => version.id)
+    )
+  const hasUncertainEffects = () =>
+    Object.values(effects()).some((effect) => !effect.acknowledged)
 
   // Initialize selected versions with first version of each mod
   if (Object.keys(selectedVersions()).length === 0) {
@@ -56,6 +74,7 @@ const DuplicatedModsResolution = (props: ModalProps) => {
       label: t("content:_trn_duplicates.steps.introduction"),
       icon: <div>1</div>,
       onClick: () => {
+        if (isApplying()) return
         setCurrentStep(0)
         setCurrentModIndex(0)
       }
@@ -64,6 +83,7 @@ const DuplicatedModsResolution = (props: ModalProps) => {
       label: t("content:_trn_duplicates.steps.select_mods"),
       icon: <div>2</div>,
       onClick: () => {
+        if (isApplying()) return
         setCurrentStep(1)
         // Keep currentModIndex as-is (stay on current mod)
       }
@@ -71,16 +91,21 @@ const DuplicatedModsResolution = (props: ModalProps) => {
     {
       label: t("content:_trn_duplicates.steps.action"),
       icon: <div>3</div>,
-      onClick: () => setCurrentStep(2)
+      onClick: () => {
+        if (!isApplying()) setCurrentStep(2)
+      }
     },
     {
       label: t("content:_trn_duplicates.steps.summary"),
       icon: <div>4</div>,
-      onClick: () => setCurrentStep(3)
+      onClick: () => {
+        if (!isApplying()) setCurrentStep(3)
+      }
     }
   ]
 
   const nextStep = () => {
+    if (isApplying()) return
     if (currentStep() === 1) {
       // On Select Mods step: cycle through mods first
       if (currentModIndex() < duplicatedMods().length - 1) {
@@ -94,6 +119,7 @@ const DuplicatedModsResolution = (props: ModalProps) => {
   }
 
   const prevStep = () => {
+    if (isApplying()) return
     if (currentStep() === 1) {
       // On Select Mods step: cycle back through mods first
       if (currentModIndex() > 0) {
@@ -111,10 +137,14 @@ const DuplicatedModsResolution = (props: ModalProps) => {
   }
 
   const handleVersionSelect = (groupKey: string, versionId: string) => {
+    if (isApplying()) return
+    if (affectedIds().includes(versionId)) return
     setSelectedVersions({ ...selectedVersions(), [groupKey]: versionId })
   }
 
   const handleActionSelect = (action: DuplicateAction) => {
+    if (isApplying()) return
+    if (hasUncertainEffects() && selectedAction() !== action) return
     setSelectedAction(action)
   }
 
@@ -127,16 +157,46 @@ const DuplicatedModsResolution = (props: ModalProps) => {
     }
     const instanceId = data().instanceId
     const action = selectedAction()
+    if (
+      plan.some((version) => {
+        const previous = effects()[artifactKey(instanceId, version)]
+        return previous?.action === "remove" && action === "disable"
+      })
+    ) {
+      toast.error(t("content:_trn_duplicates.removed_cannot_disable"))
+      return
+    }
+    if (
+      Object.values(selectedVersions()).some((id) => affectedIds().includes(id))
+    ) {
+      toast.error(t("content:_trn_duplicates.attempted_cannot_keep"))
+      return
+    }
     setIsApplying(true)
 
     try {
       for (const version of plan) {
+        const key = artifactKey(instanceId, version)
+        const previous = effects()[key]
+        if (previous?.acknowledged && previous.action === action) continue
+        if (previous && !previous.acknowledged && previous.action !== action)
+          throw new Error(t("content:_trn_duplicates.retry_before_action"))
+        const effect =
+          previous?.action === action
+            ? previous
+            : { action, token: crypto.randomUUID(), acknowledged: false }
+        setEffects((prev) => ({ ...prev, [key]: effect }))
         const mutation =
           action === "disable" ? disableModMutation : deleteModMutation
         await mutation.mutateAsync({
           instance_id: instanceId,
-          mod_id: version.id
+          mod_id: version.id,
+          operation_token: effect.token
         })
+        setEffects((prev) => ({
+          ...prev,
+          [key]: { ...effect, acknowledged: true }
+        }))
       }
 
       // Success - close modal (signals will reset on remount)
@@ -156,10 +216,16 @@ const DuplicatedModsResolution = (props: ModalProps) => {
       noHeader={props.noHeader}
       title={props?.title}
       noPadding={true}
+      preventClose={isApplying()}
     >
       <div class="w-180 box-border flex h-[600px] select-none flex-col p-6">
         <div class="flex h-16 w-full items-center justify-center overflow-hidden pb-6 mb-6">
-          <div class="w-[75%]">
+          <div
+            class="w-[75%]"
+            inert={isApplying()}
+            aria-disabled={isApplying()}
+            classList={{ "opacity-50 pointer-events-none": isApplying() }}
+          >
             <Steps steps={resolutionSteps} currentStep={currentStep()} />
           </div>
         </div>
@@ -167,6 +233,7 @@ const DuplicatedModsResolution = (props: ModalProps) => {
           <Switch>
             <Match when={currentStep() === 0}>
               <IntroStep
+                isApplying={isApplying()}
                 nextStep={nextStep}
                 duplicatedModsCount={duplicatedMods().length}
               />
@@ -177,6 +244,7 @@ const DuplicatedModsResolution = (props: ModalProps) => {
                 mod={duplicatedMods()[currentModIndex()]}
                 currentModIndex={currentModIndex()}
                 totalMods={duplicatedMods().length}
+                isApplying={isApplying()}
                 nextStep={nextStep}
                 prevStep={prevStep}
                 onVersionSelect={(versionId) =>
@@ -191,15 +259,18 @@ const DuplicatedModsResolution = (props: ModalProps) => {
                   ]
                 }
                 instanceId={data().instanceId}
+                unavailableVersions={affectedIds()}
               />
             </Match>
 
             <Match when={currentStep() === 2}>
               <ActionStep
+                isApplying={isApplying()}
                 nextStep={nextStep}
                 prevStep={prevStep}
                 onActionSelect={handleActionSelect}
                 selectedAction={selectedAction()}
+                actionLocked={hasUncertainEffects()}
               />
             </Match>
 

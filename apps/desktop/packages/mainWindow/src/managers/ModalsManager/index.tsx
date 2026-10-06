@@ -17,7 +17,10 @@ import { listenMemoryWarning } from "@/utils/memoryWarningBridge"
 import { listenServerEula } from "@/utils/serverEulaBridge"
 import { cleanupRunning } from "./modals/CacheCleanup/state"
 import { shaderInstallRunning } from "./modals/ShaderLoaderSetup/state"
-import { isChangingRuntimePath } from "./modals/ConfirmChangeRuntimePath/state"
+import {
+  isChangingRuntimePath,
+  runtimeRecoveryRequired
+} from "./modals/ConfirmChangeRuntimePath/state"
 import { resolvePreventClose } from "./preventClose"
 
 export interface ModalProps {
@@ -135,7 +138,7 @@ const getDefaultModals = (t: TypedTFunction) => ({
     // Backdrop and side-panel close are blocked while the migration is
     // running. Closing mid-flight would orphan files between old and new
     // runtime paths.
-    preventClose: () => isChangingRuntimePath()
+    preventClose: () => isChangingRuntimePath() || runtimeRecoveryRequired()
   },
   runtimeMoveNotice: {
     component: lazy(() => import("./modals/RuntimeMoveNotice")),
@@ -300,6 +303,8 @@ export interface ModalStackEntryApi {
   unregisterPreventClose: () => void
   /** Close only this live entry while it is still the current top modal. */
   closeIfCurrentTop: () => boolean
+  /** Remove only this live entry, including while another modal is above it. */
+  closeOwn: () => boolean
 }
 
 // Lets the ModalLayout rendered for a given stack entry register its own
@@ -323,13 +328,15 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
 
   const [_searchParams, setSearchParams] = useSearchParams()
 
-  const closeModal = (name?: ModalName) => {
+  const closeModal = (name?: ModalName, entry?: StackEntry) => {
     setModalStack((currentStack) => {
       const newStack = currentStack.slice()
 
       // Remove the specific modal or the top modal
       let indexToRemove: number
-      if (name) {
+      if (entry) {
+        indexToRemove = currentStack.indexOf(entry)
+      } else if (name) {
         indexToRemove = currentStack.findIndex((modal) => modal.name === name)
       } else {
         indexToRemove = currentStack.length - 1
@@ -485,6 +492,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                     return false
                   }
                   closeModal()
+                  return true
+                },
+                closeOwn: () => {
+                  if (!entryLive || !modalStack().includes(modal)) return false
+                  closeModal(undefined, modal)
                   return true
                 }
               }

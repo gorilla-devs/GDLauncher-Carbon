@@ -4,13 +4,20 @@ import ModalLayout from "../ModalLayout"
 import { Button, Input, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { createSignal } from "solid-js"
-import JavaPathAutoComplete from "@/components/JavaPathAutoComplete"
+import JavaPathAutoComplete, {
+  type JavaPathSelection
+} from "@/components/JavaPathAutoComplete"
 
 const JavaProfileCreationModal = (props: ModalProps) => {
   const modalsContext = useModal()
   const [t] = useTransContext()
   const [profileName, setProfileName] = createSignal("")
-  const [javaId, setJavaId] = createSignal("")
+  const [selection, setSelection] = createSignal<JavaPathSelection>({
+    id: null,
+    path: "",
+    pending: false
+  })
+  const [submitting, setSubmitting] = createSignal(false)
 
   const createProfileMutation = rspc.createMutation(() => ({
     mutationKey: ["java.createJavaProfile"]
@@ -28,6 +35,39 @@ const JavaProfileCreationModal = (props: ModalProps) => {
     return false
   }
 
+  const canCreate = () =>
+    !submitting() &&
+    !createProfileMutation.isPending &&
+    !profileAlreadyExists() &&
+    !!profileName() &&
+    !!selection().id &&
+    !!selection().path &&
+    !selection().pending
+  const createProfile = async () => {
+    if (!canCreate()) return
+    const captured = { ...selection() }
+    const name = profileName()
+    setSubmitting(true)
+    try {
+      if (
+        selection().id !== captured.id ||
+        selection().path !== captured.path ||
+        selection().pending
+      )
+        return
+      await createProfileMutation.mutateAsync({
+        profileName: name,
+        javaId: captured.id!
+      })
+      toast.success("Profile created")
+      modalsContext?.closeModal()
+    } catch {
+      // MutationCache owns RPC error feedback; keep this event handler settled.
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   return (
     <ModalLayout
       noHeader={props.noHeader}
@@ -41,7 +81,7 @@ const JavaProfileCreationModal = (props: ModalProps) => {
             <Trans key="general:_trn_profile_name" />
           </h4>
           <Input
-            disabled={createProfileMutation.isPending}
+            disabled={submitting() || createProfileMutation.isPending}
             placeholder={t("placeholders:_trn_type_profile_name")}
             value={profileName()}
             onInput={(e) => setProfileName(e.currentTarget.value)}
@@ -56,40 +96,22 @@ const JavaProfileCreationModal = (props: ModalProps) => {
           </h4>
           <JavaPathAutoComplete
             inputColor="bg-darkSlate-600"
-            disabled={createProfileMutation.isPending}
-            updateValue={(value) => {
-              if (value) setJavaId(value)
-            }}
+            disabled={submitting() || createProfileMutation.isPending}
+            onSelection={setSelection}
           />
         </div>
         <div class="flex justify-between">
           <Button
             type="secondary"
-            disabled={createProfileMutation.isPending}
+            disabled={submitting() || createProfileMutation.isPending}
             onClick={() => {
+              if (submitting() || createProfileMutation.isPending) return
               modalsContext?.closeModal()
             }}
           >
             <Trans key="instances:_trn_instance_confirm_deletion.cancel" />
           </Button>
-          <Button
-            disabled={
-              profileAlreadyExists() ||
-              !javaId() ||
-              !profileName() ||
-              createProfileMutation.isPending
-            }
-            onClick={async () => {
-              await createProfileMutation.mutateAsync({
-                profileName: profileName(),
-                javaId: javaId()
-              })
-
-              toast.success("Profile created")
-
-              modalsContext?.closeModal()
-            }}
-          >
+          <Button disabled={!canCreate()} onClick={createProfile}>
             <Trans key="general:_trn_create" />
           </Button>
         </div>

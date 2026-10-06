@@ -1,9 +1,10 @@
 import { Progress, toast, Spinner } from "@gd/ui"
-import { ModalProps, useModal } from ".."
+import { ModalProps, useModalStackEntry } from ".."
 import ModalLayout from "../ModalLayout"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 
 import { rspc } from "@/utils/rspcClient"
+import { extractErrorDisplay } from "@/utils/rspcErrorText"
 import { createSignal, onCleanup } from "solid-js"
 import { Mod } from "@gd/core_module/bindings"
 import { updateAddonBatch } from "@/components/ModDownloadButton/hooks/updateAddonBatch"
@@ -11,21 +12,40 @@ import { updateAddonBatch } from "@/components/ModDownloadButton/hooks/updateAdd
 interface Props {
   instanceId: number
   mods: Mod[]
-  onComplete?: () => void
+  onComplete?: () => void | Promise<unknown>
 }
 
 const ModsUpdater = (props: ModalProps) => {
+  const [t] = useTransContext()
   const data: () => Props = () => props?.data
-  const modalsContext = useModal()
+  const owningEntry = useModalStackEntry()
   const ctx = rspc.useContext()
   const captured = { ...data(), mods: [...data().mods] }
   const [modsUpdated, setModsUpdated] = createSignal(0)
   const [isDestroyed, setIsDestroyed] = createSignal(false)
+  let waitTimer: ReturnType<typeof setTimeout> | undefined
+  let releaseWait: (() => void) | undefined
+  const waitForNextRead = () =>
+    new Promise<void>((resolve) => {
+      releaseWait = resolve
+      waitTimer = setTimeout(() => {
+        waitTimer = undefined
+        releaseWait = undefined
+        resolve()
+      }, 500)
+    })
 
   onCleanup(() => {
     setIsDestroyed(true)
+    if (waitTimer !== undefined) clearTimeout(waitTimer)
+    releaseWait?.()
+    waitTimer = undefined
+    releaseWait = undefined
   })
 
+  // A refused update is reported once per mod, by name, through `settled`
+  // below (with the global toast keeping the core's sentence even after this
+  // dialog closes), so there is no third toast here.
   const updateModMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.updateMod"],
     onError: (err) => {
@@ -44,6 +64,7 @@ const ModsUpdater = (props: ModalProps) => {
       (id) => ctx.client.query(["vtask.getTaskOutcome", id]),
       () => !isDestroyed(),
       (mod, error) => {
+        if (isDestroyed()) return
         if (error !== undefined)
           toast.error(
             t("content:_trn_mods_updater.update_failed", {
@@ -53,9 +74,20 @@ const ModsUpdater = (props: ModalProps) => {
             { description: error }
           )
         setModsUpdated((prev) => prev + 1)
-      }
+      },
+      waitForNextRead
     )
     if (outcome.abandoned || isDestroyed()) return
+    try {
+      await captured.onComplete?.()
+    } catch (error) {
+      if (!isDestroyed())
+        toast.error(t("content:_trn_mods_updater.refresh_error"), {
+          description: extractErrorDisplay(error)
+        })
+      return
+    }
+    if (isDestroyed()) return
     if (outcome.failed === 0) {
       toast.success(
         captured.mods.some((mod) => mod.addon_type === "datapacks")
@@ -63,8 +95,7 @@ const ModsUpdater = (props: ModalProps) => {
           : t("content:_trn_mods_updater.success")
       )
     }
-    captured.onComplete?.()
-    modalsContext?.closeModal()
+    owningEntry?.closeOwn()
   }
 
   // The oldest update still running.

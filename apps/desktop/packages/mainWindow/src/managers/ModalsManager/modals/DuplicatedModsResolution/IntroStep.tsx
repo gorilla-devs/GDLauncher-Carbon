@@ -2,6 +2,7 @@ import { Button } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 
 interface Props {
+  isApplying?: boolean
   nextStep: () => void
   duplicatedModsCount: number
 }
@@ -47,7 +48,14 @@ const IntroStep = (props: Props) => {
       </div>
 
       <div class="mt-6 flex w-full justify-end">
-        <Button type="primary" size="large" onClick={() => props.nextStep()}>
+        <Button
+          type="primary"
+          size="large"
+          disabled={props.isApplying}
+          onClick={() => {
+            if (!props.isApplying) props.nextStep()
+          }}
+        >
           <Trans key="content:_trn_duplicates.intro.button_start" />
         </Button>
       </div>

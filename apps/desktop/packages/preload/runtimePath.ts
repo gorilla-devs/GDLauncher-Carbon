@@ -1,3 +1,4 @@
+import type { RuntimeRelocationResult } from "../main/utils/runtimeRelocation"
 import { contextBridge, ipcRenderer } from "electron"
 
 contextBridge.exposeInMainWorld("getRuntimePath", async () =>
@@ -10,7 +11,10 @@ contextBridge.exposeInMainWorld("getInitialRuntimePath", async () =>
 
 contextBridge.exposeInMainWorld(
   "changeRuntimePath",
-  async (newPath: string | null, switchOnly?: boolean) =>
+  async (
+    newPath: string | null,
+    switchOnly?: boolean
+  ): Promise<RuntimeRelocationResult> =>
     ipcRenderer.invoke("changeRuntimePath", newPath, switchOnly)
 )
 

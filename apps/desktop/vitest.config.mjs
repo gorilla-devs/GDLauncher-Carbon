@@ -19,6 +19,8 @@ export default defineConfig({
       "**/*.task30.test.{ts,tsx}",
       // Controlled Task31 modal/profile entry: vitest.task31.config.mjs.
       "**/*.task31.test.{ts,tsx}",
+      // Controlled Task32 continuation/recovery entry: vitest.task32.config.mjs.
+      "**/*.task32.test.{ts,tsx}",
       "**/node_modules/**",
       "**/dist/**",
       "e2e-tests/**/*.spec.ts",

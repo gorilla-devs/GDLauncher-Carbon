@@ -14,6 +14,14 @@ import {
 } from "./runtimePathGuard"
 import type { RuntimeBlocker } from "./coreShutdown"
 
+export type RuntimeRelocationResult =
+  | { type: "relaunching" }
+  | {
+      type: "failed"
+      recovery: "none" | "restart" | "shutdown_unresolved"
+      message: string
+    }
+
 export const MIGRATION_MARKER = ".gdl_migration_in_progress"
 
 /** The destination holds a move that stopped before it finished. */

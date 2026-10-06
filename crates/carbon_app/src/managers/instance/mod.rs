@@ -55,6 +55,7 @@ use unicode_segmentation::UnicodeSegmentation;
 #[cfg(test)]
 mod lifecycle_tests;
 
+mod addon_retry;
 pub mod explore;
 pub mod export;
 pub mod importer;
@@ -74,6 +75,7 @@ pub struct InstanceManager {
     test_hooks: lifecycle_tests::Hooks,
     pub(crate) instances: RwLock<HashMap<InstanceId, Instance>>,
     running_publication: running_publication::RunningPublication,
+    addon_retry_receipts: addon_retry::Receipts,
     index_lock: Mutex<()>,
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
@@ -280,6 +282,7 @@ impl InstanceManager {
             }),
             origin_checks: RwLock::new(HashMap::new()),
             running_publication: running_publication::RunningPublication::default(),
+            addon_retry_receipts: Default::default(),
         }
     }
 }

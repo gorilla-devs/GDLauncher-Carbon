@@ -52,7 +52,8 @@ vi.mock("./modals/ShaderLoaderSetup/state", () => ({
   shaderInstallRunning: () => false
 }))
 vi.mock("./modals/ConfirmChangeRuntimePath/state", () => ({
-  isChangingRuntimePath: () => false
+  isChangingRuntimePath: () => false,
+  runtimeRecoveryRequired: () => false
 }))
 vi.mock("@/utils/rspcClient", () => ({
   rspc: {

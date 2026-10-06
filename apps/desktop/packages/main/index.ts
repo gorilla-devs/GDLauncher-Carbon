@@ -1152,47 +1152,69 @@ function runtimeDestinationContext() {
 
 ipcMain.handle(
   "changeRuntimePath",
-  async (_, newPath: string, switchOnly = false) => {
+  async (
+    _,
+    newPath: string,
+    switchOnly = false
+  ): Promise<import("./utils/runtimeRelocation").RuntimeRelocationResult> => {
     return withRuntimeOperation(async () => {
-      if (!CURRENT_RUNTIME_PATH) throw new Error("Runtime is not initialized")
-      if (overrideCLIDataPath?.value || overrideEnvDataPath) {
-        throw new Error(
-          "Remove the explicit runtime path override and restart before relocating"
-        )
-      }
-      const source = CURRENT_RUNTIME_PATH
-      const warnings = await relocateRuntime({
-        source,
-        target: newPath,
-        switchOnly,
-        pointer: path.join(app.getPath("userData"), RUNTIME_PATH_OVERRIDE_NAME),
-        context: runtimeDestinationContext(),
-        stopCore: async () => {
-          const core = await coreModule
-          if (core.type !== "success")
-            throw new Error("Core is not ready; restart and retry relocation")
-          await stopCoreForRelocation(
-            { ...core.result, process: coreProcessHandle },
-            source
+      let recovery: "none" | "restart" | "shutdown_unresolved" = "none"
+      try {
+        if (!CURRENT_RUNTIME_PATH) throw new Error("Runtime is not initialized")
+        if (overrideCLIDataPath?.value || overrideEnvDataPath) {
+          throw new Error(
+            "Remove the explicit runtime path override and restart before relocating"
           )
-        },
-        progress: (value) =>
-          win?.webContents.send("changeRuntimePathProgress", value)
-      })
-      for (const warning of warnings) console.warn(warning)
-      if (warnings.length)
-        await dialog.showMessageBox({
-          type: "info",
-          title: "Runtime location changed",
-          message:
-            "The new runtime is ready. Review the retained files before restarting.",
-          detail: warnings.join("\n\n"),
-          buttons: ["Restart"],
-          defaultId: 0,
-          noLink: true
+        }
+        const source = CURRENT_RUNTIME_PATH
+        const warnings = await relocateRuntime({
+          source,
+          target: newPath,
+          switchOnly,
+          pointer: path.join(
+            app.getPath("userData"),
+            RUNTIME_PATH_OVERRIDE_NAME
+          ),
+          context: runtimeDestinationContext(),
+          stopCore: async () => {
+            const core = await coreModule
+            if (core.type !== "success")
+              throw new Error("Core is not ready; restart and retry relocation")
+            recovery = "shutdown_unresolved"
+            try {
+              await stopCoreForRelocation(
+                { ...core.result, process: coreProcessHandle },
+                source
+              )
+            } catch (error) {
+              if (
+                coreProcessHandle &&
+                (coreProcessHandle.exitCode != null ||
+                  coreProcessHandle.signalCode != null)
+              )
+                recovery = "restart"
+              throw error
+            }
+            recovery = "restart"
+          },
+          progress: (value) =>
+            win?.webContents.send("changeRuntimePathProgress", value)
         })
-      app.relaunch()
-      app.exit()
+        for (const warning of outcome.warnings) console.warn(warning)
+        // Whatever stayed in the old folder is named, in the user's language, on every
+        // start from the new one until the user acknowledges it. Main restarts now, as
+        // 2.0.40 did, so a window closed or crashed during the move cannot leave the
+        // launcher on a stopped core.
+        await recordRuntimeMoveNotice(
+          app.getPath("userData"),
+          leftInOldFolder(source, newPath, outcome)
+        )
+        app.relaunch()
+        app.exit()
+        return { type: "relaunching" }
+      } catch (error) {
+        return { type: "failed", recovery, message: String(error) }
+      }
     })
   }
 )

@@ -1,3 +1,4 @@
+import type { RuntimeRelocationResult } from "../../main/utils/runtimeRelocation"
 import type { DbRecoveryCategory } from "../../main/utils/dbRecovery"
 import type { FEReleaseChannel } from "@gd/core_module/bindings"
 import { BoundsSize } from "./utils/adhelper"
@@ -74,7 +75,7 @@ declare global {
     changeRuntimePath: (
       newPath: string | null,
       switchOnly?: boolean
-    ) => Promise<void>
+    ) => Promise<RuntimeRelocationResult>
     changeRuntimePathProgress: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void
@@ -83,8 +84,19 @@ declare global {
     ) => Promise<RuntimePathValidation>
     skipIntroAnimation: boolean
     closeWindow: () => void
-    onShowWindowCloseModal: (cb: () => void) => void
-    relaunch: () => void
+    onShowWindowCloseModal: (cb: () => void) => () => void
+    /** Resolves "kept" when the user chose to keep GDLauncher open. */
+    relaunch: () => Promise<{ status: "kept" | "relaunching" } | undefined>
+    onShutdownPrompt: (
+      cb: (message: ShutdownPromptMessage) => void
+    ) => () => void
+    answerShutdownPrompt: (
+      id: number,
+      choice: "wait" | "force" | "keep"
+    ) => void
+    /** Prompt `id` is on screen; main asks natively if it is never told. */
+    shownShutdownPrompt: (id: number) => void
+    setShutdownPromptText: (text: Record<string, string>) => void
     listenToCoreModuleProgress: (
       cb: (event: Electron.IpcRendererEvent, progress: number) => void
     ) => void

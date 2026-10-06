@@ -23,10 +23,10 @@ const SingleCheckBox = (props: Props) => {
   const isSelected = () =>
     !isInvalid() && instances().some((instance) => instance === uniqueId())
 
-  const handleChange = () => {
+  const handleChange = (checked: boolean) => {
     if (isInvalid()) return
 
-    if (isSelected()) {
+    if (!checked) {
       if (props.setList) {
         props.setList((prev) => prev.filter((e) => e !== uniqueId()))
       }
@@ -34,7 +34,7 @@ const SingleCheckBox = (props: Props) => {
       if (props.setList) {
         const id = uniqueId()
         if (id) {
-          props.setList((prev) => [...prev, id])
+          props.setList((prev) => (prev.includes(id) ? prev : [...prev, id]))
         }
       }
     }
@@ -49,7 +49,7 @@ const SingleCheckBox = (props: Props) => {
             ? "bg-primary-500/10 ring-1 ring-primary-500 cursor-pointer"
             : "bg-darkSlate-800 outline outline-1 outline-transparent hover:outline-darkSlate-500 cursor-pointer"
       }`}
-      onClick={handleChange}
+      onClick={() => handleChange(!isSelected())}
     >
       <Show
         when={!isInvalid()}
@@ -57,7 +57,9 @@ const SingleCheckBox = (props: Props) => {
           <div class="i-hugeicons:alert-02 text-yellow-500 shrink-0 text-xl" />
         }
       >
-        <Checkbox checked={isSelected()} onChange={handleChange} />
+        <div onClick={(event) => event.stopPropagation()}>
+          <Checkbox checked={isSelected()} onChange={handleChange} />
+        </div>
       </Show>
       <div
         class={`flex min-w-0 flex-1 flex-col gap-0.5 ${

@@ -235,5 +235,9 @@
   "_trn_table.status": "Status",
   "_trn_table.actions": "Actions",
   "_trn_mods.search": "Search mods...",
-  "_trn_sort_by_asc": "Sort Ascending"
+  "_trn_sort_by_asc": "Sort Ascending",
+  "_trn_duplicates.retry_before_action": "Retry the incomplete action before changing it. Its result has not been confirmed.",
+  "_trn_duplicates.removed_cannot_disable": "A removed addon cannot be disabled. Check installed addons and reopen this dialog.",
+  "_trn_duplicates.attempted_cannot_keep": "This addon was already changed or its result is uncertain. Retry incomplete work, then check installed addons before choosing it to keep.",
+  "_trn_mods_updater.refresh_error": "Could not refresh installed addons"
 }

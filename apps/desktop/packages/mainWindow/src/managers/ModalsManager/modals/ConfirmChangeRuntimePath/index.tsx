@@ -12,7 +12,12 @@ import {
 } from "solid-js"
 import { Portal } from "solid-js/web"
 import { RTprogress, RTsetProgress } from "@/utils/runtimePathProgress"
-import { isChangingRuntimePath, setIsChangingRuntimePath } from "./state"
+import {
+  isChangingRuntimePath,
+  setIsChangingRuntimePath,
+  runtimeRecoveryRequired,
+  setRuntimeRecoveryRequired
+} from "./state"
 
 const blockerLabel = {
   game: "java:_trn_runtime_relocation_busy.game",
@@ -134,6 +139,11 @@ function blockerRows(blockers: RuntimeBlocker[]) {
 
 const ConfirmChangeRuntimePath = (props: ModalProps) => {
   const modalsContext = useModal()
+  const submitted = {
+    target: props.data.runtimePath as string,
+    switchOnly: !!props.data.isTargetFolderAlreadyUsed
+  }
+  const [shutdownUnresolved, setShutdownUnresolved] = createSignal(false)
 
   const [migrationError, setMigrationError] = createSignal<string | undefined>(
     undefined
@@ -142,6 +152,36 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
   const [currentRuntimePath] = createResource(() => {
     return window.getRuntimePath()
   })
+
+  const attemptRelocation = async (retry: boolean) => {
+    if (
+      isChangingRuntimePath() ||
+      (runtimeRecoveryRequired() && (!retry || !shutdownUnresolved()))
+    )
+      return
+    setIsChangingRuntimePath(true)
+    setMigrationError(undefined)
+    try {
+      const result = await window.changeRuntimePath(
+        submitted.target,
+        submitted.switchOnly
+      )
+      if (result.type === "failed") {
+        // Once shutdown ownership is unresolved, a later validation/IPC error
+        // cannot silently grant dismissal of the stopped/draining service.
+        if (result.recovery !== "none") {
+          setRuntimeRecoveryRequired(true)
+          setShutdownUnresolved(result.recovery === "shutdown_unresolved")
+        }
+        setMigrationError(result.message)
+      } else modalsContext?.closeModal()
+    } catch (error) {
+      setMigrationError(String(error))
+    } finally {
+      RTsetProgress(undefined)
+      setIsChangingRuntimePath(false)
+    }
+  }
 
   const progressValue = () => {
     const p = RTprogress()
@@ -155,7 +195,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
       <ModalLayout
         noHeader={props.noHeader}
         title={props.title}
-        preventClose={isChangingRuntimePath()}
+        preventClose={isChangingRuntimePath() || runtimeRecoveryRequired()}
         height="h-120"
         width="w-180"
       >
@@ -199,8 +239,9 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
           </div>
           <div class="flex w-full justify-between">
             <Button
-              disabled={isChangingRuntimePath()}
+              disabled={isChangingRuntimePath() || runtimeRecoveryRequired()}
               onClick={() => {
+                if (isChangingRuntimePath() || runtimeRecoveryRequired()) return
                 modalsContext?.closeModal()
               }}
             >
@@ -208,24 +249,8 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
             </Button>
             <Button
               type="secondary"
-              disabled={isChangingRuntimePath()}
-              onClick={async () => {
-                setIsChangingRuntimePath(true)
-                setMigrationError(undefined)
-
-                try {
-                  await window.changeRuntimePath(
-                    props.data.runtimePath,
-                    props.data.isTargetFolderAlreadyUsed
-                  )
-                  modalsContext?.closeModal()
-                } catch (e: any) {
-                  setMigrationError(e.message)
-                }
-
-                RTsetProgress(undefined)
-                setIsChangingRuntimePath(false)
-              }}
+              disabled={isChangingRuntimePath() || runtimeRecoveryRequired()}
+              onClick={() => attemptRelocation(false)}
             >
               <Trans key="settings:_trn_confirm_change_confirm_button" />
             </Button>
@@ -453,16 +478,54 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                       <Trans key="java:_trn_runtime_recovery.not_moved_title" />
                     </Show>
                   </div>
-                  <Button
-                    type="secondary"
-                    class="mt-6"
-                    onClick={() => {
-                      setMigrationError(undefined)
-                      modalsContext?.closeModal()
-                    }}
-                  >
-                    <Trans key="general:_trn_dismiss" />
-                  </Button>
+                  <Show when={runtimeRecoveryRequired()}>
+                    <p>
+                      <Trans key="java:_trn_runtime_recovery.keep_folders" />
+                    </p>
+                    <Show when={shutdownUnresolved()}>
+                      <p>
+                        <Trans key="java:_trn_runtime_recovery.unresolved" />
+                      </p>
+                      <Button
+                        disabled={isChangingRuntimePath()}
+                        onClick={() => attemptRelocation(true)}
+                      >
+                        <Trans key="java:_trn_runtime_recovery.retry" />
+                      </Button>
+                    </Show>
+                    <Show when={!shutdownUnresolved()}>
+                      <Button
+                        type="secondary"
+                        disabled={isChangingRuntimePath()}
+                        onClick={async () => {
+                          if (isChangingRuntimePath()) return
+                          setIsChangingRuntimePath(true)
+                          try {
+                            await window.relaunch()
+                          } catch (error) {
+                            setMigrationError(String(error))
+                          } finally {
+                            setIsChangingRuntimePath(false)
+                          }
+                        }}
+                      >
+                        <Trans key="java:_trn_runtime_recovery.restart" />
+                      </Button>
+                    </Show>
+                  </Show>
+                  <Show when={!runtimeRecoveryRequired()}>
+                    <Button
+                      type="secondary"
+                      class="mt-6"
+                      onClick={() => {
+                        if (runtimeRecoveryRequired()) return
+                        setMigrationError(undefined)
+                        modalsContext?.closeModal()
+                      }}
+                    >
+                      <Trans key="general:_trn_dismiss" />
+                    </Button>
+                  </Show>
                 </div>
               </Match>
               <Match when={!migrationError()}>

@@ -151,6 +151,12 @@ async function fixture() {
       return "stopped"
     }
   }
+  const rawMove = callback("changeRuntimePath", globals)
+  const move = async (...args: unknown[]) => {
+    const result = await rawMove(...args)
+    if (result?.type === "failed") throw new Error(result.message)
+    return result
+  }
   return {
     root,
     source,
@@ -161,7 +167,7 @@ async function fixture() {
     relaunch,
     dialog,
     globals,
-    move: callback("changeRuntimePath", globals),
+    move,
     validate: callback("validateRuntimePath", globals)
   }
 }
@@ -878,7 +884,11 @@ it("explicit runtime overrides reject before core shutdown", async () => {
     ...f.globals,
     overrideCLIDataPath: { value: f.source }
   })
-  await expect(move(null, f.target)).rejects.toThrow(/explicit runtime/)
+  await expect(move(null, f.target)).resolves.toMatchObject({
+    type: "failed",
+    recovery: "none",
+    message: expect.stringMatching(/explicit runtime/)
+  })
   expect(f.stop).not.toHaveBeenCalled()
 })
 

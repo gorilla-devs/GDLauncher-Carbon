@@ -133,9 +133,9 @@ export type Procedures = {
         { key: "instance.deleteGroupWithInstances", input: FEGroupId, result: null } | 
         { key: "instance.deleteInstance", input: FEInstanceId, result: null } | 
         { key: "instance.deleteLog", input: GameLogId, result: null } | 
-        { key: "instance.deleteMod", input: InstanceMod, result: null } | 
+        { key: "instance.deleteMod", input: RetryableInstanceMod, result: null } | 
         { key: "instance.deleteShare", input: string, result: null } | 
-        { key: "instance.disableMod", input: InstanceMod, result: null } | 
+        { key: "instance.disableMod", input: RetryableInstanceMod, result: null } | 
         { key: "instance.duplicateInstance", input: DuplicateInstance, result: FEInstanceId } | 
         { key: "instance.enableMod", input: InstanceMod, result: null } | 
         { key: "instance.export", input: ExportArgs, result: FETaskId } | 
@@ -435,8 +435,6 @@ export type FEManagedJavaOs = "windows" | "linux" | "macOs"
 export type CFFEFileModule = { name: string; fingerprint: string }
 
 export type MRFEProjectID = string
-
-export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }
 
 export type MRFEVersionIDs = string[]
 

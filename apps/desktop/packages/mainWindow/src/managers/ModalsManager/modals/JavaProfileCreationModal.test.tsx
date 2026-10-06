@@ -59,7 +59,13 @@ vi.mock("@/components/JavaPathAutoComplete", () => ({
   default: (props: any) => (
     <input
       disabled={props.disabled}
-      onInput={() => props.updateValue("jdk8")}
+      onInput={() =>
+        props.onSelection({
+          id: "jdk8",
+          path: "/synthetic/jdk8",
+          pending: false
+        })
+      }
     />
   )
 }))

@@ -13,6 +13,7 @@ import { PRESS_CLASSES_LIGHT } from "../Clickable"
 interface Props {
   value: string | number | string[] | undefined
   checked: boolean
+  disabled?: boolean
   onChange?: OnChange
   buttonStyle?: ButtonStyle
   allowDeselect?: boolean
@@ -51,6 +52,7 @@ const Radio = (props: Props) => {
     <>
       <input
         type="radio"
+        disabled={props.disabled}
         class={props.buttonStyle === "button" ? "hidden" : "peer sr-only"}
         name={props.name ?? id}
         value={
@@ -61,9 +63,11 @@ const Radio = (props: Props) => {
         checked={props.checked}
         id={id}
         onChange={() => {
+          if (props.disabled) return
           if (props.buttonStyle !== "button") props.onChange?.(props.value)
         }}
         onClick={() => {
+          if (props.disabled) return
           if (
             props.buttonStyle !== "button" &&
             props.allowDeselect &&
@@ -73,6 +77,7 @@ const Radio = (props: Props) => {
           }
         }}
         onKeyDown={(event) => {
+          if (props.disabled) return
           if (
             props.buttonStyle !== "button" &&
             props.allowDeselect &&
@@ -88,12 +93,19 @@ const Radio = (props: Props) => {
         for={id}
         class={`${baseClasses} cursor-pointer peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-primary-500`}
         classList={{
-          "hover:bg-darkSlate-700": !props.checked,
+          "hover:bg-darkSlate-700": !props.checked && !props.disabled,
+          "opacity-50 !cursor-not-allowed": props.disabled,
           "bg-darkSlate-600": props.checked
         }}
-        onMouseEnter={() => setIsHovered(true)}
+        onMouseEnter={() => {
+          if (!props.disabled) setIsHovered(true)
+        }}
         onMouseLeave={() => setIsHovered(false)}
         onClick={(event) => {
+          if (props.disabled) {
+            event.preventDefault()
+            return
+          }
           if (
             props.buttonStyle === "button" ||
             (props.allowDeselect && props.checked)
@@ -106,7 +118,10 @@ const Radio = (props: Props) => {
         }}
       >
         <Show when={props.buttonStyle === "button"}>
-          <Button type={props.checked ? "primary" : "secondary"}>
+          <Button
+            disabled={props.disabled}
+            type={props.checked ? "primary" : "secondary"}
+          >
             {props.children}
           </Button>
         </Show>

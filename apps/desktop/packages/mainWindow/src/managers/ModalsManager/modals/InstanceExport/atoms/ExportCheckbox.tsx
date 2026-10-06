@@ -69,16 +69,23 @@ const ExportCheckbox = (props: {
   const rspcContext = rspc.useContext()
 
   createAsyncEffect((isStale) => {
-    const currentIsOpen = isOpen()
-    const currentContents = contents()
-    const currentPath = props.folder.path
+    const currentPath = props.folder.path ? [...props.folder.path] : undefined
+    const instanceId = props.instanceId
+    const initialData = props.initialData
+    setContents(initialData ?? null)
 
-    if (!currentIsOpen && currentContents === null && currentPath) {
+    // The parent query owns unnamed roots. Expansion is presentation only and
+    // cannot revoke a request belonging to this instance/directory.
+    if (
+      initialData === undefined &&
+      currentPath &&
+      (currentPath.length > 0 || props.folder.name)
+    ) {
       rspcContext.client
         .query([
           "instance.explore",
           {
-            instance_id: props.instanceId,
+            instance_id: instanceId,
             path: currentPath
           }
         ])
@@ -89,7 +96,8 @@ const ExportCheckbox = (props: {
           }
         })
         .catch((error) => {
-          console.error("Failed to explore instance folder:", error)
+          if (!isStale())
+            console.error("Failed to explore instance folder:", error)
         })
     }
   })

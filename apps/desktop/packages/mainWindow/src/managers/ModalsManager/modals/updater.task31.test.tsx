@@ -13,19 +13,40 @@ const c = vi.hoisted(() => ({
   route: { id: "7" }
 }))
 vi.mock("@gd/ui", async () => import("@/task31.fixture"))
-vi.mock("@gd/i18n", () => ({
-  Trans: (p: any) => (
-    <span data-key={p.key}>
-      {p.key}:{JSON.stringify(p.options)}
-    </span>
-  )
-}))
+vi.mock("@gd/i18n", async () => {
+  // Toasts are asserted in the shipped English, so the real bundle backs t().
+  const { default: content } =
+    await import("../../../../../../../../packages/i18n/locale/english/content.json")
+  const translate = (key: string, options?: Record<string, unknown>) => {
+    const template = key.startsWith("content:")
+      ? (content as Record<string, string>)[key.slice("content:".length)]
+      : undefined
+    return template
+      ? template.replace(/\{\{(\w+)\}\}/g, (_, name: string) => {
+          const value = options?.[name]
+          return typeof value === "string" || typeof value === "number"
+            ? String(value)
+            : ""
+        })
+      : key
+  }
+  return {
+    useTransContext: () => [translate],
+    i18n: { t: translate },
+    Trans: (p: any) => (
+      <span data-key={p.key}>
+        {p.key}:{JSON.stringify(p.options)}
+      </span>
+    )
+  }
+})
 vi.mock("@solidjs/router", () => ({ useParams: () => c.route }))
 vi.mock("@/managers/NavigationManager", () => ({
   useGDNavigate: () => ({ navigate: vi.fn() })
 }))
 vi.mock("@/managers/ModalsManager", () => ({
-  useModal: () => ({ closeModal: c.close, openModal: c.open })
+  useModal: () => ({ closeModal: c.close, openModal: c.open }),
+  useModalStackEntry: () => ({ closeOwn: c.close })
 }))
 vi.mock("@/managers/ModalsManager/ModalLayout", () => ({
   default: (p: any) => <div>{p.children}</div>

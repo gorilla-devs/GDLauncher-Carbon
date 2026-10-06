@@ -430,21 +430,22 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await
         }
 
-        mutation DISABLE_MOD[app, imod: InstanceMod] {
+        mutation DISABLE_MOD[app, imod: RetryableInstanceMod] {
             app.instance_manager()
-                .enable_mod(
+                .disable_mod_retryable(
                     imod.instance_id.into(),
                     imod.mod_id,
-                    false,
+                    imod.operation_token,
                 )
                 .await
         }
 
-        mutation DELETE_MOD[app, imod: InstanceMod] {
+        mutation DELETE_MOD[app, imod: RetryableInstanceMod] {
             app.instance_manager()
-                .delete_mod(
+                .delete_mod_retryable(
                     imod.instance_id.into(),
                     imod.mod_id,
+                    imod.operation_token,
                 )
                 .await
         }
@@ -1597,6 +1598,14 @@ struct SetFavorite {
 struct InstanceMod {
     instance_id: FEInstanceId,
     mod_id: String,
+}
+
+#[derive(Debug, Deserialize, Type)]
+struct RetryableInstanceMod {
+    instance_id: FEInstanceId,
+    mod_id: String,
+    #[serde(default)]
+    operation_token: Option<String>,
 }
 
 #[derive(Type, Debug, Deserialize)]

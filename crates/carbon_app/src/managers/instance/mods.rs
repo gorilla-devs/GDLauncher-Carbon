@@ -33,7 +33,7 @@ use thiserror::Error;
 
 /// A world has only its exact spelling; file addons have two mutually exclusive
 /// spellings. Probe strictly before removal and never choose between two copies.
-async fn remove_addon_from_disk(
+pub(super) async fn remove_addon_from_disk(
     enabled_path: &std::path::Path,
     disabled_path: &std::path::Path,
     is_directory: bool,
@@ -157,7 +157,7 @@ pub(super) fn validate_addon_basename(name: &str) -> anyhow::Result<()> {
 /// The frontend already declines to offer the control
 /// (`pages/Library/shared/addons/addonCapabilities.ts`'s `supportsEnableToggle`);
 /// this is the same rule where it cannot be routed around.
-fn ensure_toggleable(addon_type: domain::AddonType) -> anyhow::Result<()> {
+pub(super) fn ensure_toggleable(addon_type: domain::AddonType) -> anyhow::Result<()> {
     if addon_type == domain::AddonType::Worlds {
         bail!(
             "worlds cannot be enabled or disabled: a save is a directory, and \
@@ -498,6 +498,27 @@ impl ManagerRef<'_, InstanceManager> {
         let shortpath = instance.shortpath.clone();
         drop(instances);
 
+        if !enabled {
+            let instance_path = self
+                .app
+                .settings_manager()
+                .runtime_path
+                .get_instances()
+                .get_instance_path(&shortpath);
+            super::addon_retry::execute(
+                &self.app.db,
+                instance_id,
+                &id,
+                &instance_path,
+                super::addon_retry::Action::Disable,
+                || async {},
+            )
+            .await?;
+            self.app
+                .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
+            return Ok(());
+        }
+
         let m = self.get_owned_mod_file(instance_id, &id).await?;
 
         let addon_type = domain::AddonType::from_db_string(&m.addon_type)
@@ -520,27 +541,13 @@ impl ManagerRef<'_, InstanceManager> {
         let enabled_path = folder.join(&m.filename);
         let disabled_path = folder.join(format!("{}.disabled", m.filename));
 
-        if enabled {
-            if enabled_path.exists() {
-                bail!("mod is already enabled");
-            }
-
-            if !disabled_path.exists() {
-                bail!("mod does not exist on disk");
-            }
-
-            tokio::fs::rename(disabled_path, enabled_path).await?;
-        } else {
-            if disabled_path.exists() {
-                bail!("mod is already disabled");
-            }
-
-            if !enabled_path.exists() {
-                bail!("mod does not exist on disk");
-            }
-
-            tokio::fs::rename(enabled_path, disabled_path).await?;
+        if enabled_path.exists() {
+            bail!("mod is already enabled");
         }
+        if !disabled_path.exists() {
+            bail!("mod does not exist on disk");
+        }
+        tokio::fs::rename(disabled_path, enabled_path).await?;
 
         mfcdb::update_mod_file_enabled(
             &self.app.db,
@@ -574,62 +581,102 @@ impl ManagerRef<'_, InstanceManager> {
         let shortpath = instance.shortpath.clone();
         drop(instances);
 
-        let m = self.get_owned_mod_file(instance_id, &id).await?;
-
-        let addon_type = domain::AddonType::from_db_string(&m.addon_type)
-            .ok_or_else(|| anyhow!("unknown addon kind"))?;
-        validate_addon_basename(&m.filename)?;
-
-        let mut disabled_path = {
-            let instance_path = self
-                .app
-                .settings_manager()
-                .runtime_path
-                .get_instances()
-                .get_instance_path(&shortpath);
-
-            super::installer::publication::checked_folder(&instance_path, addon_type).await?
-        };
-
-        let enabled_path = disabled_path.join(&m.filename);
-
-        let mut disabled = m.filename.clone();
-        disabled.push_str(".disabled");
-        disabled_path.push(disabled);
-
-        remove_addon_from_disk(
-            &enabled_path,
-            &disabled_path,
-            addon_type == domain::AddonType::Worlds,
+        let instance_path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath);
+        super::addon_retry::execute(
+            &self.app.db,
+            instance_id,
+            &id,
+            &instance_path,
+            super::addon_retry::Action::Delete,
+            || async {
+                #[cfg(test)]
+                self.test_hooks.pause("addon_removed", instance_id).await;
+            },
         )
         .await?;
-
-        #[cfg(test)]
-        self.test_hooks.pause("addon_removed", instance_id).await;
-
-        // Check both represented file spellings even after a successful removal.
-        // Worlds deliberately exclude the independent literal .disabled save.
-        for path in [&enabled_path, &disabled_path].into_iter().take(
-            if addon_type == domain::AddonType::Worlds {
-                1
-            } else {
-                2
-            },
-        ) {
-            if addon_metadata(path).await?.is_some() {
-                bail!(
-                    "refusing to drop addon cache row: content remains at {}",
-                    path.display()
-                );
-            }
-        }
-
-        // Delete cache entry directly instead of re-scanning
-        mfcdb::delete_mod_file_cache_by_id(&self.app.db, &m.id).await?;
 
         // GC orphaned metadata
         self.app.meta_cache_manager().gc_mod_metadata().await;
 
+        self.app
+            .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
+        Ok(())
+    }
+
+    pub async fn disable_mod_retryable(
+        self,
+        instance_id: InstanceId,
+        id: String,
+        token: Option<String>,
+    ) -> anyhow::Result<()> {
+        if let Some(token) = token {
+            self.retryable_file_mod(instance_id, id, super::addon_retry::Action::Disable, token)
+                .await
+        } else {
+            self.enable_mod(instance_id, id, false).await
+        }
+    }
+
+    pub async fn delete_mod_retryable(
+        self,
+        instance_id: InstanceId,
+        id: String,
+        token: Option<String>,
+    ) -> anyhow::Result<()> {
+        if let Some(token) = token {
+            self.retryable_file_mod(instance_id, id, super::addon_retry::Action::Delete, token)
+                .await
+        } else {
+            self.delete_mod(instance_id, id).await
+        }
+    }
+
+    async fn retryable_file_mod(
+        self,
+        instance_id: InstanceId,
+        id: String,
+        action: super::addon_retry::Action,
+        token: String,
+    ) -> anyhow::Result<()> {
+        let _activity = self.app.runtime_lifecycle.admit("addon mutation")?;
+        let _operation = self.lock_instance(instance_id).await;
+        self.ensure_modpack_not_locked(instance_id).await?;
+        let instances = self.instances.read().await;
+        let instance = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?;
+        let shortpath = instance.shortpath.clone();
+        drop(instances);
+        let path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath);
+        super::addon_retry::execute_with_token(
+            &self.app.db,
+            &self.addon_retry_receipts,
+            instance_id,
+            &id,
+            &path,
+            action,
+            &token,
+            || async {
+                #[cfg(test)]
+                if action == super::addon_retry::Action::Delete {
+                    self.test_hooks.pause("addon_removed", instance_id).await;
+                }
+            },
+        )
+        .await?;
+        if action == super::addon_retry::Action::Delete {
+            self.app.meta_cache_manager().gc_mod_metadata().await;
+        }
         self.app
             .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
         Ok(())
@@ -1089,7 +1136,7 @@ impl ManagerRef<'_, InstanceManager> {
 
 #[derive(Error, Debug)]
 #[error("invalid mod id '{1}' given for instance '{0}'")]
-pub struct InvalidInstanceModIdError(InstanceId, String);
+pub struct InvalidInstanceModIdError(pub(super) InstanceId, pub(super) String);
 
 #[derive(Error, Debug)]
 #[error("invalid mod id '{0}'")]

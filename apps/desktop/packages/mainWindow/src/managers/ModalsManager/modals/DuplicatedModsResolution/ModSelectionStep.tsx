@@ -20,6 +20,8 @@ export interface DuplicatedMod {
 }
 
 interface Props {
+  isApplying?: boolean
+  unavailableVersions?: string[]
   mod: DuplicatedMod
   currentModIndex: number
   totalMods: number
@@ -41,6 +43,12 @@ const ModSelectionStep = (props: Props) => {
   })
 
   const handleSelect = (versionId: string | number | string[] | undefined) => {
+    if (
+      props.isApplying ||
+      (typeof versionId === "string" &&
+        props.unavailableVersions?.includes(versionId))
+    )
+      return
     if (typeof versionId === "string") {
       setSelectedVersionLocal(versionId)
       props.onVersionSelect(versionId)
@@ -104,6 +112,10 @@ const ModSelectionStep = (props: Props) => {
                 }}
               >
                 <Radio
+                  disabled={
+                    props.isApplying ||
+                    props.unavailableVersions?.includes(version.id)
+                  }
                   value={version.id}
                   checked={selectedVersionLocal() === version.id}
                   onChange={handleSelect}
@@ -132,10 +144,24 @@ const ModSelectionStep = (props: Props) => {
       </div>
 
       <div class="mt-6 flex shrink-0 justify-between">
-        <Button type="secondary" size="large" onClick={() => props.prevStep()}>
+        <Button
+          type="secondary"
+          size="large"
+          disabled={props.isApplying}
+          onClick={() => {
+            if (!props.isApplying) props.prevStep()
+          }}
+        >
           <Trans key="content:_trn_duplicates.selection.button_back" />
         </Button>
-        <Button type="primary" size="large" onClick={() => props.nextStep()}>
+        <Button
+          type="primary"
+          size="large"
+          disabled={props.isApplying}
+          onClick={() => {
+            if (!props.isApplying) props.nextStep()
+          }}
+        >
           {props.currentModIndex + 1 === props.totalMods ? (
             <Trans key="content:_trn_duplicates.selection.button_continue" />
           ) : (

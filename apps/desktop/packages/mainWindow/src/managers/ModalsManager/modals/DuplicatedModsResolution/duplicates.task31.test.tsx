@@ -164,7 +164,11 @@ it.each(["disable", "remove"])(
     summary(root, action)
     button(root, "summary.button_apply").click()
     await settle()
-    expect(c.mutate.mock.calls).toEqual([
+    expect(
+      c.mutate.mock.calls.map(
+        ([key, { operation_token: _token, ...value }]) => [key, value]
+      )
+    ).toEqual([
       [
         `instance.${action === "remove" ? "delete" : "disable"}Mod`,
         { instance_id: 7, mod_id: "a2" }

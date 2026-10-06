@@ -5,6 +5,8 @@ import { Trans } from "@gd/i18n"
 export type DuplicateAction = "remove" | "disable"
 
 interface Props {
+  isApplying?: boolean
+  actionLocked?: boolean
   nextStep: () => void
   prevStep: () => void
   onActionSelect: (action: DuplicateAction) => void
@@ -17,6 +19,7 @@ const ActionStep = (props: Props) => {
   )
 
   const handleSelect = (action: string | number | string[] | undefined) => {
+    if (props.isApplying || props.actionLocked) return
     if (action === "remove" || action === "disable") {
       setSelectedAction(action)
       props.onActionSelect(action)
@@ -37,6 +40,11 @@ const ActionStep = (props: Props) => {
           <Trans key="content:_trn_duplicates.action.question" />
         </p>
 
+        {props.actionLocked && (
+          <p>
+            <Trans key="content:_trn_duplicates.retry_before_action" />
+          </p>
+        )}
         <div class="mt-4 flex flex-col gap-3">
           <div
             class="border-darkSlate-500 rounded-lg border p-5 transition-all duration-200"
@@ -48,6 +56,7 @@ const ActionStep = (props: Props) => {
             }}
           >
             <Radio
+              disabled={props.isApplying || props.actionLocked}
               value="disable"
               checked={selectedAction() === "disable"}
               onChange={handleSelect}
@@ -75,6 +84,7 @@ const ActionStep = (props: Props) => {
             }}
           >
             <Radio
+              disabled={props.isApplying || props.actionLocked}
               value="remove"
               checked={selectedAction() === "remove"}
               onChange={handleSelect}
@@ -96,10 +106,24 @@ const ActionStep = (props: Props) => {
       </div>
 
       <div class="mt-6 flex justify-between">
-        <Button type="secondary" size="large" onClick={() => props.prevStep()}>
+        <Button
+          type="secondary"
+          size="large"
+          disabled={props.isApplying}
+          onClick={() => {
+            if (!props.isApplying) props.prevStep()
+          }}
+        >
           <Trans key="content:_trn_duplicates.action.button_back" />
         </Button>
-        <Button type="primary" size="large" onClick={() => props.nextStep()}>
+        <Button
+          type="primary"
+          size="large"
+          disabled={props.isApplying}
+          onClick={() => {
+            if (!props.isApplying) props.nextStep()
+          }}
+        >
           <Trans key="content:_trn_duplicates.action.button_continue" />
         </Button>
       </div>
