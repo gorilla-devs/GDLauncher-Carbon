@@ -2,8 +2,7 @@ import { afterEach, expect, it, vi } from "vitest"
 import { createSignal } from "solid-js"
 import { render } from "solid-js/web"
 import Wrapper, {
-  useInfiniteVersionsQuery,
-  setVersionsQuery
+  useInfiniteVersionsQuery
 } from "../InfiniteScrollVersionsQueryWrapper"
 import Navbar from "./index"
 
@@ -113,7 +112,6 @@ function fixture(
       ? new Promise((resolve) => pending.set(`${key}:${id}`, resolve))
       : Promise.resolve(key.endsWith("getProject") ? {} : [])
   )
-  setVersionsQuery({ gameVersion: null, modLoaderType: null })
   const root = document.createElement("div")
   document.body.append(root)
   function Content() {
@@ -231,6 +229,7 @@ it("R1 explicit Override permits deliberate clears; disabling it restores curren
   })
   setAddon(undefined)
   setSupportedLoaders(["forge"])
+  server()
   await flush()
   expect(c.override.checked).toBe(true)
   expect(c.options().queryKey[3]).toEqual({
@@ -348,17 +347,21 @@ it("disposed direct handlers cannot publish or refetch", async () => {
   expect(c.refetch).not.toHaveBeenCalled()
   expect(c.removeQueries).not.toHaveBeenCalled()
 })
-it("a target change reentering cache removal cannot refetch or admit the old scope", async () => {
+it("keyed filter publication avoids cache removal and a changed target blocks old handlers", async () => {
   const { server, setSelection } = fixture()
   server()
   await flush()
   c.context.setOverrideEnabled(true)
-  c.removeQueries.mockImplementationOnce(() => setSelection({ serverId: "8" }))
+  const setter = c.context.setQuery
   c.context.setQuery({ gameVersion: null })
+  expect(c.removeQueries).not.toHaveBeenCalled()
+  expect(c.refetch).not.toHaveBeenCalled()
+  setSelection({ serverId: "8" })
   expect(c.options().enabled).toBe(false)
   expect(c.options().queryKey[3]).toBeUndefined()
   expect(c.refetch).not.toHaveBeenCalled()
   c.context.setQuery({ gameVersion: "obsolete" })
+  setter({ gameVersion: "obsolete" })
   expect(c.refetch).not.toHaveBeenCalled()
   server(8)
   await flush()

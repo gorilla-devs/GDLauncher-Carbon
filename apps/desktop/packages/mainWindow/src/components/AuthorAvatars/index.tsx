@@ -1,4 +1,4 @@
-import { For, Show, createMemo } from "solid-js"
+import { For, Show, createMemo, createSignal, onCleanup } from "solid-js"
 import { Trans } from "@gd/i18n"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import {
@@ -67,9 +67,21 @@ const AuthorAvatars = (props: AuthorAvatarsProps) => {
   }
 
   const renderAuthorAvatar = (author: Author, index: number) => {
-    const backgroundColor = getAuthorColor(author.id.toString())
-    const textColor = getContrastTextColor(backgroundColor)
-    const initials = getInitials(author.name)
+    const backgroundColor = () => getAuthorColor(author.id.toString())
+    const textColor = () => getContrastTextColor(backgroundColor())
+    const image = createMemo(() =>
+      author.avatarUrl
+        ? { url: author.avatarUrl, id: author.id, platform: author.platform }
+        : undefined
+    )
+    const renderInitials = () => (
+      <div
+        class={`${sizeClasses().avatar} flex items-center justify-center rounded-full font-bold ${sizeClasses().text}`}
+        style={{ "background-color": backgroundColor(), color: textColor() }}
+      >
+        {getInitials(author.name)}
+      </div>
+    )
 
     return (
       <Tooltip>
@@ -90,26 +102,29 @@ const AuthorAvatars = (props: AuthorAvatarsProps) => {
                 "z-index": "-1"
               }}
             />
-            <Show
-              when={author.avatarUrl}
-              fallback={
-                <div
-                  class={`${sizeClasses().avatar} flex items-center justify-center rounded-full font-bold ${sizeClasses().text}`}
-                  style={{
-                    "background-color": backgroundColor,
-                    color: textColor
-                  }}
-                >
-                  {initials}
-                </div>
-              }
-            >
-              <img
-                src={author.avatarUrl!}
-                alt={`${author.name} avatar`}
-                class={`${sizeClasses().avatar} rounded-full object-cover`}
-                loading="lazy"
-              />
+            <Show when={image()} keyed fallback={renderInitials()}>
+              {(image) => {
+                // Each URL visit gets a fresh image owner, including A/B/A.
+                // A retired image's late error cannot affect its replacement.
+                const [failed, setFailed] = createSignal(false)
+                let active = true
+                onCleanup(() => {
+                  active = false
+                })
+                return (
+                  <Show when={!failed()} fallback={renderInitials()}>
+                    <img
+                      src={image.url}
+                      alt={`${author.name} avatar`}
+                      class={`${sizeClasses().avatar} rounded-full object-cover`}
+                      loading="lazy"
+                      onError={() => {
+                        if (active) setFailed(true)
+                      }}
+                    />
+                  </Show>
+                )
+              }}
             </Show>
           </div>
         </TooltipTrigger>

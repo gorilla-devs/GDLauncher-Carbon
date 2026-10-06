@@ -67,7 +67,8 @@ const ModsInfiniteScrollQueryWrapper = (props: { children?: any }) => {
   const params = useParams<{ id: string; platform: string }>()
   const platform = () => params.platform as FEUnifiedPlatform
 
-  // Hoisted project query to pass addonType to InfiniteScrollVersionsQueryWrapper
+  // Hoisted project query to pass the addon's type and the loaders and game
+  // versions it declares to InfiniteScrollVersionsQueryWrapper
   const project = rspc.createQuery(() => ({
     queryKey: [
       "modplatforms.unifiedGetProject",
@@ -88,6 +89,8 @@ const ModsInfiniteScrollQueryWrapper = (props: { children?: any }) => {
       modId={params.id}
       modplatform={platform()}
       addonType={project.data?.type}
+      supportedModloaders={project.data?.loaders}
+      supportedGameVersions={project.data?.minecraftVersions}
     >
       <AddonContext.Provider value={project}>
         <ContentWrapper zeroPadding>

@@ -63,30 +63,28 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
   }))
 
   const instanceCreationObj = (
-    fileId?: number | string,
-    projectId?: number | string
+    addon: FEUnifiedSearchResult,
+    fileId: string
   ) => {
-    if (!props.addon || !fileId) {
+    if (!fileId) {
       throw new Error("No selected pack version found")
     }
 
     const request =
-      props.addon.platform === "curseforge"
+      addon.platform === "curseforge"
         ? ({
             type: "curseforge",
             value: {
               file_id:
                 Number.parseInt(fileId?.toString() || "", 10) ||
-                Number.parseInt(props.addon.mainFileId || "0"),
-              project_id:
-                Number.parseInt(projectId?.toString() || "", 10) ||
-                Number.parseInt(props.addon.id)
+                Number.parseInt(addon.mainFileId || "0"),
+              project_id: Number.parseInt(addon.id)
             }
           } satisfies Modpack)
         : ({
             type: "modrinth",
             value: {
-              project_id: projectId?.toString() || props.addon.id,
+              project_id: addon.id,
               version_id: fileId.toString()
             }
           } satisfies Modpack)
@@ -95,15 +93,24 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
   }
 
   function handleDownload() {
+    if (loading()) return
     runWithOwner(owner, async () => {
       setLoading(true)
 
       try {
         if (!props.addon)
-          throw new Error("Pack details are unavailable. Retry.")
+          throw new TranslatedError(
+            "notifications:_trn_pack_details_unavailable",
+            "Pack details are unavailable. Retry."
+          )
+        // This attempt owns the clicked project and presentation, even when the
+        // same button receives another project's props during latest lookup.
+        const addon = { ...props.addon }
+        const name = props.name || addon.title
+        const fileId = props.fileId
         const fileVersion = await resolvePackVersion(
-          props.addon,
-          props.fileId,
+          addon,
+          fileId,
           (projectId) =>
             rspcContext.client.query([
               "modplatforms.modrinth.getProjectVersions",
@@ -113,11 +120,11 @@ const ModpackDownloadButton = (props: ModDownloadButtonProps) => {
 
         createInstanceMutation.mutate({
           use_loaded_icon: false,
-          icon_url: props.addon?.imageUrl ?? null,
+          icon_url: addon.imageUrl ?? null,
           notes: "",
-          name: props.name || props.addon?.title!,
+          name,
           version: {
-            Modpack: instanceCreationObj(fileVersion, props.addon?.id)
+            Modpack: instanceCreationObj(addon, fileVersion)
           }
         })
       } catch (error) {

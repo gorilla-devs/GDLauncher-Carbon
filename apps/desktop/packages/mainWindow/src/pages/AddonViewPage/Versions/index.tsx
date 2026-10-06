@@ -8,6 +8,12 @@ import { Trans } from "@gd/i18n"
 import { AddonContext } from "@/pages/AddonViewPage"
 import { Button, Spinner, Skeleton } from "@gd/ui"
 import { createVirtualizer } from "@tanstack/solid-virtual"
+import { getModloaderDisplayName } from "@/utils/helpers"
+import { extractErrorDisplay } from "@/utils/rspcErrorText"
+import { TranslatedError } from "@/utils/translatedError"
+
+// Instance and server names render as text, so skip HTML escaping.
+const noEscape = { escapeValue: false }
 
 const Versions = () => {
   const [searchParams] = useSearchParams<{
@@ -20,7 +26,31 @@ const Versions = () => {
   const infiniteQuery = useInfiniteVersionsQuery()
 
   const rows = () => infiniteQuery.allRows()
-  const hasError = () => !!(mod?.error || infiniteQuery.infiniteQuery.error)
+  const hasError = () =>
+    !!(
+      mod?.error ||
+      infiniteQuery.targetError ||
+      infiniteQuery.infiniteQuery.error
+    )
+  // Why the instance or server could not be read: a translated reason of
+  // the launcher's own, or the core's sentence for any other failure.
+  const targetErrorKey = () => {
+    const error = infiniteQuery.targetError
+    return error instanceof TranslatedError ? error.key : undefined
+  }
+  const targetErrorText = () => {
+    const error = infiniteQuery.targetError
+    if (!error || error instanceof TranslatedError) return undefined
+    return extractErrorDisplay(error).trim() || undefined
+  }
+  // "Fabric 1.20.1": what the target's own filters keep the list to.
+  const describeFilters = (filters: {
+    modLoaderType: string | null | undefined
+    gameVersion: string | null | undefined
+  }) =>
+    [getModloaderDisplayName(filters.modLoaderType), filters.gameVersion]
+      .filter(Boolean)
+      .join(" ")
   const [retrying, setRetrying] = createSignal(false)
   const retryVersions = async () => {
     if (retrying()) return
@@ -28,11 +58,13 @@ const Versions = () => {
     try {
       await Promise.all([
         Promise.resolve().then(() => mod?.refetch()),
-        Promise.resolve().then(() => {
+        Promise.resolve().then(async () => {
           // Manual refetch bypasses Query's enabled flag. Task28 publishes
           // targetReady only after the current scope/defaults are settled.
-          if (infiniteQuery.targetReady)
-            return infiniteQuery.infiniteQuery.refetch()
+          // Recovering the target enables its new query, which fetches once.
+          if (infiniteQuery.targetError) await infiniteQuery.retryTarget()
+          else if (infiniteQuery.targetReady)
+            await infiniteQuery.infiniteQuery.refetch()
         })
       ])
     } catch {
@@ -140,6 +172,18 @@ const Versions = () => {
             <h3 class="text-lg font-semibold text-red-300">
               <Trans key="content:_trn_error_loading_versions" />
             </h3>
+            <Show when={targetErrorKey()}>
+              {(key) => (
+                <p class="text-lightSlate-400 max-w-md text-sm">
+                  <Trans key={key()} />
+                </p>
+              )}
+            </Show>
+            <Show when={targetErrorText()}>
+              {(text) => (
+                <p class="text-lightSlate-400 max-w-md text-sm">{text()}</p>
+              )}
+            </Show>
             <Button
               type="secondary"
               size="small"
@@ -159,9 +203,49 @@ const Versions = () => {
               fallback={
                 <div class="flex flex-col items-center justify-center py-16 text-center">
                   <Show when={!hasError()}>
-                    <span class="text-lightSlate-400">
-                      <Trans key="content:_trn_no_versions_found" />
-                    </span>
+                    <Show
+                      when={infiniteQuery.targetFilters}
+                      fallback={
+                        <span class="text-lightSlate-400">
+                          <Trans key="content:_trn_no_versions_found" />
+                        </span>
+                      }
+                    >
+                      {(filters) => (
+                        // The list is kept to what the instance or server
+                        // runs. Say so, and offer the rest, as Override does.
+                        <div
+                          class="flex flex-col items-center gap-3"
+                          data-testid="addon-versions-target-empty"
+                        >
+                          <span class="text-lightSlate-200">
+                            <Trans
+                              key="content:_trn_no_versions_for_target"
+                              options={{
+                                filters: describeFilters(filters()),
+                                interpolation: noEscape
+                              }}
+                            />
+                          </span>
+                          <span class="text-lightSlate-400 max-w-md text-sm">
+                            <Trans
+                              key="content:_trn_no_versions_for_target_hint"
+                              options={{
+                                name: infiniteQuery.target.name ?? "",
+                                interpolation: noEscape
+                              }}
+                            />
+                          </span>
+                          <Button
+                            type="secondary"
+                            size="small"
+                            onClick={() => infiniteQuery.showAllVersions()}
+                          >
+                            <Trans key="content:_trn_show_all_versions" />
+                          </Button>
+                        </div>
+                      )}
+                    </Show>
                   </Show>
                 </div>
               }

@@ -1,7 +1,7 @@
 import { afterEach, expect, it, vi } from "vitest"
 import { createSignal } from "solid-js"
 import { render } from "solid-js/web"
-import Wrapper, { useInfiniteVersionsQuery, setVersionsQuery } from "./index"
+import Wrapper, { useInfiniteVersionsQuery } from "./index"
 
 const c = vi.hoisted(() => ({
   params: undefined as any,
@@ -49,7 +49,6 @@ function fixture(params: any, type: any = "mod") {
   const [p, setP] = createSignal(params),
     [addon, setAddon] = createSignal(type)
   c.params = new Proxy({}, { get: (_, key) => p()[key as any] })
-  setVersionsQuery({ gameVersion: null, modLoaderType: null })
   const root = document.createElement("div")
   document.body.append(root)
   function Child() {
@@ -93,6 +92,9 @@ it("GPT-0038 resolves server defaults, disables pending targets and ignores late
   c.context.setOverrideEnabled(true)
   c.context.setQuery({ gameVersion: null, modLoaderType: null })
   setAddon(undefined)
+  // Task35 qualifies actual addon-kind resolution; unchanged defaults keep
+  // the deliberate override after this new current lookup settles.
+  resolves.get(2)!({ modloaderType: "forge", gameVersion: "1.20.1" })
   await flush()
   await c.options().queryFn({ pageParam: 0, queryKey: c.options().queryKey })
   expect(c.query).toHaveBeenLastCalledWith([

@@ -23,6 +23,8 @@ export default defineConfig({
       "**/*.task32.test.{ts,tsx}",
       // Controlled Task33 checkbox/modal entry: vitest.task33.config.mjs.
       "**/*.task33.test.{ts,tsx}",
+      // Controlled Task35 component/request ownership entry.
+      "**/*.task35.test.{ts,tsx}",
       "**/node_modules/**",
       "**/dist/**",
       "e2e-tests/**/*.spec.ts",

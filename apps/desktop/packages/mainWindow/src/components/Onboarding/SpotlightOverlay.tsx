@@ -80,6 +80,9 @@ export const SpotlightOverlay = () => {
         {/* Popover using Kobalte with virtual anchor */}
         <PopoverPrimitive
           open={!!activeTip()}
+          onOpenChange={(open) => {
+            if (!open) onboarding.hideTip()
+          }}
           gutter={4}
           placement={placement()}
         >

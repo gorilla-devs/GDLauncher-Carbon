@@ -35,7 +35,7 @@ const JavaPathAutoComplete = (props: Props) => {
     queryKey: ["java.getAvailableJavas"]
   }))
 
-  let runOnce = false
+  let runOnce = !!props.defaultValue
 
   createEffect(() => {
     if (!runOnce && !value() && props.defaultValue) {
@@ -173,8 +173,14 @@ const JavaPathAutoComplete = (props: Props) => {
             </Match>
           </Switch>
         }
-        onSearch={(value) => {
-          setValue(value)
+        onSearch={(nextValue) => {
+          // Focus also calls onSearch. Only a changed value is an edit here;
+          // onInput below covers deliberate edits whose value is still empty.
+          if (nextValue !== value()) runOnce = true
+          setValue(nextValue)
+        }}
+        onInput={() => {
+          runOnce = true
         }}
         onBlur={() => {
           if (props.updateValueOnlyOnBlur) {
