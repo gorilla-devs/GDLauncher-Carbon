@@ -28,7 +28,7 @@ import GuideLayout from "../../components/GuideLayout.astro"
 
   <h2>Is deletion reversible?</h2>
   <p>GDLauncher itself has no Trash or Recently Deleted view, but it does send the instance folder to your OS's recycle bin by default. The setting that controls this is <strong>Settings → General → Delete through Recycle Bin</strong>, on by default. With it on, deleted instances go to Windows Recycle Bin, macOS Trash, or your Linux desktop's trash bucket and you can restore them with the standard OS tools. With it off, files are removed directly and aren't recoverable.</p>
-  <p>The database row tracking the instance is gone either way. If you restore the folder from the recycle bin, you'll need to re-import it via Library → + → Import Instance → legacy GDLauncher (or by hand, depending on how the launcher resolves the orphan).</p>
+  <p>The database row tracking the instance is gone either way. Quit GDLauncher, restore the complete original root containing <code>instance.json</code> and <code>instance/</code> under <code>instances/</code> in your configured runtime path, then restart Carbon. Do not overwrite or merge an existing folder with the same name; keep both copies. Rediscovery may reset group placement and favorites stored only in the database.</p>
   <p>For deliberate backups before risky changes, see <a href="/guides/duplicate-an-instance">How to Duplicate an Instance</a>, or copy the instance folder somewhere outside the runtime path through your OS file manager.</p>
 
   <h2>Worlds and saves</h2>

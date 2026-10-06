@@ -6,7 +6,7 @@ import PageShell from "../../components/PageShell.astro"
 import { DownloadLink } from "../../components/DownloadLink"
 import Breadcrumb from "../../components/Breadcrumb.astro"
 import TopAddonsList from "../../components/TopAddonsList.astro"
-import { getLocaleFromUrl, useTranslations } from "../../lib/i18n"
+import { getLocaleFromUrl, useTranslations, localizedPath } from "../../lib/i18n"
 import { ADDON_TYPE_PLURAL } from "../../lib/api/types"
 
 const locale = getLocaleFromUrl(Astro.url.pathname)
@@ -57,6 +57,7 @@ Astro.locals.cache(300)
             <li>{t("modpacks.section.complexity.li.heavy")}</li>
           </ul>
           <p class="text-darkSlate-100">{t("modpacks.section.complexity.outro")}</p>
+          <p><a href={localizedPath("/guides/allocate-more-ram", locale)} class="text-primary-300">{t("modpacks.learnmore.allocateram")}</a></p>
         </section>
 
         <section class="prose prose-invert prose-lg max-w-3xl mx-auto">

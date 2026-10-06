@@ -41,7 +41,7 @@ Estos tres términos aparecen en GDLauncher y no son sinónimos.
 2. Ve a la sección **Modpack Info** arriba de la página de configuración. Verás el icono, el nombre y la versión actual del pack, con una fila de botones debajo.
 3. Pulsa **Unlock** (el botón con el icono de candado). La instancia pasa al estado desbloqueado al instante.
 
-Una vez desbloqueada, la cabecera de la sección cambia a «Unlocked» con el candado abierto. Puedes volver a bloquear desde el mismo flujo, pero en la práctica, una vez que has tocado el set de mods, no suele tener sentido.
+Al desbloquear, la cabecera muestra «Unlocked» con el candado abierto. Settings no ofrece un botón para volver a bloquear. Desbloquear conserva la asociación con el pack y tus archivos personalizados; Unpair es una acción distinta.
 
 ## Cómo desemparejar (Unpair)
 
@@ -72,7 +72,7 @@ Mantén el bloqueo cuando:
 - El pack se mantiene activamente, deja al autor gestionar las versiones y espera el siguiente release.
 - Estás jugando una experiencia curada y no quieres desviarte del set previsto.
 
-Patrón habitual: desbloquea un momento, instala tus añadidos y deja la instancia desbloqueada. Lo que añadiste tú permanece aunque vuelvas a bloquear, porque el bloqueo solo afecta al set *gestionado por el pack*, aunque en la práctica, una vez has empezado a mantener la instancia tú, hay poco motivo para volver a bloquear.
+Puedes desbloquear, instalar tus añadidos y dejar la instancia desbloqueada. Tus añadidos y la asociación con el pack se conservan, así que aún puedes cambiar la versión del modpack. Tú mantienes la compatibilidad; Settings no ofrece una acción para volver a bloquear.
 
 ## Lo que el bloqueo no es
 
@@ -84,5 +84,5 @@ Los jars añadidos así aparecen en la pestaña Mods junto a los del pack. Para 
 
 - **«No puedo actualizar un mod individual.»** El bloqueo funciona como debe. O bien Unlock (Settings → Unlock), o usa Change Modpack Version para actualizar el pack entero.
 - **«Update All está en gris en una instancia bloqueada.»** La misma razón. Usa Change Modpack Version o desbloquea primero.
-- **«Mi mod user-added sigue visible tras volver a bloquear.»** El bloqueo afecta a los mods del pack; los que añadiste tú permanecen siempre.
+- **«¿Desbloquear elimina mis mods adicionales o la asociación con el pack?»** No. Permite editar y conserva los archivos y la asociación. Unpair elimina la asociación por separado.
 - **«Reinstall sobrescribió una config que había editado.»** Comportamiento esperado. Reinstall recrea el manifest. Haz copia de tus configs antes de Reinstall.

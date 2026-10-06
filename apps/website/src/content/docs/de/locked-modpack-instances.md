@@ -41,7 +41,7 @@ Die drei Begriffe tauchen im GDLauncher auf und sind nicht dasselbe.
 2. Im Bereich **Modpack Info** ganz oben auf der Settings-Seite siehst du Pack-Icon, -Name und -Version, darunter eine Reihe Buttons.
 3. Auf den **Unlock**-Button klicken (mit Schloss-Icon und „Unlock"). Die Instanz wechselt sofort in den entsperrten Zustand.
 
-Nach dem Entsperren wird die Sektion zu „Unlocked" mit dem geöffneten Schloss. Du kannst über denselben Weg wieder sperren, in der Praxis gibt es aber wenig Grund, das nach eigenen Edits zu tun.
+Nach dem Entsperren zeigt der Bereich „Unlocked“ mit dem geöffneten Schloss. Settings bietet keinen Button zum erneuten Sperren. Entsperren erhält die Pack-Zuordnung und deine eigenen Dateien; Unpair ist eine separate Aktion.
 
 ## So entkoppelst du eine Instanz (Unpair)
 
@@ -72,7 +72,7 @@ Gesperrt lassen, wenn:
 - Das Pack aktiv gepflegt wird, überlass dem Author das Versions-Pinning und warte aufs nächste Release.
 - Du eine kuratierte Erfahrung spielen willst und nicht vom Mod-Set abweichen möchtest.
 
-Üblicher Ablauf: kurz entsperren, eigene Sachen installieren, dann einfach entsperrt lassen. Was du selbst hinzugefügt hast, bleibt auch nach erneutem Sperren erhalten, das Schloss betrifft nur das *Pack-verwaltete* Set. In der Praxis gibt es aber wenig Grund, nach eigenen Edits wieder zu sperren.
+Du kannst entsperren, eigene Inhalte installieren und die Instanz entsperrt lassen. Deine Ergänzungen und die Pack-Zuordnung bleiben erhalten, sodass du die Modpack-Version weiter ändern kannst. Für Kompatibilität bist du selbst verantwortlich; Settings bietet keine Aktion zum erneuten Sperren.
 
 ## Was das Schloss nicht ist
 
@@ -84,5 +84,5 @@ Solche manuell platzierten Jars erscheinen im Mods-Tab neben den Pack-Mods. Sie 
 
 - **„Ich kann einen einzelnen Mod nicht aktualisieren."** Das Schloss arbeitet wie geplant. Entweder Unlock (Settings → Unlock) oder Change Modpack Version, um das ganze Pack zu aktualisieren.
 - **„Update All ist auf einer gesperrten Instanz ausgegraut."** Gleicher Grund. Change Modpack Version verwenden oder vorher Unlock.
-- **„Mein selbst hinzugefügter Mod taucht nach Relock immer noch im Mods-Tab auf."** Das Schloss greift nur bei Pack-Mods. User-Mods bleiben sichtbar.
+- **„Entfernt Entsperren meine eigenen Mods oder die Pack-Zuordnung?“** Nein. Entsperren erlaubt Änderungen und erhält Dateien und Zuordnung. Unpair entfernt die Zuordnung separat.
 - **„Reinstall hat eine selbst editierte Config überschrieben."** Erwartet. Reinstall setzt auf das Pack-Manifest zurück. Vor dem Reinstall editierte Configs sichern.

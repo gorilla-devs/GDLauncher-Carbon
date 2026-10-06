@@ -17,44 +17,13 @@
  *   pnpm update-addons --dry-run  # print stats without writing
  */
 
-import {
-  readFileSync,
-  writeFileSync,
-  mkdirSync,
-  existsSync,
-} from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { normalizeExternalWikiUrl } from "../src/lib/addonUrls.mjs"
+import { loadShard, prevalidateShards, publishShards } from "./addonShards.mjs"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = resolve(__dirname, "../data/addons")
-
-function loadShard(platform, type) {
-  const path = resolve(DATA_DIR, `${platform}-${type}.json`)
-  if (!existsSync(path)) return []
-  try {
-    const indexed = JSON.parse(readFileSync(path, "utf-8"))
-    return Object.values(indexed)
-  } catch {
-    return []
-  }
-}
-
-function writeShard(platform, type, list) {
-  if (!existsSync(DATA_DIR)) mkdirSync(DATA_DIR, { recursive: true })
-  const indexed = {}
-  for (const a of list) {
-    if (!a.slug) continue
-    indexed[a.slug] = a
-  }
-  // Minified: each shard is bundled into the Worker output, so indentation
-  // would inflate the compressed Worker size without helping the
-  // (machine-only) consumer.
-  const path = resolve(DATA_DIR, `${platform}-${type}.json`)
-  writeFileSync(path, JSON.stringify(indexed) + "\n")
-  return path
-}
 
 // ---------------------------------------------------------------------------
 // CLI args
@@ -426,7 +395,7 @@ async function batchLookupModrinth(ids, urlSegment) {
 // ---------------------------------------------------------------------------
 // Merge logic: append-only with deduplication
 // ---------------------------------------------------------------------------
-function mergeAddons(existing, fetched) {
+export function mergeAddons(existing, fetched) {
   const fetchedSlugs = new Set(fetched.map((a) => a.slug))
   const merged = [...existing]
   let added = 0
@@ -506,6 +475,12 @@ async function main() {
   const limitIdx = args.indexOf("--limit")
   const LIMIT = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 1000
 
+  // Refuse damaged history before provider work or any shard publication.
+  prevalidateShards(DATA_DIR, [
+    ...Object.keys(CF_CLASS_IDS).map((type) => ["curseforge", type]),
+    ...Object.keys(MR_PROJECT_TYPES).map((type) => ["modrinth", type]),
+  ])
+
   CF_API_KEY = process.env.CURSEFORGE_API_KEY
 
   console.log(`Updating addon registry (limit=${LIMIT}, dryRun=${dryRun})\n`)
@@ -519,7 +494,7 @@ async function main() {
   // CurseForge types
   for (const type of Object.keys(CF_CLASS_IDS)) {
     process.stdout.write(`CurseForge ${type}...`)
-    const existing = loadShard("curseforge", type)
+    const existing = loadShard(DATA_DIR, "curseforge", type)
     const fetched = await fetchCurseForge(type, LIMIT)
     const { merged, added, updated, stale } = mergeAddons(existing, fetched)
     console.log(
@@ -544,7 +519,7 @@ async function main() {
   // Modrinth types (no worlds)
   for (const type of Object.keys(MR_PROJECT_TYPES)) {
     process.stdout.write(`Modrinth ${type}...`)
-    const existing = loadShard("modrinth", type)
+    const existing = loadShard(DATA_DIR, "modrinth", type)
     const fetched = await fetchModrinth(type, LIMIT)
     const { merged, added, updated, stale } = mergeAddons(existing, fetched)
     console.log(
@@ -570,11 +545,12 @@ async function main() {
     `\nTotal: ${totalExisting} existing, ${totalAdded} added, ${totalUpdated} updated, ${totalRefreshed} refreshed`
   )
 
+  const published = publishShards(DATA_DIR, updatedShards, { dryRun })
   if (dryRun) {
     console.log("Dry run, not writing files.")
   } else {
-    for (const [platform, type, list] of updatedShards) {
-      const path = writeShard(platform, type, list)
+    for (const [index, [platform, type, list]] of updatedShards.entries()) {
+      const path = published[index]
       console.log(`Written ${platform}/${type} (${list.length}) to ${path}`)
     }
   }

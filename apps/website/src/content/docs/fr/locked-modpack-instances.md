@@ -41,7 +41,7 @@ Ces trois termes apparaissent dans GDLauncher et ne sont pas interchangeables.
 2. Va dans la section **Modpack Info** en haut de la page Settings. Tu vois l'icône, le nom et la version actuelle du pack, avec une rangée de boutons en dessous.
 3. Clique sur **Unlock** (le bouton avec l'icône cadenas). L'instance passe en mode déverrouillé immédiatement.
 
-Une fois déverrouillée, l'en-tête de section devient « Unlocked » avec l'icône cadenas ouvert. Tu peux reverrouiller via le même flux, mais en pratique, une fois que tu as commencé à maintenir le set de mods, peu de raisons de le faire.
+Après déverrouillage, la section affiche « Unlocked » avec le cadenas ouvert. Settings ne propose pas de bouton pour reverrouiller. Le déverrouillage conserve l’association au pack et tes fichiers personnalisés ; Unpair est une action distincte.
 
 ## Comment désappairer (Unpair)
 
@@ -72,7 +72,7 @@ Rester verrouillé quand :
 - Le pack est activement maintenu, laisse l'auteur gérer le pinning de versions et attends la prochaine release.
 - Tu joues une expérience curatée et tu ne veux pas dériver du set prévu.
 
-Pattern courant : déverrouille brièvement, installe tes ajouts, puis laisse l'instance déverrouillée. Ce que tu as ajouté toi-même reste si tu reverrouilles plus tard, parce que le verrou ne concerne que le set *géré par le pack*, mais en pratique, peu de raisons de reverrouiller une fois que tu as commencé à maintenir l'instance.
+Tu peux déverrouiller, installer tes ajouts et laisser l’instance déverrouillée. Tes ajouts et l’association au pack sont conservés, donc tu peux encore changer la version du modpack. Tu gères toi-même la compatibilité ; Settings ne propose pas de reverrouillage.
 
 ## Ce que le verrou n'est pas
 
@@ -84,5 +84,5 @@ Les jars ajoutés ainsi apparaissent dans l'onglet Mods à côté des mods du pa
 
 - **« Je ne peux pas mettre à jour un seul mod. »** Le verrou fonctionne comme prévu. Soit Unlock (Settings → Unlock), soit Change Modpack Version pour mettre à jour le pack entier.
 - **« Update All est grisé sur une instance verrouillée. »** Même raison. Utilise Change Modpack Version, ou déverrouille d'abord.
-- **« Pourquoi mon mod user-added est encore visible après reverrouillage ? »** Le verrou s'applique aux mods du pack ; ceux que tu as ajoutés en plus restent visibles.
+- **« Le déverrouillage supprime-t-il mes mods ajoutés ou l’association au pack ? »** Non. Il permet les modifications en conservant les fichiers et l’association. Unpair retire séparément l’association.
 - **« Reinstall a écrasé une config que j'avais éditée. »** Comportement attendu. Reinstall ré-applique le manifest. Sauvegarde tes configs avant un reinstall.

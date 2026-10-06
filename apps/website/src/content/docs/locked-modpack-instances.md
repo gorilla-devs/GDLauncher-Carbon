@@ -41,7 +41,7 @@ These three terms appear in GDLauncher and they're not synonymous.
 2. Scroll to the **Modpack Info** section at the top of the settings page. You'll see the pack's icon, name, and current version, with a row of buttons below.
 3. Click the **Unlock** button (the one with the lock icon next to "Unlock"). The instance flips to the unlocked state immediately.
 
-Once unlocked, the section header changes to a "Unlocked" indicator with the open-padlock icon. You can lock the instance again by going through the same flow, but in practice, once you've started maintaining the mod set yourself, there's not much reason to relock.
+Once unlocked, the section header changes to an "Unlocked" indicator with the open-padlock icon. Settings does not provide a button to lock it again. Unlocking keeps the pack association and your custom files; Unpair is a separate action.
 
 ## How to unpair an instance
 
@@ -72,7 +72,7 @@ Stay locked when:
 - The pack is actively maintained, let the author handle version pinning by waiting for the next pack release.
 - You're playing through a curated experience and don't want to drift from the intended mod set.
 
-A common pattern is: unlock briefly, install your extras, then leave the instance unlocked. Things you've added yourself stay even if you relock, since the lock only governs the *pack-managed* set, but in practice there's little reason to relock once you've started maintaining the instance.
+You can unlock, install your extras, and leave the instance unlocked. Your additions remain, and the pack association is preserved so you can still change the modpack version. Maintain compatibility yourself; Settings has no relock action.
 
 ## What the lock doesn't do
 
@@ -84,5 +84,5 @@ If you do that and then look at the Mods tab, GDLauncher will show the manually-
 
 - **"I can't update a single mod."** That's the lock working as intended. Either unlock (Settings → Unlock) or use Change Modpack Version to update the whole pack instead.
 - **"The Update All button is greyed out on a locked instance."** Same reason. Either use Change Modpack Version, or unlock first.
-- **"Why does my user-added mod still show on the Mods tab after relocking?"** The lock applies to pack-managed mods, anything you added on top stays visible regardless.
+- **"Does unlocking remove my extra mods or the pack association?"** No. Unlocking enables edits while preserving the files and pairing. Unpair separately removes the association.
 - **"The Reinstall option overwrote a config I edited."** That's expected. Reinstall resets to the pack manifest. Back up edited configs before reinstalling.

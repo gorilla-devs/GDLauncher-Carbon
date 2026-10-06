@@ -4,7 +4,7 @@ import KeywordLandingLayout from "../components/KeywordLandingLayout.astro"
 const faq = [
   {
     question: "What's the best modpack launcher for Minecraft?",
-    answer: "GDLauncher is one of the easiest modpack launchers, it installs CurseForge and Modrinth modpacks in one click, handles Java automatically, and allocates the right amount of RAM per pack. The CurseForge App and ATLauncher are alternatives; the CurseForge App is CurseForge-only, ATLauncher has its own pack ecosystem. For most players GDLauncher is the simplest entry point."
+    answer: "GDLauncher is one of the easiest modpack launchers, it installs CurseForge and Modrinth modpacks in one click, handles Java automatically, and uses your global Java memory settings unless you configure an instance override. The CurseForge App and ATLauncher are alternatives; the CurseForge App is CurseForge-only, ATLauncher has its own pack ecosystem. For most players GDLauncher is the simplest entry point."
   },
   {
     question: "How do I install RLCraft, ATM10, or Better MC?",
@@ -12,7 +12,7 @@ const faq = [
   },
   {
     question: "How much RAM do I need for modpacks?",
-    answer: "Lightweight packs (50-100 mods) work with 4 GB. Medium packs (100-200 mods) want 6-8 GB. Heavy packs like ATM10 or Vault Hunters want 8-12 GB. GDLauncher allocates a recommended default per pack; you can override it in instance settings. See our guide on allocating more RAM for details."
+    answer: "Lightweight packs (50-100 mods) work with 4 GB. Medium packs (100-200 mods) want 6-8 GB. Heavy packs like ATM10 or Vault Hunters want 8-12 GB. GDLauncher uses your global Java memory settings unless you configure a per-instance override. Adjust the memory manually for the pack and leave room for the operating system. See our guide on allocating more RAM for details."
   },
   {
     question: "Can I install custom modpacks?",
@@ -28,13 +28,13 @@ const faq = [
 <KeywordLandingLayout
   pageSlug="minecraft-modpack-launcher"
   title="Minecraft Modpack Launcher: Install Modpacks in One Click"
-  description="Install Minecraft modpacks from CurseForge and Modrinth with one click. GDLauncher handles Java, RAM allocation, and mod loaders automatically. Free for Windows, macOS, Linux."
+  description="Install Minecraft modpacks from CurseForge and Modrinth with one click. GDLauncher handles Java and mod loaders automatically. Memory follows global settings unless you set an instance override. Free for Windows, macOS, Linux."
   intro="A modpack is dozens of mods, configs, and resource packs bundled into one experience. A good modpack launcher installs all of that in a single click, sets up the right Java version, and gets out of your way. That's GDLauncher."
   keywords="minecraft modpack launcher, modpack launcher, install modpacks, rlcraft launcher, atm10 launcher, better mc launcher, ftb launcher, free modpack launcher"
   faq={faq}
 >
   <h2>What a modpack launcher does</h2>
-  <p>A modpack is more than just a list of mods. It includes specific versions of each mod, configs that make them play nicely, custom recipes, scripted progression, sometimes resource packs and shaders. Installing one by hand means downloading every file, setting up the mod loader, allocating Java memory, and praying nothing conflicts. A modpack launcher does it all in one click.</p>
+  <p>A modpack is more than just a list of mods. It includes specific versions of each mod, configs that make them play nicely, custom recipes, scripted progression, sometimes resource packs and shaders. Installing one by hand means downloading every file, setting up the mod loader, allocating Java memory, and praying nothing conflicts. GDLauncher installs the pack and manages Java automatically. Memory inherits your global settings unless you configure an instance override.</p>
 
   <h2>How GDLauncher installs modpacks</h2>
   <ol>
@@ -43,7 +43,7 @@ const faq = [
     <li>Click Install. GDLauncher downloads every mod, the matching Minecraft version, the correct mod loader, the right Java runtime, and applies the configs.</li>
     <li>Wait a minute or two for downloads. Hit Play.</li>
   </ol>
-  <p>If the pack needs more RAM than the default, bump it in instance settings → Java. <a href="/guides/allocate-more-ram">See the RAM guide</a>.</p>
+  <p>If the pack needs more RAM than your global setting, configure an override in instance settings → Java. <a href="/guides/allocate-more-ram">See the RAM guide</a>.</p>
 
   <h2>Popular modpacks GDLauncher supports out of the box</h2>
   <ul>

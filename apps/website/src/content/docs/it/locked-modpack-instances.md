@@ -41,7 +41,7 @@ Questi tre termini compaiono in GDLauncher e non sono sinonimi.
 2. Scorri fino alla sezione **Modpack Info** in cima alla pagina dei settings. Vedrai l'icona del pack, il nome e la versione corrente, con una riga di pulsanti sotto.
 3. Clicca il pulsante **Unlock** (quello con l'icona del lucchetto accanto a "Unlock"). L'istanza passa allo stato sbloccato immediatamente.
 
-Una volta sbloccata, l'intestazione della sezione cambia in un indicatore "Unlocked" con l'icona del lucchetto aperto. Puoi bloccare di nuovo l'istanza passando per lo stesso flusso, ma in pratica, una volta che hai cominciato a gestire il set di mod tu, non c'è molta ragione di riassociare il lock.
+Dopo lo sblocco, la sezione mostra "Unlocked" con il lucchetto aperto. Settings non offre un pulsante per bloccare di nuovo. Lo sblocco conserva l’associazione al pack e i file personalizzati; Unpair è un’azione separata.
 
 ## Come scollegare un'istanza
 
@@ -72,7 +72,7 @@ Resta col lock attivo quando:
 - Il pack è attivamente mantenuto, lascia che l'autore gestisca il pinning delle versioni aspettando la prossima release del pack.
 - Stai giocando un'esperienza curata e non vuoi allontanarti dal set di mod previsto.
 
-Un pattern comune è: sblocca brevemente, installa i tuoi extra, poi lascia l'istanza sbloccata. Le cose che hai aggiunto restano anche se riassoci il lock, dato che il lock governa solo il set *gestito dal pack*, ma in pratica c'è poca ragione di riassociare il lock una volta che hai cominciato a gestire l'istanza.
+Puoi sbloccare, installare i tuoi extra e lasciare l’istanza sbloccata. Le aggiunte e l’associazione al pack restano, quindi puoi ancora cambiare versione del Modpack. Mantieni tu la compatibilità; Settings non offre un’azione per bloccare di nuovo.
 
 ## Cosa il lock non fa
 
@@ -84,5 +84,5 @@ Se lo fai e poi guardi la tab Mods, GDLauncher mostrerà il file aggiunto manual
 
 - **"Non riesco ad aggiornare una singola mod."** È il lock che funziona come previsto. Sblocca (Settings → Unlock) o usa Change Modpack Version per aggiornare l'intero pack.
 - **"Il pulsante Update All è grigio su un'istanza bloccata."** Stesso motivo. Usa Change Modpack Version, oppure sblocca prima.
-- **"Perché la mia mod aggiunta dall'utente resta visibile nella tab Mods dopo aver riassociato il lock?"** Il lock si applica alle mod gestite dal pack, qualunque cosa tu abbia aggiunto sopra resta visibile comunque.
+- **"Sbloccare rimuove le mie mod aggiunte o l’associazione al pack?"** No. Consente le modifiche e conserva file e associazione. Unpair rimuove l’associazione separatamente.
 - **"L'opzione Reinstall ha sovrascritto una configurazione che avevo modificato."** È previsto. Reinstall resetta al manifest del pack. Fai il backup delle configurazioni modificate prima di reinstallare.

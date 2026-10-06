@@ -563,22 +563,49 @@ const jsonLd: Record<string, unknown>[] = [
 </style>
 
 <script>
-  const copyBtn = document.getElementById('copy-slug-btn');
-  if (copyBtn) {
+  let retireCopy: (() => void) | undefined;
+
+  function initializeCopy() {
+    retireCopy?.();
+    retireCopy = undefined;
+    const copyBtn = document.getElementById('copy-slug-btn');
+    if (!copyBtn) return;
+
+    const controller = new AbortController();
+    const span = copyBtn.querySelector('span');
+    const copyLabel = copyBtn.dataset.copyLabel ?? 'Copy';
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let generation = 0;
+    let active = true;
+    retireCopy = () => {
+      active = false;
+      generation++;
+      controller.abort();
+      clearTimeout(timer);
+      if (span) span.textContent = copyLabel;
+    };
+
     copyBtn.addEventListener('click', async () => {
       const slug = copyBtn.dataset.slug;
-      const copyLabel = copyBtn.dataset.copyLabel ?? 'Copy';
+      if (!slug) return;
+      const intent = ++generation;
       const copiedLabel = copyBtn.dataset.copiedLabel ?? 'Copied!';
-      if (slug) {
+      clearTimeout(timer);
+      if (span) span.textContent = copyLabel;
+      try {
         await navigator.clipboard.writeText(slug);
-        const span = copyBtn.querySelector('span');
-        if (span) {
-          span.textContent = copiedLabel;
-          setTimeout(() => {
-            span.textContent = copyLabel;
-          }, 2000);
-        }
+      } catch {
+        return;
       }
-    });
+      if (!active || generation !== intent || !copyBtn.isConnected || !span) return;
+      span.textContent = copiedLabel;
+      timer = setTimeout(() => {
+        if (active && generation === intent && copyBtn.isConnected) span.textContent = copyLabel;
+      }, 2000);
+    }, { signal: controller.signal });
   }
+
+  initializeCopy();
+  document.addEventListener('astro:page-load', initializeCopy);
+  document.addEventListener('astro:before-swap', () => retireCopy?.());
 </script>
