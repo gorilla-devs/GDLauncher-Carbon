@@ -118,7 +118,7 @@ Existent uniquement si le pack les apporte. Vanilla et la plupart des instances 
 | `logs/` (logs launcher) | Oui | Idem. |
 | `instance/options.txt` | Oui | Réglages du jeu remis aux défauts. |
 | `instance.json` | Ne pas faire | Le launcher perd la trace de l'instance. |
-| `packinfo.json` | Possible (équivaut à dépairer) | Le launcher arrête de traiter l'instance comme un modpack appairé. Même effet que le bouton Unpair dans l'onglet Settings de l'instance, en plus salissant. |
+| `packinfo.json` | Conserver | Conserve ce fichier : il répertorie les fichiers gérés du modpack pour les mises à jour et la récupération. Le supprimer ne désassocie pas l’instance ; l’association est dans `instance.json` (`modpack`). Utilise **Unpair** dans l’onglet **Settings** de l’instance. Ne modifie pas manuellement ce champ et ne supprime pas les données de provenance. |
 | Tout le dossier `instance/` | Ne pas faire | L'instance devient corrompue. Utilise Delete dans l'UI. |
 
 ## Note sur les instances modpack verrouillées

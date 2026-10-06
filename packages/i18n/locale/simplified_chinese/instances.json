@@ -326,7 +326,7 @@
   "_trn_view_versions_on_modrinth": "在 Modrinth 上查看版本",
   "_trn_select_icon": "选择图标",
   "_trn_instance_share.title": "分享实例",
-  "_trn_instance_share.description": "创建分享代码以允许他人下载您的实例配置。",
+  "_trn_instance_share.description": "为此实例创建分享代码。截图、日志和配置文件会被包含，可能含有个人信息，请在分享前检查。只有启用“包含存档”时才会包含世界和玩家数据（默认关闭）。",
   "_trn_instance_share.share_code_label": "分享代码",
   "_trn_instance_share.share_code_details": "将此代码分享给他人，以便他们导入您的实例。",
   "_trn_instance_share.copy": "复制",

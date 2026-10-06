@@ -118,7 +118,7 @@ Solo existen si el pack las trae. Vanilla y la mayoría de instancias custom no 
 | `logs/` (logs launcher) | Sí | Igual. |
 | `instance/options.txt` | Sí | Ajustes del juego a defaults. |
 | `instance.json` | No | El launcher pierde el rastro de la instancia. |
-| `packinfo.json` | Posible (despareja de hecho) | El launcher deja de tratar la instancia como modpack pareado. Mismo efecto que el botón Unpair en la pestaña Settings de la instancia, pero sucio. |
+| `packinfo.json` | Conservar | Conserva este archivo: registra los archivos gestionados del modpack para actualizaciones y recuperación. Borrarlo no desempareja la instancia; el emparejamiento está en `instance.json` (`modpack`). Usa **Unpair** en la pestaña **Settings** de la instancia. No edites manualmente el campo de emparejamiento ni borres los datos de procedencia. |
 | Toda la carpeta `instance/` | No | La instancia queda rota. Usa Delete en la UI. |
 
 ## Nota sobre instancias modpack bloqueadas

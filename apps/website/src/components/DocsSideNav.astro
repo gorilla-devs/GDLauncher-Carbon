@@ -379,19 +379,22 @@ const labels = LABELS[locale] ?? LABELS.en;
 </style>
 
 <script>
+  let cleanupDocsSideNav = () => {};
   function initDocsSideNav() {
+    cleanupDocsSideNav();
+    const lifetime = new AbortController();
     document.querySelectorAll('.category-header').forEach(btn => {
       btn.addEventListener('click', () => {
         const category = btn.closest('.category');
         if (category) {
-          const isExpanded = category.getAttribute('data-expanded') === 'true';
-          category.setAttribute('data-expanded', isExpanded ? 'false' : 'true');
+          const expanded = category.getAttribute('data-expanded') === 'true';
+          category.setAttribute('data-expanded', expanded ? 'false' : 'true');
         }
-      });
+      }, { signal: lifetime.signal });
     });
+    cleanupDocsSideNav = () => { cleanupDocsSideNav = () => {}; lifetime.abort(); };
   }
-
   initDocsSideNav();
-
+  document.addEventListener('astro:before-swap', () => cleanupDocsSideNav());
   document.addEventListener('astro:page-load', initDocsSideNav);
 </script>

@@ -118,7 +118,7 @@ Queste esistono solo se il pack le include. Vanilla e la maggior parte delle ist
 | `logs/` (log del launcher) | Sì | Idem. |
 | `instance/options.txt` | Sì | Reset delle impostazioni di gioco ai default. |
 | `instance.json` | No | Il launcher perde traccia dell'istanza. |
-| `packinfo.json` | Possibile (di fatto scollega) | Il launcher smette di trattare l'istanza come Modpack accoppiato. Stesso effetto del pulsante Unpair nella tab Settings dell'istanza, ma più sporco. |
+| `packinfo.json` | Conservare | Conserva questo file: registra i file gestiti del modpack per aggiornamenti e recupero. Eliminarlo non scollega l’istanza; l’abbinamento è in `instance.json` (`modpack`). Usa **Unpair** nella tab **Settings** dell’istanza. Non modificare manualmente il campo di abbinamento e non eliminare i dati di provenienza. |
 | Tutta la cartella `instance/` | No | L'istanza diventa malformata. Usa Delete dalla UI del launcher invece. |
 
 ## Una nota sulle istanze Modpack bloccate

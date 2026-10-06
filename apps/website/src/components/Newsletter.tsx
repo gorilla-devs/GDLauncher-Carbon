@@ -1,6 +1,5 @@
 import { Show, createSignal } from "solid-js";
 import Button from "./button/Button";
-import { ADD_USER_ENDPOINT } from "../consts";
 
 export interface NewsletterLabels {
   heading: string;
@@ -17,6 +16,7 @@ export interface NewsletterLabels {
 
 interface Props {
   labels: NewsletterLabels;
+  endpoint: string;
 }
 
 const NewsLetter = (props: Props) => {
@@ -26,7 +26,7 @@ const NewsLetter = (props: Props) => {
   const [success, setSuccess] = createSignal<null | string>(null);
 
   const addUser = (body: { email: string }) =>
-    fetch(ADD_USER_ENDPOINT, {
+    fetch(props.endpoint, {
       method: "POST",
       headers: {
         Accept: "application/json",

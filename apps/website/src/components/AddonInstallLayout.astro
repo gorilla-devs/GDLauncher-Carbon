@@ -25,6 +25,7 @@ import PageShell from "./PageShell.astro"
 import Breadcrumb from "./Breadcrumb.astro"
 import { DownloadLink } from "./DownloadLink"
 import { APP_URLS } from "../consts"
+import { normalizeExternalWikiUrl } from "../lib/addonUrls.mjs"
 
 import type { AddonType, Platform } from "../lib/api/types"
 import { addonTypeLabel, addonTypePlural } from "../lib/api/types"
@@ -62,6 +63,8 @@ const {
   description, authors, author, categories, loaders, gameVersions,
   downloads, license, sourceUrl, issuesUrl, wikiUrl, dateModified,
 } = Astro.props
+
+const safeWikiUrl = normalizeExternalWikiUrl(wikiUrl)
 
 const locale = getLocaleFromUrl(Astro.url.pathname)
 const t = useTranslations(locale)
@@ -457,13 +460,13 @@ const jsonLd: Record<string, unknown>[] = [
             </Fragment>
           ))}
 
-          {(sourceUrl || issuesUrl || wikiUrl) && (
+          {(sourceUrl || issuesUrl || safeWikiUrl) && (
             <Fragment>
               <h2 id="links" class="text-lightSlate-50">{t("addon.projectLinks.heading")}</h2>
               <ul>
                 {sourceUrl && <li><a href={sourceUrl} target="_blank" rel="noopener noreferrer nofollow ugc">{t("addon.projectLinks.source")}</a></li>}
                 {issuesUrl && <li><a href={issuesUrl} target="_blank" rel="noopener noreferrer nofollow ugc">{t("addon.projectLinks.issues")}</a></li>}
-                {wikiUrl && <li><a href={wikiUrl} target="_blank" rel="noopener noreferrer nofollow ugc">{t("addon.projectLinks.wiki")}</a></li>}
+                {safeWikiUrl && <li><a href={safeWikiUrl} target="_blank" rel="noopener noreferrer nofollow ugc">{t("addon.projectLinks.wiki")}</a></li>}
               </ul>
             </Fragment>
           )}

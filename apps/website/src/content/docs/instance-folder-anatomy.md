@@ -118,7 +118,7 @@ These only exist if the pack ships them. Vanilla and most custom instances don't
 | `logs/` (launcher logs) | Yes | Same. |
 | `instance/options.txt` | Yes | Resets game settings to defaults. |
 | `instance.json` | Don't | The launcher loses track of the instance. |
-| `packinfo.json` | Possible (effectively unpairs) | The launcher stops treating the instance as a paired modpack. Same effect as the Unpair button in the instance's Settings tab, but messier. |
+| `packinfo.json` | Keep | Keep this file: it records managed modpack files for updates and recovery. Deleting it does not unpair the instance; pairing is stored in `instance.json` (`modpack`). To unpair, use the **Unpair** button in the instance’s **Settings** tab. Do not manually edit the pairing field or delete provenance. |
 | The whole `instance/` folder | Don't | The instance becomes broken-shaped. Use Delete in the launcher UI instead. |
 
 ## A note on locked modpack instances

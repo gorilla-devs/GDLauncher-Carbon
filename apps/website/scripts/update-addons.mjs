@@ -25,6 +25,7 @@ import {
 } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
+import { normalizeExternalWikiUrl } from "../src/lib/addonUrls.mjs"
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const DATA_DIR = resolve(__dirname, "../data/addons")
@@ -58,12 +59,8 @@ function writeShard(platform, type, list) {
 // ---------------------------------------------------------------------------
 // CLI args
 // ---------------------------------------------------------------------------
-const args = process.argv.slice(2)
-const dryRun = args.includes("--dry-run")
-const limitIdx = args.indexOf("--limit")
-const LIMIT = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 1000
-
-const CF_API_KEY = process.env.CURSEFORGE_API_KEY
+// Credential access belongs only to the guarded CLI entry.
+let CF_API_KEY
 
 // ---------------------------------------------------------------------------
 // API constants
@@ -176,7 +173,7 @@ function summarizeGameVersions(versions) {
   return summary
 }
 
-function extractCurseForge(p) {
+export function extractCurseForge(p) {
   // CurseForge encodes loader info on each file index. modLoader is a
   // numeric enum: 1=Forge, 4=Fabric, 5=Quilt, 6=NeoForge.
   const cfLoaderMap = { 1: "Forge", 4: "Fabric", 5: "Quilt", 6: "NeoForge" }
@@ -199,7 +196,7 @@ function extractCurseForge(p) {
     websiteUrl: p.links.websiteUrl,
     sourceUrl: p.links.sourceUrl || null,
     issuesUrl: p.links.issuesUrl || null,
-    wikiUrl: p.links.wikiUrl || null,
+    wikiUrl: normalizeExternalWikiUrl(p.links.wikiUrl),
     authors: p.authors?.map((a) => a.name) || [],
     categories,
     loaders: [...loaderSet],
@@ -210,7 +207,7 @@ function extractCurseForge(p) {
   }
 }
 
-function extractModrinthSearch(hit, urlType) {
+export function extractModrinthSearch(hit, urlType) {
   const rawCategories = hit.categories || []
   const { loaders, categories } = partitionLoaders(rawCategories)
   // urlType is the Modrinth URL segment for the requested addon type
@@ -238,7 +235,7 @@ function extractModrinthSearch(hit, urlType) {
   }
 }
 
-function extractModrinthProject(p, urlType) {
+export function extractModrinthProject(p, urlType) {
   const rawCategories = [...(p.categories || []), ...(p.loaders || [])]
   const { loaders, categories } = partitionLoaders(rawCategories)
   const segment = urlType || p.project_type
@@ -248,12 +245,10 @@ function extractModrinthProject(p, urlType) {
     slug: p.slug,
     description: p.description ? stripHtml(p.description) : null,
     imageUrl: p.icon_url,
-    websiteUrl: p.source_url
-      ? p.source_url
-      : `https://modrinth.com/${segment}/${p.slug}`,
+    websiteUrl: `https://modrinth.com/${segment}/${p.slug}`,
     sourceUrl: p.source_url || null,
     issuesUrl: p.issues_url || null,
-    wikiUrl: p.wiki_url || null,
+    wikiUrl: normalizeExternalWikiUrl(p.wiki_url),
     author: null,
     categories,
     loaders,
@@ -506,6 +501,13 @@ async function refreshStaleModrinth(merged, staleEntries, type) {
 // Main
 // ---------------------------------------------------------------------------
 async function main() {
+  const args = process.argv.slice(2)
+  const dryRun = args.includes("--dry-run")
+  const limitIdx = args.indexOf("--limit")
+  const LIMIT = limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 1000
+
+  CF_API_KEY = process.env.CURSEFORGE_API_KEY
+
   console.log(`Updating addon registry (limit=${LIMIT}, dryRun=${dryRun})\n`)
 
   let totalAdded = 0
@@ -578,7 +580,9 @@ async function main() {
   }
 }
 
-main().catch((err) => {
-  console.error(err)
-  process.exit(1)
-})
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((err) => {
+    console.error(err)
+    process.exit(1)
+  })
+}

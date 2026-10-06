@@ -1029,6 +1029,26 @@ fn is_disk_full(error: &anyhow::Error) -> bool {
 /// meaning "include its whole subtree".
 fn build_share_filter(basepath: &Path, include_saves: bool) -> anyhow::Result<ExportEntry> {
     let mut hashmap = HashMap::new();
+    // Open the actual worlds root on this filesystem. A missing root is
+    // ordinary; a dangling alias or lookup error is not verified absence.
+    // Keep this stricter export policy separate from the modpack planner's
+    // best-effort resolves_into_saves bool contract.
+    let saves_path = basepath.join("saves");
+    let saves = if include_saves {
+        None
+    } else {
+        match same_file::Handle::from_path(&saves_path) {
+            Ok(handle) => Some(handle),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                match fs::symlink_metadata(&saves_path) {
+                    Err(missing) if missing.kind() == io::ErrorKind::NotFound => None,
+                    Ok(_) => return Err(error.into()),
+                    Err(lookup) => return Err(lookup.into()),
+                }
+            }
+            Err(error) => return Err(error.into()),
+        }
+    };
 
     for entry in fs::read_dir(basepath)? {
         let entry = entry?;
@@ -1043,8 +1063,20 @@ fn build_share_filter(basepath: &Path, include_saves: bool) -> anyhow::Result<Ex
         // `saves` holds the user's worlds and player data. Off by default
         // because it can be very large and most shares are "give me your
         // modpack, I'll start a new world"; opt in via the UI to ship it.
-        if name == "saves" && !include_saves {
-            continue;
+        if !include_saves {
+            if name == "saves" {
+                continue;
+            }
+            // Open-handle identity is independent of canonical path spelling:
+            // Unix device/inode or Windows volume/file index. Keep both handles
+            // alive while comparing; a distinct case-sensitive Saves survives.
+            // Open relevant spellings even without a root to surface errors.
+            if name.eq_ignore_ascii_case("saves") {
+                let candidate = same_file::Handle::from_path(entry.path())?;
+                if saves.as_ref().is_some_and(|root| root == &candidate) {
+                    continue;
+                }
+            }
         }
 
         hashmap.insert(name, None);
@@ -1223,6 +1255,191 @@ mod share_breakdown_tests {
         let f = build_share_filter(base, true).unwrap();
         assert!(f.0.contains_key("saves"));
         assert!(!f.0.contains_key("Distant_Horizons_server_data"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn task39_no_saves_refuses_unresolved_actual_root() {
+        let dir = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink("saves", dir.path().join("saves")).unwrap();
+        assert!(build_share_filter(dir.path(), false).is_err());
+        assert!(build_share_filter(dir.path(), true).is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn task39_no_saves_refuses_dangling_actual_root() {
+        let dir = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink("missing-worlds", dir.path().join("saves")).unwrap();
+        assert!(build_share_filter(dir.path(), false).is_err());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn task39_filter_excludes_physical_alias() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("saves")).unwrap();
+        std::os::unix::fs::symlink("saves", dir.path().join("Saves")).unwrap();
+        assert!(
+            !build_share_filter(dir.path(), false)
+                .unwrap()
+                .0
+                .contains_key("Saves")
+        );
+        assert!(
+            build_share_filter(dir.path(), true)
+                .unwrap()
+                .0
+                .contains_key("Saves")
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn task39_no_saves_refuses_unresolved_case_candidate() {
+        let dir = tempfile::tempdir().unwrap();
+        std::os::unix::fs::symlink("Saves", dir.path().join("Saves")).unwrap();
+        assert!(build_share_filter(dir.path(), false).is_err());
+        assert!(build_share_filter(dir.path(), true).is_ok());
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn task39_absent_root_preserves_distinct_saves_and_unrelated_links() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("Saves")).unwrap();
+        std::os::unix::fs::symlink("missing", dir.path().join("unrelated")).unwrap();
+        let filter = build_share_filter(dir.path(), false).unwrap();
+        assert!(filter.0.contains_key("Saves"));
+        assert!(filter.0.contains_key("unrelated"));
+        std::fs::create_dir(dir.path().join("saves")).unwrap();
+        assert!(
+            build_share_filter(dir.path(), false)
+                .unwrap()
+                .0
+                .contains_key("unrelated")
+        );
+    }
+
+    #[test]
+    fn task39_preserved_spelling_uses_actual_filesystem_resolution() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        std::fs::create_dir(base.join("Saves")).unwrap();
+        std::fs::write(base.join("Saves/world.dat"), "original world").unwrap();
+        // Independent oracle: observe the actual lookup and shared file edits.
+        // Neither canonical pathname equality nor same-file is assumed here.
+        let is_actual_saves = match std::fs::read(base.join("saves/world.dat")) {
+            Ok(contents) => {
+                assert_eq!(contents, b"original world");
+                std::fs::write(base.join("saves/world.dat"), "edited via lowercase").unwrap();
+                assert_eq!(
+                    std::fs::read(base.join("Saves/world.dat")).unwrap(),
+                    b"edited via lowercase"
+                );
+                true
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+            Err(error) => panic!("could not establish saves identity: {error}"),
+        };
+        for include_saves in [false, true] {
+            let filter = build_share_filter(base, include_saves).unwrap();
+            let mut writer = ZipWriter::new(std::io::Cursor::new(Vec::new()));
+            let (send, _receive) = tokio::sync::watch::channel((0, 0));
+            zip_excluding(
+                ZipMode::Create(&mut writer, FileOptions::<()>::default(), send),
+                base,
+                "overrides",
+                &filter,
+            )
+            .unwrap();
+            let mut archive = zip::ZipArchive::new(writer.finish().unwrap()).unwrap();
+            let included = include_saves || !is_actual_saves;
+            assert_eq!(archive.len(), usize::from(included));
+            if included {
+                let mut contents = String::new();
+                archive
+                    .by_name("overrides/Saves/world.dat")
+                    .unwrap()
+                    .read_to_string(&mut contents)
+                    .unwrap();
+                assert_eq!(
+                    contents,
+                    if is_actual_saves {
+                        "edited via lowercase"
+                    } else {
+                        "original world"
+                    }
+                );
+            }
+            assert!(archive.by_name("overrides/saves/world.dat").is_err());
+        }
+        println!("actual preserved Saves aliases lowercase saves: {is_actual_saves}");
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn task39_archive_preserves_sensitive_distinct_saves_and_disclosed_contents() {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        for name in [
+            "saves",
+            "Saves",
+            "screenshots",
+            "logs",
+            "config",
+            "Distant_Horizons_server_data",
+        ] {
+            std::fs::create_dir(base.join(name)).unwrap();
+            std::fs::write(base.join(name).join("fixture.txt"), name).unwrap();
+        }
+        // A native insensitive filesystem cannot hold these distinct directories.
+        assert_ne!(
+            std::fs::canonicalize(base.join("saves")).unwrap(),
+            std::fs::canonicalize(base.join("Saves")).unwrap()
+        );
+        for include_saves in [false, true] {
+            let filter = build_share_filter(base, include_saves).unwrap();
+            let mut count = 0;
+            let mut bytes = 0;
+            zip_excluding::<std::io::Cursor<Vec<u8>>, ()>(
+                ZipMode::Count(&mut count, &mut bytes),
+                base,
+                "overrides",
+                &filter,
+            )
+            .unwrap();
+            let mut writer = ZipWriter::new(std::io::Cursor::new(Vec::new()));
+            let (send, mut receive) = tokio::sync::watch::channel((0, 0));
+            zip_excluding(
+                ZipMode::Create(&mut writer, FileOptions::<()>::default(), send),
+                base,
+                "overrides",
+                &filter,
+            )
+            .unwrap();
+            let mut archive = zip::ZipArchive::new(writer.finish().unwrap()).unwrap();
+            assert_eq!(archive.len(), count as usize);
+            for name in ["Saves", "screenshots", "logs", "config"] {
+                let key = format!("overrides/{name}/fixture.txt");
+                let mut entry = archive.by_name(&key).unwrap();
+                let mut contents = String::new();
+                entry.read_to_string(&mut contents).unwrap();
+                assert_eq!(contents, name);
+            }
+            assert_eq!(
+                archive.by_name("overrides/saves/fixture.txt").is_ok(),
+                include_saves
+            );
+            assert!(
+                archive
+                    .by_name("overrides/Distant_Horizons_server_data/fixture.txt")
+                    .is_err()
+            );
+            let progress = *receive.borrow_and_update();
+            assert_eq!(progress.1, count as u64);
+            assert_eq!(progress.0, bytes);
+        }
     }
 }
 

@@ -118,7 +118,7 @@ Existieren nur, wenn der Pack sie mitbringt. Vanilla und die meisten Custom-Inst
 | `logs/` (Launcher-Logs) | Ja | Wie oben. |
 | `instance/options.txt` | Ja | Game-Settings auf Default. |
 | `instance.json` | Nicht löschen | Der Launcher verliert die Instanz aus dem Tracking. |
-| `packinfo.json` | Möglich (entkoppelt effektiv) | Der Launcher behandelt die Instanz nicht mehr als gepairtes Modpack. Wie der Unpair-Button im Settings-Tab der Instanz, nur unsauber. |
+| `packinfo.json` | Behalten | Behalte diese Datei: Sie dokumentiert verwaltete Modpack-Dateien für Updates und Wiederherstellung. Löschen entkoppelt die Instanz nicht; das Pairing steht in `instance.json` (`modpack`). Nutze zum Entkoppeln **Unpair** im **Settings**-Tab der Instanz. Ändere das Pairing-Feld nicht manuell und lösche keine Herkunftsdaten. |
 | Den gesamten `instance/`-Ordner | Nicht löschen | Die Instanz wird kaputt. Im Launcher Delete verwenden. |
 
 ## Hinweis zu gesperrten Modpack-Instanzen

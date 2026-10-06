@@ -13,7 +13,6 @@ export const APP_URLS = {
     instagram: "https://www.instagram.com/gdlauncher",
     twitter: "https://twitter.com/gdlauncher",
   },
-  newsletter: import.meta.env.ENDERIUM_API_BASE,
   olddownload: {
     win: "https://github.com/gorilla-devs/GDLauncher/releases/latest/download/GDLauncher-win-setup.exe",
     macOs:
@@ -23,15 +22,6 @@ export const APP_URLS = {
     releases: "https://github.com/gorilla-devs/GDLauncher/releases",
   },
 };
-if (!APP_URLS.newsletter) {
-  // Fail loudly at build time rather than silently producing
-  // `undefined/mailing` URLs that 404 in the browser.
-  throw new Error(
-    "ENDERIUM_API_BASE is not set. Add it to .env or the deploy environment.",
-  );
-}
-export const ADD_USER_ENDPOINT = `${APP_URLS.newsletter}/mailing`;
-
 export const SITE_TITLE =
   "GDLauncher: Free Modded Minecraft Launcher for CurseForge & Modrinth";
 export const SITE_DESCRIPTION =

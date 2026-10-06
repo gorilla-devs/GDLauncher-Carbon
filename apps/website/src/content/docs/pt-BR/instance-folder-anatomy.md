@@ -118,7 +118,7 @@ Só existem se o pack traz. Vanilla e a maioria das instâncias custom não têm
 | `logs/` (logs do launcher) | Sim | Idem. |
 | `instance/options.txt` | Sim | Configurações do jogo voltam ao default. |
 | `instance.json` | Não | O launcher perde o rastro da instância. |
-| `packinfo.json` | Possível (efetivamente desemperelha) | O launcher deixa de tratar a instância como modpack pareado. Mesmo efeito que o botão Unpair na aba Settings da instância, só que sujo. |
+| `packinfo.json` | Preservar | Preserve este arquivo: ele registra os arquivos gerenciados do modpack para atualizações e recuperação. Excluí-lo não desemparelha a instância; o emparelhamento fica em `instance.json` (`modpack`). Use **Unpair** na aba **Settings** da instância. Não edite o campo manualmente nem exclua os registros de procedência. |
 | Toda a pasta `instance/` | Não | A instância fica quebrada. Use Delete na UI do launcher. |
 
 ## Nota sobre instâncias de modpack bloqueadas

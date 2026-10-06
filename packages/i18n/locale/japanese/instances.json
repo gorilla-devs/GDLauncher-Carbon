@@ -326,7 +326,7 @@
   "_trn_view_versions_on_modrinth": "Modrinthでバージョンを見る",
   "_trn_select_icon": "アイコンを選択",
   "_trn_instance_share.title": "インスタンスを共有",
-  "_trn_instance_share.description": "共有コードを作成すると、他の人があなたのインスタンス構成をダウンロードできます。",
+  "_trn_instance_share.description": "このインスタンスの共有コードを作成します。スクリーンショット、ログ、設定ファイルも含まれ、個人情報がある場合があります。共有前に確認してください。ワールドとプレイヤーデータは「セーブを含める」を有効にした場合のみ含まれます（既定では無効）。",
   "_trn_instance_share.share_code_label": "共有コード",
   "_trn_instance_share.share_code_details": "このコードを共有すれば、相手がインスタンスをインポートできます。",
   "_trn_instance_share.copy": "コピー",

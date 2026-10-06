@@ -326,7 +326,7 @@
   "_trn_view_versions_on_modrinth": "Voir les versions sur Modrinth",
   "_trn_select_icon": "Sélectionner une icône",
   "_trn_instance_share.title": "Partager l'instance",
-  "_trn_instance_share.description": "Créez un code de partage pour permettre à d'autres de télécharger la configuration de votre instance.",
+  "_trn_instance_share.description": "Créez un code pour partager cette instance. Les captures, logs et fichiers de configuration sont inclus et peuvent contenir des données personnelles : vérifiez-les avant de partager. Les mondes et données de joueur sont inclus uniquement si Inclure les sauvegardes est activé (désactivé par défaut).",
   "_trn_instance_share.share_code_label": "Code de partage",
   "_trn_instance_share.share_code_details": "Partagez ce code avec d'autres personnes pour qu'elles puissent importer votre instance.",
   "_trn_instance_share.copy": "Copier",

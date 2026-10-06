@@ -268,62 +268,48 @@ if (faq?.length) jsonLd.push(faqJsonLd(faq));
 </style>
 
 <script>
+  let cleanupDocsLayout = () => {};
   function initDocsLayout() {
+    cleanupDocsLayout();
     const sidebar = document.getElementById('docs-sidebar');
     const overlay = document.getElementById('docs-overlay');
     const toggleBtn = document.getElementById('docs-menu-toggle');
-
     if (!sidebar || !overlay || !toggleBtn) return;
-
-    // Capture non-null references for use in closures
-    const sidebarEl = sidebar;
-    const overlayEl = overlay;
-    const toggleBtnEl = toggleBtn;
-
-    function openSidebar() {
-      sidebarEl.classList.add('open');
-      overlayEl.classList.add('open');
-      toggleBtnEl.classList.add('open');
-      document.body.style.overflow = 'hidden';
-    }
-
+    const lifetime = new AbortController();
+    const previousOverflow = document.body.style.overflow;
     function closeSidebar() {
-      sidebarEl.classList.remove('open');
-      overlayEl.classList.remove('open');
-      toggleBtnEl.classList.remove('open');
-      document.body.style.overflow = '';
+      sidebar!.classList.remove('open');
+      overlay!.classList.remove('open');
+      toggleBtn!.classList.remove('open');
+      toggleBtn!.setAttribute('aria-expanded', 'false');
+      document.body.style.overflow = previousOverflow;
     }
-
     toggleBtn.addEventListener('click', () => {
-      if (sidebar.classList.contains('open')) {
-        closeSidebar();
-      } else {
-        openSidebar();
+      if (sidebar.classList.contains('open')) closeSidebar();
+      else {
+        sidebar.classList.add('open');
+        overlay.classList.add('open');
+        toggleBtn.classList.add('open');
+        toggleBtn.setAttribute('aria-expanded', 'true');
+        document.body.style.overflow = 'hidden';
       }
-    });
-
-    overlay.addEventListener('click', closeSidebar);
-
-    // Close sidebar when clicking a link (for mobile)
+    }, { signal: lifetime.signal });
+    overlay.addEventListener('click', closeSidebar, { signal: lifetime.signal });
     sidebar.querySelectorAll('a').forEach(link => {
       link.addEventListener('click', () => {
-        if (window.innerWidth < 1024) {
-          closeSidebar();
-        }
-      });
+        if (window.innerWidth < 1024) closeSidebar();
+      }, { signal: lifetime.signal });
     });
-
-    // Close sidebar on escape key
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && sidebar.classList.contains('open')) {
-        closeSidebar();
-      }
-    });
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && sidebar.classList.contains('open')) closeSidebar();
+    }, { signal: lifetime.signal });
+    cleanupDocsLayout = () => {
+      cleanupDocsLayout = () => {};
+      closeSidebar();
+      lifetime.abort();
+    };
   }
-
-  // Run on initial load
   initDocsLayout();
-
-  // Re-run on Astro page transitions
+  document.addEventListener('astro:before-swap', () => cleanupDocsLayout());
   document.addEventListener('astro:page-load', initDocsLayout);
 </script>
