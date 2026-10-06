@@ -2,9 +2,10 @@ import { useTransContext } from "@gd/i18n"
 import LoadingGif from "/assets/images/image.gif"
 import { Progress } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
-import { createEffect, createSignal, Show } from "solid-js"
+import { batch, createEffect, createSignal, Show } from "solid-js"
 import { setTaskId, taskId } from "@/utils/import"
 import { setExportStep } from ".."
+import { exportFailureMessage } from "./exportFailureMessage"
 
 const [failedMsg, setFailedMsg] = createSignal<string | undefined>(undefined)
 export { failedMsg, setFailedMsg }
@@ -13,31 +14,46 @@ export default function Exporting() {
   const [t] = useTransContext()
   const [progress, setProgress] = createSignal(0)
 
+  const activeTask = taskId()
   const vtask = rspc.createQuery(() => ({
-    queryKey: ["vtask.getTask", taskId() || null]
+    queryKey: ["vtask.getTaskOutcome", activeTask ?? null],
+    enabled: activeTask !== undefined
   }))
 
   createEffect(() => {
-    if (vtask.data?.progress) {
-      if (vtask.data.progress.type == "Known") {
-        setProgress(Math.floor(vtask.data.progress.value * 100))
-      }
-      if (vtask.data.progress.type === "Indeterminate") {
-        setProgress(-1)
-      }
-      if (vtask.data.progress.type === "Failed") {
-        setFailedMsg(vtask.data.progress.value.cause[1].display)
+    if (activeTask === undefined || taskId() !== activeTask) return
+    const outcome = vtask.data
+    if (!outcome) return // Pending/absence cannot certify successful export.
+    const task =
+      outcome.type === "Running" || outcome.type === "Failed"
+        ? outcome.value
+        : undefined
+    if (task?.progress.type === "Known")
+      setProgress(Math.floor(task.progress.value * 100))
+    if (task?.progress.type === "Indeterminate") setProgress(-1)
+    const failed =
+      task?.progress.type === "Failed" ? task.progress.value : undefined
+    if (
+      failed ||
+      outcome.type === "Failed" ||
+      outcome.type === "Unavailable" ||
+      outcome.type === "Dismissed"
+    ) {
+      const message = exportFailureMessage(
+        failed?.cause,
+        t("instances:_trn_export_failed")
+      )
+      batch(() => {
+        setFailedMsg(message)
+        setTaskId(undefined)
         setExportStep(2)
-      }
-    }
-    const isFailed = vtask.data?.progress.type === "Failed"
-    const isDownloaded = vtask.data === null && progress() !== 0
-    if (isDownloaded || isFailed) {
-      setTaskId(undefined)
-    }
-    if (isDownloaded) {
-      setExportStep(2)
-      setProgress(0)
+      })
+    } else if (outcome.type === "Succeeded") {
+      batch(() => {
+        setFailedMsg(undefined)
+        setTaskId(undefined)
+        setExportStep(2)
+      })
     }
   })
 

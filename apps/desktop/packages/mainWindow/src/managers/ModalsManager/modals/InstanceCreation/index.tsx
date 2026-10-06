@@ -6,9 +6,10 @@ import Custom from "./Custom"
 import Import from "./Import"
 import ShareCodeImport from "./ShareCodeImport"
 import { Match, Switch } from "solid-js"
+import { editInstanceId, hasEditContext } from "./editInstanceId"
 
 interface Props {
-  id?: number
+  id?: number | string
   import?: boolean
 }
 
@@ -17,7 +18,7 @@ const InstanceCreation = (props: ModalProps) => {
   const [t] = useTransContext()
 
   const title = () =>
-    data()?.id !== undefined && data()?.id !== null
+    editInstanceId(data()) !== undefined
       ? t("modals:_trn_title.modify_instance")
       : t("modals:_trn_title.new_instance")
 
@@ -25,10 +26,10 @@ const InstanceCreation = (props: ModalProps) => {
     <ModalLayout noHeader={props.noHeader} title={title()} noPadding={true}>
       <div class="w-140 flex h-full flex-col justify-between">
         <Switch>
-          <Match when={data()?.id !== undefined && data()?.id !== null}>
+          <Match when={hasEditContext(data())}>
             <Custom data={data()} />
           </Match>
-          <Match when={data()?.id === undefined || data()?.id === null}>
+          <Match when={!hasEditContext(data())}>
             <Tabs defaultValue={data()?.import ? "import" : "custom"}>
               <TabsList class="mx-4 mt-4 w-auto">
                 <TabsIndicator />

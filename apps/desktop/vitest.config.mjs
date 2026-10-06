@@ -17,6 +17,8 @@ export default defineConfig({
       "**/*.task29.test.{ts,tsx}",
       // Controlled resolution/animation Task30 entry: vitest.task30.config.mjs.
       "**/*.task30.test.{ts,tsx}",
+      // Controlled Task31 modal/profile entry: vitest.task31.config.mjs.
+      "**/*.task31.test.{ts,tsx}",
       "**/node_modules/**",
       "**/dist/**",
       "e2e-tests/**/*.spec.ts",

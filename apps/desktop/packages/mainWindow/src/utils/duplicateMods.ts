@@ -98,6 +98,7 @@ export function detectDuplicatedMods(mods: Mod[]): DuplicatedModGroup[] {
       modId: modid,
       modName,
       mods: {
+        groupKey: modid,
         name: modName,
         modId,
         platform,

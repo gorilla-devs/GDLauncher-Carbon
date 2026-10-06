@@ -12,6 +12,7 @@ export interface ModVersion {
 }
 
 export interface DuplicatedMod {
+  groupKey: string
   name: string
   modId?: string
   platform?: string | null

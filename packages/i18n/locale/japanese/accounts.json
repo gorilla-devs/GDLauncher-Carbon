@@ -100,6 +100,8 @@
   "_trn_requires_gdl_account_modal_description": "この機能にはGDLauncherアカウントが必要です。アカウントをリンクすると、共有やクラウドセーブなどが利用できます。",
   "_trn_link_account": "アカウントをリンク",
   "_trn_gdl_account_unavailable": "GDLアカウント利用不可",
+  "_trn_gdl_account_changed_reopen": "このウィンドウを開いている間にGDLauncherアカウントが変更されました。ウィンドウを閉じて「プロフィールを編集」を開き直し、現在のアカウントを編集してください。",
+  "_trn_gdl_account_gone_close": "GDLauncherアカウントは利用できなくなりました。このウィンドウを閉じて、「設定 > アカウント」で確認してください。",
   "_trn_verification_required_title": "メール認証が必要",
   "_trn_verification_required_description": "この機能を利用するにはメール認証が必要です。受信トレイの認証リンクをご確認ください。",
   "_trn_verification_sent_to_email": "{{email}} に認証メールを送信しました",

@@ -38,6 +38,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { convertSecondsToHumanTime } from "@/utils/helpers"
 import { useModal } from "@/managers/ModalsManager"
 import { AccountEntry } from "@gd/core_module/bindings"
+import { useSavedGdlOwner } from "@/utils/savedGdlOwner"
 import { getAccountImageUuid } from "@/utils/showcaseHelpers"
 
 const defaultColumns: ColumnDef<AccountEntry>[] = [
@@ -140,6 +141,19 @@ const defaultColumns: ColumnDef<AccountEntry>[] = [
 
 const Accounts = () => {
   const globalStore = useGlobalStore()
+  const ownerProof = useSavedGdlOwner()
+  // The card's Retry is busy until its check lands, as the Edit Profile
+  // dialog's is, so a second click does not restart the check.
+  const [retryingOwner, setRetryingOwner] = createSignal(false)
+  const retryOwner = async () => {
+    if (retryingOwner()) return
+    setRetryingOwner(true)
+    try {
+      await ownerProof.refetch()
+    } finally {
+      setRetryingOwner(false)
+    }
+  }
   const [t] = useTransContext()
 
   const gdNavigator = useGDNavigate()
@@ -307,6 +321,32 @@ const Accounts = () => {
         {/* Logged in state - Discord-like profile card */}
         <Match when={validGDLUser()}>
           <div class="bg-darkSlate-700 rounded-xl p-6">
+            {/* The keyed check runs on every visit; only a definite failure,
+                null or mismatch is reported as unavailable. */}
+            <Switch>
+              <Match when={ownerProof.status() === "loading"}>
+                <p class="text-lightSlate-400 text-sm">
+                  {t("auth:_trn_login.checking_gdl_account")}
+                </p>
+              </Match>
+              <Match when={ownerProof.status() === "unavailable"}>
+                <div class="flex items-center gap-3">
+                  <p class="text-yellow-400">
+                    {t("accounts:_trn_gdl_account_unavailable")}
+                  </p>
+                  <Button
+                    type="secondary"
+                    size="small"
+                    loading={retryingOwner()}
+                    disabled={retryingOwner()}
+                    onClick={retryOwner}
+                  >
+                    <div class="i-hugeicons:refresh" />
+                    <Trans key="general:_trn_retry" />
+                  </Button>
+                </div>
+              </Match>
+            </Switch>
             {/* Profile Header */}
             <div class="mb-4 flex items-center justify-between">
               <h2 class="text-lightSlate-50 text-lg font-semibold">
@@ -410,18 +450,21 @@ const Accounts = () => {
                               type="secondary"
                               size="small"
                               class="mt-2"
+                              disabled={!ownerProof.capture()}
                               onClick={async () => {
-                                const uuid =
-                                  globalStore?.currentlySelectedAccountUuid
-                                    ?.data
-                                if (!uuid) return
+                                const owner = ownerProof.capture()
+                                if (!owner) return
 
                                 try {
                                   await clearDisplayNameHistoryMutation.mutateAsync(
-                                    uuid
+                                    owner.uuid
                                   )
+                                  if (!ownerProof.current(owner)) return
                                   queryClient.invalidateQueries({
-                                    queryKey: ["account.getDisplayNameHistory"]
+                                    queryKey: [
+                                      "account.getDisplayNameHistory",
+                                      owner.friendCode
+                                    ]
                                   })
                                   toast.success(
                                     t(
@@ -429,6 +472,7 @@ const Accounts = () => {
                                     )
                                   )
                                 } catch (err) {
+                                  if (!ownerProof.current(owner)) return
                                   console.error(err)
                                   toast.error(
                                     t(

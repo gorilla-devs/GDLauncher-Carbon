@@ -17,12 +17,12 @@ interface Props {
 
 const SummaryStep = (props: Props) => {
   const getSelectedVersion = (mod: DuplicatedMod) => {
-    const selectedId = props.selectedVersions[mod.name]
+    const selectedId = props.selectedVersions[mod.groupKey]
     return mod.versions.find((v) => v.id === selectedId)
   }
 
   const getUnselectedVersions = (mod: DuplicatedMod) => {
-    const selectedId = props.selectedVersions[mod.name]
+    const selectedId = props.selectedVersions[mod.groupKey]
     return mod.versions.filter((v) => v.id !== selectedId)
   }
 

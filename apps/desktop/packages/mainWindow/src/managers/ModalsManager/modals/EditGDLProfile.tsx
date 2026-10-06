@@ -6,14 +6,22 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  Match,
   onCleanup,
   Show,
+  Switch,
   untrack
 } from "solid-js"
 import { queryClient, rspc, apiFetch } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import ImagePicker from "@/components/ImagePicker"
 import { convertSecondsToHumanTime, blobToBase64 } from "@/utils/helpers"
+import {
+  sameGdlOwner,
+  useSavedGdlOwner,
+  type SavedGdlOwner,
+  type SavedGdlOwnerStatus
+} from "@/utils/savedGdlOwner"
 import { getErrorCode } from "@/components/SharePreviewContent"
 
 type AvatarUploadErrorKey =
@@ -45,6 +53,12 @@ const EditGDLProfile = () => {
   const [t] = useTransContext()
   const modalsContext = useModal()
   const globalStore = useGlobalStore()
+  const ownerProof = useSavedGdlOwner()
+  const [formOwner, setFormOwner] = createSignal<SavedGdlOwner>()
+  const [nameBaseline, setNameBaseline] = createSignal("")
+  const [emailBaseline, setEmailBaseline] = createSignal("")
+  const [emailError, setEmailError] = createSignal<string | null>(null)
+  const [verificationPending, setVerificationPending] = createSignal(false)
 
   // Form state
   const [displayName, setDisplayName] = createSignal("")
@@ -113,14 +127,18 @@ const EditGDLProfile = () => {
   // Initialize form with current values
   let textFieldsInitialized = false
   createEffect(() => {
-    const user = validGDLUser()
-    if (user) {
+    const certified = ownerProof.capture()
+    const user = certified?.profile
+    if (user && (!formOwner() || ownerProof.current(formOwner()))) {
       // Seed the editable text fields only once. A background refetch of the
       // GDL account (e.g. after requesting a verification email or changing the
       // avatar in this same dialog) must not overwrite an unsaved display-name
       // or recovery-email edit the user is still typing.
       if (!textFieldsInitialized) {
         textFieldsInitialized = true
+        setFormOwner(certified)
+        setNameBaseline(user.displayName || "")
+        setEmailBaseline(user.email || "")
         setDisplayName(user.displayName || "")
         setRecoveryEmail(user.email || "")
       }
@@ -162,6 +180,46 @@ const EditGDLProfile = () => {
       }
     }
   })
+
+  // What the dialog may do with the profile it shows. Routine refetches keep
+  // the owner. If the owner is lost but the same account is still shown, Retry
+  // can confirm it again; if another account is shown now, only reopening the
+  // dialog loads it, so the typed text never lands on someone else. With no
+  // valid account shown any more (it became invalid or was unlinked) there is
+  // no Edit Profile to reopen, so the dialog points to Settings > Accounts.
+  const ownerState = createMemo(
+    (): SavedGdlOwnerStatus | "changed" | "gone" => {
+      const owner = formOwner()
+      if (owner && ownerProof.current(owner)) return "owned"
+      const identity = ownerProof.identity()
+      if (!identity) return "gone"
+      if (owner && !sameGdlOwner(owner, identity)) return "changed"
+      return owner ? "unavailable" : ownerProof.status()
+    }
+  )
+
+  const [retryingOwner, setRetryingOwner] = createSignal(false)
+  const retryOwner = async () => {
+    if (retryingOwner()) return
+    setRetryingOwner(true)
+    try {
+      await ownerProof.refetch()
+    } finally {
+      setRetryingOwner(false)
+    }
+    // Without a form owner the seeding effect captures on its own. With one,
+    // only the very same account is admitted again, and the fields keep what
+    // the user typed. A save still awaiting the old owner stays retired.
+    const owner = formOwner()
+    const fresh = ownerProof.capture()
+    if (
+      owner &&
+      fresh &&
+      sameGdlOwner(owner, fresh) &&
+      !ownerProof.current(owner)
+    )
+      setFormOwner(fresh)
+  }
 
   const startDisplayNameCooldownTimer = () => {
     if (displayNameCooldownInterval) clearInterval(displayNameCooldownInterval)
@@ -220,12 +278,12 @@ const EditGDLProfile = () => {
   })
 
   const hasDisplayNameChanged = createMemo(() => {
-    const currentName = validGDLUser()?.displayName || ""
+    const currentName = nameBaseline()
     return displayName().trim() !== currentName
   })
 
   const hasEmailChanged = createMemo(() => {
-    const currentEmail = validGDLUser()?.email || ""
+    const currentEmail = emailBaseline()
     return recoveryEmail().trim() !== currentEmail
   })
 
@@ -238,6 +296,7 @@ const EditGDLProfile = () => {
   })
 
   const canSave = createMemo(() => {
+    if (!ownerProof.current(formOwner()) || isLoading()) return false
     if (!hasChanges()) return false
     if (hasDisplayNameChanged() && !isDisplayNameValid()) return false
     if (hasDisplayNameChanged() && displayNameCooldown() > 0) return false
@@ -269,103 +328,130 @@ const EditGDLProfile = () => {
 
   // Save changes
   const handleSave = async () => {
-    const uuid = globalStore?.currentlySelectedAccountUuid?.data
-    if (!uuid) return
-
-    setIsLoading(true)
-
-    try {
-      // Handle avatar changes first. If one fails we bail out before closing
-      // the dialog so the user can correct the image / try a different file.
-      if (avatarDeleted()) {
-        setAvatarLoading(true)
-        try {
-          await deleteAvatarMutation.mutateAsync(uuid)
-          toast.success(t("accounts:_trn_avatar_delete_success"))
-        } catch (err) {
-          console.error("Avatar deletion failed:", err)
-          toast.error(t("accounts:_trn_avatar_delete_failed"))
-          setAvatarLoading(false)
-          setIsLoading(false)
-          return
-        }
-        setAvatarLoading(false)
-      } else if (avatarFilePath()) {
-        setAvatarLoading(true)
-        try {
-          await uploadAvatarMutation.mutateAsync({
-            uuid,
-            iconPath: avatarFilePath()!
-          })
-          toast.success(t("accounts:_trn_avatar_upload_success"))
-        } catch (err) {
-          console.error("Avatar upload failed:", err)
-          toast.error(t(getAvatarUploadErrorKey(getErrorCode(err))))
-          setAvatarLoading(false)
-          setIsLoading(false)
-          return
-        }
-        setAvatarLoading(false)
-      }
-
-      // Handle display name change
-      if (hasDisplayNameChanged() && isDisplayNameValid()) {
-        const result = await changeDisplayNameMutation.mutateAsync({
-          uuid,
-          displayName: displayName().trim()
-        })
-
-        if (result?.status === "success") {
-          queryClient.invalidateQueries({
-            queryKey: ["account.getDisplayNameHistory"]
-          })
-        } else if (result?.status === "failed" && result.value) {
-          setDisplayNameCooldown(result.value)
-          startDisplayNameCooldownTimer()
-          setDisplayNameError(t("accounts:_trn_display_name_change_failed"))
-          setIsLoading(false)
-          return
-        }
-      }
-
-      // Handle email change
-      if (hasEmailChanged() && recoveryEmail().trim()) {
-        const result = await requestEmailChangeMutation.mutateAsync({
-          uuid,
-          email: recoveryEmail().trim()
-        })
-
-        if (result.status === "failed" && result.value) {
-          setEmailCooldown(result.value)
-          startEmailCooldownTimer()
-          setIsLoading(false)
-          return
-        }
-      }
-
-      modalsContext?.closeModal()
-    } catch (err) {
-      console.error("Save failed:", err)
+    const owner = formOwner()
+    if (!owner || !canSave() || isLoading()) return
+    const submitted = {
+      name: displayName().trim(),
+      email: recoveryEmail().trim(),
+      changeName: hasDisplayNameChanged(),
+      changeEmail: hasEmailChanged(),
+      avatarPath: avatarFilePath(),
+      deleteAvatar: avatarDeleted()
     }
-
-    setIsLoading(false)
+    setIsLoading(true)
+    try {
+      if (!ownerProof.current(owner)) return
+      if (submitted.deleteAvatar || submitted.avatarPath) {
+        setAvatarLoading(true)
+        try {
+          if (submitted.deleteAvatar)
+            await deleteAvatarMutation.mutateAsync(owner.uuid)
+          else
+            await uploadAvatarMutation.mutateAsync({
+              uuid: owner.uuid,
+              iconPath: submitted.avatarPath!
+            })
+          if (!ownerProof.current(owner)) return
+          if (submitted.deleteAvatar && avatarDeleted()) setAvatarDeleted(false)
+          if (submitted.avatarPath === avatarFilePath()) setAvatarFilePath(null)
+          toast.success(
+            t(
+              submitted.deleteAvatar
+                ? "accounts:_trn_avatar_delete_success"
+                : "accounts:_trn_avatar_upload_success"
+            )
+          )
+        } catch (err) {
+          if (ownerProof.current(owner))
+            toast.error(
+              t(
+                submitted.deleteAvatar
+                  ? "accounts:_trn_avatar_delete_failed"
+                  : getAvatarUploadErrorKey(getErrorCode(err))
+              )
+            )
+          return
+        } finally {
+          setAvatarLoading(false)
+        }
+      }
+      if (!ownerProof.current(owner)) return
+      if (submitted.changeName) {
+        const result = await changeDisplayNameMutation.mutateAsync({
+          uuid: owner.uuid,
+          displayName: submitted.name
+        })
+        if (!ownerProof.current(owner)) return
+        if (result.status !== "success") {
+          if (result.value && result.value > 0) {
+            setDisplayNameCooldown(result.value)
+            startDisplayNameCooldownTimer()
+          }
+          setDisplayNameError(t("accounts:_trn_display_name_change_failed"))
+          return
+        }
+        setNameBaseline(submitted.name)
+        queryClient.invalidateQueries({
+          queryKey: ["account.getDisplayNameHistory", owner.friendCode]
+        })
+      }
+      if (!ownerProof.current(owner)) return
+      if (submitted.changeEmail) {
+        const result = await requestEmailChangeMutation.mutateAsync({
+          uuid: owner.uuid,
+          email: submitted.email
+        })
+        if (!ownerProof.current(owner)) return
+        if (result.status !== "success") {
+          if (result.value && result.value > 0) {
+            setEmailCooldown(result.value)
+            startEmailCooldownTimer()
+          }
+          setEmailError(t("accounts:_trn_recovery_email_change_failed"))
+          return
+        }
+        setEmailBaseline(submitted.email)
+      }
+      if (ownerProof.current(owner) && !hasChanges())
+        modalsContext?.closeModal()
+    } catch {
+      // The shared mutation error path already supplies global feedback.
+      if (ownerProof.current(owner)) {
+        if (submitted.changeName && nameBaseline() !== submitted.name)
+          setDisplayNameError(t("accounts:_trn_display_name_change_failed"))
+        else if (submitted.changeEmail)
+          setEmailError(t("accounts:_trn_recovery_email_change_failed"))
+      }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
-  // Send verification email
   const handleSendVerification = async () => {
-    const uuid = globalStore?.currentlySelectedAccountUuid?.data
-    if (!uuid) return
-
+    const owner = formOwner()
+    if (
+      !owner ||
+      !ownerProof.current(owner) ||
+      verificationPending() ||
+      verificationCooldown() > 0
+    )
+      return
+    setVerificationPending(true)
     try {
-      const result = await requestNewVerificationTokenMutation.mutateAsync(uuid)
-      if (result.status === "success") {
+      const result = await requestNewVerificationTokenMutation.mutateAsync(
+        owner.uuid
+      )
+      if (!ownerProof.current(owner)) return
+      if (result.status === "success")
         toast.success(t("auth:_trn_login.verification_email_sent"))
-      } else if (result.status === "failed" && result.value) {
+      else if (result.value && result.value > 0) {
         setVerificationCooldown(result.value)
         startVerificationCooldownTimer()
       }
     } catch (err) {
       console.error("Verification request failed:", err)
+    } finally {
+      setVerificationPending(false)
     }
   }
 
@@ -376,6 +462,36 @@ const EditGDLProfile = () => {
       width="w-150"
     >
       <div class="flex flex-col gap-6">
+        <Switch>
+          <Match when={ownerState() === "loading"}>
+            <p class="text-lightSlate-400 m-0 text-sm">
+              {t("auth:_trn_login.checking_gdl_account")}
+            </p>
+          </Match>
+          <Match when={ownerState() === "unavailable"}>
+            <p class="text-yellow-400">
+              {t("accounts:_trn_gdl_account_unavailable")}
+            </p>
+            <Button
+              type="secondary"
+              loading={retryingOwner()}
+              disabled={retryingOwner()}
+              onClick={retryOwner}
+            >
+              <Trans key="general:_trn_retry" />
+            </Button>
+          </Match>
+          <Match when={ownerState() === "changed"}>
+            <p class="text-yellow-400">
+              {t("accounts:_trn_gdl_account_changed_reopen")}
+            </p>
+          </Match>
+          <Match when={ownerState() === "gone"}>
+            <p class="text-yellow-400">
+              {t("accounts:_trn_gdl_account_gone_close")}
+            </p>
+          </Match>
+        </Switch>
         {/* Avatar + Display Name Section */}
         <div class="flex items-start gap-4">
           <ImagePicker
@@ -404,7 +520,9 @@ const EditGDLProfile = () => {
                 setDisplayName(e.currentTarget.value)
                 setDisplayNameError(null)
               }}
-              disabled={!!displayNameCooldown()}
+              disabled={
+                !ownerProof.current(formOwner()) || !!displayNameCooldown()
+              }
             />
             <p class="text-lightSlate-600 m-0 mt-1 text-xs">
               <Trans key="accounts:_trn_display_name_description" />
@@ -434,9 +552,15 @@ const EditGDLProfile = () => {
           <Input
             placeholder={t("placeholders:_trn_email_example")}
             value={recoveryEmail()}
-            onInput={(e) => setRecoveryEmail(e.currentTarget.value)}
-            disabled={!!emailCooldown()}
+            onInput={(e) => {
+              setRecoveryEmail(e.currentTarget.value)
+              setEmailError(null)
+            }}
+            disabled={!ownerProof.current(formOwner()) || !!emailCooldown()}
           />
+          <Show when={emailError()}>
+            <p class="text-red-500">{emailError()}</p>
+          </Show>
           <Show when={emailCooldown()}>
             <div class="mt-3 flex items-center gap-2 text-sm text-yellow-500">
               <div class="i-hugeicons:clock-01 text-base" />
@@ -466,7 +590,11 @@ const EditGDLProfile = () => {
                   <Button
                     type="secondary"
                     size="small"
-                    disabled={!!verificationCooldown()}
+                    disabled={
+                      !ownerProof.current(formOwner()) ||
+                      verificationPending() ||
+                      !!verificationCooldown()
+                    }
                     onClick={handleSendVerification}
                   >
                     <div class="i-hugeicons:mail-send-01" />

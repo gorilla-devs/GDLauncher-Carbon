@@ -263,6 +263,7 @@
   "_trn_exported_to": "Exported correctly to",
   "_trn_open_folder": "Open Folder",
   "_trn_exporting_instance": "Exporting instance",
+  "_trn_export_failed": "Failed to export instance. Please try again.",
   "_trn_export_completed": "completed",
   "_trn_cancel_export": "Cancel",
   "_trn_begin_export": "Begin Export",

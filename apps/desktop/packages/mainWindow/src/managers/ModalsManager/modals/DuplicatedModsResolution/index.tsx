@@ -6,6 +6,7 @@ import IntroStep from "./IntroStep"
 import ModSelectionStep, { DuplicatedMod } from "./ModSelectionStep"
 import ActionStep, { DuplicateAction } from "./ActionStep"
 import SummaryStep from "./SummaryStep"
+import { duplicateResolutionPlan } from "./resolutionPlan"
 import { rspc } from "@/utils/rspcClient"
 import { useTransContext } from "@gd/i18n"
 
@@ -43,7 +44,7 @@ const DuplicatedModsResolution = (props: ModalProps) => {
   if (Object.keys(selectedVersions()).length === 0) {
     const initial: Record<string, string> = {}
     duplicatedMods().forEach((mod) => {
-      initial[mod.name] = mod.versions[0]?.id || ""
+      initial[mod.groupKey] = mod.versions[0]?.id || ""
     })
     setSelectedVersions(initial)
   }
@@ -109,8 +110,8 @@ const DuplicatedModsResolution = (props: ModalProps) => {
     }
   }
 
-  const handleVersionSelect = (modName: string, versionId: string) => {
-    setSelectedVersions({ ...selectedVersions(), [modName]: versionId })
+  const handleVersionSelect = (groupKey: string, versionId: string) => {
+    setSelectedVersions({ ...selectedVersions(), [groupKey]: versionId })
   }
 
   const handleActionSelect = (action: DuplicateAction) => {
@@ -118,34 +119,24 @@ const DuplicatedModsResolution = (props: ModalProps) => {
   }
 
   const handleFinish = async () => {
+    if (isApplying()) return
+    const plan = duplicateResolutionPlan(duplicatedMods(), selectedVersions())
+    if (!plan) {
+      toast.error(t("content:_trn_duplicates.selection.instruction"))
+      return
+    }
+    const instanceId = data().instanceId
+    const action = selectedAction()
     setIsApplying(true)
 
     try {
-      const instanceId = data().instanceId
-
-      // Loop through each duplicated mod
-      for (const mod of duplicatedMods()) {
-        const selectedVersionId = selectedVersions()[mod.name]
-
-        // Get all versions that were NOT selected
-        const unselectedVersions = mod.versions.filter(
-          (v) => v.id !== selectedVersionId
-        )
-
-        // Disable or delete each unselected version
-        for (const version of unselectedVersions) {
-          if (selectedAction() === "disable") {
-            await disableModMutation.mutateAsync({
-              instance_id: instanceId,
-              mod_id: version.id
-            })
-          } else {
-            await deleteModMutation.mutateAsync({
-              instance_id: instanceId,
-              mod_id: version.id
-            })
-          }
-        }
+      for (const version of plan) {
+        const mutation =
+          action === "disable" ? disableModMutation : deleteModMutation
+        await mutation.mutateAsync({
+          instance_id: instanceId,
+          mod_id: version.id
+        })
       }
 
       // Success - close modal (signals will reset on remount)
@@ -190,12 +181,14 @@ const DuplicatedModsResolution = (props: ModalProps) => {
                 prevStep={prevStep}
                 onVersionSelect={(versionId) =>
                   handleVersionSelect(
-                    duplicatedMods()[currentModIndex()].name,
+                    duplicatedMods()[currentModIndex()].groupKey,
                     versionId
                   )
                 }
                 selectedVersion={
-                  selectedVersions()[duplicatedMods()[currentModIndex()].name]
+                  selectedVersions()[
+                    duplicatedMods()[currentModIndex()].groupKey
+                  ]
                 }
                 instanceId={data().instanceId}
               />
