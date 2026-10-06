@@ -454,7 +454,36 @@ export async function searchForMod(
       "failing loudly"
   }).toBeChecked()
 
+  // Rows on screen right after the fill can belong to an earlier query. The
+  // list follows `debouncedSearchQuery()` (`utils/platformSearch.ts`, 500ms
+  // leading + trailing), and the fill lands within 500ms of the previous
+  // filter change (the platform click above), so the filled text is only
+  // sent 500ms after the fill. Until then
+  // the previous list stays up, and for a popular project it already holds
+  // the row `openAddonPage` wants. On macOS CI (run 41466362930) that row was
+  // hovered 170-355ms after the fill and clicked 544-715ms after it, just as
+  // the list was swapped for the filled query's: the click landed on the new
+  // row's own Download button, which installs instead of opening the page.
+  // So wait for the filled query's own search to finish first.
+  const ownSearch = page
+    .waitForEvent("requestfinished", {
+      predicate: (r) => isSearchRequestFor(r.url(), opts.query, opts.platform),
+      timeout: SEARCH_RESULTS_TIMEOUT
+    })
+    .catch((cause) => {
+      throw new Error(
+        `searchForMod: no ${opts.platform} search for "${opts.query}" ` +
+          `finished within ${SEARCH_RESULTS_TIMEOUT}ms of filling the ` +
+          "search input",
+        { cause }
+      )
+    })
+  // Handled here so a failing fill does not also leave this rejection
+  // unhandled; the await below still throws it.
+  ownSearch.catch(() => {})
+
   await page.fill(byTestId(TEST_IDS.searchInput), opts.query)
+  await ownSearch
 
   const firstResult = page.locator(byTestId(TEST_IDS.searchResultRow)).first()
   const found = await firstResult
@@ -776,6 +805,10 @@ export async function deleteModViaUi(
   page: Page,
   filename: string
 ): Promise<void> {
+  // The deleteMod wait starts only once the row is there: started first, its
+  // 15s timeout fired before this 30s one could report (Linux, run
+  // 41466362930: "no instance.deleteMod response observed", then this
+  // report failed on a closed page).
   const responsePromise = awaitMutationOk(
     page,
     "instance.deleteMod",

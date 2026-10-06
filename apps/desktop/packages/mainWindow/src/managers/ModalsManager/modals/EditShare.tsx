@@ -5,7 +5,11 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { createSignal } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { FEShareInfo } from "@gd/core_module/bindings"
-import { MAX_DOWNLOADS_LIMIT, validateMaxDownloads } from "@/utils/validation"
+import {
+  MAX_DOWNLOADS_LIMIT,
+  parseMaxDownloads,
+  validateMaxDownloads
+} from "@/utils/validation"
 
 interface Props {
   share: FEShareInfo
@@ -31,12 +35,7 @@ const EditShare = (props: ModalProps) => {
     if (!share) return
 
     const newTitle = editTitle().trim() || null
-    const maxDownloadsValue = editMaxDownloads().trim()
-    const newMaxDownloads = maxDownloadsValue
-      ? parseInt(maxDownloadsValue) >= 1
-        ? parseInt(maxDownloadsValue)
-        : null
-      : null
+    const newMaxDownloads = parseMaxDownloads(editMaxDownloads())
 
     try {
       await updateMutation.mutateAsync({

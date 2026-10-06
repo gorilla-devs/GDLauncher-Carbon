@@ -309,22 +309,28 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     createSignal<FEUnifiedSearchParameters>(searchQuery())
   let debounceTimer: ReturnType<typeof setTimeout> | undefined
 
-  createEffect(() => {
-    const current = searchQuery()
-    // Leading edge: fire immediately if no pending debounce
-    if (debounceTimer === undefined) {
-      setDebouncedSearchQuery(() => current)
-    }
-    // Trailing edge: always schedule to capture the latest value
+  createEffect(
+    on(
+      searchQuery,
+      (current) => {
+        // Leading edge: fire immediately if no pending debounce
+        if (debounceTimer === undefined) {
+          setDebouncedSearchQuery(() => current)
+        }
+        // Trailing edge: always schedule to capture the latest value
+        clearTimeout(debounceTimer)
+        debounceTimer = setTimeout(() => {
+          debounceTimer = undefined
+          setDebouncedSearchQuery(() => current)
+        }, 500)
+      },
+      { defer: true }
+    )
+  )
+
+  onCleanup(() => {
     clearTimeout(debounceTimer)
-    debounceTimer = setTimeout(() => {
-      debounceTimer = undefined
-      setDebouncedSearchQuery(() => current)
-    }, 500)
-    onCleanup(() => {
-      clearTimeout(debounceTimer)
-      debounceTimer = undefined
-    })
+    debounceTimer = undefined
   })
 
   // When the instanceId changes, reset the search query to default with instance filters

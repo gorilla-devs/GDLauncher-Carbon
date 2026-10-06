@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/solid-router"
 import { Progress } from "../../../../src"
 import ComponentDemo from "../../components/ComponentDemo"
-import { createSignal, onMount } from "solid-js"
+import { createSignal, onMount, onCleanup } from "solid-js"
 
 export const Route = createFileRoute("/components/progress")({
   component: ProgressPage
@@ -23,7 +23,7 @@ function ProgressPage() {
       }
     }, 100)
 
-    return () => clearInterval(interval)
+    onCleanup(() => clearInterval(interval))
   })
 
   return (

@@ -28,7 +28,11 @@ import {
 import { FEWaitForInstanceShareResponse } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useNavigate } from "@solidjs/router"
-import { MAX_DOWNLOADS_LIMIT, validateMaxDownloads } from "@/utils/validation"
+import {
+  MAX_DOWNLOADS_LIMIT,
+  parseMaxDownloads,
+  validateMaxDownloads
+} from "@/utils/validation"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import VerificationRequiredPlaceholder from "@/components/VerificationRequiredPlaceholder"
 import { getErrorCode } from "@/components/SharePreviewContent"
@@ -224,9 +228,9 @@ function ShareInstance(props: ModalProps) {
 
     params.set("expirationDays", expirationDays())
 
-    const maxDownloadsValue = maxDownloads().trim()
-    if (maxDownloadsValue && parseInt(maxDownloadsValue) >= 1) {
-      params.set("maxDownloads", maxDownloadsValue)
+    const maxDownloadsValue = parseMaxDownloads(maxDownloads())
+    if (maxDownloadsValue !== null) {
+      params.set("maxDownloads", maxDownloadsValue.toString())
     }
 
     if (includeSaves()) {

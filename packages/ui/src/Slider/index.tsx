@@ -103,9 +103,11 @@ function Slider(props: Props) {
     const diffs = points.map((point) => Math.abs(val - point))
     const closestPoint = points[diffs.indexOf(Math.min(...diffs))]
 
-    return props.steps !== null && props.steps !== undefined && closestPoint
-      ? parseFloat(closestPoint.toFixed(getPrecision(props.steps)))
-      : closestPoint
+    const rounded =
+      props.steps !== null && props.steps !== undefined && closestPoint
+        ? parseFloat(closestPoint.toFixed(getPrecision(props.steps)))
+        : closestPoint
+    return Math.min(Math.max(rounded, props.min), props.max)
   }
 
   const calcValueByPos = (position: number) => {

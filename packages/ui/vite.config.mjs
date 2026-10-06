@@ -16,7 +16,7 @@ export default defineConfig({
       tsconfigPath: resolve(__dirname, "tsconfig.build.json"),
       exclude: ["showcase/**/*"]
     }),
-    solidPlugin(),
+    solidPlugin({ hot: false }),
     Unocss(unocssConfig)
   ],
   test: {
@@ -27,9 +27,11 @@ export default defineConfig({
     // a resolution issue in vitest
     // And solid-testing-library needs to be here so that the 'hydrate'
     // method will be provided
+    // @tanstack/solid-router ships extensionless ESM imports that Node cannot
+    // load on its own; the showcase route tests import it.
     server: {
       deps: {
-        inline: [/solid-js/]
+        inline: [/solid-js/, /@tanstack\/solid-router/]
       }
     }
   },

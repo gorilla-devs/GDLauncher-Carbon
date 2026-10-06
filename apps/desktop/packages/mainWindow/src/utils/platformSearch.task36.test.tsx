@@ -758,6 +758,7 @@ it("provider category/sort invalidation remains independent and combined mode re
       filters: { sort_field: "name", sort_order: "ascending" }
     }
   }))
+  await new Promise((r) => setTimeout(r, 500))
   await flush()
   expect(
     c.query.mock.calls
@@ -769,9 +770,11 @@ it("provider category/sort invalidation remains independent and combined mode re
     searchApi: "modrinth",
     categories: null
   }))
+  await new Promise((r) => setTimeout(r, 500))
   await flush()
   expect(f.search.mrInfiniteResults.data?.pages[0].data).toHaveLength(20)
   f.search.setSearchQuery((p) => ({ ...p, searchApi: null }))
+  await new Promise((r) => setTimeout(r, 500))
   await flush()
   expect(f.search.mrInfiniteResults.data?.pages[0].data).toHaveLength(15)
   expect(f.search.hasNextPage()).toBe(true)
