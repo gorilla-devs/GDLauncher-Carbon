@@ -2,7 +2,7 @@
 import GuideLayout from "../../components/GuideLayout.astro"
 ---
 
-<GuideLayout
+<GuideLayout showSteps
   title="How to Set Up a Minecraft Server in GDLauncher"
   description="Create and run a Minecraft server (vanilla or modded) from GDLauncher with EULA acceptance, live console, and metrics, all from the same launcher you use to play."
   keywords="minecraft server setup, gdlauncher server, run minecraft server, server hosting, modded minecraft server, server eula, server console"
@@ -13,7 +13,7 @@ import GuideLayout from "../../components/GuideLayout.astro"
       { name: "Switch the Library to Servers mode", text: "Open the Library page and switch the mode toggle from Instances to Servers. The + button in the Library toolbar (and the right-click menu) now creates servers instead of instances." },
       { name: "Create a server", text: "Click + → Create Server. Give it a name, pick a Minecraft version, optionally pick a mod loader (Forge, NeoForge, Fabric, Quilt) and a loader version. Default port is 25565; pick a different one if you'll run multiple servers." },
       { name: "Wait for install", text: "GDLauncher downloads the server jar (vanilla, or the loader's server installer for modded), runs the mod-loader installer if needed, and reports the server as Stopped when ready to start." },
-      { name: "Accept the EULA", text: "Click Start. The first launch is blocked until you accept Mojang's EULA. GDLauncher pops a modal with a link to the EULA text; tick the checkbox and proceed. The server then walks through Installing → Starting → Running." },
+      { name: "Accept the EULA", text: "Click Start. The first launch is blocked until you accept Mojang's EULA. GDLauncher pops a modal with a link to the EULA text; tick the checkbox and proceed. After acceptance, the launcher attempts to start the already installed server and shows Running if the process starts successfully." },
       { name: "Use the console", text: "Once Running, the Console tab shows live server output. The input field at the bottom sends commands to the server, the same ones you'd type at a vanilla server console (op, whitelist add, save-all, stop, etc.)." }
     ]
   }}

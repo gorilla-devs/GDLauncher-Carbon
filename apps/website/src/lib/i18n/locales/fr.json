@@ -99,7 +99,7 @@
   "addon.related.heading": "{type} similaires",
   "addon.faq.heading": "Questions fréquentes",
   "addon.faq.q.free": "{name} est-il gratuit ?",
-  "addon.faq.a.free": "Oui. {name} est gratuit à télécharger et à installer via GDLauncher. GDLauncher lui-même est aussi gratuit et sans pub.",
+  "addon.faq.a.free": "Oui. {name} est gratuit à télécharger et à installer via GDLauncher. GDLauncher est aussi gratuit ; la publicité dans le launcher de bureau aide à financer son développement.",
   "addon.faq.q.versions": "Quelles versions de Minecraft {name} prend-il en charge ?",
   "addon.faq.a.versions": "{name} prend en charge Minecraft {versions}. GDLauncher choisit automatiquement une version compatible à l'installation.",
   "addon.faq.q.loader": "{name} a-t-il besoin de Forge ou de Fabric ?",

@@ -19,6 +19,8 @@ interface Props {
   keywords?: string
   lastUpdated?: string
   /** Optional HowTo schema. Pass an array of steps to emit it. */
+  /** Render the selected procedure visibly; existing guides opt out by default. */
+  showSteps?: boolean
   howTo?: {
     steps: Array<{ name: string; text: string }>
     totalTimeIso?: string
@@ -26,7 +28,7 @@ interface Props {
   }
 }
 
-const { title, description, keywords, lastUpdated, howTo } = Astro.props
+const { title, description, keywords, lastUpdated, howTo, showSteps = false } = Astro.props
 
 const locale = getLocaleFromUrl(Astro.url.pathname)
 const t = useTranslations(locale)
@@ -87,6 +89,16 @@ if (howTo) {
 
         <!-- Article content -->
         <article class="prose prose-invert prose-lg max-w-none">
+          {showSteps && howTo && (
+            <ol>
+              {howTo.steps.map((step, index) => (
+                <li id={`step-${index + 1}`}>
+                  <strong>{step.name}</strong>
+                  <p>{step.text}</p>
+                </li>
+              ))}
+            </ol>
+          )}
           <slot />
         </article>
         </div>

@@ -1,4 +1,5 @@
 {
+  "_trn_import_gdlpack_optional_unsupported": "此 GDLPack 包含 GDLauncher 尚不支持的可选条目。请使用包含必需平台条目和常规覆盖文件的整合包。",
   "_trn_more_actions": "更多操作",
   "_trn_instance_cancel": "取消",
   "_trn_instance_confirm": "确认",

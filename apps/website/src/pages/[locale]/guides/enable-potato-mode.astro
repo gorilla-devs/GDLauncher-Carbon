@@ -157,7 +157,7 @@ const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] 
 const b = body[locale]
 ---
 
-<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT1M", steps: m.steps }}>
+<GuideLayout showSteps title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT1M", steps: m.steps }}>
   {b.headings.map((heading, idx) => (
     <Fragment>
       <h2>{heading}</h2>

@@ -75,4 +75,6 @@ Scheitert ein Umzug, bevor der Runtime-Zeiger veröffentlicht ist, entfernt der 
 
 Der Zeiger `runtime_path_override` liegt in Electrons `userData`-Ordner (den Anwendungsdaten des Launchers), nicht in der alten Runtime. Bewahre ihn auf. Ein expliziter Runtime-Pfad auf der Kommandozeile hat Vorrang vor einem Umgebungs-Pfad; beide haben Vorrang vor dem Zeiger. Prüfe den effektiven Ort in der Runtime-Pfadeinstellung des Launchers. Verlangt der Wiederherstellungsdialog Restart oder Retry, folge dieser Aktion und behalte bei erneutem Fehler beide Ordner.
 
+Die [Marker-Datei und App-Data-Pfade](/de/docs/runtime-path-vs-app-data#die-marker-datei-runtime_path_override) helfen dir, den maßgeblichen Zeiger zu finden.
+
 Bist du dir unsicher, tritt unserem [Discord-Server](https://discord.gdlauncher.com) bei und frag nach Hilfe.

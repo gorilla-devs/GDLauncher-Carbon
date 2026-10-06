@@ -1,14 +1,14 @@
 use crate::{
-    api::translation::Translation,
     domain::{
         instance::info::{GameVersion, ModLoader, ModLoaderType, StandardVersion},
         vtask::VisualTaskId,
     },
+    managers::minecraft::gdlpack::archive::{AdmittedArchive, inspect},
     managers::{AppInner, instance::InstanceVersionSource},
 };
 use anyhow::anyhow;
 use carbon_platforms::gdlauncher::manifest::schema::v1::{Manifest, ModloaderType};
-use std::{collections::HashSet, fs, io::Read, path::PathBuf, sync::Arc};
+use std::{collections::HashSet, path::PathBuf, sync::Arc};
 use tokio::sync::RwLock;
 
 use super::{
@@ -21,8 +21,6 @@ struct Importable {
     filename: String,
     path: PathBuf,
     manifest: Manifest,
-    /// Icon data extracted from archive (bytes, extension)
-    icon_data: Option<(Vec<u8>, String)>,
 }
 
 impl From<Importable> for ImportableInstance {
@@ -64,62 +62,11 @@ impl GdlpackImporter {
 
         let path2 = path.clone();
         let r = tokio::task::spawn_blocking(move || {
-            let file =
-                fs::File::open(&path2).map_err(|_| Translation::InstanceImportGdlpackMalformed)?;
-
-            let mut zip = zip::ZipArchive::new(file)
-                .map_err(|_| Translation::InstanceImportGdlpackMalformed)?;
-
-            // Parse manifest
-            let manifest = {
-                let mut manifest_file = zip
-                    .by_name("gdlpack.json")
-                    .map_err(|_| Translation::InstanceImportGdlpackMissingManifest)?;
-
-                let mut data = Vec::new();
-                manifest_file
-                    .read_to_end(&mut data)
-                    .map_err(|_| Translation::InstanceImportGdlpackMalformedManifest)?;
-
-                let manifest = serde_json::from_slice::<Manifest>(&data)
-                    .map_err(|_| Translation::InstanceImportGdlpackMalformedManifest)?;
-
-                // Only format version 1 is understood. A newer pack could share a
-                // v1-compatible shape and silently misimport, so refuse anything
-                // else rather than guess.
-                if manifest.format_version != 1 {
-                    return Err(Translation::InstanceImportGdlpackMalformedManifest);
-                }
-
-                manifest
-            };
-
-            // Extract icon if present
-            let icon_data = if let Some(icon_path) = &manifest.icon {
-                if let Ok(mut icon_file) = zip.by_name(icon_path) {
-                    let mut icon_bytes = Vec::new();
-                    if icon_file.read_to_end(&mut icon_bytes).is_ok() {
-                        let ext = std::path::Path::new(icon_path)
-                            .extension()
-                            .and_then(|e| e.to_str())
-                            .unwrap_or("png")
-                            .to_string();
-                        Some((icon_bytes, ext))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            } else {
-                None
-            };
-
-            Ok((manifest, icon_data, path2))
+            inspect(&path2).map(|(manifest, _)| (manifest, path2))
         })
         .await?;
 
-        let (manifest, icon_data, path) = match r {
+        let (manifest, path) = match r {
             Ok(t) => t,
             Err(reason) => {
                 return Ok(Some(InternalImportEntry::Invalid(InvalidImportEntry {
@@ -133,7 +80,6 @@ impl GdlpackImporter {
             filename: name,
             path,
             manifest,
-            icon_data,
         })))
     }
 }
@@ -197,9 +143,15 @@ impl InstanceImporter for GdlpackImporter {
             .cloned()
             .ok_or_else(|| anyhow!("invalid importable instance index"))?;
 
+        let admitted = AdmittedArchive::capture(
+            instance.path.clone(),
+            app.settings_manager().runtime_path.get_temp().to_path(),
+        )
+        .await?;
+
         // Convert GDLPack modloaders to GDLauncher format
-        let modloaders: HashSet<ModLoader> = instance
-            .manifest
+        let modloaders: HashSet<ModLoader> = admitted
+            .manifest()
             .dependencies
             .modloaders
             .iter()
@@ -215,38 +167,27 @@ impl InstanceImporter for GdlpackImporter {
             .collect();
 
         let version = GameVersion::Standard(StandardVersion {
-            release: instance.manifest.dependencies.minecraft.clone(),
+            release: admitted.manifest().dependencies.minecraft.clone(),
             modloaders,
         });
 
         let instance_version_source = InstanceVersionSource::Version(version);
 
         // Set up icon from extracted data
-        let icon = instance
-            .icon_data
+        let icon = admitted
+            .icon()
             .as_ref()
             .map(|(bytes, ext)| (format!("icon.{}", ext), bytes.clone()));
 
-        let instance_path_for_copy = instance.path.clone();
-
-        let initializer = move |instance_path: PathBuf| {
-            let gdlpack_path = instance_path_for_copy;
-
-            async move {
-                let setupdir = instance_path.join(".setup");
-                tokio::fs::create_dir_all(&setupdir).await?;
-                // Copy the gdlpack file to .setup/gdlpack for processing during prepare_game
-                tokio::fs::copy(&gdlpack_path, setupdir.join("gdlpack")).await?;
-
-                Ok(())
-            }
-        };
+        let pack_name = admitted.manifest().name.clone();
+        let initializer =
+            move |instance_path: PathBuf| admitted.install(instance_path.join(".setup"));
 
         let id = app
             .instance_manager()
             .create_instance_ext(
                 app.instance_manager().get_default_group().await?,
-                name.unwrap_or_else(|| instance.manifest.name.clone()),
+                name.unwrap_or(pack_name),
                 icon,
                 None,
                 None,

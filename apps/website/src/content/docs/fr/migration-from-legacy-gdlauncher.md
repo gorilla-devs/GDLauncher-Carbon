@@ -26,8 +26,10 @@ Tu peux importer tes anciennes instances manuellement comme suit :
 
 - Crée une nouvelle instance dans GDLauncher Carbon avec la même configuration. S'il s'agit d'un modpack, installe exactement la même version. S'il s'agit d'une instance vanille, installe la même version de Minecraft et le même mod loader.
 - Ouvre le chemin des données de l'ancien GDLauncher.
-- Copie le contenu du dossier d'instance de l'ancien GDLauncher vers le dossier d'instance de GDLauncher Carbon. Voir la page [dépannage](/docs/troubleshooting) pour les détails sur le chemin des données, ou clique simplement avec le bouton droit sur la tuile d'instance puis « Ouvrir le dossier de l'instance ».
+- Ouvre la nouvelle instance Carbon par clic droit → **More Options** → **Open Folder**, puis entre dans le sous-dossier `instance/`. Copie le contenu de l'ancien dossier de jeu ici : les mondes vont dans `instance/saves/` et les mods dans `instance/mods/`. Les chemins sont décrits dans [dépannage](/docs/troubleshooting).
 
 ## Supprimer les anciennes instances (optionnel)
 
 Une fois l'import terminé, tu peux éventuellement supprimer tes anciennes instances. Cela ne sera pas fait automatiquement.
+
+Avant de supprimer la source, lance la nouvelle instance Carbon et vérifie que tes mondes et mods sont présents et fonctionnent correctement.

@@ -1,4 +1,5 @@
 {
+  "_trn_import_gdlpack_optional_unsupported": "Этот GDLPack содержит необязательные записи, которые GDLauncher пока не поддерживает. Используйте сборку с обязательными записями платформ и обычными overrides.",
   "_trn_more_actions": "Еще действия",
   "_trn_instance_cancel": "Отмена",
   "_trn_instance_confirm": "Подтвердить",

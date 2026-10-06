@@ -70,6 +70,8 @@ if (faq?.length) jsonLd.push(faqJsonLd(faq));
       id="docs-menu-toggle"
       class="lg:hidden fixed bottom-6 right-6 z-50 p-4 rounded-full bg-primary-500 hover:bg-primary-400 text-lightSlate-50 shadow-lg shadow-primary-500/25 transition-all duration-200 hover:scale-105"
       aria-label={t("docs.menu.toggle")}
+      aria-controls="docs-sidebar"
+      aria-expanded="false"
     >
       <div class="i-hugeicons:menu-02 w-6 h-6 menu-icon"></div>
       <div class="i-hugeicons:cancel-01 w-6 h-6 close-icon hidden"></div>
@@ -106,6 +108,7 @@ if (faq?.length) jsonLd.push(faqJsonLd(faq));
     }
 
     .docs-sidebar.open {
+      display: block;
       transform: translateX(0);
     }
 

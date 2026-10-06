@@ -26,8 +26,10 @@ Você pode importar suas instâncias antigas manualmente assim:
 
 - Crie uma nova instância no GDLauncher Carbon com a mesma configuração. Se for um modpack, instale exatamente a mesma versão; se for vanilla, instale a mesma versão do Minecraft e do mod loader.
 - Abra o caminho de dados do GDLauncher antigo.
-- Copie o conteúdo da pasta da instância do GDLauncher antigo para a pasta da instância no GDLauncher Carbon. Consulte a página de [solução de problemas](/docs/troubleshooting) para detalhes sobre o caminho de dados, ou simplesmente clique com o botão direito sobre o "tile" da instância e selecione "Abrir pasta da instância".
+- Abra a nova instância Carbon com botão direito → **More Options** → **Open Folder** e entre na subpasta `instance/`. Copie o conteúdo do diretório antigo do jogo para lá: mundos em `instance/saves/` e mods em `instance/mods/`. Consulte os caminhos em [solução de problemas](/docs/troubleshooting).
 
 ## Excluir as instâncias antigas (opcional)
 
 Depois de terminar a importação, você pode opcionalmente excluir suas instâncias antigas. Isso não será feito automaticamente.
+
+Antes de excluir a origem, inicie a nova instância Carbon e confira se seus mundos e mods estão presentes e funcionam corretamente.

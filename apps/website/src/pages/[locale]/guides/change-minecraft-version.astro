@@ -100,7 +100,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
 const m = meta[locale]
 ---
 
-<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
+<GuideLayout showSteps title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
   {locale === "ja" && (
     <Fragment>
       <h2>変わるもの・変わらないもの</h2>

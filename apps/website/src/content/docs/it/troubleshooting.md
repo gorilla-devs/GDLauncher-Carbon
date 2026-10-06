@@ -75,4 +75,6 @@ Se uno spostamento fallisce prima della pubblicazione del puntatore, il launcher
 
 Il puntatore `runtime_path_override` si trova nella directory `userData` di Electron (i dati applicativi del launcher), non nel vecchio runtime. Conservalo. Un percorso esplicito da riga di comando prevale su quello dell’ambiente, ed entrambi sul puntatore. Verifica il percorso effettivo nell’impostazione del runtime del launcher. Se il dialogo di recupero richiede Restart o Retry, segui quell’azione e conserva entrambe le cartelle se fallisce ancora.
 
+Consulta [il marker e le posizioni dei dati dell’app](/it/docs/runtime-path-vs-app-data#il-marker-runtime_path_override) per trovare il puntatore autorevole.
+
 In caso di dubbi, entra sul nostro [server Discord](https://discord.gdlauncher.com) e chiedi aiuto.

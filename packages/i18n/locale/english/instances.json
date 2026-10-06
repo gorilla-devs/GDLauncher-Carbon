@@ -136,6 +136,7 @@
   "_trn_import_error_bad_config": "Configuration missing or unreadable",
   "_trn_import_error_archive_malformed": "Not a valid archive",
   "_trn_import_error_archive_missing_manifest": "No modpack manifest in the archive",
+  "_trn_import_gdlpack_optional_unsupported": "This GDLPack contains optional entries, which GDLauncher does not support yet. Use a pack with required platform entries and regular overrides.",
   "_trn_import_error_archive_malformed_manifest": "The modpack manifest is malformed",
   "_trn_import_error_not_minecraft_modpack": "Not a Minecraft modpack",
   "_trn_instance_creation_custom_tab": "Custom",

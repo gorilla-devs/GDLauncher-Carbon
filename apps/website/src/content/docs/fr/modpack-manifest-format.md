@@ -7,7 +7,7 @@ faq:
   - question: "Quelle différence entre les formats CurseForge, Modrinth et GDLauncher ?"
     answer: "Les trois sont des zips contenant un manifest JSON. CurseForge utilise manifest.json avec des project/file IDs CurseForge. Modrinth utilise modrinth.index.json avec des URLs de téléchargement directes plus des hashes. GDLauncher utilise gdlpack.json avec uniquement des hashes de contenu (sha512 + sha1 + murmur2) et résout chaque fichier contre la plateforme qui le possède réellement. Ils ne sont pas interchangeables ; le launcher dispatche selon le JSON trouvé à la racine de l'archive."
   - question: "C'est quoi un .gdlpack et pourquoi ça existe ?"
-    answer: "Le format de modpack propre à GDLauncher. Chaque mod est identifié par des hashes de contenu, donc un même pack fonctionne que les mods vivent sur CurseForge, Modrinth ou les deux, sans URL qui rouille. Il a aussi un support de première classe pour les fonctionnalités optionnelles (bundles de mods + configs qu'on peut sauter) et les icônes embarquées. Recommandé quand les deux côtés utilisent GDLauncher ; CurseForge .zip reste le choix le plus sûr pour la distribution cross-launcher."
+    answer: "Le format de modpack propre à GDLauncher. Chaque mod est identifié par des hashes de contenu, donc un même pack fonctionne que les mods vivent sur CurseForge, Modrinth ou les deux, sans URL qui rouille. Il prend en charge les icônes embarquées. Les entrées de fonctionnalités optionnelles sont réservées dans le schéma, mais GDLauncher Carbon les refuse actuellement. Recommandé quand les deux côtés utilisent GDLauncher ; CurseForge .zip reste le choix le plus sûr pour la distribution cross-launcher."
   - question: "Où je trouve le manifest dans une instance installée ?"
     answer: "GDLauncher ne garde pas l'archive d'origine après l'installation. Le contenu du pack se retrouve décompressé dans le dossier de l'instance. Le manifest avec lequel GDLauncher travaille est suivi dans la base de données du launcher contre l'instance ; il n'est pas consultable comme un fichier. Pour inspecter un manifest avant d'installer, ouvre le .zip / .mrpack / .gdlpack avec n'importe quel outil d'archive et lis le fichier JSON à l'intérieur directement."
   - question: "Je peux éditer un manifest ?"
@@ -155,6 +155,8 @@ Seuls `formatVersion`, `name`, `createdAt`, `dependencies.minecraft`, `entries` 
 
 ### Manifest complet, annoté
 
+**Non pris en charge dans GDLauncher Carbon :** le schéma réserve des entrées `optional`, mais le launcher n'a pas de sélecteur de fonctionnalités et refuse tout pack qui en contient avant de créer une instance ou de préparer une installation existante. Cet exemple de schéma n'est pas un pack importable. Utilise des entrées `platform` requises et des overrides ordinaires pour les imports pris en charge.
+
 ```json
 {
   "formatVersion": 1,
@@ -221,7 +223,7 @@ Seuls `formatVersion`, `name`, `createdAt`, `dependencies.minecraft`, `entries` 
 | `createdAt` | timestamp RFC 3339 | oui | Date d'export de l'archive. |
 | `icon` | string | non | Chemin dans l'archive vers le fichier d'icône (ex. `.gdl/icon.png`). |
 | `dependencies` | object | oui | Exigences Minecraft et modloader (voir ci-dessous). |
-| `entries` | array | oui | Fichiers plateforme et fonctionnalités optionnelles (voir ci-dessous). Un tableau vide est valide pour un pack purement overrides. |
+| `entries` | array | oui | Entrées `platform` requises ; les entrées `optional` sont refusées. Un tableau vide est valide pour un pack composé uniquement d’overrides. |
 | `overrides` | string | oui (défaut `"overrides"`) | Nom du dossier dans l'archive à extraire dans l'instance. |
 | `serverOverrides` | string | non | Dossier d'overrides serveur uniquement. |
 | `clientOverrides` | string | non | Dossier d'overrides client uniquement. |
@@ -273,27 +275,7 @@ Les trois hashes doivent être présents. Chacun est utilisé différemment à l
 
 À l'installation, le launcher essaie d'abord Modrinth (lookup sha512), bascule sur CurseForge (empreinte murmur2), et fait échouer l'entrée si aucune des deux plateformes n'a le fichier. Les fichiers résolus se téléchargent toujours depuis la plateforme qui a répondu.
 
-**`optional`**, un groupe sautable de mods et/ou chemins d'overrides que l'utilisateur peut inclure ou exclure :
-
-```json
-{
-  "type": "optional",
-  "description": "Shader support - skip for low-end GPUs",
-  "platforms": [
-    { "sha512": "...", "sha1": "...", "murmur2": 1234567890 }
-  ],
-  "overridePaths": [
-    "config/iris",
-    "shaderpacks/default"
-  ]
-}
-```
-
-- `description` : montré à l'utilisateur dans l'aperçu d'import pour qu'il décide d'inclure ou non cette fonctionnalité.
-- `platforms` : zéro ou plus d'entrées hash téléchargées seulement si la fonctionnalité est incluse.
-- `overridePaths` : zéro ou plus de chemins (fichiers ou dossiers) dans le dossier `overrides/` extraits seulement si la fonctionnalité est incluse. Les chemins sont relatifs à `overrides/`.
-
-Une fonctionnalité peut n'avoir que des fichiers plateforme, que des overrides, ou les deux. Sert à grouper du contenu optionnel apparenté : un mod shader plus sa config, un preset de difficulté hardcore qui est juste des configs, un resource pack optionnel.
+**Non pris en charge dans GDLauncher Carbon :** le schéma réserve des entrées `optional`, mais le launcher n'a pas de sélecteur de fonctionnalités et refuse tout pack qui en contient avant de créer une instance ou de préparer une installation existante. Cet exemple de schéma n'est pas un pack importable. Utilise des entrées `platform` requises et des overrides ordinaires pour les imports pris en charge.
 
 #### `source`
 
@@ -340,7 +322,7 @@ Les resource packs et shader packs sont toujours bundlés, dans `overrides/resou
 | Identification des mods | Project + File ID CurseForge | URL de téléchargement + hash | Hashes de contenu uniquement |
 | Résout depuis | API CurseForge | URL embarquée dans le manifest | CurseForge **ou** Modrinth, celle qui répond |
 | Installation hors-ligne | Non (CDN requis) | Oui (les URLs peuvent encore nécessiter le CDN) | Oui quand `Bundle Addons` est activé |
-| Fonctionnalités optionnelles | Flag `required: false` par mod | `env` par fichier (client/server) | Entrée `optional` dédiée avec plusieurs fichiers |
+| Fonctionnalités optionnelles | Flag `required: false` par mod | `env` par fichier (client/server) | Schéma réservé ; refusé à l’import |
 | Dossier overrides | `overrides/` | chemin par fichier | `overrides/` (configurable) |
 | Fichiers serveur uniquement | Pack séparé | `env.server` | Dossier `serverOverrides` |
 | Icône | Externe | Externe | Embarquée dans `.gdl/icon.<ext>` |
@@ -371,4 +353,4 @@ Pas besoin de spécial. Renomme `mypack.mrpack` ou `mypack.gdlpack` en `mypack.z
 
 ## Construire un pack
 
-Si tu construis un pack à partager, le chemin le plus simple est de configurer l'instance dans GDLauncher, puis d'utiliser **Export Instance** (clic droit → Export Instance). L'assistant d'export te laisse choisir le format cible : CurseForge `.zip`, Modrinth `.mrpack` ou le `.gdlpack` propre à GDLauncher. Choisis `.gdlpack` si le destinataire utilise aussi GDLauncher et que tu veux des fonctionnalités optionnelles ou des icônes embarquées ; choisis `.zip` pour la compatibilité cross-launcher la plus large.
+Si tu construis un pack à partager, le chemin le plus simple est de configurer l'instance dans GDLauncher, puis d'utiliser **Export Instance** (clic droit → Export Instance). L'assistant d'export te laisse choisir le format cible : CurseForge `.zip`, Modrinth `.mrpack` ou le `.gdlpack` propre à GDLauncher. Choisis `.gdlpack` si le destinataire utilise aussi GDLauncher et que tu veux des icônes embarquées ; choisis `.zip` pour la compatibilité cross-launcher la plus large.

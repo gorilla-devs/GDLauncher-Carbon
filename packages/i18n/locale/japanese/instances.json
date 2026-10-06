@@ -1,4 +1,5 @@
 {
+  "_trn_import_gdlpack_optional_unsupported": "この GDLPack には GDLauncher がまだ対応していない optional エントリがあります。必須の platform エントリと通常の overrides を使用したパックを選んでください。",
   "_trn_more_actions": "その他の操作",
   "_trn_instance_cancel": "キャンセル",
   "_trn_instance_confirm": "確認",

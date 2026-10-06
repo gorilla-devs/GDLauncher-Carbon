@@ -32,3 +32,5 @@ If something still fails, please report it on our [Discord](https://discord.gdla
 ## Deleting old instances (optional)
 
 After you're done importing, you can optionally delete your old instances. This will not be done automatically.
+
+Before deleting the source, launch the new Carbon instance and verify that your worlds and mods are present and work correctly.

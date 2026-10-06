@@ -32,3 +32,5 @@ Se qualcosa fallisce comunque, segnalalo sul nostro [Discord](https://discord.gd
 ## Cancellare le vecchie istanze (opzionale)
 
 Quando hai finito di importare, puoi opzionalmente cancellare le tue vecchie istanze. Non verrà fatto automaticamente.
+
+Prima di cancellare la sorgente, avvia la nuova istanza Carbon e verifica che le tue mappe e mod siano presenti e funzionino correttamente.

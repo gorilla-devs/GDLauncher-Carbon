@@ -75,4 +75,6 @@ OS 別のパスやスクリーンショットは [Share App Logs](/guides/share-
 
 `runtime_path_override` は旧ランタイムではなく、Electron の `userData` ディレクトリ（ランチャーのアプリデータ）にあります。保存してください。明示的なコマンドラインのランタイムパスは環境変数のパスより優先され、どちらもこのポインターより優先されます。ランチャーのランタイムパス設定で実際の場所を確認してください。復旧ダイアログが Restart または Retry を要求する場合はその操作に従い、再び失敗しても両方のフォルダーを保持してください。
 
+正しいポインターの場所は[マーカーとアプリデータの場所](/ja/docs/runtime-path-vs-app-data#runtime_path_override-マーカー)を参照してください。
+
 ご不明な点があれば、[Discord サーバー](https://discord.gdlauncher.com) に参加してご質問ください。

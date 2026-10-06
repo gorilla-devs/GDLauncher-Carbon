@@ -75,4 +75,6 @@ Si un traslado falla antes de publicar el puntero, el launcher actual elimina lo
 
 El puntero `runtime_path_override` está en el directorio `userData` de Electron (los datos de aplicación del launcher), no en el runtime antiguo. Consérvalo. Una ruta explícita por línea de comandos tiene prioridad sobre la ruta del entorno, y ambas sobre el puntero. Comprueba la ubicación efectiva en el ajuste de ruta del runtime. Si el diálogo de recuperación exige Restart o Retry, sigue esa acción y conserva ambas carpetas si vuelve a fallar.
 
+Consulta [el marcador y las ubicaciones de datos de la aplicación](/es/docs/runtime-path-vs-app-data#el-marcador-runtime_path_override) para encontrar el puntero autoritativo.
+
 Si tienes dudas, únete a nuestro [servidor de Discord](https://discord.gdlauncher.com) y pide ayuda.

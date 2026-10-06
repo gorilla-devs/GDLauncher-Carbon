@@ -23,7 +23,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Library を Servers モードに切替", text: "Library ページで Instances / Servers の切替トグルを Servers に。Library のツールバーの + ボタン (および右クリックメニュー) がインスタンスではなくサーバーを作成するようになります。" },
       { name: "サーバーを作成", text: "+ → Create Server をクリック。名前を付け、Minecraft バージョン、任意で Mod ローダー (Forge、NeoForge、Fabric、Quilt) とローダーバージョンを選択。デフォルトポートは 25565、複数サーバーを動かすなら別のポートを指定。" },
       { name: "インストール待ち", text: "GDLauncher がサーバー JAR (Vanilla、または Mod 入りならローダーのサーバーインストーラー) をダウンロード、必要なら Mod ローダーインストーラー実行、開始準備完了で Stopped 報告。" },
-      { name: "EULA 承認", text: "Start をクリック。初回起動は Mojang の EULA 承認まで失敗。GDLauncher が EULA テキストへのリンク付きモーダルを表示、チェックボックスを入れ進む。サーバーは Installing → Starting → Running と進行。" },
+      { name: "EULA 承認", text: "Start をクリック。初回起動は Mojang の EULA 承認まで失敗。GDLauncher が EULA テキストへのリンク付きモーダルを表示、チェックボックスを入れ進む。承認後、ランチャーはインストール済みサーバーの起動を試み、プロセスの起動に成功すると Running と表示します。" },
       { name: "コンソール使用", text: "Running になると Console タブにライブサーバー出力。下部の入力フィールドからサーバーへコマンド送信、Vanilla サーバーコンソールで打つのと同じもの (op、whitelist add、save-all、stop など)。" }
     ]
   },
@@ -34,7 +34,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Library를 Servers 모드로 전환", text: "Library 페이지에서 Instances / Servers 전환 토글을 Servers로. Library 툴바의 + 버튼(과 오른쪽 클릭 메뉴)이 이제 인스턴스 대신 서버를 만듭니다." },
       { name: "서버 생성", text: "+ → Create Server 클릭. 이름을 주고, Minecraft 버전, 선택적으로 모드 로더(Forge, NeoForge, Fabric, Quilt)와 로더 버전 선택. 기본 포트는 25565, 여러 서버를 띄울 거면 다른 포트로." },
       { name: "설치 대기", text: "GDLauncher가 서버 jar(바닐라 또는 모드용 로더 서버 인스톨러)를 다운로드, 필요하면 모드 로더 인스톨러 실행, 시작 준비 완료 시 Stopped로 보고." },
-      { name: "EULA 수락", text: "Start 클릭. 첫 실행은 Mojang EULA 수락 전까지 실패. GDLauncher가 EULA 텍스트 링크가 있는 모달을 띄움; 체크박스 체크 후 진행. 서버는 Installing → Starting → Running으로 진행." },
+      { name: "EULA 수락", text: "Start 클릭. 첫 실행은 Mojang EULA 수락 전까지 실패. GDLauncher가 EULA 텍스트 링크가 있는 모달을 띄움; 체크박스 체크 후 진행. 수락 후 런처는 이미 설치된 서버의 시작을 시도하며, 프로세스가 성공적으로 시작되면 Running으로 표시합니다." },
       { name: "콘솔 사용", text: "Running 이후 Console 탭에 라이브 서버 출력. 하단 입력 필드로 서버에 명령 전송, 바닐라 서버 콘솔에 치는 것과 동일(op, whitelist add, save-all, stop 등)." }
     ]
   },
@@ -45,7 +45,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Library auf Servers-Modus umschalten", text: "Auf der Library-Seite den Toggle von Instances auf Servers umschalten. Der +-Button in der Library-Toolbar (und das Rechtsklick-Menü) legt jetzt Server statt Instanzen an." },
       { name: "Server anlegen", text: "+ → Create Server klicken. Namen geben, Minecraft-Version wählen, optional Mod-Loader (Forge, NeoForge, Fabric, Quilt) und Loader-Version. Standardport 25565; wähle einen anderen, wenn mehrere Server parallel laufen sollen." },
       { name: "Auf Installation warten", text: "GDLauncher lädt die Server-JAR runter (Vanilla oder die Server-Installer-Variante des Loaders), führt nötigenfalls den Modloader-Installer aus und meldet den Server als Stopped, sobald er startbereit ist." },
-      { name: "EULA bestätigen", text: "Start klicken. Der erste Start schlägt fehl, bis du Mojangs EULA bestätigst. GDLauncher zeigt ein Modal mit Link auf den EULA-Text; Häkchen setzen und weiter. Danach geht's Installing → Starting → Running." },
+      { name: "EULA bestätigen", text: "Start klicken. Der erste Start schlägt fehl, bis du Mojangs EULA bestätigst. GDLauncher zeigt ein Modal mit Link auf den EULA-Text; Häkchen setzen und weiter. Nach der Bestätigung versucht der Launcher, den bereits installierten Server zu starten, und zeigt Running an, wenn der Prozess erfolgreich startet." },
       { name: "Konsole nutzen", text: "Im Running-Zustand zeigt der Console-Tab die Live-Server-Ausgabe. Das Eingabefeld unten schickt Befehle an den Server, dieselben wie an einer Vanilla-Server-Konsole (op, whitelist add, save-all, stop usw.)." }
     ]
   },
@@ -56,7 +56,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Basculer la Library en mode Servers", text: "Sur la page Library, bascule le toggle Instances/Servers sur Servers. Le bouton + dans la barre d'outils de la Library (et le menu clic droit) crée maintenant des serveurs au lieu d'instances." },
       { name: "Créer un serveur", text: "Clique + → Create Server. Donne-lui un nom, choisis une version Minecraft, optionnellement un mod loader (Forge, NeoForge, Fabric, Quilt) et une version de loader. Port par défaut 25565 ; choisis-en un autre si tu vas faire tourner plusieurs serveurs." },
       { name: "Attendre l'installation", text: "GDLauncher télécharge le jar du serveur (vanilla, ou l'installeur serveur du loader pour moddé), lance l'installeur du mod loader si nécessaire et signale le serveur Stopped quand prêt." },
-      { name: "Accepter l'EULA", text: "Clique Start. Le premier lancement échoue tant que tu n'as pas accepté l'EULA Mojang. GDLauncher ouvre un modal avec un lien vers le texte EULA ; coche la case et continue. Après ça, le serveur passe Installing → Starting → Running." },
+      { name: "Accepter l'EULA", text: "Clique Start. Le premier lancement échoue tant que tu n'as pas accepté l'EULA Mojang. GDLauncher ouvre un modal avec un lien vers le texte EULA ; coche la case et continue. Après acceptation, le launcher tente de démarrer le serveur déjà installé et affiche Running si le processus démarre correctement." },
       { name: "Utiliser la console", text: "Une fois Running, l'onglet Console affiche la sortie serveur en direct. Le champ en bas envoie des commandes au serveur, les mêmes qu'à une console vanilla (op, whitelist add, save-all, stop, etc.)." }
     ]
   },
@@ -67,7 +67,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Cambiar la Library a modo Servers", text: "En la página Library, cambia el toggle de Instances a Servers. El botón + de la barra de la Library (y el menú clic derecho) ahora crea servidores en vez de instancias." },
       { name: "Crear un servidor", text: "Pulsa + → Create Server. Dale un nombre, escoge una versión de Minecraft, opcionalmente un mod loader (Forge, NeoForge, Fabric, Quilt) y una versión de loader. Puerto por defecto 25565; pon otro si vas a tener varios servidores." },
       { name: "Esperar la instalación", text: "GDLauncher baja el jar del servidor (vanilla, o el instalador de servidor del loader si es moddeado), corre el instalador del mod loader si toca, y reporta el servidor Stopped cuando está listo para arrancar." },
-      { name: "Aceptar la EULA", text: "Pulsa Start. El primer arranque falla hasta que aceptes la EULA de Mojang. GDLauncher abre un modal con enlace al texto de la EULA; marca la casilla y continúa. Tras eso, el servidor pasa Installing → Starting → Running." },
+      { name: "Aceptar la EULA", text: "Pulsa Start. El primer arranque falla hasta que aceptes la EULA de Mojang. GDLauncher abre un modal con enlace al texto de la EULA; marca la casilla y continúa. Tras aceptar, el launcher intenta iniciar el servidor ya instalado y muestra Running si el proceso se inicia correctamente." },
       { name: "Usar la consola", text: "Una vez Running, la pestaña Console muestra la salida en vivo del servidor. El campo de entrada de la consola envía comandos al servidor, los mismos que escribirías en una consola vanilla (op, whitelist add, save-all, stop, etc.)." }
     ]
   },
@@ -78,7 +78,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Trocar a Library pro modo Servers", text: "Na página Library, alterne o toggle de Instances pra Servers. O botão + na barra da Library (e o menu de botão direito) agora cria servidores em vez de instâncias." },
       { name: "Criar um servidor", text: "Clique + → Create Server. Dê um nome, escolha uma versão Minecraft, opcionalmente um mod loader (Forge, NeoForge, Fabric, Quilt) e uma versão de loader. Porta padrão é 25565; escolha outra se for ter vários servidores rodando." },
       { name: "Esperar a instalação", text: "O GDLauncher baixa o jar do servidor (vanilla, ou o instalador de servidor do loader se for moddado), roda o instalador do mod loader se preciso, e reporta o servidor como Stopped quando pronto pra iniciar." },
-      { name: "Aceitar a EULA", text: "Clique Start. A primeira tentativa falha até você aceitar a EULA da Mojang. O GDLauncher abre um modal com link pro texto da EULA; marque a checkbox e continue. Depois disso, o servidor passa Installing → Starting → Running." },
+      { name: "Aceitar a EULA", text: "Clique Start. A primeira tentativa falha até você aceitar a EULA da Mojang. O GDLauncher abre um modal com link pro texto da EULA; marque a checkbox e continue. Após a aceitação, o launcher tenta iniciar o servidor já instalado e mostra Running se o processo iniciar com sucesso." },
       { name: "Usar o console", text: "Uma vez Running, a aba Console mostra a saída do servidor ao vivo. O campo de entrada no fim do console envia comandos ao servidor, os mesmos que você digitaria num console vanilla (op, whitelist add, save-all, stop, etc.)." }
     ]
   },
@@ -89,7 +89,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Passa la Library in modalità Servers", text: "Nella pagina Library, sposta il toggle Instances/Servers su Servers. Il pulsante + nella toolbar della Library (e il menu del clic destro) ora crea server invece che istanze." },
       { name: "Crea un server", text: "Clicca + → Create Server. Dagli un nome, scegli una versione di Minecraft, opzionalmente un mod loader (Forge, NeoForge, Fabric, Quilt) e una versione del loader. La porta di default è 25565, sceglietene un'altra se vuoi più server attivi insieme." },
       { name: "Aspetta l'installazione", text: "GDLauncher scarica il jar del server (Vanilla, o l'installer server del loader se è con mod), esegue se serve l'installer del mod loader, e segna il server come Stopped quando è pronto al lancio." },
-      { name: "Accetta l'EULA", text: "Clicca Start. Il primo avvio fallisce finché non accetti l'EULA di Mojang. GDLauncher apre un modal con un link al testo dell'EULA, spunta la checkbox e prosegui. Dopo questo il server passa per Installing → Starting → Running." },
+      { name: "Accetta l'EULA", text: "Clicca Start. Il primo avvio fallisce finché non accetti l'EULA di Mojang. GDLauncher apre un modal con un link al testo dell'EULA, spunta la checkbox e prosegui. Dopo l’accettazione, il launcher tenta di avviare il server già installato e mostra Running se il processo si avvia correttamente." },
       { name: "Usa la console", text: "Una volta Running, la scheda Console mostra l'output live del server. Il campo di input in fondo invia comandi al server, gli stessi che scriveresti in una console Vanilla (op, whitelist add, save-all, stop, ecc.)." }
     ]
   }
@@ -185,7 +185,7 @@ const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] 
 const b = body[locale]
 ---
 
-<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT5M", steps: m.steps }}>
+<GuideLayout showSteps title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT5M", steps: m.steps }}>
   {b.headings.map((heading, idx) => (
     <Fragment>
       <h2>{heading}</h2>

@@ -2,7 +2,7 @@
 import GuideLayout from "../../components/GuideLayout.astro"
 ---
 
-<GuideLayout
+<GuideLayout showSteps
   title="How to Export an Instance from GDLauncher"
   description="Export a GDLauncher Minecraft instance as a CurseForge .zip, Modrinth .mrpack, or GDLauncher .gdlpack you can share, archive, or upload to a hosting service."
   keywords="export minecraft instance, export modpack, gdlauncher export zip, share modpack, curseforge zip export, mrpack export"
@@ -13,7 +13,7 @@ import GuideLayout from "../../components/GuideLayout.astro"
       { name: "Open the export action", text: "In the Library, right-click the instance you want to export and select Export Instance (the file-export icon)." },
       { name: "Pick the format", text: "Pick one: GDLauncher .gdlpack (best fidelity if the recipient also uses GDLauncher), CurseForge .zip (works in most launchers), or Modrinth .mrpack (works in launchers with Modrinth support)." },
       { name: "Configure the bundle", text: "Toggle 'Bundle Addons' if you want the export to include the mod JARs themselves (bigger file, installable offline). Leave it off to ship a manifest-only file (smaller, but the recipient needs internet so the launcher can re-download the mods from the source CDN)." },
-      { name: "Filter what to include", text: "Walk the file tree and tick what to include. By default mods and configs are in; saves, screenshots, your options.txt are out. Tweak as needed." },
+      { name: "Filter what to include", text: "Walk the file tree and explicitly select the files you need. Review saves, screenshots and options.txt for personal data before including them." },
       { name: "Pick a save location", text: "Choose where the file should be written. The export runs with a progress bar; for big modpacks it can take a minute or two." }
     ]
   }}

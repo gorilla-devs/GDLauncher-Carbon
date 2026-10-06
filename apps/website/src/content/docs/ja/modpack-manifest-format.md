@@ -7,7 +7,7 @@ faq:
   - question: "CurseForge、Modrinth、GDLauncher の各パック形式の違いは？"
     answer: "3 つとも JSON マニフェストを内包する zip。CurseForge は manifest.json を使い CurseForge のプロジェクト / ファイル ID で参照。Modrinth は modrinth.index.json を使い直接ダウンロード URL とハッシュで参照。GDLauncher は gdlpack.json を使いコンテンツハッシュのみ (sha512 + sha1 + murmur2) で、各ファイルを実際に存在するプラットフォームに対して解決します。互換性はなく、ランチャーはアーカイブ直下にある JSON によって処理を分けます。"
   - question: ".gdlpack とは何で、なぜ存在するのか？"
-    answer: "GDLauncher 独自の Modpack 形式。各 Mod はコンテンツハッシュで識別されるので、Mod が CurseForge にあっても Modrinth にあっても両方にあっても、同じパックが動作し、URL が腐ることもありません。オプション機能 (スキップ可能な Mod + 設定のバンドル) や埋め込みアイコンも一級サポート。送り手と受け手の両方が GDLauncher を使う場合に推奨。クロスランチャー配布には CurseForge .zip の方が無難です。"
+    answer: "GDLauncher 独自の Modpack 形式。各 Mod はコンテンツハッシュで識別されるので、Mod が CurseForge にあっても Modrinth にあっても両方にあっても、同じパックが動作し、URL が腐ることもありません。埋め込みアイコンに対応しています。オプション機能のエントリはスキーマに予約されていますが、現在 GDLauncher Carbon は拒否します。送り手と受け手の両方が GDLauncher を使う場合に推奨。クロスランチャー配布には CurseForge .zip の方が無難です。"
   - question: "インストール済みインスタンスでマニフェストを見るには？"
     answer: "GDLauncher はインストール後、元のアーカイブを残しません。パック内容はインスタンスフォルダーに展開済み。GDLauncher が参照するマニフェストはランチャーのデータベースに紐付いており、ファイルとしては閲覧できません。インストール前に確認したいなら、.zip / .mrpack / .gdlpack を任意のアーカイブツールで開いて中の JSON ファイルを直接読んでください。"
   - question: "マニフェストを編集できる？"
@@ -155,6 +155,8 @@ mypack.gdlpack/
 
 ### フルマニフェスト (注釈付き)
 
+**GDLauncher Carbon では未対応:** スキーマには `optional` エントリが定義されていますが、ランチャーには機能選択画面がなく、これらを含むパックはインスタンス作成前、または既存セットアップの準備前に拒否されます。このスキーマ例はインポート可能なパックではありません。対応するインポートには必須の `platform` エントリと通常の overrides を使用してください。
+
 ```json
 {
   "formatVersion": 1,
@@ -221,7 +223,7 @@ mypack.gdlpack/
 | `createdAt` | RFC 3339 タイムスタンプ | はい | アーカイブをエクスポートした日時。 |
 | `icon` | string | いいえ | アーカイブ内のアイコンファイルへのパス (例: `.gdl/icon.png`)。 |
 | `dependencies` | object | はい | Minecraft と Mod ローダーの要件 (下記参照)。 |
-| `entries` | array | はい | プラットフォームファイルとオプション機能 (下記参照)。overrides のみのパックなら空配列も有効。 |
+| `entries` | array | はい | 必須の `platform` エントリ。`optional` エントリは拒否されます。overrides のみのパックでは空配列も有効です。 |
 | `overrides` | string | はい (デフォルトは `"overrides"`) | インスタンスへ展開するアーカイブ内ディレクトリ名。 |
 | `serverOverrides` | string | いいえ | サーバー専用 overrides のディレクトリ。 |
 | `clientOverrides` | string | いいえ | クライアント専用 overrides のディレクトリ。 |
@@ -273,27 +275,7 @@ mypack.gdlpack/
 
 インストール時、ランチャーはまず Modrinth (sha512 ルックアップ) を試し、CurseForge (murmur2 フィンガープリント) にフォールバック、両方になければ当該エントリを失敗とします。解決されたファイルは常に応答したプラットフォームからダウンロードされます。
 
-**`optional`**, ユーザーが含めるか除外するか選べる、スキップ可能な Mod / オーバーライドパスのグループ:
-
-```json
-{
-  "type": "optional",
-  "description": "Shader support - skip for low-end GPUs",
-  "platforms": [
-    { "sha512": "...", "sha1": "...", "murmur2": 1234567890 }
-  ],
-  "overridePaths": [
-    "config/iris",
-    "shaderpacks/default"
-  ]
-}
-```
-
-- `description`: インポートプレビューでユーザーに表示され、機能を含めるか判断する材料。
-- `platforms`: この機能を含めたときだけダウンロードされる 0 個以上のハッシュエントリ。
-- `overridePaths`: この機能を含めたときだけ展開される `overrides/` 内の 0 個以上のパス (ファイルかフォルダー)。パスは `overrides/` からの相対。
-
-機能はプラットフォームファイルだけ、overrides だけ、両方、いずれも可能。関連する任意コンテンツのまとめ方として使えます: シェーダー Mod とその設定、設定のみのハードコア難易度プリセット、任意のリソースパックなど。
+**GDLauncher Carbon では未対応:** スキーマには `optional` エントリが定義されていますが、ランチャーには機能選択画面がなく、これらを含むパックはインスタンス作成前、または既存セットアップの準備前に拒否されます。このスキーマ例はインポート可能なパックではありません。対応するインポートには必須の `platform` エントリと通常の overrides を使用してください。
 
 #### `source`
 
@@ -340,7 +322,7 @@ mypack.gdlpack/
 | Mod 識別 | CurseForge プロジェクト + ファイル ID | ダウンロード URL + ハッシュ | コンテンツハッシュのみ |
 | 解決元 | CurseForge API | マニフェスト内 URL | CurseForge **か** Modrinth (応答した方) |
 | オフラインインストール | 不可 (CDN 必須) | 可能 (URL 自体は CDN 必須かも) | `Bundle Addons` ON なら可能 |
-| オプション機能 | Mod ごとに `required: false` | ファイルごとに `env` (client/server) | 専用 `optional` エントリで複数ファイル可 |
+| オプション機能 | Mod ごとに `required: false` | ファイルごとに `env` (client/server) | 予約済みスキーマ。インポートは拒否 |
 | オーバーライドフォルダー | `overrides/` | ファイルごとのパス | `overrides/` (設定可) |
 | サーバー専用ファイル | 別パック | `env.server` | `serverOverrides` ディレクトリ |
 | アイコン | 外部 | 外部 | `.gdl/icon.<ext>` に埋め込み |
@@ -371,4 +353,4 @@ Override は自動生成デフォルトより優先されますが、後でプ�
 
 ## パックを作る
 
-共有用にパックを作る場合、最も簡単な道は GDLauncher でインスタンスを構築し、**Export Instance** (右クリック → Export Instance) を使うこと。エクスポートウィザードで出力形式を選べます: CurseForge `.zip`、Modrinth `.mrpack`、または GDLauncher 独自の `.gdlpack`。受け手も GDLauncher を使い、オプション機能や埋め込みアイコンが欲しいなら `.gdlpack`。クロスランチャー互換性を最大化したいなら `.zip`。
+共有用にパックを作る場合、最も簡単な道は GDLauncher でインスタンスを構築し、**Export Instance** (右クリック → Export Instance) を使うこと。エクスポートウィザードで出力形式を選べます: CurseForge `.zip`、Modrinth `.mrpack`、または GDLauncher 独自の `.gdlpack`。受け手も GDLauncher を使い、埋め込みアイコンが欲しいなら `.gdlpack`。クロスランチャー互換性を最大化したいなら `.zip`。

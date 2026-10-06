@@ -4,5 +4,9 @@
     "strictNullChecks": true,
     "jsx": "preserve",
     "jsxImportSource": "solid-js"
-  }
+  },
+  // `pnpm build` type-checks the site. Unit tests run through vitest, and
+  // some read other workspace packages' sources, which do not follow this
+  // package's compiler settings (verbatimModuleSyntax).
+  "exclude": ["**/*.test.ts", "**/*.test.tsx", "**/*.test.mjs"]
 }

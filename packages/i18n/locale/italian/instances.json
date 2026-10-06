@@ -1,4 +1,5 @@
 {
+  "_trn_import_gdlpack_optional_unsupported": "Questo GDLPack contiene entry opzionali, non ancora supportate da GDLauncher. Usa un pack con entry di piattaforma obbligatorie e override normali.",
   "_trn_more_actions": "Altre azioni",
   "_trn_instance_cancel": "Annulla",
   "_trn_instance_confirm": "Conferma",

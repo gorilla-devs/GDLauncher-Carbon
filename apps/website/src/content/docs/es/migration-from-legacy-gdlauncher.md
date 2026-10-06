@@ -26,8 +26,10 @@ Puedes importar tus instancias antiguas manualmente del siguiente modo:
 
 - Crea una nueva instancia en GDLauncher Carbon con la misma configuración. Si es un modpack, instala exactamente la misma versión del modpack. Si es vanilla, instala la misma versión de Minecraft y el mismo mod loader.
 - Abre la ruta de datos del GDLauncher antiguo.
-- Copia el contenido de la carpeta de instancia desde la ruta de instancias del GDLauncher antiguo a la ruta de instancias de GDLauncher Carbon. Consulta la página de [solución de problemas](/docs/troubleshooting) para los detalles sobre la ruta de datos, o simplemente haz clic derecho sobre la tarjeta de la instancia y selecciona «Abrir carpeta de instancia».
+- Abre la nueva instancia Carbon con clic derecho → **More Options** → **Open Folder** y entra en la subcarpeta `instance/`. Copia allí el contenido del antiguo directorio del juego: los mundos deben quedar en `instance/saves/` y los mods en `instance/mods/`. Consulta los datos de las rutas en [solución de problemas](/docs/troubleshooting).
 
 ## Eliminar las instancias antiguas (opcional)
 
 Cuando hayas terminado de importar, puedes eliminar opcionalmente tus instancias antiguas. Esto no se hará de forma automática.
+
+Antes de eliminar el origen, inicia la nueva instancia Carbon y comprueba que tus mundos y mods están presentes y funcionan correctamente.

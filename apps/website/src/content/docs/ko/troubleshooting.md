@@ -75,4 +75,6 @@ OS별 경로와 스크린샷은 [Share App Logs](/guides/share-app-logs)를 참�
 
 `runtime_path_override` 포인터는 이전 런타임이 아닌 Electron의 `userData` 디렉터리(런처 앱 데이터)에 있습니다. 보존하세요. 명시적 명령줄 런타임 경로가 환경 변수 경로보다 우선하며 둘 다 포인터보다 우선합니다. 런처의 런타임 경로 설정에서 실제 위치를 확인하세요. 복구 대화상자가 Restart 또는 Retry를 요구하면 해당 작업을 따르고, 다시 실패해도 두 폴더를 보존하세요.
 
+실제 포인터의 위치는 [마커와 앱 데이터 위치](/ko/docs/runtime-path-vs-app-data#runtime_path_override-마커)를 참고하세요.
+
 확신이 서지 않으면 [Discord 서버](https://discord.gdlauncher.com)에 참여하여 도움을 요청하세요.

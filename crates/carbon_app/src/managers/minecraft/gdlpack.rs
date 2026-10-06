@@ -1,3 +1,4 @@
+pub(crate) mod archive;
 use crate::managers::App;
 use crate::managers::instance::modpack::packinfo::PackInfo;
 use anyhow::{Context, anyhow};
@@ -169,29 +170,99 @@ pub async fn prepare_modpack_from_gdlpack(
     existing_packinfo: Option<&PackInfo>,
     progress_sender: watch::Sender<ProgressState>,
 ) -> anyhow::Result<ModpackInfo> {
+    let resolution_progress = progress_sender.clone();
+    prepare_gdlpack(
+        gdlpack_path,
+        app.settings_manager().runtime_path.get_temp().to_path(),
+        instance_path,
+        skip_overrides,
+        existing_packinfo,
+        progress_sender,
+        |platform_files| async move {
+            let total_files = platform_files.len() as u64;
+            let mut platform_error = None;
+            // Resolve from Modrinth first — the primary source.
+            debug!("Resolving {} files from Modrinth", platform_files.len());
+            let modrinth_results = match batch_resolve_modrinth(app, &platform_files).await {
+                Ok(results) => {
+                    debug!("Modrinth resolved {} files", results.len());
+                    results
+                }
+                Err(e) => {
+                    warn!("Modrinth batch resolution failed: {}", e);
+                    platform_error = Some(e.context("Modrinth file resolution failed"));
+                    HashMap::new()
+                }
+            };
+
+            // Update progress - Modrinth done
+            resolution_progress.send_modify(|state| {
+                *state = ProgressState::ResolvingFiles(total_files / 2, total_files);
+            });
+
+            // Collect the files Modrinth didn't resolve, to look up on CurseForge.
+            let not_in_modrinth: Vec<FileHashes> = platform_files
+                .iter()
+                .filter(|h| !modrinth_results.contains_key(&h.sha512))
+                .cloned()
+                .collect();
+
+            // Resolve the remainder from CurseForge.
+            let curseforge_results = if !not_in_modrinth.is_empty() {
+                debug!(
+                    "Resolving {} remaining files from CurseForge",
+                    not_in_modrinth.len()
+                );
+                match batch_resolve_curseforge(app, &not_in_modrinth).await {
+                    Ok(results) => {
+                        debug!("CurseForge resolved {} files", results.len());
+                        results
+                    }
+                    Err(e) => {
+                        warn!("CurseForge batch resolution failed: {}", e);
+                        if platform_error.is_none() {
+                            platform_error = Some(e.context("CurseForge file resolution failed"));
+                        }
+                        HashMap::new()
+                    }
+                }
+            } else {
+                HashMap::new()
+            };
+
+            Resolution {
+                modrinth_results,
+                curseforge_results,
+                platform_error,
+            }
+        },
+    )
+    .await
+}
+
+struct Resolution {
+    modrinth_results: HashMap<String, ResolvedFile>,
+    curseforge_results: HashMap<u32, ResolvedFile>,
+    platform_error: Option<anyhow::Error>,
+}
+
+async fn prepare_gdlpack<F>(
+    gdlpack_path: &Path,
+    temp: PathBuf,
+    instance_path: &InstancePath,
+    skip_overrides: bool,
+    existing_packinfo: Option<&PackInfo>,
+    progress_sender: watch::Sender<ProgressState>,
+    resolver: impl FnOnce(Vec<FileHashes>) -> F,
+) -> anyhow::Result<ModpackInfo>
+where
+    F: std::future::Future<Output = Resolution>,
+{
     debug!("Preparing GDLPack modpack from {:?}", gdlpack_path);
 
-    // Parse the manifest
-    let manifest = tokio::task::spawn_blocking({
-        let gdlpack_path = gdlpack_path.to_path_buf();
-        move || {
-            let file = std::fs::File::open(&gdlpack_path)?;
-            let mut archive = zip::ZipArchive::new(file)?;
-
-            let mut manifest_file = archive
-                .by_name("gdlpack.json")
-                .context("Missing gdlpack.json manifest")?;
-
-            let mut manifest_data = Vec::new();
-            manifest_file.read_to_end(&mut manifest_data)?;
-
-            let manifest: Manifest =
-                serde_json::from_slice(&manifest_data).context("Failed to parse gdlpack.json")?;
-
-            Ok::<_, anyhow::Error>(manifest)
-        }
-    })
-    .await??;
+    let admitted =
+        Arc::new(archive::AdmittedArchive::capture(gdlpack_path.to_path_buf(), temp).await?);
+    let manifest = admitted.manifest().clone();
 
     // Collect all platform files that need resolution
     let platform_files: Vec<FileHashes> = manifest
@@ -218,56 +289,12 @@ pub async fn prepare_modpack_from_gdlpack(
             *state = ProgressState::ResolvingFiles(0, total_files);
         });
 
-        // Resolve from Modrinth first — the primary source.
-        debug!("Resolving {} files from Modrinth", platform_files.len());
-        let modrinth_results = match batch_resolve_modrinth(app, &platform_files).await {
-            Ok(results) => {
-                debug!("Modrinth resolved {} files", results.len());
-                results
-            }
-            Err(e) => {
-                warn!("Modrinth batch resolution failed: {}", e);
-                platform_error = Some(e.context("Modrinth file resolution failed"));
-                HashMap::new()
-            }
-        };
-
-        // Update progress - Modrinth done
-        progress_sender.send_modify(|state| {
-            *state = ProgressState::ResolvingFiles(total_files / 2, total_files);
-        });
-
-        // Collect the files Modrinth didn't resolve, to look up on CurseForge.
-        let not_in_modrinth: Vec<FileHashes> = platform_files
-            .iter()
-            .filter(|h| !modrinth_results.contains_key(&h.sha512))
-            .cloned()
-            .collect();
-
-        // Resolve the remainder from CurseForge.
-        let curseforge_results = if !not_in_modrinth.is_empty() {
-            debug!(
-                "Resolving {} remaining files from CurseForge",
-                not_in_modrinth.len()
-            );
-            match batch_resolve_curseforge(app, &not_in_modrinth).await {
-                Ok(results) => {
-                    debug!("CurseForge resolved {} files", results.len());
-                    results
-                }
-                Err(e) => {
-                    warn!("CurseForge batch resolution failed: {}", e);
-                    if platform_error.is_none() {
-                        platform_error = Some(e.context("CurseForge file resolution failed"));
-                    }
-                    HashMap::new()
-                }
-            }
-        } else {
-            HashMap::new()
-        };
-
-        // Update progress - resolution complete
+        let Resolution {
+            modrinth_results,
+            curseforge_results,
+            platform_error: error,
+        } = resolver(platform_files.clone()).await;
+        platform_error = error;
         progress_sender.send_modify(|state| {
             *state = ProgressState::ResolvingFiles(total_files, total_files);
         });
@@ -318,14 +345,14 @@ pub async fn prepare_modpack_from_gdlpack(
         // neither platform AND missing from the overrides is a real failure (handled per-file
         // below, where a platform error is surfaced as retryable).
         let found_in_overrides = tokio::task::spawn_blocking({
-            let gdlpack_path = gdlpack_path.to_path_buf();
+            let admitted = admitted.clone();
             let overrides_dir = manifest.overrides.clone();
             let client_overrides = manifest.client_overrides.clone();
             let unresolved = unresolved_platform_files.clone();
 
             move || -> anyhow::Result<Vec<bool>> {
                 find_bundled_files(
-                    &gdlpack_path,
+                    admitted.path(),
                     &overrides_dir,
                     client_overrides.as_deref(),
                     &unresolved,
@@ -361,14 +388,14 @@ pub async fn prepare_modpack_from_gdlpack(
     // Extract overrides
     if !skip_overrides {
         tokio::task::spawn_blocking({
-            let gdlpack_path = gdlpack_path.to_path_buf();
+            let admitted = admitted.clone();
             let instance_data_path = instance_path.get_data_path().to_path_buf();
             let overrides_dir = manifest.overrides.clone();
             let client_overrides = manifest.client_overrides.clone();
             let progress_sender = progress_sender.clone();
 
             move || -> anyhow::Result<()> {
-                let file = std::fs::File::open(&gdlpack_path)?;
+                let file = std::fs::File::open(admitted.path())?;
                 let mut archive = zip::ZipArchive::new(file)?;
 
                 // Count override files
@@ -626,3 +653,6 @@ fn find_bundled_files_with_budget(
 }
 #[cfg(test)]
 mod task09_tests;
+
+#[cfg(test)]
+mod task40_tests;

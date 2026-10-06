@@ -7,7 +7,7 @@ faq:
   - question: "CurseForge, Modrinth, GDLauncher 팩 포맷의 차이는?"
     answer: "셋 다 JSON 매니페스트가 들어 있는 zip. CurseForge는 manifest.json을 쓰고 CurseForge 프로젝트/파일 ID로 참조. Modrinth는 modrinth.index.json을 쓰고 직접 다운로드 URL + 해시로 참조. GDLauncher는 gdlpack.json을 쓰고 콘텐츠 해시만(sha512 + sha1 + murmur2)으로 각 파일을 실제로 가진 플랫폼에 대해 해결합니다. 호환되지 않으며 런처는 아카이브 루트에 있는 JSON에 따라 처리합니다."
   - question: ".gdlpack은 무엇이고 왜 존재하나요?"
-    answer: "GDLauncher 자체의 모드팩 포맷. 각 모드는 콘텐츠 해시로 식별되므로, 모드가 CurseForge에 있든 Modrinth에 있든 둘 다 있든 같은 팩이 동작하고 URL이 썩지도 않습니다. 옵션 기능(스킵 가능한 모드 + 설정 묶음)과 임베디드 아이콘도 1급 지원. 양쪽 모두 GDLauncher를 쓸 때 권장. 크로스 런처 배포에는 여전히 CurseForge .zip이 안전합니다."
+    answer: "GDLauncher 자체의 모드팩 포맷. 각 모드는 콘텐츠 해시로 식별되므로, 모드가 CurseForge에 있든 Modrinth에 있든 둘 다 있든 같은 팩이 동작하고 URL이 썩지도 않습니다. 임베디드 아이콘을 지원합니다. 옵션 기능 항목은 스키마에 예약되어 있지만 현재 GDLauncher Carbon은 이를 거부합니다. 양쪽 모두 GDLauncher를 쓸 때 권장. 크로스 런처 배포에는 여전히 CurseForge .zip이 안전합니다."
   - question: "설치된 인스턴스의 매니페스트는 어디서 보나요?"
     answer: "GDLauncher는 설치 후 원본 아카이브를 보관하지 않습니다. 팩 내용은 인스턴스 폴더에 풀려 있습니다. GDLauncher가 사용하는 매니페스트는 런처 DB에 인스턴스 단위로 추적되며 파일로 열람할 수 없습니다. 설치 전에 보고 싶다면 .zip / .mrpack / .gdlpack을 아무 아카이브 도구로 열어 안의 JSON 파일을 직접 읽으세요."
   - question: "매니페스트를 편집할 수 있나요?"
@@ -155,6 +155,8 @@ mypack.gdlpack/
 
 ### 전체 매니페스트 (주석 포함)
 
+**GDLauncher Carbon에서 지원하지 않음:** 스키마는 `optional` 항목을 정의하지만 런처에는 기능 선택기가 없으며, 이를 포함한 팩은 인스턴스를 만들거나 기존 설치를 준비하기 전에 거부됩니다. 이 스키마 예제는 가져올 수 있는 팩이 아닙니다. 지원되는 가져오기에는 필수 `platform` 항목과 일반 overrides를 사용하세요.
+
 ```json
 {
   "formatVersion": 1,
@@ -221,7 +223,7 @@ mypack.gdlpack/
 | `createdAt` | RFC 3339 타임스탬프 | 예 | 아카이브가 내보내진 시각. |
 | `icon` | string | 아니오 | 아카이브 내 아이콘 파일 경로 (예: `.gdl/icon.png`). |
 | `dependencies` | object | 예 | Minecraft와 모드 로더 요구사항 (아래 참조). |
-| `entries` | array | 예 | 플랫폼 파일과 옵션 기능 (아래 참조). 순수 오버라이드 팩이라면 빈 배열도 유효. |
+| `entries` | array | 예 | 필수 `platform` 항목. `optional` 항목은 거부됩니다. overrides만 있는 팩에는 빈 배열이 유효합니다. |
 | `overrides` | string | 예 (기본값 `"overrides"`) | 인스턴스로 풀어 넣을 아카이브 내 디렉터리 이름. |
 | `serverOverrides` | string | 아니오 | 서버 전용 오버라이드 디렉터리. |
 | `clientOverrides` | string | 아니오 | 클라이언트 전용 오버라이드 디렉터리. |
@@ -273,27 +275,7 @@ mypack.gdlpack/
 
 설치 시점에 런처는 먼저 Modrinth (sha512 조회)를 시도하고, CurseForge (murmur2 핑거프린트)로 폴백하며, 어느 쪽에도 없으면 해당 엔트리는 실패. 해결된 파일은 항상 응답한 쪽 플랫폼에서 다운로드.
 
-**`optional`**, 사용자가 포함하거나 제외할 수 있는, 스킵 가능한 모드 / 오버라이드 경로 그룹:
-
-```json
-{
-  "type": "optional",
-  "description": "Shader support - skip for low-end GPUs",
-  "platforms": [
-    { "sha512": "...", "sha1": "...", "murmur2": 1234567890 }
-  ],
-  "overridePaths": [
-    "config/iris",
-    "shaderpacks/default"
-  ]
-}
-```
-
-- `description`: 임포트 미리보기에서 사용자에게 표시되어 기능을 포함할지 결정하는 자료.
-- `platforms`: 이 기능을 포함할 때만 다운로드되는 0개 이상의 해시 엔트리.
-- `overridePaths`: 이 기능을 포함할 때만 풀리는 `overrides/` 안의 0개 이상의 경로(파일이나 폴더). 경로는 `overrides/`에 상대적.
-
-기능은 플랫폼 파일만, 오버라이드만, 또는 둘 다 가질 수 있음. 관련된 선택적 콘텐츠를 묶는 데 사용: 셰이더 모드 + 설정, 설정뿐인 하드코어 난이도 프리셋, 선택적 리소스 팩 등.
+**GDLauncher Carbon에서 지원하지 않음:** 스키마는 `optional` 항목을 정의하지만 런처에는 기능 선택기가 없으며, 이를 포함한 팩은 인스턴스를 만들거나 기존 설치를 준비하기 전에 거부됩니다. 이 스키마 예제는 가져올 수 있는 팩이 아닙니다. 지원되는 가져오기에는 필수 `platform` 항목과 일반 overrides를 사용하세요.
 
 #### `source`
 
@@ -340,7 +322,7 @@ mypack.gdlpack/
 | 모드 식별 | CurseForge 프로젝트 + 파일 ID | 다운로드 URL + 해시 | 콘텐츠 해시만 |
 | 해결 출처 | CurseForge API | 매니페스트 내 URL | CurseForge **또는** Modrinth (응답한 쪽) |
 | 오프라인 설치 | 불가 (CDN 필요) | 가능 (URL 자체는 CDN 필요할 수 있음) | `Bundle Addons`가 켜져 있으면 가능 |
-| 옵션 기능 | 모드별 `required: false` 플래그 | 파일별 `env` (client/server) | 여러 파일을 가질 수 있는 전용 `optional` 엔트리 |
+| 옵션 기능 | 모드별 `required: false` 플래그 | 파일별 `env` (client/server) | 예약된 스키마; 가져오기 거부 |
 | 오버라이드 폴더 | `overrides/` | 파일별 경로 | `overrides/` (설정 가능) |
 | 서버 전용 파일 | 별도 팩 | `env.server` | `serverOverrides` 디렉터리 |
 | 아이콘 | 외부 | 외부 | `.gdl/icon.<ext>`에 임베드 |
@@ -371,4 +353,4 @@ mypack.gdlpack/
 
 ## 팩 만들기
 
-공유용 팩을 만들 거라면 가장 쉬운 길은 GDLauncher에서 인스턴스를 구성한 다음 **Export Instance** (우클릭 → Export Instance)를 쓰는 것. 내보내기 마법사에서 대상 포맷을 고를 수 있음: CurseForge `.zip`, Modrinth `.mrpack`, 또는 GDLauncher 자체 `.gdlpack`. 수신자도 GDLauncher를 쓰고 옵션 기능이나 임베디드 아이콘이 필요하면 `.gdlpack`, 가장 넓은 크로스 런처 호환성을 원하면 `.zip`.
+공유용 팩을 만들 거라면 가장 쉬운 길은 GDLauncher에서 인스턴스를 구성한 다음 **Export Instance** (우클릭 → Export Instance)를 쓰는 것. 내보내기 마법사에서 대상 포맷을 고를 수 있음: CurseForge `.zip`, Modrinth `.mrpack`, 또는 GDLauncher 자체 `.gdlpack`. 수신자도 GDLauncher를 쓰고 임베디드 아이콘이 필요하면 `.gdlpack`, 가장 넓은 크로스 런처 호환성을 원하면 `.zip`.

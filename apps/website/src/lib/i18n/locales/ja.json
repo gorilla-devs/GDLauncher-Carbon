@@ -99,7 +99,7 @@
   "addon.related.heading": "関連{type}",
   "addon.faq.heading": "よくある質問",
   "addon.faq.q.free": "{name} は無料ですか?",
-  "addon.faq.a.free": "はい。{name} は GDLauncher を通じて無料でダウンロード・インストールできます。GDLauncher 自体も無料で広告がありません。",
+  "addon.faq.a.free": "はい。{name} は GDLauncher で無料でダウンロード・インストールできます。GDLauncher 自体も無料で、デスクトップランチャー内の広告が開発資金を支えています。",
   "addon.faq.q.versions": "{name} はどの Minecraft バージョンに対応していますか?",
   "addon.faq.a.versions": "{name} は Minecraft {versions} に対応しています。GDLauncher がインストール時に互換性のあるバージョンを自動選択します。",
   "addon.faq.q.loader": "{name} には Forge と Fabric のどちらが必要ですか?",

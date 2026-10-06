@@ -75,4 +75,6 @@ Si un déplacement échoue avant la publication du pointeur, le launcher actuel 
 
 Le pointeur `runtime_path_override` se trouve dans le répertoire `userData` d’Electron (les données d’application du launcher), pas dans l’ancien runtime. Conserve-le. Une route explicite en ligne de commande est prioritaire sur celle de l’environnement, et toutes deux sur le pointeur. Vérifie l’emplacement effectif dans le réglage de chemin du runtime. Si le dialogue de récupération exige Restart ou Retry, suis cette action ; conserve les deux dossiers en cas de nouvel échec.
 
+Consulte [le marqueur et les emplacements des données d’application](/fr/docs/runtime-path-vs-app-data#le-marqueur-runtime_path_override) pour trouver le pointeur faisant autorité.
+
 En cas de doute, rejoins notre [serveur Discord](https://discord.gdlauncher.com) pour demander de l'aide.

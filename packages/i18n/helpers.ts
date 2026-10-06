@@ -251,6 +251,7 @@ export function getImportErrorTranslationKey(reason: string): NamespacedTranslat
     'InstanceImportMmcZipMissingConfig': 'instances:_trn_import_error_archive_missing_manifest',
     'InstanceImportCfZipMalformedManifest': 'instances:_trn_import_error_archive_malformed_manifest',
     'InstanceImportMrpackMalformedManifest': 'instances:_trn_import_error_archive_malformed_manifest',
+    'InstanceImportGdlpackOptionalUnsupported': 'instances:_trn_import_gdlpack_optional_unsupported',
     'InstanceImportGdlpackMalformedManifest': 'instances:_trn_import_error_archive_malformed_manifest',
     'InstanceImportCfZipNotMinecraftModpack': 'instances:_trn_import_error_not_minecraft_modpack',
   }

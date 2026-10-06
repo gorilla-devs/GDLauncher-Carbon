@@ -75,4 +75,6 @@ When a move fails before the runtime pointer is published, the current launcher 
 
 The `runtime_path_override` pointer is in Electron's `userData` directory (the launcher's application data), not the old runtime. Preserve it. An explicit command-line runtime path takes precedence over an environment runtime path, and both take precedence over this pointer. Use the launcher's runtime path setting to verify the effective location. If the recovery dialog requires Restart or Retry, follow that action; keep both folders if it fails again.
 
+See the [runtime_path_override marker and app-data locations](/docs/runtime-path-vs-app-data#the-runtime_path_override-marker) when locating the authoritative pointer.
+
 If you're in doubt, make sure to join our [discord server](https://discord.gdlauncher.com) and ask for help.

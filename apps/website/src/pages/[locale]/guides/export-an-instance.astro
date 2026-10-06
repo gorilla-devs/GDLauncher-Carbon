@@ -23,7 +23,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Export アクションを開く", text: "Library で対象インスタンスを右クリックし、Export Instance (file-export アイコン) を選択。" },
       { name: "形式を選択", text: "GDLauncher .gdlpack (受け側も GDLauncher なら最高の互換性)、CurseForge .zip (ほとんどのランチャーで動作)、Modrinth .mrpack (Modrinth 対応ランチャーで動作) のいずれかを選択。" },
       { name: "バンドルを設定", text: "「Bundle Addons」トグルで Mod JAR 自体を含めるか選択 (有効: ファイルは大きくなりオフラインインストール可能。無効: マニフェストのみで小さく、受け側はランチャーが CDN から再ダウンロードするためネット接続が必要)。" },
-      { name: "含める内容をフィルタ", text: "ファイルツリーを歩いて含めるものをチェック。デフォルトでは Mod と設定が含まれ、saves、スクリーンショット、自分の options.txt は除外。必要に応じて調整。" },
+      { name: "含める内容をフィルタ", text: "ファイルツリーで必要なファイルを明示的に選択してください。saves、スクリーンショット、options.txt に個人情報がないか確認してから含めてください。" },
       { name: "保存先を指定", text: "ファイルの出力先を選択。進行バー付きで実行され、大型 Modpack では 1~2 分かかります。" }
     ]
   },
@@ -34,7 +34,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Export 액션 열기", text: "Library에서 내보낼 인스턴스를 오른쪽 클릭하고 Export Instance(file-export 아이콘)를 선택." },
       { name: "포맷 선택", text: "GDLauncher .gdlpack(받는 쪽도 GDLauncher라면 최고 호환), CurseForge .zip(대부분의 런처에서 동작), Modrinth .mrpack(Modrinth 지원 런처에서 동작) 중 하나 선택." },
       { name: "번들 구성", text: "'Bundle Addons' 토글로 모드 JAR 자체 포함 여부 선택(켜면: 파일 크고 오프라인 설치 가능. 끄면: 매니페스트만으로 작지만 받는 쪽은 런처가 CDN에서 재다운로드하므로 인터넷 필요)." },
-      { name: "포함 항목 필터", text: "파일 트리를 둘러 포함할 것을 체크. 기본은 모드와 설정 포함, saves/스크린샷/내 options.txt는 제외. 필요 시 조정." },
+      { name: "포함 항목 필터", text: "파일 트리에서 필요한 파일을 명시적으로 선택하세요. saves, 스크린샷, options.txt를 포함하기 전에 개인 정보가 있는지 확인하세요." },
       { name: "저장 위치 선택", text: "파일을 쓸 위치 선택. 진행 바와 함께 실행, 큰 모드팩은 1~2분." }
     ]
   },
@@ -45,7 +45,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Export-Action öffnen", text: "Library, Rechtsklick auf die Instanz und Export Instance wählen (file-export-Icon)." },
       { name: "Format wählen", text: "Wähle eins: GDLauncher .gdlpack (beste Treue, wenn der Empfänger auch GDLauncher nutzt), CurseForge .zip (läuft in den meisten Launchern) oder Modrinth .mrpack (läuft in Launchern mit Modrinth-Support)." },
       { name: "Bundle konfigurieren", text: "'Bundle Addons' aktivieren, wenn die Mod-JARs mit ins Archiv sollen (größere Datei, offline installierbar). Aus für eine Manifest-only-Datei (kleiner, der Empfänger braucht Internet, damit der Launcher die Mods vom Original-CDN nachlädt)." },
-      { name: "Inhalt filtern", text: "Den Dateibaum durchgehen und das Gewünschte anhaken. Standardmäßig sind Mods und Configs dabei; Saves, Screenshots und deine options.txt nicht. Nach Bedarf anpassen." },
+      { name: "Inhalt filtern", text: "Gehe den Dateibaum durch und wähle ausdrücklich die benötigten Dateien. Prüfe Saves, Screenshots und options.txt auf persönliche Daten, bevor du sie einschließt." },
       { name: "Speicherort wählen", text: "Auswählen, wohin die Datei geschrieben wird. Export läuft mit Fortschrittsbalken; bei großen Modpacks ein bis zwei Minuten." }
     ]
   },
@@ -56,7 +56,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Ouvrir l'action d'export", text: "Dans la Library, clic droit sur l'instance et choisis Export Instance (icône file-export)." },
       { name: "Choisir le format", text: "Choisis-en un : GDLauncher .gdlpack (meilleure fidélité si le destinataire utilise aussi GDLauncher), CurseForge .zip (marche dans la plupart des launchers) ou Modrinth .mrpack (marche dans les launchers avec support Modrinth)." },
       { name: "Configurer le bundle", text: "Active 'Bundle Addons' si tu veux que l'export inclue les JARs de mods eux-mêmes (fichier plus gros, installable hors ligne). Laisse-le off pour expédier un fichier manifest seul (plus petit, mais le destinataire a besoin d'internet pour que le launcher retélécharge les mods depuis le CDN)." },
-      { name: "Filtrer ce qui est inclus", text: "Parcours l'arbre de fichiers et coche ce qui est inclus. Par défaut, mods et configs sont dedans ; saves, screenshots, ton options.txt sont dehors. Ajuste selon besoin." },
+      { name: "Filtrer ce qui est inclus", text: "Parcours l’arbre de fichiers et sélectionne explicitement ceux dont tu as besoin. Vérifie les saves, screenshots et options.txt pour repérer les données personnelles avant de les inclure." },
       { name: "Choisir un emplacement", text: "Choisis où écrire le fichier. L'export tourne avec une barre de progression ; pour les gros modpacks, ça prend une minute ou deux." }
     ]
   },
@@ -67,7 +67,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Abrir la acción de export", text: "En la Library, clic derecho en la instancia y elige Export Instance (icono file-export)." },
       { name: "Elegir formato", text: "Elige uno: GDLauncher .gdlpack (mejor fidelidad si el destinatario también usa GDLauncher), CurseForge .zip (funciona en la mayoría de launchers) o Modrinth .mrpack (funciona en launchers con soporte Modrinth)." },
       { name: "Configurar el bundle", text: "Activa 'Bundle Addons' si quieres que el export incluya los JAR de mod (archivo más grande, instalable offline). Déjalo off para mandar un archivo solo-manifest (más pequeño, pero el destinatario necesita internet para que el launcher re-descargue los mods del CDN)." },
-      { name: "Filtrar qué incluir", text: "Recorre el árbol de archivos y marca lo que incluir. Por defecto mods y configs sí; saves, capturas y tu options.txt no. Ajusta a tu gusto." },
+      { name: "Filtrar qué incluir", text: "Recorre el árbol de archivos y selecciona explícitamente los que necesitas. Revisa saves, capturas y options.txt por si contienen datos personales antes de incluirlos." },
       { name: "Elegir ubicación", text: "Elige dónde escribir el archivo. El export corre con barra de progreso; modpacks grandes tardan un par de minutos." }
     ]
   },
@@ -78,7 +78,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Abrir a ação de export", text: "Na Library, botão direito na instância e escolha Export Instance (ícone file-export)." },
       { name: "Escolher o formato", text: "Escolha um: GDLauncher .gdlpack (melhor fidelidade se quem recebe também usa GDLauncher), CurseForge .zip (funciona na maioria dos launchers) ou Modrinth .mrpack (funciona em launchers com suporte a Modrinth)." },
       { name: "Configurar o bundle", text: "Ligue 'Bundle Addons' se quiser que o export inclua os JARs de mod (arquivo maior, instalável offline). Deixe desligado pra um arquivo só de manifest (menor, mas quem recebe precisa de internet pro launcher rebaixar os mods do CDN)." },
-      { name: "Filtrar o que incluir", text: "Caminhe pela árvore de arquivos e marque o que incluir. Por padrão mods e configs estão dentro; saves, prints, seu options.txt estão fora. Ajuste como precisar." },
+      { name: "Filtrar o que incluir", text: "Percorra a árvore de arquivos e selecione explicitamente os que você precisa. Confira saves, prints e options.txt quanto a dados pessoais antes de incluí-los." },
       { name: "Escolher local de salvamento", text: "Escolha onde o arquivo vai ser gravado. O export roda com barra de progresso; modpacks grandes levam um ou dois minutos." }
     ]
   },
@@ -89,7 +89,7 @@ const meta: Record<Exclude<Locale, "en">, Meta> = {
       { name: "Apri l'azione di Export", text: "Nella Library, clic destro sull'istanza e scegli Export Instance (icona file-export)." },
       { name: "Scegli il formato", text: "Scegline uno: GDLauncher .gdlpack (massima fedeltà se chi riceve usa anch'esso GDLauncher), CurseForge .zip (funziona nella maggior parte dei launcher) o Modrinth .mrpack (funziona nei launcher con supporto a Modrinth)." },
       { name: "Configura il bundle", text: "Attiva 'Bundle Addons' se vuoi includere i JAR delle mod nell'export (file più grande, installabile offline). Lascialo disattivato per spedire un file con solo il manifest (più piccolo, ma chi riceve serve di internet per far riscaricare le mod dal CDN al suo launcher)." },
-      { name: "Filtra cosa includere", text: "Sfoglia l'albero dei file e spunta cosa includere. Di default mod e config sono dentro, save, screenshot e il tuo options.txt sono fuori. Aggiusta come ti serve." },
+      { name: "Filtra cosa includere", text: "Sfoglia l’albero dei file e seleziona esplicitamente quelli che ti servono. Controlla save, screenshot e options.txt per eventuali dati personali prima di includerli." },
       { name: "Scegli la destinazione", text: "Scegli dove salvare il file. L'export procede con una barra di progresso, per i modpack grandi richiede uno o due minuti." }
     ]
   }
@@ -164,7 +164,7 @@ const body: Record<Exclude<Locale, "en">, { headings: string[]; paras: string[] 
 const b = body[locale]
 ---
 
-<GuideLayout title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
+<GuideLayout showSteps title={m.title} description={m.description} lastUpdated="May 2026" howTo={{ totalTimeIso: "PT2M", steps: m.steps }}>
   {b.headings.map((heading, idx) => (
     <Fragment>
       <h2>{heading}</h2>

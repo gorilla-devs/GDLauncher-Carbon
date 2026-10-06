@@ -58,7 +58,7 @@ const it: LocaleData = {
         {
           feature: "Supporto CurseForge",
           gdl: "Sì",
-          competitor: "No",
+          competitor: "Parziale (con workaround)",
           note: "Quando un autore di mod disattiva l'accesso via API di terze parti, Prism ti chiede di scaricare quel file a mano in un browser",
         },
         { feature: "Supporto Modrinth", gdl: "Sì", competitor: "Sì" },
