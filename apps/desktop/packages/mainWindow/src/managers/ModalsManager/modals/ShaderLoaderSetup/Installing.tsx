@@ -3,7 +3,15 @@ import { resolveTaskPoll } from "@/components/ModDownloadButton/hooks/resolveTas
 import { Button, Progress, Spinner } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { getTaskTranslationKey } from "@gd/i18n/helpers"
-import { createSignal, onMount, onCleanup, Match, Switch, Show } from "solid-js"
+import {
+  createSignal,
+  createEffect,
+  onMount,
+  onCleanup,
+  Match,
+  Switch,
+  Show
+} from "solid-js"
 import type {
   FETask,
   FETaskOutcome,
@@ -12,7 +20,7 @@ import type {
   ShaderLoaderVerification
 } from "@gd/core_module/bindings"
 import type { StepProps } from "."
-import { rspc } from "@/utils/rspcClient"
+import { extractErrorDisplay, rspc } from "@/utils/rspcClient"
 import { useModal } from "@/managers/ModalsManager"
 import { setShaderInstallRunning } from "./state"
 import { formatBytes } from "@/utils/formatBytes"
@@ -30,13 +38,37 @@ const getTranslationArgs = (translation: Translation) => {
 
 const Installing = (props: StepProps) => {
   const [t] = useTransContext()
+  const contextKey = () =>
+    JSON.stringify([
+      props.data.instanceId,
+      props.data.recommendation,
+      props.data.installLatest,
+      props.data.modSource,
+      props.data.latestModSource,
+      props.data.replacesMod,
+      props.installPlan().fileOnly
+    ])
+  const acceptedContext = contextKey()
+  const data = {
+    ...props.data,
+    modSource: props.data.modSource
+      ? JSON.parse(JSON.stringify(props.data.modSource))
+      : undefined,
+    latestModSource: props.data.latestModSource
+      ? JSON.parse(JSON.stringify(props.data.latestModSource))
+      : undefined,
+    recommendation: { ...props.data.recommendation }
+  }
+  const plan = { ...props.installPlan() }
+  let busy = false
+  let completed = false
   const modalsContext = useModal()
   const [stepName, setStepName] = createSignal<StepName>("loader")
   const [stepIndex, setStepIndex] = createSignal(0)
   const [stepCount, setStepCount] = createSignal(1)
   const [error, setError] = createSignal<string | null>(null)
+  const [unresolvedRequest, setUnresolvedRequest] = createSignal(false)
   const [destroyed, setDestroyed] = createSignal(false)
-  const [failedTaskId, setFailedTaskId] = createSignal<number | null>(null)
   const [currentTask, setCurrentTask] = createSignal<FETask | null>(null)
 
   // Lock the backdrop close before any await fires. The ModalsManager reads
@@ -49,7 +81,25 @@ const Installing = (props: StepProps) => {
     setShaderInstallRunning(false)
   })
 
+  createEffect(() => {
+    if (contextKey() !== acceptedContext) {
+      setDestroyed(true)
+      setShaderInstallRunning(false)
+      setError(t("content:_trn_shader_loader_context_changed"))
+    }
+  })
   const ctx = rspc.useContext()
+  interface Stage {
+    name: StepName
+    run: () => Promise<number | null>
+    task?: number | null
+    succeeded?: boolean
+    done?: boolean
+    failed?: boolean
+    uncertain?: boolean
+    recoverFrom?: number
+  }
+  let activeStage: Stage | undefined
 
   const waitForTask = async (taskId: number): Promise<void> => {
     while (!destroyed()) {
@@ -65,9 +115,16 @@ const Installing = (props: StepProps) => {
       if (outcome.type === "Running" || outcome.type === "Failed")
         setCurrentTask(outcome.value)
       const { action } = resolveTaskPoll(outcome, null, false)
-      if (action.kind === "completed") return
+      if (action.kind === "completed") {
+        if (activeStage) activeStage.succeeded = true
+        return
+      }
       if (action.kind === "failed" || action.kind === "dismissed") {
-        if (outcome.type === "Failed") setFailedTaskId(taskId)
+        if (activeStage) {
+          activeStage.failed =
+            outcome.type === "Failed" || outcome.type === "Dismissed"
+          activeStage.uncertain = !activeStage.failed
+        }
         throw new Error(
           action.kind === "failed"
             ? action.message
@@ -96,7 +153,6 @@ const Installing = (props: StepProps) => {
   }
 
   const installShader = async (): Promise<number | null> => {
-    const data = props.data
     if (data.installLatest && data.latestModSource) {
       return ctx.client.mutation([
         "instance.installLatestMod",
@@ -120,26 +176,24 @@ const Installing = (props: StepProps) => {
     return null
   }
 
-  const run = async () => {
-    const plan = props.installPlan()
-    const recommendation = props.data.recommendation
-
-    const steps: { name: StepName; run: () => Promise<number | null> }[] = []
+  const buildSteps = () => {
+    const recommendation = data.recommendation
+    const steps: Stage[] = []
 
     if (!plan.fileOnly) {
       if (recommendation.kind === "RequiresModloader") {
         steps.push({
           name: "modloader",
-          run: () => installModloader(props.data.instanceId)
+          run: () => installModloader(data.instanceId)
         })
         steps.push({
           name: "loader",
-          run: () => installShaderLoader(props.data.instanceId)
+          run: () => installShaderLoader(data.instanceId)
         })
       } else if (recommendation.kind === "RecommendLoader") {
         steps.push({
           name: "loader",
-          run: () => installShaderLoader(props.data.instanceId)
+          run: () => installShaderLoader(data.instanceId)
         })
       }
     }
@@ -149,15 +203,45 @@ const Installing = (props: StepProps) => {
       run: () => installShader()
     })
 
-    setStepCount(steps.length)
-
+    return steps
+  }
+  const steps = buildSteps()
+  setStepCount(steps.length)
+  const run = async () => {
+    if (destroyed() || completed) return
     try {
       await runShaderSteps(
         steps.map((step, i) => async () => {
           setStepIndex(i)
           setStepName(step.name)
           setCurrentTask(null)
-          return step.run()
+          activeStage = step
+          if (step.done || step.succeeded) return null
+          if (step.task !== undefined) return step.task
+          try {
+            step.task =
+              step.recoverFrom !== undefined
+                ? await ctx.client.mutation([
+                    "instance.prepareInstance",
+                    {
+                      instance: data.instanceId,
+                      expected_failed_task: step.recoverFrom,
+                      expected_mc_version:
+                        data.recommendation.kind === "RequiresModloader"
+                          ? data.recommendation.mc_version
+                          : ""
+                    }
+                  ])
+                : await step.run()
+            step.uncertain = false
+            if (step.task === null) step.succeeded = true
+            return step.task
+          } catch (error) {
+            step.uncertain = true
+            setUnresolvedRequest(step.recoverFrom === undefined)
+            if (step.recoverFrom === undefined) props.markUnresolvedRequest()
+            throw error
+          }
         }),
         waitForTask,
         async () => {
@@ -168,14 +252,17 @@ const Installing = (props: StepProps) => {
             ])
           const result = await ctx.client.query([
             "instance.checkShaderRequirements",
-            props.data.instanceId
+            data.instanceId
           ])
           return result.kind === "LoaderPresent"
         },
         plan.fileOnly,
         destroyed,
         (task) => {
-          props.complete(task)
+          if (completed || destroyed()) return
+          completed = true
+          setShaderInstallRunning(false)
+          props.complete(task ?? steps.at(-1)?.task ?? null)
           modalsContext?.closeModal()
         },
         async (index) => {
@@ -187,47 +274,92 @@ const Installing = (props: StepProps) => {
                 loaderVerification
               ])))
           ) {
-            throw new Error(
-              "The required shader loader is not enabled. Retry setup."
-            )
+            throw new Error(t("content:_trn_shader_loader_verification_failed"))
           }
+          steps[index].done = !!steps[index].succeeded
         }
       )
     } catch (e) {
       if (destroyed()) return
-      setError((e as Error)?.message ?? "Install failed")
+      setError(
+        extractErrorDisplay(e).trim() ||
+          t("content:_trn_shader_loader_install_failed")
+      )
       setShaderInstallRunning(false)
     }
   }
 
   const cancel = () => {
+    if (completed) return
+    completed = true
+    setDestroyed(true)
     setShaderInstallRunning(false)
     props.complete(null)
     modalsContext?.closeModal()
   }
 
   const retry = async () => {
-    const failedAttempt = failedTaskId()
+    if (busy || destroyed() || completed) return
+    busy = true
     setError(null)
     setShaderInstallRunning(true)
     try {
+      const stage = activeStage
+      // A rejected RPC may have started retained work without returning its ID.
+      // Repeating that mutation would duplicate an operation we cannot observe.
+      if (
+        stage?.uncertain &&
+        stage.task === undefined &&
+        stage.recoverFrom === undefined
+      ) {
+        throw new Error(t("content:_trn_shader_loader_uncertain"))
+      }
+      if (loaderVerification) {
+        const enabled = await ctx.client.query([
+          "instance.verifyShaderLoader",
+          loaderVerification
+        ])
+        if (destroyed()) return
+        if (
+          steps.some((step) => step.name === "loader" && step.done) &&
+          !enabled
+        ) {
+          throw new Error(t("content:_trn_shader_loader_verification_failed"))
+        }
+      }
+      const failed =
+        stage?.failed && typeof stage.task === "number" ? stage.task : null
       await retryCapturedAddonFailure(
-        failedAttempt,
+        failed,
         (id) => ctx.client.query(["vtask.getTaskOutcome", id]),
         (id) => ctx.client.mutation(["vtask.dismissTask", id]),
         async () => {
-          setFailedTaskId(null)
-          if (!destroyed()) await run()
+          if (destroyed()) return
+          if (failed !== null && stage) {
+            stage.failed = false
+            stage.recoverFrom = stage.name === "modloader" ? failed : undefined
+            stage.task = undefined
+          }
+          await run()
         }
       )
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error))
+      if (!destroyed())
+        setError(
+          extractErrorDisplay(error).trim() ||
+            t("content:_trn_shader_loader_install_failed")
+        )
       setShaderInstallRunning(false)
+    } finally {
+      busy = false
     }
   }
 
   onMount(() => {
-    void run()
+    busy = true
+    void run().finally(() => {
+      busy = false
+    })
   })
 
   const taskProgressFraction = () => {
@@ -266,14 +398,21 @@ const Installing = (props: StepProps) => {
         <div class="w-130 flex h-72 flex-col items-center justify-center gap-4 text-center">
           <div class="i-hugeicons:alert-02 text-3xl text-red-400" />
           <p class="text-red-400 m-0 text-sm">{error()}</p>
+          <Show when={unresolvedRequest()}>
+            <p class="m-0 text-sm">
+              {t("content:_trn_shader_loader_uncertain")}
+            </p>
+          </Show>
           <div class="mt-2 flex gap-2">
             <Button type="secondary" onClick={cancel}>
               <Trans key="content:_trn_shader_loader_cancel" />
             </Button>
-            <Button type="primary" onClick={retry}>
-              <div class="i-hugeicons:refresh h-4 w-4" />
-              <Trans key="general:_trn_retry" />
-            </Button>
+            <Show when={!unresolvedRequest() && !destroyed()}>
+              <Button type="primary" onClick={retry}>
+                <div class="i-hugeicons:refresh h-4 w-4" />
+                <Trans key="general:_trn_retry" />
+              </Button>
+            </Show>
           </div>
         </div>
       }

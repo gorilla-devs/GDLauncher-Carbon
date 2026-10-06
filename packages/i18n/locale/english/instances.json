@@ -503,6 +503,14 @@
   "_trn_import_retry": "Retry scan",
   "_trn_import_batch_uncertain": "Some imports may already exist. Check your library, then rescan before trying again. Accepted imports continue even if you close this window.",
   "_trn_import_source_unavailable": "This source is unavailable. Reconnect its folder and scan again.",
-  "_trn_import_java_unavailable": "The configured Java binary is unavailable. Correct the source Java setting and scan again.",
-  "_trn_import_unsupported_hook": "This enabled command uses launcher variables GDLauncher cannot expand. Replace the command in the source launcher or disable its override, then scan again."
+  "_trn_import_java_path_skipped": "Its Java path no longer exists, so GDLauncher will choose Java for this instance.",
+  "_trn_import_commands_skipped": "One or more of its custom commands use launcher variables GDLauncher can't fill in, so they won't run here. They're saved in the instance's notes. If this pack downloads or updates its mods with one of them (packwiz does), those mods won't be installed; you can add a replacement command in the instance settings.",
+  "_trn_import_config_unreadable": "Its settings file can't be read. Make sure the file is available on this computer (for example, downloaded from cloud storage), then scan again.",
+  "_trn_import_game_dir_missing": "Its game folder doesn't exist, so this instance will start empty. If the folder is on a drive that isn't connected, connect it and scan again.",
+  "_trn_import_unknown_minecraft_version": "GDLauncher can't tell which Minecraft version this profile uses. In the Minecraft Launcher, set it to a standard or mod loader version, then scan again.",
+  "_trn_import_hmcl_relative_run_dir": "HMCL runs this version in a relative folder GDLauncher cannot locate. In HMCL, set an absolute game working directory for it, then scan again.",
+  "_trn_repair_preview_failed": "The repair preview could not be loaded. Retry before repairing.",
+  "_trn_repair_origin_failed": "The origin check failed. Retry to check again.",
+  "_trn_repair_origin_unavailable": "The origin check result is unavailable. Check the instance before trying again.",
+  "_trn_repair_origin_read_failed": "The origin check status could not be read. Work may still continue. Retry reading its status."
 }

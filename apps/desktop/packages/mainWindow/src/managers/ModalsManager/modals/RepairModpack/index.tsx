@@ -1,6 +1,14 @@
-import { createEffect, createMemo, createSignal, For, Show } from "solid-js"
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  Show,
+  onCleanup,
+  batch
+} from "solid-js"
 import { keepPreviousData } from "@tanstack/solid-query"
-import { rspc } from "@/utils/rspcClient"
+import { extractErrorDisplay, rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { freezeSelection, reconcileSelections } from "./selections"
@@ -102,6 +110,37 @@ const RepairModpack = (props: ModalProps) => {
   )
   const [expanded, setExpanded] = createSignal(false)
   const [originTaskId, setOriginTaskId] = createSignal<number | null>(null)
+  const [originStarting, setOriginStarting] = createSignal(false)
+  const [originError, setOriginError] = createSignal<string>()
+  let generation = 0
+  let live = true
+  let owner = instanceId()
+  let originRequest: { instance: number; generation: number } | undefined
+  let failedOrigin:
+    | { id: number; instance: number; generation: number }
+    | undefined
+  const rpc = rspc.useContext()
+  const currentOrigin = () =>
+    live &&
+    originRequest?.generation === generation &&
+    originRequest.instance === instanceId()
+  createEffect(() => {
+    const current = instanceId()
+    if (current === owner) return
+    owner = current
+    ++generation
+    originRequest = undefined
+    failedOrigin = undefined
+    batch(() => {
+      setOriginTaskId(null)
+      setOriginStarting(false)
+      setOriginError(undefined)
+    })
+  })
+  onCleanup(() => {
+    live = false
+    ++generation
+  })
 
   const toggleTicked = (file: FEUntrackedFile) => {
     const path = file.path
@@ -310,27 +349,111 @@ const RepairModpack = (props: ModalProps) => {
   }
 
   const checkOriginMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.checkPackOrigin"],
-    onSuccess: (taskId) => setOriginTaskId(taskId),
-    onError: (error) => {
-      toast.error(t("general:_trn_error"), { description: error.message })
-    }
+    mutationKey: ["instance.checkPackOrigin"]
   }))
   const originTask = rspc.createQuery(() => ({
-    queryKey: ["vtask.getTask", originTaskId()],
+    queryKey: ["vtask.getTaskOutcome", originTaskId()],
     enabled: originTaskId() !== null
   }))
   createEffect(() => {
-    if (originTaskId() !== null && originTask.data === null) {
-      setOriginTaskId(null) // task done; preview invalidation refetches verdicts
+    const id = originTaskId()
+    if (id === null || !currentOrigin() || originTask.isPlaceholderData) return
+    const outcome = originTask.data
+    if (outcome?.type === "Failed") {
+      const progress = outcome.value.progress
+      failedOrigin = { id, instance: instanceId(), generation }
+      batch(() => {
+        setOriginTaskId(null)
+        setOriginError(
+          progress.type === "Failed"
+            ? progress.value.cause.find((cause) => cause.display.trim())
+                ?.display || t("instances:_trn_repair_origin_failed")
+            : t("instances:_trn_repair_origin_failed")
+        )
+      })
+    } else if (outcome?.type === "Succeeded") {
+      setOriginTaskId(null)
+      void rpc.queryClient.invalidateQueries({
+        queryKey: ["instance.getRepairPreview", { instance: instanceId() }]
+      })
+    } else if (outcome?.type === "Dismissed") {
+      batch(() => {
+        setOriginTaskId(null)
+        setOriginError(t("instances:_trn_repair_origin_unavailable"))
+      })
+    } else if (outcome?.type === "Unavailable") {
+      setOriginError(t("instances:_trn_repair_origin_unavailable"))
     }
   })
+  const checkOrigin = async () => {
+    if (
+      !live ||
+      originStarting() ||
+      originTaskId() !== null ||
+      !isModrinthPack()
+    )
+      return
+    const request = { instance: instanceId(), generation }
+    originRequest = request
+    setOriginStarting(true)
+    try {
+      const previous = failedOrigin
+      if (previous) {
+        await rpc.client.mutation(["vtask.dismissTask", previous.id])
+        if (!currentOrigin() || originRequest !== request) return
+        failedOrigin = undefined
+      }
+      if (!currentOrigin() || originRequest !== request) return
+      setOriginError(undefined)
+      const task = await checkOriginMutation.mutateAsync(request.instance)
+      if (!currentOrigin() || originRequest !== request) return
+      batch(() => {
+        setOriginStarting(false)
+        setOriginTaskId(task)
+      })
+    } catch (error) {
+      if (!currentOrigin() || originRequest !== request) return
+      setOriginStarting(false)
+      setOriginError(
+        extractErrorDisplay(error).trim() ||
+          t("instances:_trn_repair_origin_failed")
+      )
+    }
+  }
   const originPercentage = createMemo(() => {
-    const progress = originTask.data?.progress
-    return progress?.type === "Known"
-      ? Math.round(progress.value * 100)
+    const outcome = originTask.data
+    const task = outcome?.type === "Running" ? outcome.value : undefined
+    return task?.progress.type === "Known"
+      ? Math.round(task.progress.value * 100)
       : undefined
   })
+
+  const setupReady = () =>
+    pendingSetup.isSuccess &&
+    !pendingSetup.isFetching &&
+    !pendingSetup.isError &&
+    !pendingSetup.isPlaceholderData &&
+    !!pendingSetup.data &&
+    !pendingSetup.data.pending
+  const canConfirm = () =>
+    isServer() ||
+    (setupReady() &&
+      preview.isSuccess &&
+      !preview.isLoading &&
+      !preview.isFetching &&
+      !preview.isError &&
+      !preview.isPlaceholderData &&
+      !!preview.data)
+  const retryPreview = async () => {
+    const instance = instanceId()
+    try {
+      await pendingSetup.refetch()
+      if (live && instance === instanceId() && setupReady())
+        await preview.refetch()
+    } catch {
+      // The query's error state owns the visible error and keeps Confirm blocked.
+    }
+  }
 
   const countRows = createMemo(() => {
     const c = selectedVariant()?.counts
@@ -515,6 +638,7 @@ const RepairModpack = (props: ModalProps) => {
           <p class="m-0 text-red-400">
             {t("instances:_trn_repair_pending_status_failed")}
           </p>
+          <Button onClick={retryPreview}>{t("general:_trn_retry")}</Button>
         </Show>
         <Show
           when={
@@ -553,6 +677,41 @@ const RepairModpack = (props: ModalProps) => {
                 </p>
               </Show>
 
+              <Show when={preview.isError}>
+                <p class="m-0 text-red-400">
+                  {t("instances:_trn_repair_preview_failed")}
+                </p>
+                <Button onClick={retryPreview}>
+                  {t("general:_trn_retry")}
+                </Button>
+              </Show>
+              <Show when={originError()}>
+                {(message) => <p class="m-0 text-red-400">{message()}</p>}
+              </Show>
+              <Show
+                when={
+                  originTaskId() !== null &&
+                  (originTask.isError ||
+                    originTask.data?.type === "Unavailable")
+                }
+              >
+                <p class="m-0 text-red-400">
+                  {t("instances:_trn_repair_origin_read_failed")}
+                </p>
+                <Button
+                  data-testid="repair-origin-refresh"
+                  onClick={async () => {
+                    if (!currentOrigin() || originTaskId() === null) return
+                    try {
+                      await originTask.refetch()
+                    } catch {
+                      /* The accepted attempt remains owned. */
+                    }
+                  }}
+                >
+                  {t("general:_trn_retry")}
+                </Button>
+              </Show>
               <Checkbox
                 checked={reEnable()}
                 onChange={(checked) => setReEnable(checked)}
@@ -648,12 +807,9 @@ const RepairModpack = (props: ModalProps) => {
                         type="secondary"
                         size="small"
                         data-testid="repair-check-origin"
-                        loading={
-                          checkOriginMutation.isPending ||
-                          originTaskId() !== null
-                        }
+                        loading={originStarting() || originTaskId() !== null}
                         percentage={originPercentage()}
-                        onClick={() => checkOriginMutation.mutate(instanceId())}
+                        onClick={checkOrigin}
                       >
                         <div class="i-hugeicons:search-01" />
                         {t("instances:_trn_repair_check_origin")}
@@ -698,6 +854,7 @@ const RepairModpack = (props: ModalProps) => {
                             >
                               <div data-testid="repair-untracked-checkbox">
                                 <Checkbox
+                                  ariaLabel={file.path}
                                   checked={ticked().has(file.path)}
                                   onChange={() => toggleTicked(file)}
                                 />
@@ -756,14 +913,9 @@ const RepairModpack = (props: ModalProps) => {
           <Button
             type="secondary"
             data-testid="repair-modpack-confirm"
-            disabled={
-              !isServer() &&
-              (!pendingSetup.isSuccess ||
-                pendingSetup.data?.pending ||
-                preview.isLoading ||
-                preview.isError)
-            }
+            disabled={!canConfirm()}
             onClick={() => {
+              if (!canConfirm()) return
               modalsContext?.closeModal()
               navigateAwayIfInsideDetail()
               if (isServer()) {

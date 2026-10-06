@@ -58,7 +58,11 @@ const SingleCheckBox = (props: Props) => {
         }
       >
         <div onClick={(event) => event.stopPropagation()}>
-          <Checkbox checked={isSelected()} onChange={handleChange} />
+          <Checkbox
+            checked={isSelected()}
+            ariaLabel={props.title ?? props.filename}
+            onChange={handleChange}
+          />
         </div>
       </Show>
       <div

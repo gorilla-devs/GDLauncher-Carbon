@@ -10,7 +10,7 @@ import {
   checkedFiles,
   type NestedEntry
 } from "./ExportCheckboxParent"
-import _ from "lodash"
+import { validArchivePath } from "./archivePath"
 import { setFailedMsg } from "./Exporting"
 
 function convertNestedObject(obj: NestedEntry): ExportEntry {
@@ -47,18 +47,11 @@ const BeginExport = (props: Props) => {
 
   const validatePayload = (payload: ExportArgs) => {
     if (typeof payload.instance_id !== "number") return false
-    if (typeof payload.save_path !== "string") return false
-    const extension = _.last(payload.save_path.split("."))
-    if (
-      extension !== "zip" &&
-      extension !== "mrpack" &&
-      extension !== "gdlpack"
-    )
-      return false
-    return true
+    return validArchivePath(payload.save_path, payload.target)
   }
 
   const handleExportInstance = () => {
+    if (!validatePayload(payload as ExportArgs)) return
     setPayload((prev) => ({
       ...prev,
       instance_id: props.instanceId

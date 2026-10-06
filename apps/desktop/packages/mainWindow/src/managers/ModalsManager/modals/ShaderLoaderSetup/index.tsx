@@ -35,6 +35,7 @@ export interface StepProps {
   // `data.onComplete` directly so the owner's loading state is always cleared,
   // including when the modal is dismissed via Escape or a backdrop click.
   complete: (taskId: number | null) => void
+  markUnresolvedRequest: () => void
 }
 
 const Intro = (props: StepProps) => {
@@ -118,8 +119,11 @@ const ShaderLoaderSetup = (props: ModalProps) => {
     fileOnly: false
   })
   const [installStarted, setInstallStarted] = createSignal(false)
+  const [requestUncertain, setRequestUncertain] = createSignal(false)
+  const markUnresolvedRequest = () => setRequestUncertain(true)
 
   const data = (): ShaderLoaderSetupData => props?.data
+  const onComplete = data().onComplete
 
   // Wrapper that tracks when installation step is entered
   const setStepTracked = (step: WizardStep) => {
@@ -135,17 +139,21 @@ const ShaderLoaderSetup = (props: ModalProps) => {
     if (completed) return
     completed = true
     if (taskId === null) {
-      const key = installStarted()
-        ? "notifications:_trn_shader_install_cancelled_mid_install"
-        : "notifications:_trn_shader_install_cancelled"
+      const key = requestUncertain()
+        ? "notifications:_trn_shader_setup_closed_work_may_finish"
+        : installStarted()
+          ? "notifications:_trn_shader_install_cancelled_mid_install"
+          : "notifications:_trn_shader_install_cancelled"
       console.warn(
-        installStarted()
-          ? "[shader-wizard] cancelled after installation started"
-          : "[shader-wizard] cancelled before any install started"
+        requestUncertain()
+          ? "[shader-wizard] closed setup with uncorrelated work"
+          : installStarted()
+            ? "[shader-wizard] cancelled after installation started"
+            : "[shader-wizard] cancelled before any install started"
       )
       toast(t(key), { duration: 4000 })
     }
-    data().onComplete?.(taskId)
+    onComplete?.(taskId)
   }
   onCleanup(() => complete(null))
 
@@ -160,6 +168,7 @@ const ShaderLoaderSetup = (props: ModalProps) => {
           <Intro
             data={data()}
             complete={complete}
+            markUnresolvedRequest={markUnresolvedRequest}
             setStep={setStepTracked}
             setInstallPlan={setInstallPlan}
             installPlan={installPlan}
@@ -169,6 +178,7 @@ const ShaderLoaderSetup = (props: ModalProps) => {
           <Installing
             data={data()}
             complete={complete}
+            markUnresolvedRequest={markUnresolvedRequest}
             setStep={setStepTracked}
             setInstallPlan={setInstallPlan}
             installPlan={installPlan}

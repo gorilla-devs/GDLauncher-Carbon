@@ -1,3 +1,4 @@
+import { useTransContext } from "@gd/i18n"
 import { Checkbox } from "@gd/ui"
 import { createColumnHelper } from "@tanstack/solid-table"
 
@@ -8,6 +9,7 @@ interface SelectColumnConfig {
 }
 
 export const createSelectColumn = (config: SelectColumnConfig) => {
+  const [t] = useTransContext()
   const columnHelper = createColumnHelper<any>()
 
   return columnHelper.display({
@@ -23,6 +25,7 @@ export const createSelectColumn = (config: SelectColumnConfig) => {
 
       return (
         <Checkbox
+          ariaLabel={t("content:_trn_select_all_mods")}
           checked={isAllSelected()}
           indeterminate={isSomeSelected()}
           onChange={() => config.onSelectAll()}
@@ -31,14 +34,20 @@ export const createSelectColumn = (config: SelectColumnConfig) => {
     },
     cell: (props) => (
       <div
-        class={`ease-spring transition-opacity duration-100 ${
+        class={`ease-spring transition-opacity duration-100 focus-within:opacity-100 ${
           props.row.getIsSelected()
             ? "opacity-100"
             : "opacity-0 group-hover/row:opacity-100"
         }`}
         onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <Checkbox
+          ariaLabel={
+            props.row.original.metadata?.name ||
+            props.row.original.filename ||
+            props.row.id
+          }
           checked={props.row.getIsSelected()}
           disabled={!props.row.getCanSelect()}
           indeterminate={props.row.getIsSomeSelected()}

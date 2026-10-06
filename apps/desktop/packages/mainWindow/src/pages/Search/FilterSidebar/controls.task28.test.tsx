@@ -123,6 +123,7 @@ function pointer(element: HTMLElement) {
     Object.assign(e, { pointerId: 1 })
     element.dispatchEvent(e)
   }
+  element.dispatchEvent(new MouseEvent("click", { bubbles: true }))
 }
 it("GPT-0127 native radios are focusable with scoped names and exactly one native/pointer callback", () => {
   const calls = vi.fn()

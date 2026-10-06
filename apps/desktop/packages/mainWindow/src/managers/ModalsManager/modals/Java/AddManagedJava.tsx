@@ -163,6 +163,7 @@ const AddManagedJava = (props: ModalProps) => {
               rounded={false}
               loading={loading()}
               onClick={async () => {
+                if (loading()) return
                 const id = selectedJavaVersion() || mappedJavaVersions()[0]
                 const vend = vendor() || mappedVendors()[0]
 
@@ -180,6 +181,7 @@ const AddManagedJava = (props: ModalProps) => {
                     toast.success("Java added successfully")
                   } catch (err) {
                     console.error(err)
+                  } finally {
                     setLoading(false)
                   }
                 }

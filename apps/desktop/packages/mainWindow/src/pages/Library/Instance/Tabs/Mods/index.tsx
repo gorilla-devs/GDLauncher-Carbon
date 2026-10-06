@@ -299,6 +299,7 @@ const Mods = () => {
         <div class="flex flex-wrap items-center justify-between gap-1 pb-4">
           <div class="flex cursor-pointer items-center gap-4">
             <Checkbox
+              ariaLabel={t("content:_trn_select_all_mods")}
               indeterminate={isSelectAllIndeterminate()}
               checked={
                 (selectedMods()?.length || 0) > 0 && !isSelectAllIndeterminate()

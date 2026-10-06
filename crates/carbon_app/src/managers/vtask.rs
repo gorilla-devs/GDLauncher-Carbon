@@ -19,6 +19,7 @@ use crate::domain::vtask as domain;
 use domain::VisualTaskId;
 
 pub struct VisualTaskManager {
+    generation: String,
     tasks: RwLock<HashMap<VisualTaskId, VisualTask>>,
     // Bounded, process-local evidence for clients polling an accepted attempt.
     // Eviction means Unavailable, never success. Failures stay in `tasks`.
@@ -46,8 +47,13 @@ const TERMINAL_OUTCOME_LIMIT: usize = 2048;
 const PENDING_WARNINGS_LIMIT: usize = 64;
 
 impl VisualTaskManager {
+    pub(crate) fn generation(&self) -> &str {
+        &self.generation
+    }
+
     pub fn new() -> Self {
         Self {
+            generation: uuid::Uuid::new_v4().to_string(),
             tasks: RwLock::new(HashMap::new()),
             terminal: RwLock::new(VecDeque::new()),
             warnings: RwLock::new(VecDeque::new()),

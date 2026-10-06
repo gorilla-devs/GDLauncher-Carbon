@@ -37,42 +37,61 @@ interface Props extends VariantProps<typeof checkboxStyles> {
   indeterminate?: boolean
   disabled?: boolean
   onChange?: (_checked: boolean) => void
+  ariaLabel?: string
   children?: JSX.Element
 }
 
 function Checkbox(props: Props) {
   const [checked, setChecked] = createSignal(props.checked || false)
+  let input: HTMLInputElement | undefined
+
+  createEffect(() => {
+    checked()
+    if (input) input.indeterminate = !!props.indeterminate
+  })
 
   createEffect(() => {
     setChecked(props.checked || false)
   })
 
   return (
-    <div
-      class={`flex items-center gap-2 rounded-md ${PRESS_CLASSES}`}
+    <label
+      class={`relative flex items-center gap-2 rounded-md focus-within:ring-2 focus-within:ring-primary-400 ${PRESS_CLASSES}`}
       classList={{
         "cursor-pointer": !props.disabled,
         "cursor-not-allowed": props.disabled
       }}
-      onPointerDown={(e) => {
-        if (props.disabled) return
-        // Capture so pointerup lands here even if active:scale-95 shrinks
-        // the bounding box out from under a cursor that started near the edge.
-        e.currentTarget.setPointerCapture(e.pointerId)
+      onPointerDown={(event) => {
+        if (props.disabled || !props.onChange) return
+        event.currentTarget.setPointerCapture(event.pointerId)
       }}
-      onPointerUp={(e) => {
-        if (props.disabled) return
-        if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
-        // Don't bounds-check the pointerup position: getBoundingClientRect
-        // returns the active:scale-95 *transformed* rect, which excludes
-        // exactly the edge pixels we're trying to fix. Pointer capture
-        // already guarantees pointerup landed on the captured element.
-        e.currentTarget.releasePointerCapture(e.pointerId)
-        const check = !checked()
-        setChecked(check)
-        props.onChange?.(check)
+      onPointerUp={(event) => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+          event.currentTarget.releasePointerCapture(event.pointerId)
+        }
       }}
     >
+      <input
+        ref={input}
+        type="checkbox"
+        class="sr-only"
+        aria-label={props.ariaLabel}
+        aria-hidden={!props.onChange ? true : undefined}
+        tabIndex={props.onChange ? 0 : -1}
+        checked={checked()}
+        disabled={!!props.disabled || !props.onChange}
+        onChange={(event) => {
+          if (props.disabled) return
+          const value = event.currentTarget.checked
+          setChecked(value)
+          props.onChange?.(value)
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== "Enter") return
+          event.preventDefault()
+          if (!props.disabled && !event.repeat) event.currentTarget.click()
+        }}
+      />
       <div
         class={checkboxStyles({
           checked: checked(),
@@ -97,7 +116,7 @@ function Checkbox(props: Props) {
         </Show>
       </div>
       <Show when={props.children}>{props.children}</Show>
-    </div>
+    </label>
   )
 }
 

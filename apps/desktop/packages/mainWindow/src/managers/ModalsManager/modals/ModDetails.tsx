@@ -1,4 +1,4 @@
-import { Component, Show, For, createSignal, onMount } from "solid-js"
+import { Component, Show, For, createSignal, createMemo } from "solid-js"
 import { useTransContext } from "@gd/i18n"
 import {
   Button,
@@ -34,8 +34,6 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
   const navigator = useGDNavigate()
   const modalsContext = useModal()
   const [selectedTab, setSelectedTab] = createSignal("overview")
-  const [modDescription, setModDescription] = createSignal("")
-  const [_isLoadingDescription, setIsLoadingDescription] = createSignal(false)
 
   const mod = () => props.data.mod
   const displayName = () => mod().metadata?.name || mod().filename
@@ -45,36 +43,59 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
     mod().modrinth?.version ||
     t("modals:_trn_mod_details.unknown")
 
-  onMount(async () => {
-    // Fetch mod description if available from platforms
-    setIsLoadingDescription(true)
-    try {
-      if (mod().curseforge) {
-        const result = rspc.createQuery(() => ({
-          queryKey: [
-            "modplatforms.curseforge.getMod",
-            { modId: mod().curseforge!.project_id }
-          ]
-        }))
-        if (result.data?.data.summary) {
-          setModDescription(result.data.data.summary)
-        }
-      } else if (mod().modrinth) {
-        const result = rspc.createQuery(() => ({
-          queryKey: [
-            "modplatforms.modrinth.getProject",
-            mod().modrinth!.project_id
-          ]
-        }))
-        if (result.data?.description) {
-          setModDescription(result.data.description)
-        }
-      }
-    } catch (error) {
-      console.error("Failed to fetch mod description:", error)
-    }
-    setIsLoadingDescription(false)
+  // A keyed component owns each provider/project query. Replacing the mod
+  // disposes that owner, so a late result cannot populate the new description.
+  const descriptionSource = createMemo(() => {
+    const current = mod()
+    if (current.curseforge)
+      return { kind: "cf" as const, id: current.curseforge.project_id }
+    if (current.modrinth)
+      return { kind: "mr" as const, id: current.modrinth.project_id }
+    return undefined
   })
+  const Description = (p: { text: string }) => (
+    <div>
+      <h3 class="mb-2 font-semibold">
+        {t("modals:_trn_mod_details.description")}
+      </h3>
+      <p class="text-lightSlate-300 text-sm">{p.text}</p>
+    </div>
+  )
+  const PlatformDescription = (p: {
+    source: NonNullable<ReturnType<typeof descriptionSource>>
+  }) => {
+    const source = p.source
+    if (source.kind === "cf") {
+      const result = rspc.createQuery(() => ({
+        queryKey: ["modplatforms.curseforge.getMod", { modId: source.id }]
+      }))
+      return (
+        <Show
+          when={
+            result.isSuccess &&
+            !result.isPlaceholderData &&
+            result.data?.data.summary
+          }
+        >
+          {(text) => <Description text={text()} />}
+        </Show>
+      )
+    }
+    const result = rspc.createQuery(() => ({
+      queryKey: ["modplatforms.modrinth.getProject", source.id]
+    }))
+    return (
+      <Show
+        when={
+          result.isSuccess &&
+          !result.isPlaceholderData &&
+          result.data?.description
+        }
+      >
+        {(text) => <Description text={text()} />}
+      </Show>
+    )
+  }
 
   const getModImage = () => {
     if (mod().curseforge?.has_image) {
@@ -223,17 +244,15 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
           <Show when={selectedTab() === "overview"}>
             {/* Overview Tab */}
             <div class="space-y-4">
-              <Show when={mod().metadata?.description || modDescription()}>
-                <div>
-                  <h3 class="mb-2 font-semibold">
-                    {t("modals:_trn_mod_details.description")}
-                  </h3>
-                  <p class="text-lightSlate-300 text-sm">
-                    {mod().metadata?.description ||
-                      modDescription() ||
-                      t("modals:_trn_mod_details.no_description")}
-                  </p>
-                </div>
+              <Show
+                when={mod().metadata?.description}
+                fallback={
+                  <Show when={descriptionSource()} keyed>
+                    {(source) => <PlatformDescription source={source} />}
+                  </Show>
+                }
+              >
+                {(text) => <Description text={text()} />}
               </Show>
 
               <Show when={mod().metadata?.authors}>

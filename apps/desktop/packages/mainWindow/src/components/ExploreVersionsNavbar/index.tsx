@@ -181,8 +181,9 @@ const ExploreVersionsNavbar = (props: Props) => {
                   checked={infiniteQuery.overrideEnabled}
                   disabled={!infiniteQuery.targetReady}
                   onChange={infiniteQuery.setOverrideEnabled}
-                />
-                <Trans key="instances:_trn_rowcontainer.override_filters" />
+                >
+                  <Trans key="instances:_trn_rowcontainer.override_filters" />
+                </Checkbox>
               </div>
             </div>
           </div>

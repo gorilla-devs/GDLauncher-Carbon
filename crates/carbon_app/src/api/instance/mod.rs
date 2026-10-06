@@ -318,10 +318,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(())
         }
 
-        mutation PREPARE_INSTANCE[app, id: FEInstanceId] {
-            let (_, vtask_id) = app.instance_manager()
-                .prepare_game(id.into(), None, None, true)
-                .await?;
+        mutation PREPARE_INSTANCE[app, args: FEPrepareInstanceArgs] {
+            let (_, vtask_id) = match args {
+                FEPrepareInstanceArgs::Ordinary(id) => app.instance_manager().prepare_game(id.into(), None, None, true).await?,
+                FEPrepareInstanceArgs::ShaderRecovery { instance, expected_failed_task, expected_mc_version } =>
+                    app.instance_manager().resume_shader_modloader(instance.into(), expected_failed_task.into(), expected_mc_version).await?,
+            };
 
             Ok(FETaskId::from(vtask_id))
         }
@@ -1572,6 +1574,17 @@ struct FEUpdateInstance {
     mod_sources: Option<Set<Option<ModSources>>>,
     #[specta(optional)]
     modpack_locked: Option<Set<Option<bool>>>,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(untagged)]
+enum FEPrepareInstanceArgs {
+    Ordinary(FEInstanceId),
+    ShaderRecovery {
+        instance: FEInstanceId,
+        expected_failed_task: FETaskId,
+        expected_mc_version: String,
+    },
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -3108,5 +3121,30 @@ mod task17_search_wire_tests {
                 serde_json::json!([{"entry_index":0,"pos":3,"len":5}])
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod task33_prepare_input_tests {
+    use super::*;
+    #[test]
+    fn task33_prepare_keeps_numeric_callers_and_guarded_input_exact() {
+        assert!(matches!(
+            serde_json::from_str::<FEPrepareInstanceArgs>("7").unwrap(),
+            FEPrepareInstanceArgs::Ordinary(FEInstanceId(7))
+        ));
+        let value = serde_json::from_str::<FEPrepareInstanceArgs>(
+            r#"{"instance":7,"expected_failed_task":11,"expected_mc_version":"1.20.1"}"#,
+        )
+        .unwrap();
+        assert!(
+            matches!(value, FEPrepareInstanceArgs::ShaderRecovery { instance:FEInstanceId(7),expected_failed_task:FETaskId(11),expected_mc_version } if expected_mc_version == "1.20.1")
+        );
+        assert!(
+            serde_json::from_str::<FEPrepareInstanceArgs>(
+                r#"{"instance":7,"expected_failed_task":11}"#
+            )
+            .is_err()
+        );
     }
 }

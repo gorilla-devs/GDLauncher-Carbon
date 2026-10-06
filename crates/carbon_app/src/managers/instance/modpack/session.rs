@@ -82,6 +82,16 @@ pub struct Archive {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+pub struct AcceptedPreparation {
+    pub generation: String,
+    pub task_id: i32,
+    pub instance_id: i32,
+    pub operation: String,
+    pub version: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Session {
     pub schema_version: u32,
     pub operation: String,
@@ -100,6 +110,8 @@ pub struct Session {
     pub copied_to: Option<i32>,
     #[serde(default)]
     pub adopted_from: Option<Owner>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accepted_preparation: Option<AcceptedPreparation>,
 }
 
 pub fn binding(
@@ -219,8 +231,97 @@ impl Session {
             archive: None,
             copied_to: None,
             adopted_from: None,
+            accepted_preparation: None,
         })
     }
+    pub fn bind_preparation(
+        &mut self,
+        generation: &str,
+        task: crate::domain::vtask::VisualTaskId,
+        current: &info::Instance,
+    ) -> anyhow::Result<()> {
+        let owner = self.owner()?;
+        self.accepted_preparation = Some(AcceptedPreparation {
+            generation: generation.to_owned(),
+            task_id: task.0,
+            instance_id: owner.instance_id,
+            operation: owner.operation,
+            version: version_key(&current.game_configuration.version),
+        });
+        Ok(())
+    }
+
+    /// A retained task and its exact current-core Session certify recovery
+    /// authority, never successful preparation. The resumed task must succeed.
+    pub fn validate_shader_recovery(
+        &self,
+        current: &info::Instance,
+        instance: InstanceId,
+        expected_task: crate::domain::vtask::VisualTaskId,
+        expected_mc: &str,
+        generation: &str,
+        failed_task: Option<crate::domain::vtask::VisualTaskId>,
+        outcome: &crate::managers::vtask::TaskOutcome,
+    ) -> anyhow::Result<()> {
+        use crate::managers::vtask::TaskOutcome;
+        if failed_task != Some(expected_task)
+            || (!matches!(outcome, TaskOutcome::Failed(task) if task.id == expected_task)
+                && !matches!(outcome, TaskOutcome::Dismissed))
+        {
+            bail!(
+                "The original setup is not a settled failed attempt. Check its status before retrying."
+            );
+        }
+        let owner = self.owner()?;
+        let accepted = self.accepted_preparation.as_ref().context(
+            "This setup has no current-core preparation binding. Recover it from the instance.",
+        )?;
+        if owner.instance_id != instance.0
+            || accepted.instance_id != instance.0
+            || accepted.operation != owner.operation
+            || accepted.generation != generation
+            || accepted.task_id != expected_task.0
+            || self.copied_to.is_some()
+            || self.adopted_from.is_some()
+            || self.producer != Producer::Settings
+            || self.kind != Kind::VersionOnly
+        {
+            bail!("The setup belongs to another operation. Recover it from the instance.");
+        }
+        let original = schema::parse_instance_config(&self.installed_config)?;
+        let Some(info::GameVersion::Standard(version)) = &original.game_configuration.version
+        else {
+            bail!("The original setup has no supported game target.");
+        };
+        if version.release != expected_mc
+            || version.modloaders.len() != 1
+            || !version
+                .modloaders
+                .iter()
+                .any(|loader| loader.type_ == info::ModLoaderType::Fabric)
+        {
+            bail!("The original Fabric target changed. Recover it from the instance.");
+        }
+        let target = version_key(&original.game_configuration.version);
+        if accepted.version != target
+            || version_key(&current.game_configuration.version) != target
+            || current.modpack.as_ref().map(|pack| &pack.modpack)
+                != original.modpack.as_ref().map(|pack| &pack.modpack)
+        {
+            bail!("The game or loader changed independently. Recover it from the instance.");
+        }
+        if let Some(pending) = &self.pending_config {
+            let pending = schema::parse_instance_config(pending)?;
+            if version_key(&pending.game_configuration.version) != target
+                || pending.modpack.as_ref().map(|pack| &pack.modpack)
+                    != original.modpack.as_ref().map(|pack| &pack.modpack)
+            {
+                bail!("The pending target changed. Recover it from the instance.");
+            }
+        }
+        Ok(())
+    }
+
     pub fn owner(&self) -> anyhow::Result<Owner> {
         Ok(Owner {
             instance_id: self.instance_id.context(
@@ -283,6 +384,15 @@ impl Session {
             .await?
             .context("owned setup session disappeared; preserved for recovery")?;
         session.check_owner(owner)?;
+        Ok(session)
+    }
+    /// Private recovery keeps the exact authority captured before settings
+    /// awaits. A new valid Session for the same instance is still foreign work.
+    pub async fn require_preparation(root: &Path, expected: &Self) -> anyhow::Result<Self> {
+        let session = Self::require(root, &expected.owner()?).await?;
+        if serde_json::to_vec(&session)? != serde_json::to_vec(expected)? {
+            bail!("The original setup changed. Recover it from the instance.");
+        }
         Ok(session)
     }
     pub async fn create(&self, root: &Path) -> anyhow::Result<()> {
@@ -995,4 +1105,316 @@ pub fn unrecorded_interrupted(root: &Path, config: &info::Instance) -> bool {
         _ => None,
     };
     requested.is_none_or(|requested| !staged_request_untouched(root, config, &requested))
+}
+
+#[cfg(test)]
+mod task33_shader_recovery_tests {
+    use super::*;
+    use crate::{domain::vtask::VisualTaskId, managers::vtask::TaskOutcome};
+
+    fn config() -> info::Instance {
+        schema::parse_instance_config(r#"{"_version":"1","name":"Synthetic","game_configuration":{"version":{"release":"1.20.1","modloaders":[{"type":"Fabric","version":"0.15.11"}]}}}"#).unwrap()
+    }
+    fn bound() -> (Session, info::Instance) {
+        let config = config();
+        let mut session =
+            Session::new(&config, Producer::Settings, Kind::VersionOnly, None).unwrap();
+        session.instance_id = Some(7);
+        session
+            .bind_preparation("core-A", VisualTaskId(11), &config)
+            .unwrap();
+        (session, config)
+    }
+    fn validate(session: &Session, config: &info::Instance) -> anyhow::Result<()> {
+        session.validate_shader_recovery(
+            config,
+            InstanceId(7),
+            VisualTaskId(11),
+            "1.20.1",
+            "core-A",
+            Some(VisualTaskId(11)),
+            &TaskOutcome::Dismissed,
+        )
+    }
+    #[test]
+    fn task33_exact_owner_and_repeated_rebinding_reject_old_task() {
+        let (mut session, config) = bound();
+        validate(&session, &config).unwrap();
+        session
+            .bind_preparation("core-A", VisualTaskId(21), &config)
+            .unwrap();
+        assert!(validate(&session, &config).is_err());
+        session
+            .validate_shader_recovery(
+                &config,
+                InstanceId(7),
+                VisualTaskId(21),
+                "1.20.1",
+                "core-A",
+                Some(VisualTaskId(21)),
+                &TaskOutcome::Dismissed,
+            )
+            .unwrap();
+    }
+    #[test]
+    fn task33_foreign_replaced_copied_and_unbound_sessions_refused() {
+        let (session, config) = bound();
+        for altered in 0..5 {
+            let mut other = session.clone();
+            match altered {
+                0 => other.instance_id = Some(8),
+                1 => other.operation = uuid::Uuid::new_v4().to_string(),
+                2 => other.copied_to = Some(8),
+                3 => {
+                    other.adopted_from = Some(Owner {
+                        instance_id: 8,
+                        operation: uuid::Uuid::new_v4().to_string(),
+                    })
+                }
+                _ => other.accepted_preparation = None,
+            }
+            assert!(validate(&other, &config).is_err(), "case {altered}");
+        }
+    }
+    #[test]
+    fn task33_non_settings_non_version_only_and_non_fabric_refused() {
+        let (session, config) = bound();
+        let mut other = session.clone();
+        other.producer = Producer::Repair;
+        assert!(validate(&other, &config).is_err());
+        let mut other = session.clone();
+        other.kind = Kind::Pack;
+        assert!(validate(&other, &config).is_err());
+        let mut vanilla = config.clone();
+        if let Some(info::GameVersion::Standard(version)) = &mut vanilla.game_configuration.version
+        {
+            version.modloaders.clear();
+        }
+        let mut other = session.clone();
+        other.installed_config = schema::make_instance_config(vanilla).unwrap();
+        assert!(validate(&other, &config).is_err());
+    }
+    #[test]
+    fn task33_changed_game_loader_and_expected_mc_refused() {
+        let (session, config) = bound();
+        for change in 0..2 {
+            let mut current = config.clone();
+            if let Some(info::GameVersion::Standard(version)) =
+                &mut current.game_configuration.version
+            {
+                if change == 0 {
+                    version.release = "1.21".into();
+                } else {
+                    version.modloaders = [info::ModLoader {
+                        type_: info::ModLoaderType::Fabric,
+                        version: "0.16.0".into(),
+                    }]
+                    .into();
+                }
+            }
+            assert!(validate(&session, &current).is_err());
+        }
+        assert!(
+            session
+                .validate_shader_recovery(
+                    &config,
+                    InstanceId(7),
+                    VisualTaskId(11),
+                    "1.21",
+                    "core-A",
+                    Some(VisualTaskId(11)),
+                    &TaskOutcome::Dismissed
+                )
+                .is_err()
+        );
+    }
+    #[test]
+    fn task33_generation_mismatch_stale_failed_owner_and_unavailable_refused() {
+        let (session, config) = bound();
+        assert!(
+            session
+                .validate_shader_recovery(
+                    &config,
+                    InstanceId(7),
+                    VisualTaskId(11),
+                    "1.20.1",
+                    "core-B",
+                    Some(VisualTaskId(11)),
+                    &TaskOutcome::Dismissed
+                )
+                .is_err()
+        );
+        for failed in [None, Some(VisualTaskId(12))] {
+            assert!(
+                session
+                    .validate_shader_recovery(
+                        &config,
+                        InstanceId(7),
+                        VisualTaskId(11),
+                        "1.20.1",
+                        "core-A",
+                        failed,
+                        &TaskOutcome::Dismissed
+                    )
+                    .is_err()
+            );
+        }
+        for outcome in [TaskOutcome::Unavailable, TaskOutcome::Succeeded] {
+            assert!(
+                session
+                    .validate_shader_recovery(
+                        &config,
+                        InstanceId(7),
+                        VisualTaskId(11),
+                        "1.20.1",
+                        "core-A",
+                        Some(VisualTaskId(11)),
+                        &outcome
+                    )
+                    .is_err()
+            );
+        }
+        assert_ne!(
+            crate::managers::vtask::VisualTaskManager::new().generation(),
+            crate::managers::vtask::VisualTaskManager::new().generation()
+        );
+    }
+    #[test]
+    fn task33_failed_outcome_has_exact_task_identity() {
+        let (session, config) = bound();
+        let task = crate::domain::vtask::Task {
+            id: VisualTaskId(11),
+            name: crate::api::translation::Translation::Test,
+            progress: crate::domain::vtask::Progress::Failed(std::sync::Arc::new(anyhow::anyhow!(
+                "synthetic"
+            ))),
+            downloaded: 0,
+            download_total: 0,
+            active_subtasks: vec![],
+        };
+        session
+            .validate_shader_recovery(
+                &config,
+                InstanceId(7),
+                VisualTaskId(11),
+                "1.20.1",
+                "core-A",
+                Some(VisualTaskId(11)),
+                &TaskOutcome::Failed(task),
+            )
+            .unwrap();
+    }
+    #[test]
+    fn task33_running_or_foreign_failed_outcome_cannot_authorize_recovery() {
+        let (session, config) = bound();
+        let task = |id, progress| crate::domain::vtask::Task {
+            id: VisualTaskId(id),
+            name: crate::api::translation::Translation::Test,
+            progress,
+            downloaded: 0,
+            download_total: 0,
+            active_subtasks: vec![],
+        };
+        for outcome in [
+            TaskOutcome::Running(task(11, crate::domain::vtask::Progress::Known(1.0))),
+            TaskOutcome::Failed(task(
+                12,
+                crate::domain::vtask::Progress::Failed(std::sync::Arc::new(anyhow::anyhow!(
+                    "foreign synthetic failure"
+                ))),
+            )),
+        ] {
+            assert!(
+                session
+                    .validate_shader_recovery(
+                        &config,
+                        InstanceId(7),
+                        VisualTaskId(11),
+                        "1.20.1",
+                        "core-A",
+                        Some(VisualTaskId(11)),
+                        &outcome
+                    )
+                    .is_err()
+            );
+        }
+    }
+    #[tokio::test]
+    async fn task33_later_reload_rejects_a_valid_replacement_and_rebound_authority() {
+        let (expected, config) = bound();
+        let root = tempfile::tempdir_in(std::env::var("TMPDIR").unwrap()).unwrap();
+        tokio::fs::create_dir(root.path().join(".setup"))
+            .await
+            .unwrap();
+        expected.create(root.path()).await.unwrap();
+        let captured = Session::load(root.path()).await.unwrap().unwrap();
+        validate(&captured, &config).unwrap();
+        Session::require_preparation(root.path(), &captured)
+            .await
+            .unwrap();
+        // A completely valid same-instance replacement passes its own initial
+        // admission proof, but cannot be adopted by this captured continuation.
+        let (replacement, _) = bound();
+        validate(&replacement, &config).unwrap();
+        atomic_json(
+            &root.path().join(".setup").join(RECORD),
+            &replacement,
+            false,
+        )
+        .await
+        .unwrap();
+        assert!(
+            Session::require_preparation(root.path(), &captured)
+                .await
+                .is_err()
+        );
+        let mut rebound = captured.clone();
+        rebound
+            .bind_preparation("core-A", VisualTaskId(21), &config)
+            .unwrap();
+        atomic_json(&root.path().join(".setup").join(RECORD), &rebound, false)
+            .await
+            .unwrap();
+        assert!(
+            Session::require_preparation(root.path(), &captured)
+                .await
+                .is_err()
+        );
+        atomic_json(&root.path().join(".setup").join(RECORD), &captured, false)
+            .await
+            .unwrap();
+        Session::require_preparation(root.path(), &captured)
+            .await
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn task33_actual_session_publication_keeps_binding_and_old_record_default() {
+        let (mut session, config) = bound();
+        let root = tempfile::tempdir_in(std::env::var("TMPDIR").unwrap()).unwrap();
+        tokio::fs::create_dir(root.path().join(".setup"))
+            .await
+            .unwrap();
+        session.create(root.path()).await.unwrap();
+        let loaded = Session::load(root.path()).await.unwrap().unwrap();
+        validate(&loaded, &config).unwrap();
+        let owner = session.owner().unwrap();
+        session
+            .bind_preparation("core-A", VisualTaskId(21), &config)
+            .unwrap();
+        session.save(root.path(), &owner).await.unwrap();
+        let loaded = Session::load(root.path()).await.unwrap().unwrap();
+        assert_eq!(loaded.accepted_preparation.unwrap().task_id, 21);
+        let mut old = serde_json::to_value(&session).unwrap();
+        old.as_object_mut().unwrap().remove("accepted_preparation");
+        let old: Session = serde_json::from_value(old).unwrap();
+        assert!(old.accepted_preparation.is_none());
+        assert!(validate(&old, &config).is_err());
+        assert!(
+            Session::load(&root.path().join("missing"))
+                .await
+                .unwrap()
+                .is_none()
+        );
+    }
 }

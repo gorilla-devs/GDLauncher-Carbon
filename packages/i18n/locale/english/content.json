@@ -239,5 +239,9 @@
   "_trn_duplicates.retry_before_action": "Retry the incomplete action before changing it. Its result has not been confirmed.",
   "_trn_duplicates.removed_cannot_disable": "A removed addon cannot be disabled. Check installed addons and reopen this dialog.",
   "_trn_duplicates.attempted_cannot_keep": "This addon was already changed or its result is uncertain. Retry incomplete work, then check installed addons before choosing it to keep.",
-  "_trn_mods_updater.refresh_error": "Could not refresh installed addons"
+  "_trn_mods_updater.refresh_error": "Could not refresh installed addons",
+  "_trn_shader_loader_context_changed": "The selected instance or shader changed. Close this setup and try again.",
+  "_trn_shader_loader_verification_failed": "The required shader loader is missing, disabled, or changed. Check the instance, then retry.",
+  "_trn_shader_loader_install_failed": "Installation failed. Check the instance before retrying.",
+  "_trn_shader_loader_uncertain": "The request ended before its task could be identified. Work may still finish. Cancel this setup and check the instance before starting again."
 }

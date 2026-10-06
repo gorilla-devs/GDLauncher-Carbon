@@ -60,6 +60,12 @@ mod java;
 mod minecraft;
 pub(super) mod modpack;
 
+struct ShaderRecovery {
+    session: super::modpack::session::Session,
+    task: VisualTaskId,
+    mc_version: String,
+}
+
 #[derive(thiserror::Error, Debug)]
 #[error(
     "Minecraft needs an estimated {needed_mb} MB ({requested_mb} MB heap + JVM overhead) but only {available_mb} MB is available"
@@ -179,7 +185,44 @@ impl ManagerRef<'_, InstanceManager> {
                 _ = cancel.cancelled() => bail!("Instance preparation cancelled while waiting for ownership"),
                 operation = manager.lock_instance(instance_id) => operation,
             };
-            manager.prepare_game_owned(instance_id, launch_account, callback_task, deep_check, operation, activity, None).await
+            manager.prepare_game_owned(instance_id, launch_account, callback_task, deep_check, operation, activity, None, None).await
+        })).await?
+    }
+
+    pub async fn resume_shader_modloader(
+        self,
+        instance_id: InstanceId,
+        expected_task: VisualTaskId,
+        expected_mc: String,
+    ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            format!("instance {instance_id} shader setup recovery"),
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
+        )?;
+        let app = self.app.clone();
+        crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| Box::pin(async move {
+            let manager = app.instance_manager();
+            let cancel = activity.as_ref().unwrap().cancellation();
+            let operation = tokio::select! {
+                _ = cancel.cancelled() => bail!("Shader setup recovery cancelled while waiting for ownership"),
+                operation = manager.lock_instance(instance_id) => operation,
+            };
+            let (config, shortpath, failed_task) = {
+                let instances = manager.instances.read().await;
+                let instance = instances.get(&instance_id).ok_or(InvalidInstanceIdError(instance_id))?;
+                let data = instance.data()?;
+                let LaunchState::Inactive { failed_task } = &data.state else {
+                    bail!("The instance is still busy. Wait before retrying setup.");
+                };
+                (data.config.clone(), instance.shortpath.clone(), *failed_task)
+            };
+            let root = app.settings_manager().runtime_path.get_instances().get_instance_path(&shortpath).get_root();
+            let session = super::modpack::session::Session::load(&root).await?
+                .context("The original setup is unavailable. Recover it from the instance.")?;
+            let outcome = app.task_manager().get_task_outcome(expected_task).await;
+            session.validate_shader_recovery(&config, instance_id, expected_task, &expected_mc,
+                app.task_manager().generation(), failed_task, &outcome)?;
+            manager.prepare_game_owned(instance_id, None, None, true, operation, activity, None, Some(ShaderRecovery { session, task: expected_task, mc_version: expected_mc })).await
         })).await?
     }
 
@@ -208,6 +251,7 @@ impl ManagerRef<'_, InstanceManager> {
                         operation,
                         activity,
                         setup_request,
+                        None,
                     )
                     .await
             })
@@ -225,6 +269,7 @@ impl ManagerRef<'_, InstanceManager> {
         operation: super::InstanceOperationGuard,
         runtime_activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
         setup_request: Option<super::modpack::session::Request>,
+        shader_recovery: Option<ShaderRecovery>,
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
         use super::modpack::session::Session;
         if operation.instance_id() != instance_id {
@@ -345,6 +390,38 @@ impl ManagerRef<'_, InstanceManager> {
             None if config.modpack.as_ref().is_some() => None,
             None => bail!("Instance has no associated game version and cannot be launched"),
         };
+
+        // Settings reads above may yield. Recovery cannot adopt a Session that
+        // replaced the authority captured at admission, even for this instance.
+        if let Some(recovery) = &shader_recovery {
+            let session =
+                Session::require_preparation(&instance_path.get_root(), &recovery.session).await?;
+            let (current, failed_task) = {
+                let instances = self.instances.read().await;
+                let data = instances
+                    .get(&instance_id)
+                    .ok_or(InvalidInstanceIdError(instance_id))?
+                    .data()?;
+                let LaunchState::Inactive { failed_task } = &data.state else {
+                    bail!("The instance is still busy. Wait before retrying setup.");
+                };
+                (data.config.clone(), *failed_task)
+            };
+            let outcome = self
+                .app
+                .task_manager()
+                .get_task_outcome(recovery.task)
+                .await;
+            session.validate_shader_recovery(
+                &current,
+                instance_id,
+                recovery.task,
+                &recovery.mc_version,
+                self.app.task_manager().generation(),
+                failed_task,
+                &outcome,
+            )?;
+        }
 
         let task = VisualTask::new(match &launch_account {
             Some(_) => Translation::InstanceTaskLaunch {
@@ -497,15 +574,27 @@ impl ManagerRef<'_, InstanceManager> {
                     setups::discard_replacement(&root, &next).await;
                     return Err(error);
                 }
+                if session.producer == super::modpack::session::Producer::Settings && session.kind == super::modpack::session::Kind::VersionOnly {
+                    let owner = session.owner()?;
+                    session.bind_preparation(self.app.task_manager().generation(), id, &config)?;
+                    session.save(&root, &owner).await?;
+                }
                 Ok(Some(session.owner()?))
             } else {
-                match Session::load(&root).await? {
-                    Some(session) => {
-                        if session.instance_id.is_none() { return Ok(None); }
-                        let owner = session.owner()?;
-                        if owner.instance_id != instance_id.0 {
-                            if session.copied_to == Some(instance_id.0) { return Ok(None); }
-                            bail!("foreign pending setup has no copy provenance; original inputs retained");
+                let pending = if let Some(recovery) = &shader_recovery {
+                    Some(Session::require_preparation(&root, &recovery.session).await?)
+                } else {
+                    Session::load(&root).await?
+                };
+                match pending {
+                    Some(mut session) => {
+                        // This task may be the one that finishes the setup.
+                        for warning in &session.warnings {
+                            task.warn(warning.clone());
+                        }
+                        if session.producer == super::modpack::session::Producer::Settings && session.kind == super::modpack::session::Kind::VersionOnly {
+                            session.bind_preparation(self.app.task_manager().generation(), id, &config)?;
+                            session.save(&root, &owner).await?;
                         }
                         Ok(Some(owner))
                     }

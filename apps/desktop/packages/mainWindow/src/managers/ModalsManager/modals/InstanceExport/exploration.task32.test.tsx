@@ -150,7 +150,9 @@ it("0105 actual parent owns loading unnamed root and later initialData/selection
   await settle()
   expect(root.textContent).toContain("top.txt")
   expect(c.query).not.toHaveBeenCalled()
-  const checkbox = root.querySelector("div.rounded-md") as HTMLElement
+  const checkbox = root
+    .querySelector('input[type="checkbox"]')!
+    .closest("label") as HTMLElement
   pointerGesture(checkbox)
   await settle()
   expect(checkedFiles()).toContainEqual(["top.txt"])

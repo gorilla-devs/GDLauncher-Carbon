@@ -150,7 +150,7 @@ export type Procedures = {
         { key: "instance.moveInstance", input: MoveInstance, result: null } | 
         { key: "instance.openInstanceFolder", input: OpenInstanceFolder, result: null } | 
         { key: "instance.openLogInFolder", input: OpenLogInFolder, result: string } | 
-        { key: "instance.prepareInstance", input: FEInstanceId, result: FETaskId } | 
+        { key: "instance.prepareInstance", input: FEPrepareInstanceArgs, result: FETaskId } | 
         { key: "instance.prioritizeInstanceCache", input: FEInstanceId | null, result: null } | 
         { key: "instance.regenerateShareCode", input: string, result: FERegenerateShareCodeResponse } | 
         { key: "instance.renameGroup", input: RenameGroup, result: null } | 
@@ -983,3 +983,5 @@ export type ImportEntitySelectionType = "file" | "directory"
 export type FECurseforgeSearchSortField = "featured" | "popularity" | "totalDownloads" | "lastUpdated" | "name" | "author" | "category" | "gameVersion"
 
 export type FinalizeEnrollmentOutcome = "complete" | "obsolete"
+
+export type FEPrepareInstanceArgs = FEInstanceId | { instance: FEInstanceId; expected_failed_task: FETaskId; expected_mc_version: string }

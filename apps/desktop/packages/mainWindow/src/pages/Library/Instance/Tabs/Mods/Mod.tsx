@@ -285,7 +285,7 @@ const Mod = (props: Props) => {
       <div class="flex w-full items-center justify-between gap-4">
         <div class="flex items-center justify-between gap-4">
           <div
-            class="opacity-0 transition-opacity duration-100 ease-spring group-hover:opacity-100"
+            class="opacity-0 transition-opacity duration-100 ease-spring group-hover:opacity-100 focus-within:opacity-100"
             classList={{
               "opacity-100":
                 props.selectMods[props.mod.id] ||
@@ -293,7 +293,20 @@ const Mod = (props: Props) => {
                 isHoveringOptionsCard()
             }}
           >
-            <Checkbox checked={props.selectMods[props.mod.id]} />
+            <div onClick={(event) => event.stopPropagation()}>
+              <Checkbox
+                checked={props.selectMods[props.mod.id]}
+                ariaLabel={props.mod.metadata?.name || props.mod.filename}
+                onChange={(checked) =>
+                  props.setSelectedMods(
+                    produce((draft) => {
+                      if (checked) draft[props.mod.id] = true
+                      else delete draft[props.mod.id]
+                    })
+                  )
+                }
+              />
+            </div>
           </div>
           <div class="flex items-center gap-2">
             <div class="border-darkSlate-500 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-solid">

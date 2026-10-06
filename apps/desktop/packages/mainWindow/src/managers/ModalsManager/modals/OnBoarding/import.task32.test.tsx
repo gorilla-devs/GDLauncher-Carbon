@@ -311,7 +311,9 @@ it.each([false, true])(
       ),
       root
     )
-    const checkbox = root.querySelector("div.rounded-md") as HTMLElement
+    const checkbox = root
+      .querySelector('input[type="checkbox"]')!
+      .closest("label") as HTMLElement
     pointerGesture(checkbox)
     expect(instances()).toEqual(selected ? [] : ["row"])
   }

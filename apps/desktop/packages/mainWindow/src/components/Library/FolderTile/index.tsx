@@ -334,7 +334,7 @@ const FolderTile = (props: FolderTileProps) => {
               {/* Selection checkbox */}
               <Show when={props.onToggleSelection}>
                 <div
-                  class="ease-spring absolute left-2 top-2 z-10 transition-all duration-200"
+                  class="ease-spring absolute left-2 top-2 z-10 transition-all duration-200 focus-within:translate-x-0 focus-within:opacity-100"
                   classList={{
                     "translate-x-0 opacity-100":
                       props.isSelected ||
@@ -351,13 +351,14 @@ const FolderTile = (props: FolderTileProps) => {
                       )
                     }
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    props.onToggleSelection?.()
-                  }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Checkbox checked={props.isSelected} hover={false} />
+                  <Checkbox
+                    checked={props.isSelected}
+                    ariaLabel={groupName()}
+                    hover={false}
+                    onChange={() => props.onToggleSelection?.()}
+                  />
                 </div>
               </Show>
 

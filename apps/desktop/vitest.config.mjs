@@ -21,6 +21,8 @@ export default defineConfig({
       "**/*.task31.test.{ts,tsx}",
       // Controlled Task32 continuation/recovery entry: vitest.task32.config.mjs.
       "**/*.task32.test.{ts,tsx}",
+      // Controlled Task33 checkbox/modal entry: vitest.task33.config.mjs.
+      "**/*.task33.test.{ts,tsx}",
       "**/node_modules/**",
       "**/dist/**",
       "e2e-tests/**/*.spec.ts",

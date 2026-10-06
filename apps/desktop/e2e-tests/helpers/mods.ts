@@ -359,25 +359,30 @@ export async function searchForMod(
   // `Addons/index.tsx`'s `defaultSearchType()`, which falls back to
   // `hasModloaders() ? "mods" : "shaders"` — and `hasModloaders()` reads
   // `instance.getInstanceDetails.modloaders`. On a cold app that query can
-  // still be in flight when this click lands, in which case the app navigates
-  // to the *shaders* search instead and every later step in this helper
-  // searches the wrong catalogue: the query returns no rows (or the wrong
-  // ones) and the failure surfaces as a mystifying "no search-result-row",
-  // several steps downstream of its cause. `gotoSearchPage`
-  // (`Addons/hooks/useAddonMutations.tsx`) encodes the choice directly in the
-  // route it navigates to — `/search/mod` vs `/search/shader` — so the route
-  // is where a lost race is both visible and unambiguous. Asserted on the
-  // rendered outcome rather than on the `getInstanceDetails` response that
-  // decides it, so a details query that is simply slow cannot fail a healthy
-  // app; only actually landing on the wrong catalogue can.
+  // still be in flight when this click lands. `defaultSearchType()` treats
+  // a still-loading instance as modded; before it did, the app navigated to
+  // the *shaders* search here and every later step in this helper searched
+  // the wrong catalogue, failing as a mystifying "no search-result-row"
+  // several steps downstream of its cause. This assertion guards that
+  // fallback. `gotoSearchPage` (`Addons/hooks/useAddonMutations.tsx`)
+  // encodes the choice directly in the route it navigates to — `/search/mod`
+  // vs `/search/shader` — so the route is where a lost race is both visible
+  // and unambiguous. Asserted on the rendered outcome rather than on the
+  // `getInstanceDetails` response that decides it, so a details query that
+  // is simply slow cannot fail a healthy app; only actually landing on the
+  // wrong catalogue can. Polled: the attempts made before the navigation
+  // lands record the instance's own `/library/<id>/addons` URL as their
+  // received value (visible as failed steps in a trace even when the poll
+  // passes) — only a final `/search/shader` means the race was lost.
   await expect
     .poll(() => page.url(), {
       message:
-        `searchForMod: "Add Addons" did not land on the mods search route. ` +
-        `The app navigates to /search/shader instead of /search/mod when ` +
-        `instance.getInstanceDetails has not resolved by the time the ` +
-        `button is clicked (Addons/index.tsx defaultSearchType), so this ` +
-        `search would have run against the wrong catalogue`
+        `searchForMod: "Add Addons" did not land on the mods search route ` +
+        `(/search/mod). A received /search/shader means ` +
+        `Addons/index.tsx defaultSearchType sent this modded instance to ` +
+        `the shaders catalogue (its still-loading-instance fallback ` +
+        `regressed); a received /library/<id>/addons means the click never ` +
+        `navigated`
     })
     .toMatch(/#\/search\/mod(?:[?/]|$)/)
 

@@ -42,6 +42,10 @@ vi.mock("@solidjs/router", () => ({
 vi.mock("./server.data", () => ({ default: () => c.route }))
 vi.mock("@/utils/rspcClient", () => ({
   rspc: {
+    useContext: () => ({
+      client: { mutation: vi.fn() },
+      queryClient: { invalidateQueries: vi.fn() }
+    }),
     createQuery: (opts: any) => {
       c.queries.push(opts)
       return {

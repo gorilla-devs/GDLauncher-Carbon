@@ -269,7 +269,7 @@ const BaseTile = (props: BaseTileProps) => {
                 }
               >
                 <div
-                  class="z-10 absolute left-2 top-2 transition-all duration-200 ease-spring"
+                  class="z-10 absolute left-2 top-2 transition-all duration-200 ease-spring focus-within:translate-x-0 focus-within:opacity-100"
                   classList={{
                     "translate-x-0 opacity-100":
                       props.isMultiSelected ||
@@ -286,13 +286,14 @@ const BaseTile = (props: BaseTileProps) => {
                       )
                     }
                   }}
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    e.preventDefault()
-                    props.onToggleSelection?.()
-                  }}
+                  onClick={(e) => e.stopPropagation()}
                 >
-                  <Checkbox checked={props.isMultiSelected} hover={false} />
+                  <Checkbox
+                    checked={props.isMultiSelected}
+                    ariaLabel={props.name}
+                    hover={false}
+                    onChange={() => props.onToggleSelection?.()}
+                  />
                 </div>
               </Show>
 
