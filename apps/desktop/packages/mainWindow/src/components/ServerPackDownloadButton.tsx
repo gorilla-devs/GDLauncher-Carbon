@@ -1,5 +1,7 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { resolvePackVersion } from "@/utils/resolvePackVersion"
+import { validatedCurseForgeFile } from "@/utils/requestedVersion"
+import { TranslatedError, errorDescription } from "@/utils/translatedError"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import {
   FEServerModpackSource,
@@ -57,25 +59,50 @@ const ServerPackDownloadButton = (props: ServerPackDownloadButtonProps) => {
 
   function handleDownload() {
     runWithOwner(owner, async () => {
-      if (!props.addon) return
+      if (!props.addon || loading()) return
+      const addon = { ...props.addon }
+      const explicitFileId = props.fileId?.toString()
+      const companion = props.serverPackFileId || addon.serverPackFileId
       setLoading(true)
-
-      const serverPackFileId =
-        props.serverPackFileId || props.addon.serverPackFileId
-      if (!serverPackFileId) {
-        setLoading(false)
-        return
-      }
 
       try {
         let modpackSource: FEServerModpackSource
 
-        if (props.addon.platform === "curseforge") {
-          const fileId = props.fileId
-            ? Number.parseInt(props.fileId.toString(), 10)
-            : Number.parseInt(props.addon.mainFileId || "0")
-          const projectId = Number.parseInt(props.addon.id)
-          const spFileId = Number.parseInt(serverPackFileId)
+        if (addon.platform === "curseforge") {
+          let serverPackFileId = companion
+          if (explicitFileId) {
+            // A project-main companion cannot certify a different client release.
+            const response = await rspcContext.client.query([
+              "modplatforms.curseforge.getModFile",
+              { modId: Number(addon.id), fileId: Number(explicitFileId) }
+            ])
+            if (
+              !validatedCurseForgeFile(explicitFileId, addon.id, response.data)
+            )
+              throw new TranslatedError(
+                "notifications:_trn_curseforge_file_unavailable",
+                "The selected CurseForge file is unavailable."
+              )
+            serverPackFileId =
+              response.data.serverPackFileId?.toString() ?? null
+          }
+          if (!serverPackFileId)
+            throw new TranslatedError(
+              "notifications:_trn_server_pack_unavailable",
+              "No server pack is available for the selected release."
+            )
+          const fileId = Number(explicitFileId || addon.mainFileId)
+          const projectId = Number(addon.id)
+          const spFileId = Number(serverPackFileId)
+          if (
+            ![fileId, projectId, spFileId].every(
+              (id) => Number.isSafeInteger(id) && id > 0
+            )
+          )
+            throw new TranslatedError(
+              "notifications:_trn_server_pack_file_invalid",
+              "The selected server pack file is invalid."
+            )
 
           modpackSource = {
             curseforge: {
@@ -85,9 +112,14 @@ const ServerPackDownloadButton = (props: ServerPackDownloadButtonProps) => {
             }
           }
         } else {
+          if (!companion)
+            throw new TranslatedError(
+              "notifications:_trn_server_pack_unavailable",
+              "No server pack is available for the selected release."
+            )
           const versionId = await resolvePackVersion(
-            props.addon,
-            props.fileId,
+            addon,
+            explicitFileId,
             (projectId) =>
               rspcContext.client.query([
                 "modplatforms.modrinth.getProjectVersions",
@@ -97,24 +129,29 @@ const ServerPackDownloadButton = (props: ServerPackDownloadButtonProps) => {
 
           modpackSource = {
             modrinth: {
-              project_id: props.addon.id,
+              project_id: addon.id,
               version_id: versionId
             }
           }
         }
 
         createServerMutation.mutate({
-          name: props.addon.title,
+          name: addon.title,
           port: null,
           group: null,
           modpackSource: modpackSource,
-          iconUrl: props.addon.imageUrl ?? null
+          iconUrl: addon.imageUrl ?? null
         })
       } catch (error) {
         setLoading(false)
-        toast.error(
-          `Could not resolve pack version: ${error instanceof Error ? error.message : "Retry the download."}`
-        )
+        console.error("[ServerPackDownloadButton] No pack version:", error)
+        toast.error(t("notifications:_trn_pack_version_failed"), {
+          description: errorDescription(
+            t,
+            error,
+            "notifications:_trn_pack_version_retry"
+          )
+        })
       }
     })
   }

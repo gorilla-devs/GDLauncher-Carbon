@@ -32,6 +32,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
+.potato-pc,
+.potato-pc::before,
+.potato-pc::after,
 .potato-pc *,
 .potato-pc *::before,
 .potato-pc *::after {

@@ -24,6 +24,8 @@
   "_trn_search_modloaders_placeholder": "搜索模组加载器...",
   "_trn_selected_version_loading": "正在加载所选版本…",
   "_trn_selected_version_unavailable": "所选版本不可用或属于其他项目。请在“版本”标签页中选择一个版本。",
+  "_trn_selected_version_failed": "无法加载所选版本。请重试，或在“版本”标签页中选择一个版本。",
+  "_trn_linked_pack_file_failed": "无法加载链接的 CurseForge 文件，或该文件已不可用。请重试，或打开项目并选择一个版本。",
   "_trn_modloaders": "模组加载器",
   "_trn_no_modloaders_found": "未找到模组加载器",
   "_trn_environment": "环境",

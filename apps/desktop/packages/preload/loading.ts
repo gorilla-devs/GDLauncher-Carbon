@@ -6,7 +6,8 @@ import {
 } from "../main/utils/dbRecovery"
 import { resetDatabaseClick } from "./resetButton"
 import { restartClick } from "./restartButton"
-import { restoreSnapshotClick } from "./restoreButton"
+import { recoverRestoreClick, restoreSnapshotClick } from "./restoreButton"
+import { installReadyUpdateAction } from "./installReadyUpdate"
 import { domReady } from "./utils"
 
 export interface Log {
@@ -243,6 +244,7 @@ function useLoading() {
       )!
 
       let updateInfo: any = null
+      let readyDownloadId: number | undefined
       let updateState:
         | "idle"
         | "checking"
@@ -396,7 +398,16 @@ function useLoading() {
         }
       }
 
+      const installReady = installReadyUpdateAction(
+        () => readyDownloadId,
+        (id) => ipcRenderer.invoke("installUpdate", id),
+        (message) => setUpdateState("error", { message })
+      )
       checkUpdatesBtn.addEventListener("click", async () => {
+        if (updateState === "error" && readyDownloadId !== undefined) {
+          await installReady()
+          return
+        }
         if (
           updateState === "idle" ||
           updateState === "error" ||
@@ -407,7 +418,7 @@ function useLoading() {
         } else if (updateState === "manual-update" && updateInfo?.downloadUrl) {
           await navigator.clipboard.writeText(updateInfo.downloadUrl)
         } else if (updateState === "ready") {
-          await ipcRenderer.invoke("installUpdate")
+          await installReady()
         }
       })
 
@@ -493,6 +504,15 @@ function useLoading() {
         )
           return
         lastUpdateRevision = stateData.revision
+        readyDownloadId = stateData.readyUpdate?.id
+        if (
+          stateData.readyUpdate &&
+          !["error", "unsupported"].includes(stateData.state)
+        ) {
+          updateInfo = { version: stateData.readyUpdate.version }
+          setUpdateState("ready")
+          return
+        }
         if (
           !["downloading", "downloaded", "manual-update"].includes(
             stateData.state

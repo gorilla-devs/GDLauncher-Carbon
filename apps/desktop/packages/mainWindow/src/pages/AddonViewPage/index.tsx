@@ -1,4 +1,8 @@
-import { validatedRequestedVersion } from "@/utils/requestedVersion"
+import {
+  validatedCurseForgeFile,
+  validatedRequestedVersion
+} from "@/utils/requestedVersion"
+import { toLinkedFile } from "@/utils/linkedFile"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
@@ -158,33 +162,89 @@ const AddonExplore = (props: { children?: any }) => {
   // Use the hoisted project query from context
   const project = useContext(AddonContext)!
 
-  const requestedVersion = () =>
-    platform() === "modrinth" ? searchParams.requestedVersionId : undefined
+  const requestedVersion = () => searchParams.requestedVersionId
   const versionQuery = rspc.createQuery(() => ({
     queryKey: ["modplatforms.modrinth.getVersion", requestedVersion() || ""],
-    enabled: !!requestedVersion()
+    enabled: platform() === "modrinth" && !!requestedVersion()
+  }))
+  const requestedFileQuery = rspc.createQuery(() => ({
+    queryKey: [
+      "modplatforms.curseforge.getModFile",
+      { modId: Number(params.id), fileId: Number(requestedVersion()) }
+    ],
+    enabled:
+      platform() === "curseforge" &&
+      !!requestedVersion() &&
+      /^[1-9]\d*$/.test(requestedVersion()!) &&
+      Number.isSafeInteger(Number(requestedVersion()))
   }))
   const selection = createMemo(() => {
     try {
-      return {
-        id: validatedRequestedVersion(
-          requestedVersion(),
-          project.data?.id,
-          versionQuery.data
-        ),
-        error: versionQuery.error?.message
-      }
-    } catch (error) {
+      return platform() === "curseforge"
+        ? {
+            id: validatedCurseForgeFile(
+              requestedVersion(),
+              project.data?.id,
+              requestedFileQuery.data?.data
+            ),
+            // The global toast carries the cause; here, what to do next.
+            error: requestedFileQuery.error
+              ? t("search:_trn_selected_version_failed")
+              : undefined
+          }
+        : {
+            id: validatedRequestedVersion(
+              requestedVersion(),
+              project.data?.id,
+              versionQuery.data
+            ),
+            error: versionQuery.error
+              ? t("search:_trn_selected_version_failed")
+              : undefined
+          }
+    } catch {
+      // The validators only refuse a version that is malformed, unavailable
+      // or owned by another project; one translated reason covers all three.
       return {
         id: undefined,
-        error:
-          error instanceof Error
-            ? error.message
-            : "Selected version is unavailable"
+        error: t("search:_trn_selected_version_unavailable")
       }
     }
   })
-  const selectionReady = () => !requestedVersion() || !!selection().id
+  // A CurseForge link's file that cannot be loaded (deleted, unavailable,
+  // wrong project or a failed lookup) only blocks a modpack, whose link exists
+  // to create that exact pack version. Other addons drop the pin and install
+  // the version resolved for each target, as 2.0.40 did, and say so. A
+  // Modrinth version link is a deliberate pick, so its failure keeps Retry.
+  const linkedFileUnavailable = () =>
+    platform() === "curseforge" &&
+    !!requestedVersion() &&
+    !selection().id &&
+    !!selection().error &&
+    !!project.data?.type &&
+    project.data.type !== "modpack"
+  const selectionReady = () =>
+    !requestedVersion() || !!selection().id || linkedFileUnavailable()
+  // A requested CurseForge file comes from a link (often the website's
+  // Install button, which pins the main file). Non-modpack installs keep it
+  // only where it fits the instance; see utils/linkedFile.ts.
+  const linkedFile = createMemo(() => {
+    const id = selection().id
+    const file = requestedFileQuery.data?.data
+    return platform() === "curseforge" && id && file
+      ? toLinkedFile(id, file)
+      : undefined
+  })
+  const selectedServerCompanion = () =>
+    platform() === "curseforge" && requestedVersion()
+      ? selection().id
+        ? requestedFileQuery.data?.data.serverPackFileId?.toString()
+        : undefined
+      : project.data?.serverPackFileId
+  const retrySelection = () =>
+    platform() === "curseforge"
+      ? requestedFileQuery.refetch()
+      : versionQuery.refetch()
 
   const isFetching = () => project.isLoading
 
@@ -484,10 +544,11 @@ const AddonExplore = (props: { children?: any }) => {
                       when={selectionReady()}
                       fallback={
                         <div role="alert">
-                          {selection().error || "Loading selected version…"}
+                          {selection().error ||
+                            t("search:_trn_selected_version_loading")}
                           <Show when={selection().error}>
-                            <button onClick={() => versionQuery.refetch()}>
-                              Retry selected version
+                            <button onClick={retrySelection}>
+                              {t("general:_trn_retry")}
                             </button>
                           </Show>
                         </div>
@@ -505,17 +566,16 @@ const AddonExplore = (props: { children?: any }) => {
                               addon={project.data}
                               fileId={selection().id}
                               splitPosition={
-                                project.data?.serverPackFileId
-                                  ? "left"
-                                  : undefined
+                                selectedServerCompanion() ? "left" : undefined
                               }
                               testId="modpack-download-button"
                             />
-                            <Show when={project.data?.serverPackFileId}>
+                            <Show when={selectedServerCompanion()}>
                               <div class="bg-primary-700 w-px shrink-0 self-stretch" />
                               <ServerPackDownloadButton
                                 addon={project.data}
                                 fileId={selection().id}
+                                serverPackFileId={selectedServerCompanion()}
                                 splitPosition="right"
                               />
                             </Show>
@@ -527,9 +587,18 @@ const AddonExplore = (props: { children?: any }) => {
                             project.data?.type !== "modpack"
                           }
                         >
+                          <Show when={linkedFileUnavailable()}>
+                            <span
+                              class="max-w-60 text-xs text-yellow-400"
+                              data-testid="linked-file-unavailable"
+                            >
+                              <Trans key="search:_trn_linked_file_unavailable" />
+                            </span>
+                          </Show>
                           <ModDownloadButton
                             addon={project.data}
                             fileId={selection().id}
+                            linkedFile={linkedFile()}
                             selectedInstanceId={selectedInstanceId()}
                             selectedInstanceMods={
                               instanceMods.data ?? undefined
@@ -612,10 +681,11 @@ const AddonExplore = (props: { children?: any }) => {
                     when={selectionReady()}
                     fallback={
                       <div role="alert">
-                        {selection().error || "Loading selected version…"}
+                        {selection().error ||
+                          t("search:_trn_selected_version_loading")}
                         <Show when={selection().error}>
-                          <button onClick={() => versionQuery.refetch()}>
-                            Retry selected version
+                          <button onClick={retrySelection}>
+                            {t("general:_trn_retry")}
                           </button>
                         </Show>
                       </div>
@@ -639,16 +709,15 @@ const AddonExplore = (props: { children?: any }) => {
                             size="small"
                             iconOnly
                             splitPosition={
-                              project.data?.serverPackFileId
-                                ? "left"
-                                : undefined
+                              selectedServerCompanion() ? "left" : undefined
                             }
                           />
-                          <Show when={project.data?.serverPackFileId}>
+                          <Show when={selectedServerCompanion()}>
                             <div class="bg-primary-700 w-px shrink-0 self-stretch" />
                             <ServerPackDownloadButton
                               addon={project.data}
                               fileId={selection().id}
+                              serverPackFileId={selectedServerCompanion()}
                               size="small"
                               splitPosition="right"
                             />
@@ -668,6 +737,7 @@ const AddonExplore = (props: { children?: any }) => {
                         <ModDownloadButton
                           addon={project.data}
                           fileId={selection().id}
+                          linkedFile={linkedFile()}
                           selectedInstanceId={selectedInstanceId()}
                           selectedInstanceMods={instanceMods.data ?? undefined}
                           selectedServerId={selectedServerId()}

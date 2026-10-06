@@ -1,8 +1,12 @@
 import { FEReleaseChannel } from "@gd/core_module/bindings"
-import { createEffect, createSignal, onCleanup } from "solid-js"
+import { createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 import { rspc } from "./rspcClient"
 import { toast, Progress } from "@gd/ui"
 import { i18n } from "@gd/i18n"
+import type {
+  UpdateErrorCode,
+  UpdateStateData
+} from "../../../main/utils/updateState"
 
 const TOAST_ID_CHECKING = "updater-checking"
 const TOAST_ID_DOWNLOADING = "updater-downloading"
@@ -92,22 +96,102 @@ function CheckingDescription() {
   return <>{t("app:_trn_update_checking_description")}</>
 }
 
+// Main describes each failure in English for its logs and tags it with a code;
+// players read the translated text for that code.
+const UPDATE_ERROR_TEXT: Record<UpdateErrorCode, string> = {
+  "prepare-failed": "app:_trn_update_prepare_failed_description",
+  "download-unavailable": "app:_trn_update_download_unavailable_description",
+  "update-changed": "app:_trn_update_changed_description",
+  "update-failed": "app:_trn_update_connection_failed_description",
+  "check-failed": "app:_trn_update_check_error_description",
+  "no-manual-download": "app:_trn_update_unavailable_no_download_description",
+  "manual-check-failed": "app:_trn_update_unavailable_check_failed_description"
+}
+const updateErrorText = (
+  error: UpdateStateData["error"] | undefined,
+  fallbackKey: string
+) => t((error?.code && UPDATE_ERROR_TEXT[error.code]) || fallbackKey)
+
+let pendingReady: { id: number; version: string } | undefined
+let lastReleaseChannel: FEReleaseChannel = "stable"
+let installingReady: number | undefined
+let lastUpdatePhase = "idle"
+interface InstallPresentation {
+  id: number
+  retry: () => Promise<void>
+  /** A failure toast already explains this attempt. */
+  reported?: boolean
+}
+let installingPresentation: InstallPresentation | undefined
+function installationFailure(message: string, captured: InstallPresentation) {
+  if (
+    (pendingReady && pendingReady.id !== captured.id) ||
+    ["downloading", "manual-update"].includes(lastUpdatePhase)
+  )
+    return
+  if (installingPresentation && installingPresentation !== captured) return
+  if (installingPresentation === captured) installingPresentation = undefined
+  captured.reported = true
+  toast.error(t("app:_trn_update_failed"), {
+    id: TOAST_ID_DOWNLOADING,
+    description: message,
+    duration: 8000,
+    closeButton: true,
+    cancel: undefined,
+    action:
+      pendingReady?.id === captured.id
+        ? { label: <InstallButtonLabel />, onClick: captured.retry }
+        : {
+            label: i18n.t("general:_trn_retry"),
+            onClick: () => manualCheckForUpdates(lastReleaseChannel)
+          }
+  })
+}
 export function showPendingUpdateToast() {
+  const captured = pendingReady
+  if (!captured || installingPresentation?.id === captured.id) return
+  const install = async () => {
+    if (pendingReady?.id !== captured.id || installingReady !== undefined)
+      return
+    installingReady = captured.id
+    const presentation: InstallPresentation = {
+      id: captured.id,
+      retry: install
+    }
+    installingPresentation = presentation
+    toast.loading(<UpdateInstallingTitle />, {
+      id: TOAST_ID_DOWNLOADING,
+      description: <UpdateInstallingDescription />,
+      duration: Infinity,
+      closeButton: false,
+      action: undefined,
+      cancel: undefined
+    })
+    try {
+      await window.installUpdate(captured.id)
+    } catch (error) {
+      // The rejection carries main's English reason inside Electron's IPC
+      // wrapper. When main also published the failure, its translated reason
+      // is already on screen; otherwise the player gets the general one.
+      console.error("Update installation failed:", error)
+      if (!presentation.reported)
+        installationFailure(
+          t("app:_trn_update_install_failed_description"),
+          presentation
+        )
+    } finally {
+      if (installingReady === captured.id) installingReady = undefined
+    }
+  }
+  installingPresentation = undefined
   toast.success(<UpdateReadyTitle />, {
     id: TOAST_ID_DOWNLOADING,
     description: <UpdateReadyDescription />,
     duration: Infinity,
+    closeButton: true,
     action: {
       label: <InstallButtonLabel />,
-      onClick: () => {
-        toast.loading(<UpdateInstallingTitle />, {
-          id: TOAST_ID_DOWNLOADING,
-          description: <UpdateInstallingDescription />,
-          duration: Infinity,
-          closeButton: false
-        })
-        window.installUpdate()
-      }
+      onClick: install
     },
     cancel: {
       label: <LaterButtonLabel />,
@@ -152,9 +236,6 @@ function DownloadProgress() {
   )
 }
 
-let lastChannel: FEReleaseChannel | null = null
-let updateCheckInterval: ReturnType<typeof setInterval> | null = null
-
 const updateCapability = (async () => {
   try {
     const os = await window.getCurrentOS()
@@ -165,16 +246,30 @@ const updateCapability = (async () => {
 })()
 
 let lastUpdateRevision = -1
-const receiveUpdateState = (
-  stateData: import("../../../main/utils/updateState").UpdateStateData
-) => {
+const receiveUpdateState = (stateData: UpdateStateData) => {
   if (
     !Number.isSafeInteger(stateData.revision) ||
     stateData.revision <= lastUpdateRevision
   )
     return
   lastUpdateRevision = stateData.revision
+  lastUpdatePhase = stateData.state
+  const previousReadyId = pendingReady?.id
+  pendingReady = stateData.readyUpdate ?? undefined
+  const keepReady = !!pendingReady && supportsAutoUpdate()
+  if (keepReady) {
+    setHasPendingUpdate(true)
+    setPendingUpdateVersion(pendingReady!.version)
+    // Hydration can arrive after a later check has changed the phase. Publish
+    // only newly observed authority, preserving dismissal and current attempts.
+    if (
+      previousReadyId !== pendingReady!.id &&
+      stateData.state !== "downloaded"
+    )
+      showPendingUpdateToast()
+  }
   if (
+    !keepReady &&
     !["downloading", "downloaded", "manual-update"].includes(stateData.state)
   ) {
     setHasPendingUpdate(false)
@@ -216,6 +311,10 @@ const receiveUpdateState = (
 
     case "manual-update":
     case "downloading": {
+      if (keepReady) break
+      installingPresentation = undefined
+      setHasPendingUpdate(false)
+      setPendingUpdateVersion(null)
       setIsCheckingForUpdates(false)
       // A restart notice stays: a later download does not bring the core back.
       if (!stateData.restartRequired) toast.dismiss(TOAST_ID_CHECKING)
@@ -237,6 +336,8 @@ const receiveUpdateState = (
           description: <DownloadProgress />,
           duration: Infinity,
           closeButton: false,
+          action: undefined,
+          cancel: undefined,
           className: isUpdate ? "toast-no-animate" : undefined
         })
       } else if (stateData.updateInfo?.downloadUrl && !isShowingDownloadToast) {
@@ -277,8 +378,8 @@ const receiveUpdateState = (
       setIsCheckingForUpdates(false)
       isShowingDownloadToast = false
 
-      if (supportsAutoUpdate()) {
-        const ver = stateData.updateInfo?.version || "..."
+      if (keepReady) {
+        const ver = pendingReady!.version
         setHasPendingUpdate(true)
         setPendingUpdateVersion(ver)
         showPendingUpdateToast()
@@ -286,10 +387,36 @@ const receiveUpdateState = (
       break
 
     case "unsupported":
-    case "error":
+    case "error": {
       setIsCheckingForUpdates(false)
       isShowingDownloadToast = false
       setIsManualCheck(false)
+      // An installer that fails to start (antivirus, a locked file) reports
+      // the same code as a failed download, but the update is already on
+      // disk, so the player is not sent to check their connection.
+      const installerFailed =
+        !!installingPresentation && stateData.error?.code === "update-failed"
+      if (installingPresentation)
+        installationFailure(
+          installerFailed
+            ? t("app:_trn_update_install_failed_description")
+            : updateErrorText(
+                stateData.error,
+                "app:_trn_update_install_failed_description"
+              ),
+          installingPresentation
+        )
+      else if (previousReadyId !== undefined && !keepReady)
+        installationFailure(
+          updateErrorText(
+            stateData.error,
+            "app:_trn_update_prepare_failed_description"
+          ),
+          {
+            id: previousReadyId,
+            retry: () => manualCheckForUpdates(lastReleaseChannel)
+          }
+        )
 
       if (stateData.restartRequired) {
         showRestartRequired()
@@ -297,12 +424,23 @@ const receiveUpdateState = (
       }
       toast.error(i18n.t("app:_trn_update_failed"), {
         id: TOAST_ID_CHECKING,
-        description:
-          stateData.error?.message ||
-          i18n.t("app:_trn_update_failed_description"),
-        duration: 8000
+        description: installerFailed
+          ? t("app:_trn_update_install_failed_description")
+          : updateErrorText(
+              stateData.error,
+              "app:_trn_update_failed_description"
+            ),
+        duration: 8000,
+        closeButton: true,
+        action: !keepReady
+          ? {
+              label: i18n.t("general:_trn_retry"),
+              onClick: () => manualCheckForUpdates(lastReleaseChannel)
+            }
+          : undefined
       })
       break
+    }
   }
 }
 window.onUpdateStateChanged((_, stateData) => {
@@ -320,40 +458,30 @@ export const checkForUpdates = async () => {
     queryKey: ["settings.getSettings"]
   }))
 
+  const releaseChannel = createMemo(() => settings.data?.releaseChannel)
   createEffect(() => {
-    if (!settings.data) return
+    const channel = releaseChannel()
+    if (!channel) return
+    lastReleaseChannel = channel
 
-    if (!lastChannel || settings.data.releaseChannel !== lastChannel) {
-      lastChannel = settings.data.releaseChannel
-
-      if (updateCheckInterval) {
-        clearInterval(updateCheckInterval)
-        updateCheckInterval = null
-      }
-
-      try {
-        window.checkForUpdates(lastChannel)
-      } catch (error) {
-        console.error("Failed to trigger automatic update check:", error)
-      }
-
-      updateCheckInterval = setInterval(
-        () => {
-          try {
-            window.checkForUpdates(lastChannel!)
-          } catch (error) {
-            console.error("Failed to trigger periodic update check:", error)
-          }
-        },
-        60 * 30 * 1000
-      )
+    try {
+      window.checkForUpdates(channel)
+    } catch (error) {
+      console.error("Failed to trigger automatic update check:", error)
     }
 
+    const updateCheckInterval = setInterval(
+      () => {
+        try {
+          window.checkForUpdates(channel)
+        } catch (error) {
+          console.error("Failed to trigger periodic update check:", error)
+        }
+      },
+      60 * 30 * 1000
+    )
     onCleanup(() => {
-      if (updateCheckInterval) {
-        clearInterval(updateCheckInterval)
-        updateCheckInterval = null
-      }
+      clearInterval(updateCheckInterval)
     })
   })
 }
@@ -361,15 +489,15 @@ export const checkForUpdates = async () => {
 export const manualCheckForUpdates = async (
   releaseChannel: FEReleaseChannel
 ) => {
+  lastReleaseChannel = releaseChannel
   if (isCheckingForUpdates()) {
     return
   }
 
   try {
     const currentState = await window.getUpdateState()
-    if (currentState?.state === "downloaded" && supportsAutoUpdate()) {
-      const ver = currentState.updateInfo?.version || "..."
-      setPendingUpdateVersion(ver)
+    if (currentState?.readyUpdate && supportsAutoUpdate()) {
+      receiveUpdateState(currentState)
       showPendingUpdateToast()
       return
     }

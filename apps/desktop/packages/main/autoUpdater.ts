@@ -8,6 +8,8 @@ import path from "node:path"
 import { activeUpdateMetadata } from "./utils/updateProvider"
 import type { Installation } from "./utils/updateArtifact"
 import { createUpdaterController } from "./utils/updaterController"
+import { ownsDownloadedUpdate } from "./utils/downloadedUpdate"
+import { createOwnedInstallDispatch } from "./utils/ownedInstallDispatch"
 
 async function installationIdentity(): Promise<Installation> {
   let format: Installation["format"] = null
@@ -63,6 +65,8 @@ export default function initAutoUpdater(
   const controller = createUpdaterController({
     version: __APP_VERSION__,
     updater: autoUpdater,
+    dispatchInstall: createOwnedInstallDispatch(autoUpdater),
+    isDownloaded: (info) => ownsDownloadedUpdate(autoUpdater, info),
     broadcast: (state) =>
       BrowserWindow.getAllWindows().forEach((window) => {
         if (!window.isDestroyed())
@@ -85,6 +89,8 @@ export default function initAutoUpdater(
     await metadataReady
     return controller.check(channel)
   })
-  ipcMain.handle("installUpdate", () => controller.install())
+  ipcMain.handle("installUpdate", (_, expectedId?: number) =>
+    controller.install(expectedId)
+  )
   ipcMain.handle("getUpdateState", () => controller.getState())
 }

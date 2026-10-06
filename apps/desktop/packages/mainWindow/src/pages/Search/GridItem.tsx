@@ -1,8 +1,4 @@
-import {
-  FEUnifiedSearchResult,
-  Mod,
-  ServerAddon
-} from "@gd/core_module/bindings"
+import { Mod, ServerAddon } from "@gd/core_module/bindings"
 import { createSignal, Match, Show, Switch } from "solid-js"
 import { Trans } from "@gd/i18n"
 import { formatDownloadCount } from "@/utils/helpers"
@@ -12,9 +8,11 @@ import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
 import { Badge } from "@gd/ui"
+import { LinkedSearchResult } from "@/utils/linkedFile"
+import { LinkedFileLabel } from "./LinkedFileLabel"
 
 interface GridItemProps {
-  result: FEUnifiedSearchResult
+  result: LinkedSearchResult
   onItemClick: (id: string, platform: string) => void
   isInstalled: boolean
   instanceId?: number
@@ -82,16 +80,12 @@ export function GridItem(props: GridItemProps) {
           "group-hover:h-[70%]": true
         }}
       >
-        <Show when={props.result.requestedVersionId}>
-          <span class="text-xs">
-            Selected version: {props.result.requestedVersionId}
-          </span>
-        </Show>
         <div class="flex flex-1 flex-col p-3">
           {/* Title */}
           <p class="truncate text-base font-bold text-white">
             {props.result.title}
           </p>
+          <LinkedFileLabel result={props.result} />
 
           {/* Author - hidden by default, visible on hover */}
           <Show when={authorName()}>
@@ -189,6 +183,7 @@ export function GridItem(props: GridItemProps) {
                 selectedServerId={props.serverId}
                 addon={props.result}
                 fileId={props.result.requestedVersionId ?? undefined}
+                linkedFile={props.result.linkedFile}
                 onDropdownOpenChange={(isOpen) => {
                   setIsHoverActive(isOpen)
                 }}

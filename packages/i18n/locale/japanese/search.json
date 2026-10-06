@@ -24,6 +24,8 @@
   "_trn_search_modloaders_placeholder": "MODローダーを検索...",
   "_trn_selected_version_loading": "選択したバージョンを読み込み中…",
   "_trn_selected_version_unavailable": "選択したバージョンは利用できないか、別のプロジェクトのものです。「バージョン」タブからバージョンを選んでください。",
+  "_trn_selected_version_failed": "選択したバージョンを読み込めませんでした。もう一度お試しいただくか、「バージョン」タブからバージョンを選んでください。",
+  "_trn_linked_pack_file_failed": "リンクされた CurseForge のファイルを読み込めないか、利用できなくなりました。もう一度お試しいただくか、プロジェクトを開いてバージョンを選んでください。",
   "_trn_modloaders": "Modローダー",
   "_trn_no_modloaders_found": "Modローダーが見つかりません",
   "_trn_environment": "環境",

@@ -449,26 +449,69 @@ export default function initRspc(_port: number, _apiToken: string) {
   apiToken = _apiToken
 
   const createInvalidateQuery = () => {
-    let socket: WebSocket
+    let socket: WebSocket | undefined
+    let reconnectTimer: ReturnType<typeof setTimeout> | undefined
+    let disposed = false
+    let connectedOnce = false
+    let connected = false
+    let refreshRunning = false
+    let refreshPending = false
+
+    const coreState = (query: { queryKey: readonly unknown[] }) =>
+      typeof query.queryKey[0] === "string" &&
+      !query.queryKey[0].startsWith("modplatforms.")
+
+    const catchUp = async () => {
+      if (refreshRunning || disposed || !connected) return
+      refreshRunning = true
+      try {
+        // An open during a previous refresh queues one newest-gap follow-up.
+        // A disconnected owner waits for the next successful open.
+        while (refreshPending && connected && !disposed) {
+          refreshPending = false
+          try {
+            await queryClient.invalidateQueries(
+              { predicate: coreState, refetchType: "active" },
+              { throwOnError: true }
+            )
+          } catch (error) {
+            console.error("Invalidations channel refresh error:", error)
+          }
+        }
+      } finally {
+        refreshRunning = false
+      }
+    }
 
     function connect() {
+      reconnectTimer = undefined
+      if (disposed) return
       const base = `ws://127.0.0.1:${_port}/invalidations`
       const url = _apiToken ? `${base}?${AUTH_QUERY}=${_apiToken}` : base
-      socket = new WebSocket(url)
+      const current = new WebSocket(url)
+      socket = current
+      let opened = false
+      const ownsSocket = () => !disposed && socket === current
 
-      socket.addEventListener("open", () => {
+      current.addEventListener("open", () => {
+        if (!ownsSocket() || opened) return
+        opened = true
+        connected = true
+        clearTimeout(reconnectTimer)
+        reconnectTimer = undefined
         console.log("Invalidations channel connected")
+        // First open uses normal initial query fetching; only reconnects catch up.
+        if (connectedOnce) {
+          refreshPending = true
+          void catchUp()
+        }
+        connectedOnce = true
       })
 
-      socket.addEventListener("message", (event) => {
+      current.addEventListener("message", (event) => {
+        if (!ownsSocket() || !connected) return
         const data = parseInvalidateFrame(event.data)
-        if (!data) {
-          return
-        }
-
-        // Not a real query invalidation: the backend deletes instances in a
-        // detached task, so a deletion failure can't surface through the rspc
-        // mutation's onError. Show a toast instead.
+        if (!data) return
         if (data.key === "instance.deleteInstanceFailed") {
           const args = data.args as { error?: string } | null
           toast.error(i18n.t("notifications:_trn_cannot_delete_instance"), {
@@ -476,31 +519,40 @@ export default function initRspc(_port: number, _apiToken: string) {
           })
           return
         }
-
-        const key = invalidationKey(data)
         queryClient
-          .invalidateQueries({
-            queryKey: key
-          })
+          .invalidateQueries({ queryKey: invalidationKey(data) })
           .catch((error) => {
             console.error("Invalidations channel error:", error)
           })
       })
 
-      socket.addEventListener("close", () => {
+      current.addEventListener("close", () => {
+        if (!ownsSocket()) return
+        connected = false
+        if (reconnectTimer !== undefined) return
         console.log(
           "Invalidations channel disconnected. Attempting to reconnect..."
         )
-        setTimeout(connect, 1000)
+        reconnectTimer = setTimeout(connect, 1000)
       })
-
-      socket.addEventListener("error", (error) => {
+      current.addEventListener("error", (error) => {
+        if (!ownsSocket()) return
         console.error("Invalidations channel error:", error)
-        socket.close()
+        current.close()
       })
     }
 
     connect()
+    return () => {
+      if (disposed) return
+      disposed = true
+      connected = false
+      refreshPending = false
+      clearTimeout(reconnectTimer)
+      reconnectTimer = undefined
+      socket?.close()
+      socket = undefined
+    }
   }
 
   return {

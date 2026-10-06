@@ -41,7 +41,6 @@ interface CarouselProps {
 const News = (props: CarouselProps) => {
   const [currentImageIndex, setCurrentImageIndex] = createSignal(1)
   const [isMoving, setIsMoving] = createSignal(false)
-  let _interval: ReturnType<typeof setInterval>
 
   const mergedProps = mergeProps(
     { showIndicators: true, showArrows: true, rtl: true },
@@ -71,47 +70,115 @@ const News = (props: CarouselProps) => {
     }, props.speed || 5000) as unknown as number
   }
 
-  const handleTransitionEnd = () => {
-    setIsMoving(false)
+  let movementGeneration = 0
+  let completionTimer: ReturnType<typeof setTimeout> | undefined
+  let removeCompletionListeners: (() => void) | undefined
+
+  const retireMovement = () => {
+    movementGeneration++
+    clearTimeout(completionTimer)
+    completionTimer = undefined
+    removeCompletionListeners?.()
+    removeCompletionListeners = undefined
+  }
+
+  const completeMovement = (generation: number) => {
+    if (generation !== movementGeneration || !slidesRef) return
+    retireMovement()
     if (currentImageIndex() === 0) {
-      slidesRef.style.transition = `none`
-      setCurrentImageIndex(copiedSlides().length - 2)
+      slidesRef.style.transition = "none"
+      setCurrentImageIndex(props.slides.length)
       moveSlide()
-    }
-    if (currentImageIndex() === copiedSlides().length - 1) {
-      slidesRef.style.transition = `none`
+    } else if (currentImageIndex() === copiedSlides().length - 1) {
+      slidesRef.style.transition = "none"
       setCurrentImageIndex(1)
       moveSlide()
     }
+    setIsMoving(false)
   }
 
-  onMount(() => {
-    if (slidesRef) {
-      slidesRef.addEventListener("transitionend", handleTransitionEnd)
+  const transitionTime = () => {
+    if (slidesRef.closest(".potato-pc")) return 0
+    const style = getComputedStyle(slidesRef)
+    const properties = style.transitionProperty
+      .split(",")
+      .map((value) => value.trim())
+    const milliseconds = (value: string) => {
+      const n = Number.parseFloat(value)
+      return Number.isFinite(n)
+        ? n * (value.trim().endsWith("ms") ? 1 : 1000)
+        : 0
     }
-    resetInterval()
-  })
+    const durations = style.transitionDuration.split(",").map(milliseconds)
+    const delays = style.transitionDelay.split(",").map(milliseconds)
+    return properties.reduce((max, property, i) => {
+      if (property !== "transform" && property !== "all") return max
+      const duration = durations[i % durations.length]
+      return duration > 0
+        ? Math.max(max, duration + delays[i % delays.length])
+        : max
+    }, 0)
+  }
 
+  const selectSlide = (index: number) => {
+    if (
+      !slidesRef ||
+      !props.slides.length ||
+      index < 0 ||
+      index > props.slides.length + 1
+    )
+      return
+    retireMovement()
+    const generation = movementGeneration
+    const startedAt = new Event("transitionstart").timeStamp
+    const startedClock = performance.now()
+    resetInterval()
+    if (index === currentImageIndex()) {
+      completeMovement(generation)
+      return
+    }
+    setIsMoving(true)
+    slidesRef.style.transition = "transform 450ms ease"
+    setCurrentImageIndex(index)
+    moveSlide()
+    const time = transitionTime()
+    if (time <= 0) {
+      completeMovement(generation)
+      return
+    }
+    const complete = (event: TransitionEvent) => {
+      if (
+        event.target !== slidesRef ||
+        event.propertyName !== "transform" ||
+        event.timeStamp < startedAt
+      )
+        return
+      // A canceled previous transform may dispatch after its replacement
+      // starts. It cannot release a replacement that still has motion time.
+      if (performance.now() - startedClock < time && transitionTime() > 0)
+        return
+      completeMovement(generation)
+    }
+    slidesRef.addEventListener("transitionend", complete)
+    slidesRef.addEventListener("transitioncancel", complete)
+    removeCompletionListeners = () => {
+      slidesRef.removeEventListener("transitionend", complete)
+      slidesRef.removeEventListener("transitioncancel", complete)
+    }
+    completionTimer = setTimeout(
+      () => completeMovement(generation),
+      Math.min(time + 50, 5000)
+    )
+  }
+
+  onMount(resetInterval)
   onCleanup(() => {
-    if (slidesRef) {
-      slidesRef.removeEventListener("transitionend", handleTransitionEnd)
-    }
-    if (intervalId !== undefined) {
-      clearInterval(intervalId)
-    }
+    retireMovement()
+    if (intervalId !== undefined) clearInterval(intervalId)
   })
 
   const changeSlide = (direction: "right" | "left") => {
-    resetInterval()
-    setIsMoving(true)
-    slidesRef.style.transition = `transform 450ms ease-spring`
-    if (currentImageIndex() > props.slides.length) return
-    if (direction === "right") {
-      setCurrentImageIndex((prev) => prev + 1)
-    } else {
-      setCurrentImageIndex((prev) => prev - 1)
-    }
-    moveSlide()
+    selectSlide(currentImageIndex() + (direction === "right" ? 1 : -1))
   }
 
   const Slider = (props: SliderProps) => {
@@ -203,17 +270,14 @@ const News = (props: CarouselProps) => {
                   currentImageIndex() === i() + 1 ? "opacity-100" : "opacity-30"
                 }`}
                 onClick={() => {
-                  resetInterval()
-                  slidesRef.style.transition = `transform 450ms ease-spring`
-                  setCurrentImageIndex(i() + 1)
-                  moveSlide()
+                  selectSlide(i() + 1)
                 }}
               />
             )}
           </For>
         </div>
       </Show>
-      <Show when={props.slides}>
+      <Show when={props.slides.length > 0}>
         <Slider
           fallBackImg={props.fallBackImg}
           currentImageIndex={currentImageIndex()}

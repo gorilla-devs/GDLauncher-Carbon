@@ -44,6 +44,7 @@ function controller(
     broadcast: (s) => states.push(s),
     artifact: () => "https://active.invalid/update.zip",
     manual,
+    isDownloaded: () => true,
     prepareShutdown: async () => {
       shutdowns++
     }
@@ -189,6 +190,7 @@ describe("Task23 updater settlement", () => {
   })
   it("install awaits owned shutdown before injected installer", async () => {
     const value = controller()
+    value.events["update-available"](info)
     value.events["update-downloaded"]()
     await value.wrapper.install()
     expect(value.shutdowns).toBe(1)
@@ -472,5 +474,43 @@ describe("Task23 active-provider matching metadata", () => {
         installation
       )
     ).toBeNull()
+  })
+})
+// The renderer translates failures by code; main's message is English only.
+describe("updater failures carry a translatable code", () => {
+  const noDownload = async (): Promise<null> => null
+  const metadataFailure = async (): Promise<null> => {
+    throw Error("synthetic metadata failure")
+  }
+  it.each([
+    ["no manual download", noDownload, "no-manual-download"],
+    ["manual metadata failure", metadataFailure, "manual-check-failed"]
+  ] as const)(
+    "%s publishes unsupported with its code",
+    async (_, manual, code) => {
+      const value = controller(async () => null, manual)
+      await value.wrapper.check("stable")
+      expect(value.wrapper.getState()).toMatchObject({
+        state: "unsupported",
+        error: { code }
+      })
+    }
+  )
+  it("a failed provider check publishes check-failed", async () => {
+    const value = controller(async () => {
+      throw Error("synthetic provider failure")
+    })
+    await value.wrapper.check("stable")
+    expect(value.wrapper.getState().error?.code).toBe("check-failed")
+  })
+  it("an updater error event publishes update-failed", () => {
+    const value = controller()
+    value.events.error(Error("synthetic download failure"))
+    expect(value.wrapper.getState().error?.code).toBe("update-failed")
+  })
+  it("a downloaded event without its download publishes download-unavailable", () => {
+    const value = controller()
+    value.events["update-downloaded"]()
+    expect(value.wrapper.getState().error?.code).toBe("download-unavailable")
   })
 })

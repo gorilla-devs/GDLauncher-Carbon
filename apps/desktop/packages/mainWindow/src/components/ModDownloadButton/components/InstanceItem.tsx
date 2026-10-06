@@ -2,6 +2,7 @@ import { Show, createMemo } from "solid-js"
 import { Trans } from "@gd/i18n"
 import { DropdownMenuRadioItem, Spinner } from "@gd/ui"
 import DefaultImg from "/assets/images/default-instance-img.png"
+import { LinkedFileMismatchNotice } from "./LinkedFileMismatchNotice"
 
 interface InstanceItemProps {
   instance: {
@@ -16,6 +17,9 @@ interface InstanceItemProps {
   isLoading: boolean
   isInstalled: boolean
   staged?: boolean
+  /** Set when a link's file does not fit this instance: the game versions it
+   *  lists. */
+  linkedFileMismatch?: readonly string[]
   hoveredInstanceId: number | null
   onSelect: (instanceId: number) => void
   onMouseEnter: (instanceId: number) => void
@@ -85,6 +89,22 @@ export const InstanceItem = (props: InstanceItemProps) => {
               </span>
             </Show>
           </div>
+          <Show
+            when={
+              props.linkedFileMismatch !== undefined &&
+              !props.isInstalled &&
+              !props.instance.locked
+            }
+          >
+            <div
+              class="text-xs text-yellow-400"
+              data-testid="linked-file-mismatch"
+            >
+              <LinkedFileMismatchNotice
+                gameVersions={props.linkedFileMismatch!}
+              />
+            </div>
+          </Show>
         </div>
         <div class="flex items-center gap-1">
           <Show when={props.isLoading}>

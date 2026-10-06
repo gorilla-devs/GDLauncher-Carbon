@@ -277,13 +277,15 @@ export function buildBatchRequest(parsed: ParsedQuery): {
   modrinthOnlyIds: string[]
   modrinthVersionIds: string[]
   curseforgeOnlySlugs: string[]
+  curseforgeFiles: { projectId: number; fileId: number }[]
 } {
   const request = {
     curseforgeIds: [] as number[],
     slugs: [] as string[],
     modrinthOnlyIds: [] as string[],
     modrinthVersionIds: [] as string[],
-    curseforgeOnlySlugs: [] as string[]
+    curseforgeOnlySlugs: [] as string[],
+    curseforgeFiles: [] as { projectId: number; fileId: number }[]
   }
 
   for (const item of parsed.items) {
@@ -302,6 +304,12 @@ export function buildBatchRequest(parsed: ParsedQuery): {
         break
       case "curseforge_protocol":
         request.curseforgeIds.push(item.addonId)
+        if (item.fileId !== undefined) {
+          request.curseforgeFiles.push({
+            projectId: item.addonId,
+            fileId: item.fileId
+          })
+        }
         break
       case "modrinth_protocol":
         if (item.kind === "version") request.modrinthVersionIds.push(item.id)

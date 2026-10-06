@@ -2,6 +2,7 @@ import { Show, Switch, Match, Accessor } from "solid-js"
 import { Trans } from "@gd/i18n"
 import type { worldVersionCopy } from "../worldVersionCopy"
 import type { InstalledArtifact } from "@/utils/installedAddon"
+import { LinkedFileMismatchNotice } from "./LinkedFileMismatchNotice"
 import {
   Button,
   Tooltip,
@@ -23,6 +24,11 @@ interface InstallButtonProps {
   iconOnly?: boolean
   staged?: boolean
   copyPresentation?: ReturnType<typeof worldVersionCopy>
+  /** Set when a link's file does not fit this instance: the game versions it
+   *  lists, shown as "26.3 · NeoForge" (or a generic notice when they name
+   *  none). The instance's own version is installed instead, and the tooltip
+   *  says so. */
+  linkedFileMismatch?: readonly string[]
   testId?: string
 }
 
@@ -125,6 +131,17 @@ export const InstallButton = (props: InstallButtonProps) => {
             <Trans key={copy().disclosure} />
           </TooltipContent>
         )}
+      </Show>
+      <Show
+        when={
+          !props.instanceLocked() &&
+          !props.isInstalled() &&
+          props.linkedFileMismatch !== undefined
+        }
+      >
+        <TooltipContent>
+          <LinkedFileMismatchNotice gameVersions={props.linkedFileMismatch!} />
+        </TooltipContent>
       </Show>
       {props.instanceLocked() && (
         <TooltipContent>

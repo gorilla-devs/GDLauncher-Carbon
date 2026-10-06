@@ -24,6 +24,8 @@
   "_trn_search_modloaders_placeholder": "Rechercher des modloaders...",
   "_trn_selected_version_loading": "Chargement de la version sélectionnée…",
   "_trn_selected_version_unavailable": "La version sélectionnée est indisponible ou appartient à un autre projet. Choisissez une version dans l’onglet Versions.",
+  "_trn_selected_version_failed": "La version sélectionnée n’a pas pu être chargée. Réessayez, ou choisissez une version dans l’onglet Versions.",
+  "_trn_linked_pack_file_failed": "Le fichier CurseForge lié n’a pas pu être chargé ou n’est plus disponible. Réessayez, ou ouvrez le projet et choisissez une version.",
   "_trn_modloaders": "Modloaders",
   "_trn_no_modloaders_found": "Aucun modloader trouvé",
   "_trn_environment": "Environnement",

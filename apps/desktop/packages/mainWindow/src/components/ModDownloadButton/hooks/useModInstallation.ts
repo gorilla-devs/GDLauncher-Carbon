@@ -4,10 +4,12 @@ import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 import { useModal } from "@/managers/ModalsManager"
 import { toast } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
+import { effectiveFileId, LinkedFile, LinkTarget } from "@/utils/linkedFile"
 
 interface UseModInstallationProps {
   addon: FEUnifiedSearchResult | undefined
   fileId?: number | string
+  linkedFile?: LinkedFile
   selectedServerId?: number
 }
 
@@ -178,19 +180,21 @@ export const useModInstallation = (props: UseModInstallationProps) => {
     })
   }
 
-  // Server install handler - uses server mutations with server_id
+  // Server install handler - uses server mutations with server_id. A link's
+  // file that does not fit the server installs the server's own version
+  // instead (2.0.40's path), the same rule as instances.
   const handleServerInstall = async (serverId: number) => {
     if (!props.addon) return
 
     if (!props.fileId) {
       return await installLatestServerModMutation.mutateAsync({
         serverId,
-        modSource: latestModInstallObj()
+        modSource: createLatestModInstallObj(addon)
       })
     } else {
       return await installServerModMutation.mutateAsync({
         serverId,
-        modSource: modInstallObj()
+        modSource: createModInstallObj(addon, fileId)
       })
     }
   }

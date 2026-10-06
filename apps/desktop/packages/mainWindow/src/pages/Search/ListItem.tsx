@@ -1,9 +1,4 @@
-import {
-  FEUnifiedCategory,
-  FEUnifiedSearchResult,
-  Mod,
-  ServerAddon
-} from "@gd/core_module/bindings"
+import { FEUnifiedCategory, Mod, ServerAddon } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { formatDownloadCount } from "@/utils/helpers"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
@@ -14,9 +9,11 @@ import { createMemo, createSignal, Match, Show, Switch } from "solid-js"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
+import { LinkedSearchResult } from "@/utils/linkedFile"
+import { LinkedFileLabel } from "./LinkedFileLabel"
 
 interface SearchResultItemProps {
-  result: FEUnifiedSearchResult
+  result: LinkedSearchResult
   onItemClick: (id: string, platform: string) => void
   isInstalled: boolean
   instanceId?: number
@@ -65,11 +62,6 @@ export function ListItem(props: SearchResultItemProps) {
           props.onItemClick(props.result.id, props.result.platform)
         }
       >
-        <Show when={props.result.requestedVersionId}>
-          <span class="text-xs">
-            Selected version: {props.result.requestedVersionId}
-          </span>
-        </Show>
         <div
           class="absolute inset-0 z-0 bg-cover bg-center opacity-20 transition-opacity duration-100 group-hover:opacity-30"
           classList={{
@@ -94,6 +86,7 @@ export function ListItem(props: SearchResultItemProps) {
             <div class="text-lightSlate-700 truncate text-left text-sm">
               {props.result.description}
             </div>
+            <LinkedFileLabel result={props.result} />
             <DynamicBadgeContainer
               typeBadgeContent={props.result.type}
               categories={filteredCategories()}
@@ -172,6 +165,7 @@ export function ListItem(props: SearchResultItemProps) {
                       selectedServerId={props.serverId}
                       addon={props.result}
                       fileId={props.result.requestedVersionId ?? undefined}
+                      linkedFile={props.result.linkedFile}
                       onDropdownOpenChange={(isOpen) => {
                         if (isOpen) {
                           setIsHoverActive(true)

@@ -46,7 +46,7 @@ declare global {
     onUpdateStateChanged: (
       cb: (event: Electron.IpcRendererEvent, state: UpdateStateData) => void
     ) => void
-    installUpdate: () => void
+    installUpdate: (expectedId?: number) => Promise<void>
     openExternalLink: (link: string) => void
     openFolder: (path: string) => void
     copyToClipboard: (text: string) => void

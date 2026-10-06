@@ -1,3 +1,4 @@
+import { applyReducedMotion } from "./utils/reducedMotion"
 /* @refresh reload */
 import { render } from "solid-js/web"
 import {
@@ -204,7 +205,7 @@ const InnerApp = (props: InnerAppProps) => {
 }
 
 interface TransWrapperProps {
-  createInvalidateQuery: () => void
+  createInvalidateQuery: () => () => void
   isBackendReady: boolean
 }
 
@@ -281,19 +282,7 @@ const TransWrapper = (props: TransWrapperProps) => {
     return prevLanguage
   }, undefined)
 
-  createEffect(() => {
-    const root = document.getElementById("root")
-    const overlay = document.getElementById("overlay")
-    if (root && overlay) {
-      if (settings.data?.reducedMotion) {
-        root.classList.add("potato-pc")
-        overlay.classList.add("potato-pc")
-      } else {
-        root.classList.remove("potato-pc")
-        overlay.classList.remove("potato-pc")
-      }
-    }
-  })
+  applyReducedMotion(() => !!settings.data?.reducedMotion)
 
   return (
     <Show when={!settings.isInitialLoading && isI18nReady() && i18nOptions()}>

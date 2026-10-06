@@ -14,6 +14,13 @@ import SharePreviewContent from "@/components/SharePreviewContent"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { isAddonInstalled } from "@/utils/installedAddon"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
+import {
+  effectiveFileId,
+  instanceLinkTarget,
+  LinkedSearchResult,
+  serverLinkTarget
+} from "@/utils/linkedFile"
 
 export function List() {
   const searchContext = useSearchContext()
@@ -26,6 +33,20 @@ export function List() {
   const instanceMods = () => searchContext?.selectedInstanceMods
   const serverId = () => searchContext?.selectedServerId() || NaN
   const serverAddons = () => searchContext?.selectedServerAddons
+  const isServer = () => !isNaN(serverId()) && serverId() > 0
+  const globalStore = useGlobalStore()
+  // A link row whose linked file does not fit the instance or server installs
+  // that target's own version, so any installed copy counts as installed. On
+  // a server it fits, a copy named like the linked file is that file.
+  const rowRequested = (row: LinkedSearchResult) =>
+    effectiveFileId(
+      row.requestedVersionId ?? undefined,
+      row.linkedFile,
+      row.type,
+      isServer()
+        ? serverLinkTarget(searchContext?.selectedServer?.data)
+        : instanceLinkTarget(globalStore?.instances?.data, instanceId())
+    )
 
   // Landing tab for the current target (nothing / instance / server). Owned by
   // the search context so the tab strip, the grid and this list agree.
@@ -202,7 +223,9 @@ export function List() {
                               : {
                                   kind: "instance",
                                   addons: installedMods.data ?? []
-                                }
+                                },
+                            rowRequested(result.value!),
+                            result.value!.linkedFile
                           )}
                           onItemClick={() => {
                             const sid = serverId()

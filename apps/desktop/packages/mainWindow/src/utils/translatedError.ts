@@ -1,4 +1,5 @@
 import type { NamespacedTranslationKey, TypedTFunction } from "@gd/i18n"
+import { extractErrorDisplay } from "./rspcErrorText"
 
 /** A refusal the player can act on. `key` names its text in the player's
  *  language; `message` stays English for logs. */

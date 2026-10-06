@@ -21,9 +21,24 @@ import { toast } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
 import { worldVersionCopy } from "./worldVersionCopy"
 import { findInstalledAddon, isInstalledArtifact } from "@/utils/installedAddon"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
+import {
+  effectiveFileId,
+  instanceLinkTarget,
+  LinkedFile,
+  LinkTarget,
+  serverLinkTarget
+} from "@/utils/linkedFile"
 
 interface ModDownloadButtonProps {
   fileId?: number | string
+  /** Metadata of the file `fileId` pins when it came from an install link
+   *  rather than the user's own pick (search rows and the addon page header).
+   *  An instance or server install keeps the pin only where the file fits
+   *  that target, otherwise it installs the version resolved for it.
+   *  Versions-tab rows leave it unset: an explicit pick there always installs
+   *  as chosen. */
+  linkedFile?: LinkedFile
   addon: FEUnifiedSearchResult | undefined
   onDropdownOpenChange?: (isOpen: boolean) => void
   selectedInstanceId?: number
@@ -61,7 +76,43 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     latestModInstallObj,
     modInstallObj,
     maybeOpenShaderWizard
-  } = useModInstallation(props)
+  } = useModInstallation(props, { instanceTarget, serverTarget })
+
+  // The file an install into the selected instance or server uses: the
+  // link's file only where it fits that target.
+  const instanceFileId = createMemo(() =>
+    effectiveFileId(
+      props.fileId,
+      props.linkedFile,
+      props.addon?.type,
+      instanceTarget(props.selectedInstanceId)
+    )
+  )
+  const serverFileId = createMemo(() =>
+    effectiveFileId(
+      props.fileId,
+      props.linkedFile,
+      props.addon?.type,
+      serverTarget()
+    )
+  )
+  const scopedFileId = () =>
+    props.selectedServerId ? serverFileId() : instanceFileId()
+  // The game versions the link's file lists, for a target that gets its own
+  // version instead; undefined where the pin is kept. Same rule as the install.
+  const mismatchFor = (target: LinkTarget | undefined) =>
+    props.linkedFile &&
+    props.fileId !== undefined &&
+    effectiveFileId(
+      props.fileId,
+      props.linkedFile,
+      props.addon?.type,
+      target
+    ) === undefined
+      ? props.linkedFile.gameVersions
+      : undefined
+  const linkedFileMismatch = (instanceId: number | undefined) =>
+    mismatchFor(instanceTarget(instanceId))
 
   const {
     searchQuery,
@@ -180,7 +231,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   )
 
   const isInstalled = createMemo(() =>
-    isInstalledArtifact(installedMod(), props.fileId)
+    isInstalledArtifact(installedMod(), scopedFileId())
   )
 
   const handleDownload = async () => {
@@ -256,7 +307,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           progress={progress}
           isInstalled={isInstalled}
           instanceLocked={() => false}
-          fileId={props.fileId}
+          fileId={serverFileId()}
+          linkedFileMismatch={mismatchFor(serverTarget())}
           installedMod={installedMod}
           onDownload={handleDownload}
           size={props.size}
@@ -267,6 +319,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       <Match when={!props.selectedInstanceId}>
         <InstanceDropdown
           addon={props.addon}
+          linkedFileMismatch={linkedFileMismatch}
           filteredInstances={filteredInstances}
           shouldVirtualize={shouldVirtualize}
           searchQuery={searchQuery}
@@ -290,10 +343,11 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           staged={props.addon?.type === "datapack"}
           copyPresentation={worldVersionCopy(
             props.addon?.type,
-            props.fileId,
+            instanceFileId(),
             installedMod()?.id
           )}
-          fileId={props.fileId}
+          fileId={instanceFileId()}
+          linkedFileMismatch={linkedFileMismatch(props.selectedInstanceId)}
           installedMod={installedMod}
           onDownload={handleDownload}
           size={props.size}

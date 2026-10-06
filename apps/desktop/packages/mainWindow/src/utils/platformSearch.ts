@@ -1,10 +1,8 @@
 import { createPlatformSearchQuery } from "./platformSearchQuery"
 import {
-  FEUnifiedBatchRequest,
   FEUnifiedModLoaderType,
   FEUnifiedPlatform,
   FEUnifiedSearchParameters,
-  FEUnifiedSearchResult,
   FEUnifiedSearchType
 } from "@gd/core_module/bindings"
 
@@ -23,6 +21,38 @@ import { createInfiniteQuery } from "@tanstack/solid-query"
 import { VirtualizerHandle } from "virtua/lib/solid"
 import { useSearchParams } from "@solidjs/router"
 import { parseSearchQuery, buildBatchRequest } from "./searchQueryParser"
+import { validatedCurseForgeFile } from "./requestedVersion"
+import { i18n } from "@gd/i18n"
+import { LinkedSearchResult, toLinkedFile } from "./linkedFile"
+
+const effectivePageSize = (params: FEUnifiedSearchParameters) =>
+  params.searchApi ? 20 : params.pageSize || 15
+
+export function nextSearchOffset(
+  page: {
+    data: unknown[]
+    pagination?: {
+      index: number
+      resultCount: number
+      totalCount: number
+    } | null
+  },
+  requestedOffset: number,
+  requestedSize: number
+): number | undefined {
+  const count = page.data.length
+  if (!count) return undefined
+  const pagination = page.pagination
+  if (pagination) {
+    const next = pagination.index + pagination.resultCount
+    return pagination.resultCount > 0 &&
+      next > requestedOffset &&
+      next < pagination.totalCount
+      ? next
+      : undefined
+  }
+  return count === requestedSize ? requestedOffset + count : undefined
+}
 
 const defaultSearchQuery: FEUnifiedSearchParameters = {
   searchQuery: "",
@@ -49,7 +79,7 @@ export interface SearchResultsOpts {
 
 export interface SearchResultItem {
   type: "value" | "loader" | "skeleton"
-  value?: FEUnifiedSearchResult
+  value?: LinkedSearchResult
   platform?: "curseforge" | "modrinth"
 }
 
@@ -238,20 +268,13 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   })
 
   // Check for protocol URL in query params (from deep link)
-  const initialSearchText = searchParams.q
-    ? decodeURIComponent(String(searchParams.q))
-    : ""
+  const initialSearchText = searchParams.q ? String(searchParams.q) : ""
 
   const [searchQuery, _setSearchQuery] = createPlatformSearchQuery({
     ...defaultSearchQuery,
     ...opts.defaultSearchQuery,
     ...(initialSearchText ? { searchQuery: initialSearchText } : {})
   })
-
-  // Clear the q param from URL after reading (one-time use)
-  if (searchParams.q) {
-    _setSearchParams({ ...searchParams, q: undefined })
-  }
 
   const setSearchQuery = (
     value:
@@ -265,6 +288,19 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
 
     _setSearchQuery(value)
   }
+
+  // Router values are decoded already. Track only the one-use routed input,
+  // so ordinary edits do not reapply a consumed link.
+  createEffect(
+    on(
+      () => searchParams.q,
+      (q) => {
+        if (q === undefined) return
+        setSearchQuery((prev) => ({ ...prev, searchQuery: String(q) }))
+        _setSearchParams({ q: undefined })
+      }
+    )
+  )
 
   // Debounced version of searchQuery for network requests (leading + trailing, 500ms).
   // The initial value is set from searchQuery() so deep-link searches fire immediately on mount.
@@ -307,10 +343,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     return selectedInstanceId()
   }, undefined)
 
-  const actualPageSize = () =>
-    debouncedSearchQuery().searchApi
-      ? 20
-      : debouncedSearchQuery().pageSize || 15
+  const actualPageSize = () => effectivePageSize(debouncedSearchQuery())
 
   // Direct search mode - for URLs, protocols, and # prefix IDs
   // Must be defined before infinite queries so isDirectMode() is available
@@ -339,17 +372,85 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       : null
   })
 
-  const directBatchRequest = createMemo<FEUnifiedBatchRequest>(() =>
-    buildBatchRequest(parsedQuery())
-  )
+  const directBatchRequest = createMemo(() => buildBatchRequest(parsedQuery()))
 
-  const directSearchQuery = rspc.createQuery(() => ({
-    queryKey: [
-      "modplatforms.unifiedGetProjectsByIds",
-      directBatchRequest()
-    ] as const,
-    enabled: isDirectMode() && !isShareMode() && parsedQuery().items.length > 0
-  }))
+  const directSearchQuery = rspc.createQuery(() => {
+    const request = directBatchRequest()
+    return {
+      queryKey: ["modplatforms.unifiedGetProjectsByIds", request] as const,
+      enabled:
+        isDirectMode() && !isShareMode() && parsedQuery().items.length > 0,
+      queryFn: async ({ signal }) => {
+        // File provenance is frontend-scoped query identity, not a mutation
+        // of the project's historical main file or the backend batch schema.
+        const { curseforgeFiles, ...batch } = request
+        const response = await rspcContext.client.query(
+          ["modplatforms.unifiedGetProjectsByIds", batch],
+          { signal }
+        )
+        const errors = [...response.errors]
+        const results: LinkedSearchResult[] = []
+        for (const project of response.results) {
+          const selections =
+            project.platform === "curseforge"
+              ? curseforgeFiles.filter(
+                  (file) => String(file.projectId) === project.id
+                )
+              : []
+          if (!selections.length) {
+            results.push(project)
+            continue
+          }
+          let pinned = false
+          let unavailable = false
+          for (const selected of selections) {
+            try {
+              const file = await rspcContext.client.query(
+                [
+                  "modplatforms.curseforge.getModFile",
+                  { modId: selected.projectId, fileId: selected.fileId }
+                ],
+                { signal }
+              )
+              const id = validatedCurseForgeFile(
+                String(selected.fileId),
+                project.id,
+                file.data
+              )
+              if (!id)
+                throw new Error("The selected CurseForge file is unavailable.")
+              results.push({
+                ...project,
+                requestedVersionId: id,
+                serverPackFileId:
+                  file.data.serverPackFileId?.toString() ?? null,
+                // Website Install buttons pin CurseForge's main file, not one
+                // the user chose. Non-modpack installs check it against the
+                // target instance (utils/linkedFile.ts) and the row names it.
+                linkedFile: toLinkedFile(id, file.data)
+              })
+              pinned = true
+            } catch (error) {
+              if (signal.aborted) throw error
+              // A modpack link exists to create that exact pack version, so
+              // without its file there is nothing to offer. For other addons
+              // the pin is only advisory: keep the project row unpinned.
+              if (project.type !== "modpack") {
+                unavailable = true
+                continue
+              }
+              // Shown to the player above the results; the cause is logged.
+              console.warn("[search] Linked CurseForge file failed:", error)
+              errors.push(i18n.t("search:_trn_linked_pack_file_failed"))
+            }
+          }
+          if (unavailable && !pinned)
+            results.push({ ...project, linkedFileUnavailable: true })
+        }
+        return { results, errors }
+      }
+    }
+  })
 
   // Fields shared by both platforms — changing any of these re-runs both
   // the CurseForge and Modrinth queries.
@@ -358,7 +459,8 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     gv: params.gameVersions,
     ml: params.modloaders,
     pt: params.projectType,
-    env: params.environment
+    env: params.environment,
+    pageSize: effectivePageSize(params)
   })
 
   // CurseForge category ids are numbers, Modrinth category ids are strings,
@@ -400,97 +502,67 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     sort: platformSort(params, "modrinth")
   })
 
-  const cfInfiniteResults = createInfiniteQuery(() => ({
-    queryKey: [
-      "modplatforms.unifiedSearch.cf",
-      cfSearchCacheKey(debouncedSearchQuery())
-    ],
-    enabled:
-      !isDirectMode() &&
-      (!debouncedSearchQuery().searchApi ||
-        debouncedSearchQuery().searchApi === "curseforge"),
-    queryFn: (ctx) => {
-      return rspcContext.client.query(
-        [
-          "modplatforms.unifiedSearch",
-          {
-            searchQuery: debouncedSearchQuery().searchQuery,
-            categories: platformCategories(
-              debouncedSearchQuery(),
-              "curseforge"
-            ),
-            gameVersions: debouncedSearchQuery().gameVersions,
-            modloaders: !shouldBypassModloaderFilter(
-              debouncedSearchQuery().projectType
-            )
-              ? debouncedSearchQuery().modloaders
-              : null,
-            pageSize: actualPageSize(),
-            projectType: debouncedSearchQuery().projectType,
-            index: ctx.pageParam,
-            searchApi: "curseforge",
-            environment: debouncedSearchQuery().environment,
-            platformFilters: debouncedSearchQuery().platformFilters
-          }
-        ],
-        { signal: ctx.signal }
-      )
-    },
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => {
-      const hasMore = (lastPage?.data?.length || 0) === actualPageSize()
-      return hasMore
-        ? (lastPage?.pagination?.index || 0) + actualPageSize()
-        : null
+  const platformInfiniteOptions = (platform: FEUnifiedPlatform) => {
+    const params = debouncedSearchQuery()
+    const pageSize = effectivePageSize(params)
+    return {
+      queryKey: [
+        platform === "curseforge"
+          ? "modplatforms.unifiedSearch.cf"
+          : "modplatforms.unifiedSearch.mr",
+        platform === "curseforge"
+          ? cfSearchCacheKey(params)
+          : mrSearchCacheKey(params)
+      ],
+      enabled:
+        !isDirectMode() && (!params.searchApi || params.searchApi === platform),
+      queryFn: (ctx: { pageParam: number; signal: AbortSignal }) =>
+        rspcContext.client.query(
+          [
+            "modplatforms.unifiedSearch",
+            {
+              searchQuery: params.searchQuery,
+              categories: platformCategories(params, platform),
+              gameVersions: params.gameVersions,
+              modloaders: !shouldBypassModloaderFilter(params.projectType)
+                ? params.modloaders
+                : null,
+              pageSize,
+              projectType: params.projectType,
+              index: ctx.pageParam,
+              searchApi: platform,
+              environment: params.environment,
+              platformFilters: params.platformFilters
+            }
+          ],
+          { signal: ctx.signal }
+        ),
+      initialPageParam: 0,
+      getNextPageParam: (
+        lastPage: Awaited<
+          ReturnType<
+            typeof rspcContext.client.query<"modplatforms.unifiedSearch">
+          >
+        >,
+        _pages: unknown[],
+        lastPageParam: number
+      ) => nextSearchOffset(lastPage, lastPageParam, pageSize)
     }
-  }))
+  }
 
-  const mrInfiniteResults = createInfiniteQuery(() => ({
-    queryKey: [
-      "modplatforms.unifiedSearch.mr",
-      mrSearchCacheKey(debouncedSearchQuery())
-    ],
-    enabled:
-      !isDirectMode() &&
-      (!debouncedSearchQuery().searchApi ||
-        debouncedSearchQuery().searchApi === "modrinth"),
-    queryFn: (ctx) => {
-      return rspcContext.client.query(
-        [
-          "modplatforms.unifiedSearch",
-          {
-            searchQuery: debouncedSearchQuery().searchQuery,
-            categories: platformCategories(debouncedSearchQuery(), "modrinth"),
-            gameVersions: debouncedSearchQuery().gameVersions,
-            modloaders: !shouldBypassModloaderFilter(
-              debouncedSearchQuery().projectType
-            )
-              ? debouncedSearchQuery().modloaders
-              : null,
-            pageSize: actualPageSize(),
-            projectType: debouncedSearchQuery().projectType,
-            index: ctx.pageParam,
-            searchApi: "modrinth",
-            environment: debouncedSearchQuery().environment,
-            platformFilters: debouncedSearchQuery().platformFilters
-          }
-        ],
-        { signal: ctx.signal }
-      )
-    },
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => {
-      const hasMore = (lastPage?.data?.length || 0) === actualPageSize()
-      return hasMore
-        ? (lastPage?.pagination?.index || 0) + actualPageSize()
-        : null
-    }
-  }))
+  const cfInfiniteResults = createInfiniteQuery(() =>
+    platformInfiniteOptions("curseforge")
+  )
+  const mrInfiniteResults = createInfiniteQuery(() =>
+    platformInfiniteOptions("modrinth")
+  )
 
   const allRows = createMemo<SearchResultItem[]>(() => {
     // Direct mode - return results from batch query
     if (isDirectMode()) {
-      const directResults = directSearchQuery.data?.results ?? []
+      // The queryFn above adds frontend-only `linkedFile` metadata to rows.
+      const directResults = (directSearchQuery.data?.results ??
+        []) as LinkedSearchResult[]
       const items: SearchResultItem[] = directResults.map((item) => ({
         type: "value" as const,
         value: item

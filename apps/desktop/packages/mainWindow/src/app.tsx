@@ -22,7 +22,7 @@ import {
 import ShutdownPrompt from "./components/ShutdownPrompt"
 
 interface Props {
-  createInvalidateQuery: () => void
+  createInvalidateQuery: () => () => void
   children?: JSX.Element
 }
 
@@ -32,7 +32,7 @@ const App = (props: Props) => {
   const navigate = useGDNavigate()
   const currentRoute = useLocation()
 
-  props.createInvalidateQuery()
+  onCleanup(props.createInvalidateQuery())
 
   // While subscribed, main holds a close with a running game open for this
   // warning; unsubscribing lets the close go ahead instead.

@@ -24,6 +24,8 @@
   "_trn_search_modloaders_placeholder": "Search modloaders...",
   "_trn_selected_version_loading": "Loading the selected version…",
   "_trn_selected_version_unavailable": "The selected version is unavailable or belongs to a different project. Choose a version from the Versions tab.",
+  "_trn_selected_version_failed": "The selected version couldn't be loaded. Try again, or choose a version from the Versions tab.",
+  "_trn_linked_pack_file_failed": "The linked CurseForge file couldn't be loaded or is no longer available. Try again, or open the project and choose a version.",
   "_trn_modloaders": "Modloaders",
   "_trn_no_modloaders_found": "No modloaders found",
   "_trn_environment": "Environment",

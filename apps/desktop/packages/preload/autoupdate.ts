@@ -9,8 +9,8 @@ contextBridge.exposeInMainWorld(
     ipcRenderer.invoke("checkForUpdates", releaseChannel)
 )
 
-contextBridge.exposeInMainWorld("installUpdate", async () =>
-  ipcRenderer.invoke("installUpdate")
+contextBridge.exposeInMainWorld("installUpdate", async (expectedId?: number) =>
+  ipcRenderer.invoke("installUpdate", expectedId)
 )
 
 contextBridge.exposeInMainWorld("getUpdateState", async () =>

@@ -2,6 +2,7 @@ import { it, expect, vi } from "vitest"
 import fs from "node:fs"
 import path from "node:path"
 import vm from "node:vm"
+import { EventEmitter } from "node:events"
 import ts from "typescript"
 import { createCoreOutput } from "./coreOutput"
 import { AccountIdentityReceiver } from "./accountIdentity"
@@ -235,6 +236,9 @@ it("Task23 actual main-window update consumer clears busy/manual state and Copy 
     lastUpdateRevision: -1,
     setHasPendingUpdate() {},
     setPendingUpdateVersion() {},
+    pendingReady: undefined,
+    lastUpdatePhase: "idle",
+    installingPresentation: undefined,
     setIsCheckingForUpdates: (v: boolean) => {
       checking = v
     },
@@ -248,6 +252,7 @@ it("Task23 actual main-window update consumer clears busy/manual state and Copy 
     supportsAutoUpdate: () => false,
     toast,
     i18n: { t: (s: string) => s },
+    updateErrorText: () => "description",
     TOAST_ID_CHECKING: "checking",
     TOAST_ID_MANUAL_UPDATE: "manual",
     TOAST_ID_DOWNLOADING: "download",
@@ -296,6 +301,7 @@ it("Task23 actual recovery broadcast/hydration reducer resets unsupported button
   let copied = ""
   const context: Record<string, any> = {
     lastUpdateRevision: -1,
+    readyDownloadId: undefined,
     updateState: "checking",
     updateInfo: null,
     updateStatusText: status,
@@ -401,6 +407,8 @@ it("Task23 actual updater wrapper null branch hydrates a packaged-provider manua
   mocks["./utils/updateProvider"] = { activeUpdateMetadata }
   mocks["./utils/updaterController"] = { createUpdaterController }
   mocks.semver = { gt: () => true }
+  mocks["./utils/downloadedUpdate"] = await import("./downloadedUpdate")
+  mocks["./utils/ownedInstallDispatch"] = await import("./ownedInstallDispatch")
   const compiled = ts.transpileModule(
     source("apps/desktop/packages/main/autoUpdater.ts"),
     {
@@ -434,4 +442,158 @@ it("Task23 actual updater wrapper null branch hydrates a packaged-provider manua
     "https://packaged.invalid/feed/GDLauncher__2.0.0__linux__x64.zip"
   )
   expect(broadcast.at(-1)).toBe(result.currentState)
+})
+it("Task36 actual fatal consumer keeps positive token beside an error and Retry invokes the displayed artifact", async () => {
+  const text = source("apps/desktop/packages/preload/loading.ts"),
+    button = { textContent: "Install", disabled: false, style: {} },
+    status = { textContent: "", style: {}, innerHTML: "" }
+  let installToken: number | undefined
+  const context: Record<string, any> = {
+    lastUpdateRevision: -1,
+    readyDownloadId: undefined,
+    updateState: "ready",
+    updateInfo: null,
+    updateStatusText: status,
+    updateProgressContainer: { style: {} },
+    updateProgressBar: { style: {} },
+    checkUpdatesBtn: button,
+    installReady: async () => {
+      installToken = context.readyDownloadId
+    }
+  }
+  context.setUpdateState = evaluate(
+    initializer(text, "setUpdateState"),
+    context
+  )
+  const receive = evaluate(initializer(text, "receiveUpdateState"), context)
+  receive({
+    state: "error",
+    revision: 5,
+    readyUpdate: { id: 3, version: "2.0.0" },
+    error: { message: "Installer rejected; retry" }
+  })
+  expect(status.textContent).toContain("Installer rejected")
+  expect(button.textContent).toBe("Retry")
+  expect(context.readyDownloadId).toBe(3)
+  await evaluate(
+    callArgument(text, "checkUpdatesBtn.addEventListener", "click"),
+    context
+  )()
+  expect(installToken).toBe(3)
+})
+it("Task36 actual main wrapper owns a queued install callback through error before a successor completion", async () => {
+  const handlers: Record<string, (...args: any[]) => any> = {},
+    events: Record<string, (...args: any[]) => any> = {},
+    broadcast: any[] = []
+  const native = new EventEmitter(),
+    baseline = () => {},
+    obsolete = () => {
+      throw Error("Retired install callback invoked")
+    }
+  native.on("update-downloaded", baseline)
+  const info = {
+    version: "2.0.0",
+    path: "fixture.zip",
+    sha512: "owned",
+    releaseDate: "2026-10-01",
+    files: [{ url: "fixture.zip", sha512: "owned" }]
+  }
+  const helper = {
+    file: "/synthetic/fixture.zip",
+    versionInfo: info,
+    fileInfo: { info: info.files[0] },
+    downloadedFileInfo: { sha512: "owned" }
+  }
+  const updater: any = {
+    nativeUpdater: native,
+    downloadedUpdateHelper: helper,
+    checkForUpdates: async () => {
+      events["update-available"](info)
+      events["update-downloaded"]()
+      return {}
+    },
+    on: (event: string, handler: any) => {
+      events[event] = handler
+    },
+    quitAndInstall: (silent: boolean, run: boolean) => {
+      expect([silent, run]).toEqual([true, true])
+      native.on("update-downloaded", obsolete)
+    }
+  }
+  const exports = {},
+    mocks: Record<string, unknown> = {
+      electron: {
+        ipcMain: {
+          handle: (name: string, handler: any) => {
+            handlers[name] = handler
+          }
+        },
+        BrowserWindow: {
+          getAllWindows: () => [
+            {
+              isDestroyed: () => false,
+              webContents: {
+                send: (_: string, value: any) => broadcast.push(value)
+              }
+            }
+          ]
+        }
+      },
+      "electron-updater": { autoUpdater: updater },
+      "electron-log/main": { transports: { file: {} } },
+      "node:fs/promises": {
+        readFile: async () => {
+          throw Object.assign(Error("missing marker"), { code: "ENOENT" })
+        }
+      },
+      "node:path": path,
+      "./utils/runtimeOperation": { assertRuntimeOperationAvailable() {} },
+      semver: { gt: () => true },
+      "./utils/updateProvider": await import("./updateProvider"),
+      "./utils/updaterController": await import("./updaterController"),
+      "./utils/downloadedUpdate": await import("./downloadedUpdate"),
+      "./utils/ownedInstallDispatch": await import("./ownedInstallDispatch")
+    }
+  const compiled = ts.transpileModule(
+    source("apps/desktop/packages/main/autoUpdater.ts"),
+    {
+      compilerOptions: {
+        module: ts.ModuleKind.CommonJS,
+        target: ts.ScriptTarget.ES2022,
+        esModuleInterop: true
+      }
+    }
+  ).outputText
+  vm.runInNewContext(compiled, {
+    exports,
+    require: (name: string) => {
+      if (!(name in mocks))
+        throw Error("Unexpected actual wrapper dependency: " + name)
+      return mocks[name]
+    },
+    __APP_VERSION__: "1.0.0",
+    process: {
+      platform: "linux",
+      arch: "x64",
+      resourcesPath: "/synthetic-packaged",
+      env: {}
+    }
+  })
+  let shutdowns = 0
+  ;(exports as any).default(undefined, async () => {
+    shutdowns++
+  })
+  await handlers.checkForUpdates(null, "stable")
+  const token = handlers.getUpdateState().readyUpdate.id
+  await handlers.installUpdate(null, token)
+  expect(shutdowns).toBe(1)
+  expect((await handlers.checkForUpdates(null, "beta")).status).toBe("busy")
+  events.error(Error("Native pending installation failed"))
+  for (let i = 0; i < 20; i++) await Promise.resolve()
+  expect(native.listeners("update-downloaded")).toEqual([baseline])
+  expect(broadcast.at(-1).state).toBe("error")
+  await handlers.checkForUpdates(null, "beta")
+  native.emit("update-downloaded")
+  expect(handlers.getUpdateState().readyUpdate.id).not.toBe(token)
+  expect(handlers.getUpdateState().readyUpdate.version).toBe("2.0.0")
 })

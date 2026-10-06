@@ -39,7 +39,13 @@ vi.mock("@gd/ui", () => ({
   Tooltip: (p: any) => <div>{p.children}</div>,
   TooltipTrigger: (p: any) => <div>{p.children}</div>,
   TooltipContent: (p: any) => <div>{p.children}</div>,
-  toast: { success: vi.fn(), error: (e: any) => control.errors.push(e) }
+  toast: {
+    success: vi.fn(),
+    error: (title: any, options?: { description?: string }) =>
+      control.errors.push(
+        options?.description ? `${title} | ${options.description}` : title
+      )
+  }
 }))
 let dispose: (() => void) | undefined
 const flush = async () => {
@@ -119,11 +125,20 @@ it("both Modrinth defaults remain installable without mainFileId", async () => {
   )
 })
 it.each([undefined, "456"])(
-  "CurseForge file selection %s preserves the server pack and performs no versions query",
+  "CurseForge file selection %s uses main or verified release-specific server companion",
   async (selected) => {
+    if (selected)
+      control.query.mockResolvedValue({
+        data: { id: 456, modId: 123, isAvailable: true, serverPackFileId: 790 }
+      })
     fixture(selected, "321", "curseforge").forEach((b) => b.click())
     await flush()
-    expect(control.query).not.toHaveBeenCalled()
+    if (selected) {
+      expect(control.query).toHaveBeenCalledWith([
+        "modplatforms.curseforge.getModFile",
+        { modId: 123, fileId: 456 }
+      ])
+    } else expect(control.query).not.toHaveBeenCalled()
     const expected = Number(selected ?? "321")
     expect(
       control.creates.find((c) => c.key === "instance.createInstance").input
@@ -132,7 +147,11 @@ it.each([undefined, "456"])(
     expect(
       control.creates.find((c) => c.key === "server.createServerFromModpack")
         .input.modpackSource.curseforge
-    ).toEqual({ project_id: 123, file_id: expected, server_pack_file_id: 789 })
+    ).toEqual({
+      project_id: 123,
+      file_id: expected,
+      server_pack_file_id: selected ? 790 : 789
+    })
   }
 )
 
@@ -160,5 +179,63 @@ it.each(["empty", "rejected"])(
       new Error("synthetic mutation failure")
     )
     expect(buttons.every((b) => !b.disabled)).toBe(true)
+  }
+)
+// Refusals are written for players in their language. The backend's own
+// lookup error is shown as-is, under the same translated title.
+it.each([
+  [
+    "no Modrinth versions",
+    () => control.query.mockResolvedValue([]),
+    "modrinth",
+    undefined,
+    [
+      "notifications:_trn_pack_version_failed | notifications:_trn_pack_no_versions",
+      "notifications:_trn_pack_version_failed | notifications:_trn_pack_no_versions"
+    ]
+  ],
+  [
+    "a CurseForge release without a server pack",
+    () =>
+      control.query.mockResolvedValue({
+        data: { id: 456, modId: 123, isAvailable: true, serverPackFileId: null }
+      }),
+    "curseforge",
+    "456",
+    [
+      "notifications:_trn_pack_version_failed | notifications:_trn_server_pack_unavailable"
+    ]
+  ],
+  [
+    "an unavailable CurseForge release",
+    () =>
+      control.query.mockResolvedValue({
+        data: { id: 456, modId: 123, isAvailable: false, serverPackFileId: 790 }
+      }),
+    "curseforge",
+    "456",
+    [
+      "notifications:_trn_pack_version_failed | notifications:_trn_curseforge_file_unavailable"
+    ]
+  ],
+  [
+    "a failed version lookup",
+    () => control.query.mockRejectedValue(new Error("Modrinth returned 429")),
+    "modrinth",
+    undefined,
+    [
+      "notifications:_trn_pack_version_failed | Modrinth returned 429",
+      "notifications:_trn_pack_version_failed | Modrinth returned 429"
+    ]
+  ]
+] as const)(
+  "%s shows a translated refusal",
+  async (_, arrange, platform, fileId, errors) => {
+    arrange()
+    fixture(fileId, platform === "curseforge" ? "321" : null, platform).forEach(
+      (b) => b.click()
+    )
+    await flush()
+    expect(control.errors).toEqual(errors)
   }
 )

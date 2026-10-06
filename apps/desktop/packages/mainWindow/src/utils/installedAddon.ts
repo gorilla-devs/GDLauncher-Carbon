@@ -4,6 +4,7 @@ import type {
   Mod,
   ServerAddon
 } from "@gd/core_module/bindings"
+import type { LinkedFile } from "./linkedFile"
 
 export interface InstalledArtifact {
   id: string
@@ -34,11 +35,18 @@ export function isInstalledArtifact(
     : artifact.version.id === requested.toString()
 }
 
-/** Match actual provider/kind ownership. Server project metadata cannot prove a version. */
+/** A server addon's file name without its `.disabled` suffix. */
+const serverFileName = (addon: ServerAddon) =>
+  addon.filename.replace(/\.disabled$/, "")
+
+/** Match actual provider/kind ownership. Server project metadata cannot prove
+ *  a version, except for a copy named like a link's file: GDLauncher installs
+ *  server addons under the platform's file name, so that copy is the file. */
 export function findInstalledAddon(
   addon: FEUnifiedSearchResult,
   target: InstalledAddonTarget,
-  requested?: string | number | null
+  requested?: string | number | null,
+  linkedFile?: Pick<LinkedFile, "id" | "fileName">
 ): InstalledArtifact | undefined {
   const kind = addonKinds[addon.type]
   if (!kind) return undefined
@@ -72,11 +80,21 @@ export function findInstalledAddon(
     )
   }
   const candidates = target.addons.filter((cached) => cached.addonType === kind)
-  const byProject = candidates.find((cached) =>
+  const ofProject = candidates.filter((cached) =>
     addon.platform === "curseforge"
       ? cached.curseforgeProjectId === parseInt(projectId, 10)
       : cached.modrinthProjectId === projectId
   )
+  const linkedName = linkedFile?.fileName
+  const sameFile = linkedName
+    ? ofProject.find((cached) => serverFileName(cached) === linkedName)
+    : undefined
+  if (sameFile && linkedFile)
+    return {
+      id: sameFile.id,
+      version: { kind: "known", id: linkedFile.id }
+    }
+  const byProject = ofProject[0]
   const slug = addon.slug?.toLowerCase()
   const found =
     byProject ??
@@ -95,12 +113,17 @@ export function findInstalledAddon(
   return found ? { id: found.id, version: { kind: "unknown" } } : undefined
 }
 
+/** `requested` is the file the row would install: its pin, or nothing for a
+ *  link row whose linked file does not fit the instance (utils/linkedFile.ts).
+ *  `linkedFile` lets a server copy of that very file count as installed. */
 export function isAddonInstalled(
   addon: FEUnifiedSearchResult,
-  target: InstalledAddonTarget
+  target: InstalledAddonTarget,
+  requested: string | null | undefined,
+  linkedFile?: Pick<LinkedFile, "id" | "fileName">
 ): boolean {
   return isInstalledArtifact(
-    findInstalledAddon(addon, target, addon.requestedVersionId),
-    addon.requestedVersionId
+    findInstalledAddon(addon, target, requested, linkedFile),
+    requested
   )
 }

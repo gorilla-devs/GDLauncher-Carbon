@@ -33,6 +33,10 @@ interface InstanceDropdownProps {
   instanceLoadingStates: Accessor<Map<number, boolean>>
   clearInstanceLoadingState: (instanceId: number) => void
   handleInstanceSelection: (instanceId: number) => void
+  /** The game versions a link's file lists when it does not fit the
+   *  instance (that instance then gets its own version); undefined where the
+   *  pin is kept. */
+  linkedFileMismatch?: (instanceId: number) => readonly string[] | undefined
   onDropdownOpenChange?: (isOpen: boolean) => void
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
@@ -104,6 +108,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         instance={instance}
         isLoading={isLoading()}
         isInstalled={isInstalled()}
+        linkedFileMismatch={props.linkedFileMismatch?.(instance.id)}
         hoveredInstanceId={props.hoveredInstanceId()}
         onSelect={props.handleInstanceSelection}
         onMouseEnter={props.setHoveredInstanceId}
