@@ -1,11 +1,11 @@
 ---
 title: "GDL Account vs Microsoft Account"
-description: "GDLauncher uses two different account types. Microsoft for playing Minecraft, GDL for sharing and social features. What each is, what they unlock, and which ones you need."
+description: "GDLauncher uses two different account types. Microsoft for playing Minecraft, GDL for creating shares and social features. In the current launcher, recipients have no GDL sign-in step; share redemption remains subject to service expiry and download limits."
 faq:
   - question: "Do I need a GDL account to play Minecraft?"
-    answer: "No. To play Minecraft you only need a Microsoft account (the one you bought Minecraft Java Edition with). A GDL account is optional and only unlocks GDLauncher's own features: Cloud Instance Sharing, friend codes, display name history, profile editing. You can use GDLauncher just fine without one."
+    answer: "No. To play Minecraft you only need a Microsoft account (the one you bought Minecraft Java Edition with). A GDL account is optional and only unlocks GDLauncher's own features: creating cloud instance shares, friend codes, display name history, profile editing. You can use GDLauncher just fine without one."
   - question: "What does a GDL account unlock?"
-    answer: "Today, mainly Cloud Instance Sharing: you generate a code from a right-click → Share, and another GDLauncher user pastes it to import the instance. You also get a stable display name with rename history and a profile card with a friend code that identifies you in share previews. Everything that involves talking to other GDLauncher users runs through the GDL account."
+    answer: "Today, mainly creating cloud instance shares: you generate a code from a right-click → Share with a verified email and available share quota. You also get a stable display name with rename history and a profile card with a friend code that identifies you in share previews. In the current launcher, recipients can preview and import a valid share code without signing in to a GDL account. Redemption remains subject to the GDL service's expiry and download limits."
   - question: "Can I use GDLauncher without a Microsoft account?"
     answer: "No. The Microsoft account is what proves you own Minecraft and gets the launch token from Mojang. Without it, the launcher has nothing to authenticate to Minecraft's servers with."
   - question: "Can I have multiple Microsoft accounts in GDLauncher?"
@@ -18,7 +18,7 @@ faq:
 
 ## Two account systems, one launcher
 
-GDLauncher has two account systems. **Microsoft** is the one that proves you own Minecraft and is required to play. **GDL** is GDLauncher's own optional account, used for features that involve the GDL backend (Cloud Instance Sharing, profile, display name history).
+GDLauncher has two account systems. **Microsoft** is the one that proves you own Minecraft and is required to play. **GDL** is GDLauncher's own optional account, used for creating cloud instance shares, profile editing, and display name history.
 
 ### Microsoft account
 
@@ -34,13 +34,13 @@ What it unlocks: launching Minecraft, joining servers, owning the game.
 
 GDLauncher's own account system. It's optional and exists to power features GDLauncher itself provides, things Microsoft doesn't and shouldn't care about.
 
-You sign up with an email and a display name, and you get a stable friend code. From there you can use the features that involve other GDLauncher users.
+You sign up with an email and a display name, and you get a stable friend code. From there you can create shares and edit your profile.
 
 Stored locally is just the link: which Microsoft account this GDL identity belongs to, and a JWT for talking to the GDL backend. The display name, friend code, email, profile picture, and so on live on the GDL backend and the UI pulls them on demand.
 
 What it unlocks:
 
-- **Cloud Instance Sharing.** Right-click an instance → Share generates a code other GDLauncher users can paste to import the instance.
+- **Cloud Instance Sharing.** Right-click an instance → Share generates a code other GDLauncher users can paste to import the instance. Creating a share requires a verified email and available share quota.
 - **Display name history.** Renaming your display name tracks the change history; you can view past names from your profile card and clear them if you want.
 - **Profile editing.** Display name, profile picture, email recovery settings, all from the GDL profile card in Settings → Accounts.
 
@@ -50,10 +50,12 @@ What it unlocks:
 |---|---|---|
 | Just launch Minecraft | Required | Not needed |
 | Install mods and modpacks from CurseForge/Modrinth | Required | Not needed |
-| Share an instance with a friend | Required | Required |
-| Receive an instance share code | Required | Required |
+| Share an instance with a friend | Required | Required (verified email; share quota applies) |
+| Receive an instance share code | Required | No GDL sign-in step in the current launcher |
 | Use the friend system | Required | Required |
 | Play offline (already-installed instance) | Cached auth works briefly | Not needed |
+
+In the current launcher, recipients can preview and import a valid share code without signing in to a GDL account. Redemption remains subject to the GDL service's expiry and download limits.
 
 ## How to manage them
 

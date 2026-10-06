@@ -4,17 +4,17 @@ import GuideLayout from "../../components/GuideLayout.astro"
 
 <GuideLayout
   title="How to Share a Minecraft Instance with a Friend"
-  description="Generate a GDLauncher share code so a friend can install the same mods, configs, and resource packs you have. Creating a share needs a GDL account with a verified email; redeeming one does not."
+  description="Generate a GDLauncher share code so a friend can install the same mods, configs, and resource packs you have. Creating a share needs a GDL account with a verified email and available share quota. In the current launcher, recipients have no GDL sign-in step; redemption remains subject to service expiry and download limits."
   keywords="share minecraft instance, gdlauncher share code, send modpack to friend, copy mods to friend, gdl share"
   lastUpdated="May 2026"
   howTo={{
     totalTimeIso: "PT3M",
     steps: [
-      { name: "Sign in to a GDL account", text: "Sharing requires a GDL account with a verified email. If you don't have one, go to Settings → Accounts and click Sign in / Sign up in the GDL Account section, then verify your email." },
+      { name: "Sign in to a GDL account", text: "Sharing requires a GDL account with a verified email and available share quota. If you don't have one, go to Settings → Accounts and click Sign in / Sign up in the GDL Account section, then verify your email." },
       { name: "Right-click the instance", text: "In the Library, right-click the instance you want to share and pick Share Instance (share-line icon). The Share Instance modal opens." },
       { name: "Configure the share", text: "Optionally give it a title (shown in the recipient's preview). Expand Advanced to set expiration (1 day or 7 days) and a max-downloads cap." },
       { name: "Upload it", text: "Click Share Instance. GDLauncher uploads a snapshot to the GDL service while showing progress, then displays a code (toggle to view as a gdl.gg/i/<code> link) you can copy." },
-      { name: "Send the code", text: "Paste the code or link to your friend on Discord, in a DM, anywhere. They open the Code Share tab in the instance creation modal on their side and paste it." }
+      { name: "Send the code", text: "Paste the code or link to your friend on Discord, in a DM, anywhere. They open the Code Share tab in the instance creation modal on their side and paste it. In the current launcher, recipients can preview and import a valid code without signing in to a GDL account; redemption remains subject to service expiry and download limits." }
     ]
   }}
 >
@@ -28,8 +28,8 @@ import GuideLayout from "../../components/GuideLayout.astro"
   <p>The Share Instance dialog has an <strong>Include saves</strong> toggle under <strong>Advanced</strong>. Flip it on and the <code>saves</code> directory ships with the share, so the recipient lands in the same world(s) you have. It's off by default for two reasons: most shares are "give me your modpack, I'll start fresh", and saves can be very large, which makes the upload heavy and counts against your share quota faster.</p>
 
   <h2>Who needs a GDL account</h2>
-  <p>Only the person creating the share. A GDL account with a verified email is required to upload, because share codes are tracked server-side, attribution, quota, expiry, and the optional max-downloads cap all live against the creator's account.</p>
-  <p>The recipient does <strong>not</strong> need a GDL account. They paste the code into the Code Share tab and GDLauncher pulls the instance, no sign-in required. This matters when you're sharing with someone who hasn't set up a GDL account yet (or doesn't want one), they can still install your instance immediately.</p>
+  <p>Creating a share requires a GDL account with a verified email and available share quota. Share codes are tracked server-side: attribution, quota, expiry, and the optional max-downloads cap all live against the creator's account.</p>
+  <p>In the current launcher, recipients can preview and import a valid share code without signing in to a GDL account. They paste the code into the Code Share tab and confirm the import. Redemption remains subject to the GDL service's expiry and download limits.</p>
   <p>If you'd rather skip the GDL service entirely, see <a href="/guides/export-an-instance">Export an Instance</a> instead. Export produces a local .zip file you can deliver out of band, no accounts on either side.</p>
 
   <h2>Expiry and download limits</h2>
@@ -37,7 +37,7 @@ import GuideLayout from "../../components/GuideLayout.astro"
   <p>Max downloads caps how many times the code can be redeemed. If you set it to 1, the code dies after the first import. Useful for one-on-one sharing where you don't want the link forwarded.</p>
 
   <h2>Importing a code (the other side)</h2>
-  <p>On the recipient's GDLauncher (no GDL account required):</p>
+  <p>On the recipient's current GDLauncher, there is no GDL sign-in step for preview or import. Use a valid code within the GDL service's expiry and download limits:</p>
   <ol>
     <li>Open the Library page → click the <strong>+</strong> in the Library toolbar (or right-click empty space → Import Instance).</li>
     <li>Switch to the <strong>Code Share</strong> tab.</li>
