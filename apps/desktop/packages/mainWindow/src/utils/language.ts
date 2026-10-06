@@ -1,4 +1,9 @@
-import { loadLanguageFiles, useTransContext } from "@gd/i18n"
+import {
+  loadLanguageFiles,
+  useTransContext,
+  normalizeLanguageId,
+  getLanguageLocaleCode
+} from "@gd/i18n"
 import { rspc } from "./rspcClient"
 
 let latestSelection = 0
@@ -19,7 +24,9 @@ let publication: Promise<void> = Promise.resolve()
  *  });
  *  ```
  */
-export default async function changeLanguage(lang: string) {
+export default async function changeLanguage(language: string) {
+  const lang = normalizeLanguageId(language)
+  const localeCode = getLanguageLocaleCode(lang)
   const selection = ++latestSelection
   const [_, { changeLanguage, addResources }] = useTransContext()
 
@@ -32,12 +39,12 @@ export default async function changeLanguage(lang: string) {
   const publish = publication.then(async () => {
     if (selection !== latestSelection) return
     for (const ns in resources) {
-      addResources(lang, ns, resources[ns])
+      addResources(localeCode, ns, resources[ns])
     }
     // Once dispatched, an older write must commit before the next write can
     // start. Resource ordering alone cannot prevent reversed DB commits.
     await settingsMutation.mutateAsync({ language: { Set: lang } })
-    if (selection === latestSelection) changeLanguage(lang)
+    if (selection === latestSelection) changeLanguage(localeCode)
   })
   publication = publish.catch(() => {})
   await publish

@@ -25,9 +25,9 @@
   "_trn_task_status_idle": "Toutes les tâches sont terminées",
   "_trn_task_status_running": "En cours d'exécution",
   "_trn_task_status_failed": "Échec",
-  "_trn_task_status_active_tasks_one": "1 tâche active",
+  "_trn_task_status_active_tasks_one": "{{count}} tâche active",
   "_trn_task_status_active_tasks_other": "{{count}} tâches actives",
-  "_trn_task_status_active_count_one": "1 tâche",
+  "_trn_task_status_active_count_one": "{{count}} tâche",
   "_trn_task_status_active_count_other": "{{count}} tâches",
   "_trn_task_status_operations_info": "Les tâches en arrière-plan apparaîtront ici lorsqu'elles seront en cours d'exécution",
   "_trn_instance_task_generating_pack_info": "Génération des informations du pack",
@@ -43,5 +43,9 @@
   "_trn_server_task_extract_modpack_overrides": "Extraction des overrides",
   "_trn_server_task_download_server_jar": "Téléchargement du jar du serveur",
   "_trn_server_task_install_modloader": "Installation du modloader",
-  "_trn_cache_cleanup": "Nettoyage du cache"
+  "_trn_server_task_install_mod": "Installation d’addons sur {{server_name}}",
+  "_trn_cache_cleanup": "Nettoyage du cache",
+  "_trn_task_status_active_tasks_many": "{{count}} tâches actives",
+  "_trn_task_status_active_count_many": "{{count}} tâches",
+  "_trn_instance_task_install_world_copy": "Installation d’une copie de monde séparée {{world_name}} pour {{instance_name}} ; sauvegarde d’origine conservée"
 }

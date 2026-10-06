@@ -17,7 +17,13 @@ import { createAsyncEffect } from "@/utils/asyncEffect"
 import { HashRouter } from "@solidjs/router"
 import initRspc, { rspc, queryClient } from "@/utils/rspcClient"
 import { QueryClientProvider } from "@tanstack/solid-query"
-import { i18n, TransProvider, loadLanguageFiles } from "@gd/i18n"
+import {
+  i18n,
+  TransProvider,
+  loadLanguageFiles,
+  createI18nOptions,
+  normalizeLanguageId
+} from "@gd/i18n"
 import App from "@/app"
 import { routes } from "@/route"
 import { ModalProvider } from "@/managers/ModalsManager"
@@ -232,14 +238,12 @@ const TransWrapper = (props: TransWrapperProps) => {
 
   createAsyncEffect((isStale, prevLanguage) => {
     if (settings.isSuccess) {
-      const { language } = settings.data
+      const language = normalizeLanguageId(settings.data.language)
 
       loadLanguageFiles("english").then((englishResources) => {
         if (isStale()) {
           return
         }
-
-        const resources: any = { english: englishResources }
 
         if (language !== "english") {
           loadLanguageFiles(language).then((targetResources) => {
@@ -247,31 +251,17 @@ const TransWrapper = (props: TransWrapperProps) => {
               return
             }
 
-            resources[language] = targetResources
-
-            const options = {
-              ns: Object.keys(englishResources),
-              defaultNS: "general",
-              lng: language,
-              fallbackLng: "english",
-              resources,
-              partialBundledLanguages: true,
-              react: { useSuspense: false }
-            }
+            const options = createI18nOptions(
+              language,
+              englishResources,
+              targetResources
+            )
 
             setI18nOptions(options)
             setIsI18nReady(true)
           })
         } else {
-          const options = {
-            ns: Object.keys(englishResources),
-            defaultNS: "general",
-            lng: language,
-            fallbackLng: "english",
-            resources,
-            partialBundledLanguages: true,
-            react: { useSuspense: false }
-          }
+          const options = createI18nOptions(language, englishResources)
 
           setI18nOptions(options)
           setIsI18nReady(true)

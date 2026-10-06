@@ -19,5 +19,11 @@
   "_trn_eula_accept_failed": "接受 EULA 失败",
   "_trn_custom_java_added": "自定义 Java 路径添加成功",
   "_trn_addon_downloading_to_server": "{{title}} 正在下载到服务器",
-  "_trn_addon_fallback_name": "附加组件"
+  "_trn_addon_installed": "{{title}} 安装成功",
+  "_trn_datapack_downloaded": "{{title}} 已下载。请在实例的“附加组件”标签页中将其添加到存档。",
+  "_trn_addon_outcome_unavailable": "无法确认此附加组件的更改是否已完成。请先检查该实例的附加组件，再重试。",
+  "_trn_addon_attempt_dismissed": "此失败的尝试已被忽略。",
+  "_trn_addon_deleted_one_copy": "已删除 {{deleted}}。文件夹中还有另一个副本 {{kept}}，因此该附加组件仍显示在列表中。再次删除即可移除该副本。",
+  "_trn_addon_fallback_name": "附加组件",
+  "_trn_shader_setup_closed_work_may_finish": "设置已关闭。安装仍可能完成。请在重新开始前检查实例。"
 }

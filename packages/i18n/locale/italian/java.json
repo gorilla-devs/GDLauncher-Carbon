@@ -41,7 +41,7 @@
   "_trn_instance_settings.java_arguments_title": "Argomenti Java Istanza",
   "_trn_instance_settings.prepend_global_java_args": "Anteponi argomenti Java globali prima degli argomenti Java extra istanza ({GLOBAL_JAVA_ARGS} sotto)",
   "_trn_instance_settings.java_path_profile": "Percorso Java Istanza / Profilo",
-  "_trn_instance_settings.java_override_mismatch": "-------- [ UNTRANSLATED ] -------- The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management.",
+  "_trn_instance_settings.java_override_mismatch": "Il Java selezionato non corrisponde alla versione richiesta da questa istanza. Minecraft potrebbe non avviarsi: scegli un Java compatibile o attiva la gestione automatica di Java.",
   "_trn_system_profiles": "Profili di Sistema",
   "_trn_custom_profiles": "Profili Personalizzati",
   "_trn_profile_used_in_mc_versions": "Questo profilo è usato nelle seguenti versioni di Minecraft",
@@ -75,5 +75,9 @@
   "_trn_adjust_memory": "Regola Memoria",
   "_trn_insufficient_memory_dont_show_again": "Non mostrare più questo avviso",
   "_trn_show_memory_warning_title": "Mostra Avviso Memoria Insufficiente",
-  "_trn_show_memory_warning_text": "Mostra un avviso prima dell'avvio quando la RAM configurata supera la memoria disponibile."
+  "_trn_show_memory_warning_text": "Mostra un avviso prima dell'avvio quando la RAM configurata supera la memoria disponibile.",
+  "_trn_runtime_recovery.keep_folders": "Conserva entrambe le cartelle del runtime per il recupero. Il riavvio usa la posizione del runtime salvata.",
+  "_trn_runtime_recovery.unresolved": "Il launcher non è riuscito a completare l’arresto del core. Riprova questo spostamento per completare l’arresto in sicurezza.",
+  "_trn_runtime_recovery.retry": "Riprova lo spostamento",
+  "_trn_runtime_recovery.restart": "Riavvia"
 }

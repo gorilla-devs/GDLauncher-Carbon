@@ -1,27 +1,11 @@
+import { CF_SORT_FIELDS, MR_SORT_OPTIONS } from "../translationKeys"
 import { Collapsable, Radio } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { Show, Switch, Match, For, createUniqueId } from "solid-js"
 import useSearchContext from "@/components/SearchInputContext"
 import { capitalize } from "@/utils/helpers"
 
-const CF_SORT_FIELDS = [
-  { value: "featured", key: "search:_trn_featured" },
-  { value: "popularity", key: "search:_trn_popularity" },
-  { value: "totalDownloads", key: "search:_trn_downloads" },
-  { value: "lastUpdated", key: "search:_trn_last_updated" },
-  { value: "name", key: "search:_trn_name" },
-  { value: "author", key: "search:_trn_author" }
-] as const
-
 const CF_ORDER_OPTIONS = ["ascending", "descending"] as const
-
-const MR_SORT_OPTIONS = [
-  { value: "relevance", key: "search:_trn_relevance" },
-  { value: "downloads", key: "search:_trn_downloads" },
-  { value: "follows", key: "search:_trn_follows" },
-  { value: "newest", key: "search:_trn_newest" },
-  { value: "updated", key: "search:_trn_updated" }
-] as const
 
 function CurseforgeSortFilter() {
   const searchResults = useSearchContext()

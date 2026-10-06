@@ -19,5 +19,11 @@
   "_trn_eula_accept_failed": "Не удалось принять EULA",
   "_trn_custom_java_added": "Пользовательский путь Java успешно добавлен",
   "_trn_addon_downloading_to_server": "Идет загрузка {{title}} на сервер",
-  "_trn_addon_fallback_name": "Дополнение"
+  "_trn_addon_installed": "{{title}} успешно установлен",
+  "_trn_datapack_downloaded": "{{title}} скачан. Добавьте его в мир на вкладке «Дополнения» экземпляра.",
+  "_trn_addon_outcome_unavailable": "Не удалось подтвердить, завершилось ли изменение дополнения. Проверьте дополнения экземпляра, прежде чем пробовать снова.",
+  "_trn_addon_attempt_dismissed": "Эта неудачная попытка была скрыта.",
+  "_trn_addon_deleted_one_copy": "{{deleted}} удалён. В папке осталась ещё одна копия, {{kept}}, поэтому дополнение остаётся в списке. Удалите его ещё раз, чтобы удалить и эту копию.",
+  "_trn_addon_fallback_name": "Дополнение",
+  "_trn_shader_setup_closed_work_may_finish": "Настройка закрыта. Установка ещё может завершиться. Проверьте экземпляр, прежде чем начинать снова."
 }

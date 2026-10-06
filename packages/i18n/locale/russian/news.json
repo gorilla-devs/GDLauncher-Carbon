@@ -56,5 +56,7 @@
   "_trn_published_date": "Опубликовано {{date}}",
   "_trn_update_notification": "Доступно обновление",
   "_trn_update_available_title": "Доступно обновление",
-  "_trn_update_available_description": "Доступна новая версия GDLauncher"
+  "_trn_update_available_description": "Доступна новая версия GDLauncher",
+  "_trn_no_content": "Содержимое обновления недоступно.",
+  "_trn_patch_content_error": "Не удалось загрузить содержимое обновления."
 }

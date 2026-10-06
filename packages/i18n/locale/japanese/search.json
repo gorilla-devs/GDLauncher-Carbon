@@ -8,7 +8,7 @@
   "_trn_browser_table_headers.details": "詳細",
   "_trn_search_discover_anything": "クリックで発見、または検索...",
   "_trn_no_results_found": "結果が見つかりません",
-  "_trn_no_results_description": "検索条件に一致する{type}が見つかりません。フィルターや検索キーワードを調整してみてください。",
+  "_trn_no_results_description": "検索条件に一致する{{type}}が見つかりません。フィルターや検索キーワードを変更してください。",
   "_trn_go_back": "戻る",
   "_trn_filters": "フィルター",
   "_trn_more_filters": "その他のフィルター",
@@ -61,5 +61,14 @@
   "_trn_search": "検索",
   "_trn_group_by": "グループ化",
   "_trn_direct": "直接",
-  "_trn_share": "共有"
+  "_trn_share": "共有",
+  "_trn_sort_badge": "並び順: {{sort}}",
+  "_trn_empty_type_mod": "MOD",
+  "_trn_empty_type_modpack": "MODパック",
+  "_trn_empty_type_resource_pack": "リソースパック",
+  "_trn_empty_type_shader": "シェーダー",
+  "_trn_empty_type_world": "ワールド",
+  "_trn_empty_type_plugin": "プラグイン",
+  "_trn_empty_type_data_pack": "データパック",
+  "_trn_empty_type_addon": "アドオン"
 }

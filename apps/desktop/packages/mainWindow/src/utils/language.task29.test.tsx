@@ -5,13 +5,14 @@ import changeLanguage from "./language"
 
 const control = vi.hoisted(() => ({
   loaders: new Map<string, any>(),
-  displayed: "italian",
+  displayed: "it",
   persisted: "italian",
   writes: [] as string[],
   saves: new Map<string, any>(),
   add: vi.fn()
 }))
-vi.mock("@gd/i18n", () => ({
+vi.mock("@gd/i18n", async (importOriginal) => ({
+  ...(await importOriginal<any>()),
   loadLanguageFiles: (language: string) =>
     control.loaders.get(language).promise,
   useTransContext: () => [
@@ -50,7 +51,8 @@ afterEach(async () => {
   control.loaders.clear()
   control.saves.clear()
   control.writes = []
-  control.displayed = control.persisted = "italian"
+  control.displayed = "it"
+  control.persisted = "italian"
   vi.clearAllMocks()
 })
 const request = (language: string) =>
@@ -68,7 +70,7 @@ it("0193 latest selection wins reversed resource completion and partial fallback
   await latest
   control.loaders.get("russian").resolve({ common: { hello: "synthetic" } })
   await old
-  expect(control.displayed).toBe("english")
+  expect(control.displayed).toBe("en")
   expect(control.persisted).toBe("english")
   expect(control.writes).toEqual(["english"])
 })
@@ -93,7 +95,7 @@ it("0193 shared queue prevents attempted reversed persistence commit order", asy
   await Promise.all([old, latest])
   expect(control.writes).toEqual(["russian", "english"])
   expect(control.persisted).toBe("english")
-  expect(control.displayed).toBe("english")
+  expect(control.displayed).toBe("en")
 })
 it("0193 failed save cannot poison the latest publication", async () => {
   control.loaders.set("russian", deferred())
@@ -110,7 +112,7 @@ it("0193 failed save cannot poison the latest publication", async () => {
   await handled
   await latest
   expect(control.persisted).toBe("english")
-  expect(control.displayed).toBe("english")
+  expect(control.displayed).toBe("en")
 })
 it("0193 in-order selections retain current publication", async () => {
   for (const language of ["russian", "english"]) {
@@ -121,5 +123,5 @@ it("0193 in-order selections retain current publication", async () => {
     await result
   }
   expect(control.persisted).toBe("english")
-  expect(control.displayed).toBe("english")
+  expect(control.displayed).toBe("en")
 })

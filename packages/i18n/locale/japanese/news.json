@@ -56,5 +56,7 @@
 "_trn_published_date": "公開日: {{date}}",
 "_trn_update_notification": "アップデートあり",
 "_trn_update_available_title": "新しいバージョンが利用可能",
-"_trn_update_available_description": "GDLauncherの新しいバージョンが利用可能です"
+"_trn_update_available_description": "GDLauncherの新しいバージョンが利用可能です",
+  "_trn_no_content": "更新内容はありません。",
+  "_trn_patch_content_error": "更新内容を読み込めませんでした。"
 }

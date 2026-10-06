@@ -19,5 +19,11 @@
   "_trn_eula_accept_failed": "Échec de l'acceptation de l'EULA",
   "_trn_custom_java_added": "Chemin Java personnalisé ajouté avec succès",
   "_trn_addon_downloading_to_server": "Téléchargement de {{title}} vers le serveur",
-  "_trn_addon_fallback_name": "Addon"
+  "_trn_addon_installed": "{{title}} a été installé",
+  "_trn_datapack_downloaded": "{{title}} a été téléchargé. Ajoutez-le à un monde depuis l’onglet Addons de l’instance.",
+  "_trn_addon_outcome_unavailable": "Impossible de confirmer si cette modification d’addon s’est terminée. Vérifiez les addons de l’instance avant de réessayer.",
+  "_trn_addon_attempt_dismissed": "Cette tentative échouée a été ignorée.",
+  "_trn_addon_deleted_one_copy": "{{deleted}} a été supprimé. Une autre copie, {{kept}}, se trouve encore dans le dossier, l'addon reste donc dans la liste. Supprimez-le à nouveau pour retirer aussi cette copie.",
+  "_trn_addon_fallback_name": "Addon",
+  "_trn_shader_setup_closed_work_may_finish": "Configuration fermée. L’installation peut encore se terminer. Vérifiez l’instance avant de recommencer."
 }

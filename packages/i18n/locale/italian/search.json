@@ -8,7 +8,7 @@
   "_trn_browser_table_headers.details": "Dettagli",
   "_trn_search_discover_anything": "Fai clic per scoprire o cercare qualsiasi cosa...",
   "_trn_no_results_found": "Nessun risultato trovato",
-  "_trn_no_results_description": "Non abbiamo potuto trovare alcun {type} corrispondente ai tuoi criteri di ricerca. Prova a regolare i tuoi filtri o i termini di ricerca.",
+  "_trn_no_results_description": "Nessun risultato per {{type}} con questi criteri di ricerca. Prova a modificare i filtri o i termini di ricerca.",
   "_trn_go_back": "Torna Indietro",
   "_trn_filters": "Filtri",
   "_trn_more_filters": "Altri Filtri",
@@ -61,5 +61,14 @@
   "_trn_search": "Cerca",
   "_trn_group_by": "Raggruppa per",
   "_trn_direct": "Diretto",
-  "_trn_share": "Condividi"
+  "_trn_share": "Condividi",
+  "_trn_sort_badge": "Ordina per: {{sort}}",
+  "_trn_empty_type_mod": "mod",
+  "_trn_empty_type_modpack": "modpack",
+  "_trn_empty_type_resource_pack": "pacchetti di risorse",
+  "_trn_empty_type_shader": "shader",
+  "_trn_empty_type_world": "mondi",
+  "_trn_empty_type_plugin": "plugin",
+  "_trn_empty_type_data_pack": "pacchetti di dati",
+  "_trn_empty_type_addon": "contenuti aggiuntivi"
 }

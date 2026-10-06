@@ -1,4 +1,4 @@
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import { Button, Checkbox } from "@gd/ui"
 import { createSignal, Match, Show, Switch } from "solid-js"
 import ModalLayout from "../ModalLayout"
@@ -7,6 +7,7 @@ import { rspc } from "@/utils/rspcClient"
 
 function ConfirmWorldDeletion(props: ModalProps) {
   const modalsContext = useModal()
+  const [t] = useTransContext()
   const [dontAskAgain, setDontAskAgain] = createSignal(false)
 
   const dismissWarningMutation = rspc.createMutation(() => ({
@@ -43,12 +44,10 @@ function ConfirmWorldDeletion(props: ModalProps) {
           <div class="text-lightSlate-300 flex flex-col gap-2">
             <Show
               when={isPlural()}
-              fallback={
-                <Trans
-                  key="instances:_trn_confirm_world_deletion_body"
-                  options={{ name: worldName() }}
-                />
-              }
+              fallback={t("instances:_trn_confirm_world_deletion_body", {
+                name: worldName(),
+                interpolation: { escapeValue: false }
+              })}
             >
               <Trans
                 key="instances:_trn_confirm_world_deletion_body_plural"

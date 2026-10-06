@@ -41,7 +41,7 @@
   "_trn_instance_settings.java_arguments_title": "インスタンスのJava引数",
   "_trn_instance_settings.prepend_global_java_args": "グローバルJava引数をインスタンスの追加Java引数の前に付加 (以下の {GLOBAL_JAVA_ARGS})",
   "_trn_instance_settings.java_path_profile": "インスタンスのJavaパス / プロファイル",
-  "_trn_instance_settings.java_override_mismatch": "-------- [ UNTRANSLATED ] -------- The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management.",
+  "_trn_instance_settings.java_override_mismatch": "選択したJavaは、このインスタンスに必要なバージョンと一致しません。Minecraftが起動しない可能性があります。対応するJavaを選ぶか、Javaの自動管理を有効にしてください。",
   "_trn_system_profiles": "システムプロファイル",
   "_trn_custom_profiles": "カスタムプロファイル",
   "_trn_profile_used_in_mc_versions": "このプロファイルは以下のMinecraftバージョンで使用されています",
@@ -75,5 +75,9 @@
   "_trn_adjust_memory": "メモリを調整",
   "_trn_insufficient_memory_dont_show_again": "今後この警告を表示しない",
   "_trn_show_memory_warning_title": "メモリ不足警告を表示",
-  "_trn_show_memory_warning_text": "設定されたRAMが利用可能なメモリを超えるとき、起動前に警告を表示します。"
+  "_trn_show_memory_warning_text": "設定されたRAMが利用可能なメモリを超えるとき、起動前に警告を表示します。",
+  "_trn_runtime_recovery.keep_folders": "復旧のため、両方のランタイムフォルダーを残してください。再起動には保存されたランタイムの場所が使われます。",
+  "_trn_runtime_recovery.unresolved": "ランチャーはコアの停止を完了できませんでした。この移動を再試行して、安全に停止を完了してください。",
+  "_trn_runtime_recovery.retry": "移動を再試行",
+  "_trn_runtime_recovery.restart": "再起動"
 }

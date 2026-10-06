@@ -43,5 +43,7 @@
   "_trn_server_task_extract_modpack_overrides": "オーバーライドを展開中",
   "_trn_server_task_download_server_jar": "サーバーJARをダウンロード中",
   "_trn_server_task_install_modloader": "Modローダーをインストール中",
-  "_trn_cache_cleanup": "キャッシュをクリーンアップ中"
+  "_trn_server_task_install_mod": "{{server_name}} にアドオンをインストール中",
+  "_trn_cache_cleanup": "キャッシュをクリーンアップ中",
+  "_trn_instance_task_install_world_copy": "{{instance_name}}用にワールド{{world_name}}の別コピーをインストールしています。元のセーブデータは残ります"
 }

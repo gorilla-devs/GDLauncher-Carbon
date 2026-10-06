@@ -19,5 +19,11 @@
   "_trn_eula_accept_failed": "No se pudo aceptar el EULA",
   "_trn_custom_java_added": "Ruta de Java personalizada añadida exitosamente",
   "_trn_addon_downloading_to_server": "{{title}} descargándose al servidor",
-  "_trn_addon_fallback_name": "Complemento"
+  "_trn_addon_installed": "{{title}} se instaló correctamente",
+  "_trn_datapack_downloaded": "{{title}} se descargó. Añádelo a un mundo desde la pestaña Complementos de la instancia.",
+  "_trn_addon_outcome_unavailable": "No se pudo confirmar si este cambio de complemento terminó. Revisa los complementos de la instancia antes de volver a intentarlo.",
+  "_trn_addon_attempt_dismissed": "Este intento fallido se descartó.",
+  "_trn_addon_deleted_one_copy": "Se eliminó {{deleted}}. Otra copia, {{kept}}, sigue en la carpeta, así que el complemento sigue en la lista. Elimínalo de nuevo para quitar también esa copia.",
+  "_trn_addon_fallback_name": "Complemento",
+  "_trn_shader_setup_closed_work_may_finish": "Configuración cerrada. La instalación aún podría completarse. Revisa la instancia antes de empezar de nuevo."
 }

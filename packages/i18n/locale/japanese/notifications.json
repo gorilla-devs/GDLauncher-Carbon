@@ -19,5 +19,11 @@
   "_trn_eula_accept_failed": "EULAの同意に失敗しました",
   "_trn_custom_java_added": "カスタムJavaパスを追加しました",
   "_trn_addon_downloading_to_server": "{{title}} をサーバーにダウンロード中",
-  "_trn_addon_fallback_name": "アドオン"
+  "_trn_addon_installed": "{{title}} をインストールしました",
+  "_trn_datapack_downloaded": "{{title}} をダウンロードしました。インスタンスのアドオンタブからワールドに追加してください。",
+  "_trn_addon_outcome_unavailable": "このアドオンの変更が完了したか確認できませんでした。再試行する前にインスタンスのアドオンを確認してください。",
+  "_trn_addon_attempt_dismissed": "この失敗した試行は閉じられました。",
+  "_trn_addon_deleted_one_copy": "{{deleted}} を削除しました。別のコピー {{kept}} がフォルダーに残っているため、アドオンは一覧に残ります。そのコピーも削除するには、もう一度削除してください。",
+  "_trn_addon_fallback_name": "アドオン",
+  "_trn_shader_setup_closed_work_may_finish": "設定を閉じました。インストールはまだ完了する可能性があります。インスタンスを確認してからやり直してください。"
 }

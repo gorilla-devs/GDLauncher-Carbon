@@ -19,11 +19,36 @@ export const supportedLanguages = {
   french: "france"
 }
 
+/** Persisted IDs and resource folders stay stable; Intl/i18next use BCP47. */
+export const languageLocaleCodes = {
+  english: "en",
+  italian: "it",
+  japanese: "ja",
+  russian: "ru",
+  spanish: "es",
+  simplified_chinese: "zh-CN",
+  french: "fr"
+} as const satisfies Record<keyof typeof supportedLanguages, string>
+
+export type SupportedLanguageId = keyof typeof supportedLanguages
+
+export function normalizeLanguageId(language: unknown): SupportedLanguageId {
+  return typeof language === "string" &&
+    Object.prototype.hasOwnProperty.call(languageLocaleCodes, language)
+    ? (language as SupportedLanguageId)
+    : "english"
+}
+
+export function getLanguageLocaleCode(language: unknown) {
+  return languageLocaleCodes[normalizeLanguageId(language)]
+}
+
 type NamespacesMap = {
   [key: string]: Object
 }
 
-const loadLanguageFiles = async (lang: string) => {
+const loadLanguageFiles = async (language: string) => {
+  const lang = normalizeLanguageId(language)
   const namespacesMap: NamespacesMap = {}
 
   // Load languages data (same for all languages, not language-specific)
@@ -68,6 +93,28 @@ const loadLanguageFiles = async (lang: string) => {
   }
 
   return namespacesMap
+}
+
+/** Shared initialization options for both persisted-language startup paths. */
+export function createI18nOptions(
+  language: string,
+  englishResources: NamespacesMap,
+  targetResources?: NamespacesMap
+) {
+  return {
+    ns: Object.keys(englishResources),
+    defaultNS: "general",
+    lng: getLanguageLocaleCode(language),
+    fallbackLng: languageLocaleCodes.english,
+    resources: {
+      [languageLocaleCodes.english]: englishResources,
+      ...(targetResources && normalizeLanguageId(language) !== "english"
+        ? { [getLanguageLocaleCode(language)]: targetResources }
+        : {})
+    },
+    partialBundledLanguages: true,
+    react: { useSuspense: false }
+  }
 }
 
 // ============================================================================

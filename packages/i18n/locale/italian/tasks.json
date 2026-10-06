@@ -25,9 +25,9 @@
   "_trn_task_status_idle": "Tutte le attività completate",
   "_trn_task_status_running": "In Esecuzione",
   "_trn_task_status_failed": "Non Riuscito",
-  "_trn_task_status_active_tasks_one": "1 attività attiva",
+  "_trn_task_status_active_tasks_one": "{{count}} attività attiva",
   "_trn_task_status_active_tasks_other": "{{count}} attività attive",
-  "_trn_task_status_active_count_one": "1 attività",
+  "_trn_task_status_active_count_one": "{{count}} attività",
   "_trn_task_status_active_count_other": "{{count}} attività",
   "_trn_task_status_operations_info": "Le attività in background appariranno qui quando in esecuzione",
   "_trn_instance_task_generating_pack_info": "Generazione info pacchetto",
@@ -43,5 +43,9 @@
   "_trn_server_task_extract_modpack_overrides": "Estrazione override",
   "_trn_server_task_download_server_jar": "Download del server jar",
   "_trn_server_task_install_modloader": "Installazione modloader",
-  "_trn_cache_cleanup": "Pulizia della cache"
+  "_trn_server_task_install_mod": "Installazione di addon su {{server_name}}",
+  "_trn_cache_cleanup": "Pulizia della cache",
+  "_trn_task_status_active_tasks_many": "{{count}} attività attive",
+  "_trn_task_status_active_count_many": "{{count}} attività",
+  "_trn_instance_task_install_world_copy": "Installazione di una copia separata del mondo {{world_name}} per {{instance_name}}; salvataggio originale conservato"
 }

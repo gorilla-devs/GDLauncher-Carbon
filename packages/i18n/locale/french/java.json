@@ -41,7 +41,7 @@
   "_trn_instance_settings.java_arguments_title": "Arguments Java de l'instance",
   "_trn_instance_settings.prepend_global_java_args": "Ajouter les arguments Java globaux avant les arguments Java supplémentaires de l'instance ({GLOBAL_JAVA_ARGS} ci-dessous)",
   "_trn_instance_settings.java_path_profile": "Chemin / Profil Java de l'instance",
-  "_trn_instance_settings.java_override_mismatch": "-------- [ UNTRANSLATED ] -------- The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management.",
+  "_trn_instance_settings.java_override_mismatch": "Le Java sélectionné ne correspond pas à la version requise par cette instance. Minecraft risque de ne pas démarrer ; choisissez un Java compatible ou activez la gestion automatique de Java.",
   "_trn_system_profiles": "Profils système",
   "_trn_custom_profiles": "Profils personnalisés",
   "_trn_profile_used_in_mc_versions": "Ce profil est utilisé dans les versions de Minecraft suivantes",
@@ -75,5 +75,9 @@
   "_trn_adjust_memory": "Ajuster la mémoire",
   "_trn_insufficient_memory_dont_show_again": "Ne plus afficher cet avertissement",
   "_trn_show_memory_warning_title": "Afficher l'avertissement de mémoire insuffisante",
-  "_trn_show_memory_warning_text": "Afficher un avertissement avant le lancement lorsque la RAM configurée dépasse la mémoire disponible."
+  "_trn_show_memory_warning_text": "Afficher un avertissement avant le lancement lorsque la RAM configurée dépasse la mémoire disponible.",
+  "_trn_runtime_recovery.keep_folders": "Conservez les deux dossiers du runtime pour la récupération. Le redémarrage utilise l’emplacement du runtime enregistré.",
+  "_trn_runtime_recovery.unresolved": "Le lanceur n’a pas pu terminer l’arrêt du cœur. Réessayez ce déplacement pour terminer l’arrêt en toute sécurité.",
+  "_trn_runtime_recovery.retry": "Réessayer le déplacement",
+  "_trn_runtime_recovery.restart": "Redémarrer"
 }

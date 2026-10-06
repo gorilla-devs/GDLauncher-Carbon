@@ -25,9 +25,9 @@
   "_trn_task_status_idle": "Todas las tareas completadas",
   "_trn_task_status_running": "Ejecutando",
   "_trn_task_status_failed": "Falló",
-  "_trn_task_status_active_tasks_one": "1 tarea activa",
+  "_trn_task_status_active_tasks_one": "{{count}} tarea activa",
   "_trn_task_status_active_tasks_other": "{{count}} tareas activas",
-  "_trn_task_status_active_count_one": "1 tarea",
+  "_trn_task_status_active_count_one": "{{count}} tarea",
   "_trn_task_status_active_count_other": "{{count}} tareas",
   "_trn_task_status_operations_info": "Las tareas de fondo aparecerán aquí cuando se ejecuten",
   "_trn_instance_task_generating_pack_info": "Generando información del paquete",
@@ -43,5 +43,9 @@
   "_trn_server_task_extract_modpack_overrides": "Extrayendo overrides",
   "_trn_server_task_download_server_jar": "Descargando jar del servidor",
   "_trn_server_task_install_modloader": "Instalando modloader",
-  "_trn_cache_cleanup": "Limpiando caché"
+  "_trn_server_task_install_mod": "Instalando complementos en {{server_name}}",
+  "_trn_cache_cleanup": "Limpiando caché",
+  "_trn_task_status_active_tasks_many": "{{count}} tareas activas",
+  "_trn_task_status_active_count_many": "{{count}} tareas",
+  "_trn_instance_task_install_world_copy": "Instalando una copia separada del mundo {{world_name}} para {{instance_name}}; partida original conservada"
 }

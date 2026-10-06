@@ -1,11 +1,16 @@
+import {
+  getCurseforgeSortLabelKey,
+  getModrinthSortLabelKey
+} from "../translationKeys"
 import useSearchContext from "@/components/SearchInputContext"
 import { Show } from "solid-js"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import { FilterBadge } from "./FilterBadge"
 import { capitalize } from "@/utils/helpers"
 
 export default function SortDisplay() {
   const searchContext = useSearchContext()
+  const [t] = useTransContext()
 
   const platformFilters = () => searchContext?.searchQuery().platformFilters
 
@@ -44,8 +49,10 @@ export default function SortDisplay() {
           <div class="flex items-center gap-2">
             <div class="i-hugeicons:sort-by-up-01 h-4 w-4" />
             <Trans
-              key="search:_trn_sort_by"
-              options={{ sort: capitalize(getCurseforgeSortField()) }}
+              key="search:_trn_sort_badge"
+              options={{
+                sort: t(getCurseforgeSortLabelKey(getCurseforgeSortField()))
+              }}
             />
           </div>
         </FilterBadge>
@@ -75,8 +82,10 @@ export default function SortDisplay() {
           <div class="flex items-center gap-2">
             <div class="i-hugeicons:sort-by-up-01 h-4 w-4" />
             <Trans
-              key="search:_trn_sort_by"
-              options={{ sort: capitalize(getModrinthSortIndex()) }}
+              key="search:_trn_sort_badge"
+              options={{
+                sort: t(getModrinthSortLabelKey(getModrinthSortIndex()))
+              }}
             />
           </div>
         </FilterBadge>

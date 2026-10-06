@@ -25,9 +25,9 @@
   "_trn_task_status_idle": "Все задачи выполнены",
   "_trn_task_status_running": "Выполняется",
   "_trn_task_status_failed": "Ошибка",
-  "_trn_task_status_active_tasks_one": "1 активная задача",
+  "_trn_task_status_active_tasks_one": "{{count}} активная задача",
   "_trn_task_status_active_tasks_other": "Активных задач: {{count}}",
-  "_trn_task_status_active_count_one": "1 задача",
+  "_trn_task_status_active_count_one": "{{count}} задача",
   "_trn_task_status_active_count_other": "Задач: {{count}}",
   "_trn_task_status_operations_info": "Фоновые задачи будут отображаться здесь во время работы",
   "_trn_instance_task_generating_pack_info": "Генерация информации о модпаке...",
@@ -43,5 +43,11 @@
   "_trn_server_task_extract_modpack_overrides": "Распаковка переопределений модпака...",
   "_trn_server_task_download_server_jar": "Загрузка jar-файла сервера...",
   "_trn_server_task_install_modloader": "Установка загрузчика модов...",
-  "_trn_cache_cleanup": "Очистка кэша"
+  "_trn_server_task_install_mod": "Установка дополнений на {{server_name}}",
+  "_trn_cache_cleanup": "Очистка кэша",
+  "_trn_task_status_active_tasks_few": "{{count}} активные задачи",
+  "_trn_task_status_active_tasks_many": "{{count}} активных задач",
+  "_trn_task_status_active_count_few": "{{count}} задачи",
+  "_trn_task_status_active_count_many": "{{count}} задач",
+  "_trn_instance_task_install_world_copy": "Установка отдельной копии мира {{world_name}} для {{instance_name}}; исходное сохранение оставлено"
 }

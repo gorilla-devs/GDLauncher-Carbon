@@ -8,7 +8,7 @@
   "_trn_browser_table_headers.details": "Détails",
   "_trn_search_discover_anything": "Cliquez pour découvrir ou rechercher quoi que ce soit...",
   "_trn_no_results_found": "Aucun résultat trouvé",
-  "_trn_no_results_description": "Nous n'avons trouvé aucun {type} correspondant à vos critères de recherche. Essayez d'ajuster vos filtres ou vos termes de recherche.",
+  "_trn_no_results_description": "Aucun résultat pour les {{type}} avec ces critères de recherche. Essayez de modifier les filtres ou les termes de recherche.",
   "_trn_go_back": "Retour",
   "_trn_filters": "Filtres",
   "_trn_more_filters": "Plus de filtres",
@@ -29,7 +29,6 @@
   "_trn_modloaders": "Modloaders",
   "_trn_no_modloaders_found": "Aucun modloader trouvé",
   "_trn_environment": "Environnement",
-  "_trn_sort_by": "Trier par : {{sort}}",
   "_trn_relevance": "Pertinence",
   "_trn_downloads": "Téléchargements",
   "_trn_last_updated": "Dernière mise à jour",
@@ -62,5 +61,14 @@
   "_trn_sort_by": "Trier par",
   "_trn_group_by": "Grouper par",
   "_trn_direct": "Direct",
-  "_trn_share": "Partager"
+  "_trn_share": "Partager",
+  "_trn_sort_badge": "Tri : {{sort}}",
+  "_trn_empty_type_mod": "mods",
+  "_trn_empty_type_modpack": "packs de mods",
+  "_trn_empty_type_resource_pack": "packs de ressources",
+  "_trn_empty_type_shader": "shaders",
+  "_trn_empty_type_world": "mondes",
+  "_trn_empty_type_plugin": "plugins",
+  "_trn_empty_type_data_pack": "packs de données",
+  "_trn_empty_type_addon": "extensions"
 }

@@ -43,5 +43,7 @@
   "_trn_server_task_extract_modpack_overrides": "正在解压覆盖文件",
   "_trn_server_task_download_server_jar": "正在下载服务器 jar 文件",
   "_trn_server_task_install_modloader": "正在安装模组加载器",
-  "_trn_cache_cleanup": "正在清理缓存"
+  "_trn_server_task_install_mod": "正在为 {{server_name}} 安装附加组件",
+  "_trn_cache_cleanup": "正在清理缓存",
+  "_trn_instance_task_install_world_copy": "正在为 {{instance_name}} 安装世界 {{world_name}} 的独立副本；原始存档已保留"
 }

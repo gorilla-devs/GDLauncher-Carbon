@@ -56,5 +56,7 @@
   "_trn_published_date": "发布于 {{date}}",
   "_trn_update_notification": "有可用更新",
   "_trn_update_available_title": "有新版本可用",
-  "_trn_update_available_description": "GDLauncher 有新版本可用"
+  "_trn_update_available_description": "GDLauncher 有新版本可用",
+  "_trn_no_content": "没有可用的更新内容。",
+  "_trn_patch_content_error": "无法加载更新内容。"
 }

@@ -29,6 +29,8 @@ export default defineConfig({
       "**/*.task36.test.{ts,tsx}",
       // Controlled Task37 query/share/showcase/slider entry.
       "**/*.task37.test.{ts,tsx}",
+      // Controlled Task38 locale/translation entry.
+      "**/*.task38.test.{ts,tsx}",
       "**/node_modules/**",
       "**/dist/**",
       "e2e-tests/**/*.spec.ts",

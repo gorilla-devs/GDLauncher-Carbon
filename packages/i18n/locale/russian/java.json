@@ -41,7 +41,7 @@
   "_trn_instance_settings.java_arguments_title": "Аргументы JVM для этого экземпляра",
   "_trn_instance_settings.prepend_global_java_args": "Добавлять глобальные аргументы Java перед дополнительными аргументами экземпляра ({GLOBAL_JAVA_ARGS} ниже)",
   "_trn_instance_settings.java_path_profile": "Путь / профиль Java экземпляра",
-  "_trn_instance_settings.java_override_mismatch": "-------- [ UNTRANSLATED ] -------- The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management.",
+  "_trn_instance_settings.java_override_mismatch": "Выбранная Java не соответствует версии, которая нужна этому экземпляру. Minecraft может не запуститься; выберите подходящую Java или включите автоматическое управление Java.",
   "_trn_system_profiles": "Системные профили",
   "_trn_custom_profiles": "Пользовательские профили",
   "_trn_profile_used_in_mc_versions": "Этот профиль используется в следующих версиях Minecraft",
@@ -75,5 +75,9 @@
   "_trn_adjust_memory": "Настроить память",
   "_trn_insufficient_memory_dont_show_again": "Больше не предупреждать о нехватке памяти",
   "_trn_show_memory_warning_title": "Предупреждение о нехватке памяти",
-  "_trn_show_memory_warning_text": "Показывать предупреждение перед запуском, если выделенная память превышает доступную."
+  "_trn_show_memory_warning_text": "Показывать предупреждение перед запуском, если выделенная память превышает доступную.",
+  "_trn_runtime_recovery.keep_folders": "Сохраните обе папки среды выполнения для восстановления. Перезапуск использует сохранённое расположение среды выполнения.",
+  "_trn_runtime_recovery.unresolved": "Лаунчеру не удалось завершить остановку ядра. Повторите этот перенос для безопасного завершения остановки.",
+  "_trn_runtime_recovery.retry": "Повторить перенос",
+  "_trn_runtime_recovery.restart": "Перезапустить"
 }

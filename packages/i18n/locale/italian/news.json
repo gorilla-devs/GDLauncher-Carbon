@@ -56,5 +56,7 @@
   "_trn_published_date": "Pubblicato il {{date}}",
   "_trn_update_notification": "Aggiornamento Disponibile",
   "_trn_update_available_title": "Nuova versione disponibile",
-  "_trn_update_available_description": "Una nuova versione di GDLauncher è disponibile"
+  "_trn_update_available_description": "Una nuova versione di GDLauncher è disponibile",
+  "_trn_no_content": "Nessun contenuto della patch disponibile.",
+  "_trn_patch_content_error": "Impossibile caricare il contenuto della patch."
 }

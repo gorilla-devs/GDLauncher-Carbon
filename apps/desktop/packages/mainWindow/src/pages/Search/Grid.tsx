@@ -1,3 +1,4 @@
+import { getEmptyAddonPhraseKey } from "./translationKeys"
 import { GridItem } from "./GridItem"
 import { VList } from "@/components/VirtuaWrapper"
 import useSearchContext from "@/components/SearchInputContext"
@@ -15,7 +16,7 @@ import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useParams } from "@solidjs/router"
 import { rspc } from "@/utils/rspcClient"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { SearchResultItem } from "@/utils/platformSearch"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
@@ -33,6 +34,7 @@ const ITEM_WIDTH = 320 // Approximate width of each grid item in pixels (larger 
 const GAP = 24 // Gap between items in pixels
 
 export function Grid() {
+  const [t] = useTransContext()
   const searchContext = useSearchContext()
   const navigator = useGDNavigate()
   const params = useParams<{ type: string }>()
@@ -227,7 +229,7 @@ export function Grid() {
                 <p class="max-w-md text-gray-500">
                   <Trans
                     key="search:_trn_no_results_description"
-                    options={{ type: type() }}
+                    options={{ type: t(getEmptyAddonPhraseKey(type())) }}
                   />
                 </p>
               </div>

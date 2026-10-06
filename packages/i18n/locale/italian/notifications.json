@@ -19,5 +19,11 @@
   "_trn_eula_accept_failed": "Impossibile accettare l'EULA",
   "_trn_custom_java_added": "Percorso Java personalizzato aggiunto",
   "_trn_addon_downloading_to_server": "{{title}} in download sul server",
-  "_trn_addon_fallback_name": "Addon"
+  "_trn_addon_installed": "{{title}} installato correttamente",
+  "_trn_datapack_downloaded": "{{title}} scaricato. Aggiungilo a un mondo dalla scheda Addons dell’istanza.",
+  "_trn_addon_outcome_unavailable": "Impossibile confermare se questa modifica all’addon è stata completata. Controlla gli addon dell’istanza prima di riprovare.",
+  "_trn_addon_attempt_dismissed": "Questo tentativo non riuscito è stato ignorato.",
+  "_trn_addon_deleted_one_copy": "{{deleted}} è stato eliminato. Un'altra copia, {{kept}}, è ancora nella cartella, quindi l'addon resta nell'elenco. Eliminalo di nuovo per rimuovere anche quella copia.",
+  "_trn_addon_fallback_name": "Addon",
+  "_trn_shader_setup_closed_work_may_finish": "Configurazione chiusa. L’installazione potrebbe ancora completarsi. Controlla l’istanza prima di ricominciare."
 }
