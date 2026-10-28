@@ -157,6 +157,7 @@ function callback(
   const js = ts.transpileModule(`const callback = ${expression}`, {
     compilerOptions: { target: ts.ScriptTarget.ES2022 }
   }).outputText
+  // eslint-disable-next-line @typescript-eslint/no-implied-eval -- evaluates the transpiled IPC callback under test
   return new Function(...Object.keys(globals), `${js}; return callback`)(
     ...Object.values(globals)
   )

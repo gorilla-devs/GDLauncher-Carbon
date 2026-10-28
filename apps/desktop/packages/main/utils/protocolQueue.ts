@@ -63,6 +63,7 @@ export class ProtocolQueue<S> {
   ack(sender: S, value: ProtocolDelivery) {
     if (
       sender !== this.owner ||
+      // eslint-disable-next-line @typescript-eslint/prefer-optional-chain -- `value` is untrusted IPC input; `?.` on both sides would let a nullish value through
       !this.delivered ||
       value?.id !== this.delivered.id ||
       value.generation !== this.generation ||

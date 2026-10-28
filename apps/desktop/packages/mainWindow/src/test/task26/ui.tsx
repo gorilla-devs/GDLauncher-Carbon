@@ -27,6 +27,7 @@ export const Select = (p: any) => (
     value={p.value}
     onChange={(e) => p.onChange(e.currentTarget.value)}
   >
+    {/* eslint-disable-next-line solid/prefer-for -- static test double */}
     {p.options?.map((v: string) => (
       <option value={v}>{v}</option>
     ))}

@@ -64,6 +64,7 @@ const General = () => {
       })
       if (!owns()) return undefined
       const result = await routeData.data.refetch({ cancelRefetch: true })
+      // eslint-disable-next-line @typescript-eslint/only-throw-error -- rethrows the query's own error unchanged
       if (!result.isSuccess || !result.data) throw result.error
       return result.data.gameResolution
     }

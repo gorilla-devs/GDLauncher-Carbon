@@ -216,6 +216,8 @@ it("Task23 actual main-window update consumer clears busy/manual state and Copy 
     manual = true,
     action: any,
     clipboard = ""
+  const showing = false,
+    shown: string[] = []
   const toast = Object.assign(
     (_title: unknown, data: any) => {
       action = data.action

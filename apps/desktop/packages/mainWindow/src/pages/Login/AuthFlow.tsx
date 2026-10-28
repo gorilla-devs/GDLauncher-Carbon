@@ -258,6 +258,7 @@ function AuthFlowContent() {
     const step = getCurrentStep()
     const request = ++usernameRequest
     const revision = flow.captureEnrollment()
+    // eslint-disable-next-line prefer-const -- read by onCleanup before the debounce assigns it
     let timer: ReturnType<typeof setTimeout> | undefined
     onCleanup(() => {
       ++usernameRequest

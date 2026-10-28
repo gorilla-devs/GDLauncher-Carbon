@@ -83,6 +83,7 @@ visit(ast)
 const script = ts.transpileModule(`const handler = ${expression};`, {
   compilerOptions: { target: ts.ScriptTarget.ESNext }
 }).outputText
+// eslint-disable-next-line @typescript-eslint/no-implied-eval -- evaluates the extracted handler under test
 const handler = new Function(
   "getCurrentStep",
   "setButtonLoading",
