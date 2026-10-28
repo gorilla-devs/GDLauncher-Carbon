@@ -144,6 +144,8 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
     switchOnly: !!props.data.isTargetFolderAlreadyUsed
   }
   const [shutdownUnresolved, setShutdownUnresolved] = createSignal(false)
+  // The new folder kept a partial copy; deleting it is the way to retry there.
+  const [incompleteTarget, setIncompleteTarget] = createSignal(false)
 
   const [migrationError, setMigrationError] = createSignal<string | undefined>(
     undefined
@@ -161,6 +163,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
       return
     setIsChangingRuntimePath(true)
     setMigrationError(undefined)
+    setIncompleteTarget(false)
     try {
       const result = await window.changeRuntimePath(
         submitted.target,
@@ -173,6 +176,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
           setRuntimeRecoveryRequired(true)
           setShutdownUnresolved(result.recovery === "shutdown_unresolved")
         }
+        setIncompleteTarget(!!result.incompleteTarget)
         setMigrationError(result.message)
       } else modalsContext?.closeModal()
     } catch (error) {
@@ -478,10 +482,24 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                       <Trans key="java:_trn_runtime_recovery.not_moved_title" />
                     </Show>
                   </div>
-                  <Show when={runtimeRecoveryRequired()}>
-                    <p>
-                      <Trans key="java:_trn_runtime_recovery.keep_folders" />
+                  <Show when={incompleteTarget()}>
+                    <p class="mt-4">
+                      <Trans
+                        key="java:_trn_runtime_recovery.incomplete_target"
+                        options={{
+                          path: submitted.target,
+                          // Rendered as text; escaping would show "&#x2F;" for "/".
+                          interpolation: { escapeValue: false }
+                        }}
+                      />
                     </p>
+                  </Show>
+                  <Show when={runtimeRecoveryRequired()}>
+                    <Show when={!incompleteTarget()}>
+                      <p>
+                        <Trans key="java:_trn_runtime_recovery.keep_folders" />
+                      </p>
+                    </Show>
                     <Show when={shutdownUnresolved()}>
                       <p>
                         <Trans key="java:_trn_runtime_recovery.unresolved" />

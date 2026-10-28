@@ -1,4 +1,8 @@
-import type { RuntimeRelocationResult } from "../main/utils/runtimeRelocation"
+import type {
+  RuntimeMoveNotice,
+  RuntimePathValidation,
+  RuntimeRelocationResult
+} from "../main/utils/runtimeRelocation"
 import { contextBridge, ipcRenderer } from "electron"
 
 contextBridge.exposeInMainWorld("getRuntimePath", async () =>

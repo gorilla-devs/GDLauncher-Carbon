@@ -1167,7 +1167,7 @@ ipcMain.handle(
           )
         }
         const source = CURRENT_RUNTIME_PATH
-        const warnings = await relocateRuntime({
+        const outcome = await relocateRuntime({
           source,
           target: newPath,
           switchOnly,

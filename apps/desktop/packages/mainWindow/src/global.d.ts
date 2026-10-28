@@ -76,6 +76,10 @@ declare global {
       newPath: string | null,
       switchOnly?: boolean
     ) => Promise<RuntimeRelocationResult>
+    // What a move left in the old folder, on every start from the new one until dismissed.
+    takeRuntimeMoveNotice: () => Promise<RuntimeMoveNotice | null>
+    // The user acknowledged that notice.
+    dismissRuntimeMoveNotice: () => Promise<void>
     changeRuntimePathProgress: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void

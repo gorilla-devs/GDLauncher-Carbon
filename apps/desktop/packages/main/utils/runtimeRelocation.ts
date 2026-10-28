@@ -15,12 +15,77 @@ import {
 import type { RuntimeBlocker } from "./coreShutdown"
 
 export type RuntimeRelocationResult =
+  // Main restarts on its own once the new folder is selected, whatever the window does.
   | { type: "relaunching" }
   | {
       type: "failed"
       recovery: "none" | "restart" | "shutdown_unresolved"
       message: string
+      // The chosen folder holds only a partial copy of the data folder in use (see leftPartialCopy).
+      incompleteTarget?: boolean
     }
+
+export interface RuntimeRelocationOutcome {
+  // Technical details for the log.
+  warnings: string[]
+  // Copied files kept at their old path (relative to the old folder) because they no longer
+  // match their copy, or could not be checked: the old folder may hold a newer version.
+  changed: string[]
+  // Copied files that still match their copy but could not be deleted (open in another
+  // program, or no permission): the new folder has the same bytes.
+  notDeleted: string[]
+  // The new location is selected but could not be confirmed on disk, so nothing was deleted.
+  keptOldFolder: boolean
+}
+
+/**
+ * What every start from the new folder tells the user about the old one, until the
+ * user acknowledges it.
+ */
+export interface RuntimeMoveNotice {
+  oldFolder: string
+  newFolder: string
+  // The first LEFT_BEHIND_SHOWN of each list, relative to oldFolder.
+  changed: string[]
+  changedCount: number
+  notDeleted: string[]
+  notDeletedCount: number
+  keptOldFolder: boolean
+}
+
+export const LEFT_BEHIND_SHOWN = 20
+
+/** What the user must hear about the old folder, or null when the move emptied it. */
+export function leftInOldFolder(
+  oldFolder: string,
+  newFolder: string,
+  outcome: RuntimeRelocationOutcome
+): RuntimeMoveNotice | null {
+  if (
+    !outcome.keptOldFolder &&
+    !outcome.changed.length &&
+    !outcome.notDeleted.length
+  )
+    return null
+  return {
+    oldFolder,
+    newFolder,
+    changed: outcome.changed.slice(0, LEFT_BEHIND_SHOWN),
+    changedCount: outcome.changed.length,
+    notDeleted: outcome.notDeleted.slice(0, LEFT_BEHIND_SHOWN),
+    notDeletedCount: outcome.notDeleted.length,
+    keptOldFolder: outcome.keptOldFolder
+  }
+}
+
+export type RuntimePathValidation =
+  | "valid"
+  | "potentially_valid"
+  // A partial copy of the data folder in use: safe to delete.
+  | "incomplete_migration"
+  // Any other marked folder (2.0.40 markers are empty), which may have been used as a data folder.
+  | "other_incomplete_migration"
+  | "invalid"
 
 export const MIGRATION_MARKER = ".gdl_migration_in_progress"
 

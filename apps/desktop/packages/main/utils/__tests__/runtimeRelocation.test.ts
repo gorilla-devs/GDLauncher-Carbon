@@ -168,6 +168,7 @@ async function fixture() {
     dialog,
     globals,
     move,
+    rawMove,
     validate: callback("validateRuntimePath", globals)
   }
 }
