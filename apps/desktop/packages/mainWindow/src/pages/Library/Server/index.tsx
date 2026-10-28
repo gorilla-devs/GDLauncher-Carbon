@@ -107,9 +107,19 @@ const Server = (props: { children?: any }) => {
   const isStopped = () => details()?.state?.status === "stopped"
   const isInstalling = () => details()?.state?.status === "installing"
   const isDeleting = () => details()?.state?.status === "deleting"
+  // Left behind by an earlier session: still running, or unverified.
+  const recoveredAction = () => recoveredServerAction(details()?.state)
+  const isRecoveredRunning = () =>
+    details()?.state?.status === "recoveredRunning"
+  const isRecoveredUnverified = () =>
+    details()?.state?.status === "recoveredUnverified"
+  const recoveredPid = () => recoveredServerPid(details()?.state)
   const isBusy = () => isStarting() || isStopping() || isInstalling()
   const canStartStop = () =>
-    details()?.id === serverId() && (isStopped() || isRunning())
+    details()?.id === serverId() &&
+    (isStopped() || isRunning() || recoveredAction() !== undefined)
+  const showStop = () => isRunning() || isRecoveredRunning()
+  const recovered = useRecoveredServerAction()
   const taskId = () => {
     const state = details()?.state
     if (state?.status === "installing") return state.task_id
@@ -138,7 +148,10 @@ const Server = (props: { children?: any }) => {
 
   const handleStartStop = () => {
     if (!canStartStop()) return
-    if (isRunning()) {
+    const current = details()
+    if (current && recoveredAction()) {
+      recovered.run(current)
+    } else if (isRunning()) {
       stopServerMutation.mutate(serverId())
     } else if (isStopped()) {
       startServerMutation.mutate(serverId())
@@ -233,10 +246,11 @@ const Server = (props: { children?: any }) => {
                 classList={{
                   "bg-green-900/30 text-green-400": isRunning(),
                   "bg-yellow-900/30 text-yellow-400":
-                    isStarting() || isInstalling(),
-                  "bg-orange-900/30 text-orange-400": isStopping(),
+                    isStarting() || isInstalling() || isRecoveredRunning(),
+                  "bg-orange-900/30 text-orange-400":
+                    isStopping() || isRecoveredUnverified(),
                   "bg-darkSlate-700 text-lightSlate-500":
-                    !isRunning() && !isBusy()
+                    !isRunning() && !isBusy() && !recoveredAction()
                 }}
               >
                 <div
@@ -245,8 +259,10 @@ const Server = (props: { children?: any }) => {
                     "bg-green-400": isRunning(),
                     "bg-yellow-400 animate-pulse":
                       isStarting() || isInstalling(),
-                    "bg-orange-400": isStopping(),
-                    "bg-lightSlate-600": !isRunning() && !isBusy()
+                    "bg-yellow-400": isRecoveredRunning(),
+                    "bg-orange-400": isStopping() || isRecoveredUnverified(),
+                    "bg-lightSlate-600":
+                      !isRunning() && !isBusy() && !recoveredAction()
                   }}
                 />
                 <Switch>
@@ -296,6 +312,40 @@ const Server = (props: { children?: any }) => {
                   role="alert"
                 >
                   <Trans key="instances:_trn_repair_failed" />: {taskFailure()}
+                </div>
+              </Show>
+              {/* Left behind by an earlier session: what it means and the way out */}
+              <Show when={recoveredAction()}>
+                <div
+                  class="flex max-w-xl items-start gap-1.5 text-xs font-medium text-yellow-500"
+                  data-testid="server-recovered-notice"
+                >
+                  <div class="i-hugeicons:alert-02 h-4 w-4 shrink-0" />
+                  <Switch>
+                    {/* Windows: GDLauncher can only end it at once, but an
+                        in-game /stop saves first and is noticed by itself. */}
+                    <Match when={recoveredAction() === "forceStop"}>
+                      <Trans
+                        key="instances:_trn_server_recovered_running_notice_force"
+                        options={{ pid: recoveredPid() }}
+                      />
+                    </Match>
+                    <Match when={isRecoveredRunning()}>
+                      <Trans
+                        key="instances:_trn_server_recovered_running_notice"
+                        options={{ pid: recoveredPid() }}
+                      />
+                    </Match>
+                    <Match when={recoveredPid() != null}>
+                      <Trans
+                        key="instances:_trn_server_recovered_unverified_notice"
+                        options={{ pid: recoveredPid() }}
+                      />
+                    </Match>
+                    <Match when={true}>
+                      <Trans key="instances:_trn_server_recovered_unreadable_notice" />
+                    </Match>
+                  </Switch>
                 </div>
               </Show>
               {/* Auto-restart gave up — surfaces until the next manual start */}
@@ -377,9 +427,10 @@ const Server = (props: { children?: any }) => {
           <Button
             uppercase
             size="large"
-            variant={isRunning() ? "red" : undefined}
-            loading={isBusy()}
-            disabled={!canStartStop()}
+            variant={showStop() ? "red" : undefined}
+            loading={isBusy() || recovered.isPending()}
+            disabled={!canStartStop() || recovered.isPending()}
+            data-testid="server-main-action"
             style={{
               "view-transition-name": "server-tile-play-button",
               contain: "layout"
@@ -431,9 +482,9 @@ const Server = (props: { children?: any }) => {
           <TooltipTrigger as="div">
             <Button
               size="small"
-              variant={isRunning() ? "red" : undefined}
-              loading={isBusy()}
-              disabled={!canStartStop()}
+              variant={showStop() ? "red" : undefined}
+              loading={isBusy() || recovered.isPending()}
+              disabled={!canStartStop() || recovered.isPending()}
               onClick={handleStartStop}
             >
               <Switch>
@@ -453,17 +504,21 @@ const Server = (props: { children?: any }) => {
             <Trans
               options={{ server_name: details()?.name }}
               key={
-                isRunning()
-                  ? "instances:_trn_server_action_stop"
-                  : isStopped()
-                    ? "instances:_trn_server_action_start"
-                    : isInstalling()
-                      ? "tasks:_trn_server_task_install"
-                      : isStarting()
-                        ? "instances:_trn_server_action_starting"
-                        : isStopping()
-                          ? "instances:_trn_server_action_stopping"
-                          : "instances:_trn_server_loading"
+                recoveredAction() === "forceStop"
+                  ? "instances:_trn_server_action_force_stop"
+                  : recoveredAction() === "clearRecord"
+                    ? "instances:_trn_server_action_clear_record"
+                    : showStop()
+                      ? "instances:_trn_server_action_stop"
+                      : isStopped()
+                        ? "instances:_trn_server_action_start"
+                        : isInstalling()
+                          ? "tasks:_trn_server_task_install"
+                          : isStarting()
+                            ? "instances:_trn_server_action_starting"
+                            : isStopping()
+                              ? "instances:_trn_server_action_stopping"
+                              : "instances:_trn_server_loading"
               }
             />
           </TooltipContent>

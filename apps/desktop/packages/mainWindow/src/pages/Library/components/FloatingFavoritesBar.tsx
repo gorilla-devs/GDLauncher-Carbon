@@ -542,7 +542,8 @@ function DockAvatar(props: DockAvatarProps) {
     isServerMode()
       ? serverStatus() === "starting" ||
         serverStatus() === "stopping" ||
-        serverStatus() === "installing"
+        serverStatus() === "installing" ||
+        recovered.isPending()
       : isLoading()
 
   const handleClick = () => {
@@ -562,6 +563,11 @@ function DockAvatar(props: DockAvatarProps) {
     e?.stopPropagation()
 
     if (isServerMode()) {
+      const current = server()
+      if (current && recoveredAction()) {
+        recovered.run(current)
+        return
+      }
       if (serverStatus() !== "stopped" && serverStatus() !== "running") return
       if (isServerRunning()) {
         stopServerMutation.mutate(props.instanceId)
