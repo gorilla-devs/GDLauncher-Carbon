@@ -406,40 +406,138 @@ struct InstalledCopy {
     mr_version_id: Option<String>,
 }
 
-async fn plan_graph<F, Fut>(
-    selection: Selection,
-    dependencies: bool,
-    mut resolve: F,
-) -> anyhow::Result<Vec<Artifact>>
-where
-    F: FnMut(Selection) -> Fut,
-    Fut: std::future::Future<Output = anyhow::Result<(Artifact, Vec<Selection>)>>,
-{
-    let mut pending = VecDeque::from([(selection, false)]);
-    let mut selected = HashMap::<String, String>::new();
-    let mut result = Vec::new();
-    while let Some((selection, required)) = pending.pop_front() {
-        let (key, pin) = match &selection {
-            Selection::Curseforge(project, pin) => {
-                (format!("cf:{project}"), pin.map(|pin| pin.to_string()))
-            }
-            Selection::Modrinth(project, pin) => (format!("mr:{project}"), pin.clone()),
-        };
-        if let Some(chosen) = selected.get(&key) {
-            if pin.as_ref().is_some_and(|pin| pin != chosen) {
-                bail!("Conflicting required versions of {key}");
-            }
-            continue;
+#[derive(Debug, Clone, PartialEq)]
+enum Presence {
+    /// At least one enabled copy: any version, next to any disabled or
+    /// duplicate copy.
+    Enabled(Vec<InstalledCopy>),
+    /// Only disabled copies, sorted by file name.
+    DisabledOnly(Vec<InstalledCopy>),
+    Absent,
+}
+
+/// An addon the server loads: in `mods/` or in the selected world's datapacks.
+#[derive(Debug, Clone)]
+struct InstalledAddon {
+    copy: InstalledCopy,
+    enabled: bool,
+    /// Planner keys of every platform project that publishes these bytes.
+    keys: Vec<String>,
+    /// The platform versions these bytes are known as, as exact selections.
+    versions: Vec<Selection>,
+    /// The jar's loader mod id, normalized.
+    modid: Option<String>,
+}
+
+/// Projects whose installed copy also provides `key` on a server with
+/// `loader`: on Quilt, Quilted Fabric API provides Fabric API, as in Prism's
+/// getOverrideDeps.
+pub(super) fn providers(key: &str, loader: Option<&str>) -> Vec<String> {
+    let mut keys = vec![key.to_owned()];
+    let fabric_api = [
+        format!("mr:{}", FABRIC_API.0),
+        format!("cf:{}", FABRIC_API.1),
+    ];
+    if loader == Some("quilt") && fabric_api.iter().any(|fabric| fabric == key) {
+        keys.push(format!("mr:{}", QUILTED_FABRIC_API.0));
+        keys.push(format!("cf:{}", QUILTED_FABRIC_API.1));
+    }
+    keys
+}
+
+/// What is downloaded for a required `selection` the server does not have,
+/// when another project provides it (see [`providers`]): on Quilt, Quilted
+/// Fabric API from the same platform for Fabric API, as Prism's
+/// getOverrideDeps does. Fabric API itself also runs on Quilt, so it is
+/// still installed when Quilted Fabric API has no version for the server.
+fn stand_in(selection: &Selection, loader: Option<&str>) -> Option<Selection> {
+    if loader != Some("quilt") {
+        return None;
+    }
+    match selection {
+        Selection::Modrinth(project, _) | Selection::ModrinthRelease(project, _)
+            if project == FABRIC_API.0 =>
+        {
+            Some(Selection::Modrinth(QUILTED_FABRIC_API.0.to_owned(), None))
         }
-        let (mut artifact, children) = resolve(selection).await?;
-        if artifact.key != key || pin.as_ref().is_some_and(|pin| *pin != artifact.version) {
-            bail!("Provider returned a different pinned artifact");
+        Selection::Curseforge(project, _) if i64::from(*project) == i64::from(FABRIC_API.1) => {
+            Some(Selection::Curseforge(QUILTED_FABRIC_API.1 as u32, None))
         }
-        artifact.required = required;
-        basename(&artifact.filename)?;
-        selected.insert(artifact.key.clone(), artifact.version.clone());
-        if dependencies {
-            pending.extend(children.into_iter().map(|child| (child, true)));
+        _ => None,
+    }
+}
+
+/// The mod id Fabric API's jar declares: a copy no platform identifies (a
+/// jar dropped in by hand) still provides it.
+const FABRIC_API_MOD_ID: &str = "fabric-api";
+
+// ---------------------------------------------------------------------------
+// What runs on the server.
+
+/// Loader tags a jar may carry to run on the server: its loader, Fabric on
+/// Quilt and Forge on NeoForge 1.20.1, as on instances (see
+/// [`rule::accepted_loader_tags`]). None on a vanilla server.
+fn accepted_loaders(server_loader: Option<&str>, game_version: &str) -> Vec<&'static str> {
+    use crate::domain::instance::info::ModLoaderType;
+    let loader = match server_loader.map(str::to_ascii_lowercase).as_deref() {
+        Some("forge") => ModLoaderType::Forge,
+        Some("neoforge") => ModLoaderType::Neoforge,
+        Some("fabric") => ModLoaderType::Fabric,
+        Some("quilt") => ModLoaderType::Quilt,
+        _ => return Vec::new(),
+    };
+    rule::accepted_loader_tags(game_version, [loader])
+}
+
+/// How a jar's loader tags (Modrinth `loaders`, CurseForge `gameVersions`)
+/// fit the server, with the rule instances use (see [`rule::loader_fit`]):
+/// `Tagged` when they name the server's loader or one it also loads,
+/// `Untagged` when they name no loader at all, as most CurseForge files for
+/// 1.7.10 to 1.12.2 do (CurseForge counts those as Forge files), `Foreign`
+/// when they name other loaders only. Every jar is foreign to a vanilla
+/// server.
+fn loader_fit(tags: &[String], server_loader: Option<&str>, game_version: &str) -> LoaderFit {
+    rule::loader_fit(tags, &accepted_loaders(server_loader, game_version))
+}
+
+fn is_jar(filename: &str) -> bool {
+    filename.to_ascii_lowercase().ends_with(".jar")
+}
+
+/// Whether a file runs on the server: anything that is not a jar (a
+/// datapack), and a jar that is not built for other loaders only (see
+/// [`loader_fit`]). `Err`: why not, naming both loaders.
+fn validate_loader(
+    filename: &str,
+    tags: &[String],
+    server_loader: Option<&str>,
+    game_version: &str,
+) -> Result<(), String> {
+    if is_jar(filename) && loader_fit(tags, server_loader, game_version) == LoaderFit::Foreign {
+        return Err(loader_mismatch(tags, server_loader, game_version));
+    }
+    Ok(())
+}
+
+/// How messages name a loader tag.
+fn loader_name(tag: &str) -> String {
+    match tag.to_ascii_lowercase().as_str() {
+        "forge" => "Forge".to_owned(),
+        "neoforge" => "NeoForge".to_owned(),
+        "fabric" => "Fabric".to_owned(),
+        "quilt" => "Quilt".to_owned(),
+        "liteloader" => "LiteLoader".to_owned(),
+        "babric" => "Babric".to_owned(),
+        "bta-babric" => "BTA (Babric)".to_owned(),
+        "legacy-fabric" => "Legacy Fabric".to_owned(),
+        "nilloader" => "NilLoader".to_owned(),
+        "optifine" => "OptiFine".to_owned(),
+        "bungeecord" => "BungeeCord".to_owned(),
+        tag => {
+            let mut chars = tag.chars();
+            chars.next().map_or_else(String::new, |first| {
+                first.to_uppercase().chain(chars).collect()
+            })
         }
     }
 }
@@ -495,50 +593,66 @@ fn loader_mismatch(tags: &[String], server_loader: Option<&str>, game_version: &
     }
 }
 
-async fn resolve(
-    app: &Arc<AppInner>,
-    server: &server_repo::ServerRow,
-    selection: Selection,
-    dependencies: bool,
-) -> anyhow::Result<(Artifact, Vec<Selection>)> {
-    let (artifact, children) = match selection {
-        Selection::Curseforge(project, pin) => {
-            let key = format!("cf:{project}");
-            let file = if let Some(pin) = pin {
-                app.modplatforms_manager()
-                    .curseforge
-                    .get_mod_file(ModFileParameters {
-                        mod_id: project as i32,
-                        file_id: pin as i32,
-                    })
-                    .await?
-                    .data
-            } else {
-                let files = app
-                    .modplatforms_manager()
-                    .curseforge
-                    .get_mod_files(ModFilesParameters {
-                        mod_id: project as i32,
-                        query: ModFilesParametersQuery {
-                            game_version: Some(server.game_version.clone()),
-                            game_version_type_id: None,
-                            mod_loader_type: curseforge_modloader_filter(
-                                None,
-                                server.modloader_type.as_deref(),
-                            ),
-                            index: None,
-                            page_size: Some(200),
-                        },
-                    })
-                    .await?;
-                files
-                    .data
-                    .into_iter()
-                    .find(|f| f.game_versions.contains(&server.game_version))
-                    .context("Required server dependency has no compatible version")?
-            };
-            if file.mod_id != project as i32 || !file.game_versions.contains(&server.game_version) {
-                bail!("Selected CurseForge file does not match this server/project");
+fn normalized_mod_id(modid: &str) -> Option<String> {
+    let modid = modid.trim().to_lowercase();
+    (!modid.is_empty()).then_some(modid)
+}
+
+/// Whether an addon file is there: enabled (`Some(true)`) or only as its
+/// `.disabled` twin (`Some(false)`).
+async fn occupant(path: &Path) -> std::io::Result<Option<bool>> {
+    let mut disabled = path.as_os_str().to_owned();
+    disabled.push(".disabled");
+    for (candidate, enabled) in [(path.to_path_buf(), true), (PathBuf::from(disabled), false)] {
+        match tokio::fs::symlink_metadata(&candidate).await {
+            Ok(_) => return Ok(Some(enabled)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error),
+        }
+    }
+    Ok(None)
+}
+
+/// [`occupant`] of an addon location relative to the server's data folder.
+/// A linked folder on the way (`mods/` as a symlink, or a junction on
+/// Windows, shared between servers) is followed, as publication follows it:
+/// this only reads, so it needs none of the ownership checks that guard
+/// replacing or deleting a file.
+async fn occupant_at(data: &Path, location: &str) -> anyhow::Result<Option<bool>> {
+    world::validate_local(location)?;
+    Ok(occupant(&data.join(location)).await?)
+}
+
+/// The server's addons as the dependency rule sees them. Every row is checked
+/// against its file, so a jar deleted or toggled outside GDLauncher since the
+/// last scan is seen as it is.
+#[derive(Debug, Default)]
+struct InstalledAddons {
+    addons: Vec<InstalledAddon>,
+    /// Files in `mods/` the scan has not recorded yet, with their state.
+    unscanned: Vec<(String, bool)>,
+    loader: Option<String>,
+    /// The server's data folder, where `unscanned` is read.
+    data: Option<PathBuf>,
+    /// The jars among `unscanned` with the mod id each declares, read once
+    /// and only when a requirement needs them (see [`unscanned_jars`]).
+    jars: tokio::sync::OnceCell<Vec<InstalledAddon>>,
+}
+
+impl InstalledAddons {
+    async fn read(data: &Path, rows: &[mfcdb::ServerAddonFullRow], loader: Option<&str>) -> Self {
+        let world = world::selected(data).ok();
+        let mut addons = Vec::new();
+        let mut recorded = HashSet::new();
+        for row in rows {
+            let loaded = (row.addon_type == "mods"
+                && row.location == format!("mods/{}", row.filename))
+                || world.as_ref().is_some_and(|world| {
+                    row.addon_type == "datapacks"
+                        && row.location == format!("{world}/datapacks/{}", row.filename)
+                });
+            if !loaded {
+                continue;
             }
             if row.addon_type == "mods" {
                 recorded.insert(row.filename.clone());
@@ -583,57 +697,75 @@ async fn resolve(
                     versions.push(Selection::Curseforge(project, Some(file)));
                 }
             }
-            (
-                Artifact {
-                    key,
-                    version: version.id,
-                    filename: file.filename.clone(),
-                    url: file.url.clone(),
-                    size: file.size as u64,
-                    checksum: Checksum::Sha512(file.hashes.sha512.clone()),
-                    required: false,
+            if let (Some(project), Some(version)) = (&row.mr_project_id, &row.mr_version_id) {
+                versions.push(Selection::Modrinth(project.clone(), Some(version.clone())));
+            }
+            addons.push(InstalledAddon {
+                copy: InstalledCopy {
+                    name: row
+                        .meta_name
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|name| !name.is_empty())
+                        .unwrap_or(row.filename.as_str())
+                        .to_owned(),
+                    filename: row.filename.clone(),
+                    mr_version_id: row.mr_version_id.clone(),
                 },
-                children,
-            )
+                enabled,
+                keys,
+                versions,
+                modid: (row.addon_type == "mods")
+                    .then(|| row.modid.as_deref().and_then(normalized_mod_id))
+                    .flatten(),
+            });
         }
-    };
-    Ok((artifact, children))
-}
-
-pub(super) async fn install(
-    app: &Arc<AppInner>,
-    id: ServerId,
-    selection: Selection,
-) -> anyhow::Result<VisualTaskId> {
-    let activity = app.runtime_lifecycle.admit_owned(
-        format!("server {} addon installation", id.0),
-        crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
-    )?;
-    let app = app.clone();
-    crate::managers::runtime_lifecycle::spawn_retained(activity, move |slot| {
-        Box::pin(async move { install_owned(&app, id, selection, slot).await })
-    })
-    .await?
-}
-
-async fn install_owned(
-    app: &Arc<AppInner>,
-    id: ServerId,
-    selection: Selection,
-    activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
-) -> anyhow::Result<VisualTaskId> {
-    let server = server_repo::get_server(&app.db, id.0)
-        .await?
-        .context("Server not found")?;
-    // Reservation prevents two whole addon plans from superseding each other;
-    // the server gate remains available during all metadata and downloads.
-    let reservation = app.server_manager.addon_installations.clone();
-    match reservation.entry(id) {
-        dashmap::mapref::entry::Entry::Occupied(_) => {
-            bail!("A server addon installation is already in progress")
+        let mut unscanned = Vec::new();
+        if let Ok(mut entries) = tokio::fs::read_dir(data.join("mods")).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                let Ok(name) = entry.file_name().into_string() else {
+                    continue;
+                };
+                let (filename, enabled) = match name.strip_suffix(".disabled") {
+                    Some(filename) => (filename.to_owned(), false),
+                    None => (name, true),
+                };
+                if !recorded.contains(&filename) {
+                    unscanned.push((filename, enabled));
+                }
+            }
         }
-        dashmap::mapref::entry::Entry::Vacant(entry) => {
-            entry.insert(());
+        Self {
+            addons,
+            unscanned,
+            loader: loader.map(str::to_owned),
+            data: Some(data.to_path_buf()),
+            jars: tokio::sync::OnceCell::new(),
+        }
+    }
+
+    /// The jars in `mods/` the scan has not recorded, with the mod id each
+    /// declares, read on first use.
+    async fn unscanned_jars(&self) -> &[InstalledAddon] {
+        let Some(data) = &self.data else {
+            return &[];
+        };
+        self.jars
+            .get_or_init(|| unscanned_jars(data, &self.unscanned))
+            .await
+    }
+
+    fn presence<'a>(copies: impl Iterator<Item = &'a InstalledAddon>) -> Presence {
+        let (enabled, mut disabled): (Vec<_>, Vec<_>) = copies.partition(|addon| addon.enabled);
+        if !enabled.is_empty() {
+            return Presence::Enabled(enabled.into_iter().map(|a| a.copy.clone()).collect());
+        }
+        disabled.sort_by(|a, b| a.copy.filename.cmp(&b.copy.filename));
+        disabled.dedup_by(|a, b| a.copy.filename == b.copy.filename);
+        if disabled.is_empty() {
+            Presence::Absent
+        } else {
+            Presence::DisabledOnly(disabled.into_iter().map(|a| a.copy.clone()).collect())
         }
     }
 
@@ -674,237 +806,259 @@ async fn install_owned(
             _ => found,
         }
     }
-    let reservation = Reservation(reservation, id);
-    let task = crate::managers::vtask::VisualTask::new(
-        crate::api::translation::Translation::ServerTaskInstallMod {
-            mod_name: "Server addon and required dependencies".into(),
-            server_name: server.name.clone(),
-        },
-    );
-    let task_id = app.task_manager().spawn_task(&task).await;
-    let activity = activity.take().unwrap();
-    let app = app.clone();
-    crate::managers::runtime_lifecycle::spawn_retained(activity, move |slot| {
-        Box::pin(async move {
-            let cancel = slot.as_ref().unwrap().cancellation();
-            let _reservation = reservation;
-            let result = async {
-                anyhow::ensure!(
-                    !cancel.is_cancelled(),
-                    "Server addon installation cancelled"
-                );
-                let artifacts = plan(&app, &server, selection).await?;
-                let root = app.settings_manager().runtime_path.to_path_buf();
-                let staging = tempfile::Builder::new()
-                    .prefix(".server-addon-")
-                    .tempdir_in(root)?
-                    .keep();
-                let server_path = app
-                    .settings_manager()
-                    .runtime_path
-                    .get_servers()
-                    .get_server_path(&server.shortpath);
-                let data = server_path.get_data_path();
-                let mut prepared = Vec::new();
-                {
-                    let gate = app.server_manager().get_op_lock(id);
-                    let _guard = gate.lock().await;
-                    app.server_manager()
-                        .ensure_addon_publication(id, &server_path.get_root())
-                        .await?;
-                    let cached = mfcdb::get_server_mods_full(&app.db, id.0).await?;
-                    for (index, artifact) in artifacts.into_iter().enumerate() {
-                        let folder = server_addon_dir(&server_path, &artifact.filename)?;
-                        let location = folder
-                            .join(&artifact.filename)
-                            .strip_prefix(&data)?
-                            .to_str()
-                            .context("Invalid addon path")?
-                            .replace(std::path::MAIN_SEPARATOR, "/");
-                        let kind = if artifact.filename.to_ascii_lowercase().ends_with(".zip") {
-                            "datapacks"
-                        } else {
-                            "mods"
-                        };
-                        let stage_path = staging.join(format!("{index}-{}", artifact.filename));
-                        if let Some(item) = prepare_artifact(
-                            &data,
-                            &folder,
-                            artifact,
-                            location,
-                            &cached,
-                            &stage_path,
-                        )
-                        .await?
-                        {
-                            prepared.push(item);
-                        }
-                    }
-                }
-                for item in &prepared {
-                    if let Some(source) = &item.reuse {
-                        tokio::fs::copy(source, &item.download.path)
-                            .await
-                            .context("Satisfied bytes changed while staging")?;
-                    }
-                }
-                let downloads: Vec<_> = prepared
-                    .iter()
-                    .filter(|item| !item.satisfied && item.reuse.is_none())
-                    .map(|item| item.download.clone())
-                    .collect();
-                carbon_net::download_multiple(
-                    &downloads,
-                    DownloadOptions::builder()
-                        .concurrency(4)
-                        .cancel_token(cancel.clone())
-                        .build(),
-                )
-                .await
-                .with_context(|| {
-                    format!(
-                        "Addon download failed; staged evidence retained at {}",
-                        staging.display()
-                    )
-                })?;
-                let gate = app.server_manager().get_op_lock(id);
-                let _guard = gate.lock().await;
-                app.server_manager()
-                    .ensure_addon_publication(id, &server_path.get_root())
-                    .await?;
-                anyhow::ensure!(
-                    !cancel.is_cancelled(),
-                    "Server addon installation cancelled before publication"
-                );
-                let current = server_repo::get_server(&app.db, id.0)
-                    .await?
-                    .context("Server was deleted during download")?;
-                if current.shortpath != server.shortpath
-                    || current.game_version != server.game_version
-                    || current.modloader_type != server.modloader_type
-                {
-                    bail!("Server owner or version changed during download");
-                }
-                validate_plan(
-                    &data,
-                    &prepared,
-                    &mfcdb::get_server_mods_full(&app.db, id.0).await?,
-                )
-                .await?;
-                for (index, item) in prepared.into_iter().enumerate() {
-                    if item.satisfied {
-                        continue;
-                    }
-                    if !matches_download(&item.download.path, &item.download).await? {
-                        bail!("Staged server addon failed verification");
-                    }
-                    let folder = server_addon_dir(&server_path, &item.artifact.filename)?;
-                    let current_location = folder
-                        .join(&item.artifact.filename)
-                        .strip_prefix(&data)?
-                        .to_str()
-                        .context("Invalid addon path")?
-                        .replace(std::path::MAIN_SEPARATOR, "/");
-                    if current_location != item.location {
-                        bail!("Selected world changed during download");
-                    }
-                    let mut old_path = None;
-                    let mut enabled = true;
-                    if let Some((row, hash)) = &item.old {
-                        let now = mfcdb::get_server_mod_file_cache_by_id(&app.db, &row.id)
-                            .await?
-                            .context("Replacement owner disappeared")?;
-                        if now.server_id != id.0
-                            || now.location != row.location
-                            || now.addon_type != row.addon_type
-                        {
-                            bail!("Replacement owner changed");
-                        }
-                        let physical = world::owned_addon(
-                            &data,
-                            &row.addon_type,
-                            &row.location,
-                            &row.filename,
-                        )?;
-                        if digest(&physical).await? != *hash {
-                            bail!("Old addon changed during download");
-                        }
-                        enabled = !physical.to_string_lossy().ends_with(".disabled");
-                        if item.artifact.required && !enabled {
-                            bail!("Required dependency was disabled during download");
-                        }
-                        old_path = Some(physical);
-                    }
-                    let kind = if item
-                        .artifact
-                        .filename
-                        .to_ascii_lowercase()
-                        .ends_with(".zip")
-                    {
-                        "datapacks"
-                    } else {
-                        "mods"
-                    };
-                    selected_source(&item.artifact)?; // source feasibility before retiring any live bytes
-                    let metadata_id = app
-                        .meta_cache_manager()
-                        .prepare_server_addon_metadata(&item.download.path, &item.artifact.filename)
-                        .await?;
-                    let identity_artifact = item.artifact.clone();
-                    let location = item.location.clone();
-                    let retired = item
-                        .old
-                        .as_ref()
-                        .filter(|(row, _)| row.location != item.location)
-                        .map(|(row, _)| row.id.clone());
-                    let backup = staging.join(format!("previous-{index}"));
-                    let db = &app.db;
-                    publish_with_metadata(
-                        &item.download,
-                        &folder,
-                        &item.artifact.filename,
-                        old_path.as_deref(),
-                        item.old.as_ref().map(|(_, hash)| hash.as_slice()),
-                        enabled,
-                        &backup,
-                        async move {
-                            db.write(move |mut conn| {
-                                Ok(publish_selection(
-                                    &mut conn,
-                                    id.0,
-                                    kind,
-                                    &location,
-                                    enabled,
-                                    &metadata_id,
-                                    &identity_artifact,
-                                    retired.as_deref(),
-                                ))
-                            })
-                            .await?
-                        },
-                    )
-                    .await?;
-                    if item.old.is_some() {
-                        tokio::fs::remove_file(&backup).await?;
-                    }
-                }
-                tokio::fs::remove_dir(&staging).await?;
-                Ok::<_, anyhow::Error>(())
-            }
-            .await;
-            if result.is_ok() {
-                app.meta_cache_manager()
-                    .queue_caching(
-                        crate::managers::metadata::cache::CacheEntityId::Server(id.0),
-                        true,
-                    )
-                    .await;
-            }
-            retain_outcome(task, result).await;
-            app.invalidate(GET_SERVER_ADDONS, None);
+
+    /// What the server has under an exact file name.
+    fn file(&self, filename: &str) -> Presence {
+        let found = Self::presence(
+            self.addons
+                .iter()
+                .filter(|addon| addon.copy.filename == filename),
+        );
+        if found != Presence::Absent {
+            return found;
+        }
+        let copy = InstalledCopy {
+            name: filename.to_owned(),
+            filename: filename.to_owned(),
+            mr_version_id: None,
+        };
+        let states: Vec<bool> = self
+            .unscanned
+            .iter()
+            .filter(|(name, _)| name == filename)
+            .map(|(_, enabled)| *enabled)
+            .collect();
+        if states.contains(&true) {
+            Presence::Enabled(vec![copy])
+        } else if states.is_empty() {
+            Presence::Absent
+        } else {
+            Presence::DisabledOnly(vec![copy])
+        }
+    }
+
+    /// What the server has of a loader mod id, among its scanned addons and
+    /// `unscanned`, the jars the scan has not recorded (see
+    /// [`unscanned_jars`]).
+    fn mod_id(&self, modid: &str, unscanned: &[InstalledAddon]) -> Presence {
+        let Some(modid) = normalized_mod_id(modid) else {
+            return Presence::Absent;
+        };
+        Self::presence(
+            self.addons
+                .iter()
+                .chain(unscanned)
+                .filter(|addon| addon.modid.as_deref() == Some(modid.as_str())),
+        )
+    }
+
+    /// The installed version of the platform project `key` (on its own
+    /// platform), which the selected addon replaces: the copy the server
+    /// loads, next to disabled duplicates (see [`replaced_copy`]).
+    fn version_of(&self, key: &str) -> Option<Selection> {
+        let enabled = self.addons.iter().filter(|addon| addon.enabled);
+        let disabled = self.addons.iter().filter(|addon| !addon.enabled);
+        enabled
+            .chain(disabled)
+            .flat_map(|addon| &addon.versions)
+            .find(|version| version.key().0 == key)
+            .cloned()
+    }
+
+    /// What the server has of a requirement. A project it has only disabled
+    /// is provided by an enabled jar with the disabled copy's mod id, scanned
+    /// or not: the jars the scan has not recorded are read only then, so a
+    /// refusal never asks the user to enable a second copy of a loaded mod.
+    async fn requirement(&self, requirement: &Requirement) -> Presence {
+        match requirement {
+            Requirement::Project(key) => match self.project(key, &[]) {
+                Presence::DisabledOnly(_) => self.project(key, self.unscanned_jars().await),
+                found => found,
+            },
+            Requirement::File(filename) => self.file(filename),
+        }
+    }
+}
+
+/// The jars in `mods/` the scan has not recorded (on a server created moments
+/// ago, a jar dropped in by hand, or a symlink, which the scan skips), with the
+/// mod id each declares. Read only when a required project is there only
+/// disabled, or a downloaded dependency's mod id matches nothing the scan
+/// recorded (at publication, under the gate).
+async fn unscanned_jars(data: &Path, unscanned: &[(String, bool)]) -> Vec<InstalledAddon> {
+    let jars: Vec<(String, bool, PathBuf)> = unscanned
+        .iter()
+        .filter(|(filename, _)| filename.to_ascii_lowercase().ends_with(".jar"))
+        .map(|(filename, enabled)| {
+            let name = if *enabled {
+                filename.clone()
+            } else {
+                format!("{filename}.disabled")
+            };
+            (filename.clone(), *enabled, data.join("mods").join(name))
         })
-    });
-    Ok(task_id)
+        .collect();
+    if jars.is_empty() {
+        return Vec::new();
+    }
+    tokio::task::spawn_blocking(move || {
+        jars.into_iter()
+            .filter_map(|(filename, enabled, path)| {
+                // Follows a symlink to the jar it points at.
+                let mut file = std::fs::File::open(&path).ok()?;
+                if !file.metadata().ok()?.is_file() {
+                    return None;
+                }
+                let modid = match crate::managers::metadata::mods::parse_metadata(&mut file) {
+                    Ok(meta) => meta?.modid,
+                    Err(error) => {
+                        tracing::debug!(
+                            %filename,
+                            "Server addon has no readable mod metadata: {error:#}"
+                        );
+                        None
+                    }
+                };
+                Some(InstalledAddon {
+                    copy: InstalledCopy {
+                        name: filename.clone(),
+                        filename,
+                        mr_version_id: None,
+                    },
+                    enabled,
+                    keys: Vec::new(),
+                    versions: Vec::new(),
+                    modid: Some(modid.as_deref().and_then(normalized_mod_id)?),
+                })
+            })
+            .collect()
+    })
+    .await
+    .unwrap_or_default()
+}
+
+/// The refusal for a required dependency the server only has disabled. The
+/// Addons tab cannot toggle a copy the scan has not recorded, so renaming the
+/// file is offered too.
+fn disabled_refusal(copies: &[InstalledCopy]) -> anyhow::Error {
+    match copies {
+        [copy] if copy.name == copy.filename => anyhow!(
+            "Required dependency {0} is installed but disabled. Enable it in the server's Addons tab, or rename {0}.disabled to {0} in the server's mods folder, and retry.",
+            copy.filename
+        ),
+        [copy] => anyhow!(
+            "Required dependency {0} ({1}) is installed but disabled. Enable it in the server's Addons tab, or rename {1}.disabled to {1} in the server's mods folder, and retry.",
+            copy.name,
+            copy.filename
+        ),
+        _ => anyhow!(
+            "Required dependency {} is installed but disabled ({}). Enable one of them in the server's Addons tab, or remove .disabled from the end of its name in the server's mods folder, and retry.",
+            copies
+                .first()
+                .map(|copy| copy.name.as_str())
+                .unwrap_or_default(),
+            copies
+                .iter()
+                .map(|copy| copy.filename.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        ),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Planning.
+
+#[derive(Debug, Clone, PartialEq)]
+enum Requirement {
+    /// A planner key (`cf:<project>` / `mr:<project>`).
+    Project(String),
+    File(String),
+}
+
+impl Requirement {
+    /// The key the dependency graph knows it by.
+    fn key(&self) -> String {
+        match self {
+            Requirement::Project(key) => key.clone(),
+            Requirement::File(filename) => format!("file:{filename}"),
+        }
+    }
+}
+
+impl Child {
+    /// The key the dependency graph knows it by.
+    fn key(&self) -> String {
+        match self {
+            Child::Project(selection) => selection.key().0,
+            Child::File(filename) => format!("file:{filename}"),
+            Child::Unresolvable(skip) => skip.key(),
+        }
+    }
+}
+
+/// A required dependency the server already has. It is checked again before
+/// publication, since the user can disable or delete it during the download.
+#[derive(Debug, Clone, PartialEq)]
+struct Present {
+    requirement: Requirement,
+    /// How the installed copy names itself.
+    name: String,
+    platform: DependencyPlatform,
+    project_id: String,
+}
+
+/// An installed copy kept although a dependant pins another version of it.
+#[derive(Debug, Clone, PartialEq)]
+struct KeptPin {
+    key: String,
+    name: String,
+    filename: String,
+    pin: String,
+}
+
+/// What each planned addon requires, by graph key (`cf:<project>`,
+/// `mr:<project>`, or `file:<name>` for a requirement declared by file name
+/// only).
+#[derive(Debug, Default)]
+struct Graph {
+    /// The selected addon.
+    root: String,
+    /// The requirements each planned addon declares.
+    requires: HashMap<String, Vec<String>>,
+}
+
+/// What a plan publishes.
+#[derive(Debug, Default)]
+struct Reach {
+    /// The planned addons that are published.
+    published: HashSet<String>,
+    /// The requirements of the published addons.
+    needed: HashSet<String>,
+}
+
+impl Graph {
+    /// What is published when the planned dependencies in `held` are not,
+    /// because the server already has them. What only a held dependency
+    /// requires is not needed: an installed dependency's own requirements are
+    /// never walked, so the newer version planned in its place adds nothing.
+    fn reach(&self, held: &HashSet<String>) -> Reach {
+        let mut reach = Reach::default();
+        reach.published.insert(self.root.clone());
+        let mut stack = vec![self.root.as_str()];
+        while let Some(key) = stack.pop() {
+            for requirement in self.requires.get(key).into_iter().flatten() {
+                reach.needed.insert(requirement.clone());
+                if self.requires.contains_key(requirement)
+                    && !held.contains(requirement)
+                    && reach.published.insert(requirement.clone())
+                {
+                    stack.push(requirement);
+                }
+            }
+        }
+        reach
+    }
 }
 
 /// What a warning is about. It is shown only while that holds once the plan

@@ -5012,3 +5012,2334 @@ async fn task18_addon_lost_tree_ack_retains_runtime_unknown() {
             .is_err()
     );
 }
+
+/// One dependency rule (installed-dependency-revalidated): an enabled copy
+/// satisfies, a disabled-only copy refuses a fresh install but counts as
+/// present on an update, and an unresolvable missing dependency is skipped
+/// with a named warning. Getters run against a recording stand-in for the
+/// platform APIs, so "no request" is asserted rather than assumed.
+mod dependency_rule {
+    use super::*;
+    use crate::domain::instance::info::{GameVersion, ModLoader, ModLoaderType, StandardVersion};
+    use crate::domain::vtask::{DependencyPlatform, SkippedDependencyReason, TaskWarning};
+    use carbon_repos::dbtypes::DbDateTime;
+    use carbon_repos::repos::mod_metadata as metarepo;
+    use dependency::{Catalogue, LoaderFit};
+    use std::collections::HashMap;
+
+    const SODIUM: &str = "AANobbMI";
+
+    #[derive(Default)]
+    struct Fixture {
+        cf_mods: HashMap<i32, curseforge::Mod>,
+        cf_files: HashMap<i32, Vec<curseforge::File>>,
+        mr_versions: HashMap<String, modrinth::version::Version>,
+        mr_projects: HashMap<String, modrinth::project::Project>,
+        /// Answer every lookup with this HTTP status instead.
+        status: Option<u16>,
+        /// Only the lookups whose call starts with this prefix get `status`.
+        down: Option<&'static str>,
+        calls: std::sync::Mutex<Vec<String>>,
+    }
+
+    impl Fixture {
+        fn calls(&self) -> Vec<String> {
+            self.calls.lock().unwrap().clone()
+        }
+        fn answer<T: Clone>(&self, call: String, value: Option<&T>) -> anyhow::Result<T> {
+            use crate::error::request::{RequestContext, RequestError, RequestErrorDetails};
+            let failing = self
+                .status
+                .filter(|_| self.down.is_none_or(|prefix| call.starts_with(prefix)));
+            self.calls.lock().unwrap().push(call);
+            let status = match (failing, value) {
+                (Some(status), _) => status,
+                (None, Some(value)) => return Ok(value.clone()),
+                (None, None) => 404,
+            };
+            Err(RequestError {
+                context: RequestContext::none(),
+                error: RequestErrorDetails::UnexpectedStatus {
+                    status: reqwest::StatusCode::from_u16(status).unwrap(),
+                    details: None,
+                },
+            }
+            .into())
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Catalogue for Fixture {
+        async fn cf_mod(&self, project: i32) -> anyhow::Result<curseforge::Mod> {
+            self.answer(format!("cf_mod:{project}"), self.cf_mods.get(&project))
+        }
+        async fn cf_file(&self, project: i32, file: i32) -> anyhow::Result<curseforge::File> {
+            let found = self
+                .cf_files
+                .get(&project)
+                .and_then(|files| files.iter().find(|f| f.id == file));
+            self.answer(format!("cf_file:{project}:{file}"), found)
+        }
+        async fn cf_files(
+            &self,
+            project: i32,
+            release: &str,
+            _: i32,
+        ) -> anyhow::Result<carbon_platforms::curseforge::CurseForgeResponse<Vec<curseforge::File>>>
+        {
+            let files: Vec<_> = self
+                .cf_files
+                .get(&project)
+                .into_iter()
+                .flatten()
+                .filter(|file| file.game_versions.iter().any(|v| v == release))
+                .cloned()
+                .collect();
+            self.answer(format!("cf_files:{project}"), Some(&files))
+                .map(|data| carbon_platforms::curseforge::CurseForgeResponse {
+                    data,
+                    pagination: None,
+                })
+        }
+        async fn mr_version(&self, version: &str) -> anyhow::Result<modrinth::version::Version> {
+            self.answer(
+                format!("mr_version:{version}"),
+                self.mr_versions.get(version),
+            )
+        }
+        async fn mr_project(&self, project: &str) -> anyhow::Result<modrinth::project::Project> {
+            self.answer(
+                format!("mr_project:{project}"),
+                self.mr_projects.get(project),
+            )
+        }
+        async fn mr_versions(
+            &self,
+            filters: ProjectVersionsFilters,
+        ) -> anyhow::Result<Vec<modrinth::version::Version>> {
+            let loaders = filters.loaders.clone();
+            let mut versions: Vec<_> = self
+                .mr_versions
+                .values()
+                .filter(|v| v.project_id == *filters.project_id)
+                .filter(|v| {
+                    loaders
+                        .as_ref()
+                        .is_none_or(|loaders| v.loaders.iter().any(|l| loaders.contains(l)))
+                })
+                .cloned()
+                .collect();
+            // Newest first, as Modrinth answers.
+            versions.sort_by(|a, b| {
+                b.date_published
+                    .cmp(&a.date_published)
+                    .then_with(|| a.id.cmp(&b.id))
+            });
+            self.answer(
+                format!("mr_versions:{}:{:?}", *filters.project_id, loaders),
+                Some(&versions),
+            )
+        }
+    }
+
+    fn mr_version(
+        project: &str,
+        id: &str,
+        filename: &str,
+        bytes: &[u8],
+        games: &[&str],
+        loaders: &[&str],
+        dependencies: serde_json::Value,
+    ) -> modrinth::version::Version {
+        use sha1::Digest;
+        serde_json::from_value(serde_json::json!({
+            "name": id, "version_number": id, "dependencies": dependencies, "game_versions": games,
+            "version_type": "release", "loaders": loaders, "featured": false, "id": id, "project_id": project,
+            "author_id": "fixture", "date_published": "2026-01-01T00:00:00Z", "downloads": 0,
+            "files": [{"hashes": {"sha1": hex::encode(sha1::Sha1::digest(bytes)), "sha512": hex::encode(sha2::Sha512::digest(bytes))},
+                "url": "https://fixture.invalid/never-requested", "filename": filename, "primary": true, "size": bytes.len()}]
+        }))
+        .unwrap()
+    }
+
+    fn mr_project(id: &str, title: &str, project_type: &str) -> modrinth::project::Project {
+        serde_json::from_value(serde_json::json!({
+            "slug": id, "title": title, "description": "", "categories": [], "client_side": "required", "server_side": "optional",
+            "body": "", "additional_categories": [], "donation_urls": [], "project_type": project_type, "downloads": 0, "id": id, "team": "fixture",
+            "published": "2026-01-01T00:00:00Z", "updated": "2026-01-01T00:00:00Z", "followers": 0, "status": "approved",
+            "license": {"id": "MIT", "name": "MIT", "url": null}, "versions": [], "game_versions": [], "loaders": []
+        }))
+        .unwrap()
+    }
+
+    fn cf_file(
+        project: i32,
+        id: i32,
+        filename: &str,
+        games: &[&str],
+        downloadable: bool,
+    ) -> curseforge::File {
+        serde_json::from_value(serde_json::json!({
+            "id": id, "gameId": 432, "modId": project, "isAvailable": true,
+            "displayName": filename, "fileName": filename, "releaseType": 1,
+            "fileStatus": 4, "hashes": [], "fileDate": "2026-01-01T00:00:00Z", "fileLength": 4, "downloadCount": 0,
+            "downloadUrl": if downloadable { serde_json::json!("https://fixture.invalid/never-requested") } else { serde_json::Value::Null },
+            "gameVersions": games, "sortableGameVersions": [], "dependencies": [], "fileFingerprint": 0
+        }))
+        .unwrap()
+    }
+
+    fn cf_mod(id: i32, name: &str) -> curseforge::Mod {
+        serde_json::from_value(serde_json::json!({
+            "id": id, "gameId": 432, "name": name, "slug": name, "summary": "", "status": 4,
+            "links": {"websiteUrl": null, "wikiUrl": null, "issuesUrl": null, "sourceUrl": null},
+            "downloadCount": 0, "isFeatured": false, "primaryCategoryId": 0, "categories": [], "classId": 6,
+            "authors": [], "logo": null, "screenshots": [], "mainFileId": 0, "latestFiles": [], "latestFilesIndexes": [],
+            "dateCreated": "2026-01-01T00:00:00Z", "dateModified": "2026-01-01T00:00:00Z", "dateReleased": "2026-01-01T00:00:00Z",
+            "allowModDistribution": true, "gamePopularityRank": 0, "isAvailable": true, "thumbsUpCount": 0
+        }))
+        .unwrap()
+    }
+
+    fn mr_parent(
+        project_type: &str,
+        filename: &str,
+        bytes: &[u8],
+        dependencies: serde_json::Value,
+        catalogue: &Arc<Fixture>,
+    ) -> ModrinthModInstaller {
+        let mut resource = ModrinthModInstaller::from_version(
+            mr_version(
+                "parent",
+                "parent-2",
+                filename,
+                bytes,
+                &["1.20.1"],
+                &["fabric"],
+                dependencies,
+            ),
+            mr_project("parent", "Parent", project_type),
+        )
+        .unwrap();
+        resource.catalogue = Some(catalogue.clone());
+        resource
+    }
+
+    fn cf_parent(
+        filename: &str,
+        bytes: &[u8],
+        requires: i32,
+        catalogue: &Arc<Fixture>,
+    ) -> CurseforgeModInstaller {
+        let mut resource = cf(filename, bytes, curseforge::ClassId::Mods);
+        resource.file.dependencies =
+            serde_json::from_value(serde_json::json!([{"modId": requires, "relationType": 3}]))
+                .unwrap();
+        resource.catalogue = Some(catalogue.clone());
+        resource
+    }
+
+    async fn instance(
+        app: &Arc<AppInner>,
+        name: &str,
+        release: &str,
+        loader: Option<ModLoaderType>,
+    ) -> InstanceId {
+        let group = app.instance_manager().get_default_group().await.unwrap();
+        app.instance_manager()
+            .create_instance(
+                group,
+                name.to_owned(),
+                false,
+                super::super::super::InstanceVersionSource::Version(GameVersion::Standard(
+                    StandardVersion {
+                        release: release.to_owned(),
+                        modloaders: loader
+                            .map(|type_| ModLoader {
+                                type_,
+                                version: "0".into(),
+                            })
+                            .into_iter()
+                            .collect(),
+                    },
+                )),
+                String::new(),
+            )
+            .await
+            .unwrap()
+    }
+
+    /// A copy in the mods folder whose metadata is linked to platform projects.
+    async fn installed(
+        app: &Arc<AppInner>,
+        id: InstanceId,
+        filename: &str,
+        enabled: bool,
+        cf: Option<(i32, i32, &str)>,
+        mr: Option<(&str, &str, &str)>,
+    ) -> mfcdb::ModFileCacheRow {
+        installed_copy(app, id, filename, enabled, cf, mr, None).await
+    }
+
+    /// A jar the scan could not link to any platform, with its mod id.
+    async fn unlinked(
+        app: &Arc<AppInner>,
+        id: InstanceId,
+        filename: &str,
+        modid: Option<&str>,
+    ) -> mfcdb::ModFileCacheRow {
+        installed_copy(app, id, filename, true, None, None, modid).await
+    }
+
+    async fn installed_copy(
+        app: &Arc<AppInner>,
+        id: InstanceId,
+        filename: &str,
+        enabled: bool,
+        cf: Option<(i32, i32, &str)>,
+        mr: Option<(&str, &str, &str)>,
+        modid: Option<&str>,
+    ) -> mfcdb::ModFileCacheRow {
+        let path = publication::current_path(app, id).await.unwrap();
+        let folder = path.get_mods_path();
+        std::fs::create_dir_all(&folder).unwrap();
+        let physical = if enabled {
+            filename.to_owned()
+        } else {
+            format!("{filename}.disabled")
+        };
+        std::fs::write(folder.join(physical), filename.as_bytes()).unwrap();
+        let metadata = format!("{}-{filename}", id.0);
+        let now = || DbDateTime(chrono::Utc::now().fixed_offset());
+        metarepo::insert_metadata(
+            &app.db,
+            &metadata,
+            0,
+            metadata.as_bytes(),
+            metadata.as_bytes(),
+            "fabric",
+            None,
+            modid,
+            None,
+            None,
+            None,
+            now(),
+        )
+        .await
+        .unwrap();
+        mfcdb::upsert_mod_file_cache(
+            &app.db,
+            *id,
+            filename.to_owned(),
+            filename.len() as i32,
+            enabled,
+            "mods".into(),
+            metadata.clone(),
+            now(),
+        )
+        .await
+        .unwrap();
+        if let Some((project, file, name)) = cf {
+            metarepo::upsert_cf_mod_cache(
+                &app.db,
+                0,
+                project,
+                file,
+                name.into(),
+                "1".into(),
+                name.into(),
+                "".into(),
+                "".into(),
+                1,
+                "".into(),
+                now(),
+                metadata.clone(),
+            )
+            .await
+            .unwrap();
+        }
+        if let Some((project, version, title)) = mr {
+            metarepo::upsert_mr_mod_cache(
+                &app.db,
+                hex::encode(metadata.as_bytes()),
+                project.into(),
+                version.into(),
+                title.into(),
+                "1".into(),
+                title.into(),
+                "".into(),
+                "".into(),
+                1,
+                "".into(),
+                filename.into(),
+                "".into(),
+                now(),
+                metadata.clone(),
+            )
+            .await
+            .unwrap();
+        }
+        mfcdb::get_mod_file_cache_by_instance_filename(&app.db, *id, filename)
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    async fn first_getter(
+        app: &Arc<AppInner>,
+        id: InstanceId,
+        resource: &dyn ResourceInstaller,
+    ) -> Option<anyhow::Result<BoxedResourceInstaller>> {
+        let getter = {
+            let manager = app.instance_manager();
+            let instances = manager.instances.read().await;
+            resource
+                .dependencies(app, id, instances[&id].data().unwrap(), ModChannel::Stable)
+                .next()
+                .unwrap()
+        };
+        getter(HashMap::new()).await
+    }
+
+    async fn plan(
+        app: &Arc<AppInner>,
+        id: InstanceId,
+        root: impl ResourceInstaller + Send + 'static,
+        replacing: bool,
+    ) -> anyhow::Result<planning::Resolution> {
+        let root: BoxedResourceInstaller = Box::new(root);
+        planning::resolve(
+            Arc::new(Mutex::new(root)),
+            app,
+            id,
+            replacing,
+            &CancellationToken::new(),
+        )
+        .await
+    }
+
+    async fn planned_ids(resolution: &planning::Resolution) -> Vec<(String, Vec<String>)> {
+        let mut ids = Vec::new();
+        for (parent, children) in &resolution.plan {
+            let mut child_ids = Vec::new();
+            for child in children {
+                child_ids.push(child.lock().await.id());
+            }
+            ids.push((parent.clone(), child_ids));
+        }
+        ids
+    }
+
+    fn modrinth_requires(project: Option<&str>, version: Option<&str>) -> serde_json::Value {
+        serde_json::json!([{"project_id": project, "version_id": version, "file_name": null, "dependency_type": "required"}])
+    }
+
+    // --- Getter: what the instance already has ------------------------------
+
+    #[tokio::test]
+    async fn enabled_curseforge_dependency_is_satisfied_without_any_lookup() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "cf-enabled", "1.12.2", Some(ModLoaderType::Forge)).await;
+        installed(
+            &app,
+            id,
+            "Baubles-1.12-1.5.2.jar",
+            true,
+            Some((227083, 2518667, "Baubles")),
+            None,
+        )
+        .await;
+        let catalogue = Arc::new(Fixture::default());
+        let parent = cf_parent("parent.jar", b"parent", 227083, &catalogue);
+        assert!(first_getter(&app, id, &parent).await.is_none());
+        assert!(catalogue.calls().is_empty(), "{:?}", catalogue.calls());
+    }
+
+    #[tokio::test]
+    async fn modrinth_pin_of_another_version_keeps_the_installed_copy() {
+        // Iris 1.7.6 pins Sodium 0.5.12-beta.2 (ryOMVRuG) while 0.5.13 is installed.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "mr-pin", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        installed(
+            &app,
+            id,
+            "sodium-0.5.13.jar",
+            true,
+            None,
+            Some((SODIUM, "OihdIimA", "Sodium")),
+        )
+        .await;
+        let catalogue = Arc::new(Fixture::default());
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("ryOMVRuG")),
+            &catalogue,
+        );
+        assert!(first_getter(&app, id, &iris).await.is_none());
+        assert!(catalogue.calls().is_empty(), "{:?}", catalogue.calls());
+    }
+
+    #[tokio::test]
+    async fn enabled_copy_next_to_an_old_disabled_copy_is_satisfied() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(
+            &app,
+            "enabled-and-old",
+            "1.20.1",
+            Some(ModLoaderType::Fabric),
+        )
+        .await;
+        installed(
+            &app,
+            id,
+            "fabric-api-old.jar",
+            false,
+            Some((306612, 1, "Fabric API")),
+            None,
+        )
+        .await;
+        installed(
+            &app,
+            id,
+            "fabric-api-new.jar",
+            true,
+            Some((306612, 2, "Fabric API")),
+            None,
+        )
+        .await;
+        let catalogue = Arc::new(Fixture::default());
+        let parent = cf_parent("parent.jar", b"parent", 306612, &catalogue);
+        assert!(first_getter(&app, id, &parent).await.is_none());
+        assert!(catalogue.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn two_enabled_copies_are_satisfied() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "two-enabled", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        installed(
+            &app,
+            id,
+            "sodium-a.jar",
+            true,
+            None,
+            Some((SODIUM, "A", "Sodium")),
+        )
+        .await;
+        installed(
+            &app,
+            id,
+            "sodium-b.jar",
+            true,
+            None,
+            Some((SODIUM, "B", "Sodium")),
+        )
+        .await;
+        let catalogue = Arc::new(Fixture::default());
+        let parent = mr_parent(
+            "mod",
+            "parent.jar",
+            b"parent",
+            modrinth_requires(Some(SODIUM), None),
+            &catalogue,
+        );
+        assert!(first_getter(&app, id, &parent).await.is_none());
+        assert!(catalogue.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn enabled_copy_with_stale_hash_is_satisfied() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "stale-hash", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        installed(
+            &app,
+            id,
+            "library.jar",
+            true,
+            Some((42, 7, "Library")),
+            None,
+        )
+        .await;
+        let path = publication::current_path(&app, id).await.unwrap();
+        std::fs::write(
+            path.get_mods_path().join("library.jar"),
+            b"edited after the scan",
+        )
+        .unwrap();
+        let catalogue = Arc::new(Fixture::default());
+        let parent = cf_parent("parent.jar", b"parent", 42, &catalogue);
+        assert!(first_getter(&app, id, &parent).await.is_none());
+        // The probe never rewrites the user's file.
+        assert_eq!(
+            std::fs::read(path.get_mods_path().join("library.jar")).unwrap(),
+            b"edited after the scan"
+        );
+    }
+
+    #[tokio::test]
+    async fn copy_that_cannot_be_inspected_uses_its_recorded_state() {
+        // Both library.jar and library.jar.disabled exist: selected_file refuses
+        // to pick one, but the scanner recorded an enabled copy.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "ambiguous", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        installed(
+            &app,
+            id,
+            "library.jar",
+            true,
+            Some((42, 7, "Library")),
+            None,
+        )
+        .await;
+        let path = publication::current_path(&app, id).await.unwrap();
+        std::fs::write(path.get_mods_path().join("library.jar.disabled"), b"old").unwrap();
+        let catalogue = Arc::new(Fixture::default());
+        let parent = cf_parent("parent.jar", b"parent", 42, &catalogue);
+        assert!(first_getter(&app, id, &parent).await.is_none());
+    }
+
+    #[tokio::test]
+    async fn quilted_fabric_api_satisfies_fabric_api_on_quilt() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "qfapi", "1.20.1", Some(ModLoaderType::Quilt)).await;
+        installed(
+            &app,
+            id,
+            "qfapi.jar",
+            true,
+            None,
+            Some(("qvIfYCYJ", "Q1", "QFAPI")),
+        )
+        .await;
+        let catalogue = Arc::new(Fixture::default());
+        let parent = mr_parent(
+            "mod",
+            "parent.jar",
+            b"parent",
+            modrinth_requires(Some("P7dR8mSH"), None),
+            &catalogue,
+        );
+        assert!(first_getter(&app, id, &parent).await.is_none());
+        assert!(catalogue.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn disabled_only_copy_refuses_a_fresh_install_and_names_it() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "disabled-only", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        installed(
+            &app,
+            id,
+            "library.jar",
+            false,
+            Some((42, 7, "Library")),
+            None,
+        )
+        .await;
+        let catalogue = Arc::new(Fixture::default());
+        let parent = cf_parent("parent.jar", b"parent", 42, &catalogue);
+        let error = first_getter(&app, id, &parent)
+            .await
+            .unwrap()
+            .err()
+            .unwrap();
+        let message = error.to_string();
+        assert!(message.contains("disabled"), "{message}");
+        assert!(
+            message.contains("Library") && message.contains("library.jar"),
+            "{message}"
+        );
+        assert!(message.contains("Enable it in Addons"), "{message}");
+        let error = plan(
+            &app,
+            id,
+            cf_parent("parent.jar", b"parent", 42, &catalogue),
+            false,
+        )
+        .await
+        .err()
+        .unwrap();
+        assert!(
+            error.to_string().contains("installed but disabled"),
+            "{error:#}"
+        );
+        assert!(catalogue.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn disabled_only_copy_counts_as_present_on_an_update() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(
+            &app,
+            "disabled-update",
+            "1.20.1",
+            Some(ModLoaderType::Fabric),
+        )
+        .await;
+        installed(
+            &app,
+            id,
+            "library.jar",
+            false,
+            Some((42, 7, "Library")),
+            None,
+        )
+        .await;
+        let catalogue = Arc::new(Fixture::default());
+        let parent = cf_parent("parent.jar", b"parent", 42, &catalogue);
+        let root_id = parent.id();
+        let resolution = plan(&app, id, parent, true).await.unwrap();
+        assert_eq!(planned_ids(&resolution).await, vec![(root_id, vec![])]);
+        assert!(resolution.skipped.is_empty());
+        assert!(catalogue.calls().is_empty());
+    }
+
+    // --- Selection of what is downloaded --------------------------------------
+
+    fn target(release: &str, loader: Option<ModLoaderType>) -> DependencyTarget {
+        (
+            release.to_owned(),
+            loader
+                .map(|type_| ModLoader {
+                    type_,
+                    version: "0".into(),
+                })
+                .into_iter()
+                .collect(),
+        )
+    }
+
+    fn select_cf<'a>(
+        files: &'a [curseforge::File],
+        target: &DependencyTarget,
+    ) -> anyhow::Result<&'a curseforge::File> {
+        select_dependency(files, Some(target), false, ModChannel::Stable, |f| {
+            (
+                &f.game_versions,
+                &f.game_versions,
+                ModChannel::from(f.release_type),
+            )
+        })
+    }
+
+    fn select_mr<'a>(
+        versions: &'a [modrinth::version::Version],
+        target: &DependencyTarget,
+    ) -> anyhow::Result<&'a modrinth::version::Version> {
+        select_dependency(versions, Some(target), false, ModChannel::Stable, |v| {
+            (
+                &v.game_versions,
+                &v.loaders,
+                ModChannel::from(v.version_type),
+            )
+        })
+    }
+
+    #[test]
+    fn untagged_legacy_curseforge_file_is_accepted_on_forge_1_12_2() {
+        let files = [cf_file(
+            227083,
+            2518667,
+            "Baubles-1.12-1.5.2.jar",
+            &["1.12.2"],
+            true,
+        )];
+        let selected = select_cf(&files, &target("1.12.2", Some(ModLoaderType::Forge))).unwrap();
+        assert_eq!(selected.id, 2518667);
+    }
+
+    #[test]
+    fn fabric_only_modrinth_version_is_accepted_on_quilt() {
+        let versions = [mr_version(
+            "P7dR8mSH",
+            "F1",
+            "fabric-api.jar",
+            b"f",
+            &["1.20.1"],
+            &["fabric"],
+            serde_json::json!([]),
+        )];
+        assert!(select_mr(&versions, &target("1.20.1", Some(ModLoaderType::Quilt))).is_ok());
+    }
+
+    #[test]
+    fn forge_tagged_file_is_accepted_on_neoforge_1_20_1_only() {
+        let files = [cf_file(1, 1, "lib-1.20.1.jar", &["1.20.1", "Forge"], true)];
+        assert!(select_cf(&files, &target("1.20.1", Some(ModLoaderType::Neoforge))).is_ok());
+        let files = [cf_file(1, 2, "lib-1.21.1.jar", &["1.21.1", "Forge"], true)];
+        assert!(select_cf(&files, &target("1.21.1", Some(ModLoaderType::Neoforge))).is_err());
+    }
+
+    #[test]
+    fn forge_only_file_for_another_release_is_still_rejected_on_fabric() {
+        // GPT-0071: never fall back to an incompatible artifact.
+        let files = [
+            cf_file(1, 1, "lib-forge-1.21.jar", &["1.21", "Forge"], true),
+            cf_file(1, 2, "lib-forge-1.20.1.jar", &["1.20.1", "Forge"], true),
+        ];
+        assert!(select_cf(&files, &target("1.20.1", Some(ModLoaderType::Fabric))).is_err());
+        let versions = [mr_version(
+            "p",
+            "v",
+            "lib.jar",
+            b"l",
+            &["1.21"],
+            &["forge"],
+            serde_json::json!([]),
+        )];
+        assert!(select_mr(&versions, &target("1.20.1", Some(ModLoaderType::Fabric))).is_err());
+    }
+
+    #[test]
+    fn untagged_file_is_only_a_fallback_and_never_loads_on_vanilla() {
+        let files = [
+            cf_file(1, 1, "lib-untagged.jar", &["1.20.1"], true),
+            cf_file(1, 2, "lib-fabric.jar", &["1.20.1", "Fabric"], true),
+        ];
+        let fabric = target("1.20.1", Some(ModLoaderType::Fabric));
+        assert_eq!(select_cf(&files, &fabric).unwrap().id, 2);
+        assert!(select_cf(&files[..1], &target("1.20.1", None)).is_err());
+    }
+
+    #[test]
+    fn loader_fit_table() {
+        let tags = |tags: &[&str]| tags.iter().map(|t| t.to_string()).collect::<Vec<_>>();
+        let quilt = dependency::accepted_loader_tags("1.20.1", [ModLoaderType::Quilt]);
+        assert_eq!(
+            dependency::loader_fit(&tags(&["1.20.1", "Fabric"]), &quilt),
+            LoaderFit::Tagged
+        );
+        assert_eq!(
+            dependency::loader_fit(&tags(&["1.20.1", "Forge"]), &quilt),
+            LoaderFit::Foreign
+        );
+        assert_eq!(
+            dependency::loader_fit(&tags(&["1.12.2"]), &quilt),
+            LoaderFit::Untagged
+        );
+        assert_eq!(
+            dependency::loader_fit(&tags(&["paper"]), &quilt),
+            LoaderFit::Foreign
+        );
+        let neo = dependency::accepted_loader_tags("1.20.1", [ModLoaderType::Neoforge]);
+        assert_eq!(
+            dependency::loader_fit(&tags(&["Forge"]), &neo),
+            LoaderFit::Tagged
+        );
+        let neo = dependency::accepted_loader_tags("1.21.1", [ModLoaderType::Neoforge]);
+        assert_eq!(
+            dependency::loader_fit(&tags(&["Forge"]), &neo),
+            LoaderFit::Foreign
+        );
+        assert_eq!(
+            dependency::loader_fit(&tags(&["1.20.1"]), &[]),
+            LoaderFit::Foreign
+        );
+    }
+
+    // --- Planning --------------------------------------------------------------
+
+    #[tokio::test]
+    async fn installed_dependency_is_neither_fetched_nor_walked() {
+        // Sodium's own metadata would pull in another library if it were walked.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "no-walk", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        installed(
+            &app,
+            id,
+            "sodium.jar",
+            true,
+            None,
+            Some((SODIUM, "OihdIimA", "Sodium")),
+        )
+        .await;
+        let mut fixture = Fixture::default();
+        fixture.mr_versions.insert(
+            "OihdIimA".into(),
+            mr_version(
+                SODIUM,
+                "OihdIimA",
+                "sodium.jar",
+                b"s",
+                &["1.20.1"],
+                &["fabric"],
+                modrinth_requires(Some("transitive"), None),
+            ),
+        );
+        fixture
+            .mr_projects
+            .insert(SODIUM.into(), mr_project(SODIUM, "Sodium", "mod"));
+        let catalogue = Arc::new(fixture);
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("ryOMVRuG")),
+            &catalogue,
+        );
+        let root_id = iris.id();
+        let resolution = plan(&app, id, iris, false).await.unwrap();
+        assert_eq!(planned_ids(&resolution).await, vec![(root_id, vec![])]);
+        assert!(resolution.skipped.is_empty());
+        assert!(catalogue.calls().is_empty(), "{:?}", catalogue.calls());
+    }
+
+    #[tokio::test]
+    async fn missing_pinned_dependency_downloads_the_exact_pin() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "pin-download", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        let mut fixture = Fixture::default();
+        for (version, filename) in [
+            ("ryOMVRuG", "sodium-0.5.12-beta.2.jar"),
+            ("OihdIimA", "sodium-0.5.13.jar"),
+        ] {
+            fixture.mr_versions.insert(
+                version.into(),
+                mr_version(
+                    SODIUM,
+                    version,
+                    filename,
+                    b"s",
+                    &["1.20.1"],
+                    &["fabric"],
+                    serde_json::json!([]),
+                ),
+            );
+        }
+        fixture
+            .mr_projects
+            .insert(SODIUM.into(), mr_project(SODIUM, "Sodium", "mod"));
+        let catalogue = Arc::new(fixture);
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("ryOMVRuG")),
+            &catalogue,
+        );
+        let root_id = iris.id();
+        let resolution = plan(&app, id, iris, false).await.unwrap();
+        let planned = planned_ids(&resolution).await;
+        let root = planned
+            .iter()
+            .find(|(parent, _)| *parent == root_id)
+            .unwrap();
+        assert_eq!(root.1, vec![format!("modrinth:{SODIUM}:ryOMVRuG")]);
+        assert!(resolution.skipped.is_empty());
+        assert!(
+            !catalogue
+                .calls()
+                .iter()
+                .any(|call| call.starts_with("mr_versions")),
+            "a pin is downloaded as is: {:?}",
+            catalogue.calls()
+        );
+    }
+
+    #[tokio::test]
+    async fn missing_untagged_library_resolves_on_forge_1_12_2() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "legacy-forge", "1.12.2", Some(ModLoaderType::Forge)).await;
+        let mut fixture = Fixture::default();
+        fixture.cf_mods.insert(227083, cf_mod(227083, "Baubles"));
+        fixture.cf_files.insert(
+            227083,
+            vec![cf_file(
+                227083,
+                2518667,
+                "Baubles-1.12-1.5.2.jar",
+                &["1.12.2"],
+                true,
+            )],
+        );
+        let catalogue = Arc::new(fixture);
+        let parent = cf_parent("parent.jar", b"parent", 227083, &catalogue);
+        let root_id = parent.id();
+        let resolution = plan(&app, id, parent, false).await.unwrap();
+        let planned = planned_ids(&resolution).await;
+        let root = planned
+            .iter()
+            .find(|(parent, _)| *parent == root_id)
+            .unwrap();
+        assert_eq!(root.1, vec!["curseforge:227083:2518667".to_owned()]);
+    }
+
+    #[tokio::test]
+    async fn unresolvable_dependency_is_skipped_with_its_name() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(
+            &app,
+            "not-downloadable",
+            "1.20.1",
+            Some(ModLoaderType::Forge),
+        )
+        .await;
+        let mut fixture = Fixture::default();
+        fixture.cf_mods.insert(9, cf_mod(9, "Private Library"));
+        fixture.cf_files.insert(
+            9,
+            vec![cf_file(9, 90, "private.jar", &["1.20.1", "Forge"], false)],
+        );
+        let catalogue = Arc::new(fixture);
+        let parent = cf_parent("parent.jar", b"parent", 9, &catalogue);
+        let root_id = parent.id();
+        let resolution = plan(&app, id, parent, false).await.unwrap();
+        assert_eq!(planned_ids(&resolution).await, vec![(root_id, vec![])]);
+        assert_eq!(resolution.skipped.len(), 1);
+        assert_eq!(
+            resolution.skipped[0].name.as_deref(),
+            Some("Private Library")
+        );
+        assert_eq!(resolution.skipped[0].project_id, "9");
+        assert_eq!(
+            resolution.skipped[0].reason,
+            SkippedDependencyReason::NotDownloadable
+        );
+    }
+
+    fn sodium_fixture(versions: &[(&str, &[&str])]) -> Fixture {
+        let mut fixture = Fixture::default();
+        let mut project = mr_project(SODIUM, "Sodium", "mod");
+        project.slug = "sodium".into();
+        fixture.mr_projects.insert(SODIUM.into(), project);
+        for (version, games) in versions {
+            fixture.mr_versions.insert(
+                (*version).into(),
+                mr_version(
+                    SODIUM,
+                    version,
+                    &format!("sodium-{version}.jar"),
+                    version.as_bytes(),
+                    games,
+                    &["fabric"],
+                    serde_json::json!([]),
+                ),
+            );
+        }
+        fixture
+    }
+
+    async fn root_children(resolution: &planning::Resolution, root_id: &str) -> Vec<String> {
+        planned_ids(resolution)
+            .await
+            .into_iter()
+            .find(|(parent, _)| parent == root_id)
+            .map(|(_, children)| children)
+            .unwrap()
+    }
+
+    async fn child_is_exact(resolution: &planning::Resolution, root_id: &str) -> bool {
+        resolution.plan[root_id][0].lock().await.exact_dependency()
+    }
+
+    #[tokio::test]
+    async fn pin_for_another_release_falls_back_to_a_compatible_version() {
+        // Indium 1.0.36+mc1.20.1 is listed for 1.20.6 but pins Sodium
+        // mc1.20.1-0.5.11 (ygf8cVZg, 1.20.1 only); mc1.20.6-0.5.11 exists.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "pin-release", "1.20.6", Some(ModLoaderType::Fabric)).await;
+        let catalogue = Arc::new(sodium_fixture(&[
+            ("ygf8cVZg", &["1.20.1"]),
+            ("OwLQelEI", &["1.20.6"]),
+        ]));
+        let indium = mr_parent(
+            "mod",
+            "indium.jar",
+            b"indium",
+            modrinth_requires(Some(SODIUM), Some("ygf8cVZg")),
+            &catalogue,
+        );
+        let root_id = indium.id();
+        let resolution = plan(&app, id, indium, false).await.unwrap();
+        assert_eq!(
+            root_children(&resolution, &root_id).await,
+            vec![format!("modrinth:{SODIUM}:OwLQelEI")]
+        );
+        assert!(resolution.skipped.is_empty());
+        // The replacement is not the declared pin, so it binds no other dependant.
+        assert!(!child_is_exact(&resolution, &root_id).await);
+        // Only if nothing fits is the dependency skipped, and then truly has no
+        // version for this game and loader.
+        let catalogue = Arc::new(sodium_fixture(&[("ygf8cVZg", &["1.20.1"])]));
+        let indium = mr_parent(
+            "mod",
+            "indium.jar",
+            b"indium",
+            modrinth_requires(Some(SODIUM), Some("ygf8cVZg")),
+            &catalogue,
+        );
+        let resolution = plan(&app, id, indium, false).await.unwrap();
+        assert_eq!(resolution.skipped.len(), 1);
+        assert_eq!(resolution.skipped[0].name.as_deref(), Some("Sodium"));
+        assert_eq!(
+            resolution.skipped[0].reason,
+            SkippedDependencyReason::NoCompatibleVersion
+        );
+    }
+
+    #[tokio::test]
+    async fn removed_pin_falls_back_and_skips_are_named_by_title() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "lookup", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        // 404 on the pin: the newest compatible version is used instead.
+        let catalogue = Arc::new(sodium_fixture(&[("OihdIimA", &["1.20.1"])]));
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("gone")),
+            &catalogue,
+        );
+        let root_id = iris.id();
+        let resolution = plan(&app, id, iris, false).await.unwrap();
+        assert_eq!(
+            root_children(&resolution, &root_id).await,
+            vec![format!("modrinth:{SODIUM}:OihdIimA")]
+        );
+        assert!(resolution.skipped.is_empty());
+        // Pin gone and nothing compatible: skipped under its title.
+        let catalogue = Arc::new(sodium_fixture(&[]));
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("gone")),
+            &catalogue,
+        );
+        let resolution = plan(&app, id, iris, false).await.unwrap();
+        assert_eq!(resolution.skipped.len(), 1);
+        assert_eq!(resolution.skipped[0].name.as_deref(), Some("Sodium"));
+        assert_eq!(resolution.skipped[0].project_id, SODIUM);
+        // The project itself is gone: no name to give, the UI names the platform.
+        let catalogue = Arc::new(Fixture::default());
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("gone")),
+            &catalogue,
+        );
+        let resolution = plan(&app, id, iris, false).await.unwrap();
+        assert_eq!(resolution.skipped.len(), 1);
+        assert_eq!(resolution.skipped[0].name, None);
+        assert_eq!(resolution.skipped[0].platform, DependencyPlatform::Modrinth);
+        assert_eq!(resolution.skipped[0].project_id, SODIUM);
+        assert_eq!(
+            resolution.skipped[0].reason,
+            SkippedDependencyReason::Unavailable
+        );
+    }
+
+    #[tokio::test]
+    async fn lookup_outage_stays_fatal_and_names_the_dependency() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "outage", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        // 503 on the pin: never install the addon without its dependency over
+        // a transient error, and say which dependency could not be looked up.
+        let mut fixture = sodium_fixture(&[("OihdIimA", &["1.20.1"])]);
+        fixture.status = Some(503);
+        fixture.down = Some("mr_version:");
+        let catalogue = Arc::new(fixture);
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("ryOMVRuG")),
+            &catalogue,
+        );
+        let error = plan(&app, id, iris, false).await.err().unwrap();
+        assert!(
+            format!("{error:#}").contains(&format!(
+                "Could not look up required dependency Sodium ({SODIUM})"
+            )),
+            "{error:#}"
+        );
+        // Everything down: only the id is known.
+        let catalogue = Arc::new(Fixture {
+            status: Some(503),
+            ..Default::default()
+        });
+        let parent = cf_parent("parent.jar", b"parent", 12345, &catalogue);
+        let error = plan(&app, id, parent, false).await.err().unwrap();
+        assert!(
+            format!("{error:#}")
+                .contains("Could not look up required dependency CurseForge project 12345"),
+            "{error:#}"
+        );
+    }
+
+    #[tokio::test]
+    async fn modrinth_query_asks_for_the_loaders_the_instance_runs() {
+        for (loader, release, asked) in [
+            (
+                ModLoaderType::Quilt,
+                "1.20.1",
+                r#"Some(["fabric", "quilt"])"#,
+            ),
+            (
+                ModLoaderType::Neoforge,
+                "1.20.1",
+                r#"Some(["forge", "neoforge"])"#,
+            ),
+            (ModLoaderType::Neoforge, "1.21.1", r#"Some(["neoforge"])"#),
+        ] {
+            let app = crate::setup_managers_for_test().await;
+            let id = instance(&app, "loaders", release, Some(loader)).await;
+            let mut fixture = Fixture::default();
+            fixture.mr_projects.insert(
+                "P7dR8mSH".into(),
+                mr_project("P7dR8mSH", "Fabric API", "mod"),
+            );
+            fixture.mr_versions.insert(
+                "F1".into(),
+                mr_version(
+                    "P7dR8mSH",
+                    "F1",
+                    "fabric-api.jar",
+                    b"f",
+                    &[release],
+                    &["fabric", "forge"],
+                    serde_json::json!([]),
+                ),
+            );
+            let catalogue = Arc::new(fixture);
+            let parent = mr_parent(
+                "mod",
+                "parent.jar",
+                b"parent",
+                modrinth_requires(Some("P7dR8mSH"), None),
+                &catalogue,
+            );
+            plan(&app, id, parent, false).await.unwrap();
+            let expected = format!("mr_versions:P7dR8mSH:{asked}");
+            assert!(
+                catalogue.calls().contains(&expected),
+                "{loader:?} {release}: {:?}",
+                catalogue.calls()
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn file_name_only_dependency_is_satisfied_by_that_file() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "file-only", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        let catalogue = Arc::new(Fixture::default());
+        let requires = serde_json::json!([{"project_id": null, "version_id": null, "file_name": "library-1.0.jar", "dependency_type": "required"}]);
+        let parent = || mr_parent("mod", "parent.jar", b"parent", requires.clone(), &catalogue);
+        // Missing: named once, by its file name.
+        let resolution = plan(&app, id, parent(), false).await.unwrap();
+        assert_eq!(resolution.skipped.len(), 1);
+        assert_eq!(
+            resolution.skipped[0].name.as_deref(),
+            Some("library-1.0.jar")
+        );
+        assert_eq!(resolution.skipped[0].project_id, "library-1.0.jar");
+        // A jar the scanner has not seen yet.
+        let mods = publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_mods_path();
+        std::fs::create_dir_all(&mods).unwrap();
+        std::fs::write(mods.join("library-1.0.jar"), b"library").unwrap();
+        assert!(first_getter(&app, id, &parent()).await.is_none());
+        std::fs::remove_file(mods.join("library-1.0.jar")).unwrap();
+        // A scanned copy.
+        unlinked(&app, id, "library-1.0.jar", None).await;
+        assert!(first_getter(&app, id, &parent()).await.is_none());
+        assert!(catalogue.calls().is_empty(), "{:?}", catalogue.calls());
+    }
+
+    #[tokio::test]
+    async fn unlinked_jar_with_the_dependency_mod_id_is_kept() {
+        // A Sodium CI build the scan cannot link to the project: Fabric refuses
+        // to start with two jars of mod id "sodium".
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "unlinked", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        unlinked(&app, id, "sodium-ci-build.jar", Some("sodium")).await;
+        let catalogue = Arc::new(sodium_fixture(&[("OihdIimA", &["1.20.1"])]));
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("OihdIimA")),
+            &catalogue,
+        );
+        let root_id = iris.id();
+        let resolution = plan(&app, id, iris, false).await.unwrap();
+        assert_eq!(planned_ids(&resolution).await, vec![(root_id, vec![])]);
+        assert!(resolution.skipped.is_empty());
+        assert_eq!(catalogue.calls(), vec![format!("mr_project:{SODIUM}")]);
+        // Same on CurseForge, where Forge mod ids use '_' for the slug's '-'.
+        let id = instance(&app, "unlinked-cf", "1.20.1", Some(ModLoaderType::Forge)).await;
+        unlinked(&app, id, "cloth-config-dev.jar", Some("cloth_config")).await;
+        let mut fixture = Fixture::default();
+        fixture
+            .cf_mods
+            .insert(348521, cf_mod(348521, "cloth-config"));
+        let catalogue = Arc::new(fixture);
+        let parent = cf_parent("parent.jar", b"parent", 348521, &catalogue);
+        assert!(first_getter(&app, id, &parent).await.is_none());
+        assert_eq!(catalogue.calls(), vec!["cf_mod:348521".to_owned()]);
+    }
+
+    #[tokio::test]
+    async fn enabled_jar_of_a_disabled_copys_mod_id_satisfies_a_fresh_install() {
+        // The Duplicate mods resolver kept a Sodium build from GitHub and
+        // disabled the Modrinth copy. Iris must install: enabling the disabled
+        // copy, as the refusal would advise, starts the game with two "sodium".
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "github-sodium", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        unlinked(&app, id, "sodium-github-build.jar", Some("sodium")).await;
+        installed_copy(
+            &app,
+            id,
+            "sodium-fabric-0.5.13+mc1.20.1.jar",
+            false,
+            None,
+            Some((SODIUM, "OihdIimA", "Sodium")),
+            Some("sodium"),
+        )
+        .await;
+        let catalogue = Arc::new(sodium_fixture(&[("OihdIimA", &["1.20.1"])]));
+        let iris = || {
+            mr_parent(
+                "mod",
+                "iris.jar",
+                b"iris",
+                modrinth_requires(Some(SODIUM), Some("OihdIimA")),
+                &catalogue,
+            )
+        };
+        let root_id = iris().id();
+        let resolution = plan(&app, id, iris(), false).await.unwrap();
+        assert_eq!(planned_ids(&resolution).await, vec![(root_id, vec![])]);
+        assert!(resolution.skipped.is_empty());
+        assert!(catalogue.calls().is_empty(), "{:?}", catalogue.calls());
+
+        // The enabled copy is linked only to the other platform.
+        let id = instance(&app, "cf-sodium", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        installed_copy(
+            &app,
+            id,
+            "sodium-curseforge.jar",
+            true,
+            Some((394468, 1, "Sodium")),
+            None,
+            Some("sodium"),
+        )
+        .await;
+        installed_copy(
+            &app,
+            id,
+            "sodium-modrinth.jar",
+            false,
+            None,
+            Some((SODIUM, "OihdIimA", "Sodium")),
+            Some("sodium"),
+        )
+        .await;
+        assert!(first_getter(&app, id, &iris()).await.is_none());
+
+        // The same through a CurseForge requirement, without any lookup.
+        let id = instance(
+            &app,
+            "cf-github-sodium",
+            "1.20.1",
+            Some(ModLoaderType::Fabric),
+        )
+        .await;
+        unlinked(&app, id, "sodium-github-build.jar", Some("sodium")).await;
+        installed_copy(
+            &app,
+            id,
+            "sodium-curseforge.jar",
+            false,
+            // One CurseForge file links to one copy; the first case owns file 1.
+            Some((394468, 2, "Sodium")),
+            None,
+            Some("sodium"),
+        )
+        .await;
+        let parent = cf_parent("iris.jar", b"iris", 394468, &catalogue);
+        assert!(first_getter(&app, id, &parent).await.is_none());
+        assert!(catalogue.calls().is_empty(), "{:?}", catalogue.calls());
+
+        // An enabled jar of another mod id does not provide it.
+        let id = instance(&app, "other-mod", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        unlinked(&app, id, "lithium.jar", Some("lithium")).await;
+        installed_copy(
+            &app,
+            id,
+            "sodium-modrinth.jar",
+            false,
+            None,
+            Some((SODIUM, "OihdIimA", "Sodium")),
+            Some("sodium"),
+        )
+        .await;
+        let error = first_getter(&app, id, &iris())
+            .await
+            .unwrap()
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(error.contains("installed but disabled"), "{error}");
+    }
+
+    fn sodium_releases(versions: &[(&str, &str, &[&str])]) -> Fixture {
+        let mut fixture = sodium_fixture(&[]);
+        for (id, number, games) in versions {
+            let mut version = mr_version(
+                SODIUM,
+                id,
+                &format!("sodium-{number}.jar"),
+                id.as_bytes(),
+                games,
+                &["fabric"],
+                serde_json::json!([]),
+            );
+            version.version_number = (*number).into();
+            fixture.mr_versions.insert((*id).into(), version);
+        }
+        fixture
+    }
+
+    #[tokio::test]
+    async fn pin_for_another_release_prefers_the_same_release_and_says_nothing() {
+        // Indium 1.0.36+mc1.20.1 is listed for 1.20.6 but pins Sodium
+        // mc1.20.1-0.5.11; the same release is built for 1.20.6.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "same-release", "1.20.6", Some(ModLoaderType::Fabric)).await;
+        let mut fixture = sodium_releases(&[
+            ("ygf8cVZg", "mc1.20.1-0.5.11", &["1.20.1"]),
+            ("OwLQelEI", "mc1.20.6-0.5.11", &["1.20.6"]),
+            ("NewerOne", "mc1.20.6-0.5.12", &["1.20.6"]),
+        ]);
+        // The newest compatible version is 0.5.12.
+        fixture
+            .mr_versions
+            .get_mut("NewerOne")
+            .unwrap()
+            .date_published = "2026-02-01T00:00:00Z".parse().unwrap();
+        let catalogue = Arc::new(fixture);
+        let indium = mr_parent(
+            "mod",
+            "indium.jar",
+            b"indium",
+            modrinth_requires(Some(SODIUM), Some("ygf8cVZg")),
+            &catalogue,
+        );
+        let root_id = indium.id();
+        let resolution = plan(&app, id, indium, false).await.unwrap();
+        assert_eq!(
+            root_children(&resolution, &root_id).await,
+            vec![format!("modrinth:{SODIUM}:OwLQelEI")]
+        );
+        assert!(resolution.skipped.is_empty());
+        assert!(resolution.replaced.is_empty(), "{:?}", resolution.replaced);
+    }
+
+    #[tokio::test]
+    async fn pin_replaced_by_another_release_is_reported_with_both_versions() {
+        // Iris 1.11.4+26.1 is listed for 26.1.1 but pins Sodium mc26.1.2-0.9.2
+        // (26.1.2 only); 26.1.1 only has 0.8.9, which Iris may refuse.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "other-release", "26.1.1", Some(ModLoaderType::Fabric)).await;
+        let catalogue = Arc::new(sodium_releases(&[
+            ("tZQ3jqnf", "mc26.1.2-0.9.2", &["26.1.2"]),
+            ("uGvVQBnw", "mc26.1.1-0.8.9-fabric", &["26.1.1"]),
+        ]));
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("tZQ3jqnf")),
+            &catalogue,
+        );
+        let root_id = iris.id();
+        let resolution = plan(&app, id, iris, false).await.unwrap();
+        assert_eq!(
+            root_children(&resolution, &root_id).await,
+            vec![format!("modrinth:{SODIUM}:uGvVQBnw")]
+        );
+        assert!(resolution.skipped.is_empty());
+        assert_eq!(resolution.replaced.len(), 1, "{:?}", resolution.replaced);
+        assert_eq!(
+            TaskWarning::from(resolution.replaced[0].clone()),
+            TaskWarning::ReplacedPinnedVersion {
+                name: "Sodium".into(),
+                project_id: SODIUM.into(),
+                pinned: "mc26.1.2-0.9.2".into(),
+                installed: "mc26.1.1-0.8.9-fabric".into(),
+            }
+        );
+        // A pin that fits, or that is gone, is not reported.
+        let id = instance(&app, "fitting-pin", "26.1.2", Some(ModLoaderType::Fabric)).await;
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("tZQ3jqnf")),
+            &catalogue,
+        );
+        assert!(
+            plan(&app, id, iris, false)
+                .await
+                .unwrap()
+                .replaced
+                .is_empty()
+        );
+        let id = instance(&app, "gone-pin", "26.1.1", Some(ModLoaderType::Fabric)).await;
+        let iris = mr_parent(
+            "mod",
+            "iris.jar",
+            b"iris",
+            modrinth_requires(Some(SODIUM), Some("gone")),
+            &catalogue,
+        );
+        assert!(
+            plan(&app, id, iris, false)
+                .await
+                .unwrap()
+                .replaced
+                .is_empty()
+        );
+    }
+
+    #[tokio::test]
+    async fn fabric_api_pin_for_another_release_is_replaced_quietly() {
+        // A mod listed for 1.20.4 pins Fabric API 0.86.1+1.20.1 but runs with
+        // any build. Every build names its own Minecraft version, so the one
+        // for 1.20.4 is always another release; that is not worth a warning.
+        let app = crate::setup_managers_for_test().await;
+        for (api, loader, kind, pinned, built) in [
+            (
+                "P7dR8mSH",
+                "fabric",
+                ModLoaderType::Fabric,
+                "0.86.1+1.20.1",
+                "0.97.0+1.20.4",
+            ),
+            (
+                "qvIfYCYJ",
+                "quilt",
+                ModLoaderType::Quilt,
+                "7.0.6+0.86.1-1.20.1",
+                "9.0.0+0.97.0-1.20.4",
+            ),
+        ] {
+            let mut fixture = Fixture::default();
+            fixture
+                .mr_projects
+                .insert(api.into(), mr_project(api, "API", "mod"));
+            for (version_id, number, game) in
+                [("Pinned", pinned, "1.20.1"), ("Built", built, "1.20.4")]
+            {
+                let mut version = mr_version(
+                    api,
+                    version_id,
+                    &format!("{version_id}.jar"),
+                    number.as_bytes(),
+                    &[game],
+                    &[loader],
+                    serde_json::json!([]),
+                );
+                version.version_number = number.into();
+                fixture.mr_versions.insert(version_id.into(), version);
+            }
+            let catalogue = Arc::new(fixture);
+            let id = instance(&app, &format!("{loader}-api-pin"), "1.20.4", Some(kind)).await;
+            let parent = mr_parent(
+                "mod",
+                "parent.jar",
+                b"parent",
+                modrinth_requires(Some(api), Some("Pinned")),
+                &catalogue,
+            );
+            let root_id = parent.id();
+            let resolution = plan(&app, id, parent, false).await.unwrap();
+            assert_eq!(
+                root_children(&resolution, &root_id).await,
+                vec![format!("modrinth:{api}:Built")]
+            );
+            assert!(resolution.skipped.is_empty(), "{:?}", resolution.skipped);
+            assert!(resolution.replaced.is_empty(), "{:?}", resolution.replaced);
+        }
+    }
+
+    fn fabric_api_fixture(project_loaders: &[&str], version_loaders: &[&str]) -> Fixture {
+        let mut fixture = Fixture::default();
+        let mut project = mr_project("P7dR8mSH", "Fabric API", "mod");
+        project.loaders = project_loaders.iter().map(|l| (*l).to_owned()).collect();
+        fixture.mr_projects.insert("P7dR8mSH".into(), project);
+        fixture.mr_versions.insert(
+            "F1".into(),
+            mr_version(
+                "P7dR8mSH",
+                "F1",
+                "fabric-api.jar",
+                b"f",
+                &["1.21.1"],
+                version_loaders,
+                serde_json::json!([]),
+            ),
+        );
+        fixture.cf_mods.insert(306612, cf_mod(306612, "Fabric API"));
+        fixture.cf_files.insert(
+            306612,
+            vec![cf_file(
+                306612,
+                61,
+                "fabric-api.jar",
+                &["1.21.1", "Fabric"],
+                true,
+            )],
+        );
+        fixture
+    }
+
+    fn multi_loader_parent(loaders: &[&str], catalogue: &Arc<Fixture>) -> ModrinthModInstaller {
+        let mut parent = mr_parent(
+            "mod",
+            "lambdynamiclights.jar",
+            b"ldl",
+            modrinth_requires(Some("P7dR8mSH"), None),
+            catalogue,
+        );
+        parent.version.game_versions = vec!["1.21.1".into()];
+        parent.version.loaders = loaders.iter().map(|l| (*l).to_owned()).collect();
+        parent
+    }
+
+    #[tokio::test]
+    async fn requirement_of_another_loaders_build_is_left_out_quietly() {
+        // LambDynamicLights 4.8.11+1.21.1 is one upload for Fabric, NeoForge and
+        // Quilt and requires Fabric API, which NeoForge neither has nor needs.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(
+            &app,
+            "multi-loader",
+            "1.21.1",
+            Some(ModLoaderType::Neoforge),
+        )
+        .await;
+        let catalogue = Arc::new(fabric_api_fixture(&["fabric"], &["fabric"]));
+        let parent = multi_loader_parent(&["fabric", "neoforge", "quilt"], &catalogue);
+        let root_id = parent.id();
+        let resolution = plan(&app, id, parent, false).await.unwrap();
+        assert_eq!(planned_ids(&resolution).await, vec![(root_id, vec![])]);
+        assert!(resolution.skipped.is_empty(), "{:?}", resolution.skipped);
+
+        // Same for a CurseForge file tagged for both loaders.
+        let mut parent = cf_parent("parent.jar", b"parent", 306612, &catalogue);
+        parent.file.game_versions = vec!["1.21.1".into(), "Fabric".into(), "NeoForge".into()];
+        assert!(first_getter(&app, id, &parent).await.is_none());
+
+        // A NeoForge-only parent really asks for it: reported.
+        let parent = multi_loader_parent(&["neoforge"], &catalogue);
+        let resolution = plan(&app, id, parent, false).await.unwrap();
+        assert_eq!(resolution.skipped.len(), 1);
+        assert_eq!(resolution.skipped[0].name.as_deref(), Some("Fabric API"));
+        let mut parent = cf_parent("parent.jar", b"parent", 306612, &catalogue);
+        parent.file.game_versions = vec!["1.21.1".into(), "NeoForge".into()];
+        let resolution = plan(&app, id, parent, false).await.unwrap();
+        assert_eq!(resolution.skipped.len(), 1);
+
+        // A dependency that has NeoForge builds, just none for this release,
+        // is still reported for a multi-loader parent.
+        let catalogue = Arc::new(fabric_api_fixture(&["fabric", "neoforge"], &["fabric"]));
+        let parent = multi_loader_parent(&["fabric", "neoforge"], &catalogue);
+        let resolution = plan(&app, id, parent, false).await.unwrap();
+        assert_eq!(resolution.skipped.len(), 1);
+        assert_eq!(
+            resolution.skipped[0].reason,
+            SkippedDependencyReason::NoCompatibleVersion
+        );
+    }
+
+    #[test]
+    fn release_of_ignores_minecraft_versions_and_loaders() {
+        let release = |number: &str, games: &[&str]| {
+            let mut version = mr_version(
+                SODIUM,
+                "id",
+                "sodium.jar",
+                b"s",
+                games,
+                &["fabric"],
+                serde_json::json!([]),
+            );
+            version.version_number = number.into();
+            dependency::release_of(&version)
+        };
+        assert_eq!(
+            release("mc1.20.1-0.5.11", &["1.20.1"]),
+            release("mc1.20.6-0.5.11", &["1.20.6"])
+        );
+        assert_eq!(
+            release("0.92.2+1.20.1", &["1.20.1"]),
+            release("0.92.2+1.20.2", &["1.20.2"])
+        );
+        assert_eq!(
+            release("v3.11.10-fabric", &["1.21"]),
+            release("3.11.10+neoforge", &["1.21.1"])
+        );
+        assert_ne!(
+            release("mc26.1.2-0.9.2", &["26.1.2"]),
+            release("mc26.1.1-0.8.9-fabric", &["26.1.1"])
+        );
+    }
+
+    #[tokio::test]
+    async fn every_disabled_copy_is_named_when_there_are_several() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "two-disabled", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        for (filename, file) in [("fabric-api-0.92.jar", 2), ("fabric-api-0.90.jar", 1)] {
+            installed(
+                &app,
+                id,
+                filename,
+                false,
+                Some((306612, file, "Fabric API")),
+                None,
+            )
+            .await;
+        }
+        let catalogue = Arc::new(Fixture::default());
+        let parent = cf_parent("parent.jar", b"parent", 306612, &catalogue);
+        let error = first_getter(&app, id, &parent)
+            .await
+            .unwrap()
+            .err()
+            .unwrap()
+            .to_string();
+        assert!(
+            error.contains(
+                "Fabric API is installed but disabled (fabric-api-0.90.jar, fabric-api-0.92.jar)"
+            ),
+            "{error}"
+        );
+        assert!(error.contains("Enable one of them in Addons"), "{error}");
+    }
+
+    // --- Updates only add what the new version newly requires -----------------
+
+    fn mr_update(
+        new_requires: serde_json::Value,
+        catalogue: &Arc<Fixture>,
+    ) -> ModrinthModInstaller {
+        let mut parent = mr_parent("mod", "parent.jar", b"new parent", new_requires, catalogue);
+        parent.replaces(&dependency::ReplacedIds {
+            curseforge: None,
+            modrinth_version: Some("parent-1".into()),
+        });
+        parent
+    }
+
+    fn old_parent(fixture: &mut Fixture, old_requires: serde_json::Value) {
+        fixture.mr_versions.insert(
+            "parent-1".into(),
+            mr_version(
+                "parent",
+                "parent-1",
+                "parent.jar",
+                b"parent",
+                &["1.20.1"],
+                &["fabric"],
+                old_requires,
+            ),
+        );
+    }
+
+    #[tokio::test]
+    async fn update_only_resolves_requirements_the_new_version_introduces() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "update-new", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        // The old version already required Sodium: left to the user, as 2.0.40.
+        let mut fixture = sodium_fixture(&[("OihdIimA", &["1.20.1"])]);
+        old_parent(&mut fixture, modrinth_requires(Some(SODIUM), None));
+        let catalogue = Arc::new(fixture);
+        let parent = mr_update(
+            modrinth_requires(Some(SODIUM), Some("OihdIimA")),
+            &catalogue,
+        );
+        let root_id = parent.id();
+        let resolution = plan(&app, id, parent, true).await.unwrap();
+        assert_eq!(planned_ids(&resolution).await, vec![(root_id, vec![])]);
+        assert!(resolution.skipped.is_empty());
+        assert_eq!(catalogue.calls(), vec!["mr_version:parent-1".to_owned()]);
+        // A requirement new in this version is still added (GPT-0022).
+        let mut fixture = sodium_fixture(&[("OihdIimA", &["1.20.1"])]);
+        old_parent(&mut fixture, serde_json::json!([]));
+        let catalogue = Arc::new(fixture);
+        let parent = mr_update(
+            modrinth_requires(Some(SODIUM), Some("OihdIimA")),
+            &catalogue,
+        );
+        let root_id = parent.id();
+        let resolution = plan(&app, id, parent, true).await.unwrap();
+        assert_eq!(
+            root_children(&resolution, &root_id).await,
+            vec![format!("modrinth:{SODIUM}:OihdIimA")]
+        );
+        // The old version is gone from Modrinth: every missing requirement is new.
+        let catalogue = Arc::new(sodium_fixture(&[("OihdIimA", &["1.20.1"])]));
+        let parent = mr_update(modrinth_requires(Some(SODIUM), None), &catalogue);
+        let root_id = parent.id();
+        let resolution = plan(&app, id, parent, true).await.unwrap();
+        assert_eq!(
+            root_children(&resolution, &root_id).await,
+            vec![format!("modrinth:{SODIUM}:OihdIimA")]
+        );
+        // The old version cannot be looked up right now: retry, never guess.
+        let mut fixture = sodium_fixture(&[("OihdIimA", &["1.20.1"])]);
+        old_parent(&mut fixture, serde_json::json!([]));
+        fixture.status = Some(503);
+        fixture.down = Some("mr_version:parent-1");
+        let catalogue = Arc::new(fixture);
+        let parent = mr_update(modrinth_requires(Some(SODIUM), None), &catalogue);
+        let error = plan(&app, id, parent, true).await.err().unwrap();
+        assert!(
+            format!("{error:#}").contains("Could not look up the version this update replaces"),
+            "{error:#}"
+        );
+    }
+
+    #[tokio::test]
+    async fn curseforge_update_keeps_a_library_the_old_file_already_required() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "update-cf", "1.12.2", Some(ModLoaderType::Forge)).await;
+        let mut fixture = Fixture::default();
+        let mut old = cf_file(10, 1, "parent-old.jar", &["1.12.2"], true);
+        old.dependencies =
+            serde_json::from_value(serde_json::json!([{"modId": 227083, "relationType": 3}]))
+                .unwrap();
+        fixture.cf_files.insert(10, vec![old]);
+        let catalogue = Arc::new(fixture);
+        let mut parent = cf_parent("parent.jar", b"new parent", 227083, &catalogue);
+        parent.replaces(&dependency::ReplacedIds {
+            curseforge: Some((10, 1)),
+            modrinth_version: None,
+        });
+        assert!(first_getter(&app, id, &parent).await.is_none());
+        assert_eq!(catalogue.calls(), vec!["cf_file:10:1".to_owned()]);
+    }
+
+    #[tokio::test]
+    async fn update_never_downloads_a_second_copy_of_an_unlinked_library() {
+        // Sodium was added by hand (a CI build), so the scan has no platform id
+        // for it. Updating Iris, whose old version already required Sodium,
+        // must not put the platform's Sodium next to it.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(
+            &app,
+            "update-unlinked",
+            "1.20.1",
+            Some(ModLoaderType::Fabric),
+        )
+        .await;
+        let parent = installed(
+            &app,
+            id,
+            "parent.jar",
+            true,
+            None,
+            Some(("parent", "parent-1", "Parent")),
+        )
+        .await;
+        unlinked(&app, id, "sodium-ci-build.jar", None).await;
+        let mut fixture = sodium_fixture(&[("ygf8cVZg", &["1.20.1"])]);
+        old_parent(
+            &mut fixture,
+            modrinth_requires(Some(SODIUM), Some("ygf8cVZg")),
+        );
+        let catalogue = Arc::new(fixture);
+        let mut installer = Installer::new(Box::new(mr_parent(
+            "mod",
+            "parent.jar",
+            b"new parent",
+            modrinth_requires(Some(SODIUM), Some("ygf8cVZg")),
+            &catalogue,
+        )));
+        let source = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(source.path(), b"new parent").unwrap();
+        installer.download_fixture = Some(source.path().into());
+        let task = installer
+            .install(&app, id, false, Some(parent.id))
+            .await
+            .unwrap();
+        settle(&installer, &app, task).await;
+        assert!(matches!(
+            app.task_manager().get_task_outcome(task).await,
+            crate::managers::vtask::TaskOutcome::Succeeded
+        ));
+        let mods = publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_mods_path();
+        let mut files: Vec<_> = std::fs::read_dir(&mods)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        files.sort();
+        assert_eq!(files, vec!["parent.jar", "sodium-ci-build.jar"]);
+        assert_eq!(catalogue.calls(), vec!["mr_version:parent-1".to_owned()]);
+        assert!(app.task_manager().get_task_warnings().await.is_empty());
+    }
+
+    fn identity_of(row: &mfcdb::ModFileCacheRow) -> (String, String, bool, String) {
+        (
+            row.id.clone(),
+            row.filename.clone(),
+            row.enabled,
+            row.addon_type.clone(),
+        )
+    }
+
+    async fn identity(app: &Arc<AppInner>, id: &str) -> (String, String, bool, String) {
+        identity_of(
+            &mfcdb::get_mod_file_cache_by_id(&app.db, id)
+                .await
+                .unwrap()
+                .expect("dependency row retired"),
+        )
+    }
+
+    async fn settle(installer: &Installer, app: &Arc<AppInner>, task: VisualTaskId) {
+        tokio::time::timeout(
+            Duration::from_secs(20),
+            wait_install_completion(installer.abort_handle.lock().await.completion.clone()),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        for _ in 0..100 {
+            if !matches!(
+                app.task_manager().get_task_outcome(task).await,
+                crate::managers::vtask::TaskOutcome::Running(_)
+            ) {
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn update_keeps_an_installed_dependency_pinned_at_another_version() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "update-pin", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        let parent = installed(
+            &app,
+            id,
+            "parent.jar",
+            true,
+            None,
+            Some(("parent", "parent-1", "Parent")),
+        )
+        .await;
+        let sodium = installed(
+            &app,
+            id,
+            "sodium-0.5.13.jar",
+            true,
+            None,
+            Some((SODIUM, "OihdIimA", "Sodium")),
+        )
+        .await;
+        let path = publication::current_path(&app, id).await.unwrap();
+        let sodium_path = path.get_mods_path().join("sodium-0.5.13.jar");
+        let sodium_bytes = std::fs::read(&sodium_path).unwrap();
+        let catalogue = Arc::new(Fixture::default());
+        let mut installer = Installer::new(Box::new(mr_parent(
+            "mod",
+            "parent.jar",
+            b"new parent",
+            modrinth_requires(Some(SODIUM), Some("ygf8cVZg")),
+            &catalogue,
+        )));
+        let source = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(source.path(), b"new parent").unwrap();
+        installer.download_fixture = Some(source.path().into());
+        let task = installer
+            .install(&app, id, false, Some(parent.id))
+            .await
+            .unwrap();
+        settle(&installer, &app, task).await;
+        assert!(matches!(
+            app.task_manager().get_task_outcome(task).await,
+            crate::managers::vtask::TaskOutcome::Succeeded
+        ));
+        assert_eq!(
+            std::fs::read(path.get_mods_path().join("parent.jar")).unwrap(),
+            b"new parent"
+        );
+        assert_eq!(std::fs::read(&sodium_path).unwrap(), sodium_bytes);
+        // The post-install scan refreshes the fixture's synthetic metadata; the
+        // dependency's own row is kept, never replaced or retired.
+        assert_eq!(identity(&app, &sodium.id).await, identity_of(&sodium));
+        assert!(catalogue.calls().is_empty(), "{:?}", catalogue.calls());
+    }
+
+    #[tokio::test]
+    async fn update_all_over_a_disabled_mod_with_a_disabled_library_completes() {
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "disabled-pair", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        let parent = installed(&app, id, "parent.jar", false, Some((10, 1, "Parent")), None).await;
+        let library = installed(
+            &app,
+            id,
+            "library.jar",
+            false,
+            Some((42, 7, "Library")),
+            None,
+        )
+        .await;
+        let catalogue = Arc::new(Fixture::default());
+        let mut installer = Installer::new(Box::new(cf_parent(
+            "parent.jar",
+            b"new parent",
+            42,
+            &catalogue,
+        )));
+        let source = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(source.path(), b"new parent").unwrap();
+        installer.download_fixture = Some(source.path().into());
+        let task = installer
+            .install(&app, id, false, Some(parent.id))
+            .await
+            .unwrap();
+        settle(&installer, &app, task).await;
+        assert!(matches!(
+            app.task_manager().get_task_outcome(task).await,
+            crate::managers::vtask::TaskOutcome::Succeeded
+        ));
+        let mods = publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_mods_path();
+        assert_eq!(
+            std::fs::read(mods.join("parent.jar.disabled")).unwrap(),
+            b"new parent"
+        );
+        assert!(!mods.join("parent.jar").exists());
+        assert_eq!(
+            std::fs::read(mods.join("library.jar.disabled")).unwrap(),
+            b"library.jar"
+        );
+        assert_eq!(identity(&app, &library.id).await, identity_of(&library));
+        assert!(catalogue.calls().is_empty());
+    }
+
+    /// Updates `parent.jar`, whose new version newly requires Sodium, where
+    /// its row records `row_enabled` and its file on disk is `file_enabled`
+    /// (a rename the scan has not recorded yet when they differ). The update
+    /// follows the file: Sodium is added only next to an enabled copy.
+    async fn update_to_a_new_requirement(
+        app: &Arc<AppInner>,
+        base: &str,
+        row_enabled: bool,
+        file_enabled: bool,
+    ) {
+        let label = format!("row {row_enabled}, file {file_enabled}");
+        let id = instance(
+            app,
+            &format!("new-requirement-{row_enabled}-{file_enabled}"),
+            "1.20.1",
+            Some(ModLoaderType::Fabric),
+        )
+        .await;
+        let parent = installed(
+            app,
+            id,
+            "parent.jar",
+            row_enabled,
+            None,
+            Some(("parent", "parent-1", "Parent")),
+        )
+        .await;
+        // The fixture seeds synthetic metadata; settle the parent's real
+        // bytes first, so the scan that follows the library's publication
+        // does not look like the replaced copy changing under the update.
+        let manager = app.instance_manager();
+        let mods = publication::current_path(app, id)
+            .await
+            .unwrap()
+            .get_mods_path();
+        let operation = manager.lock_instance(id).await;
+        app.meta_cache_manager()
+            .refresh_published_addon(
+                &operation,
+                &mods,
+                parent.filename.clone(),
+                row_enabled,
+                parent.addon_type.clone(),
+            )
+            .await
+            .unwrap();
+        drop(operation);
+        let parent = manager.get_owned_mod_file(id, &parent.id).await.unwrap();
+        assert_eq!(parent.enabled, row_enabled, "{label}");
+        if file_enabled != row_enabled {
+            let spelling = |enabled: bool| {
+                mods.join(if enabled {
+                    "parent.jar"
+                } else {
+                    "parent.jar.disabled"
+                })
+            };
+            std::fs::rename(spelling(row_enabled), spelling(file_enabled)).unwrap();
+        }
+        let mut fixture = sodium_fixture(&[]);
+        // The served artifact is `test`, so the version's hashes are of it.
+        let mut sodium = mr_version(
+            SODIUM,
+            "OihdIimA",
+            "sodium.jar",
+            b"test",
+            &["1.20.1"],
+            &["fabric"],
+            serde_json::json!([]),
+        );
+        sodium.files[0].url = format!("{base}/sodium.jar");
+        fixture.mr_versions.insert("OihdIimA".into(), sodium);
+        old_parent(&mut fixture, serde_json::json!([]));
+        let catalogue = Arc::new(fixture);
+        let mut installer = Installer::new(Box::new(mr_parent(
+            "mod",
+            "parent.jar",
+            b"new parent",
+            modrinth_requires(Some(SODIUM), Some("OihdIimA")),
+            &catalogue,
+        )));
+        let source = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(source.path(), b"new parent").unwrap();
+        installer.download_fixture = Some(source.path().into());
+        let task = installer
+            .install(app, id, false, Some(parent.id))
+            .await
+            .unwrap();
+        settle(&installer, app, task).await;
+        let outcome = match app.task_manager().get_task_outcome(task).await {
+            crate::managers::vtask::TaskOutcome::Succeeded => "succeeded".to_owned(),
+            crate::managers::vtask::TaskOutcome::Running(_) => "still running".to_owned(),
+            crate::managers::vtask::TaskOutcome::Failed(task) => {
+                format!("failed: {:?}", task.progress)
+            }
+            _ => "dismissed or unavailable".to_owned(),
+        };
+        assert_eq!(outcome, "succeeded", "{label}");
+        let mut files: Vec<_> = std::fs::read_dir(&mods)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        files.sort();
+        if file_enabled {
+            assert_eq!(files, vec!["parent.jar", "sodium.jar"], "{label}");
+            assert_eq!(
+                std::fs::read(mods.join("parent.jar")).unwrap(),
+                b"new parent"
+            );
+            assert_eq!(std::fs::read(mods.join("sodium.jar")).unwrap(), b"test");
+        } else {
+            assert_eq!(files, vec!["parent.jar.disabled"], "{label}");
+            assert_eq!(
+                std::fs::read(mods.join("parent.jar.disabled")).unwrap(),
+                b"new parent"
+            );
+            assert!(
+                catalogue.calls().is_empty(),
+                "{label}: {:?}",
+                catalogue.calls()
+            );
+        }
+        assert!(app.task_manager().get_task_warnings().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn updating_a_disabled_mod_adds_no_library_its_new_version_requires() {
+        // Iris 1.7.1 required nothing and 1.7.6 requires Sodium. An enabled
+        // Iris gets Sodium with the update; a disabled one stays as it was, so
+        // the game is not handed a library that may break what runs instead.
+        let app = crate::setup_managers_for_test().await;
+        let base = super::round1_graph::serve_artifacts().await;
+        for enabled in [false, true] {
+            update_to_a_new_requirement(&app, &base, enabled, enabled).await;
+        }
+
+        // A disabled CurseForge mod whose new file requires a library that
+        // cannot be resolved updates without the sticky warning about it.
+        let id = instance(
+            &app,
+            "cf-new-requirement",
+            "1.20.1",
+            Some(ModLoaderType::Fabric),
+        )
+        .await;
+        let parent = installed(&app, id, "parent.jar", false, Some((10, 1, "Parent")), None).await;
+        let catalogue = Arc::new(Fixture::default());
+        let mut installer = Installer::new(Box::new(cf_parent(
+            "parent.jar",
+            b"new parent",
+            42,
+            &catalogue,
+        )));
+        let source = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(source.path(), b"new parent").unwrap();
+        installer.download_fixture = Some(source.path().into());
+        let task = installer
+            .install(&app, id, false, Some(parent.id))
+            .await
+            .unwrap();
+        settle(&installer, &app, task).await;
+        assert!(matches!(
+            app.task_manager().get_task_outcome(task).await,
+            crate::managers::vtask::TaskOutcome::Succeeded
+        ));
+        let mods = publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_mods_path();
+        let files: Vec<_> = std::fs::read_dir(&mods)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        assert_eq!(files, vec!["parent.jar.disabled"]);
+        assert!(catalogue.calls().is_empty(), "{:?}", catalogue.calls());
+        assert!(app.task_manager().get_task_warnings().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_update_adds_libraries_by_the_file_on_disk_not_a_stale_row() {
+        // The user renamed the jar in the file manager and updated it before
+        // the scan recorded the rename. The update is published as the file
+        // is, so its libraries follow the file too: Sodium next to an enabled
+        // Iris whose row still says disabled, none next to a disabled one
+        // whose row still says enabled.
+        let app = crate::setup_managers_for_test().await;
+        let base = super::round1_graph::serve_artifacts().await;
+        for file_enabled in [true, false] {
+            update_to_a_new_requirement(&app, &base, !file_enabled, file_enabled).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn resource_pack_installs_without_a_dependency_vanilla_cannot_load() {
+        // 'Translations for Sodium' on a vanilla instance requires Sodium.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "vanilla-pack", "1.20.1", None).await;
+        let mut fixture = Fixture::default();
+        fixture
+            .mr_projects
+            .insert(SODIUM.into(), mr_project(SODIUM, "Sodium", "mod"));
+        fixture.mr_versions.insert(
+            "OihdIimA".into(),
+            mr_version(
+                SODIUM,
+                "OihdIimA",
+                "sodium.jar",
+                b"s",
+                &["1.20.1"],
+                &["fabric"],
+                serde_json::json!([]),
+            ),
+        );
+        let catalogue = Arc::new(fixture);
+        let mut pack = mr_parent(
+            "resourcepack",
+            "translations.zip",
+            b"pack",
+            modrinth_requires(Some(SODIUM), None),
+            &catalogue,
+        );
+        // Modrinth version names are often a bare number.
+        pack.version.name = "4.0".into();
+        pack.mod_info.title = "Translations for Sodium".into();
+        let mut installer = Installer::new(Box::new(pack));
+        let source = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(source.path(), b"pack").unwrap();
+        installer.download_fixture = Some(source.path().into());
+        let task = installer.install(&app, id, true, None).await.unwrap();
+        settle(&installer, &app, task).await;
+        assert!(matches!(
+            app.task_manager().get_task_outcome(task).await,
+            crate::managers::vtask::TaskOutcome::Succeeded
+        ));
+        let path = publication::current_path(&app, id).await.unwrap();
+        assert_eq!(
+            std::fs::read(path.get_resourcepacks_path().join("translations.zip")).unwrap(),
+            b"pack"
+        );
+        assert!(
+            std::fs::read_dir(path.get_mods_path())
+                .map(|entries| entries.count() == 0)
+                .unwrap_or(true),
+            "no incompatible Sodium may be downloaded"
+        );
+        let mut pending = Vec::new();
+        for _ in 0..100 {
+            pending = app.task_manager().get_task_warnings().await;
+            if !pending.is_empty() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+        assert_eq!(pending.len(), 1);
+        assert_eq!(pending[0].id, task);
+        // The toast names the project, not the version "4.0".
+        assert_eq!(
+            pending[0].subject.as_deref(),
+            Some("Translations for Sodium")
+        );
+        assert_eq!(
+            pending[0].warnings,
+            vec![TaskWarning::SkippedDependency {
+                name: Some("Sodium".into()),
+                platform: DependencyPlatform::Modrinth,
+                project_id: SODIUM.into(),
+                reason: SkippedDependencyReason::NoCompatibleVersion,
+            }]
+        );
+        app.task_manager().acknowledge_task_warnings(task).await;
+        assert!(app.task_manager().get_task_warnings().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn failure_of_the_selected_addon_still_errors() {
+        // Only dependencies are skipped: a failure of the addon the user picked
+        // (here its own download) still fails the task and keeps the old file.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "root-failure", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        let parent = installed(&app, id, "parent.jar", true, Some((10, 1, "Parent")), None).await;
+        let catalogue = Arc::new(Fixture::default());
+        let mut installer = Installer::new(Box::new(cf_parent(
+            "parent.jar",
+            b"new parent",
+            9,
+            &catalogue,
+        )));
+        let source = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(source.path(), b"corrupted download").unwrap();
+        installer.download_fixture = Some(source.path().into());
+        let task = installer
+            .install(&app, id, false, Some(parent.id))
+            .await
+            .unwrap();
+        settle(&installer, &app, task).await;
+        assert!(matches!(
+            app.task_manager().get_task_outcome(task).await,
+            crate::managers::vtask::TaskOutcome::Failed(_)
+        ));
+        let mods = publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_mods_path();
+        assert_eq!(
+            std::fs::read(mods.join("parent.jar")).unwrap(),
+            b"parent.jar"
+        );
+        assert!(app.task_manager().get_task_warnings().await.is_empty());
+    }
+}
