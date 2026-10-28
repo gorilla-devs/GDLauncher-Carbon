@@ -33,8 +33,11 @@ import { withCleanup } from "./helpers/cleanup.js"
  * with a `.disabled` suffix) and mods.rs:361-367 for the second, non-atomic
  * representation this file deliberately does not trust: `ModFileCache.enabled`
  * in the database, written *after* the rename completes. A crash in that
- * window leaves disk and DB disagreeing permanently — a known, unfixed
- * product bug, not something these tests work around. They read disk only.
+ * window leaves a temporary disk/DB disagreement. The next successful local
+ * scan normally reconciles enabled state for a valid readable archive from
+ * its filename. An in-process failure can leave the mismatch until that scan;
+ * this is not crash-atomic or arbitrary corrupt-archive recovery. These tests
+ * keep independent disk checks rather than relying on cached DB/UI state.
  *
  * All four tests drive **Fabric API on Modrinth** (`P7dR8mSH`), the same
  * project `modInstall.spec.ts` already exercises for its Modrinth case.

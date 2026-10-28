@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto"
+import { verifyFreshPack } from "./helpers/freshPack.js"
 import fs from "node:fs"
 import path from "node:path"
 import { expect, test } from "./fixtures/index.js"
@@ -197,35 +197,9 @@ test.describe("modpack install", () => {
         const index = await fetchMrpackIndex(versionId!)
         const tree = await snapshotTree(path.join(root, "instance"))
 
-        // Every declared file is present at its declared size AND hashes to
-        // exactly what the pack's own index says — sha512, computed here
-        // straight off the on-disk bytes, never through packinfo. packinfo
-        // cannot stand in for this: its own hash is computed from the staging
-        // copy before the final rename (see the module doc comment), so it can
-        // never tell a wrong-but-same-sized file from a right one. This sha512
-        // check is the one place in either test that verifies content against
-        // a source the app itself did not compute.
-        for (const file of index.files) {
-          const entry = tree.get(file.path)
-          expect(
-            entry,
-            `pack file missing from disk: ${file.path}`
-          ).toBeDefined()
-          expect(entry!.size, `wrong size for ${file.path}`).toBe(file.size)
-          const bytes = await fs.promises.readFile(
-            path.join(root, "instance", file.path)
-          )
-          const sha512 = createHash("sha512").update(bytes).digest("hex")
-          expect(sha512, `wrong sha512 for ${file.path}`).toBe(file.sha512)
-        }
-
-        // Every override landed at its stripped path.
-        for (const override of index.overrides) {
-          expect(
-            tree.has(override),
-            `override missing from disk: ${override}`
-          ).toBe(true)
-        }
+        // Independent archive expectations for declared files and effective
+        // common/client overrides, separate from packinfo/disk consistency.
+        await verifyFreshPack(root, index, tree)
 
         // instance.json records which pack this is and took its Minecraft and
         // loader versions.

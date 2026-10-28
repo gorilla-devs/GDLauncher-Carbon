@@ -7,7 +7,7 @@ import { byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
   deleteInstanceViaUi,
   ensureLibraryInteractive,
-  waitForInstallComplete
+  runInstallAndWait
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { classifyPackinfo, packinfoDataPath } from "./helpers/packinfo.js"
@@ -264,8 +264,9 @@ test.describe("modpack repair preview", () => {
           ).toHaveText(verdict)
         }
 
-        await page.click(byTestId(TEST_IDS.repairModpackConfirm))
-        await waitForInstallComplete(page, name)
+        await runInstallAndWait(page, name, "instance.repairModpack", () =>
+          page.click(byTestId(TEST_IDS.repairModpackConfirm))
+        )
 
         const after = await snapshotTree(data)
         const audit = await readInstallAudit(root)
@@ -437,8 +438,9 @@ test.describe("modpack repair preview", () => {
             "— the mod should now count as re-enabled instead"
         ).not.toMatch(DISABLED_KEPT_PHRASE)
 
-        await page.click(byTestId(TEST_IDS.repairModpackConfirm))
-        await waitForInstallComplete(page, name)
+        await runInstallAndWait(page, name, "instance.repairModpack", () =>
+          page.click(byTestId(TEST_IDS.repairModpackConfirm))
+        )
 
         expect(
           fs.existsSync(enabledPath),

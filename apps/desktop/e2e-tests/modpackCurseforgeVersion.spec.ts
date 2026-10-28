@@ -8,7 +8,12 @@ import {
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { readInstanceConfig } from "./helpers/instanceConfig.js"
-import { readPackinfo, type Packinfo } from "./helpers/packinfo.js"
+import {
+  capturePristinePackinfo,
+  verifyPristinePackinfo,
+  readPackinfo,
+  type Packinfo
+} from "./helpers/packinfo.js"
 import { snapshotTree, type Tree } from "./helpers/instanceTree.js"
 import {
   changeModpackVersion,
@@ -159,6 +164,8 @@ test.describe("curseforge modpack version change", () => {
           path.join(twinRoot, "instance")
         )
         const twinPackinfo: Packinfo = await readPackinfo(twinRoot)
+        const pristineTarget = await capturePristinePackinfo(twinRoot, twinTree)
+        verifyPristinePackinfo(twinPackinfo, twinPackinfo, pristineTarget)
 
         expect(
           twinTree.size,
@@ -215,14 +222,8 @@ test.describe("curseforge modpack version change", () => {
           "the version change altered the instance's lock state"
         ).toBe(beforeConfig.modpack?.locked)
 
-        // packinfo now matches the tree — finding 4 (scan_dir dropping files
-        // unchanged between versions, `helpers/packinfo.js`) is fixed:
-        // `process_modpack`'s snapshot block merges the skip-oracle's hash
-        // back in for every skip-optimised path, so the version-changed
-        // instance's packinfo is exactly the same set of paths a fresh
-        // install of the same target produces — the per-key bytes check this
-        // needs is subsumed by the strict tree assertion above, which already
-        // proves every path's bytes are correct.
+        // Independently rehashed pristine twin bytes retain exact target
+        // MD5/SHA512 evidence; equal trees do not imply equal record digests.
         const subjectPackinfo = await readPackinfo(subjectRoot)
         const missing = [...twinPackinfo.keys()]
           .filter((k) => !subjectPackinfo.has(k))
@@ -243,6 +244,7 @@ test.describe("curseforge modpack version change", () => {
             "merge fix (process_modpack's snapshot block, run/modpack.rs) " +
             "regressed"
         ).toEqual([])
+        verifyPristinePackinfo(subjectPackinfo, twinPackinfo, pristineTarget)
       },
       async (alreadyFailed) => {
         if (subjectName) {

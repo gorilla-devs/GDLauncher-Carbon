@@ -332,3 +332,36 @@ describe("listModFiles", () => {
     await expect(listModFiles(filePath)).rejects.toThrow()
   })
 })
+
+it.each([true, false])(
+  "rejects a directory as the selected mod enabled=%s",
+  async (enabled) => {
+    await fs.mkdir(
+      path.join(modsDir, "fixture.jar" + (enabled ? "" : ".disabled"))
+    )
+    const result = await verifyModEnabled(modsDir, "fixture.jar", enabled)
+    expect(result.ok).toBe(false)
+    expect(result.problems.join("\n")).toContain("directory")
+  }
+)
+it.each([true, false])(
+  "keeps dual occupancy when the counterpart is a directory enabled=%s",
+  async (enabled) => {
+    await fs.writeFile(
+      path.join(modsDir, "fixture.jar" + (enabled ? "" : ".disabled")),
+      "regular"
+    )
+    await fs.mkdir(
+      path.join(modsDir, "fixture.jar" + (enabled ? ".disabled" : ""))
+    )
+    const result = await verifyModEnabled(modsDir, "fixture.jar", enabled)
+    expect(result.ok).toBe(false)
+    expect(result.problems.join("\n")).toContain("both enabled")
+  }
+)
+it("does not establish toggle success below a regular-file parent (ENOTDIR)", async () => {
+  await fs.writeFile(path.join(modsDir, "parent"), "file")
+  expect(
+    (await verifyModEnabled(modsDir, "parent/fixture.jar", false)).ok
+  ).toBe(false)
+})

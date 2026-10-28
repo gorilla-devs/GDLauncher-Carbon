@@ -6,9 +6,20 @@ import { _electron as electron } from "playwright"
 import type { ElectronApplication, Page } from "playwright"
 import { expect, type TestInfo } from "@playwright/test"
 import { byTestId, TEST_IDS } from "../helpers/selectors.js"
-import { isPidAlive } from "../helpers/processes.js"
+import { describeLauncherProcesses, isPidAlive } from "../helpers/processes.js"
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
+
+/** Adds `note` to `error`'s message. Playwright's reporter prints the
+ *  message from the stack, so the stack's copy is extended too. */
+export function appendToError(error: unknown, note: string): unknown {
+  if (!(error instanceof Error)) return error
+  const original = error.message
+  error.message = `${original}\n\n${note}`
+  if (error.stack?.includes(original))
+    error.stack = error.stack.replace(original, () => error.message)
+  return error
+}
 
 export function getRootPath(
   platform: NodeJS.Platform = process.platform
@@ -67,6 +78,8 @@ export function isCoreModulePresent(): boolean {
 
 export interface LaunchOptions {
   runtimePath: string
+  userDataPath?: string
+  runId?: string
   baseApi?: string
   e2eAuthBase?: string
   e2eEntitlementKey?: string
@@ -154,6 +167,10 @@ export async function launchApp(opts: LaunchOptions): Promise<{
       env: {
         ...process.env,
         GDL_RUNTIME_PATH: opts.runtimePath,
+        GDL_E2E_USER_DATA:
+          opts.userDataPath ??
+          path.join(opts.runtimePath, "electron-user-data"),
+        GDL_E2E_RUN_ID: opts.runId ?? path.basename(opts.runtimePath),
         ...urlEnv,
         // A fresh runtime dir derives its heap from total RAM, which on a
         // 7 GB CI runner exceeds what is available by launch time. Pin one
@@ -176,7 +193,13 @@ export async function launchApp(opts: LaunchOptions): Promise<{
         JSON.stringify(error, Object.getOwnPropertyNames(error), 2)
       )
 
-      throw error
+      // In run 41652440682 every launch after the database recovery tests
+      // died in startup: the runner had turned busy while launchers those
+      // tests relaunched were still running. Name what is running, with its
+      // CPU time, in the failure itself.
+      const running = `Launcher processes running at the failed launch:\n${describeLauncherProcesses([binaryPath, getCoreModulePath()])}`
+      console.error(running)
+      throw appendToError(error, running)
     })
 
   rememberElectronProcess(app)
@@ -381,20 +404,70 @@ export async function launcherWindow(app: ElectronApplication, page: Page) {
  *
  * Teardown-only, so a core that never exits is reported rather than thrown:
  * masking a real test failure behind a cleanup error is worse than leaking a
- * directory the next run's sweep will collect.
+ * directory the next run's sweep will collect. `strict` propagates an
+ * unconfirmed app/core exit so deleting callers can retain the owned runtime,
+ * and an Electron exit code other than 0 (an uncaught main-process exception
+ * exits with 1), which a non-strict close only reports.
  */
 export async function closeAppAndCore(
   app: ElectronApplication,
-  { timeoutMs = 30_000 } = {}
+  {
+    timeoutMs = 30_000,
+    strict = false,
+    waitForExit = waitForPidExit
+  }: {
+    timeoutMs?: number
+    strict?: boolean
+    waitForExit?: typeof waitForPidExit
+  } = {}
 ): Promise<void> {
   const corePid = await getCoreProcessId(app).catch(() => null)
-  await app.close().catch(() => {})
-  if (corePid === null) return
-
+  let failed = false
+  let firstError: unknown
+  const record = (error: unknown) => {
+    if (!failed) {
+      failed = true
+      firstError = error
+    } else console.error("closeAppAndCore:", error)
+  }
+  rememberElectronProcess(app)
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  let closed = false
   try {
-    await waitForPidExit(corePid, { timeoutMs })
+    await Promise.race([
+      app.close(),
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(
+          () => reject(new Error("Electron close timed out; exit unconfirmed")),
+          timeoutMs
+        )
+      })
+    ])
+    closed = true
   } catch (error) {
-    console.error("closeAppAndCore:", error)
+    record(error)
+  } finally {
+    clearTimeout(timeout)
+  }
+  if (closed) {
+    try {
+      assertCleanElectronExit(await electronExitStatus(app, timeoutMs))
+    } catch (error) {
+      record(error)
+    }
+  }
+  if (corePid !== null) {
+    try {
+      await waitForExit(corePid, { timeoutMs })
+    } catch (error) {
+      record(error)
+    }
+  } else if (strict) {
+    record(new Error("Owned core exit could not be confirmed"))
+  }
+  if (failed) {
+    if (strict) throw firstError
+    console.error("closeAppAndCore:", firstError)
   }
 }
 

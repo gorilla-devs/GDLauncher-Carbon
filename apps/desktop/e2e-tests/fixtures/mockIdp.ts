@@ -26,9 +26,10 @@ export interface Harness {
   mode: HarnessMode
   runtimePath: string
   entitlementKeyPath: string
-  /** `Date.now()` when this harness was created, used to date-guard the
-   * best-effort `main.log` copy in {@link preserveDebugLogs} against picking
-   * up a stale file from an unrelated earlier session. */
+  /** Stable across every launch/relaunch owned by this harness. */
+  userDataPath: string
+  runId: string
+  /** Creation timestamp for diagnostics only; never authorizes foreign logs. */
   startedAt: number
 }
 
@@ -72,7 +73,17 @@ export async function startHarness(): Promise<Harness> {
 
     console.log(`e2e harness: mode=${mode} oid=${user.oid} mock=${mock.url}`)
 
-    return { mock, user, mode, runtimePath, entitlementKeyPath, startedAt }
+    const userDataPath = path.join(runtimePath, "electron-user-data")
+    return {
+      mock,
+      user,
+      mode,
+      runtimePath,
+      entitlementKeyPath,
+      startedAt,
+      userDataPath,
+      runId: mintReservedOid()
+    }
   } catch (error) {
     // The user is already provisioned by this point. A caller that never
     // receives a Harness has nothing to pass to stopHarness, so the row
@@ -102,39 +113,6 @@ const DEBUG_LOGS_ROOT = path.resolve(
 )
 
 /**
- * The Electron main-process log (`electron-log`'s default `main.log`), at
- * the OS-standard userData path `packages/main/index.ts`'s
- * `getPatchedUserData` resolves to for a packaged, non-snapshot build.
- *
- * Unlike `__gdl_logs__`, this is *not* under `GDL_RUNTIME_PATH` — Electron's
- * `userData` is set before the runtime-path override is ever read, so every
- * launch in a run writes to the same fixed file regardless of harness.
- */
-function electronMainLogPath(): string {
-  const appDataDirName = "gdlauncher_carbon"
-
-  if (process.platform === "darwin") {
-    return path.join(
-      os.homedir(),
-      "Library",
-      "Application Support",
-      appDataDirName,
-      "main.log"
-    )
-  }
-
-  if (process.platform === "win32") {
-    const appData =
-      process.env.APPDATA ?? path.join(os.homedir(), "AppData", "Roaming")
-    return path.join(appData, appDataDirName, "main.log")
-  }
-
-  const xdgDataHome =
-    process.env.XDG_DATA_HOME ?? path.join(os.homedir(), ".local", "share")
-  return path.join(xdgDataHome, appDataDirName, "main.log")
-}
-
-/**
  * Copies whatever debug logs this run produced into `test-results/` before
  * the scratch runtime directory is deleted.
  *
@@ -147,12 +125,9 @@ function electronMainLogPath(): string {
  * or a copy failure must never fail teardown — that would mask the actual
  * test failure that's worth surfacing instead.
  */
-function preserveDebugLogs(harness: Harness): void {
+function preserveDebugLogs(harness: Harness, debugLogsRoot: string): void {
   try {
-    const destDir = path.join(
-      DEBUG_LOGS_ROOT,
-      path.basename(harness.runtimePath)
-    )
+    const destDir = path.join(debugLogsRoot, path.basename(harness.runtimePath))
 
     const coreLogsSrc = path.join(harness.runtimePath, "__gdl_logs__")
     if (fs.existsSync(coreLogsSrc)) {
@@ -166,15 +141,9 @@ function preserveDebugLogs(harness: Harness): void {
       }
     }
 
-    // Guarded by mtime rather than copied unconditionally: `main.log` isn't
-    // scoped to this harness (see `electronMainLogPath`), so without this
-    // check a run that never got as far as launching Electron would still
-    // copy in a stale file left over from a previous session.
-    const mainLogSrc = electronMainLogPath()
-    if (
-      fs.existsSync(mainLogSrc) &&
-      fs.statSync(mainLogSrc).mtimeMs >= harness.startedAt
-    ) {
+    // Ownership comes from the E2E bootstrap path, never a global timestamp.
+    const mainLogSrc = path.join(harness.userDataPath, "main.log")
+    if (fs.existsSync(mainLogSrc)) {
       fs.mkdirSync(destDir, { recursive: true })
       fs.copyFileSync(mainLogSrc, path.join(destDir, "main.log"))
     }
@@ -186,11 +155,15 @@ function preserveDebugLogs(harness: Harness): void {
 export interface StopHarnessDeps {
   deleteUser: typeof deleteTestUser
   readConfig: typeof readProvisionConfig
+  killGames: typeof killGameProcesses
+  debugLogsRoot: string
 }
 
 const defaultStopHarnessDeps: StopHarnessDeps = {
   deleteUser: deleteTestUser,
-  readConfig: readProvisionConfig
+  readConfig: readProvisionConfig,
+  killGames: killGameProcesses,
+  debugLogsRoot: DEBUG_LOGS_ROOT
 }
 
 /**
@@ -209,9 +182,10 @@ const defaultStopHarnessDeps: StopHarnessDeps = {
  */
 export async function stopHarness(
   harness: Harness,
-  deps: StopHarnessDeps = defaultStopHarnessDeps
+  deps: StopHarnessDeps = defaultStopHarnessDeps,
+  { preserveRuntime = false }: { preserveRuntime?: boolean } = {}
 ): Promise<void> {
-  const { deleteUser, readConfig } = deps
+  const { deleteUser, readConfig, killGames, debugLogsRoot } = deps
 
   const steps: (() => Promise<void>)[] = [
     () => harness.mock.close(),
@@ -222,7 +196,7 @@ export async function stopHarness(
       }
     },
     async () => {
-      preserveDebugLogs(harness)
+      preserveDebugLogs(harness, debugLogsRoot)
     },
     async () => {
       // A running game outlives the launcher by design, so closing the app no
@@ -230,7 +204,7 @@ export async function stopHarness(
       // failed mid-launch and a Minecraft JVM running until reboot. Runs
       // before the runtime path is deleted, since that path is what
       // identifies the process as ours.
-      const killed = killGameProcesses(harness.runtimePath)
+      const killed = killGames(harness.runtimePath)
       if (killed.length > 0) {
         console.log(
           `stopHarness: killed ${killed.length} leftover game process(es): ` +
@@ -248,6 +222,7 @@ export async function stopHarness(
       // The original 500ms budget (5 × 100ms) was measurably too short: it
       // threw EPERM on the runtime path once in ten adoption runs, after
       // every assertion had passed.
+      if (preserveRuntime) return
       fs.rmSync(harness.runtimePath, {
         recursive: true,
         force: true,

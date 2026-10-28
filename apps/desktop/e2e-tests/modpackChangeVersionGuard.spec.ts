@@ -162,6 +162,8 @@ test.describe("modpack change version guard", () => {
     const harness = await startHarness()
     const launchOpts: LaunchOptions = {
       runtimePath: harness.runtimePath,
+      userDataPath: harness.userDataPath,
+      runId: harness.runId,
       baseApi: `${harness.mock.url}/gdl`,
       e2eAuthBase: harness.mock.url,
       e2eEntitlementKey: harness.entitlementKeyPath,

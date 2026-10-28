@@ -1,13 +1,10 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { fileURLToPath } from "node:url"
 import { describe, expect, it, vi } from "vitest"
 import type { MockServer } from "../mock-idp/server.js"
 import type { ProvisionConfig } from "./gdlAccount.js"
 import { stopHarness, type Harness } from "./mockIdp.js"
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const CFG: ProvisionConfig = {
   apiBase: "https://api-test.invalid",
@@ -43,6 +40,8 @@ function makeHarness(
     runtimePath,
     entitlementKeyPath: path.join(runtimePath, "entitlement-key.pem"),
     startedAt: Date.now(),
+    userDataPath: path.join(runtimePath, "electron-user-data"),
+    runId: "test-run",
     ...overrides
   }
 }
@@ -66,7 +65,12 @@ describe("stopHarness", () => {
     })
 
     await expect(
-      stopHarness(harness, { deleteUser, readConfig })
+      stopHarness(harness, {
+        deleteUser,
+        readConfig,
+        killGames: () => [],
+        debugLogsRoot: path.join(runtimePath, "..", "artifacts")
+      })
     ).rejects.toThrow("close failed")
 
     // The steps after the throwing one still ran: the backend delete fired
@@ -93,9 +97,14 @@ describe("stopHarness", () => {
 
     // The first failing step (mock.close) is what the caller sees, not the
     // delete that failed after it.
-    await expect(stopHarness(harness, { deleteUser, readConfig })).rejects.toBe(
-      closeError
-    )
+    await expect(
+      stopHarness(harness, {
+        deleteUser,
+        readConfig,
+        killGames: () => [],
+        debugLogsRoot: path.join(runtimePath, "..", "artifacts")
+      })
+    ).rejects.toBe(closeError)
 
     expect(consoleError).toHaveBeenCalledWith(
       "e2e harness: teardown step failed",
@@ -116,7 +125,12 @@ describe("stopHarness", () => {
 
     const harness = makeHarness(runtimePath, { mode: "proxy" })
 
-    await stopHarness(harness, { deleteUser, readConfig })
+    await stopHarness(harness, {
+      deleteUser,
+      readConfig,
+      killGames: () => [],
+      debugLogsRoot: path.join(runtimePath, "..", "artifacts")
+    })
 
     expect(deleteUser).toHaveBeenCalledWith(CFG, harness.user.oid)
   })
@@ -130,7 +144,12 @@ describe("stopHarness", () => {
 
     const harness = makeHarness(runtimePath, { mode: "standalone" })
 
-    await stopHarness(harness, { deleteUser, readConfig })
+    await stopHarness(harness, {
+      deleteUser,
+      readConfig,
+      killGames: () => [],
+      debugLogsRoot: path.join(runtimePath, "..", "artifacts")
+    })
 
     expect(deleteUser).not.toHaveBeenCalled()
   })
@@ -147,19 +166,20 @@ describe("stopHarness", () => {
     const readConfig = vi.fn(() => CFG)
     const harness = makeHarness(runtimePath, { mode: "standalone" })
 
-    // Mirrors DEBUG_LOGS_ROOT's own resolution in mockIdp.ts, which isn't
-    // exported: CI's "Upload e2e debug logs" step reads this same tree.
-    const destDir = path.resolve(
-      __dirname,
+    const destDir = path.join(
+      runtimePath,
       "..",
-      "..",
-      "test-results",
-      "e2e-logs",
+      "artifacts",
       path.basename(runtimePath)
     )
 
     try {
-      await stopHarness(harness, { deleteUser, readConfig })
+      await stopHarness(harness, {
+        deleteUser,
+        readConfig,
+        killGames: () => [],
+        debugLogsRoot: path.join(runtimePath, "..", "artifacts")
+      })
 
       expect(
         fs.readFileSync(
@@ -172,6 +192,90 @@ describe("stopHarness", () => {
       expect(fs.existsSync(runtimePath)).toBe(false)
     } finally {
       fs.rmSync(destDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe("Task43 owned logs", () => {
+  it("never opens or copies a fresh foreign main log, even without an app launch", async () => {
+    const root = makeTempDir()
+    const runtimePath = path.join(root, "runtime")
+    const foreign = path.join(root, "foreign", "gdlauncher_carbon", "main.log")
+    fs.mkdirSync(runtimePath)
+    fs.mkdirSync(path.dirname(foreign), { recursive: true })
+    fs.writeFileSync(
+      foreign,
+      "older personal content\nfresh personal content\n"
+    )
+    const harness = makeHarness(runtimePath, {
+      mode: "standalone",
+      startedAt: Date.now() - 1000
+    })
+    vi.stubEnv("XDG_DATA_HOME", path.join(root, "foreign"))
+    const read = vi.spyOn(fs, "copyFileSync")
+    try {
+      await stopHarness(harness, {
+        deleteUser: async () => {},
+        readConfig: () => null,
+        killGames: () => [],
+        debugLogsRoot: path.join(root, "artifacts")
+      })
+      expect(read.mock.calls.some(([from]) => from === foreign)).toBe(false)
+      expect(
+        fs.existsSync(path.join(root, "artifacts", "runtime", "main.log"))
+      ).toBe(false)
+      expect(fs.readFileSync(foreign, "utf8")).toBe(
+        "older personal content\nfresh personal content\n"
+      )
+    } finally {
+      read.mockRestore()
+      vi.unstubAllEnvs()
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+  it("retains exact owned main/relaunch/core bytes independently for two harnesses", async () => {
+    const root = makeTempDir()
+    try {
+      for (const name of ["first", "second"]) {
+        const runtimePath = path.join(root, name)
+        fs.mkdirSync(runtimePath)
+        const harness = makeHarness(runtimePath, { mode: "standalone" })
+        fs.mkdirSync(harness.userDataPath)
+        fs.writeFileSync(
+          path.join(harness.userDataPath, "main.log"),
+          `${name} launch\n`
+        )
+        fs.appendFileSync(
+          path.join(harness.userDataPath, "main.log"),
+          `${name} relaunch\n`
+        )
+        fs.mkdirSync(path.join(runtimePath, "__gdl_logs__"))
+        fs.writeFileSync(
+          path.join(runtimePath, "__gdl_logs__", "core.log"),
+          `${name} core`
+        )
+        await stopHarness(harness, {
+          deleteUser: async () => {},
+          readConfig: () => null,
+          killGames: () => [],
+          debugLogsRoot: path.join(root, "artifacts")
+        })
+        expect(
+          fs.readFileSync(
+            path.join(root, "artifacts", name, "main.log"),
+            "utf8"
+          )
+        ).toBe(`${name} launch\n${name} relaunch\n`)
+        expect(
+          fs.readFileSync(
+            path.join(root, "artifacts", name, "__gdl_logs__", "core.log"),
+            "utf8"
+          )
+        ).toBe(`${name} core`)
+        expect(fs.existsSync(runtimePath)).toBe(false)
+      }
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
     }
   })
 })

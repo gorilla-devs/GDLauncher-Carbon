@@ -2,10 +2,11 @@ import { createHash } from "node:crypto"
 import fs from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   sampleKeys,
   sha1OfFile,
+  pathExists,
   verifyAssetIndex,
   verifyClientJar,
   verifyLibrariesAbsent,
@@ -15,6 +16,8 @@ import {
 function sha1(data: Buffer | string): string {
   return createHash("sha1").update(data).digest("hex")
 }
+
+const expectedIndexSha1 = new Map<string, string>()
 
 /** Builds `libraries/net/minecraft/client/<id>/<id>.jar` with `content`. */
 async function writeClientJar(
@@ -43,7 +46,9 @@ async function writeAssetIndex(
 ): Promise<void> {
   const dir = path.join(runtimePath, "assets", "indexes")
   await fs.mkdir(dir, { recursive: true })
-  await fs.writeFile(path.join(dir, `${indexId}.json`), JSON.stringify(index))
+  const raw = JSON.stringify(index)
+  expectedIndexSha1.set(indexId, sha1(raw))
+  await fs.writeFile(path.join(dir, `${indexId}.json`), raw)
 }
 
 /** Writes arbitrary (possibly non-JSON) bytes as an asset index file. */
@@ -54,6 +59,7 @@ async function writeRawAssetIndex(
 ): Promise<void> {
   const dir = path.join(runtimePath, "assets", "indexes")
   await fs.mkdir(dir, { recursive: true })
+  expectedIndexSha1.set(indexId, sha1(raw))
   await fs.writeFile(path.join(dir, `${indexId}.json`), raw)
 }
 
@@ -93,12 +99,14 @@ async function writeLibrary(
 let runtimePath: string
 
 beforeEach(async () => {
+  expectedIndexSha1.clear()
   runtimePath = await fs.mkdtemp(
     path.join(os.tmpdir(), "gdl-e2e-installverify-")
   )
 })
 
 afterEach(async () => {
+  vi.restoreAllMocks()
   await fs.rm(runtimePath, { recursive: true, force: true })
 })
 
@@ -191,12 +199,20 @@ describe("verifyAssetIndex — modern layout", () => {
 
   it("verifies a well-formed modern tree clean", async () => {
     await buildModernTree("modern-index", 5)
-    const result = await verifyAssetIndex(runtimePath, "modern-index")
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "modern-index",
+      expectedIndexSha1.get("modern-index")
+    )
     expect(result).toEqual({ ok: true, problems: [] })
   })
 
   it("reports a missing asset index file", async () => {
-    const result = await verifyAssetIndex(runtimePath, "does-not-exist")
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "does-not-exist",
+      "0".repeat(40)
+    )
     expect(result.ok).toBe(false)
     expect(result.problems).toHaveLength(1)
     expect(result.problems[0]).toContain(
@@ -216,9 +232,17 @@ describe("verifyAssetIndex — modern layout", () => {
     // raw exception that would abort an entire matrix run instead of
     // reporting a clean per-version problem list.
     await expect(
-      verifyAssetIndex(runtimePath, "truncated-index")
+      verifyAssetIndex(
+        runtimePath,
+        "truncated-index",
+        expectedIndexSha1.get("truncated-index")
+      )
     ).resolves.toMatchObject({ ok: false })
-    const result = await verifyAssetIndex(runtimePath, "truncated-index")
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "truncated-index",
+      expectedIndexSha1.get("truncated-index")
+    )
     expect(result.problems).toHaveLength(1)
     expect(result.problems[0]).toContain("not valid JSON")
   })
@@ -232,7 +256,11 @@ describe("verifyAssetIndex — modern layout", () => {
       virtual: false
     })
 
-    const result = await verifyAssetIndex(runtimePath, "no-objects-key-index")
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "no-objects-key-index",
+      expectedIndexSha1.get("no-objects-key-index")
+    )
     expect(result.ok).toBe(false)
     expect(result.problems).toHaveLength(1)
     expect(result.problems[0]).toContain('no "objects" key')
@@ -241,7 +269,11 @@ describe("verifyAssetIndex — modern layout", () => {
   it('reports an empty "objects" map as distinct from a missing key', async () => {
     await writeAssetIndex(runtimePath, "empty-objects-index", { objects: {} })
 
-    const result = await verifyAssetIndex(runtimePath, "empty-objects-index")
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "empty-objects-index",
+      expectedIndexSha1.get("empty-objects-index")
+    )
     expect(result.ok).toBe(false)
     expect(result.problems).toHaveLength(1)
     expect(result.problems[0]).toContain("empty")
@@ -252,8 +284,12 @@ describe("verifyAssetIndex — modern layout", () => {
     await writeAssetIndex(runtimePath, "empty-map", { objects: {} })
 
     const [missingKeyResult, emptyMapResult] = await Promise.all([
-      verifyAssetIndex(runtimePath, "no-key"),
-      verifyAssetIndex(runtimePath, "empty-map")
+      verifyAssetIndex(runtimePath, "no-key", expectedIndexSha1.get("no-key")),
+      verifyAssetIndex(
+        runtimePath,
+        "empty-map",
+        expectedIndexSha1.get("empty-map")
+      )
     ])
 
     expect(missingKeyResult.problems[0]).not.toBe(emptyMapResult.problems[0])
@@ -279,12 +315,17 @@ describe("verifyAssetIndex — modern layout", () => {
     })
 
     await expect(
-      verifyAssetIndex(runtimePath, "malformed-entries-index")
+      verifyAssetIndex(
+        runtimePath,
+        "malformed-entries-index",
+        expectedIndexSha1.get("malformed-entries-index")
+      )
     ).resolves.toMatchObject({ ok: false })
 
     const result = await verifyAssetIndex(
       runtimePath,
-      "malformed-entries-index"
+      "malformed-entries-index",
+      expectedIndexSha1.get("malformed-entries-index")
     )
     expect(result.problems.some((p) => p.includes("null-entry.ogg"))).toBe(true)
     expect(result.problems.some((p) => p.includes("no-hash.ogg"))).toBe(true)
@@ -306,7 +347,11 @@ describe("verifyAssetIndex — modern layout", () => {
     )
     await fs.rm(objectPath)
 
-    const result = await verifyAssetIndex(runtimePath, "missing-object-index")
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "missing-object-index",
+      expectedIndexSha1.get("missing-object-index")
+    )
     expect(result.ok).toBe(false)
     expect(result.problems.some((p) => p.includes(missingName))).toBe(true)
     expect(result.problems.some((p) => p.includes(missingHash))).toBe(true)
@@ -330,7 +375,11 @@ describe("verifyAssetIndex — modern layout", () => {
     // mismatch, not a missing file.
     await fs.writeFile(objectPath, Buffer.from("tampered bytes"))
 
-    const result = await verifyAssetIndex(runtimePath, "corrupt-object-index")
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "corrupt-object-index",
+      expectedIndexSha1.get("corrupt-object-index")
+    )
     expect(result.ok).toBe(false)
     expect(result.problems.some((p) => p.includes(corruptedName))).toBe(true)
     expect(result.problems.some((p) => p.includes(corruptedHash))).toBe(true)
@@ -354,8 +403,16 @@ describe("verifyAssetIndex — modern layout", () => {
     )
     await fs.writeFile(objectPath, Buffer.from("tampered bytes"))
 
-    const first = await verifyAssetIndex(runtimePath, "determinism-index")
-    const second = await verifyAssetIndex(runtimePath, "determinism-index")
+    const first = await verifyAssetIndex(
+      runtimePath,
+      "determinism-index",
+      expectedIndexSha1.get("determinism-index")
+    )
+    const second = await verifyAssetIndex(
+      runtimePath,
+      "determinism-index",
+      expectedIndexSha1.get("determinism-index")
+    )
 
     // `toEqual` alone cannot tell "deterministically samples the right
     // objects" from "deterministically samples nothing": a `sampleKeys`
@@ -388,7 +445,11 @@ describe("verifyAssetIndex — legacy/virtual layout", () => {
 
     await writeAssetIndex(runtimePath, "legacy", { virtual: true, objects })
 
-    const result = await verifyAssetIndex(runtimePath, "legacy")
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "legacy",
+      expectedIndexSha1.get("legacy")
+    )
     expect(result).toEqual({ ok: true, problems: [] })
   })
 
@@ -411,7 +472,11 @@ describe("verifyAssetIndex — legacy/virtual layout", () => {
       objects: { "sound/random/click.ogg": { hash, size: content.length } }
     })
 
-    const result = await verifyAssetIndex(runtimePath, "legacy")
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "legacy",
+      expectedIndexSha1.get("legacy")
+    )
     expect(result.ok).toBe(true)
     expect(result.problems).toEqual([])
   })
@@ -425,7 +490,11 @@ describe("verifyAssetIndex — legacy/virtual layout", () => {
       objects: { "sound/random/click.ogg": { hash, size: content.length } }
     })
 
-    const result = await verifyAssetIndex(runtimePath, "legacy-missing")
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "legacy-missing",
+      expectedIndexSha1.get("legacy-missing")
+    )
     expect(result.ok).toBe(false)
     expect(
       result.problems.some((p) => p.includes("sound/random/click.ogg"))
@@ -529,4 +598,113 @@ describe("verifyLibrariesAbsent", () => {
     const result = await verifyLibrariesAbsent(runtimePath, [])
     expect(result).toEqual({ ok: true, problems: [] })
   })
+})
+
+describe("asset index identity", () => {
+  it("rejects a same-size nonempty subset after original objects are removed", async () => {
+    const contents = [Buffer.from("a"), Buffer.from("b"), Buffer.from("c")]
+    const hashes = contents.map(sha1)
+    const original = JSON.stringify({
+      objects: Object.fromEntries(
+        hashes.map((hash, i) => [String(i), { hash, size: 1 }])
+      )
+    })
+    const subset = JSON.stringify({
+      objects: { "0": { hash: hashes[0], size: 1 } }
+    }).padEnd(Buffer.byteLength(original), " ")
+    expect(Buffer.byteLength(subset)).toBe(Buffer.byteLength(original))
+    const retainedExpectedSha1 = sha1(original)
+    expect(sha1(subset)).not.toBe(retainedExpectedSha1)
+    await writeRawAssetIndex(runtimePath, "identity", original)
+    for (let i = 0; i < contents.length; i++)
+      await writeAssetObject(runtimePath, hashes[i], contents[i])
+    expect(
+      (await verifyAssetIndex(runtimePath, "identity", retainedExpectedSha1)).ok
+    ).toBe(true)
+    for (const hash of hashes.slice(1))
+      await fs.rm(
+        path.join(runtimePath, "assets/objects", hash.slice(0, 2), hash)
+      )
+    const missing = await verifyAssetIndex(
+      runtimePath,
+      "identity",
+      retainedExpectedSha1
+    )
+    expect(missing.ok).toBe(false)
+    expect(missing.problems.filter((p) => p.includes("missing"))).toHaveLength(
+      2
+    )
+    await writeRawAssetIndex(runtimePath, "identity", subset)
+    const result = await verifyAssetIndex(
+      runtimePath,
+      "identity",
+      retainedExpectedSha1
+    )
+    expect(result.ok).toBe(false)
+    expect(result.problems.join("\n")).toContain("sha1")
+  })
+  it.each([undefined, "", "abc", "z".repeat(40), 42])(
+    "rejects absent or invalid expected SHA1 %s",
+    async (expected) => {
+      const content = Buffer.from("asset")
+      await writeAssetObject(runtimePath, sha1(content), content)
+      await writeAssetIndex(runtimePath, "expected", {
+        objects: { a: { hash: sha1(content), size: content.length } }
+      })
+      const result = await verifyAssetIndex(
+        runtimePath,
+        "expected",
+        expected as string
+      )
+      expect(result.ok).toBe(false)
+      expect(result.problems.join("\n")).toContain("expected")
+    }
+  )
+  it("hashes and parses the same single raw read even if the file changes afterward", async () => {
+    const content = Buffer.from("asset")
+    const raw = JSON.stringify({
+      objects: { a: { hash: sha1(content), size: content.length } }
+    })
+    await writeRawAssetIndex(runtimePath, "single-read", raw)
+    await writeAssetObject(runtimePath, sha1(content), content)
+    const indexPath = path.join(runtimePath, "assets/indexes/single-read.json")
+    const readFile = fs.readFile.bind(fs)
+    let indexReads = 0
+    vi.spyOn(fs, "readFile").mockImplementation(
+      async (...args: Parameters<typeof fs.readFile>) => {
+        const result = await readFile(...args)
+        // eslint-disable-next-line @typescript-eslint/no-base-to-string -- path arguments are strings in this test
+        if (String(args[0]) === indexPath) {
+          indexReads++
+          await fs.writeFile(indexPath, "{}")
+        }
+        return result
+      }
+    )
+    expect(
+      await verifyAssetIndex(
+        runtimePath,
+        "single-read",
+        sha1(raw).toUpperCase()
+      )
+    ).toEqual({ ok: true, problems: [] })
+    expect(indexReads).toBe(1)
+  })
+})
+it("rejects library directories while retaining generic deletion semantics", async () => {
+  const target = path.join(runtimePath, "libraries/loader-1.0.jar")
+  await fs.mkdir(target, { recursive: true })
+  expect(await pathExists(target)).toBe(true)
+  expect(
+    (await verifyLibrariesAbsent(runtimePath, ["loader-1.0.jar"])).ok
+  ).toBe(false)
+  const result = await verifyLibrariesPresent(runtimePath, ["loader-1.0.jar"])
+  expect(result.ok).toBe(false)
+  expect(result.problems.join("\n")).toContain("directory")
+})
+it("reports unsuccessful library stat below a regular file (ENOTDIR)", async () => {
+  await writeLibrary(runtimePath, "parent", Buffer.from("file"))
+  expect(
+    (await verifyLibrariesPresent(runtimePath, ["parent/loader.jar"])).ok
+  ).toBe(false)
 })

@@ -94,23 +94,29 @@ export function parseInstallAudit(text: string): InstallAudit {
   }
 
   let section: keyof typeof audit | undefined
+  let currentSkip: AuditSkip | undefined
 
   for (const line of text.split("\n")) {
     const heading = SECTIONS[line.trim() as keyof typeof SECTIONS]
     if (heading) {
       section = heading
+      currentSkip = undefined
       continue
     }
 
     if (line.startsWith("     original md5: ")) {
-      const last = audit.skipped[audit.skipped.length - 1]
-      if (!last) throw new Error(`orphaned md5 continuation line: ${line}`)
+      const last = currentSkip
+      if (section !== "skipped" || last?.reason !== "modified-by-user") {
+        throw new Error(`orphaned md5 continuation line: ${line}`)
+      }
       last.originalMd5 = line.slice("     original md5: ".length).trim()
       continue
     }
     if (line.startsWith("     current md5:  ")) {
-      const last = audit.skipped[audit.skipped.length - 1]
-      if (!last) throw new Error(`orphaned md5 continuation line: ${line}`)
+      const last = currentSkip
+      if (section !== "skipped" || last?.reason !== "modified-by-user") {
+        throw new Error(`orphaned md5 continuation line: ${line}`)
+      }
       last.currentMd5 = line.slice("     current md5:  ".length).trim()
       continue
     }
@@ -130,12 +136,13 @@ export function parseInstallAudit(text: string): InstallAudit {
     const file = body.slice(0, cut)
     const rawReason = body.slice(cut + 2)
     const reason = REASONS[rawReason]
-    if (!reason) {
+    if (!Object.prototype.hasOwnProperty.call(REASONS, rawReason)) {
       throw new Error(
         `unrecognised audit skip reason "${rawReason}" on line: ${line}`
       )
     }
-    audit.skipped.push({ file, reason })
+    currentSkip = { file, reason }
+    audit.skipped.push(currentSkip)
   }
 
   return audit

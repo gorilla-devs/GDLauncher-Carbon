@@ -24,14 +24,16 @@ import {
 } from "electron"
 import os from "os"
 import path, { join, resolve } from "path"
-import fs from "fs/promises"
-import fss from "fs"
-import fse, { ensureDirSync } from "fs-extra"
+import { ensureDirSync } from "fs-extra"
 import type { ChildProcessWithoutNullStreams } from "child_process"
 import { spawn } from "child_process"
 import crypto from "crypto"
 import log from "electron-log/main"
 import { AccountIdentityReceiver } from "./utils/accountIdentity"
+import {
+  initializeMainUserData,
+  publishE2EMainStart
+} from "./utils/e2eBootstrap"
 import { createCoreOutput } from "./utils/coreOutput"
 import {
   LauncherLifecycle,
@@ -319,17 +321,20 @@ export function getPatchedUserData() {
   return path.join(appData, "gdlauncher_carbon")
 }
 
-const patchedUserData = getPatchedUserData()
-
-const skipIntroAnimation = fss.existsSync(patchedUserData)
+const { userDataPath: patchedUserData, existed: skipIntroAnimation } =
+  initializeMainUserData({
+    e2eBuild: __E2E_BUILD__,
+    e2eUserData: __E2E_BUILD__ ? process.env.GDL_E2E_USER_DATA : undefined,
+    defaultUserData: getPatchedUserData,
+    setPath: (value) => app.setPath("userData", value),
+    setLogPath: (resolve) => {
+      log.transports.file.resolvePathFn = (variables) =>
+        resolve(variables.fileName!)
+    },
+    initializeLog: () => log.initialize()
+  })
 console.log("Skip intro animation:", skipIntroAnimation)
-
-app.setPath("userData", patchedUserData)
 console.log("User data path set to:", app.getPath("userData"))
-
-log.transports.file.resolvePathFn = (variables) =>
-  path.join(patchedUserData, variables.fileName!)
-log.initialize()
 log.eventLogger.startLogging()
 console.log("Logging initialized")
 Object.assign(console, log.functions)
@@ -345,6 +350,13 @@ if (app.isPackaged) {
   }
   initRTPath(rtPath)
 }
+
+publishE2EMainStart({
+  e2eBuild: __E2E_BUILD__,
+  runId: __E2E_BUILD__ ? process.env.GDL_E2E_RUN_ID : undefined,
+  userDataPath: patchedUserData,
+  runtimePath: CURRENT_RUNTIME_PATH
+})
 
 console.log("Userdata path:", patchedUserData)
 console.log("Runtime path:", CURRENT_RUNTIME_PATH)

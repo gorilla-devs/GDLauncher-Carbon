@@ -103,10 +103,12 @@
  * relaunch Playwright never mediated, not something this suite can silently
  * absorb. The retry test below drives it exactly once (rather than once per
  * state, which would multiply the same relaunch six times for the same code
- * path), asserts a new OS process for the app/core binary actually appeared
- * (`waitForRelaunchSibling` — the log line `ipcMain`'s handler prints before
- * calling `app.relaunch()` is not, by itself, proof the relaunch ran), and
- * cleans up the resulting sibling process itself (Linux/macOS `pgrep`,
+ * path), observes outgoing main exit and a fresh main bootstrap generation
+ * for the owned runtime/run with matching executable/start identity
+ * (`waitForRelaunchMain`), and
+ * cleans up the resulting sibling process itself: on Windows the relaunched
+ * main the marker names, with its tree (`stopRelaunchedMainOnWindows`), on
+ * Linux/macOS everything new under the harness's runtime path (`pgrep`,
  * best-effort — see `cleanupRelaunchSiblings`'s own comment). The reset
  * test relaunches the same way once more, after its "Database reset"
  * dialog, since that path reaches the relaunch only through the dialog.
@@ -115,6 +117,12 @@
 import fs from "node:fs"
 import { execSync } from "node:child_process"
 import path from "node:path"
+import {
+  captureRelaunchAttempt,
+  stopRelaunchedMain,
+  waitForRelaunchMain,
+  type RelaunchAttempt
+} from "./helpers/recoveryRelaunch.js"
 import { expect, test } from "@playwright/test"
 import type { ElectronApplication, Page } from "playwright"
 import {
@@ -129,7 +137,11 @@ import {
 import { startHarness, stopHarness, type Harness } from "./fixtures/mockIdp.js"
 import { seedDatabase, type SeedState } from "./helpers/dbSeed.js"
 import { byTestId, TEST_IDS } from "./helpers/selectors.js"
-import { isPidAlive, pidRuntimePathMatches } from "./helpers/processes.js"
+import {
+  describeLauncherProcesses,
+  isPidAlive,
+  pidRuntimePathMatches
+} from "./helpers/processes.js"
 
 interface Launched {
   app: ElectronApplication
@@ -223,6 +235,8 @@ async function waitForStdout(
 async function launchAgainstHarness(harness: Harness): Promise<Launched> {
   const opts: LaunchOptions = {
     runtimePath: harness.runtimePath,
+    userDataPath: harness.userDataPath,
+    runId: harness.runId,
     // Points the pre-DB-load terms/consent fetch (`AppInner::new`, which
     // runs before `load_and_migrate` on every launch, seeded state or not)
     // at the local mock rather than the real production API — same
@@ -521,8 +535,8 @@ test("a genuinely healthy, unseeded first launch reports success and none of the
  * used by this suite's CI matrix). Windows has no command-line-matching
  * equivalent readily available, so `tasklist` filters by image name (the
  * basename) instead — coarser than `pgrep -f`, but the recovery-screen
- * binaries (`GDLauncher.exe`, `core_module.exe`) are distinctive enough that
- * this is not a practical false-positive risk in a test's own throwaway VM.
+ * binaries (`GDLauncher.exe`, `core_module.exe`) are only a coarse cleanup inventory. Neither same-binary matching nor a new
+ * PID proves this harness relaunched; the Restart oracle uses owned markers.
  */
 function pidsForBinary(binaryPath: string): number[] {
   if (process.platform === "win32") {
@@ -563,71 +577,6 @@ function pidsForBinary(binaryPath: string): number[] {
    which the shared module deliberately does not have. */
 
 /**
- * Polls until a process matching the app or core binary appears that was not
- * already running before the relaunch was triggered (`before`), or throws
- * once `timeoutMs` elapses.
- *
- * This is the actual proof a retry click worked, not `waitForStdout`'s
- * `"relaunching app..."` line: `ipcMain.handle("relaunch", ...)` logs that
- * line *before* calling `killCoreProcess()`, `app.relaunch()`, and
- * `app.exit()` (`main/index.ts`), so a handler that logged the line and then
- * threw or returned early — never actually relaunching — would still satisfy
- * `waitForStdout` alone. Only a genuine `app.relaunch()` spawns a brand new
- * OS process, which is what this function requires to see before it will
- * pass.
- *
- * `before` must be the pid set captured immediately before the click that
- * triggers the relaunch, not an earlier one: this test's own app (main
- * process plus its zygote/gpu/renderer/utility helpers, all of which carry
- * the app binary's path as argv[0] and therefore match `pidsForBinary`) is
- * itself a "new" process relative to any snapshot taken before that app was
- * launched, and would satisfy this function on its own the instant it
- * starts — long before any relaunch — making the check pass regardless of
- * whether `app.relaunch()` ever actually ran. Callers that also want a
- * pre-launch baseline for cleanup (`cleanupRelaunchSiblings`) keep that as a
- * separate set for exactly this reason.
- */
-async function waitForRelaunchSibling(
-  before: Set<number>,
-  timeoutMs = 15_000
-): Promise<number[]> {
-  const deadline = Date.now() + timeoutMs
-  const targets = [getBinaryPath(), getCoreModulePath()]
-
-  for (;;) {
-    const found = new Set<number>()
-    for (const binaryPath of targets) {
-      for (const pid of pidsForBinary(binaryPath)) {
-        if (!before.has(pid)) found.add(pid)
-      }
-    }
-    if (found.size > 0) {
-      // A pid matching the binary path is not, on its own, proof of a
-      // genuine relaunch: this environment's Chromium re-execs the same
-      // binary as argv[0] for its zygote/gpu-process helpers, and under
-      // software-GPU fallback (observed live here — no real GPU device) a
-      // *still-running, never-relaunched* app can spawn one of these that
-      // exits again within milliseconds, which `pgrep -f` can catch mid-
-      // flight. Confirming the candidate is still alive after a short delay
-      // is what tells the two apart: a genuine `app.relaunch()` produces a
-      // new, long-lived main process, not a process that is already gone by
-      // the next check.
-      await new Promise((resolve) => setTimeout(resolve, 500))
-      const confirmed = [...found].filter(isPidAlive)
-      if (confirmed.length > 0) return confirmed
-    }
-    if (Date.now() >= deadline) {
-      throw new Error(
-        `waitForRelaunchSibling: no new process matching ${JSON.stringify(targets)} ` +
-          `appeared within ${timeoutMs}ms of clicking Restart — app.relaunch() ` +
-          "was never observed to actually run."
-      )
-    }
-    await new Promise((resolve) => setTimeout(resolve, 250))
-  }
-}
-
-/**
  * `app.relaunch()` (used by every button that acts on the recovery screen)
  * spawns a brand new OS process this harness never launched through
  * `_electron.launch()` and has no Playwright handle to — Electron re-execs
@@ -635,7 +584,7 @@ async function waitForRelaunchSibling(
  * only twice in this file — see the module doc comment) unavoidably leaves
  * that sibling running. This sweeps up anything matching the app or core
  * binary path that was not part of `before` (the pre-*launch* snapshot, not
- * the pre-*click* one `waitForRelaunchSibling` uses — this function's job is
+ * the outgoing main identity `waitForRelaunchMain` uses — this function's job is
  * "nothing from this whole test is still running", a superset of "the
  * relaunch sibling specifically"), so a real test run does not leave an idle
  * GUI process behind on a developer's own machine.
@@ -657,22 +606,14 @@ async function waitForRelaunchSibling(
  * rather than killed on the assumption it's ours.
  *
  * Best-effort and Linux/macOS-only (`pgrep`/`ps`/`kill` are Unix tools with
- * no Windows equivalent wired up here): a miss here never fails the test,
- * and on Windows CI the only cost is one idle process for the remainder of
- * that job's already-ephemeral VM — accepted deliberately
- * rather than chased with a second, less-tested cleanup path.
+ * no Windows equivalent wired up here): a miss here never fails the test.
+ * Windows is covered by `stopRelaunchedMainOnWindows` instead.
  */
 async function cleanupRelaunchSiblings(
   before: Set<number>,
   runtimePath: string
 ): Promise<void> {
-  if (process.platform === "win32") {
-    console.warn(
-      "cleanupRelaunchSiblings: no-op on win32 — a relaunched sibling process " +
-        "is left running for this job's own VM lifetime"
-    )
-    return
-  }
+  if (process.platform === "win32") return
 
   const deadline = Date.now() + 10_000
   // Once at least one match is found, keep polling until a full second has
@@ -747,6 +688,47 @@ async function cleanupRelaunchSiblings(
   }
 }
 
+/**
+ * Windows: stops the main the click relaunched, with its core and Chromium
+ * helpers. Playwright did not start it, so nothing else ends it.
+ *
+ * Run 41652440682 left them running:
+ * - Each kept files open in the harness's runtime folder (its userData lives
+ *   there), so `stopHarness` failed with EPERM.
+ * - Once the one relaunched after the database reset was up (on the login
+ *   screen, which loops a full-screen background video), the runner stayed
+ *   busy for the rest of the job: app startup went from about 0.2 s to over
+ *   1 s. The e2e build's startup identity probe then timed out in every
+ *   later launch ("Cannot identify E2E main startup").
+ *
+ * Only a main the bootstrap marker attributes to this test's outgoing main
+ * (`attempt.before`), and whose live identity still matches, is stopped
+ * (`stopRelaunchedMain`). The process list logged first shows its CPU time.
+ */
+async function stopRelaunchedMainOnWindows(
+  attempt: RelaunchAttempt | undefined
+): Promise<void> {
+  if (process.platform !== "win32" || !attempt) return
+  console.log(
+    "stopRelaunchedMain: launcher processes before the stop:\n" +
+      describeLauncherProcesses([getBinaryPath(), getCoreModulePath()])
+  )
+  const stopped = await stopRelaunchedMain(attempt.before)
+  if (!stopped) {
+    console.log(
+      "stopRelaunchedMain: no live main this test relaunched was found"
+    )
+    return
+  }
+  console.log(
+    `stopRelaunchedMain: ended relaunched main ${stopped.main} and its ` +
+      `tree (${stopped.killed.join(", ")})` +
+      (stopped.survivors.length > 0
+        ? `; still running: ${stopped.survivors.join(", ")}`
+        : "")
+  )
+}
+
 // eslint-disable-next-line no-empty-pattern
 test("clicking Restart genuinely restarts the app, not just a UI no-op", async ({}, testInfo) => {
   expect(isCoreModulePresent()).toBeTruthy()
@@ -758,6 +740,7 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
 
   const harness = await startHarness()
   let launched: Launched | undefined
+  let attempt: RelaunchAttempt | undefined
   try {
     await seedDatabase(harness.runtimePath, "DB_CORRUPT")
     launched = await launchAgainstHarness(harness)
@@ -768,39 +751,33 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
     await expect(retryButton).toBeVisible({ timeout: 60_000 })
     await expect(retryButton).toBeEnabled()
 
-    // Snapshotted immediately before the click, not reused from
-    // `beforePids` above: this test's own app (main process plus its
-    // zygote/gpu/renderer/utility helpers) is itself a new process relative
-    // to `beforePids`, which was captured before this test ever launched
-    // anything. Using that earlier snapshot here would let
-    // `waitForRelaunchSibling` return the instant it saw this test's own
-    // already-running app — true regardless of whether the click below ever
-    // triggers a real relaunch. `beforePids` stays reserved for
-    // `cleanupRelaunchSiblings`, whose job (sweep up everything left running
-    // by this whole test) is a different one — see that function's own doc
-    // comment.
-    const preClickPids = new Set([
-      ...pidsForBinary(getBinaryPath()),
-      ...pidsForBinary(getCoreModulePath())
-    ])
+    // Register outgoing exit before the action; the owned main bootstrap
+    // marker must match this exact main process and harness. Its pid is read
+    // from inside it: on Windows `app.process()` is the shell Playwright
+    // starts Electron through, not Electron itself.
+    const current = captureRelaunchAttempt(
+      launched.app.process(),
+      harness,
+      await launched.app.evaluate(() => process.pid)
+    )
+    attempt = current
 
-    await retryButton.click()
+    try {
+      await retryButton.click()
 
-    // `ipcMain.handle("relaunch", ...)` (`main/index.ts`) logs this exact
-    // line before calling `killCoreProcess()`, `app.relaunch()`, and
-    // `app.exit()`. Waiting for it proves the click's full round trip —
-    // renderer button, preload listener, ipcMain handler — reached the real
-    // handler. It does NOT by itself prove the relaunch happened: the log
-    // line is printed before any of those three calls, so a handler that
-    // logged it and then threw or returned early would satisfy this alone.
-    await waitForStdout(launched, "relaunching app...")
+      // `ipcMain.handle("relaunch", ...)` (`main/index.ts`) logs this exact
+      // line before calling `killCoreProcess()`, `app.relaunch()`, and
+      // `app.exit()`. Waiting for it proves the click's full round trip —
+      // renderer button, preload listener, ipcMain handler — reached the real
+      // handler. It does NOT by itself prove the relaunch happened: the log
+      // line is printed before any of those three calls, so a handler that
+      // logged it and then threw or returned early would satisfy this alone.
+      await waitForStdout(launched, "relaunching app...")
 
-    // The actual proof: a new OS process for the app or core binary that
-    // was not part of `preClickPids`. Only a genuine `app.relaunch()`
-    // produces this — see `waitForRelaunchSibling`'s own doc comment for why
-    // the log line above cannot substitute for it, and why this must be the
-    // pre-*click* snapshot rather than `beforePids`.
-    await waitForRelaunchSibling(preClickPids)
+      await waitForRelaunchMain(current)
+    } finally {
+      current.dispose()
+    }
   } finally {
     if (launched) {
       await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
@@ -808,6 +785,7 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
       )
       await closeAppAndCore(launched.app)
     }
+    await stopRelaunchedMainOnWindows(attempt)
     await cleanupRelaunchSiblings(beforePids, harness.runtimePath)
     await stopHarness(harness)
   }
@@ -884,6 +862,7 @@ test('"Reset Database & Restart" deletes the database file for real, on its own 
   // other spec, still needs this directory once this test is done with it.
   const harness = await startHarness()
   let launched: Launched | undefined
+  let attempt: RelaunchAttempt | undefined
   try {
     await seedDatabase(harness.runtimePath, "DB_CORRUPT")
     const dbPath = `${harness.runtimePath}/gdl_conf.db`
@@ -923,9 +902,14 @@ test('"Reset Database & Restart" deletes the database file for real, on its own 
 
     // The real, on-disk proof: the corrupt file this test seeded is gone from
     // the runtime path, and the folder the dialog names, inside that same
-    // runtime path, keeps it byte for byte.
+    // runtime path, keeps it byte for byte. The dialog spells that path as
+    // its real location, which on macOS (`/var` links to `/private/var`) and
+    // on Windows (`RUNNER~1` expands to the full name) differs from the
+    // spelling this harness was handed, so both sides are resolved first.
     expect(fs.existsSync(dbPath)).toBe(false)
-    expect(path.dirname(recoveryPath!)).toBe(harness.runtimePath)
+    expect(fs.realpathSync.native(path.dirname(recoveryPath!))).toBe(
+      fs.realpathSync.native(harness.runtimePath)
+    )
     expect(
       fs.readFileSync(path.join(recoveryPath!, "gdl_conf.db")).equals(seeded),
       "the recovery folder keeps the database exactly as it was"
@@ -933,12 +917,17 @@ test('"Reset Database & Restart" deletes the database file for real, on its own 
 
     // Pressing Restart then genuinely relaunches, as the retry test proves
     // for the Restart step.
-    const attempt = captureRelaunchAttempt(launched.app.process(), harness)
+    const current = captureRelaunchAttempt(
+      launched.app.process(),
+      harness,
+      await launched.app.evaluate(() => process.pid)
+    )
+    attempt = current
     try {
       await pressResetDialogRestart(launched.app)
-      await waitForRelaunchMain(attempt)
+      await waitForRelaunchMain(current)
     } finally {
-      attempt.dispose()
+      current.dispose()
     }
   } finally {
     if (launched) {
@@ -947,6 +936,7 @@ test('"Reset Database & Restart" deletes the database file for real, on its own 
       )
       await closeAppAndCore(launched.app)
     }
+    await stopRelaunchedMainOnWindows(attempt)
     await cleanupRelaunchSiblings(beforePids, harness.runtimePath)
     await stopHarness(harness)
   }

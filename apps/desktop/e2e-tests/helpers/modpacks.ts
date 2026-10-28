@@ -28,7 +28,11 @@ import {
   TEST_IDS
 } from "./selectors.js"
 import { dismissSearchOnboardingTip, scrollVersionRowIntoView } from "./mods.js"
-import { waitForInstallComplete } from "./instances.js"
+import {
+  armInstallOperation,
+  runInstallAndWait,
+  waitForInstallComplete
+} from "./instances.js"
 
 export interface PackFile {
   path: string
@@ -39,7 +43,7 @@ export interface PackFile {
 }
 
 export interface PackOverrideFile {
-  /** Forward-slash path, `overrides/` prefix stripped — same value as the
+  /** Forward-slash path, common/client override prefix stripped — same value as the
    *  matching entry in `PackIndex.overrides`. */
   path: string
   /** sha256 of the override's raw bytes, exactly as they sit in the
@@ -59,7 +63,7 @@ export interface PackIndex {
    *  `files[]` in `modrinth.index.json`. Paths are forward-slash and have no
    *  leading slash. */
   files: PackFile[]
-  /** Paths extracted from `overrides/`, with the prefix stripped. Kept as a
+  /** Effective paths extracted from common and client overrides, with the prefix stripped. Kept as a
    *  plain path list — every existing caller wants only that — with content
    *  hashes available in parallel via `overrideFiles`. */
   overrides: string[]
@@ -161,6 +165,7 @@ export function parseMrpackIndex(zip: Buffer): PackIndex {
       path: string
       hashes: { sha512: string }
       fileSize: number
+      env?: { client: string }
     }[]
   }
 
@@ -174,19 +179,36 @@ export function parseMrpackIndex(zip: Buffer): PackIndex {
   // Built once, together, so `overrides` and `overrideFiles` can never
   // disagree on which paths exist — `overrides` is derived from this rather
   // than computed by a second, separate filter.
-  const overrideFiles: PackOverrideFile[] = entries
-    .filter((e) => e.name.startsWith("overrides/") && !e.name.endsWith("/"))
-    .map((e) => ({
-      path: e.name.slice("overrides/".length),
-      sha256: createHash("sha256").update(e.body).digest("hex")
-    }))
+  // Same two-pass precedence as Task9 extraction: client wins regardless
+  // of archive ordering. Server-only overrides do not belong to this client.
+  const effective = new Map<string, PackOverrideFile>()
+  for (const layer of ["overrides/", "client-overrides/"]) {
+    for (const entry of entries) {
+      if (!entry.name.startsWith(layer) || entry.name.endsWith("/")) continue
+      const relative = entry.name.slice(layer.length)
+      if (
+        !relative ||
+        relative
+          .split("/")
+          .some((part) => part === ".." || part === "." || part === "")
+      )
+        continue
+      effective.set(relative, {
+        path: relative,
+        sha256: createHash("sha256").update(entry.body).digest("hex")
+      })
+    }
+  }
+  const overrideFiles = [...effective.values()]
 
   return {
-    files: index.files.map((f) => ({
-      path: f.path,
-      sha512: f.hashes.sha512,
-      size: f.fileSize
-    })),
+    files: index.files
+      .filter((f) => !f.env || f.env.client === "required")
+      .map((f) => ({
+        path: f.path,
+        sha512: f.hashes.sha512,
+        size: f.fileSize
+      })),
     overrides: overrideFiles.map((f) => f.path),
     overrideFiles,
     minecraft: index.dependencies.minecraft,
@@ -260,6 +282,36 @@ const MODPACK_SEARCH_TIMEOUT = 90_000
  *  `ModpackDownloadButton` navigates to `/library` from its `prepareInstance`
  *  success handler, so this only covers a render, not a download. */
 const TILE_APPEAR_TIMEOUT = 30_000
+
+/** How long a search row's click is given to reach its addon page's route.
+ *  The router only commits the URL once the page's transition settles, and
+ *  that transition waits on the live project fetch (see `openModpackPage`),
+ *  so this bounds a network round trip rather than a render. */
+const ADDON_ROUTE_TIMEOUT = 30_000
+
+/** The project id and platform of the addon page `url` is on, or undefined
+ *  anywhere else. The one parser behind both `openModpackPage`'s wait and
+ *  `armModpackCreation`'s read, so the two can never disagree about what
+ *  "on the selected modpack's page" means. */
+function selectedModpackRoute(
+  url: URL
+): { project: string; platform: string } | undefined {
+  const route = /^#\/addon\/([^/]+)\/([^/?]+)(?:[/?]|$)/.exec(url.hash)
+  return route
+    ? { project: decodeURIComponent(route[1]), platform: route[2] }
+    : undefined
+}
+
+/** Whether `id` is in `platform`'s project id space: CurseForge ids are
+ *  integers, Modrinth ids are base62 strings that are never all digits in
+ *  this suite's fixtures. */
+export function isPlatformProjectId(
+  id: string,
+  platform: "curseforge" | "modrinth"
+): boolean {
+  const numeric = /^\d+$/.test(id)
+  return platform === "curseforge" ? numeric : id.length > 0 && !numeric
+}
 
 /**
  * Navigates from wherever `page` is to a modpack's addon page, by search.
@@ -352,9 +404,64 @@ export async function openModpackPage(
       "search unfiltered (or the wrong platform) with nothing failing loudly"
   }).toBeChecked()
 
+  // The radio reads `searchQuery()`, which changes on the click, but the
+  // results follow `debouncedSearchQuery()` (`utils/platformSearch.ts`, 500ms
+  // leading + trailing). The fill above already spent the leading edge, so
+  // for up to 500ms after the click the list still shows the fill's
+  // both-platform results. On macOS CI the first row was read 17ms after the
+  // click and was CurseForge's 1253222 under a checked Modrinth radio. Rows
+  // carry no platform, but the two id spaces do not overlap: CurseForge ids
+  // are integers, Modrinth ids are base62 strings (`MODPACK_MR_PROJECT`), so
+  // wait for a first row whose id is the requested platform's.
   const firstResult = page.locator(byTestId(TEST_IDS.searchResultRow)).first()
   await expect(firstResult).toBeVisible({ timeout: MODPACK_SEARCH_TIMEOUT })
+  let projectId = null as string | null
+  await expect
+    .poll(
+      async () => {
+        projectId = await firstResult.getAttribute("data-project-id")
+        return projectId !== null && isPlatformProjectId(projectId, platform)
+      },
+      {
+        timeout: MODPACK_SEARCH_TIMEOUT,
+        message:
+          `openModpackPage: the first search result never became a ` +
+          `${platform} project after the platform filter was set`
+      }
+    )
+    .toBe(true)
+  if (!projectId) {
+    throw new Error(
+      "openModpackPage: the first search result row carries no data-project-id"
+    )
+  }
   await firstResult.click()
+
+  // `click()` resolving does not mean the app has left `/search`. The row's
+  // `onItemClick` is a `navigator.navigate`, and @solidjs/router only writes
+  // the new hash in `navigateEnd`, once the route's `startTransition` has
+  // settled: the lazy `AddonViewPage/Overview` chunk plus the project query it
+  // suspends on. Measured live, the URL was still `#/search` straight after
+  // the click and `#/addon/<id>/modrinth` 200ms later, so a caller reading
+  // `page.url()` straight away (`armModpackCreation`) read the search page.
+  // Wait for the addon page of the very row that was clicked, on the platform
+  // that was asked for. A stale row from the other platform fails here, by
+  // name, instead of opening the wrong pack.
+  await page
+    .waitForURL(
+      (url) => {
+        const route = selectedModpackRoute(url)
+        return route?.project === projectId && route.platform === platform
+      },
+      { timeout: ADDON_ROUTE_TIMEOUT }
+    )
+    .catch(() => {
+      throw new Error(
+        `openModpackPage: clicking the first ${platform} result ` +
+          `(${projectId}) never reached /addon/${projectId}/${platform} ` +
+          `within ${ADDON_ROUTE_TIMEOUT}ms (still at ${page.url()})`
+      )
+    })
 }
 
 /** Reads the display name off the library tile the install just created.
@@ -390,6 +497,45 @@ async function tileNames(page: Page): Promise<string[]> {
     )
 }
 
+function armModpackCreation(
+  page: Page,
+  platform: "curseforge" | "modrinth",
+  fileId?: string
+) {
+  const route = selectedModpackRoute(new URL(page.url()))
+  if (route?.platform !== platform)
+    throw new Error(`No exact selected modpack route (at ${page.url()})`)
+  const project = route.project
+  return armInstallOperation(page, {
+    create: (input) => {
+      const pack = (
+        input as {
+          version?: {
+            Modpack?: {
+              type?: string
+              value?: {
+                project_id?: string | number
+                version_id?: string
+                file_id?: number
+              }
+            }
+          }
+        } | null
+      )?.version?.Modpack
+      return (
+        pack?.type === platform &&
+        String(pack.value?.project_id) === project &&
+        (!fileId ||
+          String(
+            platform === "curseforge"
+              ? pack.value?.file_id
+              : pack.value?.version_id
+          ) === fileId)
+      )
+    }
+  })
+}
+
 /** Installs the pack's current latest via the addon Overview page's main
  *  Download button — `ModpackDownloadButton` with no `fileId`, which resolves
  *  the version itself. Returns the instance's display name. */
@@ -402,11 +548,15 @@ export async function installModpackLatest(
   const before = await tileNames(page)
 
   await openModpackPage(page, query, platform)
-  await page.click(byTestId(TEST_IDS.modpackDownloadButton))
-
-  const name = await newestTileName(page, before)
-  await waitForInstallComplete(page, name)
-  return name
+  const operation = armModpackCreation(page, platform)
+  try {
+    await page.click(byTestId(TEST_IDS.modpackDownloadButton))
+    const name = await newestTileName(page, before)
+    await waitForInstallComplete(page, name, { operation })
+    return name
+  } finally {
+    operation.dispose()
+  }
 }
 
 /** How long the addon page's Versions route is watched before it is trusted.
@@ -478,14 +628,18 @@ export async function installModpackVersion(
   // under the row is still required — the id is one-per-row — and a row may
   // also hold a `ServerPackDownloadButton`, which is why the row's button
   // has its own id rather than being selected as "the row's one button".
-  await page
-    .locator(byAddonVersionRow(fileId))
-    .locator(byTestId(TEST_IDS.modpackVersionDownloadButton))
-    .click()
-
-  const name = await newestTileName(page, before)
-  await waitForInstallComplete(page, name)
-  return name
+  const operation = armModpackCreation(page, platform, fileId)
+  try {
+    await page
+      .locator(byAddonVersionRow(fileId))
+      .locator(byTestId(TEST_IDS.modpackVersionDownloadButton))
+      .click()
+    const name = await newestTileName(page, before)
+    await waitForInstallComplete(page, name, { operation })
+    return name
+  } finally {
+    operation.dispose()
+  }
 }
 
 /** How long the tile click is given to reach the instance route at all.
@@ -623,8 +777,8 @@ export async function pickModpackVersionAndConfirm(
  *
  * `handleUpdate` closes the modal and navigates to `/library` as soon as
  * `changeModpack` resolves — which is *before* the resulting task has done
- * any work — so this waits for the instance to leave `inactive` and come
- * back, the same signal `waitForInstallComplete` uses for a first install.
+ * any work — so this prearms the accepted operation and requires its positive task
+ * outcome before trusting the final inactive tile.
  *
  * Note that a **rejected** change leaves the modal open on the instance's
  * Settings route rather than proceeding to `waitForInstallComplete`:
@@ -643,9 +797,9 @@ export async function changeModpackVersion(
 ): Promise<void> {
   await openInstanceSettings(page, instanceName)
   await page.click(byTestId(TEST_IDS.instanceSettingsChangeVersion))
-  await pickModpackVersionAndConfirm(page, versionId)
-
-  await waitForInstallComplete(page, instanceName)
+  await runInstallAndWait(page, instanceName, "instance.changeModpack", () =>
+    pickModpackVersionAndConfirm(page, versionId)
+  )
 }
 
 /** Unlocks a modpack instance. One-way: the shipped UI renders no re-lock
@@ -699,6 +853,7 @@ export async function repairModpack(
       `instance has no modpack association`
   ).toBeEnabled()
   await entry.click()
-  await page.click(byTestId(TEST_IDS.repairModpackConfirm))
-  await waitForInstallComplete(page, instanceName)
+  await runInstallAndWait(page, instanceName, "instance.repairModpack", () =>
+    page.click(byTestId(TEST_IDS.repairModpackConfirm))
+  )
 }

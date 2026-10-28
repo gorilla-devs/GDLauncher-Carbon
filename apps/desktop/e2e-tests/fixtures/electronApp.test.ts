@@ -1,6 +1,11 @@
 import path from "node:path"
 import { describe, expect, it } from "vitest"
-import { getBinaryPath, getCoreModulePath, getRootPath } from "./electronApp.js"
+import {
+  appendToError,
+  getBinaryPath,
+  getCoreModulePath,
+  getRootPath
+} from "./electronApp.js"
 
 describe("getRootPath", () => {
   it("points at the unpacked build for each platform", () => {
@@ -39,5 +44,21 @@ describe("getCoreModulePath", () => {
     expect(getCoreModulePath("darwin")).toContain(
       path.join("Contents", "Resources", "binaries", "core_module")
     )
+  })
+})
+
+describe("appendToError", () => {
+  it("extends the message and the stack's copy of it", () => {
+    const error = new Error("electron.launch: Process failed to launch!")
+    const appended = appendToError(error, "note $& kept literally")
+    expect(appended).toBe(error)
+    expect(error.message).toBe(
+      "electron.launch: Process failed to launch!\n\nnote $& kept literally"
+    )
+    expect(error.stack).toContain(error.message)
+  })
+
+  it("passes a non-Error through untouched", () => {
+    expect(appendToError("plain", "note")).toBe("plain")
   })
 })

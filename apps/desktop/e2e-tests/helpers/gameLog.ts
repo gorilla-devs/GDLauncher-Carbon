@@ -26,7 +26,7 @@ import { expect } from "@playwright/test"
 const MESSAGE_RE = /<log4j:Message><!\[CDATA\[([\s\S]*?)\]\]><\/log4j:Message>/g
 
 /**
- * Proxies for "the client finished starting and is sitting at the main menu".
+ * Corroborating startup-log markers; they do not witness a menu or response.
  *
  * Minecraft logs no explicit title-screen event, so every entry here is a
  * proxy rather than the thing itself — and each one's exact wording has
@@ -149,7 +149,7 @@ const LOG_FIRST_OUTPUT_TIMEOUT = 180_000
 /** How long to wait for the game log to stop growing once it has started. */
 const LOG_QUIESCENCE_TIMEOUT = 240_000
 
-/** How long the log must hold steady to count as "finished loading". Long
+/** How long the log must hold steady for the quiet-output observation. Long
  *  enough to clear the gaps between startup phases — texture stitching
  *  pauses for seconds at a time under software GL — without waiting out the
  *  whole test budget. */
@@ -164,9 +164,8 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Waits for the newest game log under `logsDir` to grow and then stop
- * growing — the operational proxy this suite uses for "reached a stable main
- * menu" wherever it drives a real launch (see `gameLaunch.spec.ts`'s module
- * doc comment for why no log wording is trusted as the primary signal).
+ * growing during a live-process observation. This is startup-output evidence;
+ * it does not observe menu rendering or input responsiveness.
  * `isAlive` is polled throughout so a crash mid-load is reported as a crash
  * rather than as a slow, eventually-satisfied quiescence; both current
  * callers pass a predicate over their own tracked `GAME_CLOSED` count
@@ -178,7 +177,7 @@ function sleep(ms: number): Promise<void> {
  *
  * A single shared implementation: both `gameLaunch.spec.ts` and
  * `modpackLifecycle.spec.ts` call this rather than each keeping their own
- * copy.
+ * copy. Silence and liveness alone do not establish responsiveness or menu rendering.
  */
 export async function waitForLogQuiescence(
   logsDir: string,
@@ -212,8 +211,7 @@ export async function waitForLogQuiescence(
     // cause.
     expect(
       isAlive(),
-      "the game exited while still loading — it crashed rather than " +
-        "reaching the main menu"
+      "the game exited during the startup-log observation"
     ).toBe(true)
 
     await sleep(LOG_QUIESCENCE_POLL_MS)
@@ -222,6 +220,6 @@ export async function waitForLogQuiescence(
   expect(
     Date.now() - steadySince,
     `the game log under ${logsDir} never stopped growing within ` +
-      `${LOG_QUIESCENCE_TIMEOUT}ms — the client never finished loading`
+      `${LOG_QUIESCENCE_TIMEOUT}ms — startup output did not become quiet`
   ).toBeGreaterThanOrEqual(LOG_QUIESCENCE_HOLD_MS)
 }

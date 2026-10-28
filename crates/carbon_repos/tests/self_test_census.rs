@@ -8,7 +8,8 @@
 //! flags it. A rule with no such test could silently regress into a no-op that
 //! passes everything, and nothing would notice.
 //!
-//! This census makes that impossible mechanically rather than by review. Each
+//! This census checks marker-set coverage, while enabled behavioral tests
+//! still require separate review and execution. Each
 //! rule's implementation site carries a `// CENSUS-RULE: <id>` marker; each
 //! planted-failure test carries a `// CENSUS-SELFTEST: <id>` marker. The census
 //! greps both sets straight out of the source and asserts:
@@ -17,13 +18,14 @@
 //!    or removing an enforcement rule is a deliberate, reviewed edit here, not a
 //!    silent drift);
 //! 2. every rule marker is covered by at least one self-test marker (the core
-//!    completeness guarantee — an uncovered rule fails the build);
+//!    marker-coverage guarantee — an uncovered rule fails the census);
 //! 3. every self-test marker names a real rule (a typo or a marker left behind
 //!    after a rule was removed is caught).
 //!
 //! Adding a new `// CENSUS-RULE:` without a matching `// CENSUS-SELFTEST:` fails
-//! this test, so the census can only be satisfied by actually writing the
-//! planted-failure test.
+//! this test. Comments alone can satisfy these text predicates; the census
+//! does not associate markers with enabled test functions or prove assertions
+//! detect planted failures. Review and run those behavioral tests separately.
 //!
 //! The census's own matching logic is itself fence-tested below
 //! (`census_logic_*`) with synthetic inputs, so a bug that made the census
@@ -159,7 +161,7 @@ fn orphan_selftests(rules: &BTreeSet<String>, covered: &BTreeSet<String>) -> BTr
 }
 
 #[test]
-fn every_enforcement_rule_has_a_planted_failure_self_test() {
+fn every_enforcement_rule_has_a_self_test_marker() {
     let rules = source_rule_ids();
     let covered = selftest_ids();
 
@@ -183,11 +185,11 @@ fn every_enforcement_rule_has_a_planted_failure_self_test() {
         expected.difference(&rules).collect::<Vec<_>>(),
     );
 
-    // Core guarantee: every rule is fence-tested.
+    // Core guarantee: every rule has a corresponding marker.
     let uncovered = uncovered_rules(&rules, &covered);
     assert!(
         uncovered.is_empty(),
-        "these enforcement rules have no planted-failure self-test \
+        "these enforcement rules have no self-test marker \
          (add a `// CENSUS-SELFTEST: <id>` test that proves the rule flags a violation): {uncovered:?}"
     );
 

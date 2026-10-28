@@ -21,7 +21,12 @@ import {
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { readInstanceConfig } from "./helpers/instanceConfig.js"
-import { classifyPackinfo, readPackinfo } from "./helpers/packinfo.js"
+import {
+  capturePristinePackinfo,
+  verifyPristinePackinfo,
+  classifyPackinfo,
+  readPackinfo
+} from "./helpers/packinfo.js"
 import { readInstallAudit } from "./helpers/installAudit.js"
 import { snapshotTree } from "./helpers/instanceTree.js"
 import {
@@ -195,6 +200,8 @@ test.describe("modpack interrupted staging", () => {
     const harness = await startHarness()
     const launchOpts: LaunchOptions = {
       runtimePath: harness.runtimePath,
+      userDataPath: harness.userDataPath,
+      runId: harness.runId,
       baseApi: `${harness.mock.url}/gdl`,
       e2eAuthBase: harness.mock.url,
       e2eEntitlementKey: harness.entitlementKeyPath,
@@ -446,6 +453,10 @@ test.describe("modpack interrupted staging", () => {
         const oldPackinfoText = await fs.promises.readFile(packinfoPath, "utf8")
 
         await changeModpackVersion(page, name, MODPACK_CF_FILE)
+        const targetPackinfo = await readPackinfo(root)
+        const targetTree = await snapshotTree(path.join(root, "instance"))
+        const pristineTarget = await capturePristinePackinfo(root, targetTree)
+        verifyPristinePackinfo(targetPackinfo, targetPackinfo, pristineTarget)
 
         // Restore it. `process_modpack` writes its scan to tmp-packinfo.json and
         // renames it over packinfo.json only at run/modpack.rs:803, after the
@@ -513,12 +524,12 @@ test.describe("modpack interrupted staging", () => {
         // these paths' actual hashes, not the stale ones restored into
         // packinfo.json above.
         const packinfoAfterRepair = await readPackinfo(root)
-        for (const key of staleTracked) {
-          expect(
-            packinfoAfterRepair.get(key)?.md5,
-            `packinfo still records ${key} under its stale hash after the repair`
-          ).not.toBe(stale.get(key)?.md5)
-        }
+        verifyPristinePackinfo(
+          packinfoAfterRepair,
+          targetPackinfo,
+          pristineTarget,
+          { keys: staleTracked, baseline: stale }
+        )
       },
       async (alreadyFailed) => {
         await attachCoreLogOnFailure(testInfo, harness.runtimePath)

@@ -57,6 +57,92 @@ async fn migrated_db() -> (tempfile::TempDir, Db) {
     (dir, db)
 }
 
+/// The assertion boundary consumed by each of the six ordered getters.
+fn assert_ordered_rows<R: Clone, M: Clone + std::fmt::Debug + PartialEq, K: PartialOrd>(
+    rows: &[R],
+    expected: &[M],
+    model: impl Fn(R) -> M,
+    key: impl Fn(&R) -> K,
+    ctx: &str,
+) {
+    assert_eq!(rows.len(), expected.len(), "{ctx}");
+    // Remove exactly one full-row match at a time: sets would erase multiplicity.
+    let mut unmatched: Vec<M> = rows.iter().cloned().map(model).collect();
+    for wanted in expected {
+        let position = unmatched.iter().position(|actual| actual == wanted)
+            .unwrap_or_else(|| panic!("ordered row multiset diverged at {ctx}: missing {wanted:?}; remaining {unmatched:?}"));
+        unmatched.remove(position);
+    }
+    assert!(
+        unmatched.is_empty(),
+        "extra ordered rows at {ctx}: {unmatched:?}"
+    );
+
+    assert!(
+        rows.windows(2).all(|w| key(&w[0]) <= key(&w[1])),
+        "order violated at {ctx}"
+    );
+}
+fn model_instance(r: inst::InstanceRow) -> MInst {
+    MInst {
+        id: r.id,
+        name: r.name,
+        shortpath: r.shortpath,
+        favorite: r.favorite,
+        has_pack_update: r.has_pack_update,
+        index: r.index,
+        lib: r.library_position,
+        group: r.group_id,
+    }
+}
+fn model_instance_group(r: inst::InstanceGroupRow) -> MGrp {
+    MGrp {
+        id: r.id,
+        name: r.name,
+        gidx: r.group_index,
+        lib: r.library_position,
+    }
+}
+fn model_server_group(r: srv::ServerGroupRow) -> MGrp {
+    MGrp {
+        id: r.id,
+        name: r.name,
+        gidx: r.group_index,
+        lib: r.library_position,
+    }
+}
+fn model_server(r: srv::ServerRow) -> MSrv {
+    MSrv {
+        id: r.id,
+        name: r.name,
+        shortpath: r.shortpath,
+        favorite: r.favorite,
+        index: r.index,
+        lib: r.library_position,
+        group: r.group_id,
+        icon_revision: r.icon_revision,
+        server_type: r.server_type,
+        game_version: r.game_version,
+        port: r.port,
+        motd: r.motd,
+        max_players: r.max_players,
+        online_mode: r.online_mode,
+        xmx: r.xmx,
+        xms: r.xms,
+        extra_java_args: r.extra_java_args,
+        auto_restart: r.auto_restart,
+        date_created: r.date_created,
+        last_started: r.last_started,
+        provider_type: r.provider_type,
+        hosted_server_id: r.hosted_server_id,
+        modloader_type: r.modloader_type,
+        modloader_version: r.modloader_version,
+        modpack_platform: r.modpack_platform,
+        modpack_project_id: r.modpack_project_id,
+        modpack_file_id: r.modpack_file_id,
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Instance family
 // ---------------------------------------------------------------------------
@@ -786,35 +872,32 @@ async fn instance_reordering_matches_model() {
                     let want = grps.iter().filter_map(|g| g.lib).min();
                     assert_eq!(got.and_then(|g| g.library_position), want, "{ctx}");
 
-                    // Ordered listings: same multiset (via the state check) and
-                    // correctly ordered.
+                    // Each ordered result is checked independently of the later plain listing.
                     let rows = inst::get_all_instances_ordered_by_index(&db).await.unwrap();
-                    assert_eq!(rows.len(), insts.len(), "{ctx}");
-                    assert!(
-                        rows.windows(2).all(|w| w[0].index <= w[1].index),
-                        "index order violated at {ctx}"
-                    );
+                    assert_ordered_rows(&rows, &insts, model_instance, |r| r.index, &ctx);
                     let rows = inst::get_all_groups_ordered_by_group_index(&db)
                         .await
                         .unwrap();
-                    assert_eq!(rows.len(), grps.len(), "{ctx}");
-                    assert!(
-                        rows.windows(2)
-                            .all(|w| w[0].group_index <= w[1].group_index),
-                        "group index order violated at {ctx}"
+                    assert_ordered_rows(
+                        &rows,
+                        &grps,
+                        model_instance_group,
+                        |r| r.group_index,
+                        &ctx,
                     );
                     let rows = inst::get_groups_with_library_position_ordered(&db)
                         .await
                         .unwrap();
-                    assert_eq!(
-                        rows.len(),
-                        grps.iter().filter(|g| g.lib.is_some()).count(),
-                        "{ctx}"
-                    );
-                    assert!(
-                        rows.windows(2)
-                            .all(|w| w[0].library_position <= w[1].library_position),
-                        "group library order violated at {ctx}"
+                    assert_ordered_rows(
+                        &rows,
+                        &grps
+                            .iter()
+                            .filter(|g| g.lib.is_some())
+                            .cloned()
+                            .collect::<Vec<_>>(),
+                        model_instance_group,
+                        |r| r.library_position,
+                        &ctx,
                     );
                 }
             }
@@ -839,6 +922,25 @@ struct MSrv {
     lib: Option<i32>,
     group: i32,
     icon_revision: Option<i32>,
+    server_type: String,
+    game_version: String,
+    port: i32,
+    motd: String,
+    max_players: i32,
+    online_mode: bool,
+    xmx: i32,
+    xms: i32,
+    extra_java_args: String,
+    auto_restart: bool,
+    date_created: chrono::DateTime<chrono::FixedOffset>,
+    last_started: Option<chrono::DateTime<chrono::FixedOffset>>,
+    provider_type: String,
+    hosted_server_id: Option<String>,
+    modloader_type: Option<String>,
+    modloader_version: Option<String>,
+    modpack_platform: Option<String>,
+    modpack_project_id: Option<String>,
+    modpack_file_id: Option<String>,
 }
 
 fn ts() -> DbDateTime {
@@ -859,6 +961,25 @@ async fn check_server_state(db: &Db, servers: &[MSrv], grps: &[MGrp], ctx: &str)
             lib: r.library_position,
             group: r.group_id,
             icon_revision: r.icon_revision,
+            server_type: r.server_type,
+            game_version: r.game_version,
+            port: r.port,
+            motd: r.motd,
+            max_players: r.max_players,
+            online_mode: r.online_mode,
+            xmx: r.xmx,
+            xms: r.xms,
+            extra_java_args: r.extra_java_args,
+            auto_restart: r.auto_restart,
+            date_created: r.date_created,
+            last_started: r.last_started,
+            provider_type: r.provider_type,
+            hosted_server_id: r.hosted_server_id,
+            modloader_type: r.modloader_type,
+            modloader_version: r.modloader_version,
+            modpack_platform: r.modpack_platform,
+            modpack_project_id: r.modpack_project_id,
+            modpack_file_id: r.modpack_file_id,
         })
         .collect();
     got.sort();
@@ -903,6 +1024,25 @@ async fn server_reordering_matches_model() {
                 lib: r.library_position,
                 group: r.group_id,
                 icon_revision: r.icon_revision,
+                server_type: r.server_type,
+                game_version: r.game_version,
+                port: r.port,
+                motd: r.motd,
+                max_players: r.max_players,
+                online_mode: r.online_mode,
+                xmx: r.xmx,
+                xms: r.xms,
+                extra_java_args: r.extra_java_args,
+                auto_restart: r.auto_restart,
+                date_created: r.date_created,
+                last_started: r.last_started,
+                provider_type: r.provider_type,
+                hosted_server_id: r.hosted_server_id,
+                modloader_type: r.modloader_type,
+                modloader_version: r.modloader_version,
+                modpack_platform: r.modpack_platform,
+                modpack_project_id: r.modpack_project_id,
+                modpack_file_id: r.modpack_file_id,
             })
             .collect();
         let mut grps: Vec<MGrp> = srv::get_all_server_groups(&db)
@@ -1010,6 +1150,25 @@ async fn server_reordering_matches_model() {
                         lib,
                         group: some_group,
                         icon_revision: None,
+                        server_type: "vanilla".into(),
+                        game_version: "1.20.1".into(),
+                        port: 25565,
+                        motd: "A Minecraft Server".into(),
+                        max_players: 20,
+                        online_mode: true,
+                        xmx: 2048,
+                        xms: 1024,
+                        extra_java_args: String::new(),
+                        auto_restart: false,
+                        date_created: ts().0,
+                        last_started: None,
+                        provider_type: "local".into(),
+                        hosted_server_id: None,
+                        modloader_type: None,
+                        modloader_version: None,
+                        modpack_platform: None,
+                        modpack_project_id: None,
+                        modpack_file_id: None,
                     });
                 }
 
@@ -1488,32 +1647,24 @@ async fn server_reordering_matches_model() {
                     assert_eq!(got.and_then(|g| g.library_position), want, "{ctx}");
 
                     let rows = srv::get_all_servers_ordered_by_index(&db).await.unwrap();
-                    assert_eq!(rows.len(), servers.len(), "{ctx}");
-                    assert!(
-                        rows.windows(2).all(|w| w[0].index <= w[1].index),
-                        "server index order violated at {ctx}"
-                    );
+                    assert_ordered_rows(&rows, &servers, model_server, |r| r.index, &ctx);
                     let rows = srv::get_all_server_groups_ordered_by_group_index(&db)
                         .await
                         .unwrap();
-                    assert_eq!(rows.len(), grps.len(), "{ctx}");
-                    assert!(
-                        rows.windows(2)
-                            .all(|w| w[0].group_index <= w[1].group_index),
-                        "server group index order violated at {ctx}"
-                    );
+                    assert_ordered_rows(&rows, &grps, model_server_group, |r| r.group_index, &ctx);
                     let rows = srv::get_server_groups_with_library_position_ordered(&db)
                         .await
                         .unwrap();
-                    assert_eq!(
-                        rows.len(),
-                        grps.iter().filter(|g| g.lib.is_some()).count(),
-                        "{ctx}"
-                    );
-                    assert!(
-                        rows.windows(2)
-                            .all(|w| w[0].library_position <= w[1].library_position),
-                        "server group library order violated at {ctx}"
+                    assert_ordered_rows(
+                        &rows,
+                        &grps
+                            .iter()
+                            .filter(|g| g.lib.is_some())
+                            .cloned()
+                            .collect::<Vec<_>>(),
+                        model_server_group,
+                        |r| r.library_position,
+                        &ctx,
                     );
                 }
             }
@@ -1521,4 +1672,660 @@ async fn server_reordering_matches_model() {
             check_server_state(&db, &servers, &grps, &ctx).await;
         }
     }
+}
+
+fn rejects(f: impl FnOnce()) {
+    assert!(
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).is_err(),
+        "corrupted ordered output escaped the assertion boundary"
+    );
+}
+#[tokio::test]
+async fn ordered_instance_output_rejects_corruption_with_healthy_plain_state() {
+    let (_dir, db) = migrated_db().await;
+    let group = inst::insert_group(&db, "fixture".into(), 0, Some(0))
+        .await
+        .unwrap() as i32;
+    let mut expected = Vec::new();
+    for i in 0..3 {
+        let id = inst::add_instance_tx(&db, format!("i{i}"), format!("i{i}"), i, group, Some(i))
+            .await
+            .unwrap() as i32;
+        expected.push(MInst {
+            id,
+            name: format!("i{i}"),
+            shortpath: format!("i{i}"),
+            favorite: false,
+            has_pack_update: false,
+            index: i,
+            lib: Some(i),
+            group,
+        });
+    }
+    let rows = inst::get_all_instances_ordered_by_index(&db).await.unwrap();
+    assert_ordered_rows(&rows, &expected, model_instance, |r| r.index, "healthy");
+    let duplicate = vec![rows[0].clone(); 3];
+    rejects(|| {
+        assert_ordered_rows(
+            &duplicate,
+            &expected,
+            model_instance,
+            |r| r.index,
+            "duplicate IDs",
+        )
+    });
+    let mut changed = rows.clone();
+    changed[0].has_pack_update = true;
+    rejects(|| {
+        assert_ordered_rows(
+            &changed,
+            &expected,
+            model_instance,
+            |r| r.index,
+            "non-sort field",
+        )
+    });
+    let mut reversed = rows.clone();
+    reversed.reverse();
+    rejects(|| {
+        assert_ordered_rows(
+            &reversed,
+            &expected,
+            model_instance,
+            |r| r.index,
+            "original order",
+        )
+    });
+    let mut tied = rows.clone();
+    let mut tied_expected = expected.clone();
+    for r in &mut tied {
+        r.index = 1;
+    }
+    for r in &mut tied_expected {
+        r.index = 1;
+    }
+    assert_ordered_rows(&tied, &tied_expected, model_instance, |r| r.index, "ties");
+    tied.reverse();
+    assert_ordered_rows(
+        &tied,
+        &tied_expected,
+        model_instance,
+        |r| r.index,
+        "reverse ties",
+    );
+    let plain: Vec<_> = inst::get_all_instances(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(model_instance)
+        .collect();
+    assert_eq!(plain, expected);
+}
+#[tokio::test]
+async fn ordered_server_output_rejects_corruption_with_healthy_plain_state() {
+    let (_dir, db) = migrated_db().await;
+    let group = srv::insert_server_group(&db, "fixture".into(), 0, Some(0))
+        .await
+        .unwrap() as i32;
+    let mut expected = Vec::new();
+    for i in 0..3 {
+        let id = srv::insert_server(
+            &db,
+            format!("s{i}"),
+            format!("s{i}"),
+            i,
+            group,
+            "1.20.1".into(),
+            25565,
+            "vanilla".into(),
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(i),
+            ts(),
+        )
+        .await
+        .unwrap() as i32;
+        expected.push(MSrv {
+            id,
+            name: format!("s{i}"),
+            shortpath: format!("s{i}"),
+            favorite: false,
+            index: i,
+            lib: Some(i),
+            group,
+            icon_revision: None,
+            server_type: "vanilla".into(),
+            game_version: "1.20.1".into(),
+            port: 25565,
+            motd: "A Minecraft Server".into(),
+            max_players: 20,
+            online_mode: true,
+            xmx: 2048,
+            xms: 1024,
+            extra_java_args: String::new(),
+            auto_restart: false,
+            date_created: ts().0,
+            last_started: None,
+            provider_type: "local".into(),
+            hosted_server_id: None,
+            modloader_type: None,
+            modloader_version: None,
+            modpack_platform: None,
+            modpack_project_id: None,
+            modpack_file_id: None,
+        });
+    }
+    let rows = srv::get_all_servers_ordered_by_index(&db).await.unwrap();
+    assert_ordered_rows(&rows, &expected, model_server, |r| r.index, "healthy");
+    let duplicate = vec![rows[0].clone(); 3];
+    rejects(|| {
+        assert_ordered_rows(
+            &duplicate,
+            &expected,
+            model_server,
+            |r| r.index,
+            "duplicate IDs",
+        )
+    });
+    let mut changed = rows.clone();
+    changed[0].motd = "corruption".into();
+    rejects(|| {
+        assert_ordered_rows(
+            &changed,
+            &expected,
+            model_server,
+            |r| r.index,
+            "previously unmodeled field",
+        )
+    });
+    let mut reversed = rows.clone();
+    reversed.reverse();
+    rejects(|| {
+        assert_ordered_rows(
+            &reversed,
+            &expected,
+            model_server,
+            |r| r.index,
+            "original order",
+        )
+    });
+    let mut tied = rows.clone();
+    let mut tied_expected = expected.clone();
+    for r in &mut tied {
+        r.index = 1;
+    }
+    for r in &mut tied_expected {
+        r.index = 1;
+    }
+    assert_ordered_rows(&tied, &tied_expected, model_server, |r| r.index, "ties");
+    tied.reverse();
+    assert_ordered_rows(
+        &tied,
+        &tied_expected,
+        model_server,
+        |r| r.index,
+        "reverse ties",
+    );
+    let plain: Vec<_> = srv::get_all_servers(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(model_server)
+        .collect();
+    assert_eq!(plain, expected);
+}
+
+#[tokio::test]
+async fn ordered_instance_groups_index_reject_corruption() {
+    let (_dir, db) = migrated_db().await;
+    let mut expected: Vec<MGrp> = inst::get_all_groups(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(model_instance_group)
+        .collect();
+    for i in 1..=3 {
+        let lib = if i == 3 { None } else { Some(i) };
+        let id = inst::insert_group(&db, format!("g{i}"), i, lib)
+            .await
+            .unwrap() as i32;
+        expected.push(MGrp {
+            id,
+            name: format!("g{i}"),
+            gidx: i,
+            lib,
+        });
+    }
+    let all_expected = expected.clone();
+    let rows = inst::get_all_groups_ordered_by_group_index(&db)
+        .await
+        .unwrap();
+    assert_ordered_rows(
+        &rows,
+        &expected,
+        model_instance_group,
+        |r| r.group_index,
+        "healthy",
+    );
+    let duplicate = vec![rows[0].clone(); rows.len()];
+    rejects(|| {
+        assert_ordered_rows(
+            &duplicate,
+            &expected,
+            model_instance_group,
+            |r| r.group_index,
+            "multiplicity",
+        )
+    });
+    let mut changed = rows.clone();
+    changed[0].name = "corruption".into();
+    rejects(|| {
+        assert_ordered_rows(
+            &changed,
+            &expected,
+            model_instance_group,
+            |r| r.group_index,
+            "non-sort field",
+        )
+    });
+    let mut reversed = rows.clone();
+    reversed.reverse();
+    rejects(|| {
+        assert_ordered_rows(
+            &reversed,
+            &expected,
+            model_instance_group,
+            |r| r.group_index,
+            "original order",
+        )
+    });
+    let mut tied = rows.clone();
+    let mut tied_expected = expected.clone();
+    for r in &mut tied {
+        r.group_index = 1;
+    }
+    for r in &mut tied_expected {
+        r.gidx = 1;
+    }
+    assert_ordered_rows(
+        &tied,
+        &tied_expected,
+        model_instance_group,
+        |r| r.group_index,
+        "ties",
+    );
+    tied.reverse();
+    assert_ordered_rows(
+        &tied,
+        &tied_expected,
+        model_instance_group,
+        |r| r.group_index,
+        "reverse ties",
+    );
+    let plain: Vec<_> = inst::get_all_groups(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(model_instance_group)
+        .collect();
+    assert_eq!(plain, all_expected);
+}
+
+#[tokio::test]
+async fn ordered_instance_groups_library_reject_corruption() {
+    let (_dir, db) = migrated_db().await;
+    let mut expected: Vec<MGrp> = inst::get_all_groups(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(model_instance_group)
+        .collect();
+    for i in 1..=3 {
+        let lib = if i == 3 { None } else { Some(i) };
+        let id = inst::insert_group(&db, format!("g{i}"), i, lib)
+            .await
+            .unwrap() as i32;
+        expected.push(MGrp {
+            id,
+            name: format!("g{i}"),
+            gidx: i,
+            lib,
+        });
+    }
+    let all_expected = expected.clone();
+    expected.retain(|g| g.lib.is_some());
+    let rows = inst::get_groups_with_library_position_ordered(&db)
+        .await
+        .unwrap();
+    assert_ordered_rows(
+        &rows,
+        &expected,
+        model_instance_group,
+        |r| r.library_position,
+        "healthy",
+    );
+    let duplicate = vec![rows[0].clone(); rows.len()];
+    rejects(|| {
+        assert_ordered_rows(
+            &duplicate,
+            &expected,
+            model_instance_group,
+            |r| r.library_position,
+            "multiplicity",
+        )
+    });
+    let mut changed = rows.clone();
+    changed[0].name = "corruption".into();
+    rejects(|| {
+        assert_ordered_rows(
+            &changed,
+            &expected,
+            model_instance_group,
+            |r| r.library_position,
+            "non-sort field",
+        )
+    });
+    let mut reversed = rows.clone();
+    reversed.reverse();
+    rejects(|| {
+        assert_ordered_rows(
+            &reversed,
+            &expected,
+            model_instance_group,
+            |r| r.library_position,
+            "original order",
+        )
+    });
+    let excluded = inst::get_all_groups(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|g| g.library_position.is_none())
+        .unwrap();
+    let mut wrong_subset = rows.clone();
+    wrong_subset[0] = excluded;
+    rejects(|| {
+        assert_ordered_rows(
+            &wrong_subset,
+            &expected,
+            model_instance_group,
+            |r| r.library_position,
+            "nullable subset",
+        )
+    });
+    let mut tied = rows.clone();
+    let mut tied_expected = expected.clone();
+    for r in &mut tied {
+        r.library_position = Some(1);
+    }
+    for r in &mut tied_expected {
+        r.lib = Some(1);
+    }
+    assert_ordered_rows(
+        &tied,
+        &tied_expected,
+        model_instance_group,
+        |r| r.library_position,
+        "ties",
+    );
+    tied.reverse();
+    assert_ordered_rows(
+        &tied,
+        &tied_expected,
+        model_instance_group,
+        |r| r.library_position,
+        "reverse ties",
+    );
+    let plain: Vec<_> = inst::get_all_groups(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(model_instance_group)
+        .collect();
+    assert_eq!(plain, all_expected);
+}
+
+#[tokio::test]
+async fn ordered_server_groups_index_reject_corruption() {
+    let (_dir, db) = migrated_db().await;
+    let mut expected: Vec<MGrp> = srv::get_all_server_groups(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(model_server_group)
+        .collect();
+    for i in 1..=3 {
+        let lib = if i == 3 { None } else { Some(i) };
+        let id = srv::insert_server_group(&db, format!("g{i}"), i, lib)
+            .await
+            .unwrap() as i32;
+        expected.push(MGrp {
+            id,
+            name: format!("g{i}"),
+            gidx: i,
+            lib,
+        });
+    }
+    let all_expected = expected.clone();
+    let rows = srv::get_all_server_groups_ordered_by_group_index(&db)
+        .await
+        .unwrap();
+    assert_ordered_rows(
+        &rows,
+        &expected,
+        model_server_group,
+        |r| r.group_index,
+        "healthy",
+    );
+    let duplicate = vec![rows[0].clone(); rows.len()];
+    rejects(|| {
+        assert_ordered_rows(
+            &duplicate,
+            &expected,
+            model_server_group,
+            |r| r.group_index,
+            "multiplicity",
+        )
+    });
+    let mut changed = rows.clone();
+    changed[0].name = "corruption".into();
+    rejects(|| {
+        assert_ordered_rows(
+            &changed,
+            &expected,
+            model_server_group,
+            |r| r.group_index,
+            "non-sort field",
+        )
+    });
+    let mut reversed = rows.clone();
+    reversed.reverse();
+    rejects(|| {
+        assert_ordered_rows(
+            &reversed,
+            &expected,
+            model_server_group,
+            |r| r.group_index,
+            "original order",
+        )
+    });
+    let mut tied = rows.clone();
+    let mut tied_expected = expected.clone();
+    for r in &mut tied {
+        r.group_index = 1;
+    }
+    for r in &mut tied_expected {
+        r.gidx = 1;
+    }
+    assert_ordered_rows(
+        &tied,
+        &tied_expected,
+        model_server_group,
+        |r| r.group_index,
+        "ties",
+    );
+    tied.reverse();
+    assert_ordered_rows(
+        &tied,
+        &tied_expected,
+        model_server_group,
+        |r| r.group_index,
+        "reverse ties",
+    );
+    let plain: Vec<_> = srv::get_all_server_groups(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(model_server_group)
+        .collect();
+    assert_eq!(plain, all_expected);
+}
+
+#[tokio::test]
+async fn ordered_server_groups_library_reject_corruption() {
+    let (_dir, db) = migrated_db().await;
+    let mut expected: Vec<MGrp> = srv::get_all_server_groups(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(model_server_group)
+        .collect();
+    for i in 1..=3 {
+        let lib = if i == 3 { None } else { Some(i) };
+        let id = srv::insert_server_group(&db, format!("g{i}"), i, lib)
+            .await
+            .unwrap() as i32;
+        expected.push(MGrp {
+            id,
+            name: format!("g{i}"),
+            gidx: i,
+            lib,
+        });
+    }
+    let all_expected = expected.clone();
+    expected.retain(|g| g.lib.is_some());
+    let rows = srv::get_server_groups_with_library_position_ordered(&db)
+        .await
+        .unwrap();
+    assert_ordered_rows(
+        &rows,
+        &expected,
+        model_server_group,
+        |r| r.library_position,
+        "healthy",
+    );
+    let duplicate = vec![rows[0].clone(); rows.len()];
+    rejects(|| {
+        assert_ordered_rows(
+            &duplicate,
+            &expected,
+            model_server_group,
+            |r| r.library_position,
+            "multiplicity",
+        )
+    });
+    let mut changed = rows.clone();
+    changed[0].name = "corruption".into();
+    rejects(|| {
+        assert_ordered_rows(
+            &changed,
+            &expected,
+            model_server_group,
+            |r| r.library_position,
+            "non-sort field",
+        )
+    });
+    let mut reversed = rows.clone();
+    reversed.reverse();
+    rejects(|| {
+        assert_ordered_rows(
+            &reversed,
+            &expected,
+            model_server_group,
+            |r| r.library_position,
+            "original order",
+        )
+    });
+    let excluded = srv::get_all_server_groups(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|g| g.library_position.is_none())
+        .unwrap();
+    let mut wrong_subset = rows.clone();
+    wrong_subset[0] = excluded;
+    rejects(|| {
+        assert_ordered_rows(
+            &wrong_subset,
+            &expected,
+            model_server_group,
+            |r| r.library_position,
+            "nullable subset",
+        )
+    });
+    let mut tied = rows.clone();
+    let mut tied_expected = expected.clone();
+    for r in &mut tied {
+        r.library_position = Some(1);
+    }
+    for r in &mut tied_expected {
+        r.lib = Some(1);
+    }
+    assert_ordered_rows(
+        &tied,
+        &tied_expected,
+        model_server_group,
+        |r| r.library_position,
+        "ties",
+    );
+    tied.reverse();
+    assert_ordered_rows(
+        &tied,
+        &tied_expected,
+        model_server_group,
+        |r| r.library_position,
+        "reverse ties",
+    );
+    let plain: Vec<_> = srv::get_all_server_groups(&db)
+        .await
+        .unwrap()
+        .into_iter()
+        .map(model_server_group)
+        .collect();
+    assert_eq!(plain, all_expected);
+}
+
+#[test]
+fn ordered_multiset_preserves_expected_multiplicity() {
+    let a = MGrp {
+        id: 1,
+        name: "a".into(),
+        gidx: 0,
+        lib: None,
+    };
+    let b = MGrp {
+        id: 2,
+        name: "b".into(),
+        gidx: 0,
+        lib: None,
+    };
+    assert_ordered_rows(
+        &[a.clone(), a.clone(), b.clone()],
+        &[b.clone(), a.clone(), a.clone()],
+        |r| r,
+        |r| r.gidx,
+        "valid multiplicity",
+    );
+    rejects(|| {
+        assert_ordered_rows(
+            &[a.clone(), b.clone(), b.clone()],
+            &[a.clone(), a.clone(), b.clone()],
+            |r| r,
+            |r| r.gidx,
+            "wrong multiplicity",
+        )
+    });
 }

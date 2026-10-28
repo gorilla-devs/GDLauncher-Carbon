@@ -190,10 +190,25 @@ export async function verifyModEnabled(
     ])
   }
 
-  const [existsEnabled, existsDisabled] = await Promise.all([
-    pathExists(enabledPath),
-    pathExists(disabledPath)
-  ])
+  // Occupancy and artifact type are separate: a directory twin remains ambiguous.
+  const variants = await Promise.all(
+    [enabledPath, disabledPath].map(async (target) => {
+      try {
+        return { stat: await fs.stat(target), problem: undefined }
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT")
+          return { stat: undefined, problem: undefined }
+        return {
+          stat: undefined,
+          problem: `cannot stat mod at ${target}: ${error instanceof Error ? error.message : String(error)}`
+        }
+      }
+    })
+  )
+  const statProblems = variants.flatMap((v) => (v.problem ? [v.problem] : []))
+  if (statProblems.length) return failResult(statProblems)
+  const existsEnabled = variants[0].stat !== undefined
+  const existsDisabled = variants[1].stat !== undefined
 
   if (!existsEnabled && !existsDisabled) {
     return failResult([
@@ -204,6 +219,15 @@ export async function verifyModEnabled(
   if (existsEnabled && existsDisabled) {
     return failResult([
       `mod "${filename}" exists both enabled at ${enabledPath} and disabled at ${disabledPath} — ambiguous state`
+    ])
+  }
+
+  const actualPath = existsEnabled ? enabledPath : disabledPath
+  const stat = variants[existsEnabled ? 0 : 1].stat!
+  if (!stat.isFile()) {
+    const kind = stat.isDirectory() ? "a directory" : "not a regular file"
+    return failResult([
+      `mod "${filename}" at ${actualPath} is ${kind}, not a file — cannot verify its enabled state`
     ])
   }
 

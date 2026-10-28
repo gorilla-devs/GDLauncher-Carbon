@@ -140,3 +140,69 @@ describe("encodeMatrix / decodeMatrix", () => {
     expect(() => decodeMatrix(JSON.stringify([{ id: "1.20.1" }]))).toThrow()
   })
 })
+
+describe("duplicate manifest IDs", () => {
+  it("deduplicates pinned and unpinned rows before sampling", () => {
+    expect(
+      pickMatrix(
+        [
+          { id: "1.20.1", type: "release" },
+          { id: "1.20.1", type: "release" },
+          { id: "1.19.4", type: "release" },
+          { id: "1.19.4", type: "release" }
+        ],
+        { seed: 7, randomCount: 2 }
+      )
+    ).toEqual([
+      { id: "1.20.1", source: "pinned" },
+      { id: "1.19.4", source: "random" }
+    ])
+  })
+  it("preserves first-row metadata before resolving the newest release", () => {
+    expect(
+      pickMatrix(
+        [
+          { id: "future", type: "snapshot" },
+          { id: "future", type: "release" },
+          { id: "newest", type: "release" },
+          { id: "newest", type: "snapshot" },
+          { id: "1.20.1", type: "release" },
+          { id: "random", type: "release" }
+        ],
+        { seed: 7, randomCount: 10 }
+      )
+    ).toEqual([
+      { id: "newest", source: "pinned" },
+      { id: "1.20.1", source: "pinned" },
+      { id: "random", source: "random" }
+    ])
+  })
+  it("preserves seeded draws and manifest order with interspersed duplicates", () => {
+    const repeated = MANIFEST.flatMap((row, i) => (i % 2 ? [row] : [row, row]))
+    for (let seed = 0; seed < 25; seed++) {
+      for (const randomCount of [0, 1, 3, 30]) {
+        expect(pickMatrix(repeated, { seed, randomCount })).toEqual(
+          pickMatrix(MANIFEST, { seed, randomCount })
+        )
+      }
+    }
+    // Exact unique-input algorithm control, independent of the duplicate comparison.
+    expect(
+      pickMatrix(
+        [
+          { id: "newest", type: "release" },
+          { id: "a", type: "release" },
+          { id: "1.20.1", type: "release" },
+          { id: "b", type: "release" },
+          { id: "c", type: "release" }
+        ],
+        { seed: 7, randomCount: 2 }
+      )
+    ).toEqual([
+      { id: "newest", source: "pinned" },
+      { id: "1.20.1", source: "pinned" },
+      { id: "a", source: "random" },
+      { id: "b", source: "random" }
+    ])
+  })
+})

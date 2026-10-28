@@ -98,3 +98,30 @@ describe("killGameProcesses", () => {
     expect(killGameProcesses(runtimePath)).toEqual([])
   })
 })
+
+describe("describeLauncherProcesses", () => {
+  it.skipIf(process.platform === "win32")(
+    "lists a running process with its start and CPU time",
+    async () => {
+      const marker = `gdl-describe-${process.pid}-${Date.now()}`
+      const child = spawnChildMarkedWith(marker)
+      await new Promise((resolve) => child.once("spawn", resolve))
+
+      const listing = describeLauncherProcesses([marker])
+
+      expect(listing).toContain(String(child.pid))
+      expect(listing).toContain(marker)
+      expect(listing.split("\n")[0]).toMatch(/PID.*STARTED.*TIME/)
+    },
+    PROCESS_TEST_TIMEOUT
+  )
+
+  it.skipIf(process.platform === "win32")(
+    "says none when nothing runs the binaries",
+    () => {
+      expect(
+        describeLauncherProcesses([`gdl-nothing-runs-this-${Date.now()}`])
+      ).toBe("(none)")
+    }
+  )
+})

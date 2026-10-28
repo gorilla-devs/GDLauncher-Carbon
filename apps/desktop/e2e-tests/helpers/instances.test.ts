@@ -148,3 +148,71 @@ describe("deriveLoaderVersionSeed", () => {
     expect(picks.size).toBeGreaterThan(5)
   })
 })
+
+// Only the two DOM waits and final attributes are driven; no browser exists.
+import { waitForInstallComplete } from "./instances.js"
+import type { Page } from "playwright"
+function installPage(states: (string | null)[], failed = false): Page {
+  let index = 0
+  return {
+    waitForFunction: async (
+      predicate: (selector: string) => boolean,
+      selector: string
+    ) => {
+      const prior = globalThis.document
+      try {
+        for (; index < states.length; index++) {
+          const state = states[index]
+          globalThis.document = {
+            querySelector: () =>
+              state === null ? null : { getAttribute: () => state }
+          } as unknown as Document
+          if (predicate(selector)) {
+            index++
+            return
+          }
+        }
+        throw new Error("synthetic wait exhausted")
+      } finally {
+        globalThis.document = prior
+      }
+    },
+    locator: () => ({
+      getAttribute: async (attribute: string) =>
+        attribute === "data-instance-failed"
+          ? String(failed)
+          : "synthetic failure"
+    })
+  } as unknown as Page
+}
+it.each([null, "running", "deleting"])(
+  "does not accept %s then unchanged inactive as an install",
+  async (state) => {
+    await expect(
+      waitForInstallComplete(installPage([state, "inactive"]), "target", {
+        startTimeout: 10
+      })
+    ).rejects.toThrow(/never started/)
+  }
+)
+it("does not accept always inactive", async () => {
+  await expect(
+    waitForInstallComplete(installPage(["inactive"]), "target", {
+      startTimeout: 10
+    })
+  ).rejects.toThrow(/never started/)
+})
+it.each(["queued", "preparing"])(
+  "accepts present %s then inactive",
+  async (state) => {
+    await waitForInstallComplete(installPage([state, "inactive"]), "target")
+  }
+)
+it("rejects a failed final tile", async () => {
+  await expect(
+    waitForInstallComplete(
+      installPage(["preparing", "inactive"], true),
+      "target"
+    )
+  ).rejects.toThrow(/failed install task/)
+})

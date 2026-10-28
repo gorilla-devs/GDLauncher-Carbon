@@ -278,8 +278,11 @@ async function resolveForInstance(
     if (!url.includes("modplatforms.modrinth.getProjectVersions")) return
     const input = parseModrinthVersionsInput(url)
     if (
-      input?.game_versions?.includes(MC_VERSION) &&
-      input?.loaders?.some((l) => l.toLowerCase() === loader)
+      input?.project_id === RESOLUTION_PROJECT_MODRINTH_ID &&
+      input.game_versions?.length === 1 &&
+      input.game_versions[0] === MC_VERSION &&
+      input.loaders?.length === 1 &&
+      input.loaders[0].toLowerCase() === loader
     ) {
       scopedRequestUrl = url
     }
@@ -298,14 +301,13 @@ async function resolveForInstance(
         // so the scoped request — fired once `instance.getInstanceDetails`
         // resolves, from behind the addon page's own mount — is never missed
         // regardless of how quickly the page settles. Clicking "Versions"
-        // afterward only renders the DOM rows; see `resolutionCapture.ts`'s
-        // module doc comment for why the *unfiltered* list is no longer
-        // sourced from this listener at all (a shared TanStack Query key
-        // across this project's two addon-page visits in this test means
-        // that fetch is not guaranteed to re-fire on the second visit).
+        // afterward only renders the DOM rows. The direct unfiltered
+        // catalogue is an independent compatibility oracle; current query
+        // keys own the project and target scope.
         await openAddonPage(page, RESOLUTION_PROJECT_MODRINTH_ID)
         await page.getByRole("tab", { name: "Versions" }).click()
-      }
+      },
+      { gameVersion: MC_VERSION, loader }
     )
   } finally {
     page.off("response", onResponse)
@@ -500,8 +502,9 @@ async function resolveForInstanceCurseforge(
     if (!r.url().includes("modplatforms.curseforge.getModFiles")) return
     const input = parseCurseforgeVersionsInput(r.url())
     if (
-      input?.query.gameVersion === MC_VERSION &&
-      input?.query.modLoaderType === loader
+      input?.modId === CURSEFORGE_PROJECT_ID &&
+      input.query.gameVersion === MC_VERSION &&
+      input.query.modLoaderType?.toLowerCase() === loader
     ) {
       scopedRequestUrl = r.url()
     }
@@ -510,10 +513,14 @@ async function resolveForInstanceCurseforge(
 
   let versions: VersionLists
   try {
-    versions = await captureCurseforgeVersions(page, async () => {
-      await openAddonPage(page, RESOLUTION_PROJECT_CURSEFORGE_ID)
-      await page.getByRole("tab", { name: "Versions" }).click()
-    })
+    versions = await captureCurseforgeVersions(
+      page,
+      async () => {
+        await openAddonPage(page, RESOLUTION_PROJECT_CURSEFORGE_ID)
+        await page.getByRole("tab", { name: "Versions" }).click()
+      },
+      { projectId: CURSEFORGE_PROJECT_ID, gameVersion: MC_VERSION, loader }
+    )
   } finally {
     page.off("response", onResponse)
   }
@@ -922,7 +929,8 @@ test.describe("mod resolution", () => {
           async () => {
             await openAddonPage(page, RESOLUTION_PROJECT_MODRINTH_ID)
             await page.getByRole("tab", { name: "Versions" }).click()
-          }
+          },
+          { gameVersion: MC_VERSION, loader: "fabric" }
         )
 
         const older = pickOlderVersion(

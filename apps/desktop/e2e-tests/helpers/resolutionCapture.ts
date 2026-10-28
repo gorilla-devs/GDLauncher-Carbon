@@ -1,55 +1,8 @@
-/**
- * Captures the two Modrinth version lists a mod-resolution test needs: the
- * app's own scoped response (for ordering) and every version the project has
- * ever published (for compatibility).
- *
- * The impure counterpart to `helpers/resolution.ts`'s pure predicates: this
- * module owns the Playwright/network side, `resolution.ts` owns the model of
- * "which build should have been picked" (see that file's own doc comment).
- * Keeping them
- * apart means the ordering/compatibility predicates stay unit-testable
- * without a running app.
- *
- * The single most important thing this module produces is the *separation*
- * between `scoped` and `unfiltered`, not where either comes from: `scoped` is
- * filtered to the instance's own Minecraft version and loader by the same
- * backend query the real app issues, so every entry in it is compatible by
- * construction — asserting compatibility against it can never fail.
- * `unfiltered` is every version of the project regardless of Minecraft
- * version/loader, and is the only list a compatibility assertion can
- * meaningfully fail against. A caller that reaches for `scoped` to check
- * compatibility has reintroduced exactly the unfailable-assertion trap this
- * suite was built to avoid: pointed at `scoped`, that check stays green
- * regardless of which build the app actually picked.
- *
- * `unfiltered` is fetched **directly from Modrinth's public API**
- * (`GET /v2/project/:id/version`, unauthenticated — confirmed live, no key
- * required, unlike CurseForge), not observed off the app's own network
- * traffic. Fetching it directly is forced by a genuine, reproducible defect,
- * not a preference: `InfiniteScrollVersionsQueryWrapper`'s
- * query (`components/InfiniteScrollVersionsQueryWrapper/index.tsx`) is keyed
- * only on `["modplatforms.versions", modId, modplatform]` — instance id,
- * Minecraft version, and loader are **not** part of the key — and the
- * TanStack QueryClient this app uses persists across the SolidJS router's
- * client-side navigations for the lifetime of one running app (confirmed:
- * this suite never reloads the page). This test visits the *same* Modrinth
- * project's addon page twice in one run (once per instance), so on the
- * second visit the unfiltered, pre-scoping fetch can be served straight from
- * that first visit's cache instead of firing a new network request at all —
- * confirmed live: a listener attached before the *entire*
- * page load on the second visit still observed zero unscoped responses,
- * because none were ever sent. No amount of attaching a `response` listener
- * earlier fixes this: there is nothing to listen for. The scoped request is
- * not affected — `setQueryWrapper` (`InfiniteScrollVersionsQueryWrapper`)
- * unconditionally calls `removeQueries` immediately before `refetch()` every
- * time the effect reacting to instance id/version/loader runs, so it always
- * forces a genuine new network round trip regardless of cache state; only
- * the unfiltered, cache-servable first fetch is at risk. A published
- * version's declared `game_versions`/`loaders` are immutable once published,
- * so fetching them directly rather than through the app is safe for
- * compatibility specifically — the skew concern a live app request would
- * otherwise guard against applies to *ordering* (which build is newest right
- * now), which is why that half stays sourced from the app's own response.
+/** Captures exact project/game/loader catalogues for resolution assertions.
+ * Scoped lists prove ordering; the independent Modrinth catalogue and the
+ * CurseForge game-scoped, loader-unfiltered list prove their stated axes.
+ * Current queries own project and target filters; direct catalogue fetching
+ * is an oracle choice, not a workaround for historical shared query keys.
  */
 
 import { expect, type Page, type Response } from "@playwright/test"
@@ -127,6 +80,8 @@ export function parseModrinthVersionsInput(
   } catch {
     return undefined
   }
+  if (parsed.pathname !== "/rspc/modplatforms.modrinth.getProjectVersions")
+    return undefined
   const raw = parsed.searchParams.get("input")
   if (raw == null) return undefined
   let value: unknown
@@ -135,7 +90,21 @@ export function parseModrinthVersionsInput(
   } catch {
     return undefined
   }
-  if (typeof value !== "object" || value === null || !("project_id" in value)) {
+  if (
+    typeof value !== "object" ||
+    value === null ||
+    !("project_id" in value) ||
+    typeof value.project_id !== "string" ||
+    value.project_id.length === 0 ||
+    ["game_versions", "loaders"].some(
+      (key) =>
+        key in value &&
+        (!Array.isArray((value as Record<string, unknown>)[key]) ||
+          !(value as Record<string, unknown[]>)[key].every(
+            (entry) => typeof entry === "string"
+          ))
+    )
+  ) {
     return undefined
   }
   return value as ModrinthGetProjectVersionsInput
@@ -169,20 +138,21 @@ const DIRECT_FETCH_TIMEOUT_MS = 30_000
  * first match (the scoping effect fires from behind its own
  * `getInstanceDetails` round trip and has been observed firing twice, each
  * replacing the whole virtualized row set).
- * `projectId` is used only for the direct, unauthenticated fetch that
- * supplies `unfiltered` — see the module doc comment for why that no longer
- * comes from observing the app's own traffic.
+ * Both lists bind to `projectId`; the app response additionally binds to
+ * the exact intended Minecraft version and singleton loader.
  */
 export async function captureModrinthVersions(
   page: Page,
   projectId: string,
-  run: () => Promise<void>
+  run: () => Promise<void>,
+  expected: { gameVersion: string; loader: string },
+  deps: { fetchImpl?: typeof fetch } = {}
 ): Promise<VersionLists> {
   const queryName = "modplatforms.modrinth.getProjectVersions"
 
   const scoped = await settleOnScopedResponses(
     page,
-    (r) => r.url().includes(queryName) && r.url().includes(SCOPED_MARKER),
+    (r) => matchesModrinthScope(r.url(), { projectId, ...expected }),
     { timeout: CAPTURE_TIMEOUT, run }
   )
 
@@ -198,7 +168,10 @@ export async function captureModrinthVersions(
   const scopedCandidates = await toCandidatesFromAppResponse(
     scoped[scoped.length - 1]
   )
-  const unfilteredCandidates = await fetchUnfilteredDirect(projectId)
+  const unfilteredCandidates = await fetchUnfilteredDirect(
+    projectId,
+    deps.fetchImpl ?? fetch
+  )
 
   return { scoped: scopedCandidates, unfiltered: unfilteredCandidates }
 }
@@ -246,7 +219,8 @@ async function toCandidatesFromAppResponse(
  * key required (confirmed live).
  */
 async function fetchUnfilteredDirect(
-  projectId: string
+  projectId: string,
+  fetchImpl: typeof fetch
 ): Promise<ResolutionCandidate[]> {
   const url = `${MODRINTH_API_BASE}/project/${projectId}/version`
   // Wrapped rather than left to propagate raw: an unwrapped `fetch` network
@@ -260,7 +234,7 @@ async function fetchUnfilteredDirect(
   // an unlabelled abort — this suite runs with `retries: 0`, so a hung
   // connection must fail on its own terms, not stall until Playwright's
   // 15-minute ceiling.
-  const response = await fetch(url, {
+  const response = await fetchImpl(url, {
     headers: { "user-agent": MODRINTH_USER_AGENT },
     signal: AbortSignal.timeout(DIRECT_FETCH_TIMEOUT_MS)
   }).catch((cause) => {
@@ -291,79 +265,10 @@ async function fetchUnfilteredDirect(
   return toCandidates(raw)
 }
 
-/**
- * `captureModrinthVersions`'s CurseForge counterpart — written fresh, not
- * adapted from it by analogy: CurseForge's `getModFiles` is paginated
- * (`index`/`pageSize`) while Modrinth's `getProjectVersions` is a single
- * response, so the two platforms' timing/caching behaviour is not symmetric
- * merely by having a similar shape.
- *
- * **`unfiltered` here is NOT a full, all-versions-ever-published catalogue
- * the way Modrinth's is.** `api.curseforge.com` requires an API key this
- * test process deliberately does not have (unlike Modrinth's unauthenticated
- * public API), so there is no direct-fetch escape hatch available here. The
- * fallback this module uses instead (confirmed live this task, not assumed):
- * a **loader-unfiltered, but still game-version-scoped**
- * `modplatforms.curseforge.getModFiles` request, driven through the app's
- * own addon page by checking its "Override Filters" checkbox and setting the
- * modloader selector back to "All modloaders" while leaving the
- * game-version selector at the instance's own Minecraft version. This exact
- * shape is confirmed live to return every file for that Minecraft version
- * regardless of loader — 8 files, `totalCount: 8`, for Cloth Config at
- * 1.20.1 — which is precisely what makes the LOADER half of a compatibility
- * check against this list capable of failing (it contains both the Forge
- * and Fabric builds). The MC-VERSION half is a different story: because the
- * request that produces this list is itself filtered to one Minecraft
- * version, every entry it returns is *guaranteed* to declare that version —
- * confirmed directly against the captured sample, where every one of
- * the 8 `gameVersion=1.20.1`-filtered files literally lists `"1.20.1"` in
- * its own `gameVersions` array. Asserting `gameVersions.includes(MC_VERSION)`
- * against an entry drawn from this list would therefore be exactly the
- * unfailable tautology this suite's central rule warns against, so
- * `modResolution.spec.ts`'s CurseForge test does not make that assertion —
- * only an *existence* check (is the installed file id present in this list
- * at all) plus the loader check. That omission is correct, but the existence
- * check is NOT a substitute compatibility assertion for the Minecraft-version
- * axis — it is a lookup guard, and the two catch different things. Given the
- * test's own ordering assertion has already passed, the installed id is a
- * member of the app's loader-scoped `getModFiles` response, which shares the
- * exact same `gameVersion` request parameter as this loader-unfiltered
- * oracle. For CurseForge to have installed a file for the wrong Minecraft
- * version, its `gameVersion` filter would already have to be returning that
- * file — and since this oracle is fetched with the identical `gameVersion`
- * parameter, the same broken filter would let it into this list too, so the
- * existence check would stay green. It genuinely does catch a different,
- * real failure mode: the installed id not corresponding to anything
- * CurseForge serves for this project at this Minecraft version at all (e.g.
- * a stale id, or a mismatch against the wrong project). Coverage for "did
- * CurseForge's own `gameVersion` filter return a build that doesn't actually
- * declare this Minecraft version" does not exist on the CurseForge side —
- * that axis is covered only on Modrinth, via `resolveForInstance`'s direct,
- * unfiltered fetch of every version the project has ever published,
- * precisely because CurseForge has no unauthenticated oracle available to
- * this test process.
- *
- * **Whether CurseForge shares Modrinth's caching problem — checked live,
- * not assumed symmetric:** `InfiniteScrollVersionsQueryWrapper` is the exact
- * same shared component for both platforms, keyed only on
- * `["modplatforms.versions", modId, modplatform]` (no instance id, Minecraft
- * version, or loader), and its module-level `versionsQuery` store
- * (`pages/Mods/useVersionsQuery.tsx`) persists across addon-page visits the
- * same way Modrinth's did. Confirmed live: on a second addon-page visit
- * (this project, a different instance/loader) the very first, passively
- * mounted request already carried the *previous* visit's leftover
- * `modLoaderType`/`gameVersion` rather than a fresh unfiltered fetch — the
- * same staleness class that broke Modrinth's original design. **This module
- * does not rely on that passive mount-time fetch for either list.** Both the
- * `scoped` request (fired automatically once `instance.getInstanceDetails`
- * resolves) and the loader-unfiltered request this function drives via the
- * "Override Filters" UI go through `setQueryWrapper`
- * (`InfiniteScrollVersionsQueryWrapper`), which unconditionally
- * `removeQueries`s the shared key before every `refetch()` — so both are
- * forced, genuine network round trips regardless of cache state. Confirmed
- * live across two consecutive addon-page visits in one run (fabric then
- * forge): both the scoped and the loader-unfiltered request landed fresh,
- * with the instance's own correct params, on both visits.
+/** CurseForge's compatibility oracle remains game-scoped and loader-unfiltered.
+ * Its authenticated catalogue is observed through the app; pagination must
+ * cover the complete requested scope. This does not independently test the
+ * provider's Minecraft filter against an all-game catalogue.
  */
 
 /** Present on the scoped request's URL and on the loader-unfiltered
@@ -417,6 +322,8 @@ export function parseCurseforgeVersionsInput(
   } catch {
     return undefined
   }
+  if (parsed.pathname !== "/rspc/modplatforms.curseforge.getModFiles")
+    return undefined
   const raw = parsed.searchParams.get("input")
   if (raw == null) return undefined
   let value: unknown
@@ -434,7 +341,15 @@ export function parseCurseforgeVersionsInput(
   ) {
     return undefined
   }
-  return value as CurseforgeGetModFilesInput
+  const input = value as CurseforgeGetModFilesInput
+  if (
+    !Number.isInteger(input.modId) ||
+    ![input.query.gameVersion, input.query.modLoaderType].every(
+      (field) => field === null || typeof field === "string"
+    )
+  )
+    return undefined
+  return input
 }
 
 /** Shape this module reads off a `getModFiles` response's `result.data` —
@@ -578,27 +493,52 @@ async function toCandidatesFromCurseforgeResponse(
  * unauthenticated fetch.
  *
  * Two live-confirmed hazards this works around:
- * - The checkbox and its "Override Filters" `<Trans>` label are **siblings**
- *   in `ExploreVersionsNavbar.tsx`, not parent/child — clicking the label
- *   does nothing. `Checkbox` (`packages/ui/src/Checkbox/index.tsx`) renders
- *   a plain `<div>` root (pointer-capture handlers, not a native input or a
- *   `<button>`), so this locates that div directly by scoping to its parent
- *   row's class and taking the first child, rather than the row itself.
+ * - `Checkbox` (`packages/ui/src/Checkbox/index.tsx`) renders a `<label>`
+ *   wrapping a visually hidden (`sr-only`) native `<input type="checkbox">`,
+ *   its painted box, and its children — here the "Override Filters"
+ *   `<Trans>` (`ExploreVersionsNavbar.tsx`). That text is the input's
+ *   accessible name, so the control is found by role and name, the way a
+ *   user or a screen reader finds it, not by the navbar's layout classes
+ *   (a `div > div` path broke silently when the root became a `<label>`).
+ *   The click lands on the visible label, as a user's would, and the
+ *   input's own `checked` state then proves that click actually turned the
+ *   override on before the selector checks below rely on it. The input is
+ *   disabled until the Versions tab has resolved its instance target
+ *   (`InfiniteScrollVersionsQueryWrapper`'s `targetReady`), and starts
+ *   unchecked: an instance-scoped page opens on that instance's filters.
  * - Both Select triggers in this navbar render as plain `<button>`s with no
  *   accessible name (`getByRole('button', {name})` matches nothing)
  *   — the game-version trigger is first, the modloader trigger second
  *   (confirmed live, this task); `.nth(1)` picks the modloader one.
  */
 async function driveLoaderUnfilteredRequest(page: Page): Promise<void> {
-  const overrideCheckbox = page
-    .locator("div.text-lightSlate-700.flex.gap-2 > div")
-    .first()
-  await expect(overrideCheckbox, {
+  const overrideCheckbox = page.getByRole("checkbox", {
+    name: "Override Filters",
+    exact: true
+  })
+  const overrideLabel = page.locator("label").filter({ has: overrideCheckbox })
+  await expect(overrideLabel, {
     message:
       "driveLoaderUnfilteredRequest: the addon page's Versions tab " +
       '"Override Filters" checkbox never appeared'
   }).toBeVisible()
-  await overrideCheckbox.click()
+  await expect(overrideCheckbox, {
+    message:
+      'driveLoaderUnfilteredRequest: the "Override Filters" checkbox never ' +
+      "became enabled — the Versions tab never resolved its instance target"
+  }).toBeEnabled()
+  await expect(overrideCheckbox, {
+    message:
+      'driveLoaderUnfilteredRequest: the "Override Filters" checkbox was ' +
+      "already checked on an instance-scoped addon page — it should open on " +
+      "the instance's own filters"
+  }).not.toBeChecked()
+  await overrideLabel.click()
+  await expect(overrideCheckbox, {
+    message:
+      'driveLoaderUnfilteredRequest: clicking the "Override Filters" label ' +
+      "did not check its checkbox"
+  }).toBeChecked()
 
   const modloaderTrigger = page
     .locator("div.mb-4.flex.h-12.gap-4 button")
@@ -639,24 +579,35 @@ async function driveLoaderUnfilteredRequest(page: Page): Promise<void> {
  */
 export async function captureCurseforgeVersions(
   page: Page,
-  run: () => Promise<void>
+  run: () => Promise<void>,
+  expected: { projectId: number; gameVersion: string; loader: string },
+  deps: {
+    ready?: (page: Page) => Promise<void>
+    driveUnfiltered?: (page: Page) => Promise<void>
+  } = {}
 ): Promise<VersionLists> {
   const scoped: Response[] = []
   const unfiltered: Response[] = []
 
   const onResponse = (r: Response) => {
-    if (!r.url().includes(CF_QUERY_NAME)) return
     const input = parseCurseforgeVersionsInput(r.url())
-    if (!input) return
+    if (
+      input?.modId !== expected.projectId ||
+      input.query.gameVersion !== expected.gameVersion
+    )
+      return
     const { gameVersion, modLoaderType } = input.query
     // The fully unrestricted catalogue (no gameVersion at all) — measured
     // live at 216 entries for this project across every Minecraft version
     // it has ever published for, truncated at the default pageSize of 20.
     // Neither list this function produces wants that; ignore it.
     if (gameVersion == null) return
-    if (modLoaderType != null) {
+    if (
+      typeof modLoaderType === "string" &&
+      modLoaderType.toLowerCase() === expected.loader.toLowerCase()
+    ) {
       scoped.push(r)
-    } else {
+    } else if (modLoaderType === null) {
       unfiltered.push(r)
     }
   }
@@ -665,13 +616,12 @@ export async function captureCurseforgeVersions(
   try {
     await run()
 
-    await expect(page.locator(byTestId(TEST_IDS.addonVersionRow)).first(), {
-      message:
-        "captureCurseforgeVersions: no " +
-        `"${TEST_IDS.addonVersionRow}" row ever mounted after run()`
-    }).toBeVisible({ timeout: CF_CAPTURE_TIMEOUT })
-
-    await driveLoaderUnfilteredRequest(page)
+    if (deps.ready) await deps.ready(page)
+    else
+      await expect(page.locator(byTestId(TEST_IDS.addonVersionRow)).first(), {
+        message: "captureCurseforgeVersions: no version row mounted after run()"
+      }).toBeVisible({ timeout: CF_CAPTURE_TIMEOUT })
+    await (deps.driveUnfiltered ?? driveLoaderUnfilteredRequest)(page)
 
     // Settle on BOTH lists together, not just whichever fills first: the
     // scoped effect has been observed to fire twice in a row (same
@@ -731,4 +681,18 @@ export async function captureCurseforgeVersions(
   )
 
   return { scoped: scopedCandidates, unfiltered: unfilteredCandidates }
+}
+
+export function matchesModrinthScope(
+  url: string,
+  expected: { projectId: string; gameVersion: string; loader: string }
+): boolean {
+  const input = parseModrinthVersionsInput(url)
+  return (
+    input?.project_id === expected.projectId &&
+    input.game_versions?.length === 1 &&
+    input.game_versions[0] === expected.gameVersion &&
+    input.loaders?.length === 1 &&
+    input.loaders[0].toLowerCase() === expected.loader.toLowerCase()
+  )
 }

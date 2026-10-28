@@ -1373,21 +1373,20 @@ a small sample happened to miss. A `taskset`-pinned, tens-of-runs comparison
 like this — not a handful of manual runs — is the bar for claiming a race
 condition is actually fixed.
 
-## No third-party surface
+## Mocked accounts and live download dependencies
 
-Unlike the install and mod suites — which download real Minecraft versions
-from Mojang, real loader builds from meta.gdl.gg, and real mods from
-CurseForge and Modrinth, and have all previously hit genuine live-service
-flakiness (see "Third-party flakiness is observed, not theoretical" below)
-— `persistence.spec.ts` and `dbRecovery.spec.ts` touch no third-party
-service at all. The only network endpoint either file talks to is the local
-mock IdP (`mock-idp/`); `dbRecovery.spec.ts` never even calls `completeLogin`
-— every one of its tests launches against a seeded database and asserts on
-the resulting startup status or screen, well before login would ever be
-reached (and for the fatal states, before the app gets anywhere near the
-login page at all). There is no live external dependency
-either file's pass/fail can be blamed on, and neither has produced a flake
-in any run so far.
+The standalone harness mocks account endpoints and keeps its own runtime
+across restart checks. `persistence.spec.ts` still installs a Minecraft/loader
+instance and searches for and installs Modrinth mods. Its setup depends on
+live game, loader and mod metadata/download services, so their outages can
+fail persistence tests even when the mocked account flow is healthy.
+
+The bounded `dbRecovery.spec.ts` paths seed a database (or leave it fresh)
+and assert startup status/screens before login. They do not install games
+or mods and never call `completeLogin`. Their launch options route the
+startup terms/consent fetch and updater checks to the local mock. This
+mock-only dependency description applies to those bounded paths, not every
+incidental network activity a future app startup might perform.
 
 ## Suite wall-clock
 

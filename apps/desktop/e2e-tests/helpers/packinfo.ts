@@ -96,3 +96,63 @@ export async function classifyPackinfo(
   status.missing.sort()
   return status
 }
+
+/** Independently hash retained pristine bytes, checking the already captured tree. */
+export async function capturePristinePackinfo(
+  instanceRoot: string,
+  tree: import("./instanceTree.js").Tree
+): Promise<Packinfo> {
+  const out: Packinfo = new Map()
+  for (const [relative, expected] of tree) {
+    const bytes = await fs.readFile(
+      path.join(instanceRoot, "instance", relative)
+    )
+    if (
+      bytes.length !== expected.size ||
+      createHash("sha256").update(bytes).digest("hex") !== expected.sha256
+    )
+      throw new Error(`Pristine fixture changed at ${relative}`)
+    out.set(`/${relative}`, {
+      md5: createHash("md5").update(bytes).digest("hex"),
+      sha512: createHash("sha512").update(bytes).digest("hex")
+    })
+  }
+  return out
+}
+/** Exact target records for pristine fixtures only; ordinary edited updates
+ * deliberately preserve bytes that differ from the target record.
+ */
+export function verifyPristinePackinfo(
+  actual: Packinfo,
+  target: Packinfo,
+  pristine: Packinfo,
+  opts: { keys?: string[]; baseline?: Packinfo } = {}
+): void {
+  const keys = opts.keys ?? [...target.keys()]
+  if (
+    !opts.keys &&
+    (actual.size !== target.size ||
+      target.size !== pristine.size ||
+      [...pristine.keys()].some((key) => !target.has(key)) ||
+      [...target.keys()].some((key) => !actual.has(key)))
+  ) {
+    throw new Error("Packinfo key set differs from pristine target")
+  }
+  for (const key of keys) {
+    const expected = target.get(key),
+      independent = pristine.get(key),
+      promoted = actual.get(key)
+    if (
+      !expected ||
+      !independent ||
+      !promoted ||
+      expected.md5 !== independent.md5 ||
+      expected.sha512 !== independent.sha512 ||
+      promoted.md5 !== expected.md5 ||
+      promoted.sha512 !== expected.sha512
+    )
+      throw new Error(`Packinfo target digest mismatch at ${key}`)
+    if (opts.baseline?.get(key)?.md5 === expected.md5)
+      throw new Error(`Expected a changed target digest at ${key}`)
+  }
+}

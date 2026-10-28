@@ -1,3 +1,4 @@
+import { verifyLegacyForgeRuntime } from "./helpers/loaderArtifact.js"
 import type { Page } from "playwright"
 import { expect, test } from "./fixtures/index.js"
 import { attachCoreLogOnFailure } from "./fixtures/electronApp.js"
@@ -18,8 +19,7 @@ import {
   type Loader
 } from "./helpers/instances.js"
 import {
-  verifyAssetIndex,
-  verifyClientJar,
+  verifyCachedVanillaInstall,
   verifyLibrariesPresent
 } from "./helpers/installVerify.js"
 import {
@@ -391,27 +391,11 @@ test.describe("loader install matrix", () => {
             authenticatedApp.harness.runtimePath,
             mcVersion
           )
-          const assetIndexId = cachedVersion.assetIndex?.id
-          const expectedClientSha1 = cachedVersion.downloads?.client?.sha1
-          if (!assetIndexId || !expectedClientSha1) {
-            throw new Error(
-              `cached version JSON for "${mcVersion}" is missing ` +
-                "assetIndex.id or downloads.client.sha1 — cannot verify the " +
-                "install on disk"
-            )
-          }
-          const [clientJarResult, assetIndexResult] = await Promise.all([
-            verifyClientJar(
-              authenticatedApp.harness.runtimePath,
-              mcVersion,
-              expectedClientSha1
-            ),
-            verifyAssetIndex(authenticatedApp.harness.runtimePath, assetIndexId)
-          ])
-          const diskProblems = [
-            ...clientJarResult.problems,
-            ...assetIndexResult.problems
-          ]
+          const { problems: diskProblems } = await verifyCachedVanillaInstall(
+            authenticatedApp.harness.runtimePath,
+            mcVersion,
+            cachedVersion
+          )
           if (diskProblems.length > 0) {
             throw new Error(
               `disk verification failed for ${entry.loader} on Minecraft ` +
@@ -478,6 +462,16 @@ test.describe("loader install matrix", () => {
                   "real finding, not a harness bug — do not relax this back " +
                   "to > 0 without confirming what changed."
               ).toBe(0)
+              const runtimeArtifact = await verifyLegacyForgeRuntime(
+                authenticatedApp.harness.runtimePath,
+                cacheId,
+                loaderVersion,
+                cached
+              )
+              expect(
+                runtimeArtifact.problems,
+                "selected legacy Forge runtime artifact"
+              ).toEqual([])
             }
 
             const result = await verifyLibrariesPresent(

@@ -107,6 +107,39 @@ export function isPidAlive(pid: number): boolean {
 }
 
 /**
+ * The processes running each of `binaryPaths`, with start and CPU time, for a
+ * failure message. A launcher an earlier test left running (one started by
+ * `app.relaunch()`, which Playwright does not own) shows up here, and its CPU
+ * time says whether it is keeping the machine busy. Never throws.
+ */
+export function describeLauncherProcesses(binaryPaths: string[]): string {
+  try {
+    if (process.platform === "win32") {
+      // CSV columns include "CPU Time" and "Window Title".
+      return binaryPaths
+        .map((binaryPath) =>
+          execSync(
+            `tasklist /V /FO CSV /FI "IMAGENAME eq ${path.basename(binaryPath)}"`,
+            { encoding: "utf8", timeout: 30_000 }
+          ).trim()
+        )
+        .join("\n")
+    }
+    // `pgrep -f` also matches the shell that ran it, gone by now.
+    const pids = [...new Set(binaryPaths.flatMap(pidsMatching))].filter(
+      isPidAlive
+    )
+    if (pids.length === 0) return "(none)"
+    return execSync(
+      `ps -ww -o pid,ppid,lstart,time,args -p ${pids.join(",")}`,
+      { encoding: "utf8", timeout: 30_000 }
+    ).trim()
+  } catch (error) {
+    return `(could not list them: ${(error as Error).message})`
+  }
+}
+
+/**
  * Kills any game JVM belonging to `runtimePath`, returning the pids killed.
  *
  * Matched on `<runtimePath>/managed_javas`, the launcher's own managed JRE

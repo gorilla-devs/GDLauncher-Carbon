@@ -601,6 +601,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "sha2",
+ "syn 2.0.114",
  "tempfile",
  "thiserror 1.0.69",
  "tokio",

@@ -1,4 +1,13 @@
+import { isPidAlive } from "./helpers/processes.js"
 import { rpcRoute } from "./helpers/operationObserver.js"
+import {
+  runRunningRepairCheck,
+  runningRepairGameCheck
+} from "./helpers/repairRefusal.js"
+import {
+  captureRunningRepairProtection,
+  verifyRunningRepairProtection
+} from "./helpers/runningRepairProtection.js"
 import fs from "node:fs"
 import path from "node:path"
 import { expect, test } from "./fixtures/index.js"
@@ -82,37 +91,20 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
  * staging exactly like a deleted or damaged override is, so either would
  * prove the same three assertions below.
  *
- * **Test 2 — refused while running.** Not implemented with `repairModpack`
- * (`helpers/modpacks.ts`): that helper's last step is
- * `waitForInstallComplete`, which is exactly what must never be reached here
- * — the whole point is that the mutation is rejected before it touches
- * anything. This drives the same three clicks
- * (`instanceMenuTrigger` -> `instanceMenuRepair` -> `repairModpackConfirm`)
- * directly and asserts the refusal instead: the tile must still read
- * `running`, and `.setup/` — which `repair_modpack` only ever creates
- * *after* its `LaunchState::Inactive` guard — must not exist.
- *
- * **`.setup/`'s absence is the load-bearing half of that pair, and the
- * still-running check is only corroborating.** `repair_modpack`'s guard is
- * defence in depth over `prepare_game`'s own
- * `LaunchState::Running(_) => bail!` (`run/mod.rs:194-196`), which every path
- * into this feature ends at. Remove `repair_modpack`'s guard and
- * `prepare_game` still refuses, so the instance genuinely does stay running
- * and the first assertion stays green — but by then `repair_modpack` has
- * already `remove_dir_all`'d and recreated `.setup/` and written
- * `change-pack-version.json` into it, on a live instance. That leak is what
- * this test actually detects, and it is the same leak `change_modpack`
- * exhibits unguarded today (see the README's product findings): a mid-game
- * version change is not cancelled, it is deferred to the next launch.
- * `RepairModpack/index.tsx`'s
- * `navigateAwayIfInsideDetail()` runs synchronously on the confirm click,
- * before the mutation is even dispatched. It only navigates when the current
- * route is inside the instance's own detail page, which this flow guarantees
- * by calling `openInstance` first — so it fires here regardless of whether
- * the mutation later succeeds or fails, navigating back to `/library`, which
- * is what lets this test read the tile's `data-instance-state` straight off
- * the library grid afterward, the same way `waitForInstallComplete` itself
- * relies on for a real reinstall.
+ * **Test 2 — refused while running.** While the game runs, the Repair
+ * dialog says Repair has to wait (`repairBusy`) and keeps Confirm disabled,
+ * so nothing can be confirmed from it. The core refuses on its own as well:
+ * `repair_modpack`'s `LaunchState::Inactive` guard (`modpack/mod.rs`), backed
+ * by `prepare_game`'s own (`run/mod.rs`), which runs before any setup is
+ * written. So the test sends `instance.repairModpack` itself, from the page,
+ * with the core address and token of the dialog's own `getPendingSetup`
+ * poll, as a stale dialog or a second window could, and requires that
+ * request's specific refusal (`helpers/repairRefusal.ts`). Then nothing may
+ * have changed: `.setup/` still doesn't exist, the pack-owned jars and
+ * `packinfo.json` are byte-identical (`helpers/runningRepairProtection.ts`),
+ * and the library tile still reads `running`. Not implemented with
+ * `repairModpack` (`helpers/modpacks.ts`): that helper's last step is
+ * `waitForInstallComplete`, which must never be reached here.
  *
  * **Own harness for test 2 only, like `modpackLifecycle.spec.ts` —
  * not test 1.** Test 2 leaves a real JVM running and must be free to kill it
@@ -297,6 +289,8 @@ test.describe("modpack reinstall", () => {
     const harness = await startHarness()
     const launchOpts: LaunchOptions = {
       runtimePath: harness.runtimePath,
+      userDataPath: harness.userDataPath,
+      runId: harness.runId,
       baseApi: `${harness.mock.url}/gdl`,
       e2eAuthBase: harness.mock.url,
       e2eEntitlementKey: harness.entitlementKeyPath,
@@ -365,23 +359,91 @@ test.describe("modpack reinstall", () => {
           `the repair menu entry was disabled for "${name}" — the instance ` +
             "has no modpack association"
         ).toBeEnabled()
+        // The dialog polls the pending-setup status; its request carries the
+        // core address and token the direct repair below reuses.
+        const statusPoll = page.waitForRequest(
+          (request) => rpcRoute(request.url()) === "instance.getPendingSetup",
+          { timeout: 30_000 }
+        )
         await entry.click()
-        await page.click(byTestId(TEST_IDS.repairModpackConfirm))
+        const status = await statusPoll
 
-        // The mutation rejects; the instance must still be running and its
-        // files untouched. `repairModpackConfirm`'s click synchronously
-        // navigates back to /library (see the module doc comment), which is
-        // what makes the tile locator resolve here.
+        // The dialog says Repair waits for the game and offers nothing to
+        // confirm.
+        await expect(
+          page.locator(byTestId(TEST_IDS.repairBusy)),
+          "the Repair dialog did not say it waits while the game runs"
+        ).toBeVisible({ timeout: 30_000 })
+        const confirm = page.locator(byTestId(TEST_IDS.repairModpackConfirm))
+        await expect(
+          confirm,
+          "Repair could be confirmed while the game was running"
+        ).toBeDisabled()
+        const gamePid = Number(
+          fs
+            .readFileSync(path.join(root, ".gdl_instance.pid"), "utf8")
+            .split("\n")[0]
+            .trim()
+        )
+        expect(
+          Number.isInteger(gamePid) && gamePid > 0,
+          "owned instance game PID"
+        ).toBe(true)
+        const beforeRefusal = await captureRunningRepairProtection(root)
+        // The core refuses a repair sent anyway, as a stale dialog or a second
+        // window could send it.
+        const instance = readInstanceByName(harness.runtimePath, name).id
+        const repairUrl = new URL(status.url())
+        repairUrl.pathname = "/rspc/instance.repairModpack"
+        repairUrl.search = ""
+        const token = (await status.allHeaders())["x-api-token"]
+        await runRunningRepairCheck(
+          page,
+          instance,
+          runningRepairGameCheck(page, name, gamePid, isPidAlive),
+          async () => {
+            await page.evaluate(
+              async ({ url, token, input }) => {
+                await fetch(url, {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                    ...(token ? { "x-api-token": token } : {})
+                  },
+                  body: JSON.stringify(input)
+                })
+              },
+              {
+                url: repairUrl.toString(),
+                token,
+                input: {
+                  instance,
+                  re_enable_disabled: false,
+                  expected_pending: null
+                }
+              }
+            )
+          },
+          async () => {
+            await expect(confirm).toBeDisabled()
+            await verifyRunningRepairProtection(root!, beforeRefusal)
+          }
+        )
+        // Back in the library, the game is still running. The dialog stayed
+        // open on the instance page: close it the way ensureLibraryInteractive
+        // does, then leave the page.
+        await page
+          .locator(byTestId(TEST_IDS.modalClose))
+          .last()
+          .dispatchEvent("click")
+        await expect(page.locator("#overlay")).toBeHidden()
+        await page.click(byTestId(TEST_IDS.navbarLogo))
+        await ensureLibraryInteractive(page)
         await expect(
           page.locator(byInstanceName(name)),
           "reinstall was not refused while the instance was running — it " +
             "left the running state"
         ).toHaveAttribute("data-instance-state", "running")
-        expect(
-          fs.existsSync(path.join(root, ".setup")),
-          "reinstall created .setup/ even though the instance was running — " +
-            "the running-state guard did not fire"
-        ).toBe(false)
       },
       async (alreadyFailed) => {
         if (current) {

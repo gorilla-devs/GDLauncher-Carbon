@@ -85,3 +85,28 @@ export async function withCleanup<T>(
     }
   }
 }
+
+/** Await every independent step before applying the body-failure policy once.
+ * Presence is explicit so `throw undefined` remains the first thrown value.
+ */
+export async function runCleanupSteps(
+  steps: (() => Promise<void>)[],
+  alreadyFailed: boolean,
+  message: string
+): Promise<void> {
+  let hasError = false
+  let firstError: unknown
+  for (const step of steps) {
+    try {
+      await step()
+    } catch (error) {
+      if (!hasError) {
+        hasError = true
+        firstError = error
+      } else {
+        console.error(message, error)
+      }
+    }
+  }
+  if (hasError) reportCleanupFailure(firstError, alreadyFailed, message)
+}

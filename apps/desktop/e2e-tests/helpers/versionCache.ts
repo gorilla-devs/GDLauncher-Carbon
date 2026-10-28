@@ -92,7 +92,7 @@ function readBlobRow(
 
 /** The subset of Mojang's version JSON this suite needs off of it. */
 export interface CachedVersionInfo {
-  assetIndex?: { id?: string }
+  assetIndex?: { id?: string; sha1?: string }
   downloads?: { client?: { sha1?: string } }
 }
 
@@ -143,6 +143,7 @@ export function readVersionInfo(
  *  itself (and its dependencies) under. */
 export interface CachedLoaderLibrary {
   name: string
+  downloads?: { artifact?: { path?: string; size?: number; sha1?: string } }
 }
 
 /** The subset of `daedalus::modded::PartialVersionInfo` this suite needs off

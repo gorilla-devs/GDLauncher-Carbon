@@ -55,7 +55,14 @@ export function pickMatrix(
   versions: ManifestVersion[],
   opts: { seed: number; randomCount: number }
 ): MatrixEntry[] {
-  const newestRelease = versions.find((v) => v.type === "release")
+  // First occurrence wins, including its metadata; deduplicate before any draw.
+  const seenIds = new Set<string>()
+  const uniqueVersions = versions.filter((version) => {
+    if (seenIds.has(version.id)) return false
+    seenIds.add(version.id)
+    return true
+  })
+  const newestRelease = uniqueVersions.find((v) => v.type === "release")
 
   const pinnedIds = [...PINNED_VERSIONS]
   if (newestRelease && !pinnedIds.includes(newestRelease.id)) {
@@ -64,12 +71,12 @@ export function pickMatrix(
   const pinnedSet = new Set(pinnedIds)
 
   // Manifest order, filtered down to the pinned ids actually present.
-  const pinnedEntries: MatrixEntry[] = versions
+  const pinnedEntries: MatrixEntry[] = uniqueVersions
     .filter((v) => pinnedSet.has(v.id))
     .map((v) => ({ id: v.id, source: "pinned" as const }))
 
   // Random candidates: releases only, excluding anything already pinned.
-  const pool = versions
+  const pool = uniqueVersions
     .filter((v) => v.type === "release" && !pinnedSet.has(v.id))
     .map((v) => v.id)
 

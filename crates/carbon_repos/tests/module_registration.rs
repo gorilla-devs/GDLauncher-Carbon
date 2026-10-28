@@ -10,7 +10,7 @@
 //! closes most of the gap by construction (one list instead of two). But the
 //! aggregator itself could still forget to `extend` a newly added module, so
 //! this file mechanically compares its source against `repos/mod.rs`'s own
-//! `pub mod` declarations — the one remaining place a module could be missed.
+//! root module declarations — the one remaining place a module could be missed.
 //!
 //! It also asserts `compat_probe.rs`'s `probe_check` runs every checker rule
 //! shaped `(conn: &Connection, queries: &[QueryCheck]) -> Vec<String>` that
@@ -29,34 +29,73 @@ fn read(rel_path: &str) -> String {
     std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("could not read {path}: {e}"))
 }
 
-/// The module names declared `pub mod <name>;` at the top of `src/repos/mod.rs`
-/// — every repo module that exists, per its own directory listing of itself.
-fn declared_repo_modules() -> BTreeSet<String> {
-    let src = read("src/repos/mod.rs");
-    let mut names = BTreeSet::new();
-    for line in src.lines() {
-        let trimmed = line.trim();
-        if let Some(rest) = trimmed
-            .strip_prefix("pub mod ")
-            .and_then(|s| s.strip_suffix(';'))
-        {
-            names.insert(rest.to_string());
-        }
-    }
-    names
+/// Root module declarations, independent of visibility, formatting or comments.
+fn declared_repo_modules(src: &str) -> BTreeSet<String> {
+    let file = syn::parse_file(src).expect("invalid repository Rust source");
+    file.items
+        .into_iter()
+        .filter_map(|item| match item {
+            syn::Item::Mod(module) => Some(module.ident.to_string()),
+            _ => None,
+        })
+        .collect()
 }
 
-/// The module names `repos::all_queries()` actually aggregates, parsed from its
-/// own source: every `all.extend(<name>::all_queries());` line.
-fn aggregated_repo_modules() -> BTreeSet<String> {
-    let src = read("src/repos/mod.rs");
+fn unparen(mut expr: &syn::Expr) -> &syn::Expr {
+    loop {
+        match expr {
+            syn::Expr::Paren(e) => expr = &e.expr,
+            syn::Expr::Group(e) => expr = &e.expr,
+            _ => return expr,
+        }
+    }
+}
+
+/// Direct `all.extend(module::all_queries())` statements in the root aggregator.
+/// Nested items, other functions/receivers, comments and strings cannot register modules.
+/// This is a structural census, not a proof of arbitrary control-flow execution.
+fn aggregated_repo_modules(src: &str) -> BTreeSet<String> {
+    let file = syn::parse_file(src).expect("invalid repository Rust source");
+    let mut functions = file.items.iter().filter_map(|item| match item {
+        syn::Item::Fn(f) if f.sig.ident == "all_queries" => Some(f),
+        _ => None,
+    });
+    let function = functions.next().expect("missing root all_queries function");
+    assert!(
+        functions.next().is_none(),
+        "duplicate root all_queries function"
+    );
     let mut names = BTreeSet::new();
-    for line in src.lines() {
-        let trimmed = line.trim();
-        if let Some(rest) = trimmed.strip_prefix("all.extend(") {
-            if let Some(end) = rest.find("::all_queries())") {
-                names.insert(rest[..end].to_string());
-            }
+    for statement in &function.block.stmts {
+        let syn::Stmt::Expr(expr, _) = statement else {
+            continue;
+        };
+        let syn::Expr::MethodCall(call) = unparen(expr) else {
+            continue;
+        };
+        let syn::Expr::Path(receiver) = unparen(&call.receiver) else {
+            continue;
+        };
+        if call.method != "extend" || !receiver.path.is_ident("all") || call.args.len() != 1 {
+            continue;
+        }
+        let syn::Expr::Call(argument) = unparen(&call.args[0]) else {
+            continue;
+        };
+        let syn::Expr::Path(target) = unparen(&argument.func) else {
+            continue;
+        };
+        let segments = &target.path.segments;
+        if target.qself.is_none()
+            && target.path.leading_colon.is_none()
+            && argument.args.is_empty()
+            && segments.len() == 2
+            && segments[1].ident == "all_queries"
+            && segments
+                .iter()
+                .all(|s| matches!(s.arguments, syn::PathArguments::None))
+        {
+            names.insert(segments[0].ident.to_string());
         }
     }
     names
@@ -64,18 +103,19 @@ fn aggregated_repo_modules() -> BTreeSet<String> {
 
 #[test]
 fn all_queries_aggregates_every_declared_repo_module() {
-    let declared = declared_repo_modules();
-    let aggregated = aggregated_repo_modules();
+    let src = read("src/repos/mod.rs");
+    let declared = declared_repo_modules(&src);
+    let aggregated = aggregated_repo_modules(&src);
 
     assert!(
         !declared.is_empty(),
-        "found no `pub mod` declarations in src/repos/mod.rs — the source scan is misconfigured"
+        "found no root module declarations in src/repos/mod.rs — the source scan is misconfigured"
     );
 
     assert_eq!(
         declared,
         aggregated,
-        "repos::all_queries() has drifted from repos/mod.rs's `pub mod` declarations.\n\
+        "repos::all_queries() has drifted from repos/mod.rs's root module declarations.\n\
          Declared but not aggregated (its queries silently escape the checker): {:?}\n\
          Aggregated but not declared (a stale entry for a removed module): {:?}\n\
          Add or remove an `all.extend(<module>::all_queries());` line in \
@@ -191,4 +231,69 @@ fn checker_rule_scan_flags_a_rule_missing_from_a_caller() {
         vec!["check_manifests"],
         "a commented-out call must be treated as missing, not as still executing"
     );
+}
+
+#[test]
+fn root_module_census_handles_rust_syntax() {
+    for declaration in [
+        "pub mod missing;",
+        "pub mod missing; // trailing comment",
+        "pub /* outer /* nested */ comment */ mod missing;",
+        "pub\nmod\nmissing\n;",
+        "pub   mod   missing ;",
+        "#[allow(dead_code)] pub(crate) mod missing;",
+        "mod missing;",
+        "pub mod missing { pub mod nested; }",
+    ] {
+        let source = format!("{declaration}\nfn all_queries() {{ let all = Vec::new(); all }}");
+        assert_eq!(
+            declared_repo_modules(&source),
+            BTreeSet::from(["missing".into()]),
+            "{declaration}"
+        );
+        assert_ne!(
+            declared_repo_modules(&source),
+            aggregated_repo_modules(&source),
+            "{declaration}"
+        );
+    }
+}
+#[test]
+fn aggregation_census_is_structural_and_scoped() {
+    let source = r#"
+        // pub mod comment;
+        pub mod actual; // trailing
+        pub mod parent { pub mod nested; fn all_queries() { all.extend(nested::all_queries()); } }
+        fn unrelated() { all.extend(unrelated::all_queries()); }
+        fn all_queries() {
+            let text = "all.extend(string::all_queries())";
+            // all.extend(comment::all_queries());
+            let mut all = Vec::new();
+            all /* comment */ . extend (
+                actual /* comment */ :: all_queries ( )
+            );
+            fn inner() { all.extend(inner::all_queries()); }
+            other.extend(other_receiver::all_queries());
+            all.extend(parent::all_queries());
+            all
+        }
+    "#;
+    assert_eq!(
+        declared_repo_modules(source),
+        BTreeSet::from(["actual".into(), "parent".into()])
+    );
+    assert_eq!(
+        aggregated_repo_modules(source),
+        BTreeSet::from(["actual".into(), "parent".into()])
+    );
+}
+#[test]
+fn malformed_repo_source_is_rejected() {
+    for source in [
+        "pub mod broken",
+        "fn all_queries( { all.extend(foo::all_queries());",
+    ] {
+        assert!(std::panic::catch_unwind(|| declared_repo_modules(source)).is_err());
+        assert!(std::panic::catch_unwind(|| aggregated_repo_modules(source)).is_err());
+    }
 }

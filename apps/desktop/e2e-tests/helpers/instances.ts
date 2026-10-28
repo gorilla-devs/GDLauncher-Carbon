@@ -1,5 +1,12 @@
 import { expect, type Page } from "@playwright/test"
 import { byInstanceName, byLoader, byTestId, TEST_IDS } from "./selectors.js"
+import {
+  armInstallOperation,
+  type InstallOperation
+} from "./operationObserver.js"
+export { armInstallOperation } from "./operationObserver.js"
+const pendingInstalls = new WeakMap<Page, Map<string, InstallOperation>>()
+
 import { mulberry32 } from "../versionMatrix.js"
 
 /** The modloaders selectable from the instance-creation modal (vanilla has no key). */
@@ -79,6 +86,7 @@ export async function createInstanceViaUi(
   }
   await option.first().click()
 
+  let selectedLoaderVersion = opts.loaderVersion
   if (opts.loader) {
     // Deliberately not drawn from an external manifest, unlike the Minecraft
     // version above: the vanilla matrix exists to catch Mojang/meta.gdl.gg
@@ -121,6 +129,7 @@ export async function createInstanceViaUi(
           opts.version
         )
       )
+    selectedLoaderVersion = chosenVersion
 
     // The dropdown is still open from `readLoaderVersionOptions` reading its
     // options, so this both selects and closes it.
@@ -129,8 +138,45 @@ export async function createInstanceViaUi(
     )
   }
 
-  await page.click(byTestId(TEST_IDS.instanceCreationSubmit))
-  await expect(page.locator(byInstanceName(opts.name))).toBeVisible()
+  const operation = armInstallOperation(page, {
+    create: (input) => {
+      if (typeof input !== "object" || input === null) return false
+      const value = input as {
+        name?: string
+        version?: {
+          Version?: {
+            Standard?: {
+              release?: string
+              modloaders?: { type_: string; version: string }[]
+            }
+          }
+        }
+      }
+      const version = value.version?.Version?.Standard
+      return (
+        value.name === opts.name &&
+        version?.release === opts.version &&
+        (opts.loader
+          ? version.modloaders?.length === 1 &&
+            version.modloaders[0].type_.toLowerCase() === opts.loader &&
+            version.modloaders[0].version === selectedLoaderVersion
+          : version.modloaders?.length === 0)
+      )
+    }
+  })
+  const pending =
+    pendingInstalls.get(page) ?? new Map<string, InstallOperation>()
+  pending.get(opts.name)?.dispose()
+  pending.set(opts.name, operation)
+  pendingInstalls.set(page, pending)
+  try {
+    await page.click(byTestId(TEST_IDS.instanceCreationSubmit))
+    await expect(page.locator(byInstanceName(opts.name))).toBeVisible()
+  } catch (error) {
+    operation.dispose()
+    pending.delete(opts.name)
+    throw error
+  }
 }
 
 /**
@@ -298,12 +344,18 @@ export function resolveLoaderVersionSeed(): number {
  * Waits for an instance to finish installing.
  *
  * `inactive` is both the pre-prepare and the post-install state, so this
- * waits for the tile to leave it before waiting for it to come back.
+ * requires a prearmed accepted task and positive outcome, or a present
+ * queued/preparing tile before waiting for inactive. Creation stores its
+ * prearmed observation for the following wait; mutations pass it explicitly.
  */
 export async function waitForInstallComplete(
   page: Page,
   name: string,
-  opts: { startTimeout?: number; installTimeout?: number } = {}
+  opts: {
+    startTimeout?: number
+    installTimeout?: number
+    operation?: InstallOperation
+  } = {}
 ): Promise<void> {
   const selector = byInstanceName(name)
   const startTimeout = opts.startTimeout ?? 90_000
@@ -315,21 +367,29 @@ export async function waitForInstallComplete(
   // diagnosis.
   const installTimeout = opts.installTimeout ?? 11 * 60_000
 
-  await page
-    .waitForFunction(
-      (sel) =>
-        document.querySelector(sel)?.getAttribute("data-instance-state") !==
-        "inactive",
-      selector,
-      { timeout: startTimeout }
-    )
-    .catch((cause) => {
-      throw new Error(
-        `instance "${name}" never started preparing within ${startTimeout}ms ` +
-          `(state stayed "inactive" — prepareInstance likely never ran)`,
-        { cause }
+  const operation = opts.operation ?? pendingInstalls.get(page)?.get(name)
+  pendingInstalls.get(page)?.delete(name)
+  if (operation) {
+    await operation.wait(startTimeout, installTimeout)
+  } else
+    await page
+      .waitForFunction(
+        (sel) => {
+          const state = document
+            .querySelector(sel)
+            ?.getAttribute("data-instance-state")
+          return state === "queued" || state === "preparing"
+        },
+        selector,
+        { timeout: startTimeout }
       )
-    })
+      .catch((cause) => {
+        throw new Error(
+          `instance "${name}" never started preparing within ${startTimeout}ms ` +
+            `(state stayed "inactive" — prepareInstance likely never ran)`,
+          { cause }
+        )
+      })
 
   await page
     .waitForFunction(
@@ -459,4 +519,28 @@ export async function ensureLibraryInteractive(page: Page): Promise<void> {
 
   await expect(page.locator("#overlay")).toBeHidden()
   await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
+}
+
+/** Existing instance mutations are bound to the resolved detail route. */
+export function instanceIdFromPage(page: Page): number {
+  const match = /^#\/library\/(\d+)(?:[/?]|$)/.exec(new URL(page.url()).hash)
+  if (!match) throw new Error("No exact instance detail route for installation")
+  return Number(match[1])
+}
+export async function runInstallAndWait(
+  page: Page,
+  name: string,
+  route: "instance.changeModpack" | "instance.repairModpack",
+  run: () => Promise<void>
+): Promise<void> {
+  const operation = armInstallOperation(page, {
+    route,
+    instance: instanceIdFromPage(page)
+  })
+  try {
+    await run()
+    await waitForInstallComplete(page, name, { operation })
+  } finally {
+    operation.dispose()
+  }
 }

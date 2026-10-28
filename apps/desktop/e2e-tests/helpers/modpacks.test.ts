@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest"
 import { createHash } from "node:crypto"
 import { deflateRawSync } from "node:zlib"
 import { crc32 } from "node:zlib"
-import { packPaths, parseMrpackIndex, type PackIndex } from "./modpacks.js"
+import {
+  isPlatformProjectId,
+  packPaths,
+  parseMrpackIndex,
+  type PackIndex
+} from "./modpacks.js"
+import { MODPACK_CF_PROJECT, MODPACK_MR_PROJECT } from "./modpackFixtures.js"
 
 /** Matches `parseMrpackIndex`'s own hash choice for override content — see
  *  `PackOverrideFile`'s doc comment for why sha256. */
@@ -195,5 +201,244 @@ describe("packPaths", () => {
       loader: { type: "fabric", version: "0.16.14" }
     }
     expect(packPaths(index)).toEqual(["config/x.json", "mods/a.jar"])
+  })
+})
+
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
+import { verifyFreshPack } from "./freshPack.js"
+import { snapshotTree } from "./instanceTree.js"
+import { classifyPackinfo } from "./packinfo.js"
+it.each([0, 8])(
+  "fresh override verification rejects self-consistent wrong bytes from actual ZIP method %s",
+  async (method) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-fresh-override-"))
+    try {
+      const body = "archive pristine",
+        wrong = "wrong but present"
+      const index = parseMrpackIndex(
+        buildZip(
+          {
+            "modrinth.index.json": JSON.stringify({
+              dependencies: { minecraft: "1.20.1", "fabric-loader": "0.16.14" },
+              files: []
+            }),
+            "overrides/config/a.txt": body
+          },
+          method
+        )
+      )
+      fs.mkdirSync(path.join(root, "instance/config"), { recursive: true })
+      fs.writeFileSync(path.join(root, "instance/config/a.txt"), wrong)
+      fs.writeFileSync(
+        path.join(root, "packinfo.json"),
+        JSON.stringify({
+          files: {
+            "/config/a.txt": {
+              md5: createHash("md5").update(wrong).digest("hex"),
+              sha512: createHash("sha512").update(wrong).digest("hex")
+            }
+          }
+        })
+      )
+      expect(await classifyPackinfo(root)).toEqual({
+        pristine: ["/config/a.txt"],
+        missing: [],
+        modified: []
+      })
+      await expect(
+        verifyFreshPack(
+          root,
+          index,
+          await snapshotTree(path.join(root, "instance"))
+        )
+      ).rejects.toThrow(/override/i)
+      fs.writeFileSync(path.join(root, "instance/config/a.txt"), body)
+      await verifyFreshPack(
+        root,
+        index,
+        await snapshotTree(path.join(root, "instance"))
+      )
+      fs.writeFileSync(
+        path.join(root, "packinfo.json"),
+        JSON.stringify({
+          files: {
+            "/config/a.txt": {
+              md5: createHash("md5").update(body).digest("hex"),
+              sha512: createHash("sha512").update(body).digest("hex")
+            }
+          }
+        })
+      )
+      expect(await classifyPackinfo(root)).toEqual({
+        pristine: ["/config/a.txt"],
+        missing: [],
+        modified: []
+      })
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  }
+)
+it.each([false, true])(
+  "client override wins common bytes with reverse ZIP order=%s",
+  async (reverse) => {
+    const entries: Record<string, string> = {
+      "modrinth.index.json": JSON.stringify({
+        dependencies: { minecraft: "1.20.1", "fabric-loader": "0.16.14" },
+        files: []
+      })
+    }
+    for (const layer of reverse
+      ? ["client-overrides", "overrides"]
+      : ["overrides", "client-overrides"])
+      entries[`${layer}/config/a.txt`] = layer
+    entries["server-overrides/server.txt"] = "server"
+    const index = parseMrpackIndex(buildZip(entries))
+    expect(index.overrideFiles).toEqual([
+      { path: "config/a.txt", sha256: sha256("client-overrides") }
+    ])
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-client-override-"))
+    try {
+      fs.mkdirSync(path.join(root, "instance/config"), { recursive: true })
+      fs.writeFileSync(path.join(root, "instance/config/a.txt"), "overrides")
+      await expect(
+        verifyFreshPack(
+          root,
+          index,
+          await snapshotTree(path.join(root, "instance"))
+        )
+      ).rejects.toThrow(/override/i)
+      fs.writeFileSync(
+        path.join(root, "instance/config/a.txt"),
+        "client-overrides"
+      )
+      await verifyFreshPack(
+        root,
+        index,
+        await snapshotTree(path.join(root, "instance"))
+      )
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  }
+)
+it("required client descriptors exclude optional and unsupported client files", () => {
+  const index = parseMrpackIndex(
+    buildZip({
+      "modrinth.index.json": JSON.stringify({
+        dependencies: { minecraft: "1.20.1", "fabric-loader": "0.16.14" },
+        files: [
+          {
+            path: "required",
+            hashes: { sha512: "aa" },
+            fileSize: 1,
+            env: { client: "required" }
+          },
+          {
+            path: "optional",
+            hashes: { sha512: "bb" },
+            fileSize: 1,
+            env: { client: "optional" }
+          },
+          {
+            path: "server",
+            hashes: { sha512: "cc" },
+            fileSize: 1,
+            env: { client: "unsupported" }
+          }
+        ]
+      })
+    })
+  )
+  expect(index.files.map((f) => f.path)).toEqual(["required"])
+})
+it.each(["missing-override", "declared-size", "declared-hash"])(
+  "fresh content verifier rejects %s",
+  async (mode) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-fresh-control-"))
+    try {
+      fs.mkdirSync(path.join(root, "instance"))
+      fs.writeFileSync(path.join(root, "instance/a.txt"), "abc")
+      const index: PackIndex = {
+        minecraft: "1.20.1",
+        loader: { type: "fabric", version: "0.16.14" },
+        files:
+          mode === "missing-override"
+            ? []
+            : [
+                {
+                  path: "a.txt",
+                  size: mode === "declared-size" ? 4 : 3,
+                  sha512:
+                    mode === "declared-hash"
+                      ? "wrong"
+                      : createHash("sha512").update("abc").digest("hex")
+                }
+              ],
+        overrides: mode === "missing-override" ? ["absent"] : [],
+        overrideFiles:
+          mode === "missing-override"
+            ? [{ path: "absent", sha256: sha256("archive") }]
+            : []
+      }
+      await expect(
+        verifyFreshPack(
+          root,
+          index,
+          await snapshotTree(path.join(root, "instance"))
+        )
+      ).rejects.toThrow()
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  }
+)
+it("fresh oracle explicitly rejects undeclared precedence for descriptor/override collisions", async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-fresh-collision-"))
+  try {
+    fs.mkdirSync(path.join(root, "instance"))
+    fs.writeFileSync(path.join(root, "instance/a.txt"), "abc")
+    const index: PackIndex = {
+      minecraft: "1.20.1",
+      loader: { type: "fabric", version: "0.16.14" },
+      files: [
+        {
+          path: "a.txt",
+          size: 3,
+          sha512: createHash("sha512").update("abc").digest("hex")
+        }
+      ],
+      overrides: ["a.txt"],
+      overrideFiles: [{ path: "a.txt", sha256: sha256("abc") }]
+    }
+    await expect(
+      verifyFreshPack(
+        root,
+        index,
+        await snapshotTree(path.join(root, "instance"))
+      )
+    ).rejects.toThrow(/unsupported.*collision/i)
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true })
+  }
+})
+
+describe("isPlatformProjectId", () => {
+  it("tells this suite's fixture projects apart by id space", () => {
+    expect(isPlatformProjectId(MODPACK_CF_PROJECT, "curseforge")).toBe(true)
+    expect(isPlatformProjectId(MODPACK_CF_PROJECT, "modrinth")).toBe(false)
+    expect(isPlatformProjectId(MODPACK_MR_PROJECT, "modrinth")).toBe(true)
+    expect(isPlatformProjectId(MODPACK_MR_PROJECT, "curseforge")).toBe(false)
+  })
+
+  it("rejects the stale CurseForge row the macOS run clicked under a Modrinth filter", () => {
+    expect(isPlatformProjectId("1253222", "modrinth")).toBe(false)
+  })
+
+  it("rejects an empty id for either platform", () => {
+    expect(isPlatformProjectId("", "modrinth")).toBe(false)
+    expect(isPlatformProjectId("", "curseforge")).toBe(false)
   })
 })

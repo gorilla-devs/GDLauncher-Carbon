@@ -46,6 +46,7 @@
 import { createHash } from "node:crypto"
 import fs from "node:fs/promises"
 import path from "node:path"
+import type { CachedVersionInfo } from "./versionCache.js"
 
 export interface VerifyResult {
   ok: boolean
@@ -192,7 +193,8 @@ export function sampleKeys(
 
 export async function verifyAssetIndex(
   runtimePath: string,
-  indexId: string
+  indexId: string,
+  expectedSha1: string | undefined
 ): Promise<VerifyResult> {
   const indexPath = assetIndexPath(runtimePath, indexId)
 
@@ -200,9 +202,33 @@ export async function verifyAssetIndex(
     return failResult([`asset index missing at ${indexPath}`])
   }
 
+  if (
+    typeof expectedSha1 !== "string" ||
+    !/^[0-9a-f]{40}$/i.test(expectedSha1)
+  ) {
+    return failResult([
+      `asset index at ${indexPath} has missing or invalid expected sha1 — cannot verify its identity`
+    ])
+  }
+
+  // Bind identity and parsing to the same single physical read.
+  let raw: Buffer
+  try {
+    raw = await fs.readFile(indexPath)
+  } catch (err) {
+    return failResult([
+      `cannot read asset index at ${indexPath}: ${err instanceof Error ? err.message : String(err)}`
+    ])
+  }
+  const actualSha1 = createHash("sha1").update(raw).digest("hex")
+  if (actualSha1 !== expectedSha1.toLowerCase()) {
+    return failResult([
+      `asset index at ${indexPath} has sha1 ${actualSha1}, expected ${expectedSha1}`
+    ])
+  }
   let parsed: RawAssetsIndex
   try {
-    parsed = JSON.parse(await fs.readFile(indexPath, "utf8")) as RawAssetsIndex
+    parsed = JSON.parse(raw.toString("utf8")) as RawAssetsIndex
   } catch (err) {
     return failResult([
       `asset index at ${indexPath} is not valid JSON: ${err instanceof Error ? err.message : String(err)}`
@@ -218,6 +244,9 @@ export async function verifyAssetIndex(
   // modern — has zero objects, so treat both as problems rather than
   // trivially verifying clean on zero objects to check.
   if (
+    parsed === null ||
+    typeof parsed !== "object" ||
+    Array.isArray(parsed) ||
     parsed.objects === undefined ||
     parsed.objects === null ||
     typeof parsed.objects !== "object" ||
@@ -318,24 +347,25 @@ export async function verifyLibrariesPresent(
   runtimePath: string,
   relativePaths: string[]
 ): Promise<VerifyResult> {
-  const results = await mapConcurrent(
+  const problems = await mapConcurrent(
     relativePaths,
     CONCURRENCY,
     async (relativePath) => {
       const libraryPath = path.join(runtimePath, "libraries", relativePath)
-      return {
-        relativePath,
-        libraryPath,
-        exists: await pathExists(libraryPath)
+      try {
+        const stat = await fs.stat(libraryPath)
+        if (stat.isFile()) return undefined
+        const kind = stat.isDirectory() ? "a directory" : "not a regular file"
+        return `library at ${libraryPath} is ${kind}, not a file — cannot verify it`
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === "ENOENT")
+          return `library missing at ${libraryPath}`
+        return `cannot stat library at ${libraryPath}: ${error instanceof Error ? error.message : String(error)}`
       }
     }
   )
-
-  const problems = results
-    .filter((r) => !r.exists)
-    .map((r) => `library missing at ${r.libraryPath}`)
-
-  return problems.length ? failResult(problems) : okResult()
+  const failures = problems.filter((p): p is string => p !== undefined)
+  return failures.length ? failResult(failures) : okResult()
 }
 
 /**
@@ -372,5 +402,27 @@ export async function verifyLibrariesAbsent(
         `expected ${r.relativePath} to have been deleted, but ${r.libraryPath} still exists`
     )
 
+  return problems.length ? failResult(problems) : okResult()
+}
+
+/** Shared by both install specs; expected index identity comes from cached metadata. */
+export async function verifyCachedVanillaInstall(
+  runtimePath: string,
+  versionId: string,
+  cached: CachedVersionInfo
+): Promise<VerifyResult> {
+  const assetIndexId = cached.assetIndex?.id
+  const expectedAssetIndexSha1 = cached.assetIndex?.sha1
+  const expectedClientSha1 = cached.downloads?.client?.sha1
+  if (!assetIndexId || !expectedClientSha1) {
+    return failResult([
+      `cached version JSON for "${versionId}" is missing assetIndex.id or downloads.client.sha1 — cannot verify the install on disk`
+    ])
+  }
+  const [client, assets] = await Promise.all([
+    verifyClientJar(runtimePath, versionId, expectedClientSha1),
+    verifyAssetIndex(runtimePath, assetIndexId, expectedAssetIndexSha1)
+  ])
+  const problems = [...client.problems, ...assets.problems]
   return problems.length ? failResult(problems) : okResult()
 }

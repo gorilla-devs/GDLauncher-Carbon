@@ -153,3 +153,89 @@ describe("readInstallAudit", () => {
     })
   })
 })
+
+const INHERITED_REASONS = [
+  "toString",
+  "constructor",
+  "__proto__",
+  "hasOwnProperty"
+]
+it.each(INHERITED_REASONS)("rejects inherited skip reason %s", (reason) => {
+  expect(() =>
+    parseInstallAudit(`Files that could not be replaced:\n - /a: ${reason}\n`)
+  ).toThrow(/unrecognised audit skip reason/)
+})
+it("preserves case alias and colon filename hashes", () => {
+  expect(
+    parseInstallAudit(
+      "Files that could not be replaced:\n - /A: case-aliased with a tracked path\n - /config/a: b: modified by user\n     original md5: aa\n     current md5:  bb\n"
+    ).skipped
+  ).toEqual([
+    { file: "/A", reason: "case-aliased-with-tracked-path" },
+    {
+      file: "/config/a: b",
+      reason: "modified-by-user",
+      originalMd5: "aa",
+      currentMd5: "bb"
+    }
+  ])
+})
+it.each(INHERITED_REASONS)(
+  "physical audit reader rejects inherited reason %s",
+  async (reason) => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-audit-inherited-"))
+    try {
+      fs.mkdirSync(path.join(root, ".install_audit"))
+      fs.writeFileSync(
+        path.join(root, ".install_audit/audit.txt"),
+        `Files that could not be replaced:\n - /a: ${reason}\n`
+      )
+      await expect(readInstallAudit(root)).rejects.toThrow(
+        /unrecognised audit skip reason/
+      )
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  }
+)
+
+const BAD_CONTINUATION_OWNERS = [
+  "Files that could not be replaced:\n - /a: deleted by user\nFiles created:\n - /b\n",
+  "Files that could not be replaced:\n - /a: modified by user\nFiles created:\n - /b\n",
+  "Files that could not be replaced:\n - /a: modified by user\nFiles that could not be replaced:\n",
+  ...[
+    "deleted by user",
+    "disabled by user",
+    "already present",
+    "files in /saves will never be modified",
+    "case-aliased with a tracked path"
+  ].map(
+    (reason) =>
+      `Files that could not be replaced:\n - /edited: modified by user\n - /a: ${reason}\n`
+  )
+]
+for (const prefix of ["     original md5: aa", "     current md5:  bb"]) {
+  it.each(BAD_CONTINUATION_OWNERS)(
+    `rejects unowned ${prefix} after %s`,
+    (text) => {
+      expect(() => parseInstallAudit(text + prefix + "\n")).toThrow(
+        /orphaned md5 continuation/
+      )
+    }
+  )
+  it("physical reader rejects a cross-section " + prefix, async () => {
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-audit-owner-"))
+    try {
+      fs.mkdirSync(path.join(root, ".install_audit"))
+      fs.writeFileSync(
+        path.join(root, ".install_audit/audit.txt"),
+        BAD_CONTINUATION_OWNERS[0] + prefix + "\n"
+      )
+      await expect(readInstallAudit(root)).rejects.toThrow(
+        /orphaned md5 continuation/
+      )
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+}

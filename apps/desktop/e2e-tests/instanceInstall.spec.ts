@@ -8,7 +8,7 @@ import {
   ensureLibraryInteractive,
   waitForInstallComplete
 } from "./helpers/instances.js"
-import { verifyAssetIndex, verifyClientJar } from "./helpers/installVerify.js"
+import { verifyCachedVanillaInstall } from "./helpers/installVerify.js"
 import { readVersionInfo } from "./helpers/versionCache.js"
 import { withCleanup } from "./helpers/cleanup.js"
 
@@ -85,30 +85,11 @@ test.describe("instance install", () => {
             authenticatedApp.harness.runtimePath,
             entry.id
           )
-          const assetIndexId = cachedVersion.assetIndex?.id
-          const expectedSha1 = cachedVersion.downloads?.client?.sha1
-
-          if (!assetIndexId || !expectedSha1) {
-            throw new Error(
-              `cached version JSON for "${entry.id}" is missing ` +
-                `assetIndex.id or downloads.client.sha1 — cannot verify the ` +
-                "install on disk"
-            )
-          }
-
-          const [clientJarResult, assetIndexResult] = await Promise.all([
-            verifyClientJar(
-              authenticatedApp.harness.runtimePath,
-              entry.id,
-              expectedSha1
-            ),
-            verifyAssetIndex(authenticatedApp.harness.runtimePath, assetIndexId)
-          ])
-
-          const problems = [
-            ...clientJarResult.problems,
-            ...assetIndexResult.problems
-          ]
+          const { problems } = await verifyCachedVanillaInstall(
+            authenticatedApp.harness.runtimePath,
+            entry.id,
+            cachedVersion
+          )
           if (problems.length > 0) {
             throw new Error(
               `disk verification failed for Minecraft ${entry.id}:\n` +
