@@ -36,6 +36,10 @@ locally and a small set of `/v1/*` routes are stubbed. Anything unstubbed
 answers `501` naming the route. Tests needing real backend behaviour skip with
 a stated reason.
 
+`GDL_E2E_ELECTRON_ARGS` adds Chromium switches to every launch, split on
+whitespace, for one machine's run (for example `--disable-gpu`). CI does not
+set it.
+
 ## Adding a test
 
 ```ts

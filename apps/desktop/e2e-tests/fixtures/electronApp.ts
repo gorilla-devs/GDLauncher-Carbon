@@ -149,6 +149,12 @@ export async function launchApp(opts: LaunchOptions): Promise<{
     args.push("--gdl_e2e_entitlement_key", opts.e2eEntitlementKey)
   }
 
+  // Extra Chromium switches for one machine's run, e.g. `--disable-gpu`.
+  // Unset in CI.
+  args.push(
+    ...(process.env.GDL_E2E_ELECTRON_ARGS ?? "").split(/\s+/).filter(Boolean)
+  )
+
   console.log("Launching Electron from:", binaryPath)
   console.log("Binary exists:", fs.existsSync(binaryPath))
   if (fs.existsSync(binaryPath)) {
