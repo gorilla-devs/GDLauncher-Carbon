@@ -1116,6 +1116,147 @@ async fn task04_runtime_reconciliation_preserves_corrupt_pid_evidence() -> anyho
     Ok(())
 }
 
+/// A marker left empty by a power loss in one instance used to fail the whole
+/// ownership check: games still running in other instances showed as stopped
+/// and every quit and update install was refused for the session. Now that
+/// marker is kept and named for a move only, the running game is adopted,
+/// and quitting goes through and leaves the game running.
+#[cfg(unix)]
+#[tokio::test]
+async fn corrupt_marker_keeps_adoption_and_quit_working() -> anyhow::Result<()> {
+    use crate::managers::runtime_lifecycle::{RuntimeBlockerKind, ShutdownPurpose};
+    let env = crate::setup_managers_for_test().await;
+    let app = env.app.clone();
+    let (_, corrupt_root) = fixture(&app, "corrupt-owner").await?;
+    let (running_id, running_root) = fixture(&app, "running-owner").await?;
+    tokio::fs::write(corrupt_root.join(PID_FILE_NAME), b"").await?;
+
+    // A live process whose name says java, recorded like a launch does.
+    let bin = tempfile::tempdir()?;
+    let mut game = orphan_pid::spawn_fake_java(bin.path()).await;
+    let pid = game.id().context("fake game has no pid")?;
+    let start = {
+        let mut system = sysinfo::System::new();
+        system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[sysinfo::Pid::from_u32(
+            pid,
+        )]));
+        orphan_pid::process_start_time(&system, pid).context("fake game is not running")?
+    };
+    orphan_pid::write_pid_file(&running_root, PID_FILE_NAME, pid, start).await;
+
+    app.instance_manager().scan_instances().await?;
+
+    assert!(
+        matches!(
+            app.instance_manager().get_launch_state(running_id).await?,
+            domain::LaunchState::Running { .. }
+        ),
+        "a corrupt marker elsewhere must not hide a running game"
+    );
+    let corrupt_marker = corrupt_root.join(PID_FILE_NAME);
+    assert_eq!(tokio::fs::read(&corrupt_marker).await?, b"");
+    let refused = app.runtime_lifecycle.begin_relocation("move").unwrap_err();
+    assert!(
+        refused.blockers.iter().any(|b| {
+            b.kind == RuntimeBlockerKind::UnreadableRecord
+                && b.name == corrupt_marker.display().to_string()
+        }),
+        "{refused}"
+    );
+    assert!(
+        refused
+            .blockers
+            .iter()
+            .any(|b| b.kind == RuntimeBlockerKind::PreviousGame && b.pid == Some(pid)),
+        "{refused}"
+    );
+
+    let drain = app.clone();
+    app.runtime_lifecycle
+        .prepare_shutdown_and_commit("quit", ShutdownPurpose::Quit, async move {
+            drain.server_manager().shutdown_running().await
+        })
+        .await?;
+    assert!(app.runtime_lifecycle.shutdown_committed());
+    assert!(
+        game.try_wait()?.is_none(),
+        "quitting the launcher must leave the game running"
+    );
+    assert_eq!(tokio::fs::read(&corrupt_marker).await?, b"");
+    game.kill().await?;
+    Ok(())
+}
+
+/// Closing GDLauncher while a large library is still being scanned at
+/// startup: the scan finishes the folder it is on and stops there, so the
+/// quit commits in moments instead of waiting out the operation budget and
+/// ending unresolved. Only a move stays refused, until the next start.
+#[tokio::test]
+async fn a_quit_during_the_startup_scan_stops_it_at_the_next_folder() -> anyhow::Result<()> {
+    use crate::managers::runtime_lifecycle::{RuntimeBlockerKind, ShutdownPhase, ShutdownPurpose};
+    let env = crate::setup_managers_for_test().await;
+    let app = env.app.clone();
+    let (first, _) = fixture(&app, "first").await?;
+    let (second, _) = fixture(&app, "second").await?;
+    let manager = app.instance_manager();
+    // Whichever folder the listing yields first is where the quit lands; a
+    // scan that went on to the other one would wait there for good.
+    let pauses = [
+        manager.test_hooks.arm("scan", first),
+        manager.test_hooks.arm("scan", second),
+    ];
+    let scan = manager.scan_instances();
+    tokio::pin!(scan);
+    let (current, other) = tokio::select! {
+        _ = pauses[0].entered.notified() => (&pauses[0], &pauses[1]),
+        _ = pauses[1].entered.notified() => (&pauses[1], &pauses[0]),
+        result = &mut scan => panic!("scan did not pause: {result:?}"),
+    };
+
+    let status = app
+        .runtime_lifecycle
+        .prepare_shutdown("quit", ShutdownPurpose::Quit, async { Ok(()) })?;
+    assert_eq!(status.phase, ShutdownPhase::Draining);
+    current.release.notify_one();
+    tokio::time::timeout(Duration::from_secs(5), &mut scan)
+        .await
+        .context("the scan went on to the next folder after the quit began")??;
+    let status = tokio::time::timeout(Duration::from_secs(5), async {
+        loop {
+            let status = app
+                .runtime_lifecycle
+                .shutdown_status("quit", ShutdownPurpose::Quit)
+                .unwrap();
+            if status.phase != ShutdownPhase::Draining {
+                break status;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .context("the quit kept waiting for the scan")?;
+    assert_eq!(status.phase, ShutdownPhase::Ready, "{:?}", status.blockers);
+    app.runtime_lifecycle
+        .commit_prepared_shutdown("quit", ShutdownPurpose::Quit)?;
+    assert!(
+        tokio::time::timeout(Duration::from_millis(50), other.entered.notified())
+            .await
+            .is_err(),
+        "the scan reached the second folder"
+    );
+    assert!(
+        app.runtime_lifecycle
+            .relocation_blockers("move")
+            .iter()
+            .any(
+                |blocker| blocker.kind == RuntimeBlockerKind::StartupCheckFailed
+                    && blocker.name.contains("stopped early")
+            ),
+        "an interrupted scan must keep a move refused until the next start"
+    );
+    Ok(())
+}
+
 fn task08_archive(root: &Path, files: &[(&str, &[u8])]) -> anyhow::Result<()> {
     use std::io::Write;
     // Explicit older producer fixture: no current authoritative session.
@@ -3030,13 +3171,16 @@ async fn resumed_apply_keeps_an_in_place_edit_of_a_published_file() -> anyhow::R
     handoff.release.notify_one();
     drop(permit);
     task08_round2_wait_failed(&app, id).await?;
-    tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            if app.runtime_lifecycle.begin_relocation("settled").is_ok() {
-                break;
+    // A refused id is retired, so each poll asks under a new one.
+    let settled = tokio::time::timeout(Duration::from_secs(5), async {
+        for attempt in 0.. {
+            let request = format!("settled {attempt}");
+            if app.runtime_lifecycle.begin_relocation(&request).is_ok() {
+                return request;
             }
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
+        unreachable!()
     })
     .await?;
     app.runtime_lifecycle.cancel_relocation(&settled)?;
@@ -3064,21 +3208,19 @@ async fn task08_round2_settled(app: &crate::App, id: InstanceId) -> anyhow::Resu
     )
     .await?;
     drop(gate);
-    tokio::time::timeout(Duration::from_secs(5), async {
-        loop {
-            if app
-                .runtime_lifecycle
-                .begin_relocation("producer-settled")
-                .is_ok()
-            {
-                break;
+    // A refused id is retired, so each poll asks under a new one.
+    let settled = tokio::time::timeout(Duration::from_secs(5), async {
+        for attempt in 0.. {
+            let request = format!("producer-settled {attempt}");
+            if app.runtime_lifecycle.begin_relocation(&request).is_ok() {
+                return request;
             }
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
+        unreachable!()
     })
     .await?;
-    app.runtime_lifecycle
-        .cancel_relocation("producer-settled")?;
+    app.runtime_lifecycle.cancel_relocation(&settled)?;
     Ok(())
 }
 
