@@ -599,6 +599,356 @@ it("Task36 actual main wrapper owns a queued install callback through error befo
   expect(handlers.getUpdateState().readyUpdate.id).not.toBe(token)
   expect(handlers.getUpdateState().readyUpdate.version).toBe("2.0.0")
 })
+
+function declarations(text: string, names: string[]) {
+  const file = ts.createSourceFile(
+    "fixture.tsx",
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX
+  )
+  const found = new Map<string, string>()
+  function visit(node: ts.Node) {
+    if (
+      ts.isFunctionDeclaration(node) &&
+      node.name &&
+      names.includes(node.name.text)
+    )
+      found.set(node.name.text, node.getText(file))
+    ts.forEachChild(node, visit)
+  }
+  visit(file)
+  for (const name of names)
+    if (!found.has(name))
+      throw Error("Actual production function unavailable: " + name)
+  return names.map((name) => found.get(name)!).join("\n")
+}
+/** Electron 39 marks a window destroyed before it emits 'closed'; from then
+ *  on its getters and methods throw and destroy() does nothing. */
+class ElectronLikeContents extends EventEmitter {
+  readonly mainFrame = {}
+  sent: unknown[][] = []
+  constructor(private readonly owner: ElectronLikeWindow) {
+    super()
+  }
+  send(...args: unknown[]) {
+    this.owner.live()
+    this.sent.push(args)
+  }
+  setWindowOpenHandler() {}
+  getURL() {
+    return "file:///synthetic/index.html"
+  }
+}
+class ElectronLikeWindow extends EventEmitter {
+  static created: ElectronLikeWindow[] = []
+  static failNext = false
+  static getAllWindows() {
+    return ElectronLikeWindow.created.filter((w) => !w.destroyed)
+  }
+  destroyed = false
+  focused = 0
+  closeCalls = 0
+  hidden = false
+  shown = 0
+  readonly contents: ElectronLikeContents
+  constructor() {
+    super()
+    if (ElectronLikeWindow.failNext) {
+      ElectronLikeWindow.failNext = false
+      throw Error("synthetic window creation failure")
+    }
+    this.contents = new ElectronLikeContents(this)
+    ElectronLikeWindow.created.push(this)
+  }
+  live() {
+    if (this.destroyed) throw new TypeError("Object has been destroyed")
+  }
+  get webContents() {
+    this.live()
+    return this.contents
+  }
+  isDestroyed() {
+    return this.destroyed
+  }
+  isVisible() {
+    this.live()
+    return !this.hidden
+  }
+  close() {
+    this.live()
+    this.closeCalls++
+    let prevented = false
+    this.emit("close", {
+      preventDefault() {
+        prevented = true
+      },
+      get defaultPrevented() {
+        return prevented
+      }
+    })
+    if (!prevented) this.destroy()
+  }
+  destroy() {
+    if (this.destroyed) return
+    this.destroyed = true
+    this.emit("closed")
+  }
+  minimized = false
+  isMinimized() {
+    this.live()
+    return this.minimized
+  }
+  minimize() {
+    this.live()
+    this.minimized = true
+  }
+  restore() {
+    this.live()
+    this.minimized = false
+  }
+  focus() {
+    this.live()
+    this.focused++
+  }
+  hide() {
+    this.live()
+    this.hidden = true
+  }
+  show() {
+    this.live()
+    this.hidden = false
+    this.shown++
+  }
+  async loadFile() {
+    this.live()
+  }
+}
+function mainWindow() {
+  const text = source("apps/desktop/packages/main/index.ts")
+  ElectronLikeWindow.created = []
+  ElectronLikeWindow.failNext = false
+  let quits = 0,
+    appQuits = 0
+  const deliveries: unknown[] = []
+  const protocolQueue = new ProtocolQueue<object>((sender, value) =>
+    deliveries.push({ sender, value })
+  )
+  const context: Record<string, any> = {
+    console: { log() {}, warn() {}, error() {} },
+    isSpawningWindow: false,
+    win: null,
+    lastDisplay: null,
+    pendingDisplayChange: false,
+    adSizeFallbackTimeout: null,
+    screen: { getPrimaryDisplay: () => ({ id: 1 }) },
+    getAdSize: () => ({ minWidth: 1, minHeight: 1, height: 1, width: 1 }),
+    BrowserWindow: ElectronLikeWindow,
+    join: path.join,
+    __dirname: "/synthetic",
+    app: {
+      isPackaged: true,
+      quit: () => {
+        appQuits++
+      }
+    },
+    runtimeOperationActive: () => false,
+    interruptRuntimeOperation: () => false,
+    whenRuntimeOperationIdle: () => {},
+    shutdownApproved: false,
+    shutdownInFlight: undefined,
+    shutdownPrompts: new ShutdownPrompts<any>(async () => null),
+    skipIntroAnimation: false,
+    protocolQueue,
+    mainWindowClosed,
+    userWindows,
+    showAppCloseWarning: true,
+    shell: { openExternal() {} },
+    process: { platform: "linux" },
+    setTimeout,
+    clearTimeout,
+    URL,
+    importMetaEnv: { DEV: false },
+    __SHOWCASE_MODE__: false
+  }
+  const lifecycle = new LauncherLifecycle<any>({
+    current: () => context.win,
+    clear: (window) => {
+      if (context.win === window) context.win = null
+    },
+    create: () => context.createWindow(),
+    quit: () => {
+      quits++
+    }
+  })
+  context.lifecycle = lifecycle
+  context.createWindow = evaluate(
+    "(() => {\n" +
+      declarations(text, ["createWindow", "spawnWindow"]).replaceAll(
+        "import.meta.env",
+        "importMetaEnv"
+      ) +
+      "\nreturn createWindow\n})()",
+    context
+  )
+  const decisions = evaluate(
+    "(() => {\n" +
+      declarations(text, [
+        "closedBeforeMove",
+        "quitUnlessKeptAlive",
+        "quitIfStillWindowless",
+        "quitAfterCoreExit"
+      ]) +
+      "\nreturn { quitUnlessKeptAlive, quitAfterCoreExit }\n})()",
+    context
+  )
+  Object.assign(context, decisions)
+  return {
+    text,
+    context,
+    lifecycle,
+    protocolQueue,
+    deliveries,
+    createWindow: context.createWindow as () => Promise<ElectronLikeWindow>,
+    windowAllClosed: evaluate(
+      callArgument(text, "app.on", "window-all-closed"),
+      context
+    ) as () => void,
+    quitAfterCoreExit: decisions.quitAfterCoreExit as () => void,
+    get quits() {
+      return quits
+    },
+    get appQuits() {
+      return appQuits
+    }
+  }
+}
+it("actual createWindow: closing the window neither throws inside 'closed' nor leaves a stale handle", async () => {
+  const value = mainWindow()
+  const first = await value.createWindow()
+  first.emit("ready-to-show")
+  // The quit was approved, so the window really closes ('closed' fires).
+  value.context.shutdownApproved = true
+  expect(value.context.isSpawningWindow).toBe(false)
+  expect(value.protocolQueue.session(first.contents)).not.toBeNull()
+  expect(() => first.close()).not.toThrow()
+  expect(first.destroyed).toBe(true)
+  expect(value.context.win).toBeNull()
+  expect(value.protocolQueue.session(first.contents)).toBeNull()
+  const second = await value.createWindow()
+  expect(second).not.toBe(first)
+  expect(ElectronLikeWindow.created).toHaveLength(2)
+})
+it("actual createWindow reuses a live window and drops a destroyed handle without closing it", async () => {
+  const value = mainWindow()
+  const live = await value.createWindow()
+  live.emit("ready-to-show")
+  expect(await value.createWindow()).toBe(live)
+  expect(live.focused).toBe(1)
+  expect(ElectronLikeWindow.created).toHaveLength(1)
+  // The handle a throwing 'closed' listener used to leave behind.
+  live.destroyed = true
+  const next = await value.createWindow()
+  expect(next).not.toBe(live)
+  expect(live.closeCalls).toBe(0)
+  expect(value.context.win).toBe(next)
+})
+it("actual createWindow does not leave the spawning flag stuck when creation fails or the window closes before ready-to-show", async () => {
+  const value = mainWindow()
+  ElectronLikeWindow.failNext = true
+  await expect(value.createWindow()).rejects.toThrow(
+    "synthetic window creation failure"
+  )
+  expect(value.context.isSpawningWindow).toBe(false)
+  const early = await value.createWindow()
+  expect(value.context.isSpawningWindow).toBe(true)
+  value.context.shutdownApproved = true
+  early.close()
+  expect(value.context.isSpawningWindow).toBe(false)
+  const next = await value.createWindow()
+  expect(next).not.toBe(early)
+  expect(ElectronLikeWindow.created).toHaveLength(2)
+})
+it("actual window wiring: a Close Window launch reopens exactly one window after the game exits", async () => {
+  const value = mainWindow()
+  const first = await value.createWindow()
+  first.emit("ready-to-show")
+  value.lifecycle.snapshot('{"revision":1,"instances":[1]}')
+  value.lifecycle.event("GAME_LAUNCHED|1|7|closeWindow")
+  expect(first.destroyed).toBe(true)
+  expect(value.context.win).toBeNull()
+  expect(value.lifecycle.keepAliveWithoutWindows()).toBe(true)
+  value.lifecycle.snapshot('{"revision":2,"instances":[]}')
+  value.lifecycle.event("GAME_CLOSED|1|7|closeWindow")
+  expect(ElectronLikeWindow.created).toHaveLength(2)
+  const reopened = ElectronLikeWindow.created[1]
+  expect(value.context.win).toBe(reopened)
+  expect(value.lifecycle.keepAliveWithoutWindows()).toBe(false)
+  value.lifecycle.event("GAME_CLOSED|1|7|closeWindow")
+  expect(ElectronLikeWindow.created).toHaveLength(2)
+  expect(value.quits).toBe(0)
+})
+it("actual window wiring: closing the window a relaunch showed during a Close Window game quits, and the game exit opens nothing", async () => {
+  const value = mainWindow()
+  const first = await value.createWindow()
+  first.emit("ready-to-show")
+  value.lifecycle.snapshot('{"revision":1,"instances":[1]}')
+  value.lifecycle.event("GAME_LAUNCHED|1|7|closeWindow")
+  expect(first.destroyed).toBe(true)
+  value.windowAllClosed()
+  expect(value.appQuits).toBe(0)
+  // GDLauncher is started again mid-game ('second-instance'), and the user
+  // closes that window while it is still loading.
+  const shown = await value.createWindow()
+  shown.emit("ready-to-show")
+  shown.close()
+  expect(shown.destroyed).toBe(true)
+  value.windowAllClosed()
+  expect(value.appQuits).toBe(1)
+  value.lifecycle.snapshot('{"revision":2,"instances":[]}')
+  value.lifecycle.event("GAME_CLOSED|1|7|closeWindow")
+  expect(ElectronLikeWindow.created).toHaveLength(2)
+})
+it("actual close-warning IPC: only a main-frame App acknowledgement holds a close, and a navigation withdraws it", async () => {
+  const value = mainWindow()
+  const receiver = evaluate(
+    callArgument(value.text, "ipcMain.on", "close-warning-receiver"),
+    { lifecycle: value.lifecycle }
+  )
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  // A game adopted during the startup scan, before App mounted.
+  value.lifecycle.snapshot('{"revision":1,"instances":[4]}')
+  receiver({ sender: w.contents, senderFrame: {} }, true)
+  receiver({ sender: w.contents, senderFrame: w.contents.mainFrame }, true)
+  w.close()
+  expect(w.destroyed).toBe(false)
+  expect(w.hidden).toBe(false)
+  expect(w.contents.sent).toEqual([["showAppCloseWarning"]])
+  w.contents.emit("did-navigate")
+  w.close()
+  // The close goes ahead: the last window hides and the quit starts.
+  expect(w.contents.sent).toEqual([["showAppCloseWarning"]])
+  expect(w.hidden).toBe(true)
+  expect(value.appQuits).toBe(1)
+  // Once the quit is approved it closes for good.
+  value.context.shutdownApproved = true
+  w.close()
+  expect(w.destroyed).toBe(true)
+  expect(value.context.win).toBeNull()
+  const next = await value.createWindow()
+  receiver(
+    { sender: next.contents, senderFrame: next.contents.mainFrame },
+    true
+  )
+  receiver(
+    { sender: next.contents, senderFrame: next.contents.mainFrame },
+    false
+  )
+  next.close()
+  expect(next.destroyed).toBe(true)
+})
 it("actual last-window close hides the window and starts the quit instead of destroying it", async () => {
   const value = mainWindow()
   const w = await value.createWindow()
@@ -971,6 +1321,321 @@ it("actual macOS link opened during a pending quit shows the hidden window and i
   openUrl({ preventDefault() {} }, "gdlauncher://share/LATER")
   expect(w.focused).toBe(focused + 1)
   expect(revealed).toBe(1)
+})
+/** The actual protocol IPC handlers, called as the main frame of `contents`. */
+function protocolConsumer(
+  value: ReturnType<typeof mainWindow>,
+  contents: ElectronLikeContents
+) {
+  const event = { sender: contents, senderFrame: contents.mainFrame }
+  const ready = evaluate(
+    callArgument(value.text, "ipcMain.on", "protocol-consumer-ready"),
+    { protocolQueue: value.protocolQueue }
+  )
+  const ack = evaluate(
+    callArgument(value.text, "ipcMain.on", "protocol-consumer-ack"),
+    { protocolQueue: value.protocolQueue }
+  )
+  return {
+    ready: (subscription: string, generation: number | null) =>
+      ready(event, { subscription, generation }),
+    ack: (delivery: unknown) => ack(event, delivery),
+    generation: () => value.protocolQueue.session(contents),
+    delivered: () =>
+      (value.deliveries as { sender: unknown; value: any }[]).map((d) => ({
+        sender: d.sender,
+        ...d.value
+      }))
+  }
+}
+it("actual window wiring: a link click that will-navigate cancels leaves curseforge://, modrinth:// and gdlauncher:// links working", async () => {
+  const value = mainWindow()
+  const opened: string[] = []
+  value.context.shell = { openExternal: (url: string) => opened.push(url) }
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  const consumer = protocolConsumer(value, w.contents)
+  consumer.ready("1", consumer.generation())
+  value.protocolQueue.enqueue("gdlauncher://share/FIRST")
+  expect(consumer.delivered()).toHaveLength(1)
+  consumer.ack(consumer.delivered()[0])
+  const generation = consumer.generation()
+
+  // A left click on a plain <a href> in a mod description: Electron emits
+  // 'did-start-navigation' first, then 'will-navigate', which the launcher
+  // cancels and opens in the browser. Nothing commits, so no 'did-navigate'.
+  const link = "https://discord.example.invalid/invite"
+  w.contents.emit("did-start-navigation", {}, link, false, true)
+  let prevented = false
+  w.contents.emit(
+    "will-navigate",
+    {
+      preventDefault() {
+        prevented = true
+      }
+    },
+    link
+  )
+  expect(prevented).toBe(true)
+  expect(opened).toEqual([link])
+  expect(consumer.generation()).toBe(generation)
+
+  value.protocolQueue.enqueue("curseforge://install?addonId=1&fileId=2")
+  expect(consumer.delivered()).toHaveLength(2)
+  expect(consumer.delivered()[1]).toMatchObject({
+    sender: w.contents,
+    subscription: "1",
+    generation,
+    url: "curseforge://install?addonId=1&fileId=2"
+  })
+})
+it("actual window wiring: a reload hands an unacknowledged deep link to the new App exactly once", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  const consumer = protocolConsumer(value, w.contents)
+  const old = consumer.generation()
+  consumer.ready("1", old)
+  value.protocolQueue.enqueue("gdlauncher://share/RELOAD")
+  const first = consumer.delivered()[0]
+  expect(first.generation).toBe(old)
+
+  // location.reload(): the navigation starts and then commits.
+  const url = w.contents.getURL()
+  w.contents.emit("did-start-navigation", {}, url, false, true)
+  w.contents.emit("did-navigate", {}, url, 200, "OK")
+  expect(consumer.generation()).not.toBe(old)
+
+  // The old document's late handshake and ACK belong to the old generation.
+  consumer.ready("1", old)
+  consumer.ack(first)
+  expect(consumer.delivered()).toHaveLength(1)
+
+  // The new document's preload starts counting subscriptions from 1 again.
+  consumer.ready("1", consumer.generation())
+  expect(consumer.delivered()).toHaveLength(2)
+  const again = consumer.delivered()[1]
+  expect(again).toMatchObject({
+    id: first.id,
+    url: "gdlauncher://share/RELOAD",
+    subscription: "1",
+    generation: consumer.generation()
+  })
+  consumer.ack(again)
+  consumer.ready("1", consumer.generation())
+  expect(consumer.delivered()).toHaveLength(2)
+})
+it("actual window wiring: a renderer crash holds deep links until the reloaded App subscribes", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  const consumer = protocolConsumer(value, w.contents)
+  consumer.ready("1", consumer.generation())
+  w.contents.emit("render-process-gone", {}, { reason: "crashed" })
+  value.protocolQueue.enqueue("modrinth://mod/fixture")
+  expect(consumer.delivered()).toHaveLength(0)
+  consumer.ready("1", consumer.generation())
+  expect(consumer.delivered()).toHaveLength(1)
+  expect(consumer.delivered()[0].url).toBe("modrinth://mod/fixture")
+})
+it("main index.ts no longer revokes the protocol consumer when a navigation merely starts", () => {
+  const text = source("apps/desktop/packages/main/index.ts")
+  const file = ts.createSourceFile(
+    "index.ts",
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TS
+  )
+  const listeners: string[] = []
+  function visit(node: ts.Node) {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === "on" &&
+      node.arguments[0]?.getText(file) === '"did-start-navigation"'
+    )
+      listeners.push(node.getText(file))
+    ts.forEachChild(node, visit)
+  }
+  visit(file)
+  expect(
+    listeners.filter((l) => /protocolQueue|revoke|documentReplaced/.test(l))
+  ).toEqual([])
+})
+/** Runs the actual `loadCoreModule` against a fake core process. */
+async function coreProcess(context: {
+  lifecycle: unknown
+  quitAfterCoreExit: () => void
+}) {
+  const child = Object.assign(new EventEmitter(), {
+    pid: 7,
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+    kill: () => true
+  })
+  const load = evaluate(
+    initializer(
+      source("apps/desktop/packages/main/index.ts"),
+      "loadCoreModule"
+    ),
+    {
+      CURRENT_RUNTIME_PATH: "/synthetic",
+      assertDatabaseRestoreReadySync: () => {},
+      isDev: false,
+      console: { log() {}, error() {} },
+      path,
+      __dirname: "/synthetic",
+      binaryName: "core_module",
+      buildCoreModuleArgs: () => [],
+      overrideBaseApi: null,
+      e2eAuthBase: null,
+      e2eEntitlementKey: null,
+      crypto: { randomUUID: () => "session-1" },
+      accountIdentity: { beginCore() {}, acceptPayload() {} },
+      ...context,
+      spawn: () => child,
+      process: { env: {} },
+      createCoreOutput,
+      Sentry: { captureException() {} },
+      setTimeout: () => 0,
+      clearTimeout() {},
+      getWin: () => null
+    }
+  )
+  const result = load()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  return { child, result }
+}
+it("actual core load spawns the core before yielding to the event loop", () => {
+  // Spawned after an await, the core starts while Chromium launches its own
+  // children and inherits their IPC sockets, so a failed GPU process is never
+  // noticed and the window never paints.
+  let spawned = false
+  const child = Object.assign(new EventEmitter(), {
+    pid: 7,
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+    kill: () => true
+  })
+  const load = evaluate(
+    initializer(
+      source("apps/desktop/packages/main/index.ts"),
+      "loadCoreModule"
+    ),
+    {
+      CURRENT_RUNTIME_PATH: "/synthetic",
+      assertDatabaseRestoreReadySync: () => {},
+      isDev: false,
+      console: { log() {}, error() {} },
+      path,
+      __dirname: "/synthetic",
+      binaryName: "core_module",
+      buildCoreModuleArgs: () => [],
+      overrideBaseApi: null,
+      e2eAuthBase: null,
+      e2eEntitlementKey: null,
+      crypto: { randomUUID: () => "session-1" },
+      accountIdentity: { beginCore() {}, acceptPayload() {} },
+      lifecycle: { beginCore() {}, endCore: () => false },
+      quitAfterCoreExit() {},
+      spawn: () => {
+        spawned = true
+        return child
+      },
+      process: { env: {} },
+      createCoreOutput,
+      Sentry: { captureException() {} },
+      setTimeout: () => 0,
+      clearTimeout() {},
+      getWin: () => null
+    }
+  )
+  void load()
+  expect(spawned).toBe(true)
+})
+it("actual core exit clears the lifecycle for its own session", async () => {
+  for (const keptAlive of [false, true]) {
+    const calls: string[] = []
+    const { child, result } = await coreProcess({
+      lifecycle: {
+        beginCore: (s: string) => calls.push("begin:" + s),
+        endCore: (s: string) => {
+          calls.push("end:" + s)
+          return keptAlive
+        },
+        snapshot() {},
+        event() {}
+      },
+      quitAfterCoreExit: () => calls.push("quit decision")
+    })
+    child.emit("exit", 1)
+    expect((await result).type).toBe("error")
+    expect(calls).toEqual([
+      "begin:session-1",
+      "end:session-1",
+      ...(keptAlive ? ["quit decision"] : [])
+    ])
+  }
+})
+it("actual core exit quits a launcher that a Close Window game left without a window", async () => {
+  const value = mainWindow()
+  const { child } = await coreProcess({
+    lifecycle: value.lifecycle,
+    quitAfterCoreExit: value.quitAfterCoreExit
+  })
+  const first = await value.createWindow()
+  first.emit("ready-to-show")
+  value.lifecycle.snapshot('{"revision":1,"instances":[1]}', "session-1")
+  value.lifecycle.event("GAME_LAUNCHED|1|7|closeWindow", "session-1")
+  expect(first.destroyed).toBe(true)
+  value.windowAllClosed()
+  expect(value.appQuits).toBe(0)
+  // core_module panics, or is ended from Task Manager, mid-game. It can no
+  // longer report the game's exit, so nothing would ever reopen the window.
+  child.emit("exit", 1)
+  expect(value.appQuits).toBe(1)
+})
+it("actual core exit leaves the launcher running when a window is open or a quit, restart or relocation owns it", async () => {
+  const cases: [string, (value: ReturnType<typeof mainWindow>) => unknown][] = [
+    // GDLauncher was started again mid-game and showed a window.
+    [
+      "window",
+      async (value) => (await value.createWindow()).emit("ready-to-show")
+    ],
+    ["spawning", (value) => (value.context.isSpawningWindow = true)],
+    ["shutdown", (value) => (value.context.shutdownInFlight = {})],
+    ["approved", (value) => (value.context.shutdownApproved = true)],
+    [
+      "runtime operation",
+      (value) => (value.context.runtimeOperationActive = () => true)
+    ]
+  ]
+  for (const [name, arrange] of cases) {
+    const value = mainWindow()
+    const { child } = await coreProcess({
+      lifecycle: value.lifecycle,
+      quitAfterCoreExit: value.quitAfterCoreExit
+    })
+    const first = await value.createWindow()
+    first.emit("ready-to-show")
+    value.lifecycle.event("GAME_LAUNCHED|1|7|closeWindow", "session-1")
+    expect(first.destroyed).toBe(true)
+    await arrange(value)
+    child.emit("exit", 1)
+    expect(value.appQuits, name).toBe(0)
+  }
+})
+it("actual core exit during startup leaves the window to show the error", async () => {
+  const value = mainWindow()
+  const { child, result } = await coreProcess({
+    lifecycle: value.lifecycle,
+    quitAfterCoreExit: value.quitAfterCoreExit
+  })
+  // The core can die before the first window exists.
+  child.emit("exit", 1)
+  expect((await result).type).toBe("error")
+  expect(value.appQuits).toBe(0)
 })
 
 /** The real runtime-operation guard, as main/index.ts imports it. */
