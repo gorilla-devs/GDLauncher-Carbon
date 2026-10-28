@@ -39,9 +39,9 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
  * An instance left with an update that stopped while applying is never
  * stuck: it can't be cancelled and its changes can't be previewed, but
  * Repair, opened from the library tile, offers "Discard unfinished setup and
- * repair", which retires the unfinished `.setup` (kept as
- * `.setup-cancelled-*`), reinstalls the configured pack, and the instance
- * launches afterwards.
+ * repair", which retires the unfinished `.setup` (set aside as
+ * `.setup-cancelled-*` until the repair finishes), reinstalls the configured
+ * pack, and the instance launches afterwards.
  *
  * The failed update is produced for real, as in
  * `modpackInterruptedStaging.spec.ts`'s first test: a version change is
@@ -198,21 +198,15 @@ test.describe("modpack repair with an unfinished setup", () => {
           fs.existsSync(setupDir),
           "the repair finished but left a `.setup/` behind"
         ).toBe(false)
+        // The update it discarded is settled once the repair finished, so it
+        // goes too, download and records, as 2.0.40 removed a finished setup.
         const retired = fs
           .readdirSync(root)
           .filter((entry) => entry.startsWith(".setup-cancelled-"))
         expect(
           retired,
-          "the discarded update was not kept as `.setup-cancelled-*`"
-        ).toHaveLength(1)
-        // It may have changed files, so its records stay; its download goes
-        // once the repair finished.
-        const kept = path.join(root, retired[0])
-        expect(fs.existsSync(path.join(kept, "setup-session.json"))).toBe(true)
-        expect(
-          fs.existsSync(path.join(kept, "modrinth")),
-          "the discarded update's archive outlived the repair that replaced it"
-        ).toBe(false)
+          "the discarded update outlived the repair that replaced it"
+        ).toHaveLength(0)
         expect(
           (await readInstanceConfig(root)).modpack?.modrinthVersionId,
           "Repair reinstalls the configured version; the update never applied"

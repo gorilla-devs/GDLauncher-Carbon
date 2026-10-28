@@ -317,6 +317,17 @@ async fn prepare_modpack(
             }
         }
     }
+    // A pack that 2.0.40 finished applying before its game version install
+    // failed only needs that install, as in 2.0.40: it is adopted as
+    // committed, not rebuilt from its archive and applied again.
+    if is_setup && setup_session.is_none() && copied_session.is_none() && session_owner.is_none() {
+        if let Some(adopted) =
+            Session::adopt_legacy_applied_pack(&instance_root, instance_id, &config).await?
+        {
+            *session_owner = Some(adopted.owner()?);
+            setup_session = Some(adopted);
+        }
+    }
     let reconstruct = is_setup && setup_session.is_none();
     // Unknown markerless state never reuses residual staging. Only original
     // archives can qualify it, including older consumed-disabled overrides.
@@ -2987,6 +2998,20 @@ async fn execute_representation(
                 // A destination edited after intent was recorded is preserved.
                 record.conflict = true;
                 record.completed = true;
+            } else if let Some(renamed) = reenable_in_place(
+                &record,
+                staged,
+                other,
+                dest,
+                current.as_ref(),
+                &expected_hex,
+            )
+            .await?
+            {
+                if !renamed {
+                    record.conflict = true;
+                    record.completed = true;
+                }
             } else {
                 let source = resolve_staged(staged)
                     .map(|(path, _)| path)
@@ -3076,6 +3101,42 @@ async fn execute_representation(
         tracing::info!("Representation original retained: {}", payload.display());
     }
     Ok(())
+}
+
+/// Re-enables a disabled file that already holds the pack's bytes, when
+/// nothing was staged for it, by renaming it to its bare name, as 2.0.40
+/// did. The file keeps its inode, so an open handle or a write made
+/// meanwhile stays in the live file, and nothing is copied or kept in
+/// `.repair-recovery`.
+///
+/// `None` when that doesn't apply (not a re-enable, a staged copy exists,
+/// the bare name is taken, or the disabled file no longer holds the pack's
+/// bytes): the staged copy is published instead, as for every other
+/// representation change. `Some(false)` when the bare name appeared
+/// meanwhile or the renamed file doesn't hold the pack's bytes: a conflict,
+/// with whatever is there kept.
+async fn reenable_in_place(
+    record: &RepresentationTransition,
+    staged: &Path,
+    twin: &Path,
+    bare: &Path,
+    current: Option<&String>,
+    expected: &Option<String>,
+) -> anyhow::Result<Option<bool>> {
+    if record.disabled
+        || current.is_some()
+        || resolve_staged(staged).is_some()
+        || representation_hash(twin).await? != *expected
+    {
+        return Ok(None);
+    }
+    match publish::move_noclobber_async(twin, bare).await {
+        Ok(()) => {}
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => return Ok(Some(false)),
+        Err(error) => return Err(error.into()),
+    }
+    fsync_dir(bare.parent().context("re-enabled file has no parent")?).await?;
+    Ok(Some(representation_hash(bare).await? == *expected))
 }
 
 #[cfg(test)]
@@ -3308,6 +3369,128 @@ struct CleanupRecoveryEntry {
     status: String,
 }
 
+/// The [`CleanupRecoveryEntry::status`] of a ticked file that left the
+/// instance exactly as the user ticked it: its payload is that file.
+const CLEANUP_REMOVED: &str = "removed-at-user-request";
+
+/// Deletes the recovery copies in `.repair-recovery` that the setup in
+/// `setup` (the instance's `.setup`, or a retired `.setup-cancelled-*`)
+/// made and that nothing needs once a setup committed and its game install
+/// succeeded (see `session::dispose`), as 2.0.40 deleted them during its
+/// apply: files the user ticked for removal in Repair that left the instance
+/// exactly as ticked, and what a finished representation change (a re-enable,
+/// or a file the pack now ships disabled) moved out without a conflict. Its
+/// records name them: the repair marker's batch and each transition record.
+///
+/// Everything else stays: a conflict (a changed file the apply put back, or
+/// could not), an unfinished move, anything that can't be read or is not a
+/// plain folder, and what batches no record names hold. Empty batches, and
+/// an empty `.repair-recovery`, go. Callers hold the instance gate, under
+/// which Repair makes its batches. Best effort: failures are logged.
+pub(in crate::managers::instance) async fn prune_settled_recovery(root: &Path, setup: &Path) {
+    let (root, setup) = (root.to_owned(), setup.to_owned());
+    let pruned =
+        tokio::task::spawn_blocking(move || prune_settled_recovery_blocking(&root, &setup))
+            .await
+            .map_err(anyhow::Error::from)
+            .and_then(|result| result);
+    if let Err(error) = pruned {
+        tracing::warn!(?error, "settled recovery copies kept");
+    }
+}
+
+fn prune_settled_recovery_blocking(root: &Path, setup: &Path) -> anyhow::Result<()> {
+    let plain_dir = |path: &Path| {
+        std::fs::symlink_metadata(path).is_ok_and(|m| m.is_dir() && !m.file_type().is_symlink())
+    };
+    let single_component = |name: &str| {
+        let mut components = Path::new(name).components();
+        matches!(components.next(), Some(std::path::Component::Normal(_)))
+            && components.next().is_none()
+    };
+    let recovery = root.join(".repair-recovery");
+    if !plain_dir(&recovery) || !plain_dir(setup) {
+        return Ok(());
+    }
+    // Removes `entry` of `batch`, then `batch` once it is empty.
+    let remove_entry = |batch: &Path, entry: &Path| {
+        if plain_dir(entry) {
+            if let Err(error) = std::fs::remove_dir_all(entry) {
+                tracing::warn!(?error, path = %entry.display(), "settled recovery copy kept");
+            }
+        }
+        // Only an empty folder can be removed.
+        let _ = std::fs::remove_dir(batch);
+    };
+
+    // The files the user ticked for removal.
+    let marker = setup.join("repair");
+    let options = match std::fs::symlink_metadata(&marker) {
+        Ok(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
+            serde_json::from_slice::<RepairMarkerFile>(&std::fs::read(&marker)?).ok()
+        }
+        _ => None,
+    };
+    if let Some(name) = options
+        .and_then(|options| options.cleanup_batch)
+        .filter(|name| single_component(name))
+    {
+        let batch = recovery.join(&name);
+        if plain_dir(&batch) {
+            for entry in std::fs::read_dir(&batch)? {
+                let entry = entry?.path();
+                let removed = std::fs::read(entry.join("entry.json"))
+                    .ok()
+                    .and_then(|bytes| serde_json::from_slice::<CleanupRecoveryEntry>(&bytes).ok())
+                    .is_some_and(|record| {
+                        let key = record_key(&record.selection.path);
+                        record.status == CLEANUP_REMOVED
+                            && entry.file_name().and_then(|name| name.to_str())
+                                == Some(key.as_str())
+                    });
+                if removed {
+                    remove_entry(&batch, &entry);
+                }
+            }
+            let _ = std::fs::remove_dir(&batch);
+        }
+    }
+
+    // What finished representation changes moved out. Each has its own batch.
+    let transitions = setup.join("representation-transitions");
+    if plain_dir(&transitions) {
+        for file in std::fs::read_dir(&transitions)? {
+            let file = file?.path();
+            if file.extension().is_none_or(|ext| ext != "json") {
+                continue;
+            }
+            let Some(record) = std::fs::read(&file)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<RepresentationTransition>(&bytes).ok())
+            else {
+                continue;
+            };
+            if !record.completed || record.conflict || !single_component(&record.recovery_batch) {
+                continue;
+            }
+            let batch = recovery.join(&record.recovery_batch);
+            if plain_dir(&batch) {
+                remove_entry(&batch, &batch.join(record_key(&record.entry.path)));
+            }
+        }
+    }
+    // Batches left empty (say, by a Repair refused after it made one) hold
+    // nothing; only an empty folder can be removed.
+    for batch in std::fs::read_dir(&recovery)? {
+        let batch = batch?.path();
+        if plain_dir(&batch) {
+            let _ = std::fs::remove_dir(&batch);
+        }
+    }
+    let _ = std::fs::remove_dir(&recovery);
+    Ok(())
+}
+
 async fn write_cleanup_record(entry: &Path, record: &CleanupRecoveryEntry) -> anyhow::Result<()> {
     let entry = entry.to_owned();
     let bytes = serde_json::to_vec_pretty(record)?;
@@ -3346,7 +3529,7 @@ async fn finish_cleanup_payload(
         tracing::warn!("{note}");
         report.notes.push(note);
     } else {
-        record.status = "removed-at-user-request".into();
+        record.status = CLEANUP_REMOVED.into();
         if !live.try_exists()? {
             report.removed.push(record.selection.path.clone());
         }

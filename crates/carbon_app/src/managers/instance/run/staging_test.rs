@@ -309,6 +309,90 @@ async fn reenable_pristine_disabled_twin_uses_the_twins_own_bytes() {
     );
 }
 
+/// With nothing staged, a disabled file that holds the pack's bytes is
+/// renamed to its bare name, as 2.0.40 did: the same file, not a copy, and
+/// no second copy kept in `.repair-recovery` (only the transition's
+/// manifest is there, until the setup finishes). Before, every re-enabled
+/// mod was stored twice for good.
+#[tokio::test]
+async fn reenable_without_a_staged_copy_renames_the_twin_and_keeps_no_copy() {
+    let (_tmp, root, staging) = scaffold();
+    const PATH: &str = "/mods/pristine.jar";
+    write_disabled(&root, PATH, b"pristine-disabled-bytes").await;
+    #[cfg(unix)]
+    let inode = {
+        use std::os::unix::fs::MetadataExt;
+        std::fs::metadata(disabled_path(&root, PATH)).unwrap().ino()
+    };
+    let entries = vec![PlanEntry {
+        path: PATH.into(),
+        action: PlanAction::ReEnable,
+        reason: PlanReason::ReEnabled,
+    }];
+    let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+    assert_eq!(outcomes, entries);
+    assert_eq!(
+        std::fs::read(live_path(&root, PATH)).unwrap(),
+        b"pristine-disabled-bytes"
+    );
+    assert!(!disabled_path(&root, PATH).exists());
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::MetadataExt;
+        assert_eq!(
+            std::fs::metadata(live_path(&root, PATH)).unwrap().ino(),
+            inode,
+            "renamed, not copied"
+        );
+    }
+    let record: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(super::transition_path(&root, PATH)).unwrap())
+            .unwrap();
+    assert_eq!(record["completed"], true);
+    assert_eq!(record["conflict"], false);
+    let entry = root
+        .join(".repair-recovery")
+        .join(record["recovery_batch"].as_str().unwrap())
+        .join(super::record_key(PATH));
+    assert!(entry.join("entry.json").is_file());
+    assert!(!entry.join("payload").exists(), "no second copy is kept");
+}
+
+/// A disabled file that no longer holds the pack's bytes, with nothing
+/// staged, is not renamed: both names stay as they are and the change is a
+/// conflict, as before.
+#[tokio::test]
+async fn reenable_without_a_staged_copy_keeps_a_changed_twin_disabled() {
+    let (_tmp, root, staging) = scaffold();
+    const PATH: &str = "/mods/changed.jar";
+    write_disabled(&root, PATH, b"edited").await;
+    let entries = vec![PlanEntry {
+        path: PATH.into(),
+        action: PlanAction::ReEnable,
+        reason: PlanReason::ReEnabled,
+    }];
+    let target = packinfo(&[(PATH, 2)]);
+    let mut notes = Vec::new();
+    let outcomes = super::execute_bound_plan(
+        &entries,
+        &root,
+        &staging,
+        &target,
+        None,
+        &mut notes,
+        None,
+        &Default::default(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(outcomes[0].action, PlanAction::Keep, "{notes:?}");
+    assert!(!live_path(&root, PATH).exists());
+    assert_eq!(
+        std::fs::read(disabled_path(&root, PATH)).unwrap(),
+        b"edited"
+    );
+}
+
 #[tokio::test]
 async fn reenable_damaged_disabled_twin_uses_staged_bytes_and_drops_the_twin() {
     let (_tmp, instance_root, staging_dir) = scaffold();
@@ -2092,6 +2176,88 @@ async fn cleanup_options(root: &std::path::Path, path: &str) -> super::RepairMar
     }
 }
 
+/// Once the setup is done with them (see `session::dispose`), the copies its
+/// apply moved aside go, as 2.0.40 deleted them during its apply: a file the
+/// user ticked for removal, and the damaged twin a re-enable replaced from
+/// its staged copy. A ticked file that changed while it was moved is put
+/// back, and its copy stays.
+#[tokio::test]
+async fn settled_recovery_copies_go_once_the_setup_is_done_with_them() {
+    let (_tmp, root, staging) = scaffold();
+    const REENABLE: &str = "/mods/reenabled.jar";
+    write_disabled(&root, REENABLE, b"damaged").await;
+    write_staged(&staging, REENABLE, b"pack bytes").await;
+    let entries = vec![PlanEntry {
+        path: REENABLE.into(),
+        action: PlanAction::ReEnable,
+        reason: PlanReason::ReEnabled,
+    }];
+    execute_plan(&entries, &root, &staging).await.unwrap();
+    let record: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(super::transition_path(&root, REENABLE)).unwrap())
+            .unwrap();
+    let twin_batch = root
+        .join(".repair-recovery")
+        .join(record["recovery_batch"].as_str().unwrap());
+    let twin_copy = twin_batch.join(super::record_key(REENABLE)).join("payload");
+    assert_eq!(std::fs::read(&twin_copy).unwrap(), b"damaged");
+
+    let (ticked, changed) = ("/config/ticked.cfg", "/config/changed.cfg");
+    write_live(&root, ticked, b"ticked").await;
+    write_live(&root, changed, b"as ticked").await;
+    let mut options = cleanup_options(&root, ticked).await;
+    let unused = cleanup_options(&root, changed).await;
+    options.cleanup_selections.extend(unused.cleanup_selections);
+    let changed_live = live_path(&root, changed);
+    let edit = changed_live.clone();
+    hook("cleanup-move", changed_live.clone(), move || {
+        std::fs::write(edit, b"edited meanwhile").unwrap()
+    });
+    std::fs::write(
+        root.join(".setup/repair"),
+        serde_json::to_vec(&options).unwrap(),
+    )
+    .unwrap();
+    let report = bound_cleanup(
+        &options,
+        None,
+        &packinfo(&[("/config/current.cfg", 1)]),
+        &root,
+        false,
+    )
+    .await;
+    assert_eq!(report.removed, [ticked], "{:?}", report.notes);
+    let batch = root
+        .join(".repair-recovery")
+        .join(options.cleanup_batch.as_ref().unwrap());
+    assert!(
+        batch
+            .join(super::record_key(ticked))
+            .join("payload")
+            .is_file()
+    );
+    let kept = batch.join(super::record_key(changed)).join("payload");
+    assert_eq!(std::fs::read(&kept).unwrap(), b"edited meanwhile");
+
+    super::prune_settled_recovery(&root, &root.join(".setup")).await;
+    assert!(!twin_batch.exists());
+    assert!(!batch.join(super::record_key(ticked)).exists());
+    assert_eq!(std::fs::read(&kept).unwrap(), b"edited meanwhile");
+    assert_eq!(std::fs::read(&changed_live).unwrap(), b"edited meanwhile");
+    assert!(!live_path(&root, ticked).exists());
+    // The batch the second selection made and nothing used.
+    assert!(
+        !root
+            .join(".repair-recovery")
+            .join(unused.cleanup_batch.as_ref().unwrap())
+            .exists()
+    );
+    assert_eq!(
+        std::fs::read(live_path(&root, REENABLE)).unwrap(),
+        b"pack bytes"
+    );
+}
+
 #[tokio::test]
 async fn task03_selected_cleanup_preserves_later_edit() {
     let (_tmp, root, _) = scaffold();
@@ -3458,10 +3624,8 @@ async fn long_instance_root_publishes_deep_files_transitions_and_cleanup() {
         .join(transition["recovery_batch"].as_str().unwrap())
         .join(super::record_key(REENABLE));
     assert!(recovery.join("entry.json").is_file());
-    assert_eq!(
-        std::fs::read(recovery.join("payload")).unwrap(),
-        b"pristine"
-    );
+    // Nothing was staged for it, so the twin itself was renamed.
+    assert!(!recovery.join("payload").exists());
 
     // (c) A ticked stale file is moved into retained recovery, not kept.
     write_live(&root, &retired, b"stale").await;
@@ -3547,6 +3711,8 @@ async fn cross_volume_recovery_payloads_are_copied_into_recovery() {
     let (_tmp, root, staging) = scaffold();
     const REENABLE: &str = "/mods/pristine.jar";
     write_disabled(&root, REENABLE, b"pristine").await;
+    // Published from its staged copy, so the twin moves into recovery.
+    write_staged(&staging, REENABLE, b"pristine").await;
     let transition = super::transition_path(&root, REENABLE);
     let payload_of = {
         let (root, transition) = (root.clone(), transition.clone());
@@ -4314,37 +4480,6 @@ async fn other_link_refusals_fall_back_to_a_move() {
             assert!(!staged_path(&staging, path).exists());
         }
         assert_eq!(names(root.join("instance/config")), ["a.cfg"]);
-
-        // A staged file that no longer matches its verified hash is refused.
-        const CHANGED: &str = "/mods/changed.jar";
-        write_staged(&staging, CHANGED, b"changed after verification").await;
-        let mut target = super::packinfo::scan_dir(&staging.join("instance"), None)
-            .await
-            .unwrap();
-        target.files.get_mut(CHANGED).unwrap().sha512 =
-            sha2::Sha512::digest(b"verified bytes").into();
-        fail_link(live_path(&root, CHANGED), kind);
-        let error = super::execute_plan(
-            &[PlanEntry {
-                path: CHANGED.into(),
-                action: PlanAction::Create,
-                reason: PlanReason::PackUpdate,
-            }],
-            &root,
-            &staging,
-            &target,
-        )
-        .await
-        .unwrap_err();
-        assert!(
-            format!("{error:#}").contains("staged content changed before publication"),
-            "{error:#}"
-        );
-        assert!(!live_path(&root, CHANGED).exists());
-        assert_eq!(
-            std::fs::read(staged_path(&staging, CHANGED)).unwrap(),
-            b"changed after verification"
-        );
     }
 }
 

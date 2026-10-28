@@ -982,6 +982,6 @@ export type ImportEntitySelectionType = "file" | "directory"
 
 export type FECurseforgeSearchSortField = "featured" | "popularity" | "totalDownloads" | "lastUpdated" | "name" | "author" | "category" | "gameVersion"
 
-export type FinalizeEnrollmentOutcome = "complete" | "obsolete"
+export type EnrollmentError = { errorType: EnrollmentErrorType; title: string; description: string; recoverySteps: string[]; supportLink: string; xboxError?: XboxError | null }
 
-export type FEPrepareInstanceArgs = FEInstanceId | { instance: FEInstanceId; expected_failed_task: FETaskId; expected_mc_version: string }
+export type FEInstanceModloaderType = "neoforge" | "forge" | "fabric" | "quilt"

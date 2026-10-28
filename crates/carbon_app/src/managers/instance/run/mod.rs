@@ -469,8 +469,9 @@ impl ManagerRef<'_, InstanceManager> {
                         };
                         if current != replaced.label { bail!("pending setup changed before repair"); }
                         // Most keep only their records; one that may have changed
-                        // installed content keeps everything until a later setup
-                        // finishes (see `Replaced::keep_payload`, `prune_retired`).
+                        // installed content keeps everything. Either goes once a
+                        // later setup finishes (see `Replaced::keep_payload`,
+                        // `prune_retired`).
                         (replaced.label.clone(), !replaced.keep_payload, false)
                     } else {
                         // Only a version or loader change replaces a fully installed pack
@@ -574,17 +575,28 @@ impl ManagerRef<'_, InstanceManager> {
                     setups::discard_replacement(&root, &next).await;
                     return Err(error);
                 }
-                if session.producer == super::modpack::session::Producer::Settings && session.kind == super::modpack::session::Kind::VersionOnly {
-                    let owner = session.owner()?;
-                    session.bind_preparation(self.app.task_manager().generation(), id, &config)?;
-                    session.save(&root, &owner).await?;
+                if let Some((retired, trim, installed_pack)) = retired {
+                    // Downloads nothing reads again: a setup that never changed
+                    // installed content, or a fully installed pack's archive.
+                    let trimmed = if trim {
+                        setups::trim_retired(&retired.path).await
+                    } else if installed_pack {
+                        setups::drop_installed_pack_archive(&retired.path).await
+                    } else {
+                        Ok(())
+                    };
+                    if let Err(error) = trimmed {
+                        tracing::warn!(?error, "retired setup payload kept");
+                    }
                 }
-                Ok(Some(session.owner()?))
+                Ok(Some(owner))
             } else {
                 let pending = if let Some(recovery) = &shader_recovery {
                     Some(Session::require_preparation(&root, &recovery.session).await?)
                 } else {
-                    Session::load(&root).await?
+                    Session::load(&root).await.with_context(|| {
+                        super::mods::unreadable_setup_refusal(&config, super::mods::PendingChange::Play)
+                    })?
                 };
                 match pending {
                     Some(mut session) => {
@@ -884,8 +896,8 @@ impl ManagerRef<'_, InstanceManager> {
                             let owner = session_owner
                                 .as_ref()
                                 .context("unbound setup cannot be disposed")?;
-                            // Every setup this one replaced is settled now: their
-                            // downloads go, their records stay.
+                            // This setup and every one it replaced are settled now:
+                            // they go, with the recovery copies nothing needs.
                             super::modpack::session::dispose(&instance_root, owner).await?;
                         }
 

@@ -2513,6 +2513,21 @@ async fn task08_round1_publication_reconstructed() -> anyhow::Result<()> {
     task08_round1_publication(super::modpack::session::Producer::Reconstructed).await
 }
 
+/// Copies the folder `from` to `to`, which must not exist yet.
+fn copy_tree(from: &Path, to: &Path) -> anyhow::Result<()> {
+    std::fs::create_dir(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let target = to.join(entry.file_name());
+        if entry.file_type()?.is_dir() {
+            copy_tree(&entry.path(), &target)?;
+        } else {
+            std::fs::copy(entry.path(), target)?;
+        }
+    }
+    Ok(())
+}
+
 async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow::Result<()> {
     use super::modpack::{RepairMarkerFile, packinfo, session::Session};
     let app = crate::setup_managers_for_test().await;
@@ -2605,6 +2620,11 @@ async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow
     .path();
     let mut manifest: serde_json::Value =
         serde_json::from_slice(&tokio::fs::read(recovery.join("entry.json")).await?)?;
+    // Nothing was staged for the twin, so this build renamed it in place.
+    // The records below are the earlier builds' that published a copy and
+    // kept the twin in recovery.
+    assert!(!recovery.join("payload").exists());
+    tokio::fs::copy(root.join("instance/mods/a.jar"), recovery.join("payload")).await?;
     if !copied && mode != "foreign" {
         for value in [&mut record, &mut manifest] {
             value["schema_version"] = 1.into();
@@ -2642,6 +2662,14 @@ async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow
             .get_root();
         record_path = root.join(record_path.strip_prefix(&original_root)?);
         recovery = root.join(recovery.strip_prefix(&original_root)?);
+        // Duplicate leaves the recovery copies with the original. A copy
+        // made outside the app (or by an earlier build) carries them, which
+        // is what this covers.
+        assert!(!root.join(".repair-recovery").exists());
+        copy_tree(
+            &original_root.join(".repair-recovery"),
+            &root.join(".repair-recovery"),
+        )?;
     } else {
         tokio::fs::remove_file(root.join(".setup/setup-session.json")).await?;
         if mode == "old-resolved" {
@@ -3918,33 +3946,33 @@ async fn task08_round2_removed_installed_version_cannot_be_requested_again() -> 
             .state,
         run::LaunchState::Inactive { failed_task: None }
     ));
-    // Real returned publication I/O failure: something already holds the
-    // record's name, so its no-replace publication fails on every OS. Nothing
-    // is moved while the writer holds its temporary file open (Windows
-    // refuses to rename a folder with an open file inside).
-    let next = task08_round2_replacement(&root)?;
-    assert!(next.join("change-pack-version.json").is_file());
-    tokio::fs::create_dir(next.join(session::RECORD)).await?;
-    if drop_request {
-        drop(request);
-        assert!(
-            app.runtime_lifecycle
-                .begin_relocation("io-error-pending")
-                .is_err()
-        );
-        pause.release();
-    } else {
-        pause.release();
-        assert!(
-            tokio::time::timeout(Duration::from_secs(5), request)
-                .await?
-                .is_err()
-        );
-    }
-    task08_round2_settled(&app, id).await?;
-    // The failure published no setup and removed the replacement it was
-    // writing, request included: its record, written last, never completed
-    // it. The baseline packinfo.json from the inventory step remains.
+    Ok(())
+}
+
+/// A cancel that lands once the check has done its last look still stops the
+/// change: Cancel never ends in a running update. The record stays for the
+/// next attempt to read.
+#[tokio::test]
+async fn task08_round2_cancel_after_the_last_check_still_stops_the_change() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, _inventory) = task08_round2_change_fixture(&app, "producer-late-cancel").await?;
+    let checked = app.instance_manager().test_hooks.arm("change_checked", id);
+    let change = {
+        let app = app.clone();
+        tokio::spawn(async move {
+            app.instance_manager()
+                .change_modpack(id, task08_round2_pack("B"))
+                .await
+        })
+    };
+    tokio::time::timeout(Duration::from_secs(5), checked.entered.notified()).await?;
+    app.instance_manager().cancel_version_change_check(id);
+    checked.release.notify_one();
+    let error = tokio::time::timeout(Duration::from_secs(5), change)
+        .await??
+        .unwrap_err();
+    let presented = serde_json::to_value(crate::error::FeError::from_anyhow(&error))?;
+    assert_eq!(presented["cause"][0]["code"], "MODPACK_CHECK_CANCELLED");
     assert!(!root.join(".setup").exists());
     assert!(root.join("packinfo.json").exists());
     assert!(!app.instance_manager.version_change_checks.contains_key(&id));
@@ -6660,9 +6688,9 @@ fn versiononly_legacy_applied_pack(root: &Path) -> anyhow::Result<()> {
 /// loader in Edit installed it straight away. It still does: the leftover is
 /// retired without the finished install's archive, and the new choice is
 /// prepared as a version-only install, with no pack rebuild and no failing
-/// Play first. Play alone still rebuilds the pack from the archive, so addon
-/// edits wait for it. A leftover whose apply may not have finished still
-/// waits for Play.
+/// Play first. Addon edits wait for Play, which finishes it (see
+/// `legacy_applied_pack_play_installs_only_the_game_version`). A leftover
+/// whose apply may not have finished still waits for Play.
 #[tokio::test]
 async fn versiononly_2040_applied_pack_with_failed_game_install_is_replaced() -> anyhow::Result<()>
 {
@@ -6755,6 +6783,236 @@ async fn versiononly_2040_applied_pack_with_failed_game_install_is_replaced() ->
     assert_eq!(
         tokio::fs::read(root.join("packinfo.json")).await?,
         installed
+    );
+    Ok(())
+}
+
+/// What 2.0.40 leaves once it finished applying an update from A to B and
+/// the game version install then failed: B's files and the record apply
+/// promoted, the configuration naming B (2.0.40 wrote it before applying),
+/// and B's archive, its request and the apply markers beside modpack-complete
+/// in a `.setup` with no record.
+async fn legacy_applied_update(
+    app: &crate::App,
+    name: &str,
+) -> anyhow::Result<(InstanceId, PathBuf)> {
+    use super::modpack::packinfo;
+    let (id, root) = repairblocked_installed(app, name, "B").await?;
+    tokio::fs::write(root.join("instance/mods/pack.jar"), b"B").await?;
+    tokio::fs::remove_file(root.join("instance/mods/old.jar")).await?;
+    tokio::fs::write(root.join("instance/mods/new.jar"), b"new in B").await?;
+    tokio::fs::remove_file(root.join("instance/mods/user.jar")).await?;
+    let record = packinfo::scan_dir(&root.join("instance"), None).await?;
+    tokio::fs::write(root.join("packinfo.json"), packinfo::make_packinfo(record)?).await?;
+    tokio::fs::write(root.join("instance/mods/user.jar"), b"user").await?;
+    tokio::fs::create_dir(root.join(".setup")).await?;
+    tokio::fs::write(
+        root.join(".setup/change-pack-version.json"),
+        repairblocked_request("B")?,
+    )
+    .await?;
+    repairblocked_archive_b(&root)?;
+    tokio::fs::create_dir(root.join(".setup/modpack-skip-overrides")).await?;
+    tokio::fs::write(root.join(".setup/staging-packinfo.json"), b"[]").await?;
+    tokio::fs::write(root.join(".setup/apply-started"), b"").await?;
+    tokio::fs::write(root.join(".setup/modpack-complete"), b"").await?;
+    Ok((id, root))
+}
+
+/// Play finishes a pack 2.0.40 had applied before its game version install
+/// failed by installing only the game version, as 2.0.40 did. It no longer
+/// rebuilds the pack from its archive and applies it again, which needs the
+/// platform's API and every file the pack lists: here the archive can't even
+/// be read, as when a rebuild can't reach the platform. The files, their
+/// record and the configuration stay as they are, and once the game install
+/// succeeds the setup goes.
+#[tokio::test]
+async fn legacy_applied_pack_play_installs_only_the_game_version() -> anyhow::Result<()> {
+    use super::modpack::session::{Kind, Phase, Producer, Session};
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = legacy_applied_update(&app, "legacy-applied-play").await?;
+    tokio::fs::write(root.join(".setup/modrinth"), b"not an archive").await?;
+    let instance = legacy_tree(&root.join("instance"));
+    let installed = tokio::fs::read(root.join("packinfo.json")).await?;
+    let configured = disk_config(&root).await?;
+
+    let owner = legacy_prepare(&app, id)
+        .await?
+        .expect("Play owns the setup it adopted");
+    let session = Session::require(&root, &owner).await?;
+    assert_eq!(
+        (session.producer, session.kind, session.phase),
+        (Producer::Reconstructed, Kind::Pack, Phase::Committed)
+    );
+    assert!(session.pack_installed(&root).await?);
+    assert_eq!(legacy_tree(&root.join("instance")), instance);
+    assert_eq!(
+        tokio::fs::read(root.join("packinfo.json")).await?,
+        installed
+    );
+    let config = disk_config(&root).await?;
+    assert_eq!(
+        config.modpack.map(|pack| pack.modpack),
+        configured.modpack.map(|pack| pack.modpack)
+    );
+    assert_eq!(
+        format!("{:?}", config.game_configuration.version),
+        format!("{:?}", configured.game_configuration.version)
+    );
+    for entry in std::fs::read_dir(root.join(".setup"))? {
+        let name = entry?.file_name().to_string_lossy().into_owned();
+        assert!(
+            !name.starts_with("preparing-"),
+            "nothing was rebuilt: {name}"
+        );
+    }
+
+    super::modpack::session::dispose(&root, &owner).await?;
+    assert!(!root.join(".setup").exists());
+    assert_eq!(legacy_tree(&root.join("instance")), instance);
+    Ok(())
+}
+
+/// When the game install fails again after Play adopted such a setup, a
+/// version or loader change still replaces it, as before: it is a fully
+/// installed pack. The retired setup keeps no archive.
+#[tokio::test]
+async fn legacy_applied_pack_adopted_by_play_is_still_replaced_by_a_version_change()
+-> anyhow::Result<()> {
+    use super::modpack::session::{Kind, Phase, Producer, Session};
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = legacy_applied_update(&app, "legacy-applied-replaced").await?;
+    let adopted = legacy_prepare(&app, id).await?.expect("adopted");
+    let instance = legacy_tree(&root.join("instance"));
+    let queue = versiononly_hold_queue(&app).await?;
+    let forge = versiononly_loader(info::ModLoaderType::Forge, "47.3.0");
+    app.instance_manager()
+        .update_instance(versiononly_edit(id, None, Some(Some(forge))))
+        .await?
+        .expect("the loader change prepares the instance");
+    let retired = legacy_retired(&root)?;
+    assert_eq!(retired.len(), 1);
+    assert!(
+        retired[0]
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .starts_with(&format!(".setup-cancelled-{}-", adopted.operation))
+    );
+    assert!(!retired[0].join("modrinth").exists());
+    let new = Session::load(&root).await?.expect("the replacing setup");
+    assert_eq!(
+        (new.producer, new.kind, new.phase),
+        (Producer::Settings, Kind::VersionOnly, Phase::Reserved)
+    );
+    assert_eq!(legacy_tree(&root.join("instance")), instance);
+    let staged = app.instance_manager().test_hooks.arm("setup_staged", id);
+    drop(queue);
+    tokio::time::timeout(Duration::from_secs(30), staged.entered.notified()).await?;
+    assert_eq!(legacy_tree(&root.join("instance")), instance);
+    Ok(())
+}
+
+/// Duplicating an instance leaves what earlier setups left for it alone
+/// with the original: its retired setups and the copies Repair moved aside.
+/// The pending setup and everything else are copied.
+#[tokio::test]
+async fn duplicate_leaves_setup_leftovers_with_the_original() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = repairblocked_installed(&app, "duplicate-leftovers", "A").await?;
+    for (path, bytes) in [
+        (
+            ".setup-cancelled-op-1/setup-session.json",
+            b"retired".as_slice(),
+        ),
+        (".repair-recovery/cleanup-1/entry/payload", b"ticked"),
+        (".setup-cancelled", b"not a retired setup"),
+        (".setup-next-1/change-pack-version.json", b"replacement"),
+    ] {
+        let path = root.join(path);
+        tokio::fs::create_dir_all(path.parent().unwrap()).await?;
+        tokio::fs::write(path, bytes).await?;
+    }
+    let copy = app
+        .instance_manager()
+        .duplicate_instance(id, "copy".into())
+        .await?;
+    let (shortpath, _) = app.instance_manager().current_config(copy).await?;
+    let copied = app
+        .settings_manager()
+        .runtime_path
+        .get_instances()
+        .get_instance_path(&shortpath)
+        .get_root();
+    assert!(!copied.join(".setup-cancelled-op-1").exists());
+    assert!(!copied.join(".repair-recovery").exists());
+    assert_eq!(
+        tokio::fs::read(copied.join(".setup-cancelled")).await?,
+        b"not a retired setup"
+    );
+    assert!(
+        copied
+            .join(".setup-next-1/change-pack-version.json")
+            .is_file()
+    );
+    assert_eq!(
+        legacy_tree(&copied.join("instance")),
+        legacy_tree(&root.join("instance"))
+    );
+    assert_eq!(
+        tokio::fs::read(copied.join("packinfo.json")).await?,
+        tokio::fs::read(root.join("packinfo.json")).await?
+    );
+    assert_eq!(disk_config(&copied).await?.name, "copy");
+    // The original keeps them.
+    assert!(
+        root.join(".setup-cancelled-op-1/setup-session.json")
+            .is_file()
+    );
+    assert!(
+        root.join(".repair-recovery/cleanup-1/entry/payload")
+            .is_file()
+    );
+    Ok(())
+}
+
+/// Duplicating an instance whose setup record can't be read (damaged, or
+/// written by a newer launcher) finishes like any other duplicate: the copy is
+/// listed at once, keeps the record as it is, and refuses addon edits with the
+/// same way out as the original. The duplicate used to fail after the copy's
+/// folder and database row existed, so the copy only showed up after a
+/// restart, one more with every retry.
+#[tokio::test]
+async fn duplicating_an_instance_with_an_unreadable_setup_record_finishes_the_copy()
+-> anyhow::Result<()> {
+    use super::modpack::session::RECORD;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = versiononly_new(&app, "duplicate-unreadable-setup", None).await?;
+    let unreadable = b"{\"written_by\": \"a newer launcher\"}".to_vec();
+    std::fs::write(root.join(".setup").join(RECORD), &unreadable)?;
+    let before = app.instance_manager.instances.read().await.len();
+    let copy = app
+        .instance_manager()
+        .duplicate_instance(id, "duplicate unreadable copy".into())
+        .await?;
+    assert_eq!(
+        app.instance_manager.instances.read().await.len(),
+        before + 1
+    );
+    let copy_root = versiononly_root(&app, copy).await?;
+    assert_eq!(
+        std::fs::read(copy_root.join(".setup").join(RECORD))?,
+        unreadable
+    );
+    assert_eq!(
+        disk_config(&copy_root).await?.name,
+        "duplicate unreadable copy"
+    );
+    let refused = legacy_addon_refusal(&app, copy).await;
+    assert_eq!(refused, legacy_addon_refusal(&app, id).await);
+    assert!(
+        refused.contains("delete the hidden .setup folder"),
+        "{refused}"
     );
     Ok(())
 }
@@ -7694,19 +7952,15 @@ async fn repairblocked_interrupted_apply_is_replaced_by_its_target() -> anyhow::
     repairblocked_finish_repair(&app, id, &root, second.owner()?).await?;
     repairblocked_assert_b_installed(&app, id, &root).await?;
     assert!(retired[0].join("staging/instance/mods/new.jar").is_file());
-    // Once the game install finishes too, the setup goes and every setup it
-    // replaced keeps only its records.
+    let instance_after = legacy_tree(&root.join("instance"));
+    // Once the game install finishes too, the setup goes with every setup it
+    // replaced: whatever they held is settled.
     super::modpack::session::dispose(&root, &second.owner()?).await?;
     assert!(!root.join(".setup").exists());
-    assert!(!retired[0].join("staging").exists());
-    assert!(!retired[0].join("modrinth").exists());
-    assert!(retired[0].join(super::modpack::session::RECORD).is_file());
-    assert!(
-        retired[0]
-            .join("representation-transitions/transition.json")
-            .is_file()
-    );
-    assert!(failed.join(super::modpack::session::RECORD).is_file());
+    assert!(!retired[0].exists());
+    assert!(!failed.exists());
+    assert!(legacy_retired(&root)?.is_empty());
+    assert_eq!(legacy_tree(&root.join("instance")), instance_after);
     Ok(())
 }
 
@@ -7988,9 +8242,9 @@ async fn repairblocked_legacy_leftovers_are_replaced_by_the_configured_pack() ->
 /// untouched), a repair of A that failed while downloading (2.0.40 repaired
 /// the configured pack, so its configuration switch changed nothing), and
 /// an install of B whose files applied before its game install failed, also
-/// once Play rebuilt it from its archive and stopped before applying it
-/// again (2.0.40's apply marker is still beside it). Repair retires them
-/// without their downloads, and the repair that replaces them can still be
+/// once Play adopted it as committed and its game install failed again
+/// (2.0.40's apply marker is still beside it). Repair retires them without
+/// their downloads, and the repair that replaces them can still be
 /// cancelled back to what is installed.
 #[tokio::test]
 async fn repairblocked_untouched_legacy_leftovers_keep_the_preview() -> anyhow::Result<()> {
@@ -8009,7 +8263,7 @@ async fn repairblocked_untouched_legacy_leftovers_keep_the_preview() -> anyhow::
         "update downloading",
         "repair downloading",
         "applied",
-        "applied, then rebuilt by Play",
+        "applied, then adopted by Play",
     ] {
         let applied = shape.starts_with("applied");
         let configured = if applied { "B" } else { "A" };
@@ -8057,11 +8311,11 @@ async fn repairblocked_untouched_legacy_leftovers_keep_the_preview() -> anyhow::
             )
             .await?;
         }
-        // Play rebuilds it from its archive and records it, then stops before
-        // applying it again (cancelled, closed, or a failed check).
-        let rebuilt = if shape == "applied, then rebuilt by Play" {
+        // Play records it as the committed install it is, then its game
+        // install fails again (or is cancelled, or the app closes).
+        let rebuilt = if shape == "applied, then adopted by Play" {
             let mut owner = legacy_play_owner(&app, id).await?;
-            assert!(owner.is_none(), "Play leaves it unowned until rebuilt");
+            assert!(owner.is_none(), "Play leaves it unowned until adopted");
             let (shortpath, config) = app.instance_manager().current_config(id).await?;
             run::modpack::process_modpack(
                 app.clone(),
@@ -8077,8 +8331,9 @@ async fn repairblocked_untouched_legacy_leftovers_keep_the_preview() -> anyhow::
             let session = Session::load(&root).await?.expect("Play recorded it");
             assert_eq!(
                 (session.producer, session.phase),
-                (Producer::Reconstructed, Phase::Resolved)
+                (Producer::Reconstructed, Phase::Committed)
             );
+            assert!(session.pack_installed(&root).await?);
             assert!(root.join(".setup/apply-started").is_file());
             Some(session.operation)
         } else {

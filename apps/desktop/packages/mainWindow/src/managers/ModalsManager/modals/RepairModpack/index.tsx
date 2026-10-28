@@ -9,6 +9,10 @@ import {
 } from "solid-js"
 import { keepPreviousData } from "@tanstack/solid-query"
 import { extractErrorDisplay, rspc } from "@/utils/rspcClient"
+import {
+  LOCAL_ERROR_TOAST,
+  toastMutationError
+} from "@/utils/mutationErrorToast"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { freezeSelection, reconcileSelections } from "./selections"
@@ -428,27 +432,39 @@ const RepairModpack = (props: ModalProps) => {
       : undefined
   })
 
+  // A background refetch keeps the last status: the core refuses a repair
+  // whose `expected_pending` no longer matches, so it can't authorize one.
   const setupReady = () =>
     pendingSetup.isSuccess &&
-    !pendingSetup.isFetching &&
     !pendingSetup.isError &&
     !pendingSetup.isPlaceholderData &&
-    !!pendingSetup.data &&
-    !pendingSetup.data.pending
-  const canConfirm = () =>
-    isServer() ||
-    (setupReady() &&
-      preview.isSuccess &&
+    !!pendingSetup.data
+  const previewReady = () =>
+    previewWithheld() ||
+    (preview.isSuccess &&
       !preview.isLoading &&
       !preview.isFetching &&
       !preview.isError &&
       !preview.isPlaceholderData &&
       !!preview.data)
+  const canConfirm = () =>
+    isServer() ||
+    (setupReady() &&
+      !busy() &&
+      previewReady() &&
+      !cancelPending.isPending &&
+      !resumeSetup.isPending)
   const retryPreview = async () => {
     const instance = instanceId()
     try {
       await pendingSetup.refetch()
-      if (live && instance === instanceId() && setupReady())
+      if (
+        live &&
+        instance === instanceId() &&
+        setupReady() &&
+        !previewWithheld() &&
+        !installing()
+      )
         await preview.refetch()
     } catch {
       // The query's error state owns the visible error and keeps Confirm blocked.
@@ -916,6 +932,8 @@ const RepairModpack = (props: ModalProps) => {
             disabled={!canConfirm()}
             onClick={() => {
               if (!canConfirm()) return
+              const status = pendingSetup.data
+              if (!isServer() && !status) return
               modalsContext?.closeModal()
               navigateAwayIfInsideDetail()
               if (isServer()) {

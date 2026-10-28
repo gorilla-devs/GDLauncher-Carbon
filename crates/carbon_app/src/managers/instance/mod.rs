@@ -3210,13 +3210,32 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?;
 
         let path2 = path.clone();
-        let tmpdir2 = tmpdir.to_path_buf();
         let tmppath = tmpdir.join(
             path.file_name()
                 .expect("instance path cannot end in .. or be empty"),
         );
-        tokio::task::spawn_blocking(move || {
-            fs_extra::dir::copy(path2, tmpdir2, &CopyOptions::new())
+        let tmppath2 = tmppath.clone();
+        // Everything but what earlier setups left for the original alone: its
+        // retired setups and the recovery copies Repair moved aside.
+        tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
+            std::fs::create_dir(&tmppath2)?;
+            for entry in std::fs::read_dir(&path2)? {
+                let entry = entry?;
+                if modpack::session::setup_leftover(&entry.file_name()) {
+                    continue;
+                }
+                let item = entry.path();
+                if item.is_dir() {
+                    fs_extra::dir::copy(&item, &tmppath2, &CopyOptions::new())?;
+                } else {
+                    fs_extra::file::copy(
+                        &item,
+                        tmppath2.join(entry.file_name()),
+                        &fs_extra::file::CopyOptions::new(),
+                    )?;
+                }
+            }
+            Ok(())
         })
         .await??;
 
