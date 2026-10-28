@@ -695,7 +695,7 @@ export type CFFEModParameters = { modId: number }
 
 export type FEUnifiedCategoryId = number | string
 
-export type FESubtaskProgress = { download: { downloaded: string; total: string } } | { item: { current: number; total: number } } | "opaque"
+export type ImportEntity = "LegacyGDLauncher" | "MRPack" | "Modrinth" | "CurseForgeZip" | "CurseForge" | "ATLauncher" | "Technic" | "FTB" | "MultiMC" | "PrismLauncher" | "GDLPack" | "MultiMCZip" | "Minecraft" | "XMCL" | "LunarClient" | "BadlionClient" | "FeatherClient" | "HMCL" | "PCL2"
 
 export type BannedIpEntry = { ip: string; created: string; source: string; expires: string; reason: string }
 
@@ -806,9 +806,6 @@ export type FEDuplicateSide = { path: string; pack_owned: boolean }
 export type FESettings = { theme: string; language: string; reducedMotion: boolean; discordIntegration: boolean; releaseChannel: FEReleaseChannel; concurrentDownloads: number; downloadDependencies: boolean; launcherActionOnGameLaunch: FELauncherActionOnGameLaunch; showAppCloseWarning: boolean; showFeatured: boolean; instancesSortBy: InstancesSortBy | null; instancesSortByAsc: boolean; instancesGroupBy: InstancesGroupBy | null; instancesGroupByAsc: boolean; instancesDuplicateFavorites: boolean; instancesTileSize: number; deletionThroughRecycleBin: boolean; xmx: number; xms: number; preLaunchHook: string | null; wrapperCommand: string | null; postExitHook: string | null; gameResolution: GameResolution | null; javaCustomArgs: string; autoManageJavaSystemProfiles: boolean; modSources: ModSources; termsAndPrivacyAccepted: boolean; gdlAccountId: string | null }
 
 export type MRFEDependency = { version_id: string | null; project_id: string | null; file_name: string | null; dependency_type: MRFEDependencyType }
-
-export type FETask = { id: FETaskId; name: Translation; progress: Progress; downloaded: string; download_total: string; active_subtasks: FESubtask[] }
-export type FETaskOutcome = { type: "Running"; value: FETask } | { type: "Failed"; value: FETask } | { type: "Succeeded" } | { type: "Dismissed" } | { type: "Unavailable" }
 
 export type MRFEVersion = { name: string; version_number: string; changelog: string | null; dependencies: MRFEDependency[]; game_versions: string[]; version_type: MRFEVersionType; loaders: string[]; featured: boolean; status: MRFEStatus | null; requested_status: MRFERequestedVersionStatus | null; id: string; project_id: string; author_id: string; date_published: string; downloads: number; files: MRFEVersionFile[] }
 

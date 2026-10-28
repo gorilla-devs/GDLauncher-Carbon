@@ -1103,3 +1103,71 @@ mod task21_saturation_tests {
         assert_eq!(task.downloaded_bytes().await, (u64::MAX, u64::MAX));
     }
 }
+
+#[cfg(test)]
+mod task_warning_tests {
+    use super::*;
+
+    fn skipped() -> domain::TaskWarning {
+        domain::TaskWarning::SkippedDependency {
+            name: Some("Sodium".into()),
+            platform: domain::DependencyPlatform::Modrinth,
+            project_id: "AANobbMI".into(),
+            reason: domain::SkippedDependencyReason::NoCompatibleVersion,
+        }
+    }
+
+    async fn settled(app: &crate::managers::App, id: VisualTaskId) -> TaskOutcome {
+        for _ in 0..100 {
+            let outcome = app.task_manager().get_task_outcome(id).await;
+            if !matches!(outcome, TaskOutcome::Running(_)) {
+                return outcome;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        panic!("task did not settle");
+    }
+
+    #[tokio::test]
+    async fn succeeded_task_warnings_wait_for_acknowledgement() {
+        let app = crate::setup_managers_for_test().await;
+        let task = VisualTask::new(Translation::Test);
+        task.require_explicit_completion();
+        let id = app.task_manager().spawn_task(&task).await;
+        task.clone().warn(skipped());
+        task.set_warning_subject("Cobblemon Emissive Ores".into());
+        assert!(
+            app.task_manager().get_task_warnings().await.is_empty(),
+            "a running task has nothing to report yet"
+        );
+        task.complete();
+        drop(task);
+        assert!(matches!(settled(&app, id).await, TaskOutcome::Succeeded));
+        let pending = app.task_manager().get_task_warnings().await;
+        assert_eq!(
+            pending,
+            vec![domain::TaskWarnings {
+                id,
+                name: Translation::Test,
+                subject: Some("Cobblemon Emissive Ores".into()),
+                warnings: vec![skipped()],
+            }]
+        );
+        app.task_manager().acknowledge_task_warnings(id).await;
+        assert!(app.task_manager().get_task_warnings().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn failed_task_warnings_are_not_reported() {
+        let app = crate::setup_managers_for_test().await;
+        let task = VisualTask::new(Translation::Test);
+        task.require_explicit_completion();
+        let id = app.task_manager().spawn_task(&task).await;
+        task.warn(skipped());
+        task.clone().fail(anyhow!("download failed")).await;
+        drop(task);
+        assert!(matches!(settled(&app, id).await, TaskOutcome::Failed(_)));
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        assert!(app.task_manager().get_task_warnings().await.is_empty());
+    }
+}
