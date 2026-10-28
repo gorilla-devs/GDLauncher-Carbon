@@ -91,8 +91,10 @@ function originVerdictText(
   if (verdict === "Unknown") {
     return t("instances:_trn_repair_origin_unknown")
   }
+  // Rendered as text, so the version name is passed through unescaped.
   return t("instances:_trn_repair_origin_shipped_in", {
-    version: verdict.ShippedIn.version_name
+    version: verdict.ShippedIn.version_name,
+    interpolation: { escapeValue: false }
   })
 }
 
