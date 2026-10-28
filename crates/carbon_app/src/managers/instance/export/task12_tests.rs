@@ -868,8 +868,10 @@ async fn task12r1_share_wait_observes_real_publication_and_late_hash_failure() {
                 "retain exporter failure context: {error}"
             );
             assert!(
-                error.contains("changed during the operation"),
-                "surface late hash verification failure: {error}"
+                error.contains(
+                    "mods/shared.zip changed while the instance was being exported. Try the export again."
+                ),
+                "surface late hash verification failure, naming the file: {error}"
             );
             assert!(!output.exists());
         } else {

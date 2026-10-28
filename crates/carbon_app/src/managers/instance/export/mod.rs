@@ -42,9 +42,64 @@ mod modrinth_archive;
 #[cfg(test)]
 mod task12_tests;
 
-async fn verify_linked_export_files(files: &[(PathBuf, Vec<u8>)]) -> anyhow::Result<()> {
-    for (path, sha512) in files {
-        crate::managers::metadata::cache::verify_file_hash(path, sha512).await?;
+/// A linked mod as the user sees it in the instance, e.g. `mods/jei.jar`.
+fn linked_mod_name(path: &Path) -> String {
+    let name = |path: Option<&Path>| {
+        path.and_then(Path::file_name)
+            .map(|name| name.to_string_lossy().into_owned())
+            .unwrap_or_default()
+    };
+    format!("{}/{}", name(path.parent()), name(Some(path)))
+}
+
+/// When a linked mod is read: before the export links it, or in the final
+/// re-read of every linked mod once the archive is written.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LinkedRead {
+    BeforeLinking,
+    FinalCheck,
+}
+
+/// Read a mod the export links to its platform file instead of bundling it,
+/// and confirm it still holds the bytes the link names. Returns the file's
+/// stamp when nothing about it changed during the read.
+///
+/// Every error is one plain sentence naming the file and what to do: the
+/// export window shows it as is.
+async fn verify_linked_mod(path: &Path, sha512: &[u8]) -> anyhow::Result<Option<String>> {
+    read_linked_mod(path, sha512, LinkedRead::BeforeLinking).await
+}
+
+async fn read_linked_mod(
+    path: &Path,
+    sha512: &[u8],
+    when: LinkedRead,
+) -> anyhow::Result<Option<String>> {
+    let name = linked_mod_name(path);
+    let (hash, stamp) = crate::managers::metadata::cache::read_stable_file_hash(path)
+        .await
+        .map_err(|error| {
+            if error.kind() == io::ErrorKind::NotFound && when == LinkedRead::BeforeLinking {
+                // Also a link whose target was moved, deleted or unmounted:
+                // retrying alone never helps.
+                anyhow::anyhow!(
+                    "{name} is missing or links to a file that no longer exists. Restore it, or untick it in the export's file list, then try again."
+                )
+            } else if error.kind() == io::ErrorKind::NotFound {
+                // It was read before it was linked, so it went during the export.
+                anyhow::anyhow!(
+                    "{name} was moved or deleted while the instance was being exported. Try the export again."
+                )
+            } else {
+                anyhow::anyhow!(
+                    "Could not read {name} ({error}). Close any program that is using it, or untick it in the export's file list, then try again."
+                )
+            }
+        })?;
+    if hash != sha512 {
+        anyhow::bail!(
+            "{name} changed while the instance was being exported. Try the export again."
+        );
     }
     Ok(stamp)
 }
