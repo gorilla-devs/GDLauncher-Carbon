@@ -4,7 +4,15 @@ import {
   addonInstallFailure
 } from "./addonInstallScope"
 import { rspc } from "@/utils/rspcClient"
-import { Switch, Match, createSignal, createEffect, createMemo } from "solid-js"
+import {
+  Switch,
+  Match,
+  createSignal,
+  createEffect,
+  createMemo,
+  batch,
+  onCleanup
+} from "solid-js"
 import {
   FEUnifiedSearchResult,
   Mod,
@@ -60,21 +68,44 @@ interface ModDownloadButtonProps {
 
 const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const [t] = useTransContext()
-  const [taskId, setTaskId] = createSignal<number | null>(null)
-  const [pendingInstall, setPendingInstall] = createSignal(false)
-  const [copyRequest, setCopyRequest] =
-    createSignal<ReturnType<typeof worldVersionCopy>>()
+  const [acceptedTask, setAcceptedTask] = createSignal<{
+    taskId: number
+    title: string
+    type: FEUnifiedSearchResult["type"]
+    server: boolean
+    copy: ReturnType<typeof worldVersionCopy>
+  }>()
+  const [pendingRequest, setPendingRequest] = createSignal(false)
+  const [progress, setProgress] = createSignal<number | null>(null)
+  const loading = () => pendingRequest() || acceptedTask() !== undefined
+  let active = true
+  let requestOwner: symbol | undefined
+  onCleanup(() => {
+    active = false
+    requestOwner = undefined
+  })
+
+  const globalStore = useGlobalStore()
+  const instanceTarget = (instanceId: number | undefined) =>
+    instanceLinkTarget(globalStore?.instances?.data, instanceId)
+  // Only a link row needs the server's release and loader; the search and
+  // addon page already hold this query, so it is served from the cache.
+  const serverDetails = rspc.createQuery(() => ({
+    queryKey: ["server.getServerDetails", props.selectedServerId ?? 0],
+    enabled: !!props.selectedServerId && !!props.linkedFile
+  }))
+  const serverTarget = () =>
+    props.selectedServerId ? serverLinkTarget(serverDetails.data) : undefined
 
   const {
     instanceLoadingStates,
-    instanceTaskIds,
+    instanceTasks,
     installLatestModMutation,
     installModMutation,
     handleInstanceSelection,
     handleServerInstall,
     clearInstanceLoadingState,
-    latestModInstallObj,
-    modInstallObj,
+    captureInstallAttempt,
     maybeOpenShaderWizard
   } = useModInstallation(props, { instanceTarget, serverTarget })
 
@@ -123,55 +154,21 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     shouldVirtualize
   } = useInstanceSearch({ addonType: props.addon?.type })
 
-  const { loading, setLoading, progress, setProgress } = useTaskProgress(
-    instanceTaskIds,
-    clearInstanceLoadingState,
-    props.addon
-  )
+  useTaskProgress(instanceTasks, clearInstanceLoadingState)
 
-  // Last non-`Indeterminate`/`null` progress seen for the tracked task. Used
-  // to tell a genuine completion (progress goes `Known` then the task is
-  // forgotten, `data` becomes `null`) apart from a task that failed and was
-  // then dismissed (`data` also becomes `null` once forgotten) — only the
-  // former should trigger the success toast below. Reset alongside `taskId`
-  // whenever a new task starts being tracked (the two effects right below)
-  // and when a tracked task is dismissed after failing (the poll effect's
-  // `"failed"` branch further down) — otherwise a `Failed` observed for one
-  // task would keep suppressing the success toast for whatever task gets
-  // tracked next. Mirrors `useTaskProgress.ts`'s per-instance map, which
-  // retires its own entry the same way on both failure and completion.
+  // Reset progress with the accepted record, before its query can observe an
+  // immediate terminal outcome. Only explicit Succeeded certifies completion.
   const [lastProgress, setLastProgress] = createSignal<Progress | null>(null)
-
-  createEffect(() => {
-    if (installLatestModMutation.isPending) {
-      setLoading(true)
-    }
-
-    if (installLatestModMutation.isSuccess) {
-      setTaskId(installLatestModMutation.data)
-      setLastProgress(null)
-    }
-  })
-
-  createEffect(() => {
-    if (installModMutation.isPending) {
-      setLoading(true)
-    }
-
-    if (installModMutation.isSuccess) {
-      setTaskId(installModMutation.data)
-      setLastProgress(null)
-    }
-  })
 
   // Handle task progress for single instance button
   const task = rspc.createQuery(() => ({
-    queryKey: ["vtask.getTaskOutcome", taskId()],
-    enabled: taskId() !== null
+    queryKey: ["vtask.getTaskOutcome", acceptedTask()?.taskId ?? null],
+    enabled: acceptedTask() !== undefined
   }))
 
   createEffect(() => {
-    if (taskId() === null) return
+    const accepted = acceptedTask()
+    if (!accepted) return
 
     const { action, nextLastProgress } = resolveTaskPoll(
       task?.data,
@@ -184,37 +181,36 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       setProgress(action.percent)
     } else if (action.kind === "failed") {
       toast.error(
-        t("notifications:_trn_addon_install_failed", {
-          title:
-            props.addon?.title || t("notifications:_trn_addon_fallback_name")
-        }),
+        addonInstallFailure(
+          t,
+          accepted.title || t("notifications:_trn_addon_fallback_name")
+        ),
         action.message ? { description: action.message } : undefined
       )
-      setLoading(false)
-      setPendingInstall(false)
-      setTaskId(null)
-      setProgress(null)
-      // Retire the failure from `lastProgress` too — otherwise it would
-      // outlive this task and suppress the success toast of whatever gets
-      // tracked next (see this signal's own doc comment above).
-      setLastProgress(null)
+      batch(() => {
+        setAcceptedTask(undefined)
+        setProgress(null)
+        setLastProgress(null)
+      })
     } else if (action.kind === "completed" || action.kind === "dismissed") {
       if (action.kind === "completed" && action.showSuccessToast) {
         toast.success(
-          copyRequest()
-            ? t(copyRequest()!.completion)
+          accepted.copy
+            ? t(accepted.copy.completion)
             : addonInstallCompletion(
-                props.addon?.title || "Addon",
-                props.addon?.type,
-                !!props.selectedServerId
+                t,
+                accepted.title || t("notifications:_trn_addon_fallback_name"),
+                accepted.type,
+                accepted.server
               ),
           { duration: 2000 }
         )
       }
-      setLoading(false)
-      setTaskId(null)
-      setProgress(null)
-      setPendingInstall(false)
+      batch(() => {
+        setAcceptedTask(undefined)
+        setProgress(null)
+        setLastProgress(null)
+      })
     }
   })
 
@@ -225,7 +221,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           props.selectedServerId
             ? { kind: "server", addons: props.selectedServerAddons ?? [] }
             : { kind: "instance", addons: props.selectedInstanceMods ?? [] },
-          props.fileId
+          scopedFileId(),
+          props.linkedFile
         )
       : undefined
   )
@@ -237,28 +234,56 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const handleDownload = async () => {
     if (!props.addon) return
 
+    // Newer clicks own UI observation. Entered work may still finish after a
+    // replacement or disposal; its late response must not publish over them.
+    const beginRequest = () => {
+      const owner = Symbol()
+      requestOwner = owner
+      setPendingRequest(true)
+      return () => active && requestOwner === owner
+    }
+    const accept = (
+      current: () => boolean,
+      taskId: number,
+      presentation: Omit<NonNullable<ReturnType<typeof acceptedTask>>, "taskId">
+    ) => {
+      if (!current()) return
+      batch(() => {
+        setPendingRequest(false)
+        setProgress(null)
+        setLastProgress(null)
+        setAcceptedTask({ taskId, ...presentation })
+      })
+    }
+
     // Server installs use the same retained task progression as instance installs.
     const serverId = props.selectedServerId
     if (serverId) {
-      setLoading(true)
+      if (isInstalled()) return
+      const presentation = {
+        title: props.addon.title,
+        type: props.addon.type,
+        server: true,
+        copy: undefined
+      }
+      const current = beginRequest()
       try {
         const acceptedTask = await handleServerInstall(serverId)
         if (acceptedTask === undefined)
           throw new Error("Server install returned no task")
-        setPendingInstall(true)
-        setLastProgress(null)
-        setTaskId(acceptedTask)
+        if (!current()) return
         toast.success(
-          t("notifications:_trn_addon_downloading_to_server", {
-            title:
-              props.addon?.title || t("notifications:_trn_addon_fallback_name")
-          }),
+          addonDownloadingToServer(
+            t,
+            presentation.title || t("notifications:_trn_addon_fallback_name")
+          ),
           { duration: 2000 }
         )
+        accept(current, acceptedTask, presentation)
       } catch {
         // Error surfaced via global MutationCache.onError
-        setLoading(false)
-        setProgress(null)
+      } finally {
+        if (current()) setPendingRequest(false)
       }
       return
     }
@@ -266,36 +291,45 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     // Instance install path
     const instanceId = props.selectedInstanceId
     if (!instanceId || isInstalled()) return
-
-    if (await maybeOpenShaderWizard(instanceId)) {
-      return
-    }
-
-    setCopyRequest(
-      worldVersionCopy(props.addon.type, props.fileId, installedMod()?.id)
+    const attempt = captureInstallAttempt(
+      instanceId,
+      installedMod()?.id || null
     )
-    setPendingInstall(true)
+    if (!attempt) return
+    const copy = worldVersionCopy(
+      attempt.addonType,
+      attempt.fileId,
+      attempt.replacesMod
+    )
+    const current = beginRequest()
     try {
-      if (!props.fileId) {
-        await installLatestModMutation.mutateAsync({
+      if ((await maybeOpenShaderWizard(attempt)) !== "direct") return
+      let taskId: number
+      if (attempt.installLatest) {
+        taskId = await installLatestModMutation.mutateAsync({
           instance_id: instanceId,
-          mod_source: latestModInstallObj()
+          mod_source: attempt.latestModSource!
         })
       } else {
-        const replacesMod = installedMod()?.id || null
+        const replacesMod = attempt.replacesMod
 
-        await installModMutation.mutateAsync({
-          mod_source: modInstallObj(),
+        taskId = await installModMutation.mutateAsync({
+          mod_source: attempt.modSource!,
           instance_id: instanceId,
           install_deps: true,
           replaces_mod: replacesMod
         })
       }
+      accept(current, taskId, {
+        title: attempt.title,
+        type: attempt.addonType,
+        server: false,
+        copy
+      })
     } catch {
       // Error surfaced via global MutationCache.onError
-      setPendingInstall(false)
-      setLoading(false)
-      setProgress(null)
+    } finally {
+      if (current()) setPendingRequest(false)
     }
   }
 

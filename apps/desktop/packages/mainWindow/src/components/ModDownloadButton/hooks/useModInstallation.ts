@@ -1,9 +1,13 @@
 import { rspc } from "@/utils/rspcClient"
-import { createSignal } from "solid-js"
+import { createSignal, onCleanup } from "solid-js"
 import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 import { useModal } from "@/managers/ModalsManager"
 import { toast } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
+import {
+  createLatestModInstallObj,
+  createModInstallObj
+} from "../utils/modInstallObjects"
 import { effectiveFileId, LinkedFile, LinkTarget } from "@/utils/linkedFile"
 
 interface UseModInstallationProps {
@@ -13,15 +17,37 @@ interface UseModInstallationProps {
   selectedServerId?: number
 }
 
-export const useModInstallation = (props: UseModInstallationProps) => {
+interface UseModInstallationOptions {
+  /** Release and loader of an instance, for checking a linked file. */
+  instanceTarget?: (instanceId: number) => LinkTarget | undefined
+  /** Release and loader of a server, for checking a linked file. */
+  serverTarget?: (serverId: number) => LinkTarget | undefined
+}
+
+export interface InstanceInstallTask {
+  taskId: number
+  title: string
+  type: FEUnifiedSearchResult["type"]
+}
+
+export const useModInstallation = (
+  props: UseModInstallationProps,
+  options: UseModInstallationOptions = {}
+) => {
   const [t] = useTransContext()
   const modalsContext = useModal()
   const ctx = rspc.useContext()
+  let active = true
+  const attempts = new Map<number, symbol>()
+  onCleanup(() => {
+    active = false
+    attempts.clear()
+  })
   const [instanceLoadingStates, setInstanceLoadingStates] = createSignal<
     Map<number, boolean>
   >(new Map())
-  const [instanceTaskIds, setInstanceTaskIds] = createSignal<
-    Map<number, number>
+  const [instanceTasks, setInstanceTasks] = createSignal<
+    Map<number, InstanceInstallTask>
   >(new Map())
 
   const perInstanceInstallLatestMutation = rspc.createMutation(() => ({
@@ -49,57 +75,74 @@ export const useModInstallation = (props: UseModInstallationProps) => {
     mutationKey: "server.installServerMod"
   }))
 
-  const latestModInstallObj = () => {
-    return props.addon?.platform === "curseforge"
-      ? {
-          Curseforge: parseInt(props.addon.id.toString(), 10)
-        }
-      : {
-          Modrinth: props.addon!.id.toString()
-        }
+  // Build both wire variants before requirements yields to reactive selection.
+  const captureInstallAttempt = (
+    instanceId: number,
+    replacesMod: string | null = null
+  ) => {
+    const addon = props.addon
+    if (!addon) return undefined
+    // A link's file that does not fit this instance installs the instance's
+    // own version instead (2.0.40's path), and never replaces an installed copy.
+    const fileId = effectiveFileId(
+      props.fileId,
+      props.linkedFile,
+      addon.type,
+      options.instanceTarget?.(instanceId)
+    )
+    const owner = Symbol()
+    attempts.set(instanceId, owner)
+    return {
+      owner,
+      instanceId,
+      fileId,
+      addonType: addon.type,
+      title: addon.title,
+      installLatest: !fileId,
+      modSource: fileId ? createModInstallObj(addon, fileId) : undefined,
+      latestModSource: !fileId ? createLatestModInstallObj(addon) : undefined,
+      replacesMod: fileId ? replacesMod : null
+    }
   }
-
-  const modInstallObj = () => {
-    return props.addon?.platform === "curseforge"
-      ? {
-          Curseforge: {
-            project_id: parseInt(props.addon.id.toString(), 10),
-            file_id: parseInt(props.fileId!.toString(), 10)
-          }
-        }
-      : {
-          Modrinth: {
-            project_id: props.addon!.id.toString(),
-            version_id: props.fileId!.toString()
-          }
-        }
-  }
+  type InstallAttempt = NonNullable<ReturnType<typeof captureInstallAttempt>>
+  const current = (attempt: InstallAttempt) =>
+    active && attempts.get(attempt.instanceId) === attempt.owner
 
   const maybeOpenShaderWizard = async (
-    instanceId: number
-  ): Promise<boolean> => {
-    if (props.addon?.type !== "shader") return false
+    attempt: InstallAttempt
+  ): Promise<"direct" | "wizard" | "retired"> => {
+    if (attempt.addonType !== "shader") return "direct"
+    const instanceId = attempt.instanceId
     try {
       const recommendation = await ctx.client.query([
         "instance.checkShaderRequirements",
         instanceId
       ])
-      if (recommendation.kind === "LoaderPresent") return false
+      if (active && !current(attempt)) return "retired"
+      // A captured direct install can continue in the background after disposal.
+      // A new wizard requires a live producer; retirement never means fallback.
+      if (recommendation.kind === "LoaderPresent") return "direct"
+      if (!current(attempt)) return "retired"
 
       modalsContext?.openModal(
         { name: "shaderLoaderSetup" },
         {
           recommendation,
           instanceId,
-          installLatest: !props.fileId,
-          modSource: !props.fileId ? undefined : modInstallObj(),
-          latestModSource: !props.fileId ? latestModInstallObj() : undefined,
-          replacesMod: null,
+          installLatest: attempt.installLatest,
+          modSource: attempt.modSource,
+          latestModSource: attempt.latestModSource,
+          replacesMod: attempt.replacesMod,
           onComplete: (taskId: number | null) => {
+            if (!current(attempt)) return
             if (taskId !== null) {
-              setInstanceTaskIds((prev) => {
+              setInstanceTasks((prev) => {
                 const newMap = new Map(prev)
-                newMap.set(instanceId, taskId)
+                newMap.set(instanceId, {
+                  taskId,
+                  title: attempt.title,
+                  type: attempt.addonType
+                })
                 return newMap
               })
             }
@@ -111,16 +154,20 @@ export const useModInstallation = (props: UseModInstallationProps) => {
           }
         }
       )
-      return true
+      return "wizard"
     } catch (e) {
-      console.error("Shader preflight failed", e)
-      toast.error(t("notifications:_trn_shader_preflight_failed"))
-      return false
+      if (active && !current(attempt)) return "retired"
+      if (current(attempt)) {
+        console.error("Shader preflight failed", e)
+        toast.error(t("notifications:_trn_shader_preflight_failed"))
+      }
+      return "direct"
     }
   }
 
   const handleInstanceSelection = async (instanceId: number) => {
-    if (!props.addon) return
+    const attempt = captureInstallAttempt(instanceId)
+    if (!attempt) return
 
     // Set loading state for this instance
     setInstanceLoadingStates((prev) => {
@@ -130,34 +177,43 @@ export const useModInstallation = (props: UseModInstallationProps) => {
     })
 
     try {
-      if (await maybeOpenShaderWizard(instanceId)) {
+      const decision = await maybeOpenShaderWizard(attempt)
+      if (decision !== "direct") {
+        if (decision === "retired" && current(attempt))
+          clearInstanceLoadingState(instanceId)
         return
       }
 
       let taskId: number
 
-      if (!props.fileId) {
+      if (attempt.installLatest) {
         taskId = await perInstanceInstallLatestMutation.mutateAsync({
           instance_id: instanceId,
-          mod_source: latestModInstallObj()
+          mod_source: attempt.latestModSource!
         })
       } else {
-        const replacesMod = null
+        const replacesMod = attempt.replacesMod
 
         taskId = await perInstanceInstallMutation.mutateAsync({
-          mod_source: modInstallObj(),
+          mod_source: attempt.modSource!,
           instance_id: instanceId,
           install_deps: !replacesMod,
           replaces_mod: replacesMod
         })
       }
 
-      setInstanceTaskIds((prev) => {
+      if (!current(attempt)) return
+      setInstanceTasks((prev) => {
         const newMap = new Map(prev)
-        newMap.set(instanceId, taskId)
+        newMap.set(instanceId, {
+          taskId,
+          title: attempt.title,
+          type: attempt.addonType
+        })
         return newMap
       })
     } catch (_error) {
+      if (!current(attempt)) return
       setInstanceLoadingStates((prev) => {
         const newMap = new Map(prev)
         newMap.delete(instanceId)
@@ -173,7 +229,7 @@ export const useModInstallation = (props: UseModInstallationProps) => {
       return newMap
     })
 
-    setInstanceTaskIds((prev) => {
+    setInstanceTasks((prev) => {
       const newMap = new Map(prev)
       newMap.delete(instanceId)
       return newMap
@@ -184,9 +240,16 @@ export const useModInstallation = (props: UseModInstallationProps) => {
   // file that does not fit the server installs the server's own version
   // instead (2.0.40's path), the same rule as instances.
   const handleServerInstall = async (serverId: number) => {
-    if (!props.addon) return
+    const addon = props.addon
+    if (!addon) return
+    const fileId = effectiveFileId(
+      props.fileId,
+      props.linkedFile,
+      addon.type,
+      options.serverTarget?.(serverId)
+    )
 
-    if (!props.fileId) {
+    if (!fileId) {
       return await installLatestServerModMutation.mutateAsync({
         serverId,
         modSource: createLatestModInstallObj(addon)
@@ -201,7 +264,7 @@ export const useModInstallation = (props: UseModInstallationProps) => {
 
   return {
     instanceLoadingStates,
-    instanceTaskIds,
+    instanceTasks,
     installLatestModMutation,
     installModMutation,
     installLatestServerModMutation,
@@ -209,8 +272,7 @@ export const useModInstallation = (props: UseModInstallationProps) => {
     handleInstanceSelection,
     handleServerInstall,
     clearInstanceLoadingState,
-    latestModInstallObj,
-    modInstallObj,
+    captureInstallAttempt,
     maybeOpenShaderWizard
   }
 }

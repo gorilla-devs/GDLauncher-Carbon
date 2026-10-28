@@ -7,11 +7,11 @@ import {
   addonInstallFailure
 } from "../addonInstallScope"
 import { resolveTaskPoll } from "./resolveTaskPoll"
+import type { InstanceInstallTask } from "./useModInstallation"
 
 export const useTaskProgress = (
-  instanceTaskIds: Accessor<Map<number, number>>,
-  clearInstanceLoadingState: (instanceId: number) => void,
-  addon?: { title?: string; type?: string }
+  instanceTasks: Accessor<Map<number, InstanceInstallTask>>,
+  clearInstanceLoadingState: (instanceId: number) => void
 ) => {
   const [t] = useTransContext()
   const ctx = rspc.useContext()
@@ -24,13 +24,14 @@ export const useTaskProgress = (
   })
 
   createEffect(() => {
-    instanceTaskIds().forEach((taskId, instanceId) => {
+    instanceTasks().forEach((accepted, instanceId) => {
+      const { taskId, type } = accepted
       if (watched.get(instanceId) === taskId) return
       watched.set(instanceId, taskId)
-      const title = addon?.title || "Addon"
-      const type = addon?.type
+      const title =
+        accepted.title || t("notifications:_trn_addon_fallback_name")
       const current = () =>
-        !disposed && instanceTaskIds().get(instanceId) === taskId
+        !disposed && instanceTasks().get(instanceId)?.taskId === taskId
       void (async () => {
         // Direct queries start AFTER this captured attempt was accepted. A stale
         // cached getTasks list from before acceptance cannot certify completion.

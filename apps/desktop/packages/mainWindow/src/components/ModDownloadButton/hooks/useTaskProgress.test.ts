@@ -42,11 +42,13 @@ it.each(["Failed", "Dismissed", "Unavailable", "Succeeded"] as const)(
         }
       }
     })
-    const ids = new Map([[1, 73]])
+    const ids = new Map([
+      [1, { taskId: 73, title: "Pack", type: "datapack" as const }]
+    ])
     const clear = vi.fn((id: number) => {
       ids.delete(id)
     })
-    useTaskProgress(() => ids, clear, { title: "Pack", type: "datapack" })
+    useTaskProgress(() => ids, clear)
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(state.query).toHaveBeenCalledWith(["vtask.getTaskOutcome", 73])
     expect(clear).toHaveBeenCalledWith(1)
@@ -63,7 +65,10 @@ it("unmounting before an old read finishes neither acknowledges nor reports succ
     return { type: "Succeeded" }
   })
   const clear = vi.fn()
-  useTaskProgress(() => new Map([[1, 73]]), clear)
+  useTaskProgress(
+    () => new Map([[1, { taskId: 73, title: "Pack", type: "datapack" }]]),
+    clear
+  )
   await new Promise((resolve) => setTimeout(resolve, 0))
   expect(clear).not.toHaveBeenCalled()
   expect(state.success).not.toHaveBeenCalled()
