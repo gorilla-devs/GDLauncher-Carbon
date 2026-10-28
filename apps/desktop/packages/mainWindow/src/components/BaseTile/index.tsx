@@ -2,7 +2,8 @@ import { bytePercent, formatByteUnit } from "@/utils/formatBytes"
 import { For, JSX, Show, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { getTaskTranslationKey } from "@gd/i18n/helpers"
-import { FESubtask, Translation } from "@gd/core_module/bindings"
+import { FESubtask } from "@gd/core_module/bindings"
+import { taskTranslationOptions } from "@/utils/taskTranslation"
 import {
   Checkbox,
   Spinner,
@@ -84,13 +85,6 @@ export interface BaseTileProps {
 
   // Context menu state (managed by parent ContextMenu)
   isMenuOpen?: boolean
-}
-
-const getTranslationArgs = (translation: Translation) => {
-  if ("args" in translation) {
-    return translation.args
-  }
-  return {}
 }
 
 const BaseTile = (props: BaseTileProps) => {
@@ -374,7 +368,7 @@ const BaseTile = (props: BaseTileProps) => {
                         >
                           {t(
                             getTaskTranslationKey(subTask.name.translation),
-                            getTranslationArgs(subTask.name)
+                            taskTranslationOptions(subTask.name)
                           )}
                         </div>
                       )}

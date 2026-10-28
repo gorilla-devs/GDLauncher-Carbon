@@ -16,9 +16,9 @@ import type {
   FETask,
   FETaskOutcome,
   FESubtask,
-  Translation,
   ShaderLoaderVerification
 } from "@gd/core_module/bindings"
+import { taskTranslationOptions } from "@/utils/taskTranslation"
 import type { StepProps } from "."
 import { extractErrorDisplay, rspc } from "@/utils/rspcClient"
 import { useModal } from "@/managers/ModalsManager"
@@ -28,13 +28,6 @@ import { formatBytes } from "@/utils/formatBytes"
 import { runShaderSteps } from "./pipeline"
 
 type StepName = "modloader" | "loader" | "shader"
-
-const getTranslationArgs = (translation: Translation) => {
-  if ("args" in translation) {
-    return translation.args
-  }
-  return {}
-}
 
 const Installing = (props: StepProps) => {
   const [t] = useTransContext()
@@ -438,7 +431,7 @@ const Installing = (props: StepProps) => {
               <p class="text-darkSlate-100 m-0 text-sm">
                 {t(
                   getTaskTranslationKey(sub.name.translation),
-                  getTranslationArgs(sub.name)
+                  taskTranslationOptions(sub.name)
                 )}
               </p>
             )}
