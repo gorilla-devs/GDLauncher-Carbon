@@ -216,7 +216,7 @@ async function fixture(main = false, delayedFirstResult = false) {
   })
   let getState!: () => any,
     check!: (channel: any) => Promise<any>,
-    install!: (id: number) => Promise<void>
+    install!: (id: number) => Promise<"kept" | void>
   const broadcast = (state: any) =>
     listener?.(null, { ...state, revision: state.revision + offset })
   if (main) {

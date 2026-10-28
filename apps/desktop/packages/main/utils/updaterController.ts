@@ -46,7 +46,15 @@ export function createUpdaterController(io: {
   manual(): Promise<
     (UpdateInfo & { downloadUrl: string | null }) | { noUpdate: true } | null
   >
-  prepareShutdown(): Promise<void>
+  /** Why the ready update cannot be installed here, found before the core is
+   *  stopped for it, or null when nothing stands in the way. */
+  installBlocker?(): Promise<UpdateErrorCode | null>
+  /**
+   * Stops the core so the installer can run. Resolves "kept" when the user
+   * chose to keep GDLauncher open instead: nothing is installed and the
+   * update stays ready.
+   */
+  prepareShutdown(): Promise<void | "stopped" | "forced" | "kept">
   isDownloaded(info: UpdateInfo): boolean
   dispatchInstall?(): () => void
 }) {
@@ -344,7 +352,7 @@ export function createUpdaterController(io: {
         settled()
       }
     },
-    async install(expectedId?: number) {
+    async install(expectedId?: number): Promise<"kept" | undefined> {
       const captured = downloaded
       if (!captured || (expectedId !== undefined && expectedId !== captured.id))
         throw new Error("No automatic update is ready to install")
@@ -396,7 +404,13 @@ export function createUpdaterController(io: {
           throw new Error(message)
         }
         attempt.stage = "shutdown"
-        await io.prepareShutdown()
+        if ((await io.prepareShutdown()) === "kept") {
+          // The core is back to normal and the download is untouched, so
+          // the same update can be installed later.
+          if (installing === attempt) installing = null
+          return "kept"
+        }
+        coreStopped = true
         if (!admitted())
           refuse(
             "update-changed",

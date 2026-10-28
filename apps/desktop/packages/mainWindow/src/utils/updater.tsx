@@ -169,8 +169,9 @@ export function showPendingUpdateToast() {
       action: undefined,
       cancel: undefined
     })
+    let kept = false
     try {
-      await window.installUpdate(captured.id)
+      kept = (await window.installUpdate(captured.id)) === "kept"
     } catch (error) {
       // The rejection carries main's English reason inside Electron's IPC
       // wrapper. When main also published the failure, its translated reason
@@ -183,6 +184,11 @@ export function showPendingUpdateToast() {
         )
     } finally {
       if (installingReady === captured.id) installingReady = undefined
+    }
+    // The user chose to keep GDLauncher open: the update is still ready.
+    if (kept && installingPresentation === presentation) {
+      installingPresentation = undefined
+      showPendingUpdateToast()
     }
   }
   installingPresentation = undefined

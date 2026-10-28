@@ -2,7 +2,7 @@
  * cannot replace a newer update's presentation. */
 export function installReadyUpdateAction(
   readyId: () => number | undefined,
-  install: (id: number) => Promise<void>,
+  install: (id: number) => Promise<unknown>,
   failed: (message: string) => void
 ) {
   return async () => {

@@ -599,3 +599,501 @@ it("Task36 actual main wrapper owns a queued install callback through error befo
   expect(handlers.getUpdateState().readyUpdate.id).not.toBe(token)
   expect(handlers.getUpdateState().readyUpdate.version).toBe("2.0.0")
 })
+it("actual last-window close hides the window and starts the quit instead of destroying it", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  w.close()
+  expect(w.destroyed).toBe(false)
+  expect(w.hidden).toBe(true)
+  expect(value.context.win).toBe(w)
+  expect(value.appQuits).toBe(1)
+})
+it("actual window close while a second window is open, during a move or for a Close Window launch still closes it", async () => {
+  // Another window is left.
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  const other = new ElectronLikeWindow()
+  w.close()
+  expect(w.destroyed).toBe(true)
+  expect(value.appQuits).toBe(0)
+  other.destroy()
+
+  // A move keeps its own close handling (quitUnlessKeptAlive).
+  const moving = mainWindow()
+  moving.context.runtimeOperationActive = () => true
+  const m = await moving.createWindow()
+  m.emit("ready-to-show")
+  m.close()
+  expect(m.destroyed).toBe(true)
+
+  // A Close Window launch action.
+  const launch = mainWindow()
+  const l = await launch.createWindow()
+  l.emit("ready-to-show")
+  launch.lifecycle.event("GAME_LAUNCHED|1|7|closeWindow")
+  expect(l.destroyed).toBe(true)
+  expect(launch.appQuits).toBe(0)
+})
+/** A hidden 1x1 window ow-electron opens for itself, such as the Overwolf
+ *  consent window or, on Windows, its package manager's. */
+function owElectronHelperWindow() {
+  const helper = new ElectronLikeWindow()
+  helper.hidden = true
+  return helper
+}
+it("actual last-window close still hides the window and quits while ow-electron has a hidden window of its own", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  const helper = owElectronHelperWindow()
+  w.close()
+  expect(w.destroyed).toBe(false)
+  expect(w.hidden).toBe(true)
+  expect(value.appQuits).toBe(1)
+  helper.destroy()
+})
+it("actual core exit quits a windowless launcher although ow-electron has a hidden window of its own", async () => {
+  const value = mainWindow()
+  const { child } = await coreProcess({
+    lifecycle: value.lifecycle,
+    quitAfterCoreExit: value.quitAfterCoreExit
+  })
+  const first = await value.createWindow()
+  first.emit("ready-to-show")
+  const helper = owElectronHelperWindow()
+  value.lifecycle.snapshot('{"revision":1,"instances":[1]}', "session-1")
+  value.lifecycle.event("GAME_LAUNCHED|1|7|closeWindow", "session-1")
+  expect(first.destroyed).toBe(true)
+  child.emit("exit", 1)
+  expect(value.appQuits).toBe(1)
+  helper.destroy()
+})
+it("actual window close is held while a shutdown prompt waits for an answer", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  value.context.shutdownPrompts = { open: true, receiver() {} }
+  w.close()
+  expect(w.destroyed).toBe(false)
+  expect(w.hidden).toBe(false)
+  expect(value.appQuits).toBe(0)
+})
+/** The actual quit path: before-quit, ownedShutdown and its helpers. */
+function quitPath(
+  value: ReturnType<typeof mainWindow>,
+  core: {
+    reply(endpoint: string, body: any): { status: number; body: unknown }
+    kill(signal?: string): boolean
+  }
+) {
+  const calls: string[] = []
+  const process = Object.assign(new EventEmitter(), {
+    exitCode: null as number | null,
+    signalCode: null as string | null,
+    kill: (signal?: string) => {
+      calls.push(`kill ${signal ?? "SIGTERM"}`)
+      return core.kill(signal)
+    }
+  })
+  const transport = async (url: string, options: any) => {
+    const endpoint = String(url).split("/").at(-1)!
+    const body = JSON.parse(options.body)
+    calls.push(endpoint)
+    const answer = core.reply(endpoint, body)
+    return {
+      ok: answer.status < 300,
+      status: answer.status,
+      json: async () => answer.body,
+      text: async () => JSON.stringify(answer.body)
+    }
+  }
+  const native: { window: unknown; view: ShutdownView }[] = []
+  let choose: (choice: "wait" | "force" | "keep") => void = () => {}
+  const prompted = new Promise<void>((shown) => {
+    value.context.shutdownPrompts = new ShutdownPrompts<any>((window, view) => {
+      native.push({ window, view })
+      shown()
+      return new Promise((resolve) => (choose = resolve))
+    })
+  })
+  const success = {
+    type: "success",
+    result: { port: 1, apiToken: "fixture" }
+  }
+  const lifecycleCalls: string[] = []
+  Object.assign(value.context, {
+    coreModule: Promise.resolve(success),
+    coreLoaded: success,
+    coreProcessHandle: process,
+    ShutdownFlow,
+    ShutdownBlockedError,
+    ShutdownNotPossibleError,
+    stopCoreForShutdown: (c: any, purpose: any, _t: any, ms: any, o: any) =>
+      stopCoreForShutdown(c, purpose, transport as any, ms, o),
+    cancelCoreShutdown: (c: any) => cancelCoreShutdown(c, transport as any),
+    forceTerminateCore: (proc: any) => forceTerminateCore(proc, 50, 1000),
+    terminateAndObserveCoreExit,
+    fetch: transport,
+    AbortController,
+    Promise,
+    Error
+  })
+  const quitFailed = value.lifecycle.quitFailed.bind(value.lifecycle)
+  value.lifecycle.quitFailed = () => {
+    lifecycleCalls.push("quitFailed")
+    quitFailed()
+  }
+  value.context.app.exit = () => calls.push("app.exit")
+  Object.assign(
+    value.context,
+    evaluate(
+      "(() => {\n" +
+        declarations(value.text, [
+          "revealWindow",
+          "hideWindow",
+          "startedCore",
+          "stopOwnedCore",
+          "ownedShutdown",
+          "closedBeforeMove",
+          "quitAgain"
+        ]) +
+        "\nreturn { revealWindow, hideWindow, ownedShutdown, closedBeforeMove, quitAgain }\n})()",
+      value.context
+    )
+  )
+  const beforeQuit = evaluate(
+    callArgument(value.text, "app.on", "before-quit"),
+    value.context
+  ) as (event: { preventDefault(): void }) => void
+  return {
+    calls,
+    native,
+    process,
+    prompted,
+    lifecycleCalls,
+    choose: (choice: "wait" | "force" | "keep") => choose(choice),
+    beforeQuit: () => beforeQuit({ preventDefault() {} })
+  }
+}
+/** A core that cannot finish: a deletion ignores its cancellation. */
+const unresolvedCore = (exitOn: string[] = []) => {
+  let proc: EventEmitter & { exitCode: number | null }
+  return {
+    bind(process: any) {
+      proc = process
+    },
+    reply(endpoint: string, body: any) {
+      if (endpoint === "cancel-shutdown")
+        return { status: 200, body: { requestId: body.requestId } }
+      return {
+        status: 200,
+        body: {
+          requestId: body.requestId,
+          status: {
+            ...body,
+            phase: "unresolved",
+            blockers: [{ kind: "deletion", name: "delete instance 12" }],
+            serversStopped: true
+          }
+        }
+      }
+    },
+    kill(signal = "SIGTERM") {
+      if (exitOn.includes(signal))
+        setTimeout(() => {
+          proc.exitCode = 0
+          proc.emit("exit", 0)
+        }, 0)
+      return true
+    }
+  }
+}
+it("actual quit that cannot finish shows the hidden window with the prompt parented to it, and Keep GDLauncher open gives the core back", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  const core = unresolvedCore()
+  const quit = quitPath(value, core)
+  core.bind(quit.process)
+  quit.beforeQuit()
+  expect(w.hidden).toBe(true)
+  await quit.prompted
+  // No App listens in this fixture, so the native dialog asks, over the window.
+  expect(quit.native).toHaveLength(1)
+  expect(quit.native[0].window).toBe(w)
+  expect(w.hidden).toBe(false)
+  expect(quit.native[0].view).toMatchObject({
+    action: "quit",
+    stage: "blocked",
+    reason: "unresolved",
+    blockers: [{ kind: "deletion", name: "delete instance 12" }],
+    serversStopped: true,
+    canWait: true
+  })
+  quit.choose("keep")
+  await vi.waitFor(() => expect(quit.lifecycleCalls).toEqual(["quitFailed"]))
+  expect(quit.calls).toEqual(["prepare-shutdown", "cancel-shutdown"])
+  expect(w.hidden).toBe(false)
+  expect(w.destroyed).toBe(false)
+  expect(value.appQuits).toBe(0)
+  expect(value.context.shutdownApproved).toBe(false)
+  await vi.waitFor(() => expect(value.context.shutdownInFlight).toBeUndefined())
+})
+it("actual quit that cannot finish ends the core on Quit now, escalating to SIGKILL, and then quits", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  // The core's own SIGTERM handler goes through the same refused handshake.
+  const core = unresolvedCore(["SIGKILL"])
+  const quit = quitPath(value, core)
+  core.bind(quit.process)
+  quit.beforeQuit()
+  await quit.prompted
+  expect(w.hidden).toBe(false)
+  quit.choose("force")
+  // The window goes at once, not after the few seconds SIGKILL waits.
+  await vi.waitFor(() => expect(quit.calls).toContain("kill SIGTERM"))
+  expect(w.hidden).toBe(true)
+  await vi.waitFor(() => expect(value.appQuits).toBe(1))
+  expect(quit.calls).toEqual([
+    "prepare-shutdown",
+    "kill SIGTERM",
+    "kill SIGKILL"
+  ])
+  expect(value.context.shutdownApproved).toBe(true)
+  expect(quit.lifecycleCalls).toEqual([])
+})
+it("actual pending quit: a Minimize game that exits leaves the window hidden, and after Keep GDLauncher open a game exit shows it again", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  value.lifecycle.snapshot('{"revision":1,"instances":[1,2]}')
+  value.lifecycle.event("GAME_LAUNCHED|1|7|minimizeWindow")
+  value.lifecycle.event("GAME_LAUNCHED|2|8|minimizeWindow")
+  expect(w.minimized).toBe(true)
+  const core = unresolvedCore()
+  const quit = quitPath(value, core)
+  core.bind(quit.process)
+  // Cmd+Q: the window hides while the quit waits on the core.
+  quit.beforeQuit()
+  expect(w.hidden).toBe(true)
+  const shown = w.shown
+  value.lifecycle.event("GAME_CLOSED|1|7|minimizeWindow")
+  expect(w.hidden).toBe(true)
+  expect(w.shown).toBe(shown)
+  // The quit's own prompt brings it back.
+  await quit.prompted
+  expect(w.hidden).toBe(false)
+  quit.choose("keep")
+  await vi.waitFor(() => expect(quit.lifecycleCalls).toEqual(["quitFailed"]))
+  w.hide()
+  value.lifecycle.event("GAME_CLOSED|2|8|minimizeWindow")
+  expect(w.hidden).toBe(false)
+})
+it("actual second launch during a pending quit shows the hidden window and its prompt instead of a new window", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  w.close()
+  expect(w.hidden).toBe(true)
+  let revealed = 0
+  value.context.shutdownFlow = { reveal: () => revealed++ }
+  value.context.shutdownInFlight = new Promise(() => {})
+  Object.assign(
+    value.context,
+    evaluate(
+      "(() => {\n" +
+        declarations(value.text, ["revealWindow"]) +
+        "\nreturn { revealWindow }\n})()",
+      value.context
+    )
+  )
+  value.context.isSupportedProtocol = () => false
+  const secondInstance = evaluate(
+    callArgument(value.text, "app.on", "second-instance"),
+    value.context
+  ) as (event: unknown, argv: string[]) => void
+  secondInstance({}, [])
+  expect(w.hidden).toBe(false)
+  expect(revealed).toBe(1)
+  expect(ElectronLikeWindow.created).toHaveLength(1)
+  const activate = evaluate(
+    callArgument(value.text, "app.on", "activate"),
+    value.context
+  ) as () => void
+  w.hide()
+  activate()
+  expect(w.hidden).toBe(false)
+  expect(revealed).toBe(2)
+  expect(ElectronLikeWindow.created).toHaveLength(1)
+})
+it("actual macOS link opened during a pending quit shows the hidden window and its prompt, and still reaches it", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  const consumer = protocolConsumer(value, w.contents)
+  consumer.ready("1", consumer.generation())
+  w.close()
+  expect(w.hidden).toBe(true)
+  let revealed = 0
+  value.context.shutdownFlow = { reveal: () => revealed++ }
+  value.context.shutdownInFlight = new Promise(() => {})
+  Object.assign(
+    value.context,
+    evaluate(
+      "(() => {\n" +
+        declarations(value.text, ["revealWindow"]) +
+        "\nreturn { revealWindow }\n})()",
+      value.context
+    )
+  )
+  value.context.isSupportedProtocol = (url: string) =>
+    url.startsWith("gdlauncher://")
+  value.context.app.isReady = () => true
+  const openUrl = evaluate(
+    callArgument(value.text, "app.on", "open-url"),
+    value.context
+  ) as (event: { preventDefault(): void }, url: string) => void
+  let prevented = 0
+  openUrl({ preventDefault: () => prevented++ }, "gdlauncher://share/LINK")
+  expect(prevented).toBe(1)
+  expect(w.hidden).toBe(false)
+  expect(revealed).toBe(1)
+  expect(ElectronLikeWindow.created).toHaveLength(1)
+  expect(consumer.delivered().map((d) => d.url)).toEqual([
+    "gdlauncher://share/LINK"
+  ])
+  // Without a quit under way, a link only brings the window forward.
+  value.context.shutdownInFlight = undefined
+  const focused = w.focused
+  openUrl({ preventDefault() {} }, "gdlauncher://share/LATER")
+  expect(w.focused).toBe(focused + 1)
+  expect(revealed).toBe(1)
+})
+
+/** The real runtime-operation guard, as main/index.ts imports it. */
+function realRuntimeOperation(context: Record<string, any>) {
+  Object.assign(context, {
+    runtimeOperationActive,
+    interruptRuntimeOperation,
+    whenRuntimeOperationIdle
+  })
+}
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
+/** A move that waits in its check phase until the app is closed. */
+function checkingMove() {
+  let started!: () => void
+  const checking = new Promise<void>((resolve) => (started = resolve))
+  let stopped = false
+  const move = withRuntimeOperation(async () => {
+    const interruptible = interruptibleUntilCommitted()
+    started()
+    await new Promise((resolve) =>
+      interruptible.signal.addEventListener("abort", resolve)
+    )
+    // Right before the core would be stopped.
+    interruptible.commit()
+    stopped = true
+  })
+  return { checking, move, stopped: () => stopped }
+}
+/** A move already past the point where the core is asked to stop. */
+function committedMove() {
+  let finish!: () => void
+  const move = withRuntimeOperation(async () => {
+    interruptibleUntilCommitted().commit()
+    await new Promise<void>((resolve) => (finish = resolve))
+  })
+  return { move, finish: () => finish() }
+}
+it("actual last-window close while a move only checks the data folder ends it with nothing moved, then quits", async () => {
+  const value = mainWindow()
+  realRuntimeOperation(value.context)
+  const move = checkingMove()
+  await move.checking
+  value.windowAllClosed()
+  // Nothing quits while the move is still unwinding.
+  expect(value.appQuits).toBe(0)
+  await expect(move.move).rejects.toThrow(/closed before the move started/)
+  await tick()
+  expect(move.stopped()).toBe(false)
+  expect(runtimeOperationActive()).toBe(false)
+  expect(value.appQuits).toBe(1)
+})
+it("actual last-window close after a move asked the core to stop lets it finish, then quits unless a window is back", async () => {
+  for (const reopened of [false, true]) {
+    const value = mainWindow()
+    realRuntimeOperation(value.context)
+    const move = committedMove()
+    value.windowAllClosed()
+    expect(value.appQuits).toBe(0)
+    if (reopened) (await value.createWindow()).emit("ready-to-show")
+    move.finish()
+    await move.move
+    await tick()
+    expect(value.appQuits, `reopened: ${reopened}`).toBe(reopened ? 0 : 1)
+  }
+})
+it("actual quit request while a move only checks ends it and quits after; one past its commit keeps its window", async () => {
+  const text = source("apps/desktop/packages/main/index.ts")
+  let quits = 0,
+    prepared = 0,
+    prevented = 0
+  const context: Record<string, any> = {
+    shutdownApproved: false,
+    shutdownInFlight: undefined,
+    prepareOwnedShutdown: () => {
+      prepared++
+      return new Promise(() => {})
+    },
+    lifecycle: { quitFailed() {} },
+    dialog: { showMessageBox: async () => ({}) },
+    app: {
+      quit: () => {
+        quits++
+      }
+    }
+  }
+  realRuntimeOperation(context)
+  Object.assign(
+    context,
+    evaluate(
+      "(() => {\n" +
+        declarations(text, ["closedBeforeMove", "quitAgain"]) +
+        "\nreturn { closedBeforeMove, quitAgain }\n})()",
+      context
+    )
+  )
+  const beforeQuit = evaluate(
+    callArgument(text, "app.on", "before-quit"),
+    context
+  ) as (event: { preventDefault(): void }) => void
+  const event = {
+    preventDefault() {
+      prevented++
+    }
+  }
+
+  const checking = checkingMove()
+  await checking.checking
+  beforeQuit(event)
+  expect(prevented).toBe(1)
+  await expect(checking.move).rejects.toThrow(/closed before the move started/)
+  await tick()
+  expect(checking.stopped()).toBe(false)
+  // The deferred quit; its own before-quit then runs the normal shutdown.
+  expect(quits).toBe(1)
+  expect(prepared).toBe(0)
+
+  const committed = committedMove()
+  beforeQuit(event)
+  expect(prevented).toBe(2)
+  committed.finish()
+  await committed.move
+  await tick()
+  // The window stays to show how the move ended, as before.
+  expect(quits).toBe(1)
+  expect(prepared).toBe(0)
+})

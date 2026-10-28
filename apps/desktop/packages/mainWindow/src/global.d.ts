@@ -46,7 +46,8 @@ declare global {
     onUpdateStateChanged: (
       cb: (event: Electron.IpcRendererEvent, state: UpdateStateData) => void
     ) => void
-    installUpdate: (expectedId?: number) => Promise<void>
+    /** Resolves "kept" when the user chose to keep GDLauncher open. */
+    installUpdate: (expectedId?: number) => Promise<"kept" | undefined>
     openExternalLink: (link: string) => void
     openFolder: (path: string) => void
     copyToClipboard: (text: string) => void
