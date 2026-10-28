@@ -35,18 +35,12 @@ export default {
   },
   test: {
     ...base.test,
+    name: "task38",
     server: {
       deps: {
         inline: [...base.test.server.deps.inline, /@mbarzda\/solid-i18next/]
       }
     },
-    include: [
-      "packages/mainWindow/src/**/*.task38.test.{ts,tsx}",
-      "packages/mainWindow/src/utils/language.task29.test.tsx",
-      "packages/mainWindow/src/utils/search-debounce.task37.test.tsx",
-      "packages/mainWindow/src/utils/platformSearch.task36.test.tsx",
-      "packages/mainWindow/src/components/PackDownload.task21.test.tsx",
-      "packages/mainWindow/src/components/pack.task35.test.tsx"
-    ]
+    include: ["packages/mainWindow/src/**/*.task38.test.{ts,tsx}"]
   }
 }

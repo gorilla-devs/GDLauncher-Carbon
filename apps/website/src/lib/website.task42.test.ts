@@ -1,12 +1,17 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 import vm from "node:vm"
 import ts from "typescript"
 import { marked } from "marked"
 import data, { getAddon, listAddons, type AddonEntry } from "./addonsData"
 import { getComparison, COMPETITOR_NAMES, type ComparisonSlug } from "./vsData"
 
-const source = (rel: string) => fs.readFileSync(`${process.cwd()}/apps/website/src/${rel}`, "utf8")
+// Resolved from this file, not the working directory, so the test runs from
+// the repository root and from apps/website alike.
+const src = path.join(path.dirname(fileURLToPath(import.meta.url)), "..")
+const source = (rel: string) => fs.readFileSync(path.join(src, rel), "utf8")
 function declarations(rel: string, names: string[]) {
   const front = source(rel).split("---")[1]
   const ast = ts.createSourceFile(rel, front, ts.ScriptTarget.Latest, true)

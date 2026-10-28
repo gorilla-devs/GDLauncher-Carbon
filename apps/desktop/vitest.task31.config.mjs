@@ -4,6 +4,7 @@ export default {
   ...base,
   test: {
     ...base.test,
+    name: "task31",
     server: {
       deps: {
         inline: [

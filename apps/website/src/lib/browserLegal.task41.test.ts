@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 import vm from "node:vm"
 import { transpileModule } from "typescript"
 import { loadLegalDocument } from "./legalDocument.mjs"
 
-const script = fs.readFileSync(process.cwd() + "/apps/website/src/components/AddonInstallLayout.astro", "utf8").match(/<script>([\s\S]*?)<\/script>/)![1]
+const script = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "../components/AddonInstallLayout.astro"), "utf8").match(/<script>([\s\S]*?)<\/script>/)![1]
 const runtime = transpileModule(script, {compilerOptions:{target:9}}).outputText
 let context: vm.Context
 let timers = new Map<number, () => void>()

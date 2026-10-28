@@ -30,6 +30,7 @@ export default defineConfig({
     }
   },
   test: {
+    name: "enrollment",
     environment: "jsdom",
     include: [
       "packages/mainWindow/src/pages/Login/steps/EnrollingStep.test.tsx",

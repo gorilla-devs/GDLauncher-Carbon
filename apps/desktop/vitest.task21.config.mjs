@@ -25,6 +25,7 @@ export default defineConfig({
     }
   },
   test: {
+    name: "task21",
     environment: "jsdom",
     include: ["packages/mainWindow/src/**/*.task21.test.{ts,tsx}"],
     server: { deps: { inline: [/solid-js/] } }

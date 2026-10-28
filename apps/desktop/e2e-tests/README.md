@@ -1450,9 +1450,16 @@ minutes in isolation is dominated by two full loader installs that a
 full-suite run has already done. Treat the per-file numbers as "what this file
 costs if you run just it while iterating", not as a share of the total.
 
-- Unit suite (`pnpm test:unit`, **256 tests across 25 files**): **~1.2s**.
-- Combined: **roughly 17 minutes** of e2e test time per OS, plus the unit
-  suite's second or so.
+- Unit stage (`pnpm test:unit`): turbo first rebuilds `@gd/config`,
+  `@gd/i18n` and `@gd/ui`, then runs the desktop, ui and website vitest
+  projects (**about 2,000 tests across 166 files**) and the node:test suites
+  under `scripts/` and `apps/website/scripts/`. It took **about a minute** on
+  the Linux machine measured here, about 45s of it the desktop run. Its own
+  output prints the current counts. `pnpm test:all` also runs
+  `pnpm test:account-contract` (one carbon_app test and the vitest file that
+  reads its fixture) before it.
+- Combined: **roughly 17 minutes** of e2e test time per OS, plus about a
+  minute for the unit stage.
 
 `.github/workflows/all_os.yml` runs this on three OS jobs (`ubuntu-22.04`,
 `windows-2022`, `macos-14`) **in parallel**, each with its own 80-minute job

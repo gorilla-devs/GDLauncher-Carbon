@@ -13,9 +13,7 @@ export default {
   },
   test: {
     ...base.test,
-    include: [
-      "packages/mainWindow/src/**/*.task28.test.{ts,tsx}",
-      ...base.test.include
-    ]
+    name: "task28",
+    include: ["packages/mainWindow/src/**/*.task28.test.{ts,tsx}"]
   }
 }

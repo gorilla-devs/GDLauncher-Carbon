@@ -4,6 +4,7 @@ export default {
   ...base,
   test: {
     ...base.test,
+    name: "task35",
     server: {
       deps: {
         inline: [
@@ -14,12 +15,6 @@ export default {
         ]
       }
     },
-    include: [
-      "packages/mainWindow/src/**/*.task35.test.{ts,tsx}",
-      "packages/mainWindow/src/components/ExploreVersionsNavbar/navbar.task28.test.tsx",
-      "packages/mainWindow/src/components/InfiniteScrollVersionsQueryWrapper/scope.task28.test.tsx",
-      "packages/mainWindow/src/components/PackDownload.task21.test.tsx",
-      "packages/mainWindow/src/managers/ModalsManager/modals/java-profile.task32.test.tsx"
-    ]
+    include: ["packages/mainWindow/src/**/*.task35.test.{ts,tsx}"]
   }
 }

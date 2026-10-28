@@ -44,14 +44,9 @@ export default defineConfig({
     }
   },
   test: {
+    name: "task25",
     environment: "jsdom",
-    include: [
-      "packages/mainWindow/src/**/*.task25.test.{ts,tsx}",
-      "packages/mainWindow/src/pages/Library/Instance/Tabs/Addons/hooks/useAddonMutations.test.ts",
-      "packages/mainWindow/src/pages/Library/Instance/Tabs/Addons/hooks/resolveBooleanPreference.test.ts",
-      "packages/mainWindow/src/components/ModDownloadButton/hooks/resolveTaskPoll.test.ts",
-      "packages/mainWindow/src/test/serverGrouping.test.ts"
-    ],
+    include: ["packages/mainWindow/src/**/*.task25.test.{ts,tsx}"],
     server: { deps: { inline: [/solid-js/] } }
   }
 })

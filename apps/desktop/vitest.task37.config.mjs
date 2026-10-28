@@ -6,6 +6,7 @@ export default {
   root: fileURLToPath(new URL(".", import.meta.url)),
   test: {
     ...base.test,
+    name: "task37",
     server: {
       deps: {
         inline: [
@@ -15,13 +16,6 @@ export default {
         ]
       }
     },
-    include: [
-      "packages/mainWindow/src/**/*.task37.test.{ts,tsx}",
-      "../../packages/ui/**/*.task37.test.{ts,tsx}",
-      "packages/mainWindow/src/utils/platformSearch.task36.test.tsx",
-      "packages/mainWindow/src/utils/platformSearchQuery.task21.test.ts",
-      "packages/mainWindow/src/utils/searchQueryParser.task21.test.ts",
-      "packages/mainWindow/src/utils/requestedVersion.task21.test.ts"
-    ]
+    include: ["packages/mainWindow/src/**/*.task37.test.{ts,tsx}"]
   }
 }

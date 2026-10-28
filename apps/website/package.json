@@ -9,7 +9,8 @@
     "check": "NODE_OPTIONS=--max-old-space-size=16384 astro check",
     "preview": "astro preview",
     "astro": "astro",
-    "update-addons": "node --env-file=.env scripts/update-addons.mjs"
+    "update-addons": "node --env-file=.env scripts/update-addons.mjs",
+    "test:unit": "vitest run && node --test \"scripts/**/*.test.mjs\""
   },
   "dependencies": {
     "@astrojs/cloudflare": "^9.1.0",
@@ -37,7 +38,9 @@
     "@unocss/astro": "^0.65.1",
     "@unocss/preset-icons": "^0.65.1",
     "@unocss/preset-wind": "^0.65.1",
+    "jsdom": "^28.1.0",
     "sharp": "^0.33.1",
-    "unocss": "^0.65.1"
+    "unocss": "^0.65.1",
+    "vitest": "^4.0.18"
   }
 }

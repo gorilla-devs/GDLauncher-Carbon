@@ -1,8 +1,13 @@
 import { afterEach, expect, it } from "vitest"
 import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 import vm from "node:vm"
 import { transpileModule } from "typescript"
-const source = fs.readFileSync(process.cwd() + "/apps/website/src/layouts/Docs.astro", "utf8")
+// Resolved from this file, not the working directory, so the test runs from
+// the repository root and from apps/website alike.
+const here = path.dirname(fileURLToPath(import.meta.url))
+const source = fs.readFileSync(path.join(here, "../layouts/Docs.astro"), "utf8")
 afterEach(() => { document.body.innerHTML = ""; document.head.innerHTML = "" })
 function mount(width: number) {
   Object.defineProperty(window, "innerWidth", { value: width, configurable: true })
@@ -40,7 +45,7 @@ import { getImportErrorTranslationKey } from "../../../../packages/i18n/helpers"
 import { createI18nOptions } from "../../../../packages/i18n/index"
 import { createInstance } from "i18next"
 it.each(["english", "italian", "japanese", "russian", "spanish", "simplified_chinese", "french"])("delivers the typed unsupported-pack reason in %s", async language => {
-  const read = (lang: string) => JSON.parse(fs.readFileSync(process.cwd() + `/packages/i18n/locale/${lang}/instances.json`, "utf8"))
+  const read = (lang: string) => JSON.parse(fs.readFileSync(path.join(here, `../../../../packages/i18n/locale/${lang}/instances.json`), "utf8"))
   const target = read(language)
   const translator = createInstance()
   await translator.init(createI18nOptions(language, { instances: read("english") }, { instances: target }))
