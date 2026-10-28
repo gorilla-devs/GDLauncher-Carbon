@@ -70,5 +70,11 @@
   "_trn_empty_type_world": "ワールド",
   "_trn_empty_type_plugin": "プラグイン",
   "_trn_empty_type_data_pack": "データパック",
-  "_trn_empty_type_addon": "アドオン"
+  "_trn_empty_type_addon": "アドオン",
+  "_trn_linked_file": "{{versions}} 用のリンクされたファイル: {{name}}",
+  "_trn_linked_file_name": "リンクされたファイル: {{name}}",
+  "_trn_linked_file_mismatch": "リンクされたファイルは {{versions}} 用のため、GDLauncher が互換性のあるバージョンを探します",
+  "_trn_linked_file_mismatch_unknown": "リンクされたファイルが対応していないため、GDLauncher が互換性のあるバージョンを探します",
+  "_trn_linked_file_unavailable": "リンクされたファイルは利用できないため、GDLauncher が互換性のあるバージョンを探します",
+  "_trn_linked_version": "特定のバージョンへのリンク"
 }

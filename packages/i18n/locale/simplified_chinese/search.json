@@ -70,5 +70,11 @@
   "_trn_empty_type_world": "世界",
   "_trn_empty_type_plugin": "插件",
   "_trn_empty_type_data_pack": "数据包",
-  "_trn_empty_type_addon": "附加内容"
+  "_trn_empty_type_addon": "附加内容",
+  "_trn_linked_file": "适用于 {{versions}} 的链接文件：{{name}}",
+  "_trn_linked_file_name": "链接文件：{{name}}",
+  "_trn_linked_file_mismatch": "链接文件适用于 {{versions}}，GDLauncher 将查找兼容的版本",
+  "_trn_linked_file_mismatch_unknown": "链接文件不匹配，GDLauncher 将查找兼容的版本",
+  "_trn_linked_file_unavailable": "链接文件不可用，GDLauncher 将查找兼容的版本",
+  "_trn_linked_version": "链接到特定版本"
 }

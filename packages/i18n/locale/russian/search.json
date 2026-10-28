@@ -70,5 +70,11 @@
   "_trn_empty_type_world": "миры",
   "_trn_empty_type_plugin": "плагины",
   "_trn_empty_type_data_pack": "пакеты данных",
-  "_trn_empty_type_addon": "дополнения"
+  "_trn_empty_type_addon": "дополнения",
+  "_trn_linked_file": "Файл по ссылке для {{versions}}: {{name}}",
+  "_trn_linked_file_name": "Файл по ссылке: {{name}}",
+  "_trn_linked_file_mismatch": "Файл по ссылке предназначен для {{versions}}, поэтому GDLauncher поищет совместимую версию",
+  "_trn_linked_file_mismatch_unknown": "Файл по ссылке не подходит, поэтому GDLauncher поищет совместимую версию",
+  "_trn_linked_file_unavailable": "Файл по ссылке недоступен, поэтому GDLauncher поищет совместимую версию",
+  "_trn_linked_version": "Ссылка на конкретную версию"
 }

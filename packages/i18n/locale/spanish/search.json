@@ -70,5 +70,11 @@
   "_trn_empty_type_world": "mundos",
   "_trn_empty_type_plugin": "plugins",
   "_trn_empty_type_data_pack": "paquetes de datos",
-  "_trn_empty_type_addon": "complementos"
+  "_trn_empty_type_addon": "complementos",
+  "_trn_linked_file": "Archivo enlazado para {{versions}}: {{name}}",
+  "_trn_linked_file_name": "Archivo enlazado: {{name}}",
+  "_trn_linked_file_mismatch": "El archivo enlazado es para {{versions}}, así que GDLauncher buscará una versión compatible",
+  "_trn_linked_file_mismatch_unknown": "El archivo enlazado no coincide, así que GDLauncher buscará una versión compatible",
+  "_trn_linked_file_unavailable": "El archivo enlazado no está disponible, así que GDLauncher buscará una versión compatible",
+  "_trn_linked_version": "Enlazado a una versión específica"
 }

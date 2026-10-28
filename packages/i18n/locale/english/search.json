@@ -70,5 +70,11 @@
   "_trn_empty_type_world": "worlds",
   "_trn_empty_type_plugin": "plugins",
   "_trn_empty_type_data_pack": "data packs",
-  "_trn_empty_type_addon": "addons"
+  "_trn_empty_type_addon": "addons",
+  "_trn_linked_file": "Linked file for {{versions}}: {{name}}",
+  "_trn_linked_file_name": "Linked file: {{name}}",
+  "_trn_linked_file_mismatch": "Linked file is for {{versions}}, so GDLauncher will look for a compatible version",
+  "_trn_linked_file_mismatch_unknown": "Linked file doesn't match, so GDLauncher will look for a compatible version",
+  "_trn_linked_file_unavailable": "Linked file is unavailable, so GDLauncher will look for a compatible version",
+  "_trn_linked_version": "Linked to a specific version"
 }
