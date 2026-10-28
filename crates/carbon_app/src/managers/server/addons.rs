@@ -64,11 +64,11 @@ pub(super) async fn digest(path: &Path) -> anyhow::Result<Vec<u8>> {
     }
     Ok(digest.finalize().to_vec())
 }
-fn move_owned(source: &Path, destination: &Path) -> anyhow::Result<()> {
-    let mut temp = tempfile::TempPath::from_path(source.to_path_buf());
-    temp.disable_cleanup(true);
-    temp.persist_noclobber(destination)
-        .map_err(|error| error.error)?;
+/// No-replace move through the shared publication helper. It copies when the
+/// server folder is on another drive than staging, so it runs on the
+/// blocking pool.
+async fn move_owned(source: &Path, destination: &Path) -> anyhow::Result<()> {
+    crate::util::publish::move_noclobber_async(source, destination).await?;
     Ok(())
 }
 
@@ -860,14 +860,65 @@ async fn publish_staged(
             );
         }
     }
-    if let Err(error) = move_owned(&download.path, &destination) {
-        if let Some(old) = old {
-            let _ = move_owned(backup, old);
-        }
-        return Err(error).context(format!(
-            "Addon publication failed; recovery retained at {}",
-            backup.display()
-        ));
+    #[tokio::test]
+    async fn task07_replacement_rejects_changed_old_and_unrelated_collision() {
+        let root = tempfile::tempdir().unwrap();
+        let staged = root.path().join("staged");
+        std::fs::write(&staged, b"new").unwrap();
+        let download = Downloadable::new("https://fixture.invalid/not-requested", &staged)
+            .with_size(3)
+            .with_checksum(Some(Checksum::Sha512(hex::encode(Sha512::digest(b"new")))));
+        let old = root.path().join("old.jar");
+        std::fs::write(&old, b"old").unwrap();
+        let expected = digest(&old).await.unwrap();
+        std::fs::write(&old, b"edit").unwrap();
+        assert!(
+            publish_staged(
+                &download,
+                root.path(),
+                "new.jar",
+                Some(&old),
+                Some(&expected),
+                true,
+                &root.path().join("backup")
+            )
+            .await
+            .is_err()
+        );
+        std::fs::write(root.path().join("new.jar"), b"unrelated").unwrap();
+        assert!(
+            publish_staged(
+                &download,
+                root.path(),
+                "new.jar",
+                None,
+                None,
+                true,
+                &root.path().join("backup")
+            )
+            .await
+            .is_err()
+        );
+        assert_eq!(std::fs::read(&old).unwrap(), b"edit");
+        assert_eq!(
+            std::fs::read(root.path().join("new.jar")).unwrap(),
+            b"unrelated"
+        );
+    }
+    #[tokio::test]
+    async fn task07_artifact_failure_is_retained_in_actual_visual_task() {
+        let task = crate::managers::vtask::VisualTask::new(
+            crate::api::translation::Translation::ServerTaskInstallMod {
+                mod_name: "fixture".into(),
+                server_name: "fixture".into(),
+            },
+        );
+        let observer = task.clone();
+        retain_outcome(task, Err(anyhow!("fixture artifact checksum failed"))).await;
+        let actual = observer.make_domain_task(VisualTaskId(7)).await;
+        assert!(
+            matches!(actual.progress, crate::domain::vtask::Progress::Failed(error) if error.to_string().contains("checksum failed"))
+        );
     }
     Ok(())
 }

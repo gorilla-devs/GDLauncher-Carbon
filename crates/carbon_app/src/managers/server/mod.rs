@@ -2964,11 +2964,8 @@ impl ManagerRef<'_, ServerManager> {
             bail!("Datapack destination is occupied");
         }
         tokio::fs::create_dir_all(&folder).await?;
-        let mut owned = tempfile::TempPath::from_path(source);
-        owned.disable_cleanup(true);
-        owned
-            .persist_noclobber(folder.join(&candidate.filename))
-            .map_err(|error| error.error)?;
+        crate::util::publish::move_noclobber_async(&source, &folder.join(&candidate.filename))
+            .await?;
         self.app
             .meta_cache_manager()
             .refresh_server_addon(
