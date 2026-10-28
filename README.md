@@ -88,8 +88,12 @@ To contribute, please see the [contributing](CONTRIBUTING.md) guide.
 
 ### Requirements
 
-- Node 22.x.x
+- Node >= 24.14.0 (the contributor pin is in [`.nvmrc`](.nvmrc))
 - Rust >= 1.85.1
+
+If you use nvm, run `nvm use` from the repository root to select `.nvmrc` before installing dependencies.
+
+Both Nix entrypoints (`nix/shell.nix` and `nix/fhs-env.nix`) use the `.nvmrc` minimum. Your nixpkgs package set must provide a sufficiently recent `nodejs_24` and a compatible `pnpm_9`; older or missing packages produce an error with guidance. Both expressions also accept explicit `nodejs` and `pnpm` derivations. Supplied pnpm packages must honor the `nodejs` and `withNode` override arguments to use the selected Node runtime, as the standard Nixpkgs pnpm package does.
 
 ### Pnpm
 

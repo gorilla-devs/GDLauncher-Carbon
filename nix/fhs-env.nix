@@ -1,5 +1,5 @@
-{ pkgs ? import <nixpkgs> {} }: let
-  shell = import ./shell.nix { inherit pkgs; };
+{ pkgs ? import <nixpkgs> {}, nodejs ? null, pnpm ? null }: let
+  shell = import ./shell.nix { inherit pkgs nodejs pnpm; };
 in (pkgs.buildFHSEnv {
   name = "gdl-fhs-env";
 

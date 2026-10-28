@@ -15,7 +15,7 @@ Thank you for your interest in translating GDLauncher into your language! This g
 From the project root, run the sync script to create language files:
 
 ```bash
-pnpm translations:sync --language french
+pnpm --dir apps/desktop run translations:sync --language french
 ```
 
 This command will:
@@ -93,7 +93,7 @@ All generated translation files will have strings marked with the `-------- [ UN
 Ensure all your translations are valid:
 
 ```bash
-pnpm translations:validate-sync --language french
+pnpm --dir apps/desktop run translations:validate-sync --language french
 ```
 
 This validates:
@@ -123,7 +123,7 @@ When new features are added to GDLauncher, new translation keys are added to Eng
 Run the sync script for your language:
 
 ```bash
-pnpm translations:sync --language french
+pnpm --dir apps/desktop run translations:sync --language french
 ```
 
 This will:
@@ -141,7 +141,7 @@ Search for `-------- [ UNTRANSLATED ] --------` in your language files and trans
 Ensure everything is correct:
 
 ```bash
-pnpm translations:validate-sync --language french
+pnpm --dir apps/desktop run translations:validate-sync --language french
 ```
 
 ### 4. Submit
@@ -183,7 +183,7 @@ The translation system is organized into 26 namespaces for better maintainabilit
 
 ## 🛠️ Useful Commands
 
-### `pnpm translations:sync --language <name>`
+### `pnpm --dir apps/desktop run translations:sync --language <name>`
 
 Creates a new language or syncs an existing language with English:
 
@@ -196,12 +196,12 @@ Creates a new language or syncs an existing language with English:
 **Examples:**
 
 ```bash
-pnpm translations:sync --language french        # Create or sync French
-pnpm translations:sync --languages french,spanish  # Multiple languages
-pnpm translations:sync                          # Sync ALL languages
+pnpm --dir apps/desktop run translations:sync --language french        # Create or sync French
+pnpm --dir apps/desktop run translations:sync --languages french,spanish  # Multiple languages
+pnpm --dir apps/desktop run translations:sync                          # Sync ALL languages
 ```
 
-### `pnpm translations:validate-sync --language <name>`
+### `pnpm --dir apps/desktop run translations:validate-sync --language <name>`
 
 Validates that a language is in sync with English (without making changes):
 
@@ -215,15 +215,15 @@ Exits with code 0 if valid, 1 if issues found (suggests running `sync`).
 **Examples:**
 
 ```bash
-pnpm translations:validate-sync --language french  # Validate French
-pnpm translations:validate-sync                    # Validate ALL languages
+pnpm --dir apps/desktop run translations:validate-sync --language french  # Validate French
+pnpm --dir apps/desktop run translations:validate-sync                    # Validate ALL languages
 ```
 
-### `pnpm translations:gen-types`
+### `pnpm --dir apps/desktop run translations:gen-types`
 
 Regenerates TypeScript types from translation keys for autocomplete and type checking. Run after modifying translation files.
 
-### `pnpm translations:validate-english-keys`
+### `pnpm --dir apps/desktop run translations:validate-english-keys`
 
 Validates English translation files for correctness.
 
