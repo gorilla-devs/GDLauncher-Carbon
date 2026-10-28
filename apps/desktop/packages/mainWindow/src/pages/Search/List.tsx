@@ -1,12 +1,11 @@
 import { getEmptyAddonPhraseKey } from "./translationKeys"
+import { useSearchAddonType } from "./useSearchAddonType"
 import { ListItem } from "./ListItem"
 import { VList } from "@/components/VirtuaWrapper"
 import useSearchContext from "@/components/SearchInputContext"
 import { Skeleton } from "@gd/ui"
-import { Show, createEffect, Match, Switch } from "solid-js"
-import { FEUnifiedSearchType } from "@gd/core_module/bindings"
+import { Show, Match, Switch } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { useParams } from "@solidjs/router"
 import { rspc } from "@/utils/rspcClient"
 import { Trans, useTransContext } from "@gd/i18n"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
@@ -27,7 +26,6 @@ export function List() {
   const [t] = useTransContext()
   const searchContext = useSearchContext()
   const navigator = useGDNavigate()
-  const params = useParams<{ type: string }>()
 
   const allRows = () => searchContext?.allRows() || []
 
@@ -50,40 +48,7 @@ export function List() {
         : instanceLinkTarget(globalStore?.instances?.data, instanceId())
     )
 
-  // Landing tab for the current target (nothing / instance / server). Owned by
-  // the search context so the tab strip, the grid and this list agree.
-  const defaultFallbackType: () => FEUnifiedSearchType = () =>
-    searchContext?.defaultAddonType() ?? "modpack"
-
-  const type = () => {
-    // Explicit URL segment always wins.
-    if (params.type) return params.type as FEUnifiedSearchType
-    // When entering with an instance/server context (i.e. via "Add
-    // addons"), ignore the previous session's projectType — the user
-    // came here to add an addon to this instance, not to resume browsing
-    // modpacks they were looking at earlier.
-    if (instanceId() || serverId()) return defaultFallbackType()
-    return searchContext?.searchQuery().projectType || defaultFallbackType()
-  }
-
-  // Sync the resolved type into searchContext so the active tab pill
-  // tracks it (the tab strip reads searchQuery().projectType, not the
-  // URL). Without this the tab can render unselected ("blank") when the
-  // URL omits :type and we fell back to defaultFallbackType().
-  //
-  // Wrapped in createEffect because `type()` depends on the instance/server
-  // details query, which resolves asynchronously after mount — a one-shot
-  // evaluation in the component body would lock in the pre-load fallback and
-  // never re-sync once the modloader info arrives.
-  createEffect(() => {
-    const resolvedType = type()
-    if (resolvedType !== searchContext?.searchQuery().projectType) {
-      searchContext?.setSearchQuery((prev) => ({
-        ...prev,
-        projectType: resolvedType
-      }))
-    }
-  })
+  const type = useSearchAddonType(searchContext)
 
   // Note: Scroll restoration is handled in VList's ref callback
   // to ensure it works when switching between view modes

@@ -6,7 +6,13 @@ import {
 import { useParams } from "@solidjs/router"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { Mod as ModType, AddonType } from "@gd/core_module/bindings"
+import {
+  Mod as ModType,
+  AddonType,
+  FEKeptAddonCopy
+} from "@gd/core_module/bindings"
+import { i18n } from "@gd/i18n"
+import type { BrowsableAddonType } from "@/utils/browsableAddonType"
 import { useModal } from "@/managers/ModalsManager"
 import { requiresDeletionConfirmation } from "@/pages/Library/shared/addons/addonCapabilities"
 import { createEffect, on, onCleanup } from "solid-js"
@@ -326,13 +332,14 @@ export const useAddonMutations = (
   }
 
   const gotoSearchPage = (type?: AddonType) => {
-    const searchParam = {
+    const searchTypes: Record<AddonType, BrowsableAddonType> = {
       mods: "mod",
       shaders: "shader",
-      resourcepacks: "resource-pack",
+      resourcepacks: "resourcePack",
       datapacks: "datapack",
       worlds: "world"
-    }?.[type!]
+    }
+    const searchParam = type ? searchTypes[type] : undefined
     navigator.navigate(`/search/${searchParam ?? ""}?instanceId=${params.id}`)
   }
 

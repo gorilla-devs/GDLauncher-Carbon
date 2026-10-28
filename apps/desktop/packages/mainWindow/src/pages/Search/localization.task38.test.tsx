@@ -19,6 +19,8 @@ import { List } from "./List"
 import SortDisplay from "./FiltersDisplay/SortDisplay"
 import { SortFilter } from "./FilterSidebar/SortFilter"
 import ConfirmWorldDeletion from "@/managers/ModalsManager/modals/ConfirmWorldDeletion"
+import { getEmptyAddonPhraseKey } from "./translationKeys"
+import type { FEUnifiedSearchType } from "@gd/core_module/bindings"
 
 const c = vi.hoisted(() => ({
   context: undefined as any,
@@ -37,7 +39,10 @@ vi.mock("@/utils/instances", () => ({
   }
 }))
 vi.mock("@/components/SearchInputContext", () => ({ default: () => c.context }))
-vi.mock("@solidjs/router", () => ({ useParams: () => c.params }))
+vi.mock("@solidjs/router", () => ({
+  useParams: () => c.params,
+  useLocation: () => ({ search: "" })
+}))
 vi.mock("@/managers/NavigationManager", () => ({
   useGDNavigate: () => ({ navigate: vi.fn() })
 }))
@@ -259,7 +264,9 @@ const englishPhrases: Record<string, string> = {
 it.each(
   ids.flatMap((id) =>
     ["grid", "list"].flatMap((mode) =>
-      Object.keys(englishPhrases).map((type) => [id, mode, type])
+      Object.keys(englishPhrases)
+        .filter((type) => type !== "plugin" && type !== "unknown")
+        .map((type) => [id, mode, type])
     )
   )
 )("GPT0184 %s %s empty %s uses localized phrases", async (id, mode, type) => {
@@ -278,6 +285,35 @@ it.each(
     )
   }
 })
+// The backend's plugin/unknown phrase keys remain useful without making them
+// browsable routes. Deliver them through the same plain Trans text sink.
+const EmptyPhrase = (props: { type: string }) => {
+  const [t] = useTransContext()
+  return (
+    <p>
+      <Trans
+        key="search:_trn_no_results_description"
+        options={{
+          type: t(getEmptyAddonPhraseKey(props.type as FEUnifiedSearchType))
+        }}
+      />
+    </p>
+  )
+}
+it.each(ids.flatMap((id) => ["plugin", "unknown"].map((type) => [id, type])))(
+  "GPT0184 %s non-route %s phrase remains localized",
+  async (id, type) => {
+    const { root } = await mount(id, () => <EmptyPhrase type={type} />)
+    const text = root.querySelector("p")!.textContent
+    expect(text).not.toMatch(/\{type\}|_trn_/)
+    if (id === "english")
+      expect(text).toContain(`any ${englishPhrases[type]} matching`)
+    else
+      expect(text).toContain(
+        localizedPhrases[id][Object.keys(englishPhrases).indexOf(type)]
+      )
+  }
+)
 it.each(["grid", "list"])(
   "GPT0184 %s initial loading hides empty; nonempty rows stay visible",
   async (mode) => {
@@ -461,10 +497,9 @@ it("M17 warning preference saves before actual callback; Cancel performs no dele
 })
 
 it.each(["not-a-type", "__proto__", "toString"])(
-  "GPT0184 unsupported route %s renders the general addon phrase",
+  "GPT0184 non-route %s retains generic phrase delivery",
   async (type) => {
-    context("grid", type)
-    const { root } = await mount("english", () => <Grid />)
+    const { root } = await mount("english", () => <EmptyPhrase type={type} />)
     expect(root.querySelector("p")?.textContent).toContain(
       "any addons matching"
     )

@@ -11,6 +11,10 @@ import { useLocation } from "@solidjs/router"
 import useSearchContext from "./SearchInputContext"
 import { useTransContext } from "@gd/i18n"
 import { getAddonTypeIcon } from "@/utils/addonIcons"
+import {
+  addonTypeLabelKeys,
+  resolveBrowsableAddonType
+} from "@/utils/browsableAddonType"
 
 interface AddonTypeOption {
   label: string
@@ -18,19 +22,6 @@ interface AddonTypeOption {
   icon: string
   path: string
 }
-
-// The addon types users can actually browse. `FEUnifiedSearchType` also carries
-// "plugin" and "unknown", which have no label and are never offered as options.
-const LABEL_KEYS = {
-  modpack: "search:_trn_modpacks",
-  mod: "search:_trn_mods",
-  shader: "search:_trn_shaders",
-  resourcePack: "search:_trn_resource_packs",
-  datapack: "search:_trn_data_packs",
-  world: "search:_trn_worlds"
-} as const
-
-type BrowsableAddonType = keyof typeof LABEL_KEYS
 
 export function AddonTypeDropdown() {
   const searchContext = useSearchContext()
@@ -42,9 +33,12 @@ export function AddonTypeDropdown() {
   // an instance, or a server); the search context owns that rule.
   const addonTypeOptions: () => AddonTypeOption[] = () =>
     (searchContext?.allowedAddonTypes() ?? [])
-      .filter((value): value is BrowsableAddonType => value in LABEL_KEYS)
+      .flatMap((value) => {
+        const resolved = resolveBrowsableAddonType(value)
+        return resolved ? [resolved] : []
+      })
       .map((value) => ({
-        label: t(LABEL_KEYS[value]),
+        label: t(addonTypeLabelKeys[value]),
         value,
         icon: getAddonTypeIcon(value),
         path: `/search/${value}`
