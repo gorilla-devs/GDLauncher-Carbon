@@ -2925,32 +2925,35 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // Run the actual deletion in a spawned task so the rspc call returns
         // promptly, but log failures: a dropped one leaves the instance to
         // re-appear on the next list.
-        tokio::spawn(async move {
-            if let Err(e) = app.instance_manager()._delete_instance(instance_id).await {
-                tracing::error!("Failed to delete instance {}: {:#}", instance_id.0, e);
+        deletion::spawn_deletion(
+            &self.app.runtime_lifecycle,
+            format!("delete instance {instance_id}"),
+            async move {
+                if let Err(e) = app.instance_manager()._delete_instance(instance_id).await {
+                    tracing::error!("Failed to delete instance {}: {:#}", instance_id.0, e);
 
-                // The instance was put into `LaunchState::Deleting` before the
-                // deletion failed. Without restoring it, the frontend stays
-                // stuck on the deleting/loading state forever. Reset it back to
-                // Inactive so the UI recovers.
-                let instance_name = {
-                    let instance_manager = app.instance_manager();
-                    let mut instances = instance_manager.instances.write().await;
-                    instances.get_mut(&instance_id).and_then(|instance| {
-                        if let InstanceType::Valid(data) = &mut instance.type_ {
-                            // Only the mid-delete failure path leaves the instance in Deleting.
-                            // A refusal to delete a running/preparing instance returns Err while
-                            // that live state is still set, so it must not be clobbered here (that
-                            // would drop the kill channel and orphan the running game).
-                            if matches!(data.state, LaunchState::Deleting) {
-                                data.state = LaunchState::Inactive { failed_task: None };
+                    // The instance was put into `LaunchState::Deleting` before the
+                    // deletion failed. Without restoring it, the frontend stays
+                    // stuck on the deleting/loading state forever. Reset it back to
+                    // Inactive so the UI recovers.
+                    let instance_name = {
+                        let instance_manager = app.instance_manager();
+                        let mut instances = instance_manager.instances.write().await;
+                        instances.get_mut(&instance_id).and_then(|instance| {
+                            if let InstanceType::Valid(data) = &mut instance.type_ {
+                                // Only the mid-delete failure path leaves the instance in Deleting.
+                                // A refusal to delete a running/preparing instance returns Err while
+                                // that live state is still set, so it must not be clobbered here (that
+                                // would drop the kill channel and orphan the running game).
+                                if matches!(data.state, LaunchState::Deleting) {
+                                    data.state = LaunchState::Inactive { failed_task: None };
+                                }
+                                Some(data.config.name.clone())
+                            } else {
+                                None
                             }
-                            Some(data.config.name.clone())
-                        } else {
-                            None
-                        }
-                    })
-                };
+                        })
+                    };
 
                     // Surface the error to the UI so the caller realizes the
                     // instance still exists.
