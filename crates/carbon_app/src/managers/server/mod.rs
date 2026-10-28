@@ -4329,14 +4329,10 @@ impl ManagerRef<'_, ServerManager> {
         if any_servers {
             let default_group = self.get_default_group().await?;
 
-            // Server-side oddity (preserved verbatim): base_index counts the
-            // DEFAULT group, not the group being deleted.
+            // The repository allocates separate destination index/root positions
+            // in the move/delete transaction while this index lock remains held.
             let default_id = default_group.0;
-            let base_index =
-                server_repo::count_servers_in_group(&self.app.db, default_id).await? as i32;
-
-            server_repo::delete_server_group_tx(&self.app.db, group_id, default_id, base_index)
-                .await?;
+            server_repo::delete_server_group_tx(&self.app.db, group_id, default_id).await?;
         } else {
             server_repo::delete_server_group(&self.app.db, group_id).await?;
         }

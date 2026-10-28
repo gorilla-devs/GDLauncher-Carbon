@@ -6,11 +6,9 @@
 //! "belongs to the default group / library root" so a query never has to
 //! resolve the default group id.
 //!
-//! Two behaviors differ from the instance side:
-//! the library-position shifts during a group move are scoped to the default
-//! group on the `Server` table (the instance side shifts across all rows), and
-//! `delete_server_group` computes `base_index` from the DEFAULT group (the
-//! instance side counts the group being deleted).
+//! Library-position shifts during a group move are scoped to the default
+//! group on `Server`. Unlink allocates the legacy group index and mixed root
+//! library position separately inside its writer transaction.
 
 use crate::db_error::DbResult;
 use crate::db_exec::Db;
@@ -395,20 +393,58 @@ pub async fn arrange_server_library_tx(
     .await
 }
 
-/// Moves every server of `group_id` into `default_group_id` (offsetting their
-/// index by `base_index`) then deletes the group, in one write-pool transaction.
-///
-/// `base_index` is computed by the caller — the server-side oddity counts the
-/// DEFAULT group (not the group being deleted); this fn does not recompute it.
-pub async fn delete_server_group_tx(
-    db: &Db,
-    group_id: i32,
-    default_group_id: i32,
-    base_index: i32,
-) -> DbResult<()> {
+/// Return members to the root without changing existing destination coordinates.
+/// The caller holds the manager index lock. Both coordinate domains are allocated
+/// inside this transaction; `(index, id)` defines source order, including ties.
+pub async fn delete_server_group_tx(db: &Db, group_id: i32, default_group_id: i32) -> DbResult<()> {
     db.write(move |mut conn| {
         let tx = conn.transaction()?;
-        move_all_servers_to_group_conn(&tx, group_id, default_group_id, base_index)?;
+        if group_id == default_group_id {
+            return Err(crate::db_error::DbError::Conversion(
+                "Cannot unlink the default server group".into(),
+            ));
+        }
+        let mut members = get_servers_by_group_conn(&tx, group_id)?;
+        members.sort_by_key(|row| (row.index, row.id));
+        if !members.is_empty() {
+            if get_server_group_conn(&tx, default_group_id)?.is_none() {
+                return Err(crate::db_error::DbError::Conversion(
+                    "Destination server group disappeared".into(),
+                ));
+            }
+            let destination = get_servers_by_group_conn(&tx, default_group_id)?;
+            let mut index = destination.iter().map(|row| row.index).max();
+            // Legacy root rows with null positions render at their group index.
+            let mut position = destination
+                .iter()
+                .map(|row| row.library_position.unwrap_or(row.index))
+                .max();
+            for group in get_all_server_groups_conn(&tx)? {
+                if group.id != group_id && group.id != default_group_id {
+                    position = position.max(group.library_position);
+                }
+            }
+            for member in members {
+                let next = |value: Option<i32>| -> DbResult<i32> {
+                    value.map_or(Some(0), |v| v.checked_add(1)).ok_or_else(|| {
+                        crate::db_error::DbError::Conversion(
+                            "Server library coordinate overflow".into(),
+                        )
+                    })
+                };
+                let new_index = next(index)?;
+                let new_position = next(position)?;
+                set_server_group_index_library_position_conn(
+                    &tx,
+                    member.id,
+                    default_group_id,
+                    new_index,
+                    Some(new_position),
+                )?;
+                index = Some(new_index);
+                position = Some(new_position);
+            }
+        }
         delete_server_group_conn(&tx, group_id)?;
         tx.commit()?;
         Ok(())

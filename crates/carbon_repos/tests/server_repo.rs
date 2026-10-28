@@ -1,4 +1,4 @@
-use carbon_repos::db_exec::{Db, ReadAccess};
+use carbon_repos::db_exec::{Db, ReadAccess, WriteAccess};
 use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::server::{self as s, IndexShift, ServerPatch};
 use chrono::{TimeZone, Utc};
@@ -15,7 +15,7 @@ async fn migrated_db() -> (tempfile::TempDir, Db) {
         let (m, _n) = carbon_repos::get_migrations();
         m.to_latest(&mut conn).unwrap();
     }
-    let db = Db::open(&path, 2, false).unwrap();
+    let db = Db::open(&path, 2, true).unwrap();
     (dir, db)
 }
 
@@ -268,9 +268,7 @@ async fn move_all_servers_to_group_preserves_relative_order() {
 }
 
 #[tokio::test]
-async fn delete_server_group_tx_uses_default_group_base_index() {
-    // Server-side oddity: base_index counts the DEFAULT group, not the group
-    // being deleted.
+async fn delete_server_group_tx_appends_contiguous_root_coordinates() {
     let (_d, db) = migrated_db().await;
     let def = seed_group(&db, "default", 0, None).await;
     let grp = seed_group(&db, "grp", 1, Some(0)).await;
@@ -281,14 +279,13 @@ async fn delete_server_group_tx_uses_default_group_base_index() {
 
     let base_index = s::count_servers_in_group(&db, def).await.unwrap() as i32;
     assert_eq!(base_index, 2);
-    s::delete_server_group_tx(&db, grp, def, base_index)
-        .await
-        .unwrap();
+    s::delete_server_group_tx(&db, grp, def).await.unwrap();
 
     assert!(s::get_server_group(&db, grp).await.unwrap().is_none());
     let row = s::get_server(&db, moved).await.unwrap().unwrap();
     assert_eq!(row.group_id, def);
-    assert_eq!(row.index, 2); // 0 + base_index(2)
+    assert_eq!(row.index, 2);
+    assert_eq!(row.library_position, Some(2));
 }
 
 #[tokio::test]
@@ -473,4 +470,203 @@ async fn group_by_name_and_default_first_ordering() {
             .unwrap()
             .is_none()
     );
+}
+
+// Task43: production migrated transactions, durable coordinates and refusal.
+#[tokio::test]
+async fn task43_unlink_prepend_and_sparse_coordinates_survive_reopen() {
+    for (root_indices, root_positions, source_indices, first_index, first_position) in [
+        (vec![0], vec![None], vec![0, -1], 1, 121),
+        (vec![4, 90], vec![Some(80), Some(-7)], vec![0, -1], 91, 121),
+        (vec![4, 300], vec![Some(500), None], vec![0, -1], 301, 501),
+        (vec![4, 300], vec![Some(-10), None], vec![0, -1], 301, 301),
+        (vec![0, 1], vec![None, Some(1)], vec![0, 1], 2, 121),
+        (vec![], vec![], vec![5, -3, -3], 0, 121),
+    ] {
+        let (dir, db) = migrated_db().await;
+        let def = s::find_server_group_by_name(&db, "Default")
+            .await
+            .unwrap()
+            .unwrap()
+            .id;
+        let src = seed_group(&db, "source", 1, Some(999)).await;
+        let folder = seed_group(&db, "remaining", 2, Some(120)).await;
+        let mut destinations = Vec::new();
+        for (n, (&index, &position)) in root_indices.iter().zip(&root_positions).enumerate() {
+            let id = seed_server(
+                &db,
+                &format!("root{n}"),
+                &format!("root{n}"),
+                index,
+                def,
+                position,
+            )
+            .await;
+            destinations.push(s::get_server(&db, id).await.unwrap().unwrap());
+        }
+        let mut source = Vec::new();
+        for (n, &index) in source_indices.iter().enumerate() {
+            let id = seed_server(
+                &db,
+                &format!("source{n}"),
+                &format!("source{n}"),
+                index,
+                src,
+                None,
+            )
+            .await;
+            source.push(s::get_server(&db, id).await.unwrap().unwrap());
+        }
+        source.sort_by_key(|r| (r.index, r.id));
+        s::delete_server_group_tx(&db, src, def).await.unwrap();
+        drop(db);
+        let db = Db::open(&dir.path().join("t.db"), 2, true).unwrap();
+        assert!(s::get_server_group(&db, src).await.unwrap().is_none());
+        assert_eq!(
+            s::get_server_group(&db, folder)
+                .await
+                .unwrap()
+                .unwrap()
+                .library_position,
+            Some(120)
+        );
+        for original in &destinations {
+            assert_eq!(
+                s::get_server(&db, original.id).await.unwrap().unwrap(),
+                *original
+            );
+        }
+        let mut rows = s::get_servers_by_group(&db, def).await.unwrap();
+        rows.sort_by_key(|r| (r.index, r.id));
+        let indices: std::collections::BTreeSet<_> = rows.iter().map(|r| r.index).collect();
+        assert_eq!(
+            indices.len(),
+            rows.len(),
+            "combined root indices must be unique"
+        );
+        let moved: Vec<_> = rows
+            .iter()
+            .filter(|r| source.iter().any(|s| s.id == r.id))
+            .collect();
+        assert_eq!(
+            moved.iter().map(|r| r.id).collect::<Vec<_>>(),
+            source.iter().map(|r| r.id).collect::<Vec<_>>()
+        );
+        for (offset, (row, original)) in moved.iter().zip(&source).enumerate() {
+            let position = row
+                .library_position
+                .expect("moved root members need libraryPosition");
+            assert_eq!(row.index, first_index + offset as i32);
+            assert_eq!(position, first_position + offset as i32);
+            let mut expected = original.clone();
+            expected.group_id = def;
+            expected.index = row.index;
+            expected.library_position = row.library_position;
+            assert_eq!(**row, expected, "only group/order coordinates may change");
+        }
+        let violations: i64 = db
+            .read(|conn| {
+                Ok(
+                    conn.query_row("SELECT COUNT(*) FROM pragma_foreign_key_check", [], |r| {
+                        r.get(0)
+                    })?,
+                )
+            })
+            .await
+            .unwrap();
+        assert_eq!(violations, 0);
+        // Optional owned artifact compares these actual committed rows with
+        // the existing TS folders-first renderer, not a mirrored SQL model.
+        if first_position == 501 {
+            if let Ok(path) = std::env::var("TASK43_SERVER_PROJECTION") {
+                let groups = s::get_all_server_groups(&db).await.unwrap();
+                let mut projection = vec![format!("D\t{def}")];
+                for group in groups {
+                    projection.push(format!(
+                        "G\t{}\t{}\t{}",
+                        group.id,
+                        group
+                            .library_position
+                            .map_or("null".into(), |p| p.to_string()),
+                        group.name
+                    ));
+                }
+                for row in &rows {
+                    projection.push(format!(
+                        "S\t{}\t{}\t{}\t{}\t{}",
+                        row.id,
+                        row.index,
+                        row.library_position
+                            .map_or("null".into(), |p| p.to_string()),
+                        row.group_id,
+                        row.name
+                    ));
+                }
+                for id in [
+                    format!("server-folder-{folder}"),
+                    format!("server-{}", destinations[1].id),
+                    format!("server-{}", destinations[0].id),
+                    format!("server-{}", source[0].id),
+                    format!("server-{}", source[1].id),
+                ] {
+                    projection.push(format!("E\t{id}"));
+                }
+                std::fs::write(path, projection.join("\n")).unwrap();
+            }
+        }
+    }
+}
+
+#[tokio::test]
+async fn task43_unlink_coordinate_overflow_is_atomic_after_partial_move() {
+    for (index, position) in [(i32::MAX - 1, Some(0)), (0, Some(i32::MAX - 1))] {
+        let (dir, db) = migrated_db().await;
+        let def = s::find_server_group_by_name(&db, "Default")
+            .await
+            .unwrap()
+            .unwrap()
+            .id;
+        let src = seed_group(&db, "source", 1, Some(9)).await;
+        seed_server(&db, "root", "root", index, def, position).await;
+        seed_server(&db, "a", "a", -1, src, None).await;
+        seed_server(&db, "b", "b", 0, src, None).await;
+        let before = s::get_all_servers(&db).await.unwrap();
+        assert!(
+            s::delete_server_group_tx(&db, src, def).await.is_err(),
+            "overflow must refuse rather than corrupt coordinates"
+        );
+        drop(db);
+        let db = Db::open(&dir.path().join("t.db"), 2, true).unwrap();
+        assert_eq!(s::get_all_servers(&db).await.unwrap(), before);
+        assert!(s::get_server_group(&db, src).await.unwrap().is_some());
+    }
+}
+
+#[tokio::test]
+async fn task43_unlink_late_delete_failure_rolls_back_and_empty_folder_works() {
+    let (dir, db) = migrated_db().await;
+    let def = s::find_server_group_by_name(&db, "Default")
+        .await
+        .unwrap()
+        .unwrap()
+        .id;
+    let src = seed_group(&db, "source", 1, Some(9)).await;
+    seed_server(&db, "a", "a", -1, src, None).await;
+    let before = s::get_all_servers(&db).await.unwrap();
+    db.write(move |conn| { conn.execute_batch("CREATE TRIGGER refuse_group_delete BEFORE DELETE ON ServerGroup BEGIN SELECT RAISE(ABORT, 'injected delete refusal'); END;")?; Ok(()) }).await.unwrap();
+    assert!(s::delete_server_group_tx(&db, src, def).await.is_err());
+    drop(db);
+    let db = Db::open(&dir.path().join("t.db"), 2, true).unwrap();
+    assert_eq!(s::get_all_servers(&db).await.unwrap(), before);
+    assert!(s::get_server_group(&db, src).await.unwrap().is_some());
+    db.write(|conn| {
+        conn.execute_batch("DROP TRIGGER refuse_group_delete")?;
+        Ok(())
+    })
+    .await
+    .unwrap();
+    let empty = seed_group(&db, "empty", 2, Some(12)).await;
+    s::delete_server_group_tx(&db, empty, def).await.unwrap();
+    assert!(s::get_server_group(&db, empty).await.unwrap().is_none());
+    assert_eq!(s::get_all_servers(&db).await.unwrap(), before);
 }
