@@ -534,5 +534,14 @@
   "_trn_servers": "服务器",
   "_trn_folder_deletion_partial": "已完成 {{total}} 个所选操作中的 {{completed}} 个。部分操作失败。请重试或取消。",
   "_trn_deleting_server_selection_progress": "正在删除服务器并取消关联文件夹 {{current}}/{{total}}...",
-  "_trn_export_failed": "导出实例失败。请重试。"
+  "_trn_export_failed": "导出实例失败。请重试。",
+  "_trn_custom_create_failed": "无法开始创建。草稿已保留。请检查所选版本或图标后重试。",
+  "_trn_custom_create_uncertain": "创建可能已经成功。重试前请检查库。创建另一份副本可能会产生重复实例。",
+  "_trn_custom_prepare_failed": "实例已创建，但无法开始设置。请重试设置，或在库中找到该实例。",
+  "_trn_custom_retry_preparation": "重试设置",
+  "_trn_custom_update_failed": "无法更新实例。请检查所选版本后重试。",
+  "_trn_custom_existing_snapshot": "重试会使用你选择的设置来设置已创建的实例“{{name}}”，不会创建新的副本。",
+  "_trn_custom_view_library": "查看库",
+  "_trn_custom_fresh_copy": "允许另一份副本",
+  "_trn_custom_create_admitted": "实例已创建，正在进行设置。你可以在库中查看进度。"
 }

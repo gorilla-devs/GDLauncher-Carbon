@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
 import { render } from "solid-js/web"
 import { createStore } from "solid-js/store"
-import { button, input, settle } from "@/task31.fixture"
+import { input, settle, toast } from "@/task31.fixture"
 import InstanceCreation from "."
 
 const c = vi.hoisted(() => ({
@@ -20,7 +20,8 @@ vi.mock("@/components/GlobalStoreContext", () => ({
   useGlobalStore: () => c.store
 }))
 vi.mock("@/managers/ModalsManager", () => ({
-  useModal: () => ({ closeModal: c.close })
+  useModal: () => ({ closeModal: c.close }),
+  useModalStackEntry: () => ({ closeOwn: c.close })
 }))
 vi.mock("@/managers/ModalsManager/ModalLayout", () => ({
   default: (p: any) => <div data-title={p.title}>{p.children}</div>
@@ -42,6 +43,8 @@ vi.mock("@/utils/helpers", () => ({
 }))
 vi.mock("@/utils/rspcClient", () => ({
   apiFetch: vi.fn(),
+  extractErrorDisplay: (error: unknown) =>
+    error instanceof Error ? error.message : String(error),
   rspc: {
     createQuery: (f: any) => c.queries[f().queryKey[0]],
     createMutation: (f: any) => ({
@@ -362,4 +365,49 @@ it("0103 pending metadata preserves deliberate compatible loader choice then val
       modloader: { Set: { type_: "forge", version: "1.21.1-52.1.0" } }
     })
   )
+})
+
+it("a refused version change keeps the dialog and the choice, and shows the core's reason", async () => {
+  const reason =
+    "This instance has an unfinished modpack update or repair. Press Play to finish it, or cancel it from Repair, before changing the game version or loader."
+  c.mutate.mockImplementation(async (key) => {
+    if (key === "instance.updateInstance") throw new Error(reason)
+  })
+  const root = mount(edit("forge"))
+  chooseGame(root, "1.21.1")
+  submit(root).click()
+  await settle()
+  expect(c.mutate).toHaveBeenCalledWith(
+    "instance.updateInstance",
+    expect.objectContaining({ version: { Set: "1.21.1" } })
+  )
+  expect(root.querySelector('[role="alert"]')?.textContent).toBe(reason)
+  expect(c.close).not.toHaveBeenCalled()
+  expect(toast.error).not.toHaveBeenCalled()
+  expect(toast.success).not.toHaveBeenCalled()
+  expect(root.querySelector("select")?.getAttribute("data-value")).toBe(
+    "1.21.1"
+  )
+})
+it("a failed edit without a reason falls back to a translated message", async () => {
+  c.mutate.mockImplementation(async (key) => {
+    if (key === "instance.updateInstance") throw new Error("  ")
+  })
+  const root = mount(edit())
+  input(root, 0, "Renamed instance")
+  submit(root).click()
+  await settle()
+  expect(root.querySelector('[role="alert"]')?.textContent).toBe(
+    "instances:_trn_custom_update_failed"
+  )
+  expect(c.close).not.toHaveBeenCalled()
+})
+it("a successful edit still closes the dialog", async () => {
+  const root = mount(edit())
+  input(root, 0, "Renamed instance")
+  submit(root).click()
+  await settle()
+  expect(c.close).toHaveBeenCalled()
+  expect(toast.success).toHaveBeenCalled()
+  expect(root.querySelector('[role="alert"]')).toBeNull()
 })

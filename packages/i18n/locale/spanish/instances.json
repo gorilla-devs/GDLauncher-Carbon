@@ -539,5 +539,14 @@
   "_trn_servers": "servidores",
   "_trn_folder_deletion_partial": "Se completaron {{completed}} de {{total}} acciones seleccionadas. Algunas acciones fallaron. Reintenta o cancela.",
   "_trn_deleting_server_selection_progress": "Eliminando servidores y desvinculando carpetas {{current}}/{{total}}...",
-  "_trn_export_failed": "No se pudo exportar la instancia. Vuelve a intentarlo."
+  "_trn_export_failed": "No se pudo exportar la instancia. Vuelve a intentarlo.",
+  "_trn_custom_create_failed": "No se pudo iniciar la creación. Se conserva el borrador. Revisa la versión o el icono seleccionado y vuelve a intentarlo.",
+  "_trn_custom_create_uncertain": "Es posible que la creación ya haya tenido éxito. Revisa la biblioteca antes de intentarlo otra vez. Crear otra copia podría dejar un duplicado.",
+  "_trn_custom_prepare_failed": "Se creó la instancia, pero su configuración no pudo empezar. Reintenta la configuración o busca la instancia en la biblioteca.",
+  "_trn_custom_retry_preparation": "Reintentar configuración",
+  "_trn_custom_update_failed": "No se pudo actualizar la instancia. Revisa la versión seleccionada y vuelve a intentarlo.",
+  "_trn_custom_existing_snapshot": "Reintentar configura la instancia «{{name}}» ya creada con los ajustes que elegiste. No se crea una copia nueva.",
+  "_trn_custom_view_library": "Ver biblioteca",
+  "_trn_custom_fresh_copy": "Permitir otra copia",
+  "_trn_custom_create_admitted": "Instancia creada. Se está configurando; puedes seguir el progreso en la biblioteca."
 }

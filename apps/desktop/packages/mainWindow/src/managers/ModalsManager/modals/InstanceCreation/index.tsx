@@ -5,7 +5,7 @@ import { Trans, useTransContext } from "@gd/i18n"
 import Custom from "./Custom"
 import Import from "./Import"
 import ShareCodeImport from "./ShareCodeImport"
-import { Match, Switch } from "solid-js"
+import { Match, Switch, createSignal } from "solid-js"
 import { editInstanceId, hasEditContext } from "./editInstanceId"
 
 interface Props {
@@ -16,6 +16,8 @@ interface Props {
 const InstanceCreation = (props: ModalProps) => {
   const data: () => Props = () => props.data
   const [t] = useTransContext()
+  const [pending, setPending] = createSignal(false)
+  const [tab, setTab] = createSignal(data()?.import ? "import" : "custom")
 
   const title = () =>
     editInstanceId(data()) !== undefined
@@ -23,17 +25,29 @@ const InstanceCreation = (props: ModalProps) => {
       : t("modals:_trn_title.new_instance")
 
   return (
-    <ModalLayout noHeader={props.noHeader} title={title()} noPadding={true}>
+    <ModalLayout
+      noHeader={props.noHeader}
+      title={title()}
+      noPadding={true}
+      preventClose={pending()}
+    >
       <div class="w-140 flex h-full flex-col justify-between">
         <Switch>
           <Match when={hasEditContext(data())}>
-            <Custom data={data()} />
+            <Custom data={data()} onPendingChange={setPending} />
           </Match>
           <Match when={!hasEditContext(data())}>
-            <Tabs defaultValue={data()?.import ? "import" : "custom"}>
+            <Tabs
+              defaultValue={data()?.import ? "import" : "custom"}
+              value={tab()}
+              onChange={(value) => {
+                if (!pending()) setTab(value)
+              }}
+            >
               <TabsList class="mx-4 mt-4 w-auto">
                 <TabsIndicator />
                 <TabsTrigger
+                  disabled={pending()}
                   value="custom"
                   class="flex-1"
                   data-testid="instance-creation-custom-tab"
@@ -43,21 +57,25 @@ const InstanceCreation = (props: ModalProps) => {
                     <Trans key="instances:_trn_instance_creation_custom_tab" />
                   </div>
                 </TabsTrigger>
-                <TabsTrigger value="import" class="flex-1">
+                <TabsTrigger disabled={pending()} value="import" class="flex-1">
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:upload-01" />
                     <Trans key="instances:_trn_instance_import_tab" />
                   </div>
                 </TabsTrigger>
-                <TabsTrigger value="share" class="flex-1">
+                <TabsTrigger disabled={pending()} value="share" class="flex-1">
                   <div class="flex items-center gap-2">
                     <div class="i-hugeicons:share-08" />
                     <Trans key="instances:_trn_instance_share_code_tab" />
                   </div>
                 </TabsTrigger>
               </TabsList>
-              <TabsContent value="custom">
-                <Custom data={data()} />
+              <TabsContent
+                value="custom"
+                forceMount
+                style={{ display: tab() === "custom" ? undefined : "none" }}
+              >
+                <Custom data={data()} onPendingChange={setPending} />
               </TabsContent>
               <TabsContent value="import">
                 <Import />

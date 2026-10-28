@@ -539,5 +539,14 @@
   "_trn_servers": "serveurs",
   "_trn_folder_deletion_partial": "{{completed}} actions sélectionnées sur {{total}} ont été effectuées. Certaines actions ont échoué. Réessayez ou annulez.",
   "_trn_deleting_server_selection_progress": "Suppression des serveurs et dissociation des dossiers {{current}}/{{total}}...",
-  "_trn_export_failed": "Échec de l’exportation de l’instance. Veuillez réessayer."
+  "_trn_export_failed": "Échec de l’exportation de l’instance. Veuillez réessayer.",
+  "_trn_custom_create_failed": "La création n’a pas pu démarrer. Le brouillon est conservé. Vérifiez la version ou l’icône sélectionnée, puis réessayez.",
+  "_trn_custom_create_uncertain": "La création a peut-être déjà réussi. Vérifiez la bibliothèque avant de réessayer. Une autre copie pourrait créer un doublon.",
+  "_trn_custom_prepare_failed": "L’instance a été créée, mais sa configuration n’a pas pu démarrer. Relancez la configuration ou retrouvez l’instance dans la bibliothèque.",
+  "_trn_custom_retry_preparation": "Relancer la configuration",
+  "_trn_custom_update_failed": "L’instance n’a pas pu être mise à jour. Vérifiez la version sélectionnée, puis réessayez.",
+  "_trn_custom_existing_snapshot": "Relancer configure l’instance « {{name}} » déjà créée, avec les paramètres choisis. Aucune nouvelle copie n’est créée.",
+  "_trn_custom_view_library": "Voir la bibliothèque",
+  "_trn_custom_fresh_copy": "Autoriser une autre copie",
+  "_trn_custom_create_admitted": "Instance créée. Sa configuration est en cours ; vous pouvez suivre la progression dans la bibliothèque."
 }

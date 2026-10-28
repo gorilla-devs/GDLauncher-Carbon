@@ -10,7 +10,7 @@ import {
   Badge,
   PRESS_CLASSES
 } from "@gd/ui"
-import { ModalProps, useModal } from "../.."
+import { ModalProps, useModal, useModalStackEntry } from "../.."
 import { Trans, useTransContext } from "@gd/i18n"
 import {
   createEffect,
@@ -19,11 +19,12 @@ import {
   For,
   Match,
   on,
+  onCleanup,
   untrack,
   Show,
   Switch
 } from "solid-js"
-import { apiFetch, rspc } from "@/utils/rspcClient"
+import { apiFetch, extractErrorDisplay, rspc } from "@/utils/rspcClient"
 import {
   CFFEModLoaderType,
   FEModdedManifestLoaderVersion,
@@ -49,14 +50,11 @@ interface Instancetype {
   img: string | undefined
 }
 
-enum Modloaders {
-  _Quilt = "quilt",
-  _Forge = "forge",
-  _NeoForge = "neoforge",
-  _Fabric = "fabric"
-}
-
-const Custom = (props: Pick<ModalProps, "data">) => {
+const Custom = (
+  props: Pick<ModalProps, "data"> & {
+    onPendingChange?: (pending: boolean) => void
+  }
+) => {
   const [t] = useTransContext()
   const [mappedMcVersions, setMappedMcVersions] = createSignal<
     MappedMcVersions[]
@@ -68,6 +66,26 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     hasEditContext(instanceData()) && editId() === undefined
 
   const [error, setError] = createSignal("")
+  const [submitting, setSubmitting] = createSignal(false)
+  const [createdId, setCreatedId] = createSignal<number | null>(null)
+  const [preparationRecovery, setPreparationRecovery] = createSignal(false)
+  const [createUncertain, setCreateUncertain] = createSignal(false)
+  const editsLocked = () =>
+    submitting() || createdId() !== null || createUncertain()
+  const stackEntry = useModalStackEntry()
+  let alive = true
+  onCleanup(() => {
+    alive = false
+  })
+  const setPending = (pending: boolean) => {
+    setSubmitting(pending)
+    props.onPendingChange?.(pending)
+  }
+  const openLibrary = () => {
+    if (!alive || submitting()) return
+    if (stackEntry && !stackEntry.closeOwn()) return
+    navigator.navigate("/library")
+  }
   const [bgPreview, setBgPreview] = createSignal<string | null>(
     instanceData()?.img || null
   )
@@ -156,7 +174,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
   // loader selection is checked again at the dispatch boundary.
   createEffect(
     on([mcVersion, loader, loaderVersions], () => {
-      if (untrack(() => originalPair())) return
+      if (untrack(() => editsLocked() || originalPair())) return
       const query = loaderQuery()
       if (loader() && (!query?.data || query.isFetching || query.isError))
         return
@@ -270,18 +288,19 @@ const Custom = (props: Pick<ModalProps, "data">) => {
 
   // Load preview without side effects - just for display
   const loadPreview = async (filePath: string) => {
+    if (!alive || editsLocked()) return
     const response = await apiFetch(
       `/loadImage?path=${encodeURIComponent(filePath)}`
     )
     const blob = await response.blob()
     const b64 = (await blobToBase64(blob)) as string
+    if (!alive || editsLocked()) return
     setBgPreview(`data:image/png;base64,${b64.substring(b64.indexOf(",") + 1)}`)
     setIconPath(filePath)
   }
 
   // Store icon in backend before create/update
-  const storeIconForBackend = async () => {
-    const path = iconPath()
+  const storeIconForBackend = async (path = iconPath()) => {
     if (path) {
       const response = await apiFetch(
         `/instance/loadIcon?path=${encodeURIComponent(path)}`
@@ -312,61 +331,101 @@ const Custom = (props: Pick<ModalProps, "data">) => {
     )
   }
 
+  const prepareCreated = async (instanceId: number) => {
+    await prepareInstanceMutation.mutateAsync(instanceId)
+    if (!alive) return
+    // This RPC acknowledges preparation admission; installation continues in Library.
+    if (stackEntry && !stackEntry.closeOwn()) return
+    navigator.navigate("/library")
+    toast.success(t("instances:_trn_custom_create_admitted"))
+  }
+
+  const retryPreparation = async () => {
+    const instanceId = createdId()
+    if (!alive || submitting() || instanceId === null) return
+    setPending(true)
+    setError("")
+    try {
+      await prepareCreated(instanceId)
+    } catch {
+      if (alive) {
+        setPreparationRecovery(true)
+        setError(t("instances:_trn_custom_prepare_failed"))
+      }
+    } finally {
+      if (alive) setPending(false)
+    }
+  }
+
   const handleCreate = async () => {
+    if (!alive || editsLocked()) return
     const pair = readPair()
     if (hasEditContext(instanceData()) || !pairIsValid(pair)) return
-    if (!title()) {
-      setError("Fields must be filled in!")
-    } else {
-      setError("")
-
-      try {
-        // Store icon in backend before creating instance
-        await storeIconForBackend()
-
-        if (!pairIsValid(pair)) return
-        const instanceId = await createInstanceMutation.mutateAsync({
-          group:
-            (props.data as { groupId?: number } | undefined)?.groupId ??
-            defaultGroup.data ??
-            1,
-          use_loaded_icon: true,
-          notes: "",
-          name: title()!,
-          version: {
-            Version: {
-              Standard: {
-                release: pair.release,
-                modloaders: pair.kind
-                  ? [
-                      {
-                        type_: pair.kind!,
-                        version: pair.version!
-                      } as ModLoader
-                    ]
-                  : []
-              }
+    const name = title()
+    if (!name) {
+      setError(t("errors:_trn_error.missing_field_title"))
+      return
+    }
+    // Own the complete validated intent synchronously, before icon IO.
+    const draft = {
+      name,
+      group:
+        (props.data as { groupId?: number } | undefined)?.groupId ??
+        defaultGroup.data ??
+        1,
+      icon: iconPath(),
+      pair
+    }
+    setPending(true)
+    setError("")
+    let createSent = false
+    try {
+      await storeIconForBackend(draft.icon)
+      if (!alive) return
+      if (!pairIsValid(draft.pair)) {
+        setError(t("instances:_trn_custom_create_failed"))
+        return
+      }
+      createSent = true
+      const instanceId = await createInstanceMutation.mutateAsync({
+        group: draft.group,
+        use_loaded_icon: true,
+        notes: "",
+        name: draft.name,
+        version: {
+          Version: {
+            Standard: {
+              release: draft.pair.release,
+              modloaders: draft.pair.kind
+                ? [
+                    {
+                      type_: draft.pair.kind,
+                      version: draft.pair.version!
+                    } as ModLoader
+                  ]
+                : []
             }
           }
-        })
-
-        await prepareInstanceMutation.mutateAsync(instanceId)
-
-        modalsContext?.closeModal()
-        navigator.navigate(`/library`)
-        toast.success("Instance successfully created.")
-      } catch (err) {
-        console.error(err)
-        modalsContext?.closeModal()
-        toast.error("Error while creating the instance.")
-      } finally {
-        setError("")
-        setCustomTitle("")
-        setError("")
-        setBgPreview(null)
-        setMcVersion("")
-        setChosenLoaderVersion("")
+        }
+      })
+      // Publication can precede either a lost acknowledgement or a later manager error.
+      // Only the returned identity authorizes a same-instance preparation retry.
+      if (!alive) return
+      setCreatedId(instanceId)
+      await prepareCreated(instanceId)
+    } catch {
+      if (!alive) return
+      if (createdId() !== null) {
+        setPreparationRecovery(true)
+        setError(t("instances:_trn_custom_prepare_failed"))
+      } else if (createSent) {
+        setCreateUncertain(true)
+        setError(t("instances:_trn_custom_create_uncertain"))
+      } else {
+        setError(t("instances:_trn_custom_create_failed"))
       }
+    } finally {
+      if (alive) setPending(false)
     }
   }
 
@@ -406,28 +465,31 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               ? {
                   Set: pair.kind
                     ? ({
-                        type_: pair.kind!,
+                        type_: pair.kind,
                         version: pair.version!
                       } as ModLoader)
                     : null
                 }
               : null
         })
-
-        modalsContext?.closeModal()
-        toast.success("Instance successfully updated.")
       } catch (err) {
         console.error(err)
-        modalsContext?.closeModal()
-        toast.error("Error while creating the instance.")
-      } finally {
-        setError("")
-        setCustomTitle("")
-        setError("")
-        setBgPreview(null)
-        setMcVersion("")
-        setChosenLoaderVersion("")
+        if (!alive) return
+        // Keep the dialog and the user's choices, and say why the core
+        // refused (for example an unfinished modpack update and its way out).
+        setError(
+          extractErrorDisplay(err).trim() ||
+            t("instances:_trn_custom_update_failed")
+        )
+        return
       }
+      modalsContext?.closeModal()
+      toast.success("Instance successfully updated.")
+      setError("")
+      setCustomTitle("")
+      setBgPreview(null)
+      setMcVersion("")
+      setChosenLoaderVersion("")
     }
   }
 
@@ -445,8 +507,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
 
   return (
     <div class="flex h-[600px] w-full flex-col">
-      <div
-        class="flex flex-1 flex-col gap-3 overflow-y-auto p-4"
+      <fieldset
+        disabled={editsLocked()}
+        class="m-0 min-h-0 min-w-0 border-0 flex flex-1 flex-col gap-3 overflow-y-auto p-4"
         style={{ "scrollbar-gutter": "stable" }}
       >
         {/* Instance Details Section */}
@@ -463,11 +526,13 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <ImagePicker
               imageUrl={bgPreview}
               onSelect={loadPreview}
+              isLoading={editsLocked}
               onDelete={() => {
+                if (editsLocked()) return
                 setBgPreview(null)
                 setIconPath(null)
               }}
-              deletable={true}
+              deletable={!editsLocked()}
               confirmDelete={false}
               sizeClass="h-20 w-20"
               dialogTitle={t("instances:_trn_select_icon")}
@@ -484,7 +549,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 placeholder={t("instances:_trn_new_instance")}
                 inputColor="bg-darkSlate-800"
                 onInput={(e) => {
-                  setCustomTitle(e.currentTarget.value)
+                  if (!editsLocked()) setCustomTitle(e.currentTarget.value)
                 }}
                 value={title()!}
                 errorMessage={
@@ -511,7 +576,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             <Select
               value={mcVersion()}
               onChange={(value) => {
-                if (!value) return
+                if (!value || editsLocked()) return
                 if (mappedMcVersions().some((v) => v.id === value))
                   setMcVersion(value)
               }}
@@ -569,6 +634,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 variant={snapshotVersionFilter() ? "default" : "secondary"}
                 class="cursor-pointer px-2.5 py-1 text-xs"
                 onClick={() =>
+                  !editsLocked() &&
                   setSnapshotVersionFilter(!snapshotVersionFilter())
                 }
                 title="Snapshot versions"
@@ -584,6 +650,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 variant={oldAlphaVersionFilter() ? "default" : "secondary"}
                 class="cursor-pointer px-2.5 py-1 text-xs"
                 onClick={() =>
+                  !editsLocked() &&
                   setOldAlphaVersionFilter(!oldAlphaVersionFilter())
                 }
                 title="Old alpha versions"
@@ -598,7 +665,10 @@ const Custom = (props: Pick<ModalProps, "data">) => {
               <Badge
                 variant={oldBetaVersionFilter() ? "default" : "secondary"}
                 class="cursor-pointer px-2.5 py-1 text-xs"
-                onClick={() => setOldBetaVersionFilter(!oldBetaVersionFilter())}
+                onClick={() =>
+                  !editsLocked() &&
+                  setOldBetaVersionFilter(!oldBetaVersionFilter())
+                }
                 title="Old beta versions"
               >
                 <div class="flex items-center gap-1">
@@ -632,6 +702,7 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                   }}
                   data-testid={`instance-creation-loader-${modloader.key ?? "vanilla"}`}
                   onClick={() => {
+                    if (editsLocked()) return
                     if (modloader.key === "forge") {
                       forgeVersionsQuery.refetch()
                     } else if (modloader.key === "neoforge") {
@@ -678,7 +749,9 @@ const Custom = (props: Pick<ModalProps, "data">) => {
                 <Match when={loaderVersions().length > 0}>
                   <Select
                     value={chosenLoaderVersion()}
-                    onChange={(value) => value && setChosenLoaderVersion(value)}
+                    onChange={(value) =>
+                      !editsLocked() && value && setChosenLoaderVersion(value)
+                    }
                     options={loaderVersions()?.map((v) => v.id) || []}
                     disabled={
                       forgeVersionsQuery.isFetching ||
@@ -728,12 +801,61 @@ const Custom = (props: Pick<ModalProps, "data">) => {
             </div>
           </Show>
         </div>
-      </div>
+      </fieldset>
+
+      <Show when={error() && title()}>
+        <p role="alert" class="m-0 px-4 pb-3 text-sm text-red-400">
+          {error()}
+        </p>
+      </Show>
+      <Show when={createdId() !== null}>
+        <p class="m-0 px-4 pb-3 text-sm">
+          <Trans
+            key="instances:_trn_custom_existing_snapshot"
+            options={{
+              name: title(),
+              interpolation: { escapeValue: false }
+            }}
+          />
+        </p>
+      </Show>
 
       {/* Buttons - outside scrollable area */}
-      <div class="flex w-full justify-end px-4 pb-4 pt-0">
+      <div class="flex w-full flex-wrap justify-end gap-2 px-4 pb-4 pt-0">
+        <Show when={preparationRecovery()}>
+          <Button
+            data-testid="instance-creation-retry"
+            loading={submitting()}
+            onClick={retryPreparation}
+          >
+            <Trans key="instances:_trn_custom_retry_preparation" />
+          </Button>
+        </Show>
+        <Show when={createdId() !== null || createUncertain()}>
+          <Button
+            data-testid="instance-creation-library"
+            disabled={submitting()}
+            onClick={openLibrary}
+          >
+            <Trans key="instances:_trn_custom_view_library" />
+          </Button>
+        </Show>
+        <Show when={createUncertain()}>
+          <Button
+            data-testid="instance-creation-fresh-copy"
+            disabled={submitting()}
+            onClick={() => {
+              if (!alive || submitting()) return
+              setCreateUncertain(false)
+              setError("")
+            }}
+          >
+            <Trans key="instances:_trn_custom_fresh_copy" />
+          </Button>
+        </Show>
         <Button
-          disabled={!pairIsValid() || !isUpdatingWithDiffs()}
+          disabled={editsLocked() || !pairIsValid() || !isUpdatingWithDiffs()}
+          loading={submitting() && !preparationRecovery()}
           type="primary"
           data-testid="instance-creation-submit"
           style={{ width: "100%", "max-width": "200px" }}

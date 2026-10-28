@@ -534,5 +534,14 @@
   "_trn_servers": "サーバー",
   "_trn_folder_deletion_partial": "選択した操作{{total}}件のうち{{completed}}件が完了しました。一部の操作に失敗しました。再試行するかキャンセルしてください。",
   "_trn_deleting_server_selection_progress": "サーバーを削除し、フォルダーの関連付けを解除しています {{current}}/{{total}}...",
-  "_trn_export_failed": "インスタンスのエクスポートに失敗しました。再試行してください。"
+  "_trn_export_failed": "インスタンスのエクスポートに失敗しました。再試行してください。",
+  "_trn_custom_create_failed": "作成を開始できませんでした。入力内容は保持されています。選択したバージョンまたはアイコンを確認して再試行してください。",
+  "_trn_custom_create_uncertain": "作成はすでに成功している可能性があります。再試行する前にライブラリを確認してください。別のコピーを作成すると重複する可能性があります。",
+  "_trn_custom_prepare_failed": "インスタンスは作成されましたが、セットアップを開始できませんでした。セットアップを再試行するか、ライブラリでインスタンスを確認してください。",
+  "_trn_custom_retry_preparation": "セットアップを再試行",
+  "_trn_custom_update_failed": "インスタンスを更新できませんでした。選択したバージョンを確認して再試行してください。",
+  "_trn_custom_existing_snapshot": "再試行すると、作成済みのインスタンス「{{name}}」を選択した設定でセットアップします。新しいコピーは作成されません。",
+  "_trn_custom_view_library": "ライブラリを開く",
+  "_trn_custom_fresh_copy": "別のコピーを許可",
+  "_trn_custom_create_admitted": "インスタンスを作成しました。現在セットアップ中です。進行状況はライブラリで確認できます。"
 }
