@@ -1,6 +1,8 @@
 //! Relocation admission owns external writers independently of UI/map state.
 //! Lock order: briefly acquire lifecycle mutex before instance/server operation gates;
-//! never hold it across awaits. Abandoned external ownership remains a blocker.
+//! never hold it across awaits. Abandoned external ownership remains a relocation
+//! blocker. Quit, restart and update wait only for this core's own work: records
+//! from an earlier session, readable or not, never keep the launcher from closing.
 use super::orphan_pid::{self, IdentityStatus, ProcessRecord};
 use anyhow::{Context, Result, bail};
 use std::{
@@ -36,8 +38,27 @@ trait ProcessAbsenceObserver: std::fmt::Debug + Send + Sync {
     fn observation(&self, _record: ProcessRecord) -> orphan_pid::ProcessObservation {
         orphan_pid::ProcessObservation::Unknown
     }
-    fn record_gone(&self, record: ProcessRecord) -> bool {
-        self.confirmed_absent(record.pid, record.start_time.unwrap_or(0))
+    /// What `record` names now: the same process, one that ended or whose
+    /// PID another process holds, or something that cannot be told apart.
+    /// `require_java` is set for game and server markers, whose process is
+    /// always a JVM. Fixtures that only model absence keep everything that
+    /// is not confirmed absent.
+    fn status(&self, record: ProcessRecord, _require_java: bool) -> IdentityStatus {
+        if self.confirmed_absent(record.pid, record.start_time.unwrap_or(0)) {
+            IdentityStatus::GoneOrReused
+        } else {
+            IdentityStatus::Unknown
+        }
+    }
+    /// [`Self::status`] with the name of the program that holds the PID
+    /// now (`javaw.exe`, `java`), read in the same look at the process
+    /// table. Fixtures that do not model program names give none.
+    fn inspect(
+        &self,
+        record: ProcessRecord,
+        require_java: bool,
+    ) -> (IdentityStatus, Option<String>) {
+        (self.status(record, require_java), None)
     }
 }
 #[derive(Debug)]
@@ -46,8 +67,15 @@ impl ProcessAbsenceObserver for RealProcessAbsenceObserver {
     fn observation(&self, record: ProcessRecord) -> orphan_pid::ProcessObservation {
         orphan_pid::observe_process(record.pid)
     }
-    fn record_gone(&self, record: ProcessRecord) -> bool {
-        recorded_identity_confirmed_gone(record)
+    fn status(&self, record: ProcessRecord, require_java: bool) -> IdentityStatus {
+        recorded_identity_status(record, require_java)
+    }
+    fn inspect(
+        &self,
+        record: ProcessRecord,
+        require_java: bool,
+    ) -> (IdentityStatus, Option<String>) {
+        recorded_identity(record, require_java)
     }
     fn confirmed_absent(&self, pid: u32, start: u64) -> bool {
         recorded_process_confirmed_absent(pid, start)
@@ -72,6 +100,156 @@ struct State {
     shutdown: Option<ShutdownStatus>,
     adopted: HashMap<ProcessRecord, String>,
     adopted_games: std::collections::HashSet<ProcessRecord>,
+    /// Adopted records that came from a game or server marker, or from the
+    /// copy kept of one. Their process is a JVM, so a PID that a process
+    /// other than Java now holds has been reused. Child records of hooks and
+    /// installers are not in it: those processes are not Java.
+    java_records: std::collections::HashSet<ProcessRecord>,
+    /// The program that held each adopted record's PID when
+    /// `refresh_adopted` last looked, so a refused move can name it next
+    /// to the PID. Missing when it could not be read.
+    programs: HashMap<ProcessRecord, String>,
+    /// Process records and markers from an earlier session that could not be
+    /// read, decoded, verified or removed. Each may describe a process that
+    /// still runs, so the file stays where it is and keeps the runtime folder
+    /// from being moved until it is gone or names a process that has ended.
+    /// Nothing else waits on them.
+    unresolved: std::collections::BTreeSet<PathBuf>,
+    /// Records `external_child` created in this session. A startup reconcile
+    /// running beside a spawn skips them: they belong to this core's own
+    /// activities, not to an earlier session.
+    own_records: std::collections::HashSet<PathBuf>,
+    /// Relocation ids the launcher cancelled or the core refused. The
+    /// launcher never reuses either, so a prepare-relocation for one of them
+    /// that the core only gets to now (its sender gave up waiting and asked
+    /// again) must not grant a lease that nobody owns.
+    cancelled_relocations: std::collections::VecDeque<String>,
+    /// Shutdown request ids the launcher cancelled, or that a later request
+    /// replaced. A prepare-shutdown for one of them that the core only gets
+    /// to now must not freeze the core again for a request nobody owns.
+    retired_shutdowns: std::collections::VecDeque<String>,
+    /// Tests shorten [`OPERATION_SETTLE_BUDGET`] with this.
+    #[cfg(test)]
+    settle_budget: Option<std::time::Duration>,
+}
+/// How many cancelled or refused relocation ids are remembered. Each move
+/// attempt uses one, so this covers far more retries than a session sees.
+const CANCELLED_RELOCATIONS_KEPT: usize = 32;
+impl State {
+    /// Every writer and every unverified state that keeps the runtime folder
+    /// from being moved, in admission order. Empty means the move may start.
+    fn relocation_blockers(&self) -> Vec<RuntimeBlocker> {
+        use RuntimeBlockerKind as Kind;
+        let mut blockers = vec![];
+        if !self.ready {
+            blockers.push(match &self.failure {
+                Some(failure) => RuntimeBlocker::new(Kind::StartupCheckFailed, failure),
+                None => RuntimeBlocker::new(Kind::StartupCheckPending, ""),
+            });
+        }
+        if self.shutdown.is_some() {
+            blockers.push(RuntimeBlocker::new(Kind::Shutdown, ""));
+        }
+        if self.relocation.is_some() {
+            blockers.push(RuntimeBlocker::new(Kind::Relocation, ""));
+        }
+        for entry in self.activities_in_order() {
+            // A game's session worker is named by the game itself while that
+            // game is registered; it is listed on its own once the game is gone.
+            if entry
+                .follows
+                .is_some_and(|game| self.activities.contains_key(&game))
+            {
+                continue;
+            }
+            // Likewise the watcher of games from an earlier session is named
+            // by those games while any of them is still running.
+            if entry.watches_adopted && !self.adopted_games.is_empty() {
+                continue;
+            }
+            blockers.push(entry.blocker());
+        }
+        let mut adopted: Vec<_> = self.adopted.iter().collect();
+        adopted.sort_by(|(a, a_label), (b, b_label)| (a_label, a.pid).cmp(&(b_label, b.pid)));
+        for (record, label) in adopted {
+            let kind = if self.adopted_games.contains(record) {
+                Kind::PreviousGame
+            } else {
+                Kind::PreviousProcess
+            };
+            blockers.push(
+                RuntimeBlocker::new(kind, label)
+                    .with_pid(record.pid)
+                    .with_program(self.programs.get(record).cloned()),
+            );
+        }
+        for path in &self.unresolved {
+            blockers.push(RuntimeBlocker::new(
+                Kind::UnreadableRecord,
+                path.display().to_string(),
+            ));
+        }
+        blockers
+    }
+    fn activities_in_order(&self) -> impl Iterator<Item = &ActivityEntry> {
+        let mut activities: Vec<_> = self.activities.iter().collect();
+        activities.sort_by_key(|(id, _)| **id);
+        activities.into_iter().map(|(_, entry)| entry)
+    }
+    /// What keeps a quit, restart or update from finishing: this core's own
+    /// work, split into the session workers of games and the watcher of
+    /// games from an earlier session (`followers`) and everything else.
+    /// Running games are never listed: they outlive the core.
+    fn shutdown_blockers(&self) -> (Vec<RuntimeBlocker>, Vec<RuntimeBlocker>) {
+        let (mut others, mut followers) = (vec![], vec![]);
+        for entry in self.activities_in_order() {
+            if entry.running_game() {
+                continue;
+            }
+            if entry.session_follower() {
+                followers.push(entry.blocker());
+            } else {
+                others.push(entry.blocker());
+            }
+        }
+        (others, followers)
+    }
+    /// Records a process from an earlier session under the label a refused
+    /// move shows for it. `java` marks a game or server JVM.
+    fn adopt(&mut self, record: ProcessRecord, label: String, java: bool) {
+        self.adopted.insert(record, label);
+        if java {
+            self.java_records.insert(record);
+        }
+    }
+    fn forget_adopted(&mut self, record: &ProcessRecord) {
+        self.adopted.remove(record);
+        self.adopted_games.remove(record);
+        self.java_records.remove(record);
+        self.programs.remove(record);
+    }
+    /// Remembers an id that will never hold a lease, dropping the oldest
+    /// once the bound is reached.
+    fn retire_relocation(&mut self, request: &str) {
+        if self.cancelled_relocations.iter().any(|id| id == request) {
+            return;
+        }
+        if self.cancelled_relocations.len() == CANCELLED_RELOCATIONS_KEPT {
+            self.cancelled_relocations.pop_front();
+        }
+        self.cancelled_relocations.push_back(request.to_owned());
+    }
+    /// Remembers a shutdown request id that must never freeze the core
+    /// again, dropping the oldest once the bound is reached.
+    fn retire_shutdown(&mut self, request: &str) {
+        if self.retired_shutdowns.iter().any(|id| id == request) {
+            return;
+        }
+        if self.retired_shutdowns.len() == RETIRED_SHUTDOWNS_KEPT {
+            self.retired_shutdowns.pop_front();
+        }
+        self.retired_shutdowns.push_back(request.to_owned());
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -501,23 +679,11 @@ impl RuntimeActivity {
     }
     /// All external writers retain a durable relocation record. Persist intent
     /// before spawn so a core crash cannot turn an orphan into apparent quiescence.
-    pub fn external_child(&mut self) -> Result<()> {
-        if let Some(root) = &self.lifecycle.child_records {
-            std::fs::create_dir_all(root)?;
-            let record = root.join(format!("{}.json", uuid::Uuid::new_v4()));
-            let file = std::fs::OpenOptions::new()
-                .write(true)
-                .create_new(true)
-                .open(&record)?;
-            self.record = Some(record);
-            file.sync_all()?; // empty record is explicitly Unknown, never completion
-            #[cfg(unix)]
-            {
-                std::fs::File::open(root)?.sync_all()?;
-                if let Some(parent) = root.parent() {
-                    std::fs::File::open(parent)?.sync_all()?;
-                }
-            }
+    pub fn external_child(&mut self) -> std::result::Result<(), ChildBookkeepingFailed> {
+        let lifecycle = self.lifecycle.clone();
+        if let Some(root) = &lifecycle.child_records {
+            self.persist_intent(root)
+                .map_err(ChildBookkeepingFailed::before_spawn)?;
         }
         self.external();
         self.owns_child = true;
@@ -762,6 +928,14 @@ fn decode_child_record(bytes: &[u8]) -> Result<ProcessRecord> {
     anyhow::ensure!(record.version == 1, "Unknown durable child record version");
     record.process.validate_identity()
 }
+/// The file's bytes, or `None` once it has been removed.
+async fn read_unless_gone(path: &Path) -> Result<Option<Vec<u8>>> {
+    match tokio::fs::read(path).await {
+        Ok(bytes) => Ok(Some(bytes)),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
 fn persist_child_record(path: &std::path::Path, identity: ProcessRecord) -> Result<()> {
     #[cfg(test)]
     tests_support::child_record_fault()?;
@@ -805,16 +979,72 @@ fn sync_new_record(file: &std::fs::File, root: &Path, new_folder: bool) -> Resul
     }
     Ok(())
 }
-pub(crate) fn recorded_identity_confirmed_gone(record: ProcessRecord) -> bool {
-    #[cfg(target_os = "linux")]
-    {
-        orphan_pid::identity_status(record, orphan_pid::observe_process(record.pid), false)
-            == IdentityStatus::GoneOrReused
+/// What a process record from an earlier session names right now.
+///
+/// `GoneOrReused` means the process ended, or its PID belongs to another
+/// process: one that is not Java when `require_java` (game and server
+/// markers), one with a different boot/ticks identity on Linux, or one with
+/// a different creation time on Windows and macOS. `Same` and `Unknown`
+/// keep the record. On Linux a legacy record without boot/ticks identity
+/// whose epoch start differs from a live Java process stays `Unknown`: a
+/// wall-clock step moves that epoch (M23).
+pub(crate) fn recorded_identity_status(
+    record: ProcessRecord,
+    require_java: bool,
+) -> IdentityStatus {
+    recorded_identity(record, require_java).0
+}
+/// [`recorded_identity_status`] with the name of the program holding the
+/// PID, from the same observation.
+fn recorded_identity(
+    record: ProcessRecord,
+    require_java: bool,
+) -> (IdentityStatus, Option<String>) {
+    let (observed, program) = orphan_pid::observe_process_named(record.pid);
+    let status = classify_observed(
+        record,
+        observed,
+        require_java,
+        orphan_pid::EPOCH_START_TIMES_ARE_STABLE,
+        || recorded_process_confirmed_absent(record.pid, record.start_time.unwrap_or(0)),
+    );
+    (status, program)
+}
+/// [`recorded_identity_status`] for a given observation and platform rule.
+/// A process sysinfo did not list counts as ended only when the native
+/// probe (`/proc`, `kill(pid, 0)`, `OpenProcess`) confirms no process holds
+/// the PID: a partial or permission-limited listing is not absence.
+fn classify_observed(
+    record: ProcessRecord,
+    observed: orphan_pid::ProcessObservation,
+    require_java: bool,
+    epoch_is_stable: bool,
+    confirmed_absent: impl FnOnce() -> bool,
+) -> IdentityStatus {
+    match orphan_pid::identity_status_with(record, observed, require_java, epoch_is_stable) {
+        IdentityStatus::GoneOrReused
+            if observed == orphan_pid::ProcessObservation::Absent && !confirmed_absent() =>
+        {
+            IdentityStatus::Unknown
+        }
+        status => status,
     }
-    #[cfg(not(target_os = "linux"))]
-    {
-        recorded_process_confirmed_absent(record.pid, record.start_time.unwrap_or(0))
-    }
+}
+/// Copies `reconcile_root` keeps of game and server markers. Their process
+/// is a JVM, unlike other child records (hooks, installers, Java probes).
+fn is_marker_copy(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with("reconciled-"))
+}
+/// Whether two records describe the same process, also when one of them
+/// was upgraded with the Linux boot/ticks identity verified for it.
+fn same_process(a: ProcessRecord, b: ProcessRecord) -> bool {
+    a == b
+        || (a.pid == b.pid
+            && (a.identity.is_none() || b.identity.is_none())
+            && a.start_time.is_some()
+            && a.start_time == b.start_time)
 }
 
 impl RuntimeLifecycle {
@@ -868,39 +1098,40 @@ impl RuntimeLifecycle {
         let Some(bytes) = read_unless_gone(path).await? else {
             return Ok(());
         };
-        while let Some(entry) = entries.next_entry().await? {
-            let bytes = tokio::fs::read(entry.path()).await?;
-            let mut record = decode_child_record(&bytes)
-                .with_context(|| format!("Unconfirmed external writer ownership at {}; independently verify exit before removing this record", entry.path().display()))?;
-            if self.process_observer.record_gone(record) {
-                let current = decode_child_record(&tokio::fs::read(entry.path()).await?)?;
+        let record = decode_child_record(&bytes)?;
+        let require_java = is_marker_copy(path);
+        if self.record_gone(record, require_java) {
+            if let Some(current) = read_unless_gone(path).await? {
                 anyhow::ensure!(
-                    current == record,
+                    decode_child_record(&current)? == record,
                     "Durable child identity changed; ownership retained"
                 );
-                tokio::fs::remove_file(entry.path()).await?;
-                let mut state = self.state.lock().unwrap();
-                state.adopted.remove(&record);
-                state.adopted_games.remove(&record);
-            } else {
-                if let Some(upgraded) = orphan_pid::verified_record(
-                    record,
-                    self.process_observer.observation(record),
-                    false,
-                ) {
-                    if upgraded != record {
-                        persist_child_record(&entry.path(), upgraded)?;
-                        let mut state = self.state.lock().unwrap();
-                        state.adopted.remove(&record);
-                        state.adopted_games.remove(&record);
-                        record = upgraded;
-                    }
+                match tokio::fs::remove_file(path).await {
+                    Ok(()) => {}
+                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                    Err(error) => return Err(error.into()),
                 }
-                self.state
-                    .lock()
-                    .unwrap()
-                    .adopted
-                    .insert(record, entry.path().display().to_string());
+            }
+            let mut state = self.state.lock().unwrap();
+            state.forget_adopted(&record);
+            return Ok(());
+        }
+        self.state
+            .lock()
+            .unwrap()
+            .adopt(record, path.display().to_string(), require_java);
+        if let Some(upgraded) = orphan_pid::verified_record(
+            record,
+            self.process_observer.observation(record),
+            require_java,
+        ) {
+            if upgraded != record {
+                // The process is adopted either way. A failed upgrade may
+                // have left the file truncated, so it is listed as well.
+                persist_child_record(path, upgraded)?;
+                let mut state = self.state.lock().unwrap();
+                state.forget_adopted(&record);
+                state.adopt(upgraded, path.display().to_string(), require_java);
             }
         }
         Ok(())
@@ -1480,7 +1711,8 @@ impl RuntimeLifecycle {
         state
             .adopted
             .entry(record)
-            .or_insert_with(|| format!("adopted game {}", record.pid));
+            // The blocker carries the PID; a folder label replaces this.
+            .or_default();
         state.adopted_games.insert(record);
     }
     pub(crate) fn adopted_game_published(&self, pid: u32, start: u64) {
@@ -1570,7 +1802,7 @@ impl RuntimeLifecycle {
             .collect();
         let resolved: Vec<_> = unresolved
             .into_iter()
-            .filter(|record| self.process_observer.record_gone(*record))
+            .filter(|path| self.evidence_resolved(path))
             .collect();
         let mut state = self.state.lock().unwrap();
         for (record, (status, program)) in inspected {
@@ -1593,11 +1825,42 @@ impl RuntimeLifecycle {
             state.unresolved.remove(&path);
         }
     }
-    fn persist_reconciled_process(&self, identity: ProcessRecord) -> Result<()> {
-        let Some(root) = &self.child_records else {
-            return Ok(());
+    /// Whether an unresolved file no longer stands for a process that may
+    /// still run. It changes nothing on disk: the next start's check still
+    /// removes what is stale. A file that now reads as a process which may
+    /// be running stays listed; it can be a game this session started, as a
+    /// launch rewrites its instance's marker, and it clears once that ends.
+    fn evidence_resolved(&self, path: &Path) -> bool {
+        let bytes = match std::fs::read(path) {
+            Ok(bytes) => bytes,
+            // A file under a folder that is gone, or that is now a plain
+            // file, cannot exist either.
+            Err(error) => {
+                return matches!(
+                    error.kind(),
+                    std::io::ErrorKind::NotFound | std::io::ErrorKind::NotADirectory
+                );
+            }
         };
-        std::fs::create_dir_all(root)?;
+        let child_record = self
+            .child_records
+            .as_deref()
+            .is_some_and(|root| path.parent() == Some(root));
+        let record = if child_record {
+            decode_child_record(&bytes).ok()
+        } else {
+            std::str::from_utf8(&bytes)
+                .ok()
+                .and_then(|text| orphan_pid::parse_process_file(text).ok())
+        };
+        // Markers and their copies name a JVM; other child records do not.
+        let java = !child_record || is_marker_copy(path);
+        record.is_some_and(|record| self.record_gone(record, java))
+    }
+    /// Where `persist_reconciled_process` keeps a recovered process so a
+    /// restart still knows about it after its marker is cleaned up.
+    fn reconciled_record_path(&self, identity: ProcessRecord) -> Option<PathBuf> {
+        let root = self.child_records.as_ref()?;
         let token = match identity.identity {
             Some(orphan_pid::ProcessIdentity::LinuxBootTicks {
                 boot_id,
@@ -1611,7 +1874,16 @@ impl RuntimeLifecycle {
                     .unwrap_or_else(|| "unknown".into())
             ),
         };
-        let record = root.join(format!("reconciled-{}-{token}.json", identity.pid));
+        Some(root.join(format!("reconciled-{}-{token}.json", identity.pid)))
+    }
+    fn persist_reconciled_process(&self, identity: ProcessRecord) -> Result<()> {
+        let (Some(root), Some(record)) = (
+            self.child_records.as_ref(),
+            self.reconciled_record_path(identity),
+        ) else {
+            return Ok(());
+        };
+        let new_folder = create_records_folder(root)?;
         let mut file = match std::fs::OpenOptions::new()
             .write(true)
             .create_new(true)
@@ -1644,33 +1916,104 @@ impl RuntimeLifecycle {
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(()),
             Err(e) => return Err(anyhow::Error::from(e).context(listing())),
         };
-        while let Some(entry) = entries.next_entry().await? {
-            if !entry.file_type().await?.is_dir() {
-                continue;
-            }
-            let record = orphan_pid::read_process_file(&entry.path(), marker)
-                .await
-                .with_context(|| format!("Cannot reconcile {}", entry.path().display()))?;
-            if let Some(record) = record {
-                if !self.process_observer.record_gone(record) {
-                    let record = orphan_pid::verified_record(
-                        record,
-                        self.process_observer.observation(record),
-                        true,
-                    )
-                    .unwrap_or(record);
-                    self.persist_reconciled_process(record)?;
-                    self.state.lock().unwrap().adopted.insert(
-                        record,
-                        format!(
-                            "{} (present or unconfirmed process)",
-                            entry.path().display()
-                        ),
-                    );
-                }
-            }
+        while let Some(entry) = entries.next_entry().await.with_context(listing)? {
+            let file_type = entry.file_type().await;
+            self.reconcile_folder(&entry.path(), file_type, marker)
+                .await;
         }
         Ok(())
+    }
+    /// One entry of `reconcile_root`, given the type its listing reported.
+    /// Only the marker file is ever listed as unresolved, never the instance
+    /// or server folder: the move refusal tells the user to delete what it
+    /// lists, and that folder holds their worlds.
+    async fn reconcile_folder(
+        &self,
+        folder: &Path,
+        file_type: std::io::Result<std::fs::FileType>,
+        marker: &str,
+    ) {
+        match file_type {
+            Ok(file_type) if !file_type.is_dir() => return,
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+            // Some network and FUSE file systems leave the type out of the
+            // listing, and the stat that stands in for it can fail. Reading
+            // the marker decides instead.
+            Err(error) => tracing::debug!(
+                "Cannot tell whether {} is a folder ({error}); checking for its process marker",
+                folder.display()
+            ),
+        }
+        // A marker removed since the folder was listed reads as none, and so
+        // does one under an entry that turns out not to be a folder.
+        let record = match orphan_pid::read_process_file(folder, marker).await {
+            Ok(Some(record)) => record,
+            Ok(None) => return,
+            Err(error)
+                if error
+                    .downcast_ref::<std::io::Error>()
+                    .is_some_and(|error| error.kind() == std::io::ErrorKind::NotADirectory) =>
+            {
+                return;
+            }
+            Err(error) => {
+                self.unresolved_evidence(orphan_pid::pid_file_path(folder, marker), error);
+                return;
+            }
+        };
+        // A game or server marker names a JVM: a PID held by anything else,
+        // or by a process with another identity, was reused.
+        if self.record_gone(record, true) {
+            return;
+        }
+        let record =
+            orphan_pid::verified_record(record, self.process_observer.observation(record), true)
+                .unwrap_or(record);
+        // The folder is what the launcher shows the user.
+        self.state
+            .lock()
+            .unwrap()
+            .adopt(record, folder.display().to_string(), true);
+        if let Err(error) = self.persist_reconciled_process(record) {
+            // This session still refuses a move on the process itself.
+            // The copy that carries it across a restart is what is unsure.
+            if let Some(path) = self.reconciled_record_path(record) {
+                self.unresolved_evidence(path, error);
+            }
+        }
+    }
+}
+
+/// Waits up to `budget` for every settlement to be Complete. Returns early
+/// as soon as one turns Unknown or loses its sender: the final check after
+/// it names whatever remains, so this only bounds the grace period.
+async fn wait_for_settlement(
+    receivers: Vec<tokio::sync::watch::Receiver<Settlement>>,
+    budget: std::time::Duration,
+) {
+    let wait =
+        futures::future::try_join_all(receivers.into_iter().map(|mut receiver| async move {
+            loop {
+                match *receiver.borrow_and_update() {
+                    Settlement::Complete => return Ok(()),
+                    Settlement::Unknown => bail!("Runtime operation settlement is unknown"),
+                    Settlement::Pending => {}
+                }
+                receiver
+                    .changed()
+                    .await
+                    .context("Runtime operation lost its terminal acknowledgement")?;
+            }
+        }));
+    match tokio::time::timeout(budget, wait).await {
+        Ok(Ok(_)) => {}
+        Ok(Err(error)) => {
+            tracing::warn!("Shutdown found an unsettled runtime operation: {error:#}")
+        }
+        Err(_) => tracing::warn!(
+            "Runtime operations were still active {budget:?} into shutdown; the final check names any that remain"
+        ),
     }
 }
 
@@ -2402,44 +2745,72 @@ mod task07_request_tests {
     async fn task07r1_r6_live_reused_unknown_block_only_relocation_and_adopted_game_survives_quit()
     {
         for start in [Some(10), Some(99), None] {
-            let lifecycle = Arc::new(RuntimeLifecycle {
-                process_observer: Arc::new(InjectedObservation {
-                    start,
-                    authority_absent: false,
-                }),
-                ..Default::default()
-            });
-            lifecycle.reconciliation_finished(Ok(()));
-            lifecycle
-                .state
-                .lock()
-                .unwrap()
-                .adopted
-                .insert(ProcessRecord::legacy(42, 10), "recovered owner".into());
-            lifecycle.adopted_game_published(42, 10);
-            for _ in 0..2 {
-                lifecycle
-                    .prepare_shutdown("move", ShutdownPurpose::Relocation, async { Ok(()) })
-                    .unwrap();
-                tokio::task::yield_now().await;
-                let status = lifecycle
-                    .shutdown_status("move", ShutdownPurpose::Relocation)
-                    .unwrap();
-                assert_eq!(
-                    status.phase,
-                    ShutdownPhase::Unresolved,
-                    "observation {start:?}"
-                );
-                assert_eq!(status.blockers, ["recovered owner"]);
-                assert!(lifecycle.admit("late writer").is_err());
-                assert!(
+            for (published, kind) in [
+                (false, RuntimeBlockerKind::PreviousProcess),
+                (true, RuntimeBlockerKind::PreviousGame),
+            ] {
+                for purpose in [ShutdownPurpose::Quit, ShutdownPurpose::Update] {
+                    let lifecycle = Arc::new(RuntimeLifecycle {
+                        process_observer: Arc::new(InjectedObservation {
+                            start,
+                            authority_absent: false,
+                        }),
+                        ..Default::default()
+                    });
+                    lifecycle.reconciliation_finished(Ok(()));
                     lifecycle
                         .state
                         .lock()
                         .unwrap()
-                        .adopted_games
-                        .contains(&ProcessRecord::legacy(42, 10))
-                );
+                        .adopted
+                        .insert(ProcessRecord::legacy(42, 10), "recovered owner".into());
+                    if published {
+                        lifecycle.adopted_game_published(42, 10);
+                    }
+                    for attempt in 0..2 {
+                        // What /prepare-relocation runs: refresh, then the refuse-first lease.
+                        lifecycle.refresh_adopted();
+                        let refused = lifecycle
+                            .begin_relocation(&format!("move {attempt}"))
+                            .unwrap_err();
+                        assert_eq!(
+                            refused.blockers,
+                            [RuntimeBlocker::new(kind, "recovered owner").with_pid(42)],
+                            "observation {start:?}"
+                        );
+                        {
+                            let state = lifecycle.state.lock().unwrap();
+                            assert!(state.relocation.is_none() && state.shutdown.is_none());
+                        }
+                        drop(lifecycle.admit("launch after refused move").unwrap());
+                    }
+                    let request = format!("{purpose:?}");
+                    lifecycle
+                        .prepare_shutdown(&request, purpose, async { Ok(()) })
+                        .unwrap();
+                    let status = loop {
+                        let status = lifecycle.shutdown_status(&request, purpose).unwrap();
+                        if status.phase != ShutdownPhase::Draining {
+                            break status;
+                        }
+                        tokio::task::yield_now().await;
+                    };
+                    assert_eq!(status.phase, ShutdownPhase::Ready, "{start:?} {purpose:?}");
+                    assert!(status.blockers.is_empty(), "{:?}", status.blockers);
+                    lifecycle
+                        .commit_prepared_shutdown(&request, purpose)
+                        .unwrap();
+                    assert!(lifecycle.shutdown_committed());
+                    assert!(
+                        lifecycle
+                            .state
+                            .lock()
+                            .unwrap()
+                            .adopted
+                            .contains_key(&ProcessRecord::legacy(42, 10)),
+                        "the record stays evidence for a later move"
+                    );
+                }
             }
         }
         let lifecycle = Arc::new(RuntimeLifecycle {
@@ -2492,10 +2863,8 @@ mod task07_request_tests {
             .unwrap()
             .adopted
             .insert(ProcessRecord::legacy(42, 10), "recovered server".into());
-        lifecycle
-            .prepare_shutdown("move", ShutdownPurpose::Relocation, async { Ok(()) })
-            .unwrap();
-        tokio::task::yield_now().await;
+        lifecycle.refresh_adopted();
+        let refused = lifecycle.begin_relocation("move").unwrap_err();
         assert_eq!(
             refused.blockers,
             [
@@ -3026,9 +3395,1256 @@ mod task18_settlement_tests {
     }
 }
 
+/// Relocation refuses before it changes anything. A move attempted while a
+/// game, server, download or unverified process exists must leave the game's
+/// session worker, the servers and admission exactly as they were.
+#[cfg(test)]
+mod relocation_refusal_tests {
+    use super::*;
+    use RuntimeBlockerKind as Kind;
+    use tokio_util::sync::CancellationToken;
+
+    fn ready() -> Arc<RuntimeLifecycle> {
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle
+    }
+    fn blocker(kind: Kind, name: &str) -> RuntimeBlocker {
+        RuntimeBlocker::new(kind, name)
+    }
+    /// No lease, no freeze, no cancelled token, and new work is still admitted.
+    fn assert_nothing_changed(lifecycle: &Arc<RuntimeLifecycle>, tokens: &[CancellationToken]) {
+        {
+            let state = lifecycle.state.lock().unwrap();
+            assert!(state.relocation.is_none(), "refusal took a lease");
+            assert!(state.shutdown.is_none(), "refusal froze shutdown");
+        }
+        assert!(!lifecycle.admission_frozen());
+        assert!(
+            tokens.iter().all(|token| !token.is_cancelled()),
+            "refusal cancelled running work"
+        );
+        drop(lifecycle.admit("launch after refused move").unwrap());
+    }
+
+    #[test]
+    fn running_game_refuses_once_and_keeps_its_session_worker() {
+        let lifecycle = ready();
+        // Admitted like InstanceManager::prepare_game: downloads first.
+        let worker = lifecycle
+            .admit_owned("instance 3 preparation/session", ActivityPolicy::Installer)
+            .unwrap();
+        // Each Try again is a new attempt under a new id, as in the launcher.
+        assert_eq!(
+            lifecycle.begin_relocation("move 1").unwrap_err().blockers,
+            [blocker(Kind::Install, "instance 3 preparation/session")]
+        );
+        let mut game = lifecycle.admit("game 3").unwrap();
+        game.external();
+        game.spawn(ActivityPolicy::Game, || Ok(())).unwrap();
+        worker.follow_spawned_game(&game).unwrap();
+        let tokens = [worker.cancellation(), game.cancellation()];
+
+        let refused = lifecycle.begin_relocation("move 2").unwrap_err();
+        // The worker is the game's own reader, so the game names both.
+        assert_eq!(refused.blockers, [blocker(Kind::Game, "game 3")]);
+        assert_nothing_changed(&lifecycle, &tokens);
+
+        // Closing the game ends the game entry; a worker still settling is named.
+        game.finish();
+        let refused = lifecycle.begin_relocation("move 3").unwrap_err();
+        assert_eq!(
+            refused.blockers,
+            [blocker(Kind::Task, "instance 3 preparation/session")]
+        );
+        assert_nothing_changed(&lifecycle, &tokens);
+
+        worker.finish();
+        lifecycle.begin_relocation("move 4").unwrap();
+    }
+
+    #[test]
+    fn each_writer_kind_refuses_with_its_own_blocker() {
+        let lifecycle = ready();
+        let mut server = lifecycle.admit("server 7 run").unwrap();
+        server.external();
+        server.spawn(ActivityPolicy::Server, || Ok(())).unwrap();
+        let install = lifecycle
+            .admit_owned("addon installation tree", ActivityPolicy::Installer)
+            .unwrap();
+        let lost = lifecycle.admit("lost deletion").unwrap();
+        lost.unknown("controlled".into());
+        let task = lifecycle.admit("instance export").unwrap();
+        lifecycle
+            .state
+            .lock()
+            .unwrap()
+            .adopted
+            .insert(ProcessRecord::legacy(42, 10), "recovered server".into());
+        lifecycle.adopted_record_published(ProcessRecord::legacy(43, 10));
+        let tokens = [
+            server.cancellation(),
+            install.cancellation(),
+            lost.cancellation(),
+            task.cancellation(),
+        ];
+
+        let refused = lifecycle.begin_relocation("move").unwrap_err();
+        assert_eq!(
+            refused.blockers,
+            [
+                blocker(Kind::Server, "server 7 run"),
+                blocker(Kind::Install, "addon installation tree"),
+                blocker(Kind::Unconfirmed, "lost deletion"),
+                blocker(Kind::Task, "instance export"),
+                // A game published without a folder is named by its PID alone.
+                blocker(Kind::PreviousGame, "").with_pid(43),
+                blocker(Kind::PreviousProcess, "recovered server").with_pid(42),
+            ]
+        );
+        assert!(refused.to_string().contains("server 7 run"), "{refused}");
+        assert_nothing_changed(&lifecycle, &tokens);
+    }
+
+    #[test]
+    fn startup_check_refuses_while_pending_and_names_a_failure() {
+        let pending = Arc::new(RuntimeLifecycle::default());
+        assert_eq!(
+            pending.begin_relocation("move").unwrap_err().blockers,
+            [blocker(Kind::StartupCheckPending, "")]
+        );
+        assert_nothing_changed(&pending, &[]);
+
+        let failed = Arc::new(RuntimeLifecycle::default());
+        failed.reconciliation_finished(Err(anyhow::anyhow!("Cannot reconcile /data/instances/A")));
+        failed.reconciliation_finished(Ok(()));
+        assert_eq!(
+            failed.begin_relocation("move").unwrap_err().blockers,
+            [blocker(
+                Kind::StartupCheckFailed,
+                "Cannot reconcile /data/instances/A"
+            )]
+        );
+        assert_nothing_changed(&failed, &[]);
+    }
+
+    #[test]
+    fn a_quit_in_progress_or_another_move_refuses_without_taking_over() {
+        let lifecycle = ready();
+        lifecycle
+            .begin_shutdown("quit", ShutdownPurpose::Quit)
+            .unwrap();
+        assert_eq!(
+            lifecycle.begin_relocation("move").unwrap_err().blockers,
+            [blocker(Kind::Shutdown, "")]
+        );
+        assert!(lifecycle.state.lock().unwrap().relocation.is_none());
+
+        let lifecycle = ready();
+        lifecycle.begin_relocation("first").unwrap();
+        assert_eq!(
+            lifecycle.begin_relocation("second").unwrap_err().blockers,
+            [blocker(Kind::Relocation, "")]
+        );
+        assert!(matches!(
+            lifecycle.cancel_relocation("second"),
+            Err(CancelRelocationError::Missing)
+        ));
+        lifecycle.cancel_relocation("first").unwrap();
+        assert_nothing_changed(&lifecycle, &[]);
+    }
+
+    #[test]
+    fn a_confirmed_gone_record_clears_and_the_move_commits() {
+        #[derive(Debug)]
+        struct Gone;
+        impl ProcessAbsenceObserver for Gone {
+            fn confirmed_absent(&self, _pid: u32, _start: u64) -> bool {
+                true
+            }
+        }
+        let lifecycle = Arc::new(RuntimeLifecycle {
+            process_observer: Arc::new(Gone),
+            ..Default::default()
+        });
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle.adopted_record_published(ProcessRecord::legacy(42, 10));
+        assert!(lifecycle.begin_relocation("busy").is_err());
+        lifecycle.refresh_adopted();
+        lifecycle.begin_relocation("move").unwrap();
+        assert!(lifecycle.admit("late launch").is_err());
+        assert!(!lifecycle.shutdown_committed());
+        lifecycle.commit_shutdown("move").unwrap();
+        assert!(lifecycle.shutdown_committed());
+        lifecycle.begin_relocation("move").unwrap();
+        assert!(matches!(
+            lifecycle.cancel_relocation("move"),
+            Err(CancelRelocationError::Committed)
+        ));
+        // A committed lease is not cancelled, so a retry still re-joins it.
+        lifecycle.begin_relocation("move").unwrap();
+    }
+
+    /// A prepare-relocation the core gets to only after the launcher gave up
+    /// on it and cancelled the id must not grant a lease nobody owns: that
+    /// lease would refuse every launch and every later move until a restart.
+    #[test]
+    fn a_cancelled_id_never_gets_a_lease() {
+        // Cancelled before the core saw the prepare: nothing was held.
+        let lifecycle = ready();
+        assert!(matches!(
+            lifecycle.cancel_relocation("late"),
+            Err(CancelRelocationError::Missing)
+        ));
+        let refused = lifecycle.begin_relocation("late").unwrap_err();
+        assert!(refused.cancelled);
+        assert!(refused.blockers.is_empty());
+        assert!(refused.to_string().contains("cancelled"), "{refused}");
+        assert_nothing_changed(&lifecycle, &[]);
+
+        // Released after a grant: a duplicate prepare cannot take it again.
+        lifecycle.begin_relocation("released").unwrap();
+        lifecycle.cancel_relocation("released").unwrap();
+        assert!(
+            lifecycle
+                .begin_relocation("released")
+                .unwrap_err()
+                .cancelled
+        );
+        assert_nothing_changed(&lifecycle, &[]);
+
+        // A new attempt has a new id and is decided on what runs.
+        lifecycle.begin_relocation("fresh").unwrap();
+        lifecycle.cancel_relocation("fresh").unwrap();
+    }
+
+    /// The launcher's first prepare goes unanswered, its retry with the same
+    /// id is refused while a download finishes, and the user sees the busy
+    /// view. If the first prepare reaches the core only once the download is
+    /// done, it must not take a lease nobody owns: that lease would refuse
+    /// every launch and every later move until a restart.
+    #[test]
+    fn a_refused_id_never_gets_a_lease_later() {
+        let lifecycle = ready();
+        let install = lifecycle
+            .admit_owned("addon installation tree", ActivityPolicy::Installer)
+            .unwrap();
+        let refused = lifecycle.begin_relocation("stalled").unwrap_err();
+        assert!(!refused.cancelled);
+        assert_eq!(
+            refused.blockers,
+            [blocker(Kind::Install, "addon installation tree")]
+        );
+        install.finish();
+
+        let late = lifecycle.begin_relocation("stalled").unwrap_err();
+        assert!(late.cancelled, "{late}");
+        assert!(late.blockers.is_empty());
+        assert_nothing_changed(&lifecycle, &[]);
+
+        // Try again uses a new id and is decided on what runs now.
+        lifecycle.begin_relocation("try again").unwrap();
+        lifecycle.cancel_relocation("try again").unwrap();
+        assert_nothing_changed(&lifecycle, &[]);
+    }
+
+    #[test]
+    fn cancelled_ids_are_remembered_up_to_a_bound() {
+        let lifecycle = ready();
+        for attempt in 0..=CANCELLED_RELOCATIONS_KEPT {
+            let _ = lifecycle.cancel_relocation(&format!("attempt {attempt}"));
+        }
+        let _ = lifecycle.cancel_relocation("attempt 1");
+        let state = lifecycle.state.lock().unwrap();
+        assert_eq!(
+            state.cancelled_relocations.len(),
+            CANCELLED_RELOCATIONS_KEPT
+        );
+        assert!(
+            !state
+                .cancelled_relocations
+                .iter()
+                .any(|id| id == "attempt 0")
+        );
+        drop(state);
+        lifecycle.begin_relocation("attempt 0").unwrap();
+    }
+
+    /// The check before the folder scan answers like begin_relocation would,
+    /// without taking the lease, and the caller's own lease is not a blocker.
+    #[test]
+    fn the_blocker_check_takes_no_lease() {
+        let lifecycle = ready();
+        let task = lifecycle.admit("instance export").unwrap();
+        assert_eq!(
+            lifecycle.relocation_blockers("move"),
+            [blocker(Kind::Task, "instance export")]
+        );
+        assert_nothing_changed(&lifecycle, &[task.cancellation()]);
+        task.finish();
+        assert!(lifecycle.relocation_blockers("move").is_empty());
+        assert_nothing_changed(&lifecycle, &[]);
+
+        lifecycle.begin_relocation("move").unwrap();
+        assert!(lifecycle.relocation_blockers("move").is_empty());
+        assert_eq!(
+            lifecycle.relocation_blockers("other"),
+            [blocker(Kind::Relocation, "")]
+        );
+    }
+
+    /// A game left running by an earlier session is one entry, not two: its
+    /// watcher is part of that game until the game is gone.
+    #[test]
+    fn an_adopted_game_names_its_watcher() {
+        let lifecycle = ready();
+        lifecycle
+            .state
+            .lock()
+            .unwrap()
+            .adopted
+            .insert(ProcessRecord::legacy(42, 10), "/data/instances/Pack".into());
+        lifecycle.adopted_record_published(ProcessRecord::legacy(42, 10));
+        let watcher = lifecycle
+            .admit_owned("adopted game core watcher", ActivityPolicy::CoreWork)
+            .unwrap();
+        watcher.watch_adopted_games();
+        assert_eq!(
+            lifecycle.begin_relocation("move 1").unwrap_err().blockers,
+            [blocker(Kind::PreviousGame, "/data/instances/Pack").with_pid(42)]
+        );
+        // The game is gone but its watcher is still finishing up.
+        {
+            let mut state = lifecycle.state.lock().unwrap();
+            state.adopted.clear();
+            state.adopted_games.clear();
+        }
+        assert_eq!(
+            lifecycle.begin_relocation("move 2").unwrap_err().blockers,
+            [blocker(Kind::Task, "adopted game core watcher")]
+        );
+        watcher.finish();
+        lifecycle.begin_relocation("move 3").unwrap();
+    }
+
+    /// A lease that could not be released or whose exit was not observed must
+    /// not keep the user from quitting, restarting or updating.
+    #[tokio::test]
+    async fn quit_is_never_pinned_by_a_relocation_lease() {
+        for committed in [false, true] {
+            let lifecycle = ready();
+            lifecycle.begin_relocation("move").unwrap();
+            if committed {
+                lifecycle.commit_shutdown("move").unwrap();
+            }
+            lifecycle
+                .prepare_shutdown_and_commit("quit", ShutdownPurpose::Quit, async { Ok(()) })
+                .await
+                .unwrap();
+            assert!(lifecycle.shutdown_committed());
+        }
+    }
+}
+
+/// The operation grace period runs beside the server drain. A local server may
+/// take up to the drain's own bound to save and stop, and that is not a reason
+/// to refuse the quit, restart or update once it has stopped.
+#[cfg(test)]
+mod shutdown_drain_budget_tests {
+    use super::*;
+    use std::time::Duration;
+    use tokio::time::Instant;
+
+    fn ready() -> Arc<RuntimeLifecycle> {
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle
+    }
+    /// A running local server as start_server_impl and the supervisor leave it:
+    /// admitted, spawned as Server/Running, retained until finalize_run.
+    fn server_run(lifecycle: &Arc<RuntimeLifecycle>, owner: &str) -> RuntimeActivity {
+        let mut run = lifecycle.admit(owner).unwrap();
+        run.external();
+        run.spawn(ActivityPolicy::Server, || Ok(())).unwrap();
+        run
+    }
+    /// Polls like Electron does and returns every phase seen plus the final status.
+    async fn settle(
+        lifecycle: &RuntimeLifecycle,
+        request: &str,
+        purpose: ShutdownPurpose,
+    ) -> (Vec<ShutdownPhase>, ShutdownStatus) {
+        let mut seen = vec![];
+        let deadline = Instant::now() + Duration::from_secs(120);
+        loop {
+            let status = lifecycle.shutdown_status(request, purpose).unwrap();
+            if seen.last() != Some(&status.phase) {
+                seen.push(status.phase);
+            }
+            if status.phase != ShutdownPhase::Draining {
+                return (seen, status);
+            }
+            assert!(Instant::now() < deadline, "shutdown never settled");
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+    }
+
+    async fn slow_server_stop_readies(stop: Duration) {
+        let lifecycle = ready();
+        let run = server_run(&lifecycle, "slow server");
+        let started = Instant::now();
+        lifecycle
+            .prepare_shutdown("quit", ShutdownPurpose::Quit, async move {
+                // 'stop' sent; the world saves, the process exits, finalize_run
+                // publishes the logs and finishes the run.
+                tokio::time::sleep(stop).await;
+                run.finish();
+                Ok(())
+            })
+            .unwrap();
+        let (seen, status) = settle(&lifecycle, "quit", ShutdownPurpose::Quit).await;
+        assert_eq!(
+            seen,
+            [ShutdownPhase::Draining, ShutdownPhase::Ready],
+            "{:?}",
+            status.blockers
+        );
+        assert!(status.blockers.is_empty());
+        assert!(started.elapsed() >= stop);
+        lifecycle
+            .commit_prepared_shutdown("quit", ShutdownPurpose::Quit)
+            .unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_server_that_takes_25_seconds_to_stop_does_not_fail_the_quit() {
+        slow_server_stop_readies(Duration::from_secs(25)).await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_hung_server_killed_after_the_grace_period_does_not_fail_the_quit() {
+        // 30 s graceful stop, 1 s + 5 s kill, 5 s log settle.
+        slow_server_stop_readies(Duration::from_secs(41)).await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_operation_that_never_settles_still_blocks_after_the_budget() {
+        for policy in [ActivityPolicy::Installer, ActivityPolicy::CoreWork] {
+            let lifecycle = ready();
+            let operation = lifecycle.admit_owned("stuck installer", policy).unwrap();
+            let started = Instant::now();
+            lifecycle
+                .prepare_shutdown("quit", ShutdownPurpose::Quit, async { Ok(()) })
+                .unwrap();
+            tokio::time::sleep(OPERATION_SETTLE_BUDGET - Duration::from_secs(1)).await;
+            assert_eq!(
+                lifecycle
+                    .shutdown_status("quit", ShutdownPurpose::Quit)
+                    .unwrap()
+                    .phase,
+                ShutdownPhase::Draining,
+                "the operation gets the whole budget"
+            );
+            let (_, status) = settle(&lifecycle, "quit", ShutdownPurpose::Quit).await;
+            assert_eq!(status.phase, ShutdownPhase::Unresolved);
+            assert!(started.elapsed() >= OPERATION_SETTLE_BUDGET);
+            assert!(
+                status
+                    .blockers
+                    .iter()
+                    .any(|blocker| blocker.name == "stuck installer"),
+                "{:?}",
+                status.blockers
+            );
+            assert!(
+                lifecycle
+                    .commit_prepared_shutdown("quit", ShutdownPurpose::Quit)
+                    .is_err()
+            );
+            operation.finish();
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_operation_that_settles_after_the_budget_but_before_the_drain_is_not_a_blocker() {
+        let lifecycle = ready();
+        let run = server_run(&lifecycle, "slow server");
+        let operation = lifecycle
+            .admit_owned("late writer", ActivityPolicy::CoreWork)
+            .unwrap();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(18)).await;
+            operation.finish();
+        });
+        lifecycle
+            .prepare_shutdown("update", ShutdownPurpose::Update, async move {
+                tokio::time::sleep(Duration::from_secs(25)).await;
+                run.finish();
+                Ok(())
+            })
+            .unwrap();
+        let (seen, status) = settle(&lifecycle, "update", ShutdownPurpose::Update).await;
+        assert_eq!(
+            seen,
+            [ShutdownPhase::Draining, ShutdownPhase::Ready],
+            "{:?}",
+            status.blockers
+        );
+        lifecycle
+            .commit_prepared_shutdown("update", ShutdownPurpose::Update)
+            .unwrap();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_failed_drain_names_its_error_and_the_server_it_left_running() {
+        for drain_fails in [true, false] {
+            let lifecycle = ready();
+            let run = server_run(&lifecycle, "unconfirmed server");
+            let started = Instant::now();
+            lifecycle
+                .prepare_shutdown("quit", ShutdownPurpose::Quit, async move {
+                    if drain_fails {
+                        anyhow::bail!(
+                            "Server forced exit unconfirmed; files and ownership retained"
+                        );
+                    }
+                    Ok(())
+                })
+                .unwrap();
+            let (_, status) = settle(&lifecycle, "quit", ShutdownPurpose::Quit).await;
+            assert_eq!(status.phase, ShutdownPhase::Unresolved);
+            assert!(
+                started.elapsed() < Duration::from_secs(1),
+                "the drain's verdict is not delayed by the operation budget"
+            );
+            assert!(
+                status.blockers.contains(&RuntimeBlocker::new(
+                    RuntimeBlockerKind::Server,
+                    "unconfirmed server"
+                )),
+                "a server run the drain did not finish is still named: {:?}",
+                status.blockers
+            );
+            // A failed drain is not a server still stopping: retrying the
+            // request only repeats it, so it is named as unconfirmed, which
+            // the launcher does not wait on.
+            assert_eq!(
+                status.blockers.iter().any(|blocker| {
+                    blocker.kind == RuntimeBlockerKind::Unconfirmed
+                        && blocker.name.contains("Server forced exit unconfirmed")
+                }),
+                drain_fails,
+                "{:?}",
+                status.blockers
+            );
+            assert!(
+                !status.blockers.iter().any(|blocker| {
+                    blocker.kind == RuntimeBlockerKind::Server
+                        && blocker.name.contains("Server forced exit unconfirmed")
+                }),
+                "{:?}",
+                status.blockers
+            );
+            assert!(
+                !status
+                    .blockers
+                    .iter()
+                    .any(|blocker| blocker.name.contains("remain active")),
+                "{:?}",
+                status.blockers
+            );
+            assert!(
+                lifecycle
+                    .commit_prepared_shutdown("quit", ShutdownPurpose::Quit)
+                    .is_err()
+            );
+            run.finish();
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_operation_turning_unknown_resolves_the_request_promptly() {
+        let lifecycle = ready();
+        let operation = lifecycle
+            .admit_owned("lost worker", ActivityPolicy::CoreWork)
+            .unwrap();
+        let held = lifecycle
+            .admit_owned("busy installer", ActivityPolicy::Installer)
+            .unwrap();
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(3)).await;
+            operation.unknown("worker supervision lost".into());
+        });
+        let started = Instant::now();
+        lifecycle
+            .prepare_shutdown("quit", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        let (_, status) = settle(&lifecycle, "quit", ShutdownPurpose::Quit).await;
+        assert_eq!(status.phase, ShutdownPhase::Unresolved);
+        assert!(
+            started.elapsed() < OPERATION_SETTLE_BUDGET,
+            "Unknown does not wait out the budget"
+        );
+        assert!(
+            status.blockers.contains(&RuntimeBlocker::new(
+                RuntimeBlockerKind::Unconfirmed,
+                "lost worker"
+            )),
+            "{:?}",
+            status.blockers
+        );
+        assert!(
+            status.blockers.contains(&RuntimeBlocker::new(
+                RuntimeBlockerKind::Install,
+                "busy installer"
+            )),
+            "{:?}",
+            status.blockers
+        );
+        held.finish();
+    }
+}
+
+/// A quit, restart or update that cannot finish never leaves the core
+/// frozen and never stops tracking a running game: the user can cancel it
+/// and keep using the launcher, or start another attempt in its place.
+#[cfg(test)]
+mod failed_shutdown_tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn ready() -> Arc<RuntimeLifecycle> {
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle
+    }
+    /// Polls like Electron does until the request leaves Draining.
+    async fn settled(
+        lifecycle: &RuntimeLifecycle,
+        request: &str,
+        purpose: ShutdownPurpose,
+    ) -> ShutdownStatus {
+        tokio::time::timeout(Duration::from_secs(120), async {
+            loop {
+                let status = lifecycle.shutdown_status(request, purpose).unwrap();
+                if status.phase != ShutdownPhase::Draining {
+                    return status;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        })
+        .await
+        .expect("shutdown never settled")
+    }
+    /// A long copy or Recycle Bin move: it does not look at its cancellation.
+    fn stuck(lifecycle: &Arc<RuntimeLifecycle>) -> RuntimeActivity {
+        lifecycle
+            .admit_owned("stuck copy", ActivityPolicy::CoreWork)
+            .unwrap()
+    }
+    fn admission_open(lifecycle: &Arc<RuntimeLifecycle>) -> bool {
+        let Ok(mut launch) = lifecycle.admit("launch after cancel") else {
+            return false;
+        };
+        let spawned = launch.spawn(ActivityPolicy::Game, || Ok(())).is_ok();
+        launch.finish();
+        spawned
+    }
+    /// A game this core started and its session worker, as instance/run
+    /// sets them up: the worker detaches the game when cancelled, and
+    /// otherwise sees it exit and sets the instance back to Inactive.
+    struct Session {
+        worker: tokio::task::JoinHandle<&'static str>,
+        cancel: tokio_util::sync::CancellationToken,
+        exit: tokio::sync::oneshot::Sender<()>,
+    }
+    fn session(lifecycle: &Arc<RuntimeLifecycle>, instance: u32) -> Session {
+        let follower = lifecycle.admit(format!("game {instance} session")).unwrap();
+        let mut game = lifecycle
+            .admit_owned(format!("game {instance}"), ActivityPolicy::Game)
+            .unwrap();
+        game.spawn(ActivityPolicy::Game, || Ok(())).unwrap();
+        follower.follow_spawned_game(&game).unwrap();
+        let cancel = follower.cancellation();
+        let (exit, exited) = tokio::sync::oneshot::channel();
+        let worker = spawn_retained(follower, move |slot| {
+            let cancel = slot.as_ref().unwrap().cancellation();
+            Box::pin(async move {
+                tokio::select! {
+                    _ = cancel.cancelled() => {
+                        game.detach_surviving_game().unwrap();
+                        "detached"
+                    }
+                    _ = exited => {
+                        game.finish();
+                        "inactive"
+                    }
+                }
+            })
+        });
+        Session {
+            worker,
+            cancel,
+            exit,
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn cancelling_an_unresolved_quit_reopens_admission_and_retires_its_id() {
+        let lifecycle = ready();
+        let copy = stuck(&lifecycle);
+        lifecycle
+            .prepare_shutdown("quit-1", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        let status = settled(&lifecycle, "quit-1", ShutdownPurpose::Quit).await;
+        assert_eq!(status.phase, ShutdownPhase::Unresolved);
+        assert_eq!(
+            status.blockers,
+            [RuntimeBlocker::new(RuntimeBlockerKind::Task, "stuck copy")]
+        );
+        assert!(
+            !admission_open(&lifecycle),
+            "an unresolved quit freezes admission"
+        );
+
+        assert!(matches!(
+            lifecycle.cancel_shutdown("someone else"),
+            Err(CancelShutdownError::Missing)
+        ));
+        assert!(lifecycle.admission_frozen());
+        lifecycle.cancel_shutdown("quit-1").unwrap();
+        assert!(!lifecycle.admission_frozen());
+        assert!(
+            admission_open(&lifecycle),
+            "Play, installs and spawns work again"
+        );
+        assert!(
+            lifecycle
+                .shutdown_status("quit-1", ShutdownPurpose::Quit)
+                .is_err()
+        );
+
+        // A late duplicate of the cancelled request cannot freeze the core again.
+        assert!(matches!(
+            lifecycle.cancel_shutdown("quit-1"),
+            Err(CancelShutdownError::Missing)
+        ));
+        assert!(
+            lifecycle
+                .prepare_shutdown("quit-1", ShutdownPurpose::Quit, async { Ok(()) })
+                .is_err()
+        );
+        assert!(!lifecycle.admission_frozen());
+        copy.finish();
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_drain_that_finishes_after_the_cancel_changes_nothing() {
+        let lifecycle = ready();
+        let (finish_drain, drain_finished) = tokio::sync::oneshot::channel::<()>();
+        let (drained, drain_done) = tokio::sync::oneshot::channel::<()>();
+        lifecycle
+            .prepare_shutdown("quit-1", ShutdownPurpose::Quit, async move {
+                let _ = drain_finished.await;
+                let _ = drained.send(());
+                Ok(())
+            })
+            .unwrap();
+        tokio::task::yield_now().await;
+        assert_eq!(
+            lifecycle
+                .shutdown_status("quit-1", ShutdownPurpose::Quit)
+                .unwrap()
+                .phase,
+            ShutdownPhase::Draining
+        );
+        lifecycle.cancel_shutdown("quit-1").unwrap();
+        finish_drain.send(()).unwrap();
+        drain_done.await.unwrap();
+        for _ in 0..20 {
+            tokio::task::yield_now().await;
+        }
+        assert!(lifecycle.state.lock().unwrap().shutdown.is_none());
+        assert!(admission_open(&lifecycle));
+    }
+
+    #[tokio::test]
+    async fn a_committed_request_cannot_be_cancelled() {
+        let lifecycle = ready();
+        lifecycle
+            .prepare_shutdown("quit-1", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        assert_eq!(
+            settled(&lifecycle, "quit-1", ShutdownPurpose::Quit)
+                .await
+                .phase,
+            ShutdownPhase::Ready
+        );
+        assert!(matches!(
+            lifecycle.cancel_shutdown("quit-1"),
+            Err(CancelShutdownError::Finishing)
+        ));
+        lifecycle
+            .commit_prepared_shutdown("quit-1", ShutdownPurpose::Quit)
+            .unwrap();
+        assert!(matches!(
+            lifecycle.cancel_shutdown("quit-1"),
+            Err(CancelShutdownError::Committed)
+        ));
+        assert!(lifecycle.shutdown_committed());
+        assert!(lifecycle.admission_frozen());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_new_request_replaces_only_an_unresolved_one() {
+        let lifecycle = ready();
+        let copy = stuck(&lifecycle);
+        lifecycle
+            .prepare_shutdown("update-1", ShutdownPurpose::Update, async { Ok(()) })
+            .unwrap();
+        assert_eq!(
+            settled(&lifecycle, "update-1", ShutdownPurpose::Update)
+                .await
+                .phase,
+            ShutdownPhase::Unresolved
+        );
+        // Closing the window after a failed update install.
+        lifecycle
+            .prepare_shutdown("quit-2", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        assert!(
+            lifecycle
+                .shutdown_status("update-1", ShutdownPurpose::Update)
+                .is_err()
+        );
+        assert!(
+            lifecycle
+                .begin_shutdown("update-1", ShutdownPurpose::Update)
+                .is_err(),
+            "the replaced request is retired"
+        );
+        // While it drains, it is not replaced.
+        assert!(
+            lifecycle
+                .begin_shutdown("update-3", ShutdownPurpose::Update)
+                .is_err()
+        );
+        assert_eq!(
+            settled(&lifecycle, "quit-2", ShutdownPurpose::Quit)
+                .await
+                .phase,
+            ShutdownPhase::Unresolved
+        );
+        copy.finish();
+        // The same request retries once it is unresolved.
+        lifecycle
+            .prepare_shutdown("quit-2", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        assert_eq!(
+            settled(&lifecycle, "quit-2", ShutdownPurpose::Quit)
+                .await
+                .phase,
+            ShutdownPhase::Ready
+        );
+        assert!(
+            lifecycle
+                .begin_shutdown("update-4", ShutdownPurpose::Update)
+                .is_err(),
+            "a ready request is not replaced"
+        );
+        lifecycle
+            .commit_prepared_shutdown("quit-2", ShutdownPurpose::Quit)
+            .unwrap();
+        assert!(
+            lifecycle
+                .begin_shutdown("update-5", ShutdownPurpose::Update)
+                .is_err(),
+            "a committed request is not replaced"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn servers_stopped_by_a_replaced_attempt_are_still_reported() {
+        let lifecycle = ready();
+        let mut server = lifecycle.admit("server 7 run").unwrap();
+        server.external();
+        server.spawn(ActivityPolicy::Server, || Ok(())).unwrap();
+        let copy = stuck(&lifecycle);
+        let draining = lifecycle.clone();
+        lifecycle
+            .prepare_shutdown("quit-1", ShutdownPurpose::Quit, async move {
+                // As ServerManager::shutdown_running_for does once it sent 'stop'.
+                draining.shutdown_drain("quit-1").servers_asked_to_stop();
+                server.finish();
+                Ok(())
+            })
+            .unwrap();
+        let status = settled(&lifecycle, "quit-1", ShutdownPurpose::Quit).await;
+        assert_eq!(status.phase, ShutdownPhase::Unresolved);
+        assert!(status.servers_stopped);
+        lifecycle
+            .prepare_shutdown("update-2", ShutdownPurpose::Update, async { Ok(()) })
+            .unwrap();
+        assert!(
+            lifecycle
+                .shutdown_status("update-2", ShutdownPurpose::Update)
+                .unwrap()
+                .servers_stopped
+        );
+        copy.finish();
+    }
+
+    /// The note that servers were stopped is only shown once the drain
+    /// asked one to stop: a server that is running while the drain still
+    /// waits for something else was not stopped yet.
+    #[tokio::test(start_paused = true)]
+    async fn servers_count_as_stopped_only_once_the_drain_asked_them() {
+        let lifecycle = ready();
+        let mut server = lifecycle.admit("server 7 run").unwrap();
+        server.external();
+        server.spawn(ActivityPolicy::Server, || Ok(())).unwrap();
+        let (asked, ask) = tokio::sync::oneshot::channel::<()>();
+        let draining = lifecycle.clone();
+        lifecycle
+            .prepare_shutdown("quit-1", ShutdownPurpose::Quit, async move {
+                let _ = ask.await;
+                draining.shutdown_drain("quit-1").servers_asked_to_stop();
+                server.finish();
+                Ok(())
+            })
+            .unwrap();
+        tokio::task::yield_now().await;
+        let status = lifecycle
+            .shutdown_status("quit-1", ShutdownPurpose::Quit)
+            .unwrap();
+        assert_eq!(status.phase, ShutdownPhase::Draining);
+        assert!(!status.servers_stopped);
+        asked.send(()).unwrap();
+        let status = settled(&lifecycle, "quit-1", ShutdownPurpose::Quit).await;
+        assert_eq!(status.phase, ShutdownPhase::Ready);
+        assert!(status.servers_stopped);
+    }
+
+    /// Keep GDLauncher open, or a later request taking the place of an
+    /// unresolved one, tells a drain still running for the old request to
+    /// leave alone the servers it has not asked to stop yet. A drain that
+    /// starts after its request is gone touches nothing.
+    #[tokio::test(start_paused = true)]
+    async fn a_cancelled_or_replaced_request_tells_its_drain_to_stop_asking() {
+        let lifecycle = ready();
+        lifecycle
+            .prepare_shutdown("quit-1", ShutdownPurpose::Quit, std::future::pending())
+            .unwrap();
+        let drain = lifecycle.shutdown_drain("quit-1");
+        assert!(!drain.cancelled());
+        lifecycle.cancel_shutdown("quit-1").unwrap();
+        assert!(drain.cancelled());
+        assert!(lifecycle.shutdown_drain("quit-1").cancelled());
+        // Reporting for a request that is gone changes nothing.
+        drain.servers_asked_to_stop();
+
+        let copy = stuck(&lifecycle);
+        lifecycle
+            .prepare_shutdown("quit-2", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        let retried = lifecycle.shutdown_drain("quit-2");
+        assert_eq!(
+            settled(&lifecycle, "quit-2", ShutdownPurpose::Quit)
+                .await
+                .phase,
+            ShutdownPhase::Unresolved
+        );
+        // A retry of the same request keeps its handle live.
+        lifecycle
+            .begin_shutdown("quit-2", ShutdownPurpose::Quit)
+            .unwrap();
+        assert!(!retried.cancelled());
+        lifecycle.cancel_shutdown("quit-2").unwrap();
+        assert!(retried.cancelled());
+
+        lifecycle
+            .prepare_shutdown("quit-3", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        let unresolved = lifecycle.shutdown_drain("quit-3");
+        assert_eq!(
+            settled(&lifecycle, "quit-3", ShutdownPurpose::Quit)
+                .await
+                .phase,
+            ShutdownPhase::Unresolved
+        );
+        lifecycle
+            .begin_shutdown("update-4", ShutdownPurpose::Update)
+            .unwrap();
+        assert!(unresolved.cancelled(), "a replaced request is cancelled");
+        assert!(!lifecycle.shutdown_drain("update-4").cancelled());
+        assert!(
+            !lifecycle
+                .shutdown_status("update-4", ShutdownPurpose::Update)
+                .unwrap()
+                .servers_stopped
+        );
+        copy.finish();
+    }
+
+    /// A retired id is refused with its own error, which the route reports
+    /// as `cancelled: true` so the launcher starts over under a new id.
+    #[test]
+    fn a_retired_id_is_refused_as_such() {
+        let lifecycle = ready();
+        lifecycle
+            .begin_shutdown("quit-1", ShutdownPurpose::Quit)
+            .unwrap();
+        lifecycle.cancel_shutdown("quit-1").unwrap();
+        let error = lifecycle
+            .begin_shutdown("quit-1", ShutdownPurpose::Quit)
+            .unwrap_err();
+        assert!(error.is::<ShutdownRetired>(), "{error:#}");
+        let error = lifecycle
+            .begin_shutdown("", ShutdownPurpose::Quit)
+            .unwrap_err();
+        assert!(!error.is::<ShutdownRetired>());
+        assert!(!lifecycle.admission_frozen());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_refused_attempt_keeps_tracking_running_games_until_the_retry_can_finish() {
+        let lifecycle = ready();
+        let game = session(&lifecycle, 3);
+        let watcher = lifecycle
+            .admit_owned("adopted game core watcher", ActivityPolicy::CoreWork)
+            .unwrap();
+        watcher.watch_adopted_games();
+        let watcher_cancel = watcher.cancellation();
+        let copy = stuck(&lifecycle);
+
+        lifecycle
+            .prepare_shutdown("quit-1", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        // While it drains, only what keeps it from finishing is listed.
+        assert_eq!(
+            lifecycle
+                .shutdown_status("quit-1", ShutdownPurpose::Quit)
+                .unwrap()
+                .blockers,
+            [RuntimeBlocker::new(RuntimeBlockerKind::Task, "stuck copy")]
+        );
+        let status = settled(&lifecycle, "quit-1", ShutdownPurpose::Quit).await;
+        assert_eq!(status.phase, ShutdownPhase::Unresolved);
+        assert_eq!(
+            status.blockers,
+            [RuntimeBlocker::new(RuntimeBlockerKind::Task, "stuck copy")],
+            "the session worker and watcher are not in the way"
+        );
+        assert!(!game.cancel.is_cancelled(), "the game is still tracked");
+        assert!(!watcher_cancel.is_cancelled());
+
+        // Keep GDLauncher open: the game exits later and is seen exiting.
+        lifecycle.cancel_shutdown("quit-1").unwrap();
+        game.exit.send(()).unwrap();
+        assert_eq!(game.worker.await.unwrap(), "inactive");
+
+        // Another quit once the copy is done hands the next game over.
+        let next = session(&lifecycle, 4);
+        lifecycle
+            .prepare_shutdown("quit-2", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        let status = settled(&lifecycle, "quit-2", ShutdownPurpose::Quit).await;
+        assert_eq!(status.phase, ShutdownPhase::Unresolved);
+        assert!(!next.cancel.is_cancelled());
+        copy.finish();
+        lifecycle
+            .prepare_shutdown("quit-2", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(1), next.cancel.cancelled())
+            .await
+            .expect("the session worker is cancelled once nothing else is left");
+        assert!(watcher_cancel.is_cancelled());
+        watcher.finish();
+        assert_eq!(next.worker.await.unwrap(), "detached");
+        let status = settled(&lifecycle, "quit-2", ShutdownPurpose::Quit).await;
+        assert_eq!(status.phase, ShutdownPhase::Ready, "{:?}", status.blockers);
+        lifecycle
+            .commit_prepared_shutdown("quit-2", ShutdownPurpose::Quit)
+            .unwrap();
+        drop(next.exit);
+    }
+
+    /// The end of a drain decides under one lock whether running games are
+    /// handed over, so work that ends between the check and the settlement
+    /// can never leave an unreleased session worker named as the blocker.
+    #[tokio::test]
+    async fn a_drain_hands_games_over_only_when_it_succeeded_and_nothing_else_is_left() {
+        let lifecycle = ready();
+        let game = session(&lifecycle, 8);
+        let copy = stuck(&lifecycle);
+        let status = |lifecycle: &RuntimeLifecycle| {
+            lifecycle
+                .shutdown_status("quit-1", ShutdownPurpose::Quit)
+                .unwrap()
+        };
+
+        lifecycle
+            .begin_shutdown("quit-1", ShutdownPurpose::Quit)
+            .unwrap();
+        assert!(
+            lifecycle
+                .release_followers_or_settle("quit-1", Ok(()))
+                .is_none()
+        );
+        assert!(!game.cancel.is_cancelled());
+        assert_eq!(status(&lifecycle).phase, ShutdownPhase::Unresolved);
+        assert_eq!(
+            status(&lifecycle).blockers,
+            [RuntimeBlocker::new(RuntimeBlockerKind::Task, "stuck copy")]
+        );
+
+        // A server whose exit stayed unconfirmed keeps the games tracked too.
+        copy.finish();
+        assert!(
+            lifecycle
+                .begin_shutdown("quit-1", ShutdownPurpose::Quit)
+                .unwrap()
+        );
+        assert!(
+            lifecycle
+                .release_followers_or_settle("quit-1", Err(anyhow::anyhow!("exit unconfirmed")))
+                .is_none()
+        );
+        assert!(!game.cancel.is_cancelled());
+        assert_eq!(
+            status(&lifecycle).blockers,
+            [RuntimeBlocker::new(
+                RuntimeBlockerKind::Unconfirmed,
+                "exit unconfirmed"
+            )]
+        );
+
+        // Another request's drain changes nothing.
+        assert!(
+            lifecycle
+                .begin_shutdown("quit-1", ShutdownPurpose::Quit)
+                .unwrap()
+        );
+        assert!(
+            lifecycle
+                .release_followers_or_settle("quit-0", Ok(()))
+                .is_none()
+        );
+        assert_eq!(status(&lifecycle).phase, ShutdownPhase::Draining);
+
+        let followers = lifecycle
+            .release_followers_or_settle("quit-1", Ok(()))
+            .expect("nothing else is left, so the game is handed over");
+        assert_eq!(followers.len(), 1);
+        assert!(game.cancel.is_cancelled());
+        assert_eq!(status(&lifecycle).phase, ShutdownPhase::Draining);
+        assert_eq!(game.worker.await.unwrap(), "detached");
+        wait_for_settlement(followers, FOLLOWER_SETTLE_BUDGET).await;
+        assert_eq!(
+            lifecycle.settle_shutdown("quit-1", Ok(())).unwrap().phase,
+            ShutdownPhase::Ready
+        );
+        drop(game.exit);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_session_worker_that_does_not_settle_after_its_release_is_named() {
+        let lifecycle = ready();
+        let follower = lifecycle.admit("game 5 session").unwrap();
+        let mut game = lifecycle
+            .admit_owned("game 5", ActivityPolicy::Game)
+            .unwrap();
+        game.spawn(ActivityPolicy::Game, || Ok(())).unwrap();
+        follower.follow_spawned_game(&game).unwrap();
+        lifecycle
+            .prepare_shutdown("quit-1", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        let status = settled(&lifecycle, "quit-1", ShutdownPurpose::Quit).await;
+        assert_eq!(status.phase, ShutdownPhase::Unresolved);
+        assert_eq!(
+            status.blockers,
+            [RuntimeBlocker::new(
+                RuntimeBlockerKind::Task,
+                "game 5 session"
+            )]
+        );
+        assert!(follower.cancellation().is_cancelled());
+        // Its game is already handed over, so going back is still allowed
+        // once the attempt ended unresolved.
+        lifecycle.cancel_shutdown("quit-1").unwrap();
+        follower.finish();
+        drop(game);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_request_whose_games_were_handed_over_is_finishing() {
+        let lifecycle = ready();
+        let (settle, settled_rx) = tokio::sync::oneshot::channel::<()>();
+        let follower = lifecycle.admit("game 6 session").unwrap();
+        let mut game = lifecycle
+            .admit_owned("game 6", ActivityPolicy::Game)
+            .unwrap();
+        game.spawn(ActivityPolicy::Game, || Ok(())).unwrap();
+        follower.follow_spawned_game(&game).unwrap();
+        let cancel = follower.cancellation();
+        let worker = spawn_retained(follower, move |_| {
+            Box::pin(async move {
+                let _ = settled_rx.await;
+                game.detach_surviving_game().unwrap();
+            })
+        });
+        lifecycle
+            .prepare_shutdown("quit-1", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        tokio::time::timeout(Duration::from_secs(1), cancel.cancelled())
+            .await
+            .unwrap();
+        assert!(matches!(
+            lifecycle.cancel_shutdown("quit-1"),
+            Err(CancelShutdownError::Finishing)
+        ));
+        settle.send(()).unwrap();
+        worker.await.unwrap();
+        assert_eq!(
+            settled(&lifecycle, "quit-1", ShutdownPurpose::Quit)
+                .await
+                .phase,
+            ShutdownPhase::Ready
+        );
+    }
+
+    #[test]
+    fn a_deletion_is_named_as_one() {
+        let lifecycle = ready();
+        let deletion = lifecycle
+            .admit_owned("delete instance 12", ActivityPolicy::Deletion)
+            .unwrap();
+        assert_eq!(
+            lifecycle.relocation_blockers("move"),
+            [RuntimeBlocker::new(
+                RuntimeBlockerKind::Deletion,
+                "delete instance 12"
+            )]
+        );
+        drop(
+            lifecycle
+                .admit_as("server deletion", ActivityPolicy::Deletion)
+                .unwrap(),
+        );
+        assert_eq!(
+            lifecycle.relocation_blockers("move").len(),
+            1,
+            "dropping it completes it"
+        );
+        deletion.finish();
+    }
+}
+
 #[cfg(test)]
 mod task22_tests {
     use super::*;
+    /// The real classification on an injected observation. Injected Absent
+    /// means the native probe confirmed no process holds the PID.
     #[derive(Debug)]
     struct SyntheticObserver(Mutex<orphan_pid::ProcessObservation>);
     impl ProcessAbsenceObserver for SyntheticObserver {
@@ -3038,22 +4654,14 @@ mod task22_tests {
         fn observation(&self, _: ProcessRecord) -> orphan_pid::ProcessObservation {
             *self.0.lock().unwrap()
         }
-        fn record_gone(&self, record: ProcessRecord) -> bool {
-            #[cfg(target_os = "linux")]
-            {
-                orphan_pid::identity_status(record, self.observation(record), false)
-                    == IdentityStatus::GoneOrReused
-            }
-            // Model the separate conservative non-Linux durable policy, not
-            // adoption's epoch classifier. Injected Absent means confirmed
-            // native PID absence; no native query is made by this fixture.
-            #[cfg(not(target_os = "linux"))]
-            {
-                matches!(
-                    self.observation(record),
-                    orphan_pid::ProcessObservation::Absent
-                )
-            }
+        fn status(&self, record: ProcessRecord, require_java: bool) -> IdentityStatus {
+            classify_observed(
+                record,
+                self.observation(record),
+                require_java,
+                orphan_pid::EPOCH_START_TIMES_ARE_STABLE,
+                || true,
+            )
         }
     }
     fn record() -> ProcessRecord {
@@ -3106,7 +4714,7 @@ mod task22_tests {
         lifecycle.adopted_record_published(replacement);
         *observer.0.lock().unwrap() = observed(replacement, 1700000000);
         lifecycle.refresh_adopted();
-        #[cfg(target_os = "linux")]
+        // Another boot/ticks identity behind the PID is reuse on every platform.
         assert!(
             !lifecycle
                 .state
@@ -3115,24 +4723,6 @@ mod task22_tests {
                 .adopted
                 .contains_key(&record)
         );
-        #[cfg(not(target_os = "linux"))]
-        assert!(
-            lifecycle
-                .state
-                .lock()
-                .unwrap()
-                .adopted
-                .contains_key(&record)
-        );
-    }
-}
-
-#[cfg(test)]
-mod task22_invalid_token_tests {
-    use super::*;
-    #[test]
-    fn task22_nil_boot_durable_extension_is_malformed_without_fallback() {
-        let bytes = br#"{"version":1,"process":{"pid":4242,"start_time":1700000000,"identity":{"kind":"LinuxBootTicks","boot_id":"00000000-0000-0000-0000-000000000000","start_ticks":123456}}}"#;
         assert!(
             lifecycle
                 .state
@@ -3174,40 +4764,32 @@ mod task22_invalid_token_tests {
             boot_id: uuid::Uuid::new_v4(),
             start_ticks: 123456,
         });
+        *observer.0.lock().unwrap() = observed(reused, 1700000000);
         lifecycle.reconcile_children().await.unwrap();
-        #[cfg(target_os = "linux")]
+        // Another boot/ticks identity behind the PID is reuse on every platform.
         assert!(!file.exists());
-        #[cfg(not(target_os = "linux"))]
-        {
-            assert!(
-                file.exists(),
-                "A present PID remains a durable non-Linux blocker"
-            );
-            assert_eq!(
-                decode_child_record(&std::fs::read(&file).unwrap()).unwrap(),
-                record
-            );
-            *observer.0.lock().unwrap() = orphan_pid::ProcessObservation::Absent;
-            lifecycle.reconcile_children().await.unwrap();
-            assert!(!file.exists());
-        }
         let legacy = ProcessRecord::legacy(4242, 1700000000);
-        std::fs::write(
-            &file,
-            serde_json::to_vec(&(legacy.pid, legacy.start_time.unwrap())).unwrap(),
-        )
-        .unwrap();
+        let legacy_bytes = serde_json::to_vec(&(legacy.pid, legacy.start_time.unwrap())).unwrap();
+        std::fs::write(&file, &legacy_bytes).unwrap();
         *observer.0.lock().unwrap() = observed(record, 1700000030);
         lifecycle.reconcile_children().await.unwrap();
-        assert!(file.exists());
-        assert!(
-            lifecycle
-                .state
-                .lock()
-                .unwrap()
-                .adopted
-                .contains_key(&legacy)
-        );
+        if orphan_pid::EPOCH_START_TIMES_ARE_STABLE {
+            // A creation time on Windows or macOS does not move with the
+            // clock: another start time is another process.
+            assert!(!file.exists());
+            std::fs::write(&file, &legacy_bytes).unwrap();
+        } else {
+            // On Linux a clock step can explain it (M23): kept, unconfirmed.
+            assert!(file.exists());
+            assert!(
+                lifecycle
+                    .state
+                    .lock()
+                    .unwrap()
+                    .adopted
+                    .contains_key(&legacy)
+            );
+        }
         *observer.0.lock().unwrap() = observed(record, 1700000000);
         lifecycle.reconcile_children().await.unwrap();
         assert_eq!(
@@ -3221,8 +4803,13 @@ mod task22_invalid_token_tests {
             decode_child_record(b"[4242,1700000000]").unwrap(),
             ProcessRecord::legacy(4242, 1700000000)
         );
+        for bytes in [b"".as_slice(), b"{}", b"{\"version\":2,\"process\":{\"pid\":4242,\"start_time\":1700000000,\"identity\":null}}", b"{\"version\":1,\"process\":{\"pid\":4242,\"start_time\":1700000000,\"identity\":{\"kind\":\"unknown\"}}}"] { assert!(decode_child_record(bytes).is_err()); }
     }
+}
 
+#[cfg(test)]
+mod task22_spawn_tests {
+    use super::*;
     #[test]
     fn task22_owned_capture_persists_same_token_and_unconfirmed_intent() {
         let root = tempfile::tempdir().unwrap();
@@ -3329,6 +4916,1018 @@ mod task22_invalid_token_tests {
         assert!(
             decode_child_record(bytes).is_err(),
             "Malformed stable token must remain Unknown, never prove reuse or gain epoch fallback"
+        );
+    }
+}
+
+/// Records and markers the startup check cannot resolve keep only a move of
+/// the runtime folder from starting. Quit, restart and update never wait on
+/// them, on a failed check or on a check that is still running.
+#[cfg(test)]
+mod ownership_evidence_tests {
+    use super::*;
+    use RuntimeBlockerKind as Kind;
+
+    /// A PID some process still holds: never confirmed gone, identity unknown.
+    #[derive(Debug)]
+    struct NeverGone;
+    impl ProcessAbsenceObserver for NeverGone {
+        fn confirmed_absent(&self, _pid: u32, _start: u64) -> bool {
+            false
+        }
+    }
+    fn never_gone(root: &Path) -> Arc<RuntimeLifecycle> {
+        Arc::new(RuntimeLifecycle {
+            process_observer: Arc::new(NeverGone),
+            ..RuntimeLifecycle::with_runtime_path(root)
+        })
+    }
+    fn unreadable(path: &Path) -> RuntimeBlocker {
+        RuntimeBlocker::new(Kind::UnreadableRecord, path.display().to_string())
+    }
+    /// Every file under `root` with its bytes; folders by name only.
+    fn snapshot(root: &Path) -> Vec<(PathBuf, Option<Vec<u8>>)> {
+        let mut files: Vec<_> = std::fs::read_dir(root)
+            .unwrap()
+            .map(|entry| {
+                let path = entry.unwrap().path();
+                let bytes = path.is_file().then(|| std::fs::read(&path).unwrap());
+                (path, bytes)
+            })
+            .collect();
+        files.sort();
+        files
+    }
+
+    /// (a) A runtime folder that could not be listed fails the startup check
+    /// for the session. A move is refused and names that folder; quitting
+    /// and installing an update still go through.
+    #[tokio::test]
+    async fn a_failed_startup_check_refuses_a_move_but_not_quit_or_update() {
+        for purpose in [ShutdownPurpose::Quit, ShutdownPurpose::Update] {
+            let root = tempfile::tempdir().unwrap();
+            // A file where the instances folder should be cannot be listed.
+            let instances = root.path().join("instances");
+            std::fs::write(&instances, b"not a folder").unwrap();
+            let lifecycle = Arc::new(RuntimeLifecycle::default());
+            let error = lifecycle
+                .reconcile_root(&instances, ".gdl_instance.pid")
+                .await
+                .unwrap_err();
+            lifecycle.reconciliation_finished(Err(error));
+            lifecycle.reconciliation_finished(Ok(()));
+
+            let refused = lifecycle.begin_relocation("move").unwrap_err();
+            assert_eq!(refused.blockers.len(), 1, "{refused}");
+            assert_eq!(refused.blockers[0].kind, Kind::StartupCheckFailed);
+            assert!(
+                refused.blockers[0]
+                    .name
+                    .contains(&instances.display().to_string()),
+                "{refused}"
+            );
+            assert!(
+                refused
+                    .to_string()
+                    .contains(&instances.display().to_string())
+            );
+
+            lifecycle
+                .prepare_shutdown_and_commit("shutdown", purpose, async { Ok(()) })
+                .await
+                .unwrap();
+            assert_eq!(
+                lifecycle
+                    .shutdown_status("shutdown", purpose)
+                    .unwrap()
+                    .phase,
+                ShutdownPhase::Committed
+            );
+        }
+    }
+
+    /// (b) Quitting in the first seconds, before the startup check is done,
+    /// still stops servers and closes, through Electron's prepare/commit and
+    /// through the core's own termination signal handler alike.
+    #[tokio::test]
+    async fn a_quit_while_the_startup_check_runs_goes_through() {
+        let drained = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        let flag = drained.clone();
+        let status = lifecycle
+            .prepare_shutdown("quit", ShutdownPurpose::Quit, async move {
+                flag.store(true, std::sync::atomic::Ordering::SeqCst);
+                Ok(())
+            })
+            .unwrap();
+        assert_eq!(status.phase, ShutdownPhase::Draining);
+        let status = loop {
+            let status = lifecycle
+                .shutdown_status("quit", ShutdownPurpose::Quit)
+                .unwrap();
+            if status.phase != ShutdownPhase::Draining {
+                break status;
+            }
+            tokio::task::yield_now().await;
+        };
+        assert_eq!(status.phase, ShutdownPhase::Ready);
+        // Servers are still asked to stop and awaited, as on any quit.
+        assert!(drained.load(std::sync::atomic::Ordering::SeqCst));
+        lifecycle
+            .commit_prepared_shutdown("quit", ShutdownPurpose::Quit)
+            .unwrap();
+        assert!(lifecycle.shutdown_committed());
+
+        // main.rs: SIGTERM/SIGINT run the same handshake under this id.
+        let signalled = Arc::new(RuntimeLifecycle::default());
+        signalled
+            .prepare_shutdown_and_commit("core-termination-signal", ShutdownPurpose::Quit, async {
+                Ok(())
+            })
+            .await
+            .unwrap();
+        assert!(signalled.shutdown_committed());
+
+        // A move still waits for the check to finish.
+        let pending = Arc::new(RuntimeLifecycle::default());
+        assert_eq!(
+            pending.begin_relocation("move").unwrap_err().blockers,
+            [RuntimeBlocker::new(Kind::StartupCheckPending, "")]
+        );
+    }
+
+    /// (d) One bad entry in __gdl_runtime_writers no longer fails the whole
+    /// check. Files the launcher never writes are skipped, records it cannot
+    /// read are kept in place and named, and a valid record is still adopted.
+    #[tokio::test]
+    async fn bad_writer_entries_are_kept_and_named_while_valid_records_are_adopted() {
+        let root = tempfile::tempdir().unwrap();
+        let writers = root.path().join("__gdl_runtime_writers");
+        std::fs::create_dir_all(&writers).unwrap();
+        // Left empty by a crash between the spawn intent and the PID write.
+        let empty = writers.join("3f1c2b7e-7a51-4c55-9a0e-2d4b6f0c8e11.json");
+        std::fs::write(&empty, b"").unwrap();
+        let garbage = writers.join("8b0d7c3a-15e2-4f4b-a6a3-91e5c2d7f402.json");
+        std::fs::write(&garbage, b"{\"version\":1,\"proc").unwrap();
+        // Finder's folder metadata, never a record.
+        std::fs::write(writers.join(".DS_Store"), b"\0\0\0\x01Bud1").unwrap();
+        // A folder, even one named like a record.
+        std::fs::create_dir(writers.join("folder.json")).unwrap();
+        let live = writers.join("c9a4e5f0-2b1d-4c3e-8f7a-6d5b4c3a2e10.json");
+        let record = ProcessRecord::legacy(4242, 1_700_000_000);
+        std::fs::write(&live, encode_child_record(record).unwrap()).unwrap();
+        let before = snapshot(&writers);
+
+        let lifecycle = never_gone(root.path());
+        let mut expected_unresolved = vec![unreadable(&empty), unreadable(&garbage)];
+        expected_unresolved.sort_by(|a, b| a.name.cmp(&b.name));
+        for run in 0..2 {
+            lifecycle.reconcile_children().await.unwrap();
+            assert_eq!(snapshot(&writers), before, "run {run} changed a file");
+            {
+                let state = lifecycle.state.lock().unwrap();
+                assert_eq!(state.adopted.len(), 1, "run {run}");
+                assert_eq!(state.adopted[&record], live.display().to_string());
+            }
+            lifecycle.reconciliation_finished(Ok(()));
+            let refused = lifecycle
+                .begin_relocation(&format!("move {run}"))
+                .unwrap_err();
+            let mut expected = vec![
+                RuntimeBlocker::new(Kind::PreviousProcess, live.display().to_string())
+                    .with_pid(4242),
+            ];
+            expected.extend(expected_unresolved.iter().cloned());
+            assert_eq!(refused.blockers, expected, "run {run}");
+        }
+
+        // None of it keeps the user from quitting or updating.
+        lifecycle
+            .prepare_shutdown_and_commit("update", ShutdownPurpose::Update, async { Ok(()) })
+            .await
+            .unwrap();
+        assert_eq!(snapshot(&writers), before);
+    }
+
+    /// The way out the move refusal gives: once the user deletes a record it
+    /// named, Try again no longer lists it.
+    #[tokio::test]
+    async fn a_deleted_unreadable_record_clears_on_the_next_attempt() {
+        let root = tempfile::tempdir().unwrap();
+        let writers = root.path().join("__gdl_runtime_writers");
+        std::fs::create_dir_all(&writers).unwrap();
+        let empty = writers.join("3f1c2b7e-7a51-4c55-9a0e-2d4b6f0c8e11.json");
+        std::fs::write(&empty, b"").unwrap();
+        let lifecycle = never_gone(root.path());
+        lifecycle.reconcile_children().await.unwrap();
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle.refresh_adopted();
+        assert_eq!(
+            lifecycle.begin_relocation("move 1").unwrap_err().blockers,
+            [unreadable(&empty)]
+        );
+        std::fs::remove_file(&empty).unwrap();
+        // What /prepare-relocation runs: refresh, then the refuse-first lease.
+        lifecycle.refresh_adopted();
+        lifecycle.begin_relocation("move 2").unwrap();
+        lifecycle.cancel_relocation("move 2").unwrap();
+    }
+
+    /// (e) A record removed while the check reads it is gone, whether it was
+    /// removed after the folder was listed or between the two reads.
+    #[tokio::test]
+    async fn a_record_removed_during_the_check_is_gone() {
+        let root = tempfile::tempdir().unwrap();
+        let lifecycle = never_gone(root.path());
+        let missing = root
+            .path()
+            .join("__gdl_runtime_writers")
+            .join("listed-then-removed.json");
+        lifecycle.reconcile_child(&missing).await.unwrap();
+
+        /// Confirms the process gone and, like a second launcher cleaning
+        /// up, removes the record before it is read again.
+        #[derive(Debug)]
+        struct RemovedOnCheck(PathBuf);
+        impl ProcessAbsenceObserver for RemovedOnCheck {
+            fn confirmed_absent(&self, _pid: u32, _start: u64) -> bool {
+                std::fs::remove_file(&self.0).unwrap();
+                true
+            }
+        }
+        let writers = root.path().join("__gdl_runtime_writers");
+        std::fs::create_dir_all(&writers).unwrap();
+        let record = writers.join("removed-between-reads.json");
+        std::fs::write(
+            &record,
+            encode_child_record(ProcessRecord::legacy(4242, 10)).unwrap(),
+        )
+        .unwrap();
+        let racing = Arc::new(RuntimeLifecycle {
+            process_observer: Arc::new(RemovedOnCheck(record.clone())),
+            ..RuntimeLifecycle::with_runtime_path(root.path())
+        });
+        racing.reconcile_children().await.unwrap();
+        for lifecycle in [&lifecycle, &racing] {
+            let state = lifecycle.state.lock().unwrap();
+            assert!(state.unresolved.is_empty(), "{:?}", state.unresolved);
+            assert!(state.adopted.is_empty());
+        }
+    }
+
+    /// (e) The startup reconcile runs beside the startup Java scan. A probe
+    /// this core is spawning right then has an empty intent on disk; it is
+    /// this session's own work, so it is neither evidence nor touched, and
+    /// the probe still records its PID afterwards.
+    #[tokio::test]
+    async fn this_cores_own_spawn_intent_is_not_earlier_session_evidence() {
+        let root = tempfile::tempdir().unwrap();
+        let lifecycle = Arc::new(RuntimeLifecycle::with_runtime_path(root.path()));
+        let mut probe = lifecycle.admit("java probe").unwrap();
+        probe.external_child().unwrap();
+        let intent = probe.record.clone().unwrap();
+        assert!(std::fs::read(&intent).unwrap().is_empty());
+
+        lifecycle.reconcile_children().await.unwrap();
+        // Read before asserting: a failed assert must not poison the lock
+        // the probe's own drop takes.
+        let (unresolved, adopted) = {
+            let state = lifecycle.state.lock().unwrap();
+            (state.unresolved.clone(), state.adopted.clone())
+        };
+        assert!(unresolved.is_empty(), "{unresolved:?}");
+        assert!(adopted.is_empty(), "{adopted:?}");
+        assert!(std::fs::read(&intent).unwrap().is_empty());
+
+        let pid = std::process::id();
+        probe.record_child_pid(Some(pid)).unwrap();
+        let recorded = decode_child_record(&std::fs::read(&intent).unwrap()).unwrap();
+        assert_eq!(recorded.pid, pid);
+        probe.finish();
+        assert!(!intent.exists());
+        assert!(lifecycle.state.lock().unwrap().own_records.is_empty());
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle.begin_relocation("move").unwrap();
+    }
+
+    /// (f) One bad instance or server marker no longer fails the whole check:
+    /// the folders after it are still reconciled, so running games are still
+    /// adopted, and the bad markers are kept in place and named.
+    #[tokio::test]
+    async fn bad_markers_are_kept_and_named_while_valid_ones_are_adopted() {
+        const MARKER: &str = ".gdl_instance.pid";
+        let root = tempfile::tempdir().unwrap();
+        let instances = root.path().join("instances");
+        let folder = |name: &str| {
+            let folder = instances.join(name);
+            std::fs::create_dir_all(&folder).unwrap();
+            folder
+        };
+        // Truncated by a power loss right after a launch.
+        let empty = folder("Empty").join(MARKER);
+        std::fs::write(&empty, b"").unwrap();
+        let locked = folder("Locked").join(MARKER);
+        std::fs::write(&locked, b"4243\n1700000000").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        }
+        // Where permissions do not stop this user (root, Windows), a folder
+        // with the marker's name cannot be read as one either.
+        if std::fs::read(&locked).is_ok() {
+            std::fs::remove_file(&locked).unwrap();
+            std::fs::create_dir(&locked).unwrap();
+        }
+        let running = folder("Running");
+        std::fs::write(running.join(MARKER), b"4242\n1700000000").unwrap();
+        // A stray file next to the instance folders is not an instance.
+        std::fs::write(instances.join("notes.txt"), b"").unwrap();
+
+        let lifecycle = never_gone(&root.path().join("runtime"));
+        lifecycle.reconcile_root(&instances, MARKER).await.unwrap();
+        lifecycle.reconciliation_finished(Ok(()));
+        let record = ProcessRecord::legacy(4242, 1_700_000_000);
+        {
+            let state = lifecycle.state.lock().unwrap();
+            assert_eq!(state.adopted.len(), 1);
+            assert_eq!(state.adopted[&record], running.display().to_string());
+            assert_eq!(
+                state.unresolved.iter().cloned().collect::<Vec<_>>(),
+                [empty.clone(), locked.clone()]
+            );
+        }
+        assert_eq!(
+            lifecycle.begin_relocation("move").unwrap_err().blockers,
+            [
+                RuntimeBlocker::new(Kind::PreviousProcess, running.display().to_string())
+                    .with_pid(4242),
+                unreadable(&empty),
+                unreadable(&locked),
+            ]
+        );
+        // Kept, not renamed: a restart sees them again.
+        assert!(std::fs::read(&empty).unwrap().is_empty());
+        assert!(locked.exists());
+        // The running game's durable copy survives its marker being cleaned up.
+        assert!(lifecycle.reconciled_record_path(record).unwrap().is_file());
+
+        lifecycle
+            .prepare_shutdown_and_commit("quit", ShutdownPurpose::Quit, async { Ok(()) })
+            .await
+            .unwrap();
+        #[cfg(unix)]
+        if locked.is_file() {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o600)).unwrap();
+        }
+    }
+
+    /// Some network and FUSE file systems leave an entry's type out of the
+    /// listing, and the stat behind it can fail. The move refusal says to
+    /// delete what it lists, so it must name the marker inside an instance
+    /// folder, never the folder with the user's worlds in it.
+    #[tokio::test]
+    async fn a_folder_whose_type_cannot_be_read_is_never_listed_only_its_marker() {
+        const MARKER: &str = ".gdl_instance.pid";
+        let root = tempfile::tempdir().unwrap();
+        let instances = root.path().join("instances");
+        let folder = |name: &str| {
+            let folder = instances.join(name);
+            std::fs::create_dir_all(&folder).unwrap();
+            folder
+        };
+        let crashed = folder("Survival World");
+        std::fs::write(crashed.join(MARKER), b"").unwrap();
+        let idle = folder("Idle");
+        let running = folder("Running");
+        std::fs::write(running.join(MARKER), b"4242\n1700000000").unwrap();
+        let stray = instances.join("notes.txt");
+        std::fs::write(&stray, b"").unwrap();
+
+        let lifecycle = never_gone(&root.path().join("runtime"));
+        for entry in [&crashed, &idle, &running, &stray] {
+            let unknown = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
+            lifecycle
+                .reconcile_folder(entry, Err(unknown), MARKER)
+                .await;
+        }
+        let state = lifecycle.state.lock().unwrap();
+        assert_eq!(
+            state.unresolved.iter().cloned().collect::<Vec<_>>(),
+            [crashed.join(MARKER)]
+        );
+        assert_eq!(
+            state.adopted[&ProcessRecord::legacy(4242, 1_700_000_000)],
+            running.display().to_string()
+        );
+        assert_eq!(state.adopted.len(), 1);
+    }
+
+    /// Try again checks each listed file again instead of only whether it
+    /// still exists: one that reads again (an antivirus or sync lock lifted)
+    /// and names a process that has ended clears, while one naming a
+    /// process that may still run, or still unreadable, stays listed.
+    #[tokio::test]
+    async fn try_again_clears_a_listed_file_that_now_names_an_ended_process() {
+        /// Only the given PID still runs.
+        #[derive(Debug)]
+        struct OnlyRunning(u32);
+        impl ProcessAbsenceObserver for OnlyRunning {
+            fn confirmed_absent(&self, pid: u32, _start: u64) -> bool {
+                pid != self.0
+            }
+        }
+        const MARKER: &str = ".gdl_instance.pid";
+        let root = tempfile::tempdir().unwrap();
+        let instances = root.path().join("instances");
+        let writers = root.path().join("__gdl_runtime_writers");
+        std::fs::create_dir_all(&writers).unwrap();
+        let mut markers = vec![];
+        for name in ["Ended", "Live", "Still empty"] {
+            let folder = instances.join(name);
+            std::fs::create_dir_all(&folder).unwrap();
+            std::fs::write(folder.join(MARKER), b"").unwrap();
+            markers.push(folder.join(MARKER));
+        }
+        let record = writers.join("3f1c2b7e-7a51-4c55-9a0e-2d4b6f0c8e11.json");
+        std::fs::write(&record, b"").unwrap();
+        let lifecycle = Arc::new(RuntimeLifecycle {
+            process_observer: Arc::new(OnlyRunning(4242)),
+            ..RuntimeLifecycle::with_runtime_path(root.path())
+        });
+        lifecycle.reconcile_children().await.unwrap();
+        lifecycle.reconcile_root(&instances, MARKER).await.unwrap();
+        lifecycle.reconciliation_finished(Ok(()));
+        assert_eq!(lifecycle.state.lock().unwrap().unresolved.len(), 4);
+
+        std::fs::write(&markers[0], b"4241\n1700000000").unwrap();
+        std::fs::write(&markers[1], b"4242\n1700000000").unwrap();
+        std::fs::write(
+            &record,
+            encode_child_record(ProcessRecord::legacy(4243, 1_700_000_000)).unwrap(),
+        )
+        .unwrap();
+        lifecycle.refresh_adopted();
+        assert_eq!(
+            lifecycle.begin_relocation("move 1").unwrap_err().blockers,
+            [unreadable(&markers[1]), unreadable(&markers[2])]
+        );
+        // Checking changes nothing on disk.
+        assert_eq!(std::fs::read(&markers[0]).unwrap(), b"4241\n1700000000");
+        assert!(record.is_file());
+    }
+}
+
+/// Server and game markers from an earlier session whose PID now belongs to
+/// another process are retired, as 2.0.40 did, instead of being kept as a
+/// live owner for as long as that unrelated process runs.
+#[cfg(test)]
+mod stale_marker_tests {
+    use super::*;
+    use IdentityStatus::{GoneOrReused, Same, Unknown};
+    use RuntimeBlockerKind as Kind;
+    use orphan_pid::{LiveProc, ProcessIdentity, ProcessObservation};
+
+    const WINDOWS_OR_MACOS: bool = true;
+    const LINUX: bool = false;
+    const MARKER: &str = ".gdl_server.pid";
+
+    fn present(
+        is_java: bool,
+        start_time: u64,
+        identity: Option<ProcessIdentity>,
+    ) -> ProcessObservation {
+        ProcessObservation::Present {
+            process: LiveProc {
+                is_java,
+                start_time,
+            },
+            identity,
+        }
+    }
+    fn ticks(start_ticks: u64) -> ProcessIdentity {
+        ProcessIdentity::LinuxBootTicks {
+            boot_id: uuid::Uuid::parse_str("cf2d86a1-9be4-41d2-94cb-1e2c71d7cc80").unwrap(),
+            start_ticks,
+        }
+    }
+    /// A two-line marker as 2.0.40 wrote it: PID and epoch start, no
+    /// boot/ticks identity.
+    fn legacy() -> ProcessRecord {
+        ProcessRecord::legacy(4242, 1_700_000_000)
+    }
+    /// What the native probe says when sysinfo did not list the PID.
+    fn classify(
+        record: ProcessRecord,
+        observed: ProcessObservation,
+        require_java: bool,
+        platform: bool,
+        native_absent: bool,
+    ) -> IdentityStatus {
+        classify_observed(record, observed, require_java, platform, || native_absent)
+    }
+
+    #[test]
+    fn windows_and_macos_retire_a_reused_pid_and_keep_the_same_process() {
+        let record = legacy();
+        // A PID Windows handed to svchost or chrome after a reboot.
+        assert_eq!(
+            classify(
+                record,
+                present(false, 1_700_000_000, None),
+                true,
+                WINDOWS_OR_MACOS,
+                false
+            ),
+            GoneOrReused
+        );
+        // Another JVM (a game, another launcher's server) got the PID.
+        assert_eq!(
+            classify(
+                record,
+                present(true, 1_700_500_000, None),
+                true,
+                WINDOWS_OR_MACOS,
+                false
+            ),
+            GoneOrReused
+        );
+        // The server JVM itself, orphaned when 2.0.40 was closed.
+        assert_eq!(
+            classify(
+                record,
+                present(true, 1_700_000_001, None),
+                true,
+                WINDOWS_OR_MACOS,
+                false
+            ),
+            Same
+        );
+        // sysinfo did not list it but the native probe still sees it: a
+        // partial listing is not exit proof.
+        assert_eq!(
+            classify(
+                record,
+                ProcessObservation::Absent,
+                true,
+                WINDOWS_OR_MACOS,
+                false
+            ),
+            Unknown
+        );
+        assert_eq!(
+            classify(
+                record,
+                ProcessObservation::Absent,
+                true,
+                WINDOWS_OR_MACOS,
+                true
+            ),
+            GoneOrReused
+        );
+    }
+
+    #[test]
+    fn linux_retires_a_reused_pid_but_keeps_a_legacy_epoch_mismatch_on_java() {
+        let record = legacy();
+        assert_eq!(
+            classify(
+                record,
+                present(false, 1_700_000_000, Some(ticks(7))),
+                true,
+                LINUX,
+                false
+            ),
+            GoneOrReused
+        );
+        // A clock step moves the epoch Linux reports (M23): unconfirmed.
+        assert_eq!(
+            classify(
+                record,
+                present(true, 1_700_500_000, Some(ticks(7))),
+                true,
+                LINUX,
+                false
+            ),
+            Unknown
+        );
+        let current = ProcessRecord {
+            identity: Some(ticks(7)),
+            ..record
+        };
+        assert_eq!(
+            classify(
+                current,
+                present(true, 1_700_500_000, Some(ticks(8))),
+                true,
+                LINUX,
+                false
+            ),
+            GoneOrReused
+        );
+        assert_eq!(
+            classify(
+                current,
+                present(true, 1_700_500_000, Some(ticks(7))),
+                true,
+                LINUX,
+                false
+            ),
+            Same
+        );
+        assert_eq!(
+            classify(record, ProcessObservation::Absent, true, LINUX, false),
+            Unknown
+        );
+    }
+
+    #[test]
+    fn a_live_hook_child_is_kept_although_it_is_not_java() {
+        // Pre-launch and post-exit hooks run scripts, not Java.
+        for platform in [WINDOWS_OR_MACOS, LINUX] {
+            let identity = (!platform).then(|| ticks(7));
+            let record = ProcessRecord {
+                identity,
+                ..legacy()
+            };
+            assert_eq!(
+                classify(
+                    record,
+                    present(false, 1_700_000_000, identity),
+                    false,
+                    platform,
+                    false
+                ),
+                Same
+            );
+            assert_eq!(
+                classify(
+                    record,
+                    present(false, 1_700_000_000, identity),
+                    true,
+                    platform,
+                    false
+                ),
+                GoneOrReused,
+                "only a marker requires Java"
+            );
+        }
+    }
+
+    /// Injected observations for each PID; everything else is absent.
+    #[derive(Debug, Default)]
+    struct Processes {
+        observed: Mutex<HashMap<u32, ProcessObservation>>,
+        /// The program name the process table gives for a PID.
+        programs: Mutex<HashMap<u32, &'static str>>,
+    }
+    impl Processes {
+        fn set(&self, pid: u32, observed: ProcessObservation) {
+            self.observed.lock().unwrap().insert(pid, observed);
+        }
+        fn name(&self, pid: u32, program: &'static str) {
+            self.programs.lock().unwrap().insert(pid, program);
+        }
+    }
+    impl ProcessAbsenceObserver for Processes {
+        fn confirmed_absent(&self, _: u32, _: u64) -> bool {
+            panic!("classification goes through status")
+        }
+        fn observation(&self, record: ProcessRecord) -> ProcessObservation {
+            self.observed
+                .lock()
+                .unwrap()
+                .get(&record.pid)
+                .copied()
+                .unwrap_or(ProcessObservation::Absent)
+        }
+        fn status(&self, record: ProcessRecord, require_java: bool) -> IdentityStatus {
+            classify(
+                record,
+                self.observation(record),
+                require_java,
+                orphan_pid::EPOCH_START_TIMES_ARE_STABLE,
+                true,
+            )
+        }
+        /// Like the real observer, a name only comes with a listed process.
+        fn inspect(
+            &self,
+            record: ProcessRecord,
+            require_java: bool,
+        ) -> (IdentityStatus, Option<String>) {
+            let listed = matches!(self.observation(record), ProcessObservation::Present { .. });
+            let program = self.programs.lock().unwrap().get(&record.pid).copied();
+            (
+                self.status(record, require_java),
+                program.filter(|_| listed).map(str::to_owned),
+            )
+        }
+    }
+    fn lifecycle(root: &Path, processes: &Arc<Processes>) -> Arc<RuntimeLifecycle> {
+        let lifecycle = Arc::new(RuntimeLifecycle {
+            process_observer: processes.clone(),
+            ..RuntimeLifecycle::with_runtime_path(root)
+        });
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle
+    }
+    /// The live process a marker for `record` describes on this platform.
+    fn its_jvm(record: ProcessRecord) -> ProcessObservation {
+        present(true, record.start_time.unwrap(), record.identity)
+    }
+    fn server_with_marker(servers: &Path, name: &str, record: ProcessRecord) -> PathBuf {
+        let folder = servers.join(name);
+        std::fs::create_dir_all(&folder).unwrap();
+        let mut text = format!("{}\n{}", record.pid, record.start_time.unwrap());
+        if let Some(ProcessIdentity::LinuxBootTicks {
+            boot_id,
+            start_ticks,
+        }) = record.identity
+        {
+            text.push_str(&format!("\nlinux-boot-ticks-v1 {boot_id} {start_ticks}"));
+        }
+        std::fs::write(folder.join(MARKER), text).unwrap();
+        folder
+    }
+    fn copies(root: &Path) -> Vec<String> {
+        match std::fs::read_dir(root.join("__gdl_runtime_writers")) {
+            Ok(entries) => entries
+                .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+                .collect(),
+            Err(_) => vec![],
+        }
+    }
+
+    /// A marker whose PID a process other than Java now holds is never
+    /// adopted: no blocker, no copy kept for the next start.
+    #[tokio::test]
+    async fn a_server_marker_on_a_reused_pid_is_not_adopted() {
+        let root = tempfile::tempdir().unwrap();
+        let servers = root.path().join("servers");
+        let processes = Arc::new(Processes::default());
+        let record = legacy();
+        server_with_marker(&servers, "Survival", record);
+        processes.set(record.pid, present(false, 1_700_000_000, record.identity));
+        let lifecycle = lifecycle(root.path(), &processes);
+        lifecycle.reconcile_root(&servers, MARKER).await.unwrap();
+        assert!(lifecycle.state.lock().unwrap().adopted.is_empty());
+        assert!(copies(root.path()).is_empty());
+        lifecycle.begin_relocation("move").unwrap();
+    }
+
+    /// The copy kept of a marker names a JVM too, while other child records
+    /// name hooks and probes, which are not Java.
+    #[tokio::test]
+    async fn a_marker_copy_requires_java_and_a_hook_record_does_not() {
+        let root = tempfile::tempdir().unwrap();
+        let writers = root.path().join("__gdl_runtime_writers");
+        std::fs::create_dir_all(&writers).unwrap();
+        let processes = Arc::new(Processes::default());
+        let hook = ProcessRecord::legacy(5000, 1_700_000_000);
+        let copied = ProcessRecord::legacy(5001, 1_700_000_000);
+        let hook_file = writers.join("3f1c2b7e-7a51-4c55-9a0e-2d4b6f0c8e11.json");
+        let copy_file = writers.join("reconciled-5001-epoch-1700000000.json");
+        std::fs::write(&hook_file, encode_child_record(hook).unwrap()).unwrap();
+        std::fs::write(&copy_file, encode_child_record(copied).unwrap()).unwrap();
+        for pid in [hook.pid, copied.pid] {
+            processes.set(pid, present(false, 1_700_000_000, None));
+        }
+        let lifecycle = lifecycle(root.path(), &processes);
+        lifecycle.reconcile_children().await.unwrap();
+        assert!(hook_file.exists());
+        assert!(!copy_file.exists());
+        let state = lifecycle.state.lock().unwrap();
+        assert_eq!(state.adopted.keys().copied().collect::<Vec<_>>(), [hook]);
+    }
+
+    /// A server JVM left running by an earlier session is the server's to
+    /// stop, not a reason to refuse Quit or Update. It still refuses a move
+    /// of the runtime folder until it is stopped or its marker cleared, and
+    /// releasing the marker forgets it together with its copy.
+    #[tokio::test]
+    async fn a_recovered_server_refuses_only_a_move_until_its_marker_is_released() {
+        let root = tempfile::tempdir().unwrap();
+        let servers = root.path().join("servers");
+        let processes = Arc::new(Processes::default());
+        let record = ProcessRecord {
+            identity: (!orphan_pid::EPOCH_START_TIMES_ARE_STABLE).then(|| ticks(7)),
+            ..legacy()
+        };
+        let folder = server_with_marker(&servers, "Survival", record);
+        processes.set(record.pid, its_jvm(record));
+        let lifecycle = lifecycle(root.path(), &processes);
+        lifecycle.reconcile_root(&servers, MARKER).await.unwrap();
+        assert_eq!(copies(root.path()).len(), 1);
+        let blocker =
+            RuntimeBlocker::new(Kind::PreviousProcess, folder.display().to_string()).with_pid(4242);
+
+        for purpose in [ShutdownPurpose::Quit, ShutdownPurpose::Update] {
+            let request = format!("{purpose:?}");
+            lifecycle.begin_shutdown(&request, purpose).unwrap();
+            let status = lifecycle.settle_shutdown(&request, Ok(())).unwrap();
+            assert_eq!(status.phase, ShutdownPhase::Ready, "{purpose:?}");
+            assert!(status.blockers.is_empty(), "{:?}", status.blockers);
+            lifecycle.state.lock().unwrap().shutdown = None;
+        }
+        lifecycle.refresh_adopted();
+        assert_eq!(
+            lifecycle.begin_relocation("move 1").unwrap_err().blockers,
+            [blocker]
+        );
+
+        // Stopped from the server page: the server code removes the
+        // marker, then releases it here.
+        std::fs::remove_file(folder.join(MARKER)).unwrap();
+        lifecycle.release_marker(
+            &folder.join(MARKER),
+            Some(ProcessRecord::legacy(4242, 1_700_000_000)),
+        );
+        assert!(copies(root.path()).is_empty());
+        assert!(lifecycle.state.lock().unwrap().adopted.is_empty());
+        lifecycle.begin_relocation("move 2").unwrap();
+    }
+
+    /// An unreadable marker the user cleared from the server page no longer
+    /// refuses a move.
+    #[tokio::test]
+    async fn a_cleared_unreadable_marker_no_longer_refuses_a_move() {
+        let root = tempfile::tempdir().unwrap();
+        let servers = root.path().join("servers");
+        let folder = servers.join("Survival");
+        std::fs::create_dir_all(&folder).unwrap();
+        let marker = folder.join(MARKER);
+        std::fs::write(&marker, b"\x004242\n17000").unwrap();
+        let lifecycle = lifecycle(root.path(), &Arc::new(Processes::default()));
+        lifecycle.reconcile_root(&servers, MARKER).await.unwrap();
+        assert_eq!(
+            lifecycle.begin_relocation("move 1").unwrap_err().blockers,
+            [RuntimeBlocker::new(
+                Kind::UnreadableRecord,
+                marker.display().to_string()
+            )]
+        );
+        std::fs::remove_file(&marker).unwrap();
+        lifecycle.release_marker(&marker, None);
+        lifecycle.begin_relocation("move 2").unwrap();
+    }
+
+    /// The record of a JVM on this platform: Linux records carry the
+    /// boot/ticks identity this build writes.
+    fn jvm_record(pid: u32) -> ProcessRecord {
+        ProcessRecord {
+            pid,
+            identity: (!orphan_pid::EPOCH_START_TIMES_ARE_STABLE).then(|| ticks(u64::from(pid))),
+            ..legacy()
+        }
+    }
+    /// The same PID, start and identity, held by a program that is not Java.
+    fn not_java(record: ProcessRecord) -> ProcessObservation {
+        present(false, record.start_time.unwrap(), record.identity)
+    }
+    fn refused_pids(lifecycle: &RuntimeLifecycle) -> Vec<(Kind, Option<u32>)> {
+        lifecycle.refresh_adopted();
+        lifecycle
+            .relocation_blockers("probe")
+            .into_iter()
+            .map(|blocker| (blocker.kind, blocker.pid))
+            .collect()
+    }
+
+    /// Try again stops refusing a move once a program other than Java holds
+    /// the PID of a recorded game or server, wherever the record came from:
+    /// the marker, the instance check that published its game, or the copy
+    /// a later start reads. 2.0.40 removed such a marker on the same verdict.
+    #[tokio::test]
+    async fn try_again_retires_a_record_whose_pid_a_program_other_than_java_holds() {
+        let root = tempfile::tempdir().unwrap();
+        let servers = root.path().join("servers");
+        let processes = Arc::new(Processes::default());
+        let server = jvm_record(4242);
+        let game = jvm_record(4300);
+        server_with_marker(&servers, "Survival", server);
+        for record in [server, game] {
+            processes.set(record.pid, its_jvm(record));
+        }
+        let lifecycle = lifecycle(root.path(), &processes);
+        lifecycle.reconcile_root(&servers, MARKER).await.unwrap();
+        lifecycle.adopted_record_published(game);
+        assert_eq!(
+            refused_pids(&lifecycle),
+            [
+                (Kind::PreviousGame, Some(4300)),
+                (Kind::PreviousProcess, Some(4242))
+            ]
+        );
+        assert_eq!(copies(root.path()).len(), 1);
+
+        // Both JVMs ended and Windows gave their PIDs to Discord and
+        // explorer.exe: only the Java check tells them apart.
+        for record in [server, game] {
+            processes.set(record.pid, not_java(record));
+        }
+        assert!(refused_pids(&lifecycle).is_empty());
+        lifecycle.begin_relocation("move").unwrap();
+
+        // The next start drops the copy kept of the server marker as well.
+        let next = self::lifecycle(root.path(), &processes);
+        next.reconcile_children().await.unwrap();
+        assert!(copies(root.path()).is_empty());
+        assert!(refused_pids(&next).is_empty());
+    }
+
+    /// A JVM that may still be the recorded game or server keeps refusing
+    /// a move, also on Try again: one whose start matches, one whose start
+    /// a one-line marker does not record, and one this look cannot read. So
+    /// does a JVM whose start differs on Linux, where a clock step moves the
+    /// start a legacy marker recorded; Windows and macOS keep creation times
+    /// stable, so there it is another JVM that reused the PID.
+    #[tokio::test]
+    async fn a_java_process_with_a_matching_or_unknown_start_keeps_refusing_a_move() {
+        let root = tempfile::tempdir().unwrap();
+        let servers = root.path().join("servers");
+        let processes = Arc::new(Processes::default());
+        let matching = jvm_record(4242);
+        server_with_marker(&servers, "Survival", matching);
+        processes.set(matching.pid, its_jvm(matching));
+        let one_line = servers.join("Creative");
+        std::fs::create_dir_all(&one_line).unwrap();
+        std::fs::write(one_line.join(MARKER), "4243").unwrap();
+        processes.set(4243, present(true, 1_700_000_500, None));
+        let unreadable = jvm_record(4244);
+        server_with_marker(&servers, "Lobby", unreadable);
+        processes.set(unreadable.pid, ProcessObservation::Unknown);
+        let legacy_later = ProcessRecord {
+            pid: 4245,
+            ..legacy()
+        };
+        server_with_marker(&servers, "Hub", legacy_later);
+        processes.set(
+            legacy_later.pid,
+            present(
+                true,
+                1_700_500_000,
+                (!orphan_pid::EPOCH_START_TIMES_ARE_STABLE).then(|| ticks(5)),
+            ),
+        );
+
+        let lifecycle = lifecycle(root.path(), &processes);
+        lifecycle.reconcile_root(&servers, MARKER).await.unwrap();
+        let mut expected = vec![4242, 4243, 4244];
+        if !orphan_pid::EPOCH_START_TIMES_ARE_STABLE {
+            expected.push(4245);
+        }
+        for _ in 0..2 {
+            let mut pids: Vec<_> = refused_pids(&lifecycle)
+                .into_iter()
+                .map(|(kind, pid)| {
+                    assert_eq!(kind, Kind::PreviousProcess);
+                    pid.unwrap()
+                })
+                .collect();
+            pids.sort();
+            assert_eq!(pids, expected);
+        }
+    }
+
+    /// A refused move names the program that holds each PID, as the look
+    /// that kept the record read it, and never a name it no longer reads.
+    #[tokio::test]
+    async fn a_refused_move_names_the_program_that_holds_the_pid() {
+        let root = tempfile::tempdir().unwrap();
+        let servers = root.path().join("servers");
+        let processes = Arc::new(Processes::default());
+        let record = jvm_record(4242);
+        let folder = server_with_marker(&servers, "Survival", record);
+        processes.set(record.pid, its_jvm(record));
+        processes.name(record.pid, "javaw.exe");
+        let lifecycle = lifecycle(root.path(), &processes);
+        lifecycle.reconcile_root(&servers, MARKER).await.unwrap();
+        lifecycle.refresh_adopted();
+        let blocker =
+            RuntimeBlocker::new(Kind::PreviousProcess, folder.display().to_string()).with_pid(4242);
+        let named = blocker.clone().with_program(Some("javaw.exe".into()));
+        let refused = lifecycle.begin_relocation("move 1").unwrap_err();
+        assert_eq!(refused.blockers, [named.clone()]);
+        let json = serde_json::to_value(&named).unwrap();
+        assert_eq!(json["pid"], 4242);
+        assert_eq!(json["program"], "javaw.exe");
+        assert!(refused.to_string().contains("(PID 4242, javaw.exe)"));
+
+        // The process table cannot be read for it now: still refused, by
+        // PID alone.
+        processes.set(record.pid, ProcessObservation::Unknown);
+        lifecycle.refresh_adopted();
+        assert_eq!(
+            lifecycle.begin_relocation("move 2").unwrap_err().blockers,
+            [blocker.clone()]
+        );
+        assert!(
+            serde_json::to_value(&blocker)
+                .unwrap()
+                .get("program")
+                .is_none()
         );
     }
 }

@@ -8,10 +8,13 @@
 //! next startup able to find that JVM again.
 //!
 //! Instance recovery uses the identity classification below for adoption.
-//! Server recovery retains live or ambiguous ownership without signalling;
-//! ServerManager retires only markers with proven absence or stable reuse. Save completion for a
-//! recovered server is unknown and requires operator recovery. RuntimeLifecycle
-//! retains unconfirmed ownership as a relocation blocker.
+//! ServerManager uses the same classification at startup and again before
+//! every start, delete or file change: a marker whose process ended, or
+//! whose PID now belongs to another process, is removed; a verified server
+//! JVM is shown as running from a previous session with a Stop button; a
+//! marker that cannot be verified is kept until the user clears it. Startup
+//! never signals a recovered process. RuntimeLifecycle keeps unconfirmed
+//! ownership as a relocation blocker.
 //!
 //! A PID is reusable. New Linux records retain epoch metadata on their first
 //! two lines and append `linux-boot-ticks-v1 <boot UUID> <start ticks>`. The
@@ -94,12 +97,32 @@ pub enum IdentityStatus {
     Unknown,
 }
 
+/// Whether an epoch start time sysinfo reports for a live process stays the
+/// same for that process's whole life. Windows and macOS report the
+/// creation time the kernel stored when the process started. Linux derives
+/// it from the current wall clock minus uptime, so a clock step moves it
+/// (M23), and only the boot/ticks pair identifies a process there.
+pub const EPOCH_START_TIMES_ARE_STABLE: bool = cfg!(not(target_os = "linux"));
+
 /// Legacy clock mismatches cannot prove exit/reuse on Linux. A present stable
 /// extension is authoritative and can never fall back to epoch matching.
 pub fn identity_status(
     record: ProcessRecord,
     observed: ProcessObservation,
     require_java: bool,
+) -> IdentityStatus {
+    identity_status_with(record, observed, require_java, EPOCH_START_TIMES_ARE_STABLE)
+}
+/// [`identity_status`] with the platform rule passed in, so both rules can
+/// be tested on any platform. `epoch_is_stable` decides what a legacy
+/// record whose start time differs from the live process's means: reuse
+/// where creation times are stable, unknown where a clock step could
+/// explain the difference.
+pub(crate) fn identity_status_with(
+    record: ProcessRecord,
+    observed: ProcessObservation,
+    require_java: bool,
+    epoch_is_stable: bool,
 ) -> IdentityStatus {
     if record.validate_identity().is_err() {
         return IdentityStatus::Unknown;
@@ -123,16 +146,8 @@ pub fn identity_status(
                     IdentityStatus::Same
                 }
                 (None, _) if record.start_time.is_none() => IdentityStatus::Unknown,
-                (None, _) => {
-                    #[cfg(target_os = "linux")]
-                    {
-                        IdentityStatus::Unknown
-                    }
-                    #[cfg(not(target_os = "linux"))]
-                    {
-                        IdentityStatus::GoneOrReused
-                    }
-                }
+                (None, _) if epoch_is_stable => IdentityStatus::GoneOrReused,
+                (None, _) => IdentityStatus::Unknown,
             }
         }
     }
@@ -215,34 +230,48 @@ fn observe_bracketed(
     }
 }
 pub fn observe_process(pid: u32) -> ProcessObservation {
+    observe_process_named(pid).0
+}
+/// [`observe_process`] with the name of the program that holds `pid`
+/// (`javaw.exe`, `java`), read from the same process table snapshot. The
+/// name is only given for a `Present` observation, so it always belongs to
+/// the process that was observed.
+pub fn observe_process_named(pid: u32) -> (ProcessObservation, Option<String>) {
+    // A Cell keeps the snapshot a plain `Fn` closure on every platform.
+    let name = std::cell::Cell::new(None);
     let snapshot = || {
         let mut system = System::new();
         system.refresh_processes(sysinfo::ProcessesToUpdate::Some(&[Pid::from_u32(pid)]));
+        name.set(
+            system
+                .process(Pid::from_u32(pid))
+                .map(|process| process.name().to_string_lossy().into_owned()),
+        );
         live_proc(&system, pid)
     };
     #[cfg(target_os = "linux")]
-    {
-        observe_bracketed(
-            read_linux_identity(pid),
-            snapshot,
-            || read_linux_identity(pid),
-            || {
-                // ENOENT from an unavailable proc mount is not absence proof.
-                std::fs::read_to_string("/proc/self/stat").is_ok()
-                    && matches!(std::fs::metadata(format!("/proc/{pid}")), Err(e) if e.kind() == std::io::ErrorKind::NotFound)
-            },
-        )
-    }
+    let observed = observe_bracketed(
+        read_linux_identity(pid),
+        snapshot,
+        || read_linux_identity(pid),
+        || {
+            // ENOENT from an unavailable proc mount is not absence proof.
+            std::fs::read_to_string("/proc/self/stat").is_ok()
+                && matches!(std::fs::metadata(format!("/proc/{pid}")), Err(e) if e.kind() == std::io::ErrorKind::NotFound)
+        },
+    );
     #[cfg(not(target_os = "linux"))]
-    {
-        match snapshot() {
-            Some(process) => ProcessObservation::Present {
-                process,
-                identity: None,
-            },
-            None => ProcessObservation::Absent,
-        }
-    }
+    let observed = match snapshot() {
+        Some(process) => ProcessObservation::Present {
+            process,
+            identity: None,
+        },
+        None => ProcessObservation::Absent,
+    };
+    let name = name
+        .into_inner()
+        .filter(|name| !name.is_empty() && matches!(observed, ProcessObservation::Present { .. }));
+    (observed, name)
 }
 /// Called immediately at owned spawn, while the actual child is retained.
 pub fn capture_process(pid: u32) -> Option<ProcessRecord> {
@@ -283,6 +312,11 @@ pub async fn read_process_file(root: &Path, file_name: &str) -> Result<Option<Pr
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(error.into()),
     };
+    parse_process_file(&content).map(Some)
+}
+/// The record a process marker's text describes; see [`write_process_file`]
+/// for the format.
+pub fn parse_process_file(content: &str) -> Result<ProcessRecord> {
     let mut lines = content.lines();
     let pid = lines.next().unwrap_or("").trim().parse::<u32>()?;
     let start_time = match lines.next().map(str::trim) {
@@ -309,11 +343,11 @@ pub async fn read_process_file(root: &Path, file_name: &str) -> Result<Option<Pr
         lines.next().is_none(),
         "Unexpected process identity extension"
     );
-    Ok(Some(ProcessRecord {
+    Ok(ProcessRecord {
         pid,
         start_time,
         identity,
-    }))
+    })
 }
 pub async fn remove_process_file_if_matches_strict(
     root: &Path,

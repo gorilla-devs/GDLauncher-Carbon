@@ -937,26 +937,38 @@ impl ManagerRef<'_, ServerManager> {
         // against the live process table: a JVM from a session the core
         // didn't shut down cleanly (crash, force-quit, Windows
         // TerminateProcess) is otherwise invisible here and keeps holding
-        // its port forever.
-        match self
-            .app
-            .runtime_lifecycle
-            .reconcile_root(
-                &self
-                    .app
-                    .settings_manager()
-                    .runtime_path
-                    .get_servers()
-                    .to_path(),
-                provider::PID_FILE_NAME,
-            )
-            .await
-        {
-            Ok(()) => self.clean_up_orphaned_servers(&db_servers).await,
-            Err(error) => self
+        // its port. A quit, restart or update that began first only skips
+        // this check, which leaves every marker in place and refuses a move
+        // of the runtime folder; the list below still loads, and Start
+        // checks the marker again.
+        let mut recovered = HashMap::new();
+        match self.app.runtime_lifecycle.admit("server ownership scan") {
+            Ok(_runtime_activity) => match self
                 .app
                 .runtime_lifecycle
-                .reconciliation_finished(Err(error)),
+                .reconcile_root(
+                    &self
+                        .app
+                        .settings_manager()
+                        .runtime_path
+                        .get_servers()
+                        .to_path(),
+                    provider::PID_FILE_NAME,
+                )
+                .await
+            {
+                Ok(()) => recovered = self.clean_up_orphaned_servers(&db_servers).await,
+                Err(error) => self
+                    .app
+                    .runtime_lifecycle
+                    .reconciliation_finished(Err(error)),
+            },
+            Err(error) => {
+                self.app
+                    .runtime_lifecycle
+                    .reconciliation_finished(Err(error
+                        .context("The server check was skipped because GDLauncher began closing")))
+            }
         }
 
         let any_recovered = recovered.values().any(watched_while_recovered);
@@ -1087,19 +1099,18 @@ impl ManagerRef<'_, ServerManager> {
                 .get_servers()
                 .get_server_path(&server.shortpath)
                 .get_root();
-            if let Ok(Some(record)) = provider::read_process_file(&root).await {
-                if super::runtime_lifecycle::recorded_identity_confirmed_gone(record) {
-                    if let Err(error) = provider::retire_recovered_marker(&root, record).await {
-                        warn!("Cannot retire confirmed-absent server marker: {error:#}");
-                    }
-                    continue;
+            match classify_marker(&self.app.runtime_lifecycle, &root).await {
+                Ok(MarkerCheck::Clear) => {}
+                Ok(check) => {
+                    info!(
+                        "Server {} has a process marker from a previous session: {check:?}",
+                        server.id
+                    );
+                    recovered.insert(ServerId(server.id), check.state());
                 }
-            }
-            if provider::pid_file_path(&root).exists() {
-                warn!(
-                    "Server {} has recovery ownership: verify it has stopped before retrying. No orphan is automatically terminated; save completion is unknown.",
-                    server.id
-                );
+                // Gone, but the marker could not be removed. Start tries
+                // again and names the file if it still cannot.
+                Err(error) => warn!("Server {}: {error:#}", server.id),
             }
         }
         recovered
