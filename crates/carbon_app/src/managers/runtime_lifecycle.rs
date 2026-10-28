@@ -93,6 +93,197 @@ struct ActivityEntry {
     cancel: tokio_util::sync::CancellationToken,
     settlement: tokio::sync::watch::Sender<Settlement>,
     reservation: Option<Arc<tokio::sync::OwnedSemaphorePermit>>,
+    /// The game activity this session worker follows (`follow_spawned_game`).
+    follows: Option<u64>,
+    /// Watches games adopted from an earlier session (`watch_adopted_games`).
+    watches_adopted: bool,
+}
+impl ActivityEntry {
+    /// A game this core started, past its spawn: it outlives the core.
+    fn running_game(&self) -> bool {
+        self.policy == ActivityPolicy::Game && self.phase == ActivityPhase::Running
+    }
+    /// The session worker of a game this core started, or the watcher of
+    /// games from an earlier session. Cancelling either hands its games over
+    /// for good (logs and playtime stop being tracked), so shutdown cancels
+    /// them only once nothing else is left and the core is about to exit.
+    fn session_follower(&self) -> bool {
+        self.follows.is_some() || self.watches_adopted
+    }
+    /// Whether a quit, restart or update cancels this as it begins. Running
+    /// games and their followers are handed over last instead. A
+    /// pre-launch or post-exit hook is the user's own script (a backup, a
+    /// sync): cancelling it kills it midway, so it is left to finish and the
+    /// quit prompt names it, with Quit now as the way out.
+    fn cancelled_by_shutdown(&self) -> bool {
+        !self.running_game() && !self.session_follower() && self.policy != ActivityPolicy::Hook
+    }
+    fn blocker(&self) -> RuntimeBlocker {
+        use RuntimeBlockerKind as Kind;
+        let kind = match (self.phase, self.policy) {
+            (ActivityPhase::Unknown, _) => Kind::Unconfirmed,
+            (_, ActivityPolicy::Game) => Kind::Game,
+            (_, ActivityPolicy::Server) => Kind::Server,
+            (_, ActivityPolicy::Installer) => Kind::Install,
+            (_, ActivityPolicy::Deletion) => Kind::Deletion,
+            (_, ActivityPolicy::Hook) => Kind::Hook,
+            (
+                _,
+                ActivityPolicy::CoreWork
+                | ActivityPolicy::TemporaryChild
+                | ActivityPolicy::JavaProbe,
+            ) => Kind::Task,
+        };
+        RuntimeBlocker::new(kind, &self.owner)
+    }
+}
+
+/// One thing that keeps the runtime folder from being moved, or a quit,
+/// restart or update from finishing, in a form the launcher can show: a kind
+/// it translates and a name. For running work the name is the internal
+/// owner, kept for logs; for earlier-session processes it is the folder or
+/// record they belong to, and for a failed startup check or server drain
+/// its error.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RuntimeBlocker {
+    pub kind: RuntimeBlockerKind,
+    pub name: String,
+    /// The process ID of a process from an earlier session, which is what
+    /// Task Manager and Activity Monitor list it by.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub pid: Option<u32>,
+    /// The program that holds that PID now, as the process table names it
+    /// (`javaw.exe`, `java`), when it could be read. It tells the user
+    /// whether the PID is a JVM before they end anything.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub program: Option<String>,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum RuntimeBlockerKind {
+    /// Minecraft started in this session is running.
+    Game,
+    /// A local server is running or stopping.
+    Server,
+    /// A download or install is in progress: an instance or modpack setup,
+    /// repair, import or game preparation, or an addon, server or Java install.
+    Install,
+    /// An instance or server is being deleted.
+    Deletion,
+    /// A pre-launch or post-exit hook the user set up is still running. A
+    /// quit, restart or update lets it finish rather than cancel it.
+    Hook,
+    /// Any other launcher work: an export, copy or scan.
+    Task,
+    /// Work whose end this core could not confirm, also a server drain that
+    /// failed (its name is then the error). It clears if the work still
+    /// settles (a child reaped after the 5 s budget); otherwise only a
+    /// restart does.
+    Unconfirmed,
+    /// Minecraft started before the launcher last restarted is still running.
+    PreviousGame,
+    /// A process from an earlier session may still be running.
+    PreviousProcess,
+    /// A record of a process from an earlier session that cannot be read,
+    /// verified or removed; its name is the file. It clears once the file is
+    /// gone.
+    UnreadableRecord,
+    /// The startup check for running games and servers has not finished.
+    StartupCheckPending,
+    /// The startup check for running games and servers failed.
+    StartupCheckFailed,
+    /// The launcher is closing, restarting or updating.
+    Shutdown,
+    /// Another move of the runtime folder holds the lease.
+    Relocation,
+}
+impl RuntimeBlocker {
+    fn new(kind: RuntimeBlockerKind, name: impl Into<String>) -> Self {
+        Self {
+            kind,
+            name: name.into(),
+            pid: None,
+            program: None,
+        }
+    }
+    fn with_pid(self, pid: u32) -> Self {
+        Self {
+            pid: Some(pid),
+            ..self
+        }
+    }
+    fn with_program(self, program: Option<String>) -> Self {
+        Self { program, ..self }
+    }
+}
+impl std::fmt::Display for RuntimeBlocker {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}: {}", self.kind, self.name)?;
+        match (self.pid, &self.program) {
+            (Some(pid), Some(program)) => write!(f, " (PID {pid}, {program})")?,
+            (Some(pid), None) => write!(f, " (PID {pid})")?,
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
+/// The core refused to start a relocation. Nothing was frozen, cancelled or
+/// stopped: running games, servers and downloads carry on.
+#[derive(Debug)]
+pub struct RelocationRefused {
+    pub blockers: Vec<RuntimeBlocker>,
+    /// The launcher already cancelled this request id, or the core already
+    /// refused it. Nothing is held for it; a new attempt needs a new id.
+    pub cancelled: bool,
+}
+impl std::fmt::Display for RelocationRefused {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.cancelled {
+            return write!(
+                f,
+                "This move attempt was already cancelled or refused; start a new one"
+            );
+        }
+        write!(
+            f,
+            "Runtime is busy; close Minecraft, stop servers and let downloads finish, then retry: {}",
+            self.blockers
+                .iter()
+                .map(ToString::to_string)
+                .collect::<Vec<_>>()
+                .join("; ")
+        )
+    }
+}
+impl std::error::Error for RelocationRefused {}
+
+#[derive(Debug, thiserror::Error)]
+pub enum CancelShutdownError {
+    /// The core is on its way out; the launcher only has to see it exit.
+    #[error("Shutdown is already committed")]
+    Committed,
+    /// Everything settled and the session workers of running games were
+    /// already handed over: the request is about to report Ready.
+    #[error("Shutdown is already finishing")]
+    Finishing,
+    #[error("No matching cancellable shutdown")]
+    Missing,
+}
+/// A prepare-shutdown for an id the launcher cancelled or a later request
+/// replaced. Nothing is frozen for it, so the launcher starts over under a
+/// new id: its cancel may have landed although the answer was lost.
+#[derive(Debug, thiserror::Error)]
+#[error("This shutdown request was cancelled or replaced; start a new one")]
+pub struct ShutdownRetired;
+#[derive(Debug, thiserror::Error)]
+pub enum CancelRelocationError {
+    /// The lease was committed: the core is on its way out and the move goes on.
+    #[error("Relocation is already committed")]
+    Committed,
+    #[error("No matching cancellable relocation")]
+    Missing,
 }
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Settlement {
@@ -225,6 +416,20 @@ impl RuntimeActivity {
         own.phase = ActivityPhase::Running;
         own.follows = Some(child.id);
         Ok(())
+    }
+    /// Marks this activity as the watcher of games adopted from an earlier
+    /// session. While any such game runs, it names the watcher's work too.
+    pub fn watch_adopted_games(&self) {
+        if let Some(entry) = self
+            .lifecycle
+            .state
+            .lock()
+            .unwrap()
+            .activities
+            .get_mut(&self.id)
+        {
+            entry.watches_adopted = true;
+        }
     }
     pub fn unknown(&self, reason: String) {
         if let Some(entry) = self
@@ -377,14 +582,11 @@ impl Drop for RuntimeActivity {
                     }
                 }
             }
-            if let Some(entry) = self
-                .lifecycle
-                .state
-                .lock()
-                .unwrap()
-                .activities
-                .remove(&self.id)
-            {
+            let mut state = self.lifecycle.state.lock().unwrap();
+            if let Some(record) = &self.record {
+                state.own_records.remove(record);
+            }
+            if let Some(entry) = state.activities.remove(&self.id) {
                 entry.settlement.send_replace(Settlement::Complete);
             }
         }
@@ -647,6 +849,8 @@ impl RuntimeLifecycle {
                 cancel: tokio_util::sync::CancellationToken::new(),
                 settlement: tokio::sync::watch::channel(Settlement::Pending).0,
                 reservation: None,
+                follows: None,
+                watches_adopted: false,
             },
         );
         Ok(RuntimeActivity {
@@ -926,6 +1130,38 @@ impl RuntimeLifecycle {
         Self::settle_locked(&mut state, drain_result);
         None
     }
+    #[cfg(test)]
+    pub(crate) fn set_settle_budget(&self, budget: std::time::Duration) {
+        self.state.lock().unwrap().settle_budget = Some(budget);
+    }
+    /// Lets the launcher go back to normal after a quit, restart or update
+    /// that the user chose not to force: admission opens again, and a drain
+    /// still running for `request` no longer changes anything: it does not
+    /// settle, and it leaves alone every server it had not asked to stop yet
+    /// (also one started after this). Work that was cancelled stays
+    /// cancelled and servers that were asked to stop stay stopped, but
+    /// running games keep being tracked, as their session workers are
+    /// cancelled last. The id is retired either way.
+    pub fn cancel_shutdown(&self, request: &str) -> std::result::Result<(), CancelShutdownError> {
+        let mut state = self.state.lock().unwrap();
+        let result = match &state.shutdown {
+            Some(status) if status.request_id == request => match status.phase {
+                ShutdownPhase::Committed => return Err(CancelShutdownError::Committed),
+                ShutdownPhase::Ready => return Err(CancelShutdownError::Finishing),
+                ShutdownPhase::Draining if status.released => {
+                    return Err(CancelShutdownError::Finishing);
+                }
+                ShutdownPhase::Draining | ShutdownPhase::Unresolved => {
+                    status.cancel.cancel();
+                    state.shutdown = None;
+                    Ok(())
+                }
+            },
+            _ => Err(CancelShutdownError::Missing),
+        };
+        state.retire_shutdown(request);
+        result
+    }
     pub async fn prepare_shutdown_and_commit<F>(
         self: &Arc<Self>,
         request: &str,
@@ -952,14 +1188,33 @@ impl RuntimeLifecycle {
             }
         }
     }
+    /// The handle a server drain for `request` checks and reports through.
+    /// A request that is no longer the current one gives a handle that is
+    /// already cancelled, so a drain that starts late touches nothing.
+    pub fn shutdown_drain(self: &Arc<Self>, request: &str) -> ShutdownDrain {
+        let state = self.state.lock().unwrap();
+        let cancel = match state.shutdown.as_ref().filter(|s| s.request_id == request) {
+            Some(status) => status.cancel.clone(),
+            None => {
+                let cancel = tokio_util::sync::CancellationToken::new();
+                cancel.cancel();
+                cancel
+            }
+        };
+        ShutdownDrain {
+            owner: Some((Arc::downgrade(self), request.to_owned())),
+            cancel,
+        }
+    }
+    /// The request's status. While it drains, its blockers are what is still
+    /// running right now, so the launcher can say what it is waiting for.
     pub fn shutdown_status(
         &self,
         request: &str,
         purpose: ShutdownPurpose,
     ) -> Result<ShutdownStatus> {
-        self.state
-            .lock()
-            .unwrap()
+        let state = self.state.lock().unwrap();
+        let mut status = state
             .shutdown
             .as_ref()
             .filter(|s| s.request_id == request && s.purpose == purpose)
@@ -976,6 +1231,12 @@ impl RuntimeLifecycle {
     }
     /// Final blocker check follows retained operation ACKs and server drain.
     /// Child absence alone never acknowledges a producer or its entered writes.
+    /// Only this core's own work counts. Processes adopted from an earlier
+    /// session keep running whether the core stays or goes, as games this
+    /// core started do, so they never refuse a quit, restart or update.
+    /// The session workers of running games are named only once nothing
+    /// else is left: until `release_followers_or_settle` cancels them they
+    /// are not in the way, they just still have to settle.
     pub fn settle_shutdown(
         &self,
         request: &str,
@@ -1021,13 +1282,8 @@ impl RuntimeLifecycle {
     }
     pub fn commit_prepared_shutdown(&self, request: &str, purpose: ShutdownPurpose) -> Result<()> {
         let mut state = self.state.lock().unwrap();
-        let current_blockers = state.activities.values().any(|entry| {
-            purpose == ShutdownPurpose::Relocation
-                || entry.policy != ActivityPolicy::Game
-                || entry.phase != ActivityPhase::Running
-        }) || state.adopted.keys().any(|key| {
-            purpose == ShutdownPurpose::Relocation || !state.adopted_games.contains(key)
-        });
+        // Like settle_shutdown, only this core's own work counts.
+        let current_blockers = state.activities.values().any(|entry| !entry.running_game());
         if current_blockers {
             bail!("Runtime ownership changed or remains unsettled before shutdown commit");
         }
@@ -1566,9 +1822,13 @@ mod tests {
         assert!(!preparation.cancellation().is_cancelled());
         let result = l.settle_shutdown("quit", Ok(())).unwrap();
         assert_eq!(result.phase, ShutdownPhase::Unresolved);
-        assert_eq!(result.blockers.len(), 1);
-        assert!(result.blockers[0].contains("game preparation"));
-        assert!(preparation.cancellation().is_cancelled());
+        assert_eq!(
+            result.blockers,
+            [RuntimeBlocker::new(
+                RuntimeBlockerKind::Task,
+                "game preparation"
+            )]
+        );
         child.finish();
         preparation.settling();
         assert_eq!(
@@ -2158,14 +2418,29 @@ mod task18_settlement_tests {
             .unwrap();
         game.spawn(ActivityPolicy::Game, || Ok(())).unwrap();
         operation.follow_spawned_game(&game).unwrap();
+        let cancel = operation.cancellation();
         lifecycle
-            .begin_shutdown("quit18", ShutdownPurpose::Quit)
+            .prepare_shutdown("quit18", ShutdownPurpose::Quit, async { Ok(()) })
             .unwrap();
+        // Nothing else runs, so the worker is cancelled right after the drain.
+        tokio::time::timeout(std::time::Duration::from_secs(1), cancel.cancelled())
+            .await
+            .expect("core logging/finalization needs its own cancellation and settlement");
         assert!(!game.cancellation().is_cancelled());
         assert!(
-            operation.cancellation().is_cancelled(),
-            "core logging/finalization needs its own cancellation and settlement"
+            lifecycle
+                .commit_prepared_shutdown("quit18", ShutdownPurpose::Quit)
+                .is_err(),
+            "the worker still has to settle"
         );
+        operation.finish();
+        phase(
+            &lifecycle,
+            "quit18",
+            ShutdownPurpose::Quit,
+            ShutdownPhase::Ready,
+        )
+        .await;
     }
     async fn phase(
         lifecycle: &RuntimeLifecycle,
@@ -2333,18 +2608,22 @@ mod task18_settlement_tests {
         lifecycle
             .commit_prepared_shutdown("quit-game", ShutdownPurpose::Quit)
             .unwrap();
-        // Same surviving game remains a relocation blocker in a separately owned request.
-        lifecycle.state.lock().unwrap().shutdown = None;
-        lifecycle
-            .prepare_shutdown("move-game", ShutdownPurpose::Relocation, async { Ok(()) })
-            .unwrap();
-        phase(
-            &lifecycle,
-            "move-game",
-            ShutdownPurpose::Relocation,
-            ShutdownPhase::Unresolved,
-        )
-        .await;
+        // The surviving game still refuses a move, and the refusal changes nothing.
+        let refused = lifecycle.begin_relocation("move-game").unwrap_err();
+        assert!(
+            refused.blockers.contains(&RuntimeBlocker::new(
+                RuntimeBlockerKind::Game,
+                "proven game"
+            )),
+            "{refused}"
+        );
+        let state = lifecycle.state.lock().unwrap();
+        assert!(state.relocation.is_none());
+        assert_eq!(
+            state.shutdown.as_ref().unwrap().phase,
+            ShutdownPhase::Committed
+        );
+        assert_eq!(state.activities[&game_id].phase, ActivityPhase::Running);
     }
     #[tokio::test]
     async fn task18_unknown_worker_and_late_game_transition_block_commit() {

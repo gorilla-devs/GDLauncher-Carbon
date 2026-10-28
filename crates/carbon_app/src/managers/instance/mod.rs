@@ -2207,7 +2207,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     {
         let activity = self.app.runtime_lifecycle.admit_owned(
             "borrowed create/import instance setup",
-            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
         )?;
         crate::managers::runtime_lifecycle::run_borrowed_owned(
             activity,

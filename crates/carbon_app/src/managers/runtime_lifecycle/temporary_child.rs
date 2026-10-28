@@ -314,7 +314,7 @@ mod tests {
             "caller loss must request retained child cleanup"
         );
         assert!(
-            lifecycle.begin_relocation("move").is_err(),
+            lifecycle.begin_relocation("busy").is_err(),
             "kill acceptance is not wait proof"
         );
         exit.send(Ok(ExitStatus::from_raw(0))).unwrap();

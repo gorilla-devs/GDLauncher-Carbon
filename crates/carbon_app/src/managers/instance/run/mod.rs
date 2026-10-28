@@ -167,7 +167,7 @@ impl ManagerRef<'_, InstanceManager> {
     ) -> anyhow::Result<(JoinHandle<()>, VisualTaskId)> {
         let activity = self.app.runtime_lifecycle.admit_owned(
             format!("instance {instance_id} preparation/session"),
-            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
         )?;
         let app = self.app.clone();
         crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| Box::pin(async move {
@@ -1690,6 +1690,8 @@ impl ManagerRef<'_, InstanceManager> {
                 return;
             }
         };
+        // A blocked move names the adopted games, not this watcher as well.
+        activity.watch_adopted_games();
         crate::managers::runtime_lifecycle::spawn_retained(activity, move |slot| {
             Box::pin(async move {
                 let cancel = slot.as_ref().unwrap().cancellation();

@@ -191,7 +191,7 @@ impl ManagerRef<'_, InstanceManager> {
     ) -> anyhow::Result<VisualTaskId> {
         let activity = self.app.runtime_lifecycle.admit_owned(
             format!("instance {instance_id} setup producer"),
-            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
         )?;
         let app = self.app.clone();
         crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| {
@@ -352,7 +352,7 @@ impl ManagerRef<'_, InstanceManager> {
     ) -> anyhow::Result<VisualTaskId> {
         let activity = self.app.runtime_lifecycle.admit_owned(
             format!("instance {instance_id} repair producer"),
-            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
         )?;
         let app = self.app.clone();
         crate::managers::runtime_lifecycle::spawn_retained(activity, move |activity| {

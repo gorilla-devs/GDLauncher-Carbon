@@ -118,7 +118,7 @@ impl ManagerRef<'_, InstanceImportManager> {
 
         let activity = app.runtime_lifecycle.admit_owned(
             "share import operation",
-            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
         )?;
         // The public handle only awaits this already retained producer.
         let worker = crate::managers::runtime_lifecycle::spawn_retained(activity, move |slot| {
@@ -272,7 +272,7 @@ impl ManagerRef<'_, InstanceImportManager> {
     ) -> anyhow::Result<VisualTaskId> {
         let runtime_activity = self.app.runtime_lifecycle.admit_owned(
             "accepted instance import",
-            crate::managers::runtime_lifecycle::ActivityPolicy::CoreWork,
+            crate::managers::runtime_lifecycle::ActivityPolicy::Installer,
         )?;
         let scanner = match self.manager.selected_scanner(&session).await {
             Ok(scanner) => scanner,

@@ -348,10 +348,15 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
             let request = format!("core-termination-signal-{}", uuid::Uuid::new_v4());
             let purpose = managers::runtime_lifecycle::ShutdownPurpose::Quit;
             let draining_app = app2.clone();
+            let id = request.clone();
             match app2
                 .runtime_lifecycle
-                .prepare_shutdown_and_commit(request, purpose, async move {
-                    draining_app.server_manager().shutdown_running().await
+                .prepare_shutdown_and_commit(&request, purpose, async move {
+                    let drain = draining_app.runtime_lifecycle.shutdown_drain(&id);
+                    draining_app
+                        .server_manager()
+                        .shutdown_running_for(&drain)
+                        .await
                 })
                 .await
             {
