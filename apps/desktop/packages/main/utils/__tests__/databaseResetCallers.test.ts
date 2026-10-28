@@ -8,10 +8,22 @@ import vm from "node:vm"
 import { EventEmitter } from "node:events"
 import { resetDatabaseAndRestart } from "../databaseReset"
 import {
+  ShutdownBlockedError,
+  cancelCoreShutdown,
+  forceTerminateCore,
   terminateAndObserveCoreExit,
   stopCoreForShutdown
 } from "../coreShutdown"
-import { withRuntimeOperation } from "../runtimeOperation"
+import {
+  ShutdownFlow,
+  ShutdownNotPossibleError,
+  type ShutdownChoice,
+  type ShutdownView
+} from "../shutdownFlow"
+import {
+  runtimeOperationBrief,
+  withRuntimeOperation
+} from "../runtimeOperation"
 import { createCoreOutput } from "../coreOutput"
 import getAdSize from "../../adSize"
 const displayFixture = vi.hoisted(() => ({
@@ -81,6 +93,65 @@ function actual(kind: string, name: string, globals: Record<string, unknown>) {
   globals.Error = Error
   return vm.runInNewContext(`(() => { ${js}; return actual })()`, globals)
 }
+/**
+ * The actual ownedShutdown, stopOwnedCore and startedCore from index.ts over
+ * `globals`, with prompts answered from `answers` (Keep GDLauncher open once
+ * they run out).
+ */
+function owned(
+  globals: Record<string, unknown>,
+  answers: ShutdownChoice[] = []
+) {
+  const text = fss.readFileSync(path.resolve("packages/main/index.ts"), "utf8")
+  const ast = ts.createSourceFile(
+    "index.ts",
+    text,
+    ts.ScriptTarget.Latest,
+    true
+  )
+  const names = ["ownedShutdown", "stopOwnedCore", "startedCore"]
+  const found: string[] = []
+  ts.forEachChild(ast, (node) => {
+    if (ts.isFunctionDeclaration(node) && names.includes(node.name!.text))
+      found.push(node.getText(ast))
+  })
+  expect(found).toHaveLength(names.length)
+  const prompts: ShutdownView[] = []
+  const context: Record<string, unknown> = {
+    ShutdownFlow,
+    ShutdownBlockedError,
+    ShutdownNotPossibleError,
+    cancelCoreShutdown,
+    forceTerminateCore,
+    fetch: undefined,
+    shutdownApproved: false,
+    shutdownInFlight: undefined,
+    shutdownFlow: undefined,
+    coreLoaded: undefined,
+    lifecycle: { approveQuit() {} },
+    win: { isDestroyed: () => false },
+    createWindow: async () => context.win,
+    hideWindow() {},
+    shutdownPrompts: {
+      ask: async (_window: unknown, view: ShutdownView) => {
+        prompts.push(view)
+        return answers.shift() ?? "keep"
+      }
+    },
+    console,
+    setTimeout,
+    clearTimeout,
+    AbortController,
+    Promise,
+    Error,
+    ...globals
+  }
+  const js = ts.transpileModule(found.join("\n") + "\nreturn ownedShutdown", {
+    compilerOptions: { target: ts.ScriptTarget.ES2022 }
+  }).outputText
+  const ownedShutdown = vm.runInNewContext(`(() => { ${js} })()`, context)
+  return { ownedShutdown, prompts, context }
+}
 async function fixture() {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), "task24-caller-"))
   await fs.writeFile(path.join(root, "gdl_conf.db"), "metadata")
@@ -91,7 +162,7 @@ async function fixture() {
   })
   const app = { relaunch: vi.fn(), exit: vi.fn() },
     dialog = { showMessageBox: vi.fn(async () => ({ response: 0 })) }
-  const globals = {
+  const globals: Record<string, unknown> = {
     CURRENT_RUNTIME_PATH: root,
     RECOVERY_COPY_DAYS: 30,
     coreModule: Promise.resolve({ type: "error", logs: [] }),
@@ -105,13 +176,30 @@ async function fixture() {
     app,
     console
   }
+  /** The reset IPC with the actual ownedShutdown over `extra`. */
+  const resetWith = (
+    extra: Record<string, unknown> = {},
+    answers: ShutdownChoice[] = []
+  ) => {
+    const shutdown = owned({ ...globals, ...extra }, answers)
+    return {
+      ...shutdown,
+      reset: actual("ipc", "deleteDbAndRestart", {
+        ...globals,
+        ...extra,
+        keptBeforeDatabaseChange: () => new Error("kept open"),
+        ownedShutdown: shutdown.ownedShutdown
+      })
+    }
+  }
   return {
     root,
     child,
     app,
     dialog,
     globals,
-    reset: actual("ipc", "deleteDbAndRestart", globals)
+    resetWith,
+    reset: resetWith().reset
   }
 }
 it("actual reset IPC waits for observed owned pre-READY exit, then retains bytes and restarts", async () => {
@@ -135,11 +223,12 @@ it("actual reset IPC waits for observed owned pre-READY exit, then retains bytes
 })
 it("actual reset IPC refuses a running external core without touching files", async () => {
   const f = await fixture()
-  f.globals.coreProcessHandle = null as any
-  const reset = actual("ipc", "deleteDbAndRestart", f.globals)
+  const { reset, prompts } = f.resetWith({ coreProcessHandle: null })
   const result = await reset()
   expect(result.ok).toBe(false)
   expect(result.message).toContain("launcher-owned")
+  // Nothing to wait for or force: it is not offered as Reset now.
+  expect(prompts).toEqual([])
   expect(await fs.readFile(path.join(f.root, "gdl_conf.db"), "utf8")).toBe(
     "metadata"
   )
@@ -185,13 +274,12 @@ it("actual reset uses quit-purpose readiness and observed exit without selecting
     }
   })
   const stop = (core: any, purpose: any) =>
-    stopCoreForShutdown(core, purpose, undefined, transport as any)
+    stopCoreForShutdown(core, purpose, transport as any)
   f.child.kill.mockImplementation(() => {
     f.child.emit("exit", 0)
     return true
   })
-  const reset = actual("ipc", "deleteDbAndRestart", {
-    ...f.globals,
+  const { reset } = f.resetWith({
     coreModule: Promise.resolve({
       type: "success",
       result: { port: 1, apiToken: "synthetic" }
@@ -201,12 +289,22 @@ it("actual reset uses quit-purpose readiness and observed exit without selecting
   expect((await reset()).ok).toBe(true)
   expect(calls).toEqual(["prepare-shutdown", "shutdown"])
 })
-it("actual reset preserves sources on unresolved shutdown and reuses request identity", async () => {
+it("actual reset preserves sources on unresolved shutdown, retries the same request on Wait and gives it back on Keep open", async () => {
   const f = await fixture()
-  const ids: string[] = []
-  const transport = vi.fn(async (_url: any, options: any) => {
+  const calls: { endpoint: string; requestId: string }[] = []
+  // The install is still running at first; on Try again it no longer
+  // reports anything, which waiting cannot fix, so the user is asked again.
+  const blockers = [
+    [{ kind: "install", name: "unknown installer" }],
+    [{ kind: "unconfirmed", name: "unknown installer" }]
+  ]
+  const transport = vi.fn(async (url: any, options: any) => {
     const body = JSON.parse(options.body)
-    ids.push(body.requestId)
+    const endpoint = String(url).split("/").at(-1)!
+    calls.push({ endpoint, requestId: body.requestId })
+    const attempt = calls.filter(
+      (call) => call.endpoint === "prepare-shutdown"
+    ).length
     return {
       ok: true,
       json: async () => ({
@@ -214,22 +312,49 @@ it("actual reset preserves sources on unresolved shutdown and reuses request ide
         status: {
           ...body,
           phase: "unresolved",
-          blockers: ["unknown installer"]
+          blockers: blockers[Math.min(attempt, 2) - 1],
+          serversStopped: false
         }
       })
     }
   })
-  const reset = actual("ipc", "deleteDbAndRestart", {
-    ...f.globals,
-    coreModule: Promise.resolve({
-      type: "success",
-      result: { port: 1, apiToken: "synthetic" }
-    }),
-    stopCoreForShutdown: (core: any, purpose: any) =>
-      stopCoreForShutdown(core, purpose, undefined, transport as any)
+  const core = {
+    type: "success",
+    result: { port: 1, apiToken: "synthetic" }
+  }
+  const { reset, prompts, context } = f.resetWith(
+    {
+      coreModule: Promise.resolve(core),
+      stopCoreForShutdown: (core: any, purpose: any) =>
+        stopCoreForShutdown(core, purpose, transport as any),
+      cancelCoreShutdown: (core: any) =>
+        cancelCoreShutdown(core, transport as any)
+    },
+    ["wait", "keep"]
+  )
+  context.coreLoaded = core
+  const result = await reset()
+  expect(result.ok).toBe(false)
+  expect(result.message).toContain("kept open")
+  expect(prompts.map((view) => [view.action, view.stage, view.reason])).toEqual(
+    [
+      ["reset", "blocked", "unresolved"],
+      ["reset", "blocked", "unresolved"]
+    ]
+  )
+  expect(prompts[0].blockers).toEqual([
+    { kind: "install", name: "unknown installer" }
+  ])
+  expect(prompts[1]).toMatchObject({
+    canWait: false,
+    blockers: [{ kind: "unconfirmed", name: "unknown installer" }]
   })
-  for (let i = 0; i < 2; i++) expect((await reset()).ok).toBe(false)
-  expect(new Set(ids).size).toBe(1)
+  expect(calls.map((call) => call.endpoint)).toEqual([
+    "prepare-shutdown",
+    "prepare-shutdown",
+    "cancel-shutdown"
+  ])
+  expect(new Set(calls.map((call) => call.requestId)).size).toBe(1)
   expect(f.child.kill).not.toHaveBeenCalled()
   expect(f.app.relaunch).not.toHaveBeenCalled()
   expect(await fs.readFile(path.join(f.root, "gdl_conf.db"), "utf8")).toBe(
@@ -263,15 +388,16 @@ it("actual core exit callback retains owned exit evidence and does not replace n
 })
 it("actual nondeleting Restart preserves metadata and supports external development restart", async () => {
   const f = await fixture()
-  const stop = actual("function", "killCoreProcess", {
+  const { ownedShutdown, prompts } = owned({
     ...f.globals,
     coreProcessHandle: null
   })
   const restart = actual("ipc", "relaunch", {
     ...f.globals,
-    killCoreProcess: stop
+    ownedShutdown
   })
-  await restart()
+  expect(await restart()).toEqual({ status: "relaunching" })
+  expect(prompts).toEqual([])
   expect(await fs.readFile(path.join(f.root, "gdl_conf.db"), "utf8")).toBe(
     "metadata"
   )

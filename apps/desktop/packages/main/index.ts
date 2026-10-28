@@ -449,17 +449,6 @@ const DEV_API_TOKEN = "dev-mode-only-do-not-use-in-production"
 // core promise via the timeout below while the process itself stays alive.
 let coreProcessHandle: ChildProcessWithoutNullStreams | null = null
 
-// Restart shares ordinary shutdown/game-survival when a READY owned core exists.
-// A nondeleting development restart remains supported; reset separately refuses it.
-async function killCoreProcess(): Promise<void> {
-  const core = await coreModule
-  const owned = coreProcessHandle
-  if (!owned) return
-  if (core.type === "success")
-    await stopCoreForShutdown({ ...core.result, process: owned }, "quit")
-  else await terminateAndObserveCoreExit(owned)
-}
-
 const loadCoreModule: CoreModule = async () => {
   // Nothing here may await before the spawn below. Called while this module
   // loads, the core starts before Chromium launches any child process, as in
@@ -972,15 +961,8 @@ ipcMain.handle("deleteDbAndRestart", async () =>
       // Resolves only once the core's exit was observed, also when the user
       // chose Reset now: files move only after that.
       stopCore: async () => {
-        const core = await coreModule
-        const owned = coreProcessHandle
-        if (!owned)
-          throw new Error(
-            "Database reset requires a launcher-owned core exit; external/development core must be stopped and recovered manually"
-          )
-        if (core.type === "success")
-          await stopCoreForShutdown({ ...core.result, process: owned }, "quit")
-        else await terminateAndObserveCoreExit(owned)
+        if ((await ownedShutdown("reset")) === "kept")
+          throw keptBeforeDatabaseChange()
       },
       restart: async (recoveryPath) => {
         console.log(`Database reset; recovery files kept in ${recoveryPath}`)

@@ -27,7 +27,20 @@ import {
 } from "../runtimeRelocation"
 import { resetDatabaseAndRestart } from "../databaseReset"
 import { restoreDatabaseSnapshot } from "../databaseRestore"
-import { withRuntimeOperation } from "../runtimeOperation"
+import {
+  interruptRuntimeOperation,
+  interruptibleUntilCommitted,
+  runtimeOperationActive,
+  whenRuntimeOperationIdle,
+  withRuntimeOperation
+} from "../runtimeOperation"
+import { ShutdownRefusedError, relocationLeaseHeld } from "../coreShutdown"
+import {
+  recordRuntimeMoveNotice,
+  takeRuntimeMoveNotice,
+  dismissRuntimeMoveNotice,
+  RUNTIME_MOVE_NOTICE_NAME
+} from "../runtimeMoveNotice"
 
 // Execute the actual IPC callbacks without importing Electron or starting an app.
 function callback(name: string, globals: Record<string, unknown>) {
@@ -115,6 +128,7 @@ async function fixture() {
     checkRelocation: check,
     stopCoreForRelocation: stop,
     stopCoreForShutdown: stop,
+    ShutdownRefusedError,
     terminateAndObserveCoreExit: stop,
     resetDatabaseAndRestart,
     restoreDatabaseSnapshot,

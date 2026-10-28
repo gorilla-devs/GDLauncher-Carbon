@@ -5,6 +5,7 @@ import {
   type DbRecoveryCategory
 } from "../main/utils/dbRecovery"
 import { resetDatabaseClick } from "./resetButton"
+import { restartClick } from "./restartButton"
 import { restoreSnapshotClick } from "./restoreButton"
 import { domReady } from "./utils"
 

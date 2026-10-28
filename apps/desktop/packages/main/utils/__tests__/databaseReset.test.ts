@@ -2,7 +2,11 @@ import { describe, it, expect, vi } from "vitest"
 import fs from "node:fs/promises"
 import path from "node:path"
 import os from "node:os"
+import { EventEmitter } from "node:events"
+import type { ChildProcess } from "node:child_process"
 import { resetDatabaseAndRestart } from "../databaseReset"
+import { ShutdownBlockedError, forceTerminateCore } from "../coreShutdown"
+import { ShutdownFlow } from "../shutdownFlow"
 const names = [
   "gdl_conf.db",
   "gdl_conf.db-wal",
@@ -410,4 +414,71 @@ it("failed restart notice retains complete backup and reports failed restart", a
   expect(
     await fs.readFile(path.join(result.recoveryPath!, names[0]), "utf8")
   ).toBe("synthetic metadata 0")
+})
+
+it("Reset now after a refused stop still waits for the observed core exit before any database file moves", async () => {
+  vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+  try {
+    const root = await fixture()
+    // The core's own SIGTERM handler is refused like the request was.
+    const core = Object.assign(new EventEmitter(), {
+      exitCode: null as number | null,
+      signalCode: null as string | null,
+      kill: vi.fn((_signal?: string) => true)
+    })
+    const touched: string[] = []
+    const files = new Proxy(fs, {
+      get(target, key: string) {
+        const value = (target as any)[key]
+        if (!["unlink", "rename", "mkdtemp", "rm"].includes(key)) return value
+        return async (...args: unknown[]) => {
+          touched.push(key)
+          return value.apply(target, args)
+        }
+      }
+    })
+    const restart = vi.fn()
+    const reset = resetDatabaseAndRestart(root, {
+      stopCore: async () => {
+        const outcome = await new ShutdownFlow("reset", {
+          stop: async () => {
+            throw new ShutdownBlockedError("unresolved", "unresolved", [
+              { kind: "task", name: "stuck copy" }
+            ])
+          },
+          cancel: async () => "released",
+          force: () =>
+            forceTerminateCore(core as unknown as ChildProcess, 3000, 5000),
+          prompt: async () => "force"
+        }).run()
+        expect(outcome).toBe("forced")
+      },
+      restart,
+      files
+    })
+    await vi.advanceTimersByTimeAsync(3000)
+    expect(core.kill.mock.calls.map(([signal]) => signal)).toEqual([
+      "SIGTERM",
+      "SIGKILL"
+    ])
+    await vi.advanceTimersByTimeAsync(4000)
+    expect(touched).toEqual([])
+    for (const [i, name] of names.entries())
+      expect(await fs.readFile(path.join(root, name), "utf8")).toBe(
+        `synthetic metadata ${i}`
+      )
+    core.signalCode = "SIGKILL"
+    core.emit("exit", null, "SIGKILL")
+    const result = await reset
+    expect(result).toMatchObject({ ok: true })
+    expect(touched).toContain("unlink")
+    if (!result.ok) throw Error(result.message)
+    for (const [i, name] of names.entries())
+      expect(
+        await fs.readFile(path.join(result.recoveryPath, name), "utf8")
+      ).toBe(`synthetic metadata ${i}`)
+    expect(restart).toHaveBeenCalledOnce()
+  } finally {
+    vi.useRealTimers()
+  }
 })
