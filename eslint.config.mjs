@@ -136,6 +136,19 @@ export default [
     }
   },
 
+  // Tests, fixtures and test doubles render placeholder text, not user-facing copy
+  {
+    files: [
+      "apps/desktop/packages/mainWindow/**/*.test.{ts,tsx}",
+      "apps/desktop/packages/mainWindow/**/*.fixture.{ts,tsx}",
+      "apps/desktop/packages/mainWindow/src/test/**/*"
+    ],
+    rules: {
+      "i18next/no-literal-string": "off"
+    }
+  },
+
+
   // temporarily disabled files
   {
     ignores: ["packages/ui/.storybook/**/*"]
