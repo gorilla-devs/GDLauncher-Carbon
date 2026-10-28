@@ -23,6 +23,16 @@ export type RuntimeRelocationResult =
       message: string
       // The chosen folder holds only a partial copy of the data folder in use (see leftPartialCopy).
       incompleteTarget?: boolean
+      // The move stopped before it finished and removed what it had copied (see removedPartialCopy).
+      copyRemoved?: boolean
+      /**
+       * The live core confirmed it holds no move for this launcher: it refused
+       * to start one (the blockers say why) or released it before commit.
+       * Nothing was frozen, cancelled or stopped.
+       */
+      refused?: { blockers: RuntimeBlocker[] }
+      // Links or special files inside the data folder that a move would not carry over.
+      unsupported?: UnsupportedRuntimeEntries
     }
 
 export interface RuntimeRelocationOutcome {

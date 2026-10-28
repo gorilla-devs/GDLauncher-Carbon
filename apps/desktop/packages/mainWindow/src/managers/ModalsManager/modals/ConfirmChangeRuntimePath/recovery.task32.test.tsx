@@ -17,14 +17,33 @@ import {
   selectRuntimePath,
   MIGRATION_MARKER
 } from "../../../../../../main/utils/runtimeRelocation"
-import { withRuntimeOperation } from "../../../../../../main/utils/runtimeOperation"
+import {
+  interruptibleUntilCommitted,
+  withRuntimeOperation
+} from "../../../../../../main/utils/runtimeOperation"
+import {
+  ShutdownRefusedError,
+  relocationLeaseHeld
+} from "../../../../../../main/utils/coreShutdown"
+import {
+  dismissRuntimeMoveNotice,
+  recordRuntimeMoveNotice,
+  takeRuntimeMoveNotice,
+  RUNTIME_MOVE_NOTICE_NAME
+} from "../../../../../../main/utils/runtimeMoveNotice"
+import {
+  showRuntimeMoveNotice,
+  showUnavailableRuntimePath
+} from "@/utils/runtimeMoveNotice"
 import { ModalProvider, useModal } from "@/managers/ModalsManager"
 import {
   isChangingRuntimePath,
+  runtimeRecoveryRequired,
   setIsChangingRuntimePath,
   setRuntimeRecoveryRequired
 } from "./state"
 import { button, settle } from "@/task32.fixture"
+import { RTsetProgress } from "@/utils/runtimePathProgress"
 const c = vi.hoisted(() => {
   window.changeRuntimePathProgress = vi.fn()
   return {
@@ -52,8 +71,10 @@ vi.mock("@gd/i18n", () => ({
   useTransContext: () => [(key: string) => key],
   Trans: (p: any) => (
     <span>
-      {p.key.includes("runtime_recovery.")
-        ? (englishJava as Record<string, string>)[p.key.split(":")[1]]
+      {/runtime_recovery\.|runtime_relocation_busy\.|_trn_copying_file|_trn_removing_file|_trn_removing_partial_copy|_trn_saving_copy/.test(
+        p.key
+      )
+        ? translate(p.key, p.options)
         : p.key}
     </span>
   )
@@ -156,11 +177,19 @@ async function fixture(relocate: typeof relocateRuntime = relocateRuntime) {
   await fs.writeFile(path.join(source, "b"), "second bytes")
   await fs.writeFile(pointer, source)
   const stop = vi.fn(async () => {}),
+    check = vi.fn(async (_core: unknown) => {}),
     restart = vi.fn(async (_selected?: string) => {}),
     notice = vi.fn(async () => {})
   const globals = {
     withRuntimeOperation,
-    relocateRuntime,
+    interruptibleUntilCommitted,
+    relocationLeaseHeld,
+    relocateRuntime: relocate,
+    leftInOldFolder,
+    recordRuntimeMoveNotice,
+    leftPartialCopy,
+    unsupportedRuntimeEntries,
+    removedPartialCopy,
     CURRENT_RUNTIME_PATH: source,
     overrideCLIDataPath: undefined,
     overrideEnvDataPath: undefined,
@@ -170,7 +199,9 @@ async function fixture(relocate: typeof relocateRuntime = relocateRuntime) {
     RUNTIME_PATH_OVERRIDE_NAME: "runtime_path_override",
     coreModule: Promise.resolve({ type: "success", result: {} }),
     coreProcessHandle: {},
+    checkRelocation: check,
     stopCoreForRelocation: stop,
+    ShutdownRefusedError,
     win: null,
     console,
     dialog: { showMessageBox: notice }
@@ -198,9 +229,10 @@ async function fixture(relocate: typeof relocateRuntime = relocateRuntime) {
   window.relaunch = callback(
     {
       withRuntimeOperation,
-      killCoreProcess: async () => {
+      ownedShutdown: async () => {
         const selected = selectRuntimePath(null, root)
         await restart(selected)
+        return "stopped"
       },
       app: { relaunch: vi.fn(), exit: vi.fn() },
       console
@@ -247,6 +279,7 @@ async function fixture(relocate: typeof relocateRuntime = relocateRuntime) {
     target,
     pointer,
     stop,
+    check,
     restart,
     notice,
     element: document.body,
@@ -751,4 +784,503 @@ it("a failure that left no partial copy keeps the generic recovery advice", asyn
   expect(text).toContain("java:_trn_migration_errored")
   expect(text).not.toContain("java:_trn_migration_stopped")
   expect(text).not.toContain("unfinished move")
+})
+const busy = [
+  { kind: "game", name: "game 3" },
+  { kind: "server", name: "server 7 run" }
+] as const
+const javaText = englishJava as Record<string, string>
+it("a move refused while Minecraft runs explains why, lists what is running and can be dismissed", async () => {
+  const f = await fixture()
+  f.stop.mockRejectedValue(
+    new ShutdownRefusedError("Core relocation refused", [...busy])
+  )
+  await submit(f)
+  const text = document.body.textContent
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.body"])
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.game"])
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.server"])
+  // Internal owner names mean nothing to the user.
+  expect(text).not.toContain("game 3")
+  expect(text).not.toContain("server 7 run")
+  expect(text).not.toContain("Retry relocation")
+  expect(selectRuntimePath(null, f.root)).toBe(f.source)
+  expect(await fs.readdir(f.target)).toEqual([])
+  expect(runtimeRecoveryRequired()).toBe(false)
+  button(document.body, "general:_trn_dismiss").click()
+  await settle()
+  expect(c.manager.hasOpenModals()).toBe(false)
+  expect(f.restart).not.toHaveBeenCalled()
+})
+it("Try again after closing the game finishes the move", async () => {
+  const f = await fixture()
+  f.stop.mockRejectedValueOnce(
+    new ShutdownRefusedError("Core relocation refused", [...busy])
+  )
+  await submit(f)
+  button(
+    document.body,
+    javaText["_trn_runtime_relocation_busy.try_again"]
+  ).click()
+  await vi.waitFor(() => expect(f.restart).toHaveBeenCalledTimes(1))
+  expect(f.stop).toHaveBeenCalledTimes(2)
+  expect(selectRuntimePath(null, f.root)).toBe(f.target)
+})
+it("an unresolved move that the core then refuses becomes dismissible", async () => {
+  const f = await fixture()
+  f.stop
+    .mockRejectedValueOnce(Error("core unreachable"))
+    .mockRejectedValueOnce(
+      new ShutdownRefusedError("Core relocation refused", [...busy])
+    )
+  await submit(f)
+  expect(c.protection()).toBe(true)
+  button(document.body, "Retry relocation").click()
+  await vi.waitFor(() => expect(f.stop).toHaveBeenCalledTimes(2))
+  await settle()
+  expect(document.body.textContent).toContain(
+    javaText["_trn_runtime_relocation_busy.title"]
+  )
+  // The core confirmed it holds no move, so the shared lock is lifted too:
+  // the modal closes normally and the next one opens unlocked.
+  expect(runtimeRecoveryRequired()).toBe(false)
+  expect(c.protection()).toBe(false)
+})
+it("a stopped core still offers only Restart", async () => {
+  const f = await fixture()
+  const move = f.move
+  window.changeRuntimePath = async (target, switchOnly) => {
+    const result = await move(null, target, switchOnly)
+    return { ...result, recovery: "restart" }
+  }
+  f.stop.mockRejectedValue(Error("Core exit was not confirmed"))
+  await submit(f)
+  expect(c.protection()).toBe(true)
+  expect(document.body.textContent).toContain("Restart")
+  expect(document.body.textContent).not.toContain("Retry relocation")
+  expect(
+    Array.from(document.querySelectorAll("button")).some((b) =>
+      b.textContent?.includes("general:_trn_dismiss")
+    )
+  ).toBe(false)
+})
+
+const hasButton = (text: string) =>
+  Array.from(document.querySelectorAll("button")).some((b) =>
+    b.textContent?.includes(text)
+  )
+it("a failed startup check offers a restart instead of a Try again that can never work", async () => {
+  const f = await fixture()
+  const failure =
+    "Cannot reconcile /data/instances/Pack: invalid digit found in string"
+  f.stop.mockRejectedValue(
+    new ShutdownRefusedError("Core relocation refused", [
+      { kind: "startupCheckFailed", name: failure }
+    ])
+  )
+  await submit(f)
+  const text = document.body.textContent
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.body_steps"])
+  expect(text).not.toContain(javaText["_trn_runtime_relocation_busy.body"])
+  expect(text).toContain(
+    javaText["_trn_runtime_relocation_busy.startup_check_failed"]
+  )
+  // The only thing that names the file or folder to look at.
+  expect(text).toContain(failure)
+  expect(hasButton(javaText["_trn_runtime_relocation_busy.try_again"])).toBe(
+    false
+  )
+  expect(hasButton("general:_trn_dismiss")).toBe(true)
+  button(
+    document.body,
+    javaText["_trn_runtime_relocation_busy.restart"]
+  ).click()
+  await vi.waitFor(() => expect(f.restart).toHaveBeenCalledTimes(1))
+  // A plain restart keeps the old folder: nothing was moved.
+  expect(f.restart).toHaveBeenCalledWith(f.source)
+})
+it("a restart that fails keeps the calm view, says nothing was moved and can still be dismissed", async () => {
+  const f = await fixture()
+  f.stop.mockRejectedValue(
+    new ShutdownRefusedError("Core relocation refused", [
+      {
+        kind: "startupCheckFailed",
+        name: "Cannot reconcile /data/instances/Pack"
+      }
+    ])
+  )
+  const raw =
+    "Error: Shutdown unresolved (request 3f2a); core ownership retained. Core shutdown refused: Runtime ownership reconciliation is pending or failed"
+  f.restart.mockRejectedValueOnce(Error(raw))
+  const logged = vi.spyOn(console, "error").mockImplementation(() => {})
+  await submit(f)
+  button(
+    document.body,
+    javaText["_trn_runtime_relocation_busy.restart"]
+  ).click()
+  await vi.waitFor(() =>
+    expect(document.body.textContent).toContain(
+      javaText["_trn_runtime_relocation_busy.restart_failed"]
+    )
+  )
+  await settle()
+  const text = document.body.textContent
+  // Nothing was moved: no red "State might be corrupted" screen and no
+  // request ids or internal reasons, which go to the log instead.
+  expect(text).not.toContain("java:_trn_migration_errored")
+  expect(text).not.toContain("3f2a")
+  expect(text).not.toContain("reconciliation is pending")
+  expect(logged).toHaveBeenCalled()
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.title"])
+  expect(text).toContain(
+    javaText["_trn_runtime_relocation_busy.startup_check_failed"]
+  )
+  expect(runtimeRecoveryRequired()).toBe(false)
+  expect(selectRuntimePath(null, f.root)).toBe(f.source)
+  // Restart stays on offer, and Dismiss closes the modal.
+  expect(hasButton(javaText["_trn_runtime_relocation_busy.restart"])).toBe(true)
+  button(document.body, "general:_trn_dismiss").click()
+  await settle()
+  expect(c.manager.hasOpenModals()).toBe(false)
+})
+it("an unconfirmed task offers Try again, which succeeds once it settles, and no Restart", async () => {
+  const f = await fixture()
+  f.stop.mockRejectedValueOnce(
+    new ShutdownRefusedError("Core relocation refused", [
+      { kind: "unconfirmed", name: "temporary child forge installer" }
+    ])
+  )
+  await submit(f)
+  const text = document.body.textContent
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.unconfirmed"])
+  expect(text).not.toContain("forge installer")
+  // A restart would stop servers and freeze the core while it is still
+  // unconfirmed, so it is not offered from here.
+  expect(hasButton(javaText["_trn_runtime_relocation_busy.restart"])).toBe(
+    false
+  )
+  // The installer's child is reaped a moment later; Try again then moves.
+  button(
+    document.body,
+    javaText["_trn_runtime_relocation_busy.try_again"]
+  ).click()
+  await vi.waitFor(() => expect(f.restart).toHaveBeenCalledTimes(1))
+  expect(selectRuntimePath(null, f.root)).toBe(f.target)
+})
+it("a running Pre-Launch or Post-Exit Hook is named as one, without its internal name, and Try again moves once it ends", async () => {
+  const f = await fixture()
+  f.stop.mockRejectedValueOnce(
+    new ShutdownRefusedError("Core relocation refused", [
+      { kind: "hook", name: "temporary child" }
+    ])
+  )
+  await submit(f)
+  const text = document.body.textContent
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.body"])
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.hook"])
+  expect(text).not.toContain(javaText["_trn_runtime_relocation_busy.task"])
+  expect(text).not.toContain("temporary child")
+  button(
+    document.body,
+    javaText["_trn_runtime_relocation_busy.try_again"]
+  ).click()
+  await vi.waitFor(() => expect(f.restart).toHaveBeenCalledTimes(1))
+  expect(selectRuntimePath(null, f.root)).toBe(f.target)
+})
+it("a refusal without a blocker list stays calm and offers Try again", async () => {
+  const f = await fixture()
+  f.stop.mockRejectedValueOnce(
+    new ShutdownRefusedError("The operation was aborted due to timeout")
+  )
+  await submit(f)
+  const text = document.body.textContent
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.title"])
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.not_started"])
+  expect(text).not.toContain("java:_trn_migration_errored")
+  expect(text).not.toContain("aborted due to timeout")
+  expect(runtimeRecoveryRequired()).toBe(false)
+  expect(hasButton("general:_trn_dismiss")).toBe(true)
+  button(
+    document.body,
+    javaText["_trn_runtime_relocation_busy.try_again"]
+  ).click()
+  await vi.waitFor(() => expect(f.restart).toHaveBeenCalledTimes(1))
+  expect(selectRuntimePath(null, f.root)).toBe(f.target)
+})
+it("a process from an earlier session shows the PID to look for, with the program that holds it", async () => {
+  const f = await fixture()
+  f.stop.mockRejectedValue(
+    new ShutdownRefusedError("Core relocation refused", [
+      {
+        kind: "previousProcess",
+        name: "/data/instances/All the Mods 9",
+        pid: 12345,
+        program: "javaw.exe"
+      },
+      // A game published without a folder is named by its PID alone.
+      { kind: "previousGame", name: "", pid: 678, program: "java" },
+      // The core could not read which program holds it.
+      { kind: "previousProcess", name: "/data/servers/Old", pid: 910 }
+    ])
+  )
+  await submit(f)
+  const text = document.body.textContent
+  const pids = Array.from(
+    document.querySelectorAll("[data-testid=relocation-pid]")
+  ).map((line) => line.textContent)
+  expect(text).toContain("/data/instances/All the Mods 9")
+  expect(pids).toEqual([
+    "Process ID (PID): 12345 (javaw.exe)",
+    "Process ID (PID): 678 (java)",
+    "Process ID (PID): 910"
+  ])
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.previous_game"])
+  expect(text).not.toContain("undefined")
+})
+it("never tells the user to end a PID that may belong to a program other than Java", async () => {
+  const f = await fixture()
+  f.stop.mockRejectedValue(
+    new ShutdownRefusedError("Core relocation refused", [
+      {
+        kind: "previousProcess",
+        name: "/data/__gdl_runtime_writers/3f1c2b7e.json",
+        pid: 9876,
+        program: "Discord & Co.exe"
+      }
+    ])
+  )
+  await submit(f)
+  const row = document.querySelector("li")!.textContent
+  // The program is shown as the process table names it, unescaped.
+  expect(row).toContain("Process ID (PID): 9876 (Discord & Co.exe)")
+  const label = javaText["_trn_runtime_relocation_busy.previous_process"]
+  expect(row).toContain(label)
+  // Minecraft is closed normally, so it saves. Ending is advised only for
+  // Java that is not the user's own server or program; anything else gets
+  // a restart instead.
+  expect(label).not.toContain("End the process")
+  expect(label).toMatch(/If it is Minecraft, close the game normally/)
+  expect(label).toMatch(
+    /If the process with the PID shown below is Java \(java, java\.exe or javaw\.exe\) and you are not running a Minecraft server or another Java program yourself, end it/
+  )
+  // Linux has its own tool.
+  expect(label).toMatch(
+    /Task Manager, in Activity Monitor or in System Monitor/
+  )
+  expect(label).toMatch(
+    /Otherwise do not end anything: restart your computer instead/
+  )
+})
+it("a server left by an earlier session points to its page, which can stop it or clear its record", async () => {
+  const f = await fixture()
+  const windowsServer =
+    "C:\\Users\\Ann\\gdlauncher_carbon\\data\\servers\\Lobby"
+  const marker = "/data/servers/Survival/.gdl_server.pid"
+  f.stop.mockRejectedValue(
+    new ShutdownRefusedError("Core relocation refused", [
+      { kind: "previousProcess", name: "/data/servers/Creative", pid: 4242 },
+      { kind: "previousProcess", name: windowsServer, pid: 4343 },
+      { kind: "previousProcess", name: "/data/instances/Old", pid: 42 },
+      { kind: "unreadableRecord", name: marker },
+      {
+        kind: "unreadableRecord",
+        name: "/data/instances/Pack/.gdl_instance.pid"
+      }
+    ])
+  )
+  await submit(f)
+  const rows = Array.from(document.querySelectorAll("li"))
+  const row = (path: string) =>
+    rows.find((li) => li.textContent?.includes(path))!.textContent
+  const processHint = javaText["_trn_runtime_relocation_busy.previous_server"]
+  const markerHint =
+    javaText["_trn_runtime_relocation_busy.unreadable_server_marker"]
+
+  expect(row("/data/servers/Creative")).toContain(processHint)
+  expect(row(windowsServer)).toContain(processHint)
+  expect(row("/data/instances/Old")).not.toContain(processHint)
+  expect(row(marker)).toContain(markerHint)
+  expect(row("/data/instances/Pack/.gdl_instance.pid")).not.toContain(
+    markerHint
+  )
+  // The way out it already gave stays.
+  expect(row("/data/servers/Creative")).toContain(
+    javaText["_trn_runtime_relocation_busy.previous_process"]
+  )
+})
+it("a record the launcher cannot read names its file and Try again moves once it is deleted", async () => {
+  const f = await fixture()
+  const record = "/data/__gdl_runtime_writers/3f1c2b7e.json"
+  const marker = "/data/instances/Pack/.gdl_instance.pid"
+  f.stop.mockRejectedValueOnce(
+    new ShutdownRefusedError("Core relocation refused", [
+      { kind: "unreadableRecord", name: record },
+      { kind: "unreadableRecord", name: marker }
+    ])
+  )
+  await submit(f)
+  const text = document.body.textContent
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.body_steps"])
+  expect(text).not.toContain(javaText["_trn_runtime_relocation_busy.body"])
+  expect(
+    text.split(javaText["_trn_runtime_relocation_busy.unreadable_record"])
+  ).toHaveLength(3)
+  // The file to delete is the only thing the user can act on.
+  expect(text).toContain(record)
+  expect(text).toContain(marker)
+  // Restarting would not clear it; deleting the file and trying again does.
+  expect(hasButton(javaText["_trn_runtime_relocation_busy.restart"])).toBe(
+    false
+  )
+  expect(hasButton("general:_trn_dismiss")).toBe(true)
+  button(
+    document.body,
+    javaText["_trn_runtime_relocation_busy.try_again"]
+  ).click()
+  await vi.waitFor(() => expect(f.restart).toHaveBeenCalledTimes(1))
+  expect(selectRuntimePath(null, f.root)).toBe(f.target)
+})
+it.each([
+  ["Linux x86_64", true],
+  ["MacIntel", true],
+  ["Win32", false]
+])(
+  "on %s each unreadable file can be shown in the file manager and copied, and a crashed instance marker offers a way out without one",
+  async (platform, hidesDotFiles) => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue(platform)
+    const f = await fixture()
+    // After the fixture, which installs its own.
+    const openFolder = vi.fn()
+    window.openFolder = openFolder
+    const record = "/data/__gdl_runtime_writers/3f1c2b7e.json"
+    const marker = "/data/instances/Pack/.gdl_instance.pid"
+    const server = "/data/servers/Lobby/.gdl_server.pid"
+    f.stop.mockRejectedValueOnce(
+      new ShutdownRefusedError("Core relocation refused", [
+        { kind: "unreadableRecord", name: record },
+        { kind: "unreadableRecord", name: marker },
+        { kind: "unreadableRecord", name: server },
+        { kind: "previousProcess", name: "/data/instances/Old", pid: 42 }
+      ])
+    )
+    await submit(f)
+    const rows = Array.from(document.querySelectorAll("li"))
+    const row = (path: string) =>
+      rows.find((li) => li.textContent?.includes(path))!
+    const show = javaText["_trn_runtime_relocation_busy.show_file"]
+    const launchHint =
+      javaText["_trn_runtime_relocation_busy.unreadable_instance_marker"]
+    const hiddenHint = javaText["_trn_runtime_relocation_busy.hidden_file"]
+
+    // Only the instance marker is replaced by a launch.
+    expect(row(marker).textContent).toContain(launchHint)
+    expect(row(server).textContent).not.toContain(launchHint)
+    expect(row(record).textContent).not.toContain(launchHint)
+    // Dot files are hidden in Finder and Linux file managers, not Explorer.
+    expect(row(marker).textContent?.includes(hiddenHint)).toBe(hidesDotFiles)
+    expect(row(server).textContent?.includes(hiddenHint)).toBe(hidesDotFiles)
+    expect(row(record).textContent).not.toContain(hiddenHint)
+    // A process row has no file to show.
+    expect(row("/data/instances/Old").textContent).not.toContain(show)
+
+    for (const path of [record, marker, server]) {
+      button(row(path), show).click()
+      expect(openFolder).toHaveBeenLastCalledWith(path)
+      const detail = Array.from(row(path).querySelectorAll("div")).find(
+        (div) => div.textContent === path
+      )!
+      expect(detail.style.userSelect).toBe("text")
+    }
+    expect(openFolder).toHaveBeenCalledTimes(3)
+    // Showing a file changes nothing about the refusal.
+    expect(selectRuntimePath(null, f.root)).toBe(f.source)
+    expect(document.body.textContent).toContain(
+      javaText["_trn_runtime_relocation_busy.title"]
+    )
+  }
+)
+it("a mixed list keeps the step for each row, and a pending startup check alone is told to wait", async () => {
+  const f = await fixture()
+  f.stop
+    .mockRejectedValueOnce(
+      new ShutdownRefusedError("Core relocation refused", [
+        { kind: "game", name: "game 3" },
+        { kind: "previousProcess", name: "/data/servers/Old", pid: 42 }
+      ])
+    )
+    .mockRejectedValueOnce(
+      new ShutdownRefusedError("Core relocation refused", [
+        { kind: "startupCheckPending", name: "" }
+      ])
+    )
+  await submit(f)
+  let text = document.body.textContent
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.body_steps"])
+  // The general "close Minecraft" body is gone, so the row says it.
+  expect(javaText["_trn_runtime_relocation_busy.game"]).toMatch(/Close it/)
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.game"])
+  button(
+    document.body,
+    javaText["_trn_runtime_relocation_busy.try_again"]
+  ).click()
+  await vi.waitFor(() => expect(f.stop).toHaveBeenCalledTimes(2))
+  await settle()
+  text = document.body.textContent
+  // Nothing runs: no "close Minecraft, stop your servers" body.
+  expect(text).not.toContain(javaText["_trn_runtime_relocation_busy.body"])
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.body_steps"])
+  expect(text).toContain(
+    javaText["_trn_runtime_relocation_busy.startup_check_pending"]
+  )
+})
+it("collapses identical rows and shows only details the user can act on", async () => {
+  const f = await fixture()
+  f.stop.mockRejectedValue(
+    new ShutdownRefusedError("Core relocation refused", [
+      { kind: "server", name: "server start_server_impl" },
+      { kind: "server", name: "server start_server_impl" },
+      { kind: "install", name: "instance 5 setup producer" },
+      { kind: "previousProcess", name: "/data/instances/Old" }
+    ])
+  )
+  await submit(f)
+  const text = document.body.textContent
+  const serverLabel = javaText["_trn_runtime_relocation_busy.server"]
+  expect(text.split(serverLabel)).toHaveLength(2)
+  expect(text).not.toContain("start_server_impl")
+  expect(text).not.toContain("setup producer")
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.install"])
+  expect(text).toContain(
+    javaText["_trn_runtime_relocation_busy.previous_process"]
+  )
+  expect(text).toContain("/data/instances/Old")
+  // Closing that process clears it, so retrying is offered; a restart is not.
+  expect(text).toContain(javaText["_trn_runtime_relocation_busy.body_steps"])
+  expect(hasButton(javaText["_trn_runtime_relocation_busy.try_again"])).toBe(
+    true
+  )
+  expect(hasButton(javaText["_trn_runtime_relocation_busy.restart"])).toBe(
+    false
+  )
+})
+it("does not warn against closing the app while it only checks before the move", async () => {
+  await fixture()
+  setIsChangingRuntimePath(true)
+  await settle()
+  expect(document.body.textContent).toContain("java:_trn_checking_runtime_path")
+  RTsetProgress({ action: "check", currentName: "", current: 0, total: 0 })
+  await settle()
+  expect(document.body.textContent).not.toContain(
+    "java:_trn_do_not_close_app_or_pc_title"
+  )
+  // Once the core is stopped the warning matters.
+  RTsetProgress({ action: "scan", currentName: "", current: 0, total: 0 })
+  await settle()
+  expect(document.body.textContent).toContain(
+    "java:_trn_do_not_close_app_or_pc_title"
+  )
+  expect(document.body.textContent).not.toContain(
+    "java:_trn_checking_runtime_path"
+  )
+  RTsetProgress(undefined)
 })

@@ -12,6 +12,8 @@ import {
 } from "solid-js"
 import { Portal } from "solid-js/web"
 import { RTprogress, RTsetProgress } from "@/utils/runtimePathProgress"
+import type { RuntimeBlocker } from "../../../../../../main/utils/coreShutdown"
+import type { UnsupportedRuntimeEntries } from "../../../../../../main/utils/runtimeRelocation"
 import {
   isChangingRuntimePath,
   setIsChangingRuntimePath,
@@ -146,6 +148,20 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
   const [shutdownUnresolved, setShutdownUnresolved] = createSignal(false)
   // The new folder kept a partial copy; deleting it is the way to retry there.
   const [incompleteTarget, setIncompleteTarget] = createSignal(false)
+  // The move stopped and removed what it had copied: the new folder is as it was.
+  const [copyRemoved, setCopyRemoved] = createSignal(false)
+  // What the core named when it refused to start the move. Empty when it
+  // refused without a list: nothing was moved, so the same calm view fits.
+  const [busy, setBusy] = createSignal<RuntimeBlocker[]>()
+  // The busy view's Restart failed; nothing was moved, so the view stays.
+  const [restartFailed, setRestartFailed] = createSignal(false)
+  // Stopped before the core was asked to stop: nothing was moved or changed.
+  const [stoppedBeforeMove, setStoppedBeforeMove] = createSignal(false)
+  // The links or special files that keep the data folder from moving.
+  const [unsupported, setUnsupported] =
+    createSignal<UnsupportedRuntimeEntries>()
+  // An earlier unresolved attempt keeps its recovery view, whatever this one found.
+  const notMoved = () => stoppedBeforeMove() && !runtimeRecoveryRequired()
 
   const [migrationError, setMigrationError] = createSignal<string | undefined>(
     undefined
@@ -164,15 +180,26 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
     setIsChangingRuntimePath(true)
     setMigrationError(undefined)
     setIncompleteTarget(false)
+    setCopyRemoved(false)
+    setBusy(undefined)
+    setRestartFailed(false)
+    setStoppedBeforeMove(false)
+    setUnsupported(undefined)
     try {
       const result = await window.changeRuntimePath(
         submitted.target,
         submitted.switchOnly
       )
       if (result.type === "failed") {
-        // Once shutdown ownership is unresolved, a later validation/IPC error
-        // cannot silently grant dismissal of the stopped/draining service.
-        if (result.recovery !== "none") {
+        if (result.refused) {
+          // The live core confirmed it holds no move for us, also after an
+          // earlier unresolved attempt: nothing is frozen, so dismissing is safe.
+          setRuntimeRecoveryRequired(false)
+          setShutdownUnresolved(false)
+          setBusy(result.refused.blockers)
+        } else if (result.recovery !== "none") {
+          // Once shutdown ownership is unresolved, a later validation/IPC error
+          // cannot silently grant dismissal of the stopped/draining service.
           setRuntimeRecoveryRequired(true)
           setShutdownUnresolved(result.recovery === "shutdown_unresolved")
         }

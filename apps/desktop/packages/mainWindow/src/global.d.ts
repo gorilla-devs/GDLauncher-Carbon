@@ -1,4 +1,9 @@
-import type { RuntimeRelocationResult } from "../../main/utils/runtimeRelocation"
+import type {
+  RuntimeMoveNotice,
+  RuntimePathValidation,
+  RuntimeRelocationResult
+} from "../../main/utils/runtimeRelocation"
+import type { ShutdownPromptMessage } from "../../main/utils/shutdownPrompt"
 import type { DbRecoveryCategory } from "../../main/utils/dbRecovery"
 import type { FEReleaseChannel } from "@gd/core_module/bindings"
 import { BoundsSize } from "./utils/adhelper"

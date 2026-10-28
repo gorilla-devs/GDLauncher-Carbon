@@ -1159,6 +1159,10 @@ ipcMain.handle(
   ): Promise<import("./utils/runtimeRelocation").RuntimeRelocationResult> => {
     return withRuntimeOperation(async () => {
       let recovery: "none" | "restart" | "shutdown_unresolved" = "none"
+      // Set only when the live core confirmed it holds no move for us.
+      let refused: { blockers: RuntimeBlocker[] } | undefined
+      // A quit or last-window close before the core is stopped ends the move.
+      const interruptible = interruptibleUntilCommitted()
       try {
         if (!CURRENT_RUNTIME_PATH) throw new Error("Runtime is not initialized")
         if (overrideCLIDataPath?.value || overrideEnvDataPath) {
@@ -1176,6 +1180,30 @@ ipcMain.handle(
             RUNTIME_PATH_OVERRIDE_NAME
           ),
           context: runtimeDestinationContext(),
+          interruptible,
+          // Read-only and before anything is stopped, so recovery stays "none".
+          checkCore: async () => {
+            const core = await coreModule
+            if (core.type !== "success")
+              throw new Error("Core is not ready; restart and retry relocation")
+            try {
+              await checkRelocation({
+                ...core.result,
+                process: coreProcessHandle
+              })
+            } catch (error) {
+              // A core that is already gone gets only Restart, as below.
+              if (
+                coreProcessHandle &&
+                (coreProcessHandle.exitCode != null ||
+                  coreProcessHandle.signalCode != null)
+              )
+                recovery = "restart"
+              else if (error instanceof ShutdownRefusedError)
+                refused = { blockers: error.blockers }
+              throw error
+            }
+          },
           stopCore: async () => {
             const core = await coreModule
             if (core.type !== "success")
@@ -1193,6 +1221,12 @@ ipcMain.handle(
                   coreProcessHandle.signalCode != null)
               )
                 recovery = "restart"
+              else if (error instanceof ShutdownRefusedError) {
+                // Refused or released before commit: the core never froze,
+                // so the game, servers and downloads keep running.
+                recovery = "none"
+                refused = { blockers: error.blockers }
+              }
               throw error
             }
             recovery = "restart"
@@ -1213,7 +1247,24 @@ ipcMain.handle(
         app.exit()
         return { type: "relaunching" }
       } catch (error) {
-        return { type: "failed", recovery, message: String(error) }
+        // Ended by a quit before the core was asked to stop: nothing moved,
+        // and with no lease left from an earlier attempt nothing is held.
+        if (
+          error === interruptible.signal.reason &&
+          recovery === "none" &&
+          !relocationLeaseHeld(coreProcessHandle)
+        )
+          refused = { blockers: [] }
+        return {
+          type: "failed",
+          recovery,
+          message: String(error),
+          // Decided from what failed, never by probing the renderer-supplied path.
+          incompleteTarget: leftPartialCopy(error),
+          unsupported: unsupportedRuntimeEntries(error),
+          ...(removedPartialCopy(error) && { copyRemoved: true }),
+          ...(refused && { refused })
+        }
       }
     })
   }
