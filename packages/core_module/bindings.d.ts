@@ -440,10 +440,6 @@ export type EnrollmentErrorType = "deviceCodeExpired" | "xboxAccount" | "noGameO
 
 export type CFFEFileModule = { name: string; fingerprint: string }
 
-export type ImportRequest = { index: number; name: string | null; session: string }
-
-export type ConfigurationParseError = { type_: ConfigurationParseErrorType; message: string; line: number; config_text: string }
-
 export type MRFEProjectID = string
 
 export type InstanceMod = { instance_id: FEInstanceId; mod_id: string }

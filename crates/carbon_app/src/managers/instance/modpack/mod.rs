@@ -30,6 +30,9 @@ use std::path::{Component, Path, PathBuf};
 pub mod apply_plan;
 pub mod disk_scan;
 mod imported_baseline;
+pub use imported_baseline::ChangeVersionRefusal;
+#[cfg(test)]
+pub(crate) use imported_baseline::inventory_fixture;
 pub mod origin_check;
 pub mod packinfo;
 pub(crate) mod session;

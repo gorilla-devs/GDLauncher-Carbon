@@ -2941,3 +2941,235 @@ pub(super) fn ensure_pack_unlocked(
     }
     Ok(())
 }
+
+/// Whether addon edits may go ahead beside this instance's pending setup: one
+/// that never stages or applies pack content (see
+/// [`Session::is_content_free`]) and still targets the configured game version
+/// and pack. A version-only install keeps allowing them after it fails or is
+/// cancelled, in any phase, as 2.0.40 did. So does a completed import that
+/// keeps its platform link: its pack request is never downloaded or applied,
+/// Play only checks that it still matches the record. The same holds for such
+/// a record copied by a duplicate (or written before the instance had an id)
+/// that Play continues as this instance's own. The lock is checked before
+/// this, so only the pack's identity has to match, and a user who unpaired the
+/// pack (no configured pack) may edit too, as after Unlock: Play neither
+/// applies the link nor attaches it again. Read-only.
+///
+/// [`Session::is_content_free`]: super::modpack::session::Session::is_content_free
+async fn setup_allows_addon_edits(
+    root: &std::path::Path,
+    instance_id: InstanceId,
+    config: &info::Instance,
+    session: &super::modpack::session::Session,
+) -> anyhow::Result<bool> {
+    if !session.is_content_free() {
+        return Ok(false);
+    }
+    let owned = session.instance_id == Some(*instance_id) && session.copied_to.is_none();
+    if !owned && session.copy_qualification(root, instance_id).await? != Some(true) {
+        return Ok(false);
+    }
+    let installed = super::schema::parse_instance_config(&session.installed_config)?;
+    if !same_addon_game_version(
+        &installed.game_configuration.version,
+        &config.game_configuration.version,
+    ) || config.modpack.as_ref().is_some_and(|pack| {
+        installed.modpack.as_ref().map(|pack| &pack.modpack) != Some(&pack.modpack)
+    }) {
+        return Ok(false);
+    }
+    let setup = root.join(".setup");
+    // A pack request that is not the record's own is one Play refuses.
+    let request = setup.join("change-pack-version.json");
+    let on_disk = match addon_metadata(&request).await? {
+        None => None,
+        Some(metadata) if metadata.is_file() && !metadata.file_type().is_symlink() => {
+            match tokio::fs::read_to_string(&request).await {
+                Ok(text) => Some(text),
+                Err(error) if error.kind() == std::io::ErrorKind::InvalidData => {
+                    return Ok(false);
+                }
+                Err(error) => return Err(error.into()),
+            }
+        }
+        Some(_) => return Ok(false),
+    };
+    if on_disk != session.requested_pack {
+        return Ok(false);
+    }
+    for marker in [
+        "repair",
+        "apply-started",
+        "representation-transitions",
+        "staging-packinfo.json",
+    ] {
+        if addon_metadata(&setup.join(marker)).await?.is_some() {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
+/// Why addons wait while Play (or a Repair or update) is installing a setup
+/// that writes them, such as a modpack's files: the way out is to wait.
+pub(super) const PREPARING_SETUP_REFUSAL: &str = "This instance is still installing or updating its files. Wait for it to finish, then change its addons.";
+
+/// What waits for a pending setup, for [`pending_setup_refusal`] and
+/// [`unreadable_setup_refusal`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum PendingChange {
+    Addons,
+    GameVersion,
+    /// Play itself, which finishes the pending setup.
+    Play,
+}
+
+impl PendingChange {
+    fn before(self) -> &'static str {
+        match self {
+            Self::Addons => "changing addons",
+            Self::GameVersion => "changing the game version or loader",
+            Self::Play => "playing",
+        }
+    }
+    fn not_safe(self) -> &'static str {
+        match self {
+            Self::Addons => "addons can't be changed safely",
+            Self::GameVersion => "the game version or loader can't be changed safely",
+            Self::Play => "it can't be finished safely",
+        }
+    }
+}
+
+/// Why `change` waits for a pending setup whose record can't be read (an
+/// unknown or damaged `setup-session.json`, or a `.setup` that is not a plain
+/// folder), naming the way out: Repair for a modpack, otherwise removing the
+/// hidden folder, as for the 2.0.40 leftovers Play refuses. The technical
+/// cause stays in the error chain and the logs.
+pub(super) fn unreadable_setup_refusal(config: &info::Instance, change: PendingChange) -> String {
+    let unreadable = format!(
+        "This instance has an unfinished install or update that can't be checked, so {}.",
+        change.not_safe()
+    );
+    if config.modpack.is_some() {
+        format!(
+            "{unreadable} Use Repair on this instance to reinstall the modpack; your worlds are kept."
+        )
+    } else if change == PendingChange::GameVersion {
+        format!(
+            "{unreadable} To change it anyway, delete the hidden .setup folder inside the instance folder, then choose the version again."
+        )
+    } else {
+        format!(
+            "{unreadable} To install it again, delete the hidden .setup folder inside the instance folder, then press Play."
+        )
+    }
+}
+
+/// Why `change` waits for the pending setup in `root`, naming the way out
+/// that Play, Edit and the Repair dialog actually offer for it. `session` is its
+/// record, if it has one. Read-only: not every caller holds the gate.
+pub(super) async fn pending_setup_refusal(
+    root: &std::path::Path,
+    instance_id: InstanceId,
+    config: &info::Instance,
+    session: Option<&super::modpack::session::Session>,
+    change: PendingChange,
+) -> anyhow::Result<String> {
+    use super::modpack::session::{self, Kind};
+    let unfinished = format!(
+        "This instance has an unfinished install or update. Press Play to finish it before {}.",
+        change.before()
+    );
+    let cancellable = format!(
+        "This instance has an unfinished modpack update or repair. Press Play to finish it, or cancel it from Repair, before {}.",
+        change.before()
+    );
+    // A setup that only waits for its game version install, which a version
+    // or loader change replaces. Not advertised for a modpack, whose files
+    // target its own version.
+    let replaceable = format!(
+        "This instance's game version or loader hasn't finished installing. Press Play to finish installing it, or choose another version with Edit, before {}.",
+        change.before()
+    );
+    let advertise_edit = change == PendingChange::Addons && config.modpack.is_none();
+    // Repair, and so its Cancel, is only offered for an instance with a
+    // modpack: not after the user unpaired it.
+    let repair_offered = config.modpack.is_some();
+    let setup = root.join(".setup");
+    let Some(session) = session else {
+        let legacy = session::classify_legacy(root).await;
+        // The Repair dialog adopts an untouched update of an installed pack
+        // and offers Cancel for it, as it does once adopted.
+        if repair_offered
+            && matches!(&legacy, Ok(Some(request)) if request.over_installed_pack(config))
+        {
+            return Ok(cancellable);
+        }
+        if advertise_edit && session::legacy_pack_applied(root).await.unwrap_or(false) {
+            return Ok(replaceable);
+        }
+        if matches!(legacy, Ok(Some(_))) || session::legacy_resumed_by_play(root).unwrap_or(false) {
+            return Ok(unfinished);
+        }
+        // The leftovers Play refuses to resume, in the same words.
+        return Ok(if config.modpack.is_some() {
+            format!(
+                "An earlier launcher version was interrupted while applying this modpack's files, so {}. Use Repair on this instance to reinstall the modpack; your worlds are kept.",
+                change.not_safe()
+            )
+        } else {
+            format!(
+                "An earlier launcher version was interrupted while applying this instance's files, so {}. To install it again, delete the hidden .setup folder inside the instance folder, then press Play.",
+                change.not_safe()
+            )
+        });
+    };
+    // Play and the Repair dialog both continue a copied record that qualifies
+    // as this instance's own, and the dialog offers Cancel for a copied pack
+    // request.
+    let owned = session.instance_id == Some(*instance_id);
+    let continued_copy = !owned
+        && matches!(
+            session.copy_qualification(root, instance_id).await,
+            Ok(Some(true))
+        );
+    // The dialog withholds Cancel once apply may have started.
+    let apply_marked = addon_metadata(&setup.join("apply-started"))
+        .await?
+        .is_some()
+        || addon_metadata(&setup.join("representation-transitions"))
+            .await?
+            .is_some();
+    let edit_replaces = advertise_edit
+        && (session
+            .supersedable(root, instance_id)
+            .await
+            .unwrap_or(false)
+            || session
+                .supersedable_once_continued(root, instance_id)
+                .await
+                .unwrap_or(false)
+            || session
+                .copied_pack_installed(root, instance_id)
+                .await
+                .unwrap_or(false));
+    Ok(
+        if repair_offered
+            && (owned || continued_copy && session.kind == Kind::Pack)
+            && !apply_marked
+            && session.cancel_reason(config).is_none()
+        {
+            cancellable
+        } else if edit_replaces {
+            replaceable
+        } else if owned
+            || continued_copy
+            || session.binds_to(instance_id) && session::has_original_archive(&setup)
+        {
+            unfinished
+        } else {
+            "This instance was copied while its setup was part-way through, so the copy can't continue it. Finish the setup on the original instance, then copy it again.".into()
+        },
+    )
+}
