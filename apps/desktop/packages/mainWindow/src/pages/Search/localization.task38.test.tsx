@@ -460,9 +460,12 @@ it.each(ids)(
     expect(root.textContent).not.toMatch(/UNTRANSLATED|_trn_/)
     expect(root.textContent).toContain("2")
     expect(root.textContent).toContain("4")
-    expect(instance.t("instances:_trn_import_error_bad_config")).toBe(
-      "Configuration missing or unreadable"
-    )
+    // Translated in every shipped language now, not an English fallback.
+    const importError = instance.t("instances:_trn_import_error_bad_config")
+    expect(importError).not.toContain("_trn_")
+    expect(importError).not.toBe("")
+    if (id !== "english")
+      expect(importError).not.toBe("Configuration missing or unreadable")
     expect(instance.t("instances:_trn_repair_origin_incomplete")).not.toContain(
       "_trn_"
     )

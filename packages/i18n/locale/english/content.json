@@ -34,6 +34,7 @@
   "_trn_addon_failures.refresh_failed": "Couldn't refresh this list. It will try again automatically.",
   "_trn_addon_failures.empty": "No failed addon installs.",
   "_trn_addon_failures.details": "Error details",
+  "_trn_addon_failures.dismiss_failed": "Couldn't remove this failure from the list. Try again.",
   "_trn_addon_failures.dismiss": "Remove from list",
   "_trn_addon_failures.dismiss_all": "Remove all from list",
   "_trn_addon_failures.dismiss_all_failed": "Couldn't remove every failure from the list. Try again.",

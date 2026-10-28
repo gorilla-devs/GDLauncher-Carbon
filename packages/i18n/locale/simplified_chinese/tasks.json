@@ -33,6 +33,8 @@
   "_trn_instance_task_generating_pack_info": "正在生成整合包信息",
   "_trn_instance_task_launch_waiting": "正在等待其他实例启动",
   "_trn_instance_task_prepare": "正在准备 {{name}}",
+  "_trn_instance_task_check_pack_origin": "正在检查 {{name}} 的文件来源",
+  "_trn_instance_task_check_pack_origin_versions": "正在检查整合包版本",
   "_trn_instance_task_launch_apply_staged_patches": "正在应用暂存的补丁",
   "_trn_finalizing_import": "正在完成导入",
   "_trn_server_task_install": "正在安装服务器 {{server_name}}",
