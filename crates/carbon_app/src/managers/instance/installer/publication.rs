@@ -334,13 +334,13 @@ impl ReplacementPlan {
     }
 }
 
-/// Use the existing tempfile platform primitive: rename-without-replacement
-/// where supported, with its no-clobber fallback. Failure retains the source.
-fn move_noclobber(source: &Path, destination: &Path) -> std::io::Result<()> {
-    let mut path = tempfile::TempPath::from_path(source.to_owned());
-    path.disable_cleanup(true);
-    path.persist_noclobber(destination)
-        .map_err(|error| error.error)
+/// Rename-without-replacement through the shared publication helper, which
+/// also copies across volumes (staging lives in the data folder, the
+/// instance may be on another drive). Failure retains the source. The moved
+/// file may be a copy, so stamps are taken from where it ends up, and the
+/// move runs on the blocking pool so a large copy never stalls the runtime.
+async fn move_noclobber(source: &Path, destination: &Path) -> std::io::Result<()> {
+    crate::util::publish::move_noclobber_async(source, destination).await
 }
 
 pub(super) async fn publish_file(
@@ -405,8 +405,9 @@ pub(super) async fn publish_file(
     } else {
         format!("{name}.disabled")
     });
-    // Same filesystem, no-clobber publication. Keep the original recoverable until
-    // local cache finalization succeeds; failure never deletes new public bytes.
+    // No-clobber publication, copied when the instance is on another volume. Keep the
+    // original recoverable until local cache finalization succeeds; failure never
+    // deletes new public bytes.
     let backup = staged
         .parent()
         .context("missing staging directory")?
@@ -418,22 +419,35 @@ pub(super) async fn publish_file(
         else {
             bail!("world copy plan cannot replace a file addon");
         };
-        move_noclobber(physical, &backup)?;
-        if file_digest(&backup).await? != *digest {
-            // Keep the moved bytes recoverable, without overwriting a later arrival.
-            let _ = move_noclobber(&backup, physical);
-            bail!(
-                "old addon changed at publication; recovery: {}",
-                backup.display()
-            );
-        }
+        let original_digest = file_digest(physical).await?;
+        move_noclobber(physical, &backup).await?;
+        let unchanged = file_digest(&backup).await? == *digest;
+        // A move across volumes leaves a copy, so stamp the backup itself.
+        let stamp = match file_stamp(&backup) {
+            Ok(stamp) if unchanged => stamp,
+            _ => {
+                // Keep the moved bytes recoverable, without overwriting a later arrival.
+                let _ = move_noclobber(&backup, physical).await;
+                bail!(
+                    "old addon changed at publication; recovery: {}",
+                    backup.display()
+                );
+            }
+        };
+        previous = Some((
+            backup.clone(),
+            physical.clone(),
+            original_digest,
+            stamp,
+            row.clone(),
+        ));
     }
     #[cfg(test)]
     manager.test_hooks.pause("addon_before_publish", id).await;
-    let publish = move_noclobber(staged, &destination);
+    let publish = move_noclobber(staged, &destination).await;
     if let Err(error) = publish {
         if let Some((physical, _)) = &old {
-            let _ = move_noclobber(&backup, physical);
+            let _ = move_noclobber(&backup, physical).await;
         }
         return Err(error).with_context(|| {
             format!(
@@ -724,7 +738,7 @@ pub(super) async fn enable_satisfied(
         return Ok(());
     }
     let destination = folder.join(&name);
-    move_noclobber(&physical, &destination)?;
+    move_noclobber(&physical, &destination).await?;
     app.meta_cache_manager()
         .refresh_published_addon(
             ownership,

@@ -88,6 +88,43 @@ async fn task05_replace_modrinth_checks_real_artifact_and_kind() {
     assert!(!resource.is_already_installed(&app, id).await.unwrap());
 }
 
+/// Staging lives in the data folder; an instance junctioned or linked to
+/// another drive makes both renames of a replacement cross volumes. They
+/// become copies, and the receipt must still own (and commit) what landed.
+#[tokio::test]
+async fn cross_volume_replacement_publishes_copies_and_commits() {
+    use crate::util::publish::fault::{CROSS_DEVICE, Step, inject, pending};
+    let app = crate::setup_managers_for_test().await;
+    let (id, row, path) = super::super::mods::tests::addon_fixture(
+        &app,
+        "cross-volume",
+        instance::AddonType::Mods,
+        "same.jar",
+        b"v1",
+    )
+    .await;
+    let resource = mr("same.jar", b"v2");
+    let plan = publication::ReplacementPlan::capture(&app, id, &row.id, instance::AddonType::Mods)
+        .await
+        .unwrap();
+    let stage = tempfile::tempdir().unwrap();
+    let bytes = stage.path().join("artifact");
+    std::fs::write(&bytes, b"v2").unwrap();
+    let backup = stage.path().join("previous-addon");
+    inject(Step::NoReplace, &backup, CROSS_DEVICE);
+    inject(Step::NoReplace, &path, CROSS_DEVICE);
+    publication::publish_file(&resource, &app, id, &bytes, Some(&plan), None)
+        .await
+        .unwrap();
+    // Both renames really crossed volumes: each injected fault was taken.
+    assert!(!pending(Step::NoReplace, &backup));
+    assert!(!pending(Step::NoReplace, &path));
+    assert_eq!(std::fs::read(&path).unwrap(), b"v2");
+    assert!(!bytes.exists());
+    assert!(!backup.exists(), "committed replacement retires its backup");
+    assert!(resource.is_already_installed(&app, id).await.unwrap());
+}
+
 fn zip(path: &std::path::Path, entries: &[(&str, &[u8])]) {
     let mut writer = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
     for (name, bytes) in entries {
