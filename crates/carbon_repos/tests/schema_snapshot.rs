@@ -1,6 +1,6 @@
 //! Byte-identical schema baseline (spec Plan 3 §T2).
 //!
-//! Applies all 28 migrations to a fresh DB, dumps the normalized
+//! Applies all 29 migrations to a fresh DB, dumps the normalized
 //! `sqlite_master` schema through the shared [`carbon_repos::schema_dump`]
 //! normalizer, and byte-compares it against the committed snapshot. This is
 //! the acceptance test for the rusqlite/SQLite version bump: the bundled
@@ -37,7 +37,7 @@ fn migrated_schema_matches_committed_snapshot() {
     let dir = tempfile::tempdir().unwrap();
     let mut conn = Connection::open(dir.path().join("snapshot.db")).unwrap();
     let (migrations, count) = carbon_repos::get_migrations();
-    assert_eq!(count, 28, "snapshot baseline assumes exactly 28 migrations");
+    assert_eq!(count, 29, "snapshot baseline assumes exactly 29 migrations");
     migrations.to_latest(&mut conn).unwrap();
 
     let dump = dump_schema(&conn).unwrap();

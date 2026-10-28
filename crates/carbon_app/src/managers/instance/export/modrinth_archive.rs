@@ -629,7 +629,7 @@ async fn select_linked_mod(
         return Ok(None);
     }
     let path = basepath.join("mods").join(&row.filename);
-    crate::managers::metadata::cache::verify_file_hash(&path, &row.sha512).await?;
+    super::verify_linked_mod(&path, &row.sha512, row.file_stamp.as_deref()).await?;
     mods_filter.remove(&row.filename);
     Ok(Some((path, row)))
 }

@@ -129,13 +129,13 @@ fn task15_artifact_collision_down_refuses_without_mutating_current_state() {
     assert_eq!(
         c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
             .unwrap(),
-        28
+        29
     );
     assert_eq!(
         c.query_row("SELECT count(*) FROM _migrations", [], |r| r
             .get::<_, i32>(0))
             .unwrap(),
-        28
+        29
     );
     assert_eq!(
         c.query_row(

@@ -1921,46 +1921,19 @@ impl ManagerRef<'_, MetaCacheManager> {
         // qualified marker share a writer transaction, including with FKs off.
         for attempt in 0..2 {
             let meta_id = self.ensure_mod_metadata(&result, &mod_filename).await?;
-            let id = meta_id.clone();
-            let filename = mod_filename.clone();
-            let kind = addon_type.clone();
-            let observed = result.file_stamp.clone();
-            let filesize = result.content_len as i32;
-            let published = self
-                .app
-                .db
-                .write(move |mut conn| {
-                    let tx = conn.transaction()?;
-                    mfcdb::upsert_mod_file_cache_conn(
-                        &tx,
-                        *instance_id,
-                        &filename,
-                        filesize,
-                        enabled,
-                        &kind,
-                        &id,
-                        DbDateTime(Utc::now().fixed_offset()),
-                    )?;
-                    let metadata = metarepo::get_metadata_by_id_conn(&tx, &id)?
-                        .expect("validated owner in the same transaction");
-                    let stamp = observed
-                        .as_deref()
-                        .map(|value| qualified_file_stamp(&metadata, value));
-                    mfcdb::update_mod_file_stamp_conn(
-                        &tx,
-                        *instance_id,
-                        &kind,
-                        &filename,
-                        &id,
-                        stamp.as_deref(),
-                        DbDateTime(Utc::now().fixed_offset()),
-                    )?;
-                    tx.commit()?;
-                    Ok(())
-                })
-                .await;
+            let published = publish_instance_row(
+                &self.app.db,
+                instance_id,
+                &mod_filename,
+                &addon_type,
+                enabled,
+                &meta_id,
+                &result,
+                None,
+            )
+            .await;
             match published {
-                Ok(()) => return Ok(meta_id),
+                Ok(_) => return Ok(meta_id),
                 Err(error) if attempt == 0 && error.is_foreign_key_violation() => continue,
                 Err(error) => return Err(error.into()),
             }
@@ -2005,16 +1978,16 @@ impl ManagerRef<'_, MetaCacheManager> {
             .await?;
         for attempt in 0..2 {
             let meta_id = self.ensure_mod_metadata(&result, &filename).await?;
-            match mfcdb::upsert_server_mod_file_cache_at_location(
+            match publish_server_row(
                 &self.app.db,
                 server_id,
-                filename.clone(),
-                location.clone(),
-                result.content_len as i32,
+                &filename,
+                &location,
                 enabled,
-                addon_type.clone(),
-                meta_id.clone(),
-                DbDateTime(Utc::now().fixed_offset()),
+                &addon_type,
+                &meta_id,
+                &result,
+                None,
             )
             .await
             {

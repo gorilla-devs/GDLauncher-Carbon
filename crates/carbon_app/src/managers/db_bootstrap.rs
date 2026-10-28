@@ -944,13 +944,13 @@ mod task15_bootstrap_tests {
             assert_eq!(
                 c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
                     .unwrap(),
-                28
+                29
             );
             assert_eq!(
                 c.query_row("SELECT count(*) FROM _migrations", [], |r| r
                     .get::<_, i32>(0))
                     .unwrap(),
-                28
+                29
             );
             assert!(
                 c.prepare("PRAGMA foreign_key_check")
