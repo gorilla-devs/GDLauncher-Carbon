@@ -66,7 +66,9 @@ import {
   relocationLeaseHeld,
   stopCoreForRelocation,
   stopCoreForShutdown,
-  terminateAndObserveCoreExit
+  terminateAndObserveCoreExit,
+  type RuntimeBlocker,
+  type ShutdownStatus
 } from "./utils/coreShutdown"
 import {
   ShutdownFlow,
@@ -86,6 +88,8 @@ import {
   restoreDatabaseSnapshot
 } from "./utils/databaseRestore"
 import {
+  interruptRuntimeOperation,
+  interruptibleUntilCommitted,
   runtimeOperationActive,
   runtimeOperationBrief,
   whenRuntimeOperationIdle,
@@ -162,6 +166,35 @@ ipcMain.on("protocol-consumer-revoke", (event, subscription) => {
 ipcMain.on("close-warning-receiver", (event, ready) => {
   if (event.senderFrame === event.sender.mainFrame)
     lifecycle.warningReceiver(event.sender, ready === true)
+})
+/** The prompt's text in the user's language, once an App has sent it. */
+let promptText: ShutdownPromptText = {}
+/** Shows a quit, restart or update that did not finish (utils/shutdownFlow). */
+const shutdownPrompts = new ShutdownPrompts<BrowserWindow>(
+  async (window, view, signal) => {
+    const { options, choices } = nativeShutdownDialog(view, promptText)
+    const { response } = await dialog.showMessageBox(window, {
+      ...options,
+      signal
+    })
+    return signal.aborted ? null : (choices[response] ?? null)
+  }
+)
+ipcMain.on("shutdown-prompt-receiver", (event, ready) => {
+  if (event.senderFrame === event.sender.mainFrame)
+    shutdownPrompts.receiver(event.sender, ready === true)
+})
+ipcMain.on("shutdown-prompt-shown", (event, id) => {
+  if (event.senderFrame === event.sender.mainFrame)
+    shutdownPrompts.shown(event.sender, id)
+})
+ipcMain.on("shutdown-prompt-answer", (event, value) => {
+  if (event.senderFrame === event.sender.mainFrame)
+    shutdownPrompts.answer(event.sender, value?.id, value?.choice)
+})
+ipcMain.on("shutdown-prompt-text", (event, value) => {
+  if (event.senderFrame === event.sender.mainFrame)
+    promptText = shutdownPromptText(value)
 })
 let showAppCloseWarning = true
 
@@ -1254,10 +1287,11 @@ app.whenReady().then(async () => {
   app.on("second-instance", (_e, argv) => {
     for (const url of argv.filter(isSupportedProtocol))
       protocolQueue.enqueue(url)
-    if (win && !win.isDestroyed()) {
+    if (shutdownInFlight || !win || win.isDestroyed()) revealWindow()
+    else {
       if (win.isMinimized()) win.restore()
       win.focus()
-    } else createWindow()
+    }
   })
 
   // During a quit that is still finishing, the hidden window comes back
@@ -1321,18 +1355,105 @@ function hideWindow() {
 let shutdownInFlight: Promise<ShutdownOutcome> | undefined
 let shutdownFlow: ShutdownFlow | undefined
 let shutdownApproved = false
-async function prepareOwnedShutdown(purpose: "quit" | "update"): Promise<void> {
-  if (shutdownApproved) return
-  if (shutdownInFlight) return shutdownInFlight
-  shutdownInFlight = (async () => {
-    const core = await coreModule
-    if (core.type === "success")
-      await stopCoreForShutdown(
-        { ...core.result, process: coreProcessHandle },
-        purpose
+/** Settles once the core module has: never waits on a core still starting. */
+let coreLoaded: Awaited<typeof coreModule> | undefined
+void coreModule.then((core) => {
+  coreLoaded = core
+  // A quit meanwhile waits for this and then runs.
+})
+/** Waits for the core to start unless `signal` gives up first. */
+function startedCore(signal: AbortSignal) {
+  return new Promise<Awaited<typeof coreModule>>((resolve, reject) => {
+    const aborted = () =>
+      reject(
+        new ShutdownBlockedError("GDLauncher is still starting up", "slow")
       )
-    shutdownApproved = true
-    lifecycle.approveQuit()
+    if (signal.aborted) return aborted()
+    signal.addEventListener("abort", aborted, { once: true })
+    void coreModule.then((core) => {
+      signal.removeEventListener("abort", aborted)
+      resolve(core)
+    })
+  })
+}
+/**
+ * One attempt to stop the launcher-owned core for `action`. An external
+ * development core is left running, as before, except for a reset, which
+ * must see the exit. A core that never reported READY is only ended for a
+ * restart, reset or restore.
+ */
+async function stopOwnedCore(
+  action: ShutdownAction,
+  signal: AbortSignal,
+  onStatus: (status: ShutdownStatus) => void
+) {
+  const core = await startedCore(signal)
+  const owned = coreProcessHandle
+  if (!owned) {
+    // Database files only move after an observed exit.
+    if (action === "reset")
+      throw new ShutdownNotPossibleError(
+        "Database reset requires a launcher-owned core exit; external/development core must be stopped and recovered manually"
+      )
+    if (action === "restore" && core.type === "success")
+      throw new ShutdownNotPossibleError(
+        "Database restore requires a launcher-owned core exit; external/development core must be stopped and recovered manually"
+      )
+    return
+  }
+  if (core.type === "success")
+    await stopCoreForShutdown(
+      { ...core.result, process: owned },
+      action === "update" ? "update" : "quit",
+      fetch,
+      5000,
+      { signal, onStatus }
+    )
+  else if (action !== "quit" && action !== "update")
+    await terminateAndObserveCoreExit(owned)
+}
+/**
+ * Stops the owned core for a quit, update, restart or database reset or
+ * restore. If that does not finish within about 3 s, the launcher window
+ * shows why, and the user can wait, stop it now, or keep GDLauncher open
+ * (which gives the core its work back). Callers for the same action join;
+ * another action is refused while one runs.
+ */
+function ownedShutdown(action: ShutdownAction): Promise<ShutdownOutcome> {
+  if (shutdownApproved) return Promise.resolve("stopped")
+  if (shutdownInFlight) {
+    if (shutdownFlow?.action === action) return shutdownInFlight
+    shutdownFlow?.reveal()
+    return Promise.reject(
+      new Error("GDLauncher is already closing, restarting or updating")
+    )
+  }
+  const flow = new ShutdownFlow(action, {
+    stop: (signal, onStatus) => stopOwnedCore(action, signal, onStatus),
+    cancel: async () => {
+      const owned = coreProcessHandle
+      if (coreLoaded?.type !== "success" || !owned) return "released"
+      return cancelCoreShutdown({ ...coreLoaded.result, process: owned })
+    },
+    force: async () => {
+      if (coreProcessHandle) await forceTerminateCore(coreProcessHandle)
+    },
+    prompt: async (view: ShutdownView, signal: AbortSignal) => {
+      const window = win && !win.isDestroyed() ? win : await createWindow()
+      return shutdownPrompts.ask(window, view, signal)
+    },
+    update: (view: ShutdownView, signal: AbortSignal) =>
+      shutdownPrompts.update(signal, view),
+    hide: action === "quit" ? hideWindow : undefined,
+    log: (message, error) => console.warn(message, error)
+  })
+  const run = (async (): Promise<ShutdownOutcome> => {
+    const outcome = await flow.run()
+    if (outcome !== "kept") {
+      shutdownApproved = true
+      lifecycle.approveQuit()
+    }
+    return outcome
   })()
   shutdownFlow = flow
   shutdownInFlight = run
@@ -1394,10 +1515,30 @@ function quitAfterCoreExit() {
 app.on("before-quit", (event) => {
   if (shutdownApproved) return
   event.preventDefault()
-  if (runtimeOperationActive() || shutdownInFlight) return
-  void prepareOwnedShutdown("quit")
-    .then(() => app.quit())
-    .catch(async (error) => {
+  if (runtimeOperationActive()) {
+    // A move that has not stopped the core yet gives way, and a brief step
+    // such as removing old recovery copies finishes: the quit runs once
+    // either has ended. Anything else, such as a move further along, keeps
+    // its window and finishes.
+    if (
+      interruptRuntimeOperation(closedBeforeMove()) ||
+      runtimeOperationBrief()
+    )
+      whenRuntimeOperationIdle(quitAgain)
+    return
+  }
+  if (shutdownInFlight) {
+    // Quit again while one is still finishing: show where it stands.
+    revealWindow()
+    return
+  }
+  // The window goes away at once; it comes back if the quit does not finish,
+  // and not because a game launched with Hide or Minimize exits meanwhile.
+  hideWindow()
+  lifecycle.quitStarted()
+  void ownedShutdown("quit").then(
+    (outcome) => {
+      if (outcome !== "kept") return app.quit()
       lifecycle.quitFailed()
       await dialog.showMessageBox({
         type: "error",
@@ -1420,8 +1561,11 @@ app.on("open-url", (event, url) => {
   if (!isSupportedProtocol(url)) return
   event.preventDefault()
   protocolQueue.enqueue(url)
-  if (win && !win.isDestroyed()) {
+  if (shutdownInFlight || !win || win.isDestroyed()) {
+    // Before ready, the window the launch creates takes the link.
+    if (app.isReady()) revealWindow()
+  } else {
     if (win.isMinimized()) win.restore()
     win.focus()
-  } else if (app.isReady()) createWindow()
+  }
 })

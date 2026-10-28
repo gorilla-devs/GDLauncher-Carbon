@@ -1,4 +1,4 @@
-import { it, expect } from "vitest"
+import { it, expect, vi } from "vitest"
 import fs from "node:fs"
 import path from "node:path"
 import vm from "node:vm"
@@ -7,6 +7,27 @@ import { createCoreOutput } from "./coreOutput"
 import { AccountIdentityReceiver } from "./accountIdentity"
 import { ProtocolQueue } from "./protocolQueue"
 import { LauncherLifecycle, mainWindowClosed } from "./windowLifecycle"
+import { ShutdownPrompts } from "./shutdownPrompt"
+import {
+  ShutdownFlow,
+  ShutdownNotPossibleError,
+  type ShutdownView
+} from "./shutdownFlow"
+import {
+  ShutdownBlockedError,
+  cancelCoreShutdown,
+  forceTerminateCore,
+  stopCoreForShutdown,
+  terminateAndObserveCoreExit
+} from "./coreShutdown"
+import {
+  interruptRuntimeOperation,
+  interruptibleUntilCommitted,
+  runtimeOperationActive,
+  runtimeOperationBrief,
+  whenRuntimeOperationIdle,
+  withRuntimeOperation
+} from "./runtimeOperation"
 
 const root = path.resolve(__dirname, "../../../../..")
 function source(relative: string) {

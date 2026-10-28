@@ -24,6 +24,7 @@ import {
   assertDatabaseRestoreReadySync
 } from "./databaseRestore"
 import { restoreSnapshotClick } from "../../preload/restoreButton"
+import { restartClick } from "../../preload/restartButton"
 
 function output() {
   const logs: CoreLog[] = [],
@@ -335,6 +336,65 @@ describe("Task23 window and keyed game ownership", () => {
     expect(value.lifecycle.keepAliveWithoutWindows()).toBe(false)
     expect(value.creates).toBe(1)
     expect(w.destroyed).toBe(true)
+  })
+})
+describe("Last window close quits with the window kept", () => {
+  const event = (prevented = false) => ({ defaultPrevented: prevented })
+  it("closing the last window quits, so it is hidden instead of destroyed", () => {
+    const value = windows(),
+      w = value.make()
+    expect(value.lifecycle.quitsOnClose(w, event(), 0)).toBe(true)
+  })
+  it("a held close, another window, an approved quit or a Close Window game lets it close", () => {
+    const value = windows(),
+      w = value.make()
+    expect(value.lifecycle.quitsOnClose(w, event(true), 0)).toBe(false)
+    expect(value.lifecycle.quitsOnClose(w, event(), 1)).toBe(false)
+    value.lifecycle.approveQuit()
+    expect(value.lifecycle.quitsOnClose(w, event(), 0)).toBe(false)
+    value.lifecycle.quitFailed()
+    expect(value.lifecycle.quitsOnClose(w, event(), 0)).toBe(true)
+
+    // The Close Window launch closes the window it was launched from...
+    const launch = windows({ deferClosed: true }),
+      l = launch.make()
+    let during: boolean | undefined
+    l.closing = (e) => {
+      launch.lifecycle.close(l, e, true)
+      const { defaultPrevented } = e as { defaultPrevented?: boolean }
+      during = launch.lifecycle.quitsOnClose(l, { defaultPrevented }, 0)
+    }
+    launch.lifecycle.event("GAME_LAUNCHED|1|7|closeWindow")
+    expect(during).toBe(false)
+    l.finishClose()
+    // ...and keeps the launcher running for its game without one.
+    const shown = launch.make()
+    expect(launch.lifecycle.keepAliveWithoutWindows()).toBe(true)
+    expect(launch.lifecycle.quitsOnClose(shown, event(), 0)).toBe(false)
+  })
+})
+describe("Windows that keep GDLauncher's window open", () => {
+  const window = (visible: boolean, destroyed = false) => ({
+    isVisible: () => visible,
+    isDestroyed: () => destroyed
+  })
+  it("ignores ow-electron's hidden helper windows, so closing the launcher still hides it and quits", () => {
+    const own = window(true),
+      consent = window(false)
+    // Electron lists the newest window first.
+    const others = userWindows([consent, own], own).filter((w) => w !== own)
+    expect(others).toEqual([])
+    const value = windows(),
+      w = value.make()
+    expect(value.lifecycle.quitsOnClose(w, {}, others.length)).toBe(true)
+  })
+  it("counts the launcher's own window while it is hidden, and other windows the user can see", () => {
+    const own = window(false),
+      cmp = window(true),
+      helper = window(false)
+    expect(userWindows([helper, cmp, own], own)).toEqual([cmp, own])
+    expect(userWindows([helper], null)).toEqual([])
+    expect(userWindows([window(true, true), own], own)).toEqual([own])
   })
 })
 describe("Main window closed listener on destroyed windows", () => {
@@ -1457,4 +1517,70 @@ it("Task23 round01 canceled close before exit retains warnings and never claims 
   expect(value.creates).toBe(1)
   expect(value.current).toBe(w)
   expect(value.lifecycle.keepAliveWithoutWindows()).toBe(false)
+})
+describe("Startup error screen Restart", () => {
+  it("awaits the restart, says when it failed outright and enables the button again", async () => {
+    const button = { disabled: false, style: { opacity: "1" } },
+      error = { textContent: "" }
+    let finish!: (value: unknown) => void
+    let fail!: (error: Error) => void
+    const click = restartClick(
+      button as any,
+      error,
+      () =>
+        new Promise((resolve, reject) => {
+          finish = resolve
+          fail = reject
+        })
+    )
+    const first = click()
+    expect(button.disabled).toBe(true)
+    // A second click while it runs starts nothing.
+    await click()
+    fail(new Error("Core exit was not confirmed after SIGKILL"))
+    await first
+    expect(error.textContent).toContain("could not restart")
+    expect(button.disabled).toBe(false)
+
+    // Keep GDLauncher open resolves: nothing to report.
+    const second = click()
+    expect(error.textContent).toBe("")
+    finish({ status: "kept" })
+    await second
+    expect(error.textContent).toBe("")
+    expect(button.disabled).toBe(false)
+    expect(button.style.opacity).toBe("1")
+  })
+})
+describe("a quit under way", () => {
+  it("brings no window back when a Hide or Minimize game exits, until the quit is given up", () => {
+    const value = windows(),
+      w = value.make()
+    value.lifecycle.event("GAME_LAUNCHED|1|1|minimizeWindow")
+    value.lifecycle.event("GAME_LAUNCHED|2|2|hideWindow")
+    value.lifecycle.event("GAME_LAUNCHED|3|3|minimizeWindow")
+    expect(w.hidden).toBe(true)
+    // Cmd+Q or X: the window is hidden while the quit waits on the core.
+    value.lifecycle.quitStarted()
+    // Not an approved quit: a revealed window still hides on close.
+    expect(value.lifecycle.quitsOnClose(w, {}, 0)).toBe(true)
+    value.lifecycle.event("GAME_CLOSED|1|1|minimizeWindow")
+    value.lifecycle.event("GAME_CLOSED|2|2|hideWindow")
+    expect(w.shown).toBe(0)
+    expect(value.creates).toBe(1)
+    // Keep GDLauncher open: a game exit restores the window as before.
+    value.lifecycle.quitFailed()
+    value.lifecycle.event("GAME_CLOSED|3|3|minimizeWindow")
+    expect(w.shown).toBe(1)
+  })
+  it("opens no window for a Close Window game that exits either", () => {
+    const value = windows(),
+      w = value.make()
+    value.lifecycle.event("GAME_LAUNCHED|1|1|closeWindow")
+    expect(w.destroyed).toBe(true)
+    value.lifecycle.quitStarted()
+    value.lifecycle.event("GAME_CLOSED|1|1|closeWindow")
+    expect(value.creates).toBe(1)
+    expect(value.current).toBeNull()
+  })
 })

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron"
 import { subscribeProtocol } from "./protocolBridge"
 import { subscribeCloseWarning } from "./closeWarningBridge"
+import { subscribeShutdownPrompt } from "./shutdownPromptBridge"
 
 import "./loading"
 import "./core_module_loader"

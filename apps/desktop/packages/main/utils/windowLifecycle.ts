@@ -30,6 +30,12 @@ export class LauncherLifecycle<W extends LauncherWindow> {
   private closeIntent: W | null = null
   private closeEvent: { defaultPrevented?: boolean } | null = null
   private quitting = false
+  /**
+   * A quit is under way and its window is hidden until it finishes or comes
+   * back with a prompt. Unlike `quitting`, the close warning and the
+   * hide-on-close stay as they are, as the quit may still be given up.
+   */
+  private quitPending = false
   /** Renderers whose App has mounted the close-warning listener. */
   private warningReceivers = new WeakSet<object>()
   constructor(
@@ -231,7 +237,12 @@ export class LauncherLifecycle<W extends LauncherWindow> {
       for (const [key, session] of this.sessions)
         if (session.closeState === "closed") this.sessions.delete(key)
     const current = this.io.current()
-    if (reopen && !this.quitting && (!current || current.isDestroyed()))
+    if (
+      reopen &&
+      !this.quitting &&
+      !this.quitPending &&
+      (!current || current.isDestroyed())
+    )
       this.io.create()
   }
   cancelLaunchClose(window: W) {
@@ -256,8 +267,14 @@ export class LauncherLifecycle<W extends LauncherWindow> {
     this.quitting = true
     this.io.quit()
   }
+  /** A quit started and hid the window; see `quitPending`. */
+  quitStarted() {
+    this.quitPending = true
+  }
+  /** The quit was given up (Keep GDLauncher open): the launcher stays. */
   quitFailed() {
     this.quitting = false
+    this.quitPending = false
   }
   approveQuit() {
     this.quitting = true

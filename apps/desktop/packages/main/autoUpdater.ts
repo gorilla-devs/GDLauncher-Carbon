@@ -78,7 +78,7 @@ export default function initAutoUpdater(
       assertRuntimeOperationAvailable()
       if (!prepareShutdown)
         throw new Error("Owned core shutdown is unavailable")
-      await prepareShutdown()
+      return prepareShutdown()
     }
   })
   ipcMain.handle("checkForUpdates", async (_, channel: FEReleaseChannel) => {

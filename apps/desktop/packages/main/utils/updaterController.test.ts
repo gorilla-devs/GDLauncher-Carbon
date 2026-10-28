@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
+import { EventEmitter } from "node:events"
+import type { ChildProcess } from "node:child_process"
 import {
   AppImageUpdater,
   type AppUpdater,
@@ -9,6 +11,8 @@ import { createUpdaterController } from "./updaterController"
 import { activeUpdateMetadata } from "./updateProvider"
 import { selectUpdateArtifact } from "./updateArtifact"
 import type { UpdateStateData } from "./updateState"
+import { ShutdownBlockedError, stopCoreForShutdown } from "./coreShutdown"
+import { ShutdownFlow, type ShutdownChoice } from "./shutdownFlow"
 function controller(
   check: () => Promise<unknown> = async () => null,
   manual: () => Promise<any> = async () => null,
@@ -189,6 +193,159 @@ describe("Task23 updater settlement", () => {
     await value.wrapper.install()
     expect(value.shutdowns).toBe(1)
     expect(value.installed).toBe(1)
+  })
+  // main/index.ts wires prepareShutdown to prepareOwnedShutdown("update"),
+  // which runs this handshake. Whether leftover records from an earlier
+  // session hold it up is the core's answer (api/runtime.rs
+  // an_update_install_commits_despite_leftover_process_records).
+  it("install asks the core for an 'update' shutdown and installs only after the core exited", async () => {
+    const order: string[] = []
+    const core = Object.assign(new EventEmitter(), {
+      exitCode: null,
+      signalCode: null,
+      kill: vi.fn(() => {
+        order.push("core exit")
+        core.emit("exit", 0)
+        return true
+      })
+    })
+    const transport = vi.fn(async (url: string, options: any) => {
+      const body = JSON.parse(options.body)
+      order.push(`${String(url).split("/").at(-1)} ${body.purpose}`)
+      return {
+        ok: true,
+        json: async () => ({
+          ...body,
+          runtimePath: process.cwd(),
+          status: { ...body, phase: "ready", blockers: [] }
+        })
+      }
+    })
+    const events: Record<string, (...args: any[]) => void> = {}
+    const wrapper = createUpdaterController({
+      version: "1.0.0",
+      updater: {
+        channel: null as string | null,
+        allowPrerelease: false,
+        allowDowngrade: false,
+        checkForUpdates: async () => null,
+        on: (e: string, f: (...args: any[]) => void) => {
+          events[e] = f
+        },
+        quitAndInstall: () => {
+          order.push("install")
+        }
+      },
+      broadcast: () => {},
+      artifact: () => "https://active.invalid/update.zip",
+      manual: async () => null,
+      isDownloaded: () => true,
+      prepareShutdown: () =>
+        stopCoreForShutdown(
+          {
+            port: 1,
+            apiToken: "fixture",
+            process: core as unknown as ChildProcess
+          },
+          "update",
+          transport as any
+        )
+    })
+    events["update-available"](info)
+    events["update-downloaded"]()
+    await wrapper.install()
+    expect(order).toEqual([
+      "prepare-shutdown update",
+      "shutdown update",
+      "core exit",
+      "install"
+    ])
+  })
+})
+// main/index.ts runs prepareShutdown as ownedShutdown("update"): this flow.
+describe("an update install the core cannot stop for", () => {
+  function refused(answers: ShutdownChoice[]) {
+    const order: string[] = []
+    const events: Record<string, (...args: any[]) => void> = {}
+    let blocked = true
+    const wrapper = createUpdaterController({
+      version: "1.0.0",
+      updater: {
+        channel: null as string | null,
+        allowPrerelease: false,
+        allowDowngrade: false,
+        checkForUpdates: async () => null,
+        on: (e: string, f: (...args: any[]) => void) => {
+          events[e] = f
+        },
+        quitAndInstall: () => {
+          order.push("quitAndInstall")
+        }
+      },
+      broadcast: () => {},
+      artifact: () => "https://active.invalid/update.zip",
+      manual: async () => null,
+      isDownloaded: () => true,
+      prepareShutdown: () =>
+        new ShutdownFlow("update", {
+          stop: async () => {
+            order.push("prepare-shutdown")
+            if (blocked)
+              throw new ShutdownBlockedError("busy", "unresolved", [
+                { kind: "server", name: "server 7 run" }
+              ])
+          },
+          cancel: async () => {
+            order.push("cancel-shutdown")
+            return "released"
+          },
+          force: async () => {
+            order.push("force")
+          },
+          prompt: async (view) => {
+            order.push(`prompt ${view.action} ${view.stage}`)
+            return answers.shift() ?? "keep"
+          }
+        }).run()
+    })
+    events["update-available"](info)
+    events["update-downloaded"]()
+    return {
+      wrapper,
+      order,
+      unblock: () => {
+        blocked = false
+      }
+    }
+  }
+  it("Install now ends the core and then installs", async () => {
+    const value = refused(["force"])
+    await expect(value.wrapper.install()).resolves.toBeUndefined()
+    expect(value.order).toEqual([
+      "prepare-shutdown",
+      "prompt update blocked",
+      // The window says it is stopping until the core's exit is seen.
+      "prompt update stopping",
+      "force",
+      "quitAndInstall"
+    ])
+  })
+  it("Keep GDLauncher open gives the core back and the same update can be installed later", async () => {
+    const value = refused(["keep"])
+    const ready = value.wrapper.getState().readyUpdate
+    expect(await value.wrapper.install(ready!.id)).toBe("kept")
+    expect(value.order).toEqual([
+      "prepare-shutdown",
+      "prompt update blocked",
+      "cancel-shutdown"
+    ])
+    expect(value.wrapper.getState()).toMatchObject({
+      state: "downloaded",
+      readyUpdate: ready
+    })
+    value.unblock()
+    await value.wrapper.install(ready!.id)
+    expect(value.order.slice(3)).toEqual(["prepare-shutdown", "quitAndInstall"])
   })
 })
 function provider(base: string, channel = "latest") {
