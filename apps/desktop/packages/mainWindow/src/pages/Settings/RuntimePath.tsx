@@ -57,7 +57,7 @@ const RuntimePath = () => {
     setRuntimePath(currentRuntimePath()!)
   })
 
-  const [isPathValid] = createResource(
+  const [isPathValid, { refetch: revalidate }] = createResource(
     () => runtimePath() || false,
     async (path) => {
       return { path, classification: await window.validateRuntimePath(path) }
@@ -81,6 +81,23 @@ const RuntimePath = () => {
       currentRuntimePath() !== result.path
     )
   }
+
+  // A refused folder can change outside the launcher (the user deletes a partial
+  // copy in Explorer or Finder), so check it again when the window regains focus.
+  // An accepted one is left alone, so a click that focuses the window still applies.
+  const revalidateRefused = () => {
+    if (runtimePath() === currentRuntimePath()) return
+    const classification = currentValidation()?.classification
+    if (
+      isPathValid.state === "errored" ||
+      (classification !== undefined &&
+        classification !== "valid" &&
+        classification !== "potentially_valid")
+    )
+      revalidate()
+  }
+  window.addEventListener("focus", revalidateRefused)
+  onCleanup(() => window.removeEventListener("focus", revalidateRefused))
 
   return (
     <>
@@ -201,6 +218,22 @@ const RuntimePath = () => {
                     }
                   >
                     <Trans key="ui:_trn_tooltip.apply_and_restart" />
+                  </Match>
+                  <Match
+                    when={
+                      currentValidation()?.classification ===
+                      "incomplete_migration"
+                    }
+                  >
+                    <Trans key="ui:_trn_tooltip.rtp_incomplete_migration" />
+                  </Match>
+                  <Match
+                    when={
+                      currentValidation()?.classification ===
+                      "other_incomplete_migration"
+                    }
+                  >
+                    <Trans key="ui:_trn_tooltip.rtp_other_incomplete_migration" />
                   </Match>
                   <Match
                     when={
