@@ -1436,6 +1436,9 @@ pub async fn process_modpack_staging(
 // Resolved itself owns the complete target and verified source inventory.
 // Publishing the two derived records is restartable at either await boundary;
 // stale/truncated records are retained, never used as target authority.
+// Both records derive from the bound target, not from the staged bytes, so
+// the sources are not hashed here: preparation scanned them moments before
+// binding, and the apply hashes them once before it publishes anything.
 async fn finish_preparation_records(
     app: &Arc<AppInner>,
     id: InstanceId,
@@ -1450,7 +1453,6 @@ async fn finish_preparation_records(
     if saved.phase != Phase::Resolved {
         bail!("setup phase changed during preparation publication");
     }
-    saved.verify_sources(&root.join(".setup/staging")).await?;
     let target = saved
         .target
         .as_ref()
@@ -2606,7 +2608,7 @@ async fn adopt_legacy_transitions(
             bail!("legacy transition differs from original source representation");
         }
         let manifest = transition_batch(root, &record)
-            .join(transition_key(&record.entry.path))
+            .join(record_key(&record.entry.path))
             .join("entry.json");
         let mut initial = record.clone();
         initial.published = false;
@@ -2630,7 +2632,7 @@ async fn adopt_legacy_transitions(
                 )
                 .await;
         } else if transition_batch(root, &record)
-            .join(transition_key(&record.entry.path))
+            .join(record_key(&record.entry.path))
             .join("payload")
             .try_exists()?
         {
@@ -2768,7 +2770,7 @@ async fn execute_representation(
     let twin = disabled_sibling(&bare);
     let mut record = if path.try_exists()? {
         let record = read_transition(&path).await?;
-        validate_transition(&record, &binding, target, owner)?;
+        validate_transition(&record, binding, target, owner)?;
         if record.entry.path != entry.path {
             bail!("representation path mismatch");
         }
@@ -2783,8 +2785,8 @@ async fn execute_representation(
         let record = RepresentationTransition {
             schema_version: if owner.is_some() { 2 } else { 1 },
             owner: owner.cloned(),
-            target_digest: binding.0,
-            options_digest: binding.1,
+            target_digest: binding.0.clone(),
+            options_digest: binding.1.clone(),
             recovery_batch: crate::managers::instance::modpack::create_cleanup_batch(root)?,
             entry: entry.clone(),
             disabled,
@@ -2794,12 +2796,7 @@ async fn execute_representation(
             completed: false,
             conflict: false,
         };
-        validate_transition(
-            &record,
-            &transition_binding(target, options)?,
-            target,
-            owner,
-        )?;
+        validate_transition(&record, binding, target, owner)?;
         ensure_plain_directory(path.parent().unwrap()).await?;
         fsync_dir(&root.join(".setup")).await?;
         write_transition(&path, &record, true).await?;

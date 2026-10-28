@@ -177,15 +177,15 @@ async fn publish_bytes(path: &Path, bytes: Vec<u8>, new: bool) -> anyhow::Result
     let sync_parent = parent.clone();
     tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
         use std::io::Write;
-        let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+        let mut temporary = crate::util::publish::temp_in(&parent)?;
         temporary.write_all(&bytes)?;
         crate::util::durable::sync_file(temporary.as_file())?;
         #[cfg(test)]
         let publication_pause = publication_fixture::wait(&path);
         if new {
-            temporary.persist_noclobber(path).map_err(|e| e.error)?;
+            crate::util::publish::persist_noclobber(temporary, &path)?;
         } else {
-            temporary.persist(path).map_err(|e| e.error)?;
+            crate::util::publish::persist(temporary, &path)?;
         }
         #[cfg(test)]
         if let Some(pause) = publication_pause {

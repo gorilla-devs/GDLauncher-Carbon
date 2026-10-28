@@ -1411,6 +1411,89 @@ async fn task08_legacy_disabled_archive_recovers_with_owned_retained_original() 
     Ok(())
 }
 
+/// A long instance folder name ('Vault Hunters 3rd Edition' under a short
+/// Windows user name is already 89 characters) puts the representation
+/// record, its recovery manifest and deep pack files past 260 characters.
+/// Windows refuses those through plain Win32 paths, which left the setup
+/// stuck in Applying; a full owned update must reach Applied and commit.
+#[tokio::test]
+async fn long_instance_root_owned_update_with_disabled_replace_commits() -> anyhow::Result<()> {
+    use super::modpack::{
+        packinfo,
+        session::{Phase, Session},
+    };
+    let app = crate::setup_managers_for_test().await;
+    let name = format!("Vault Hunters 3rd Edition {}", "x".repeat(144));
+    let (id, root) = fixture(&app, &name).await?;
+    assert!(root.as_os_str().len() >= 190, "{}", root.display());
+    let deep = format!(
+        "kubejs/{}/{}/biome_tags.json",
+        "a".repeat(40),
+        "b".repeat(40)
+    );
+    task08_archive(
+        &root,
+        &[("mods/a.jar.disabled", b"target"), (deep.as_str(), b"deep")],
+    )?;
+    tokio::fs::create_dir(root.join("instance/mods")).await?;
+    tokio::fs::write(root.join("instance/mods/a.jar"), b"old").await?;
+    let old = packinfo::scan_dir(&root.join("instance"), None).await?;
+    tokio::fs::write(root.join("packinfo.json"), packinfo::make_packinfo(old)?).await?;
+    let (shortpath, config) = app.instance_manager().current_config(id).await?;
+    let task = crate::managers::vtask::VisualTask::new(
+        crate::api::translation::Translation::InstanceTaskPrepare {
+            name: "fixture".into(),
+        },
+    );
+    let mut owner = None;
+    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+        app.clone(),
+        id,
+        true,
+        config,
+        shortpath.clone(),
+        &task,
+        false,
+        &mut owner,
+    )
+    .await?;
+    run::modpack::process_modpack_staging(
+        app.clone(),
+        id,
+        shortpath,
+        &subtasks,
+        options,
+        oracle,
+        owner.as_ref(),
+    )
+    .await?;
+    assert_eq!(Session::load(&root).await?.unwrap().phase, Phase::Committed);
+    assert!(!root.join("instance/mods/a.jar").exists());
+    assert_eq!(
+        tokio::fs::read(root.join("instance/mods/a.jar.disabled")).await?,
+        b"target"
+    );
+    let deep = root.join("instance").join(&deep);
+    assert!(deep.as_os_str().len() >= 270);
+    assert_eq!(tokio::fs::read(&deep).await?, b"deep");
+    let mut records = tokio::fs::read_dir(root.join(".setup/representation-transitions")).await?;
+    let record_path = records.next_entry().await?.unwrap().path();
+    let record: serde_json::Value = serde_json::from_slice(&tokio::fs::read(&record_path).await?)?;
+    assert_eq!(record["completed"], true);
+    let batch = root
+        .join(".repair-recovery")
+        .join(record["recovery_batch"].as_str().unwrap());
+    let entry = tokio::fs::read_dir(batch)
+        .await?
+        .next_entry()
+        .await?
+        .unwrap()
+        .path();
+    assert!(entry.join("entry.json").as_os_str().len() >= 260);
+    assert_eq!(tokio::fs::read(entry.join("payload")).await?, b"old");
+    Ok(())
+}
+
 #[tokio::test]
 async fn task08_promoted_restart_merges_current_edits_and_rejects_old_record() -> anyhow::Result<()>
 {
@@ -2788,13 +2871,20 @@ async fn large_pack_applies_with_a_bounded_number_of_session_loads() -> anyhow::
     Ok(())
 }
 
-fn task08_round2_pack(version: &str) -> info::Modpack {
-    info::Modpack::Modrinth(info::ModrinthModpack {
-        project_id: "synthetic".into(),
-        version_id: version.into(),
-    })
+/// `count` override files in one config folder.
+fn config_files(count: usize) -> Vec<(String, Vec<u8>)> {
+    (0..count)
+        .map(|i| {
+            (
+                format!("config/pack/f{i:02}.json"),
+                format!("{{\"file\":{i}}}").into_bytes(),
+            )
+        })
+        .collect()
 }
-async fn task08_round2_change_fixture(
+
+/// A synthetic override-only pack of `files`, prepared up to the apply.
+async fn prepared_pack(
     app: &crate::App,
     name: &str,
 ) -> anyhow::Result<(InstanceId, PathBuf)> {
@@ -2829,9 +2919,16 @@ async fn task08_round2_wait_failed(app: &crate::App, id: InstanceId) -> anyhow::
     .await??;
     Ok(())
 }
+
+/// An apply stopped halfway leaves its published files as second names of
+/// the staged originals, so a config edited in place before the retry is
+/// edited in staging too. The retry must not refuse that as a changed
+/// original, and it keeps the edit.
 #[tokio::test]
-async fn task08_round2_request_drop_keeps_real_producer_owned() -> anyhow::Result<()> {
-    use super::modpack::session::{self, Session};
+async fn resumed_apply_keeps_an_in_place_edit_of_a_published_file() -> anyhow::Result<()> {
+    use run::modpack::staging_test::fail_io;
+    use std::io::Write;
+    const EDITED: &[u8] = b"{\"edited\":true}";
     let app = crate::setup_managers_for_test().await;
     let (id, root) = task08_round2_change_fixture(&app, "producer-drop").await?;
     let permit = app
