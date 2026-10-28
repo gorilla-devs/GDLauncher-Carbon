@@ -4,6 +4,7 @@ import { render } from "solid-js/web"
 import { GameVersionsFilter } from "./GameVersionsFilter"
 import GameVersionsDisplay from "../FiltersDisplay/GameVersionsDisplay"
 import { CategoriesFilter } from "./CategoriesFilter"
+import { ModloadersFilter } from "./ModloadersFilter"
 import { SearchCategoryDropdown } from "@/components/NavSearchInputFilters"
 import { createPlatformSearchQuery } from "@/utils/platformSearchQuery"
 const control = vi.hoisted(() => ({
@@ -16,7 +17,8 @@ vi.mock("@/components/SearchInputContext", () => ({
 }))
 vi.mock("@/components/GlobalStoreContext", () => ({
   useGlobalStore: () => ({
-    minecraftVersions: { data: [{ id: "1.20.1" }, { id: "1.21.1" }] }
+    minecraftVersions: { data: [{ id: "1.20.1" }, { id: "1.21.1" }] },
+    modloaders: { data: ["forge", "fabric"] }
   })
 }))
 vi.mock("@/components/VirtuaWrapper", () => ({
@@ -34,7 +36,7 @@ vi.mock("../FiltersDisplay/FilterBadge", () => ({
 }))
 vi.mock("./SearchableCheckboxList", () => ({
   SearchableCheckboxList: (p: any) => (
-    <div>
+    <div data-placeholder={p.searchPlaceholder}>
       <For each={p.items}>
         {(item: any) => (
           <button
@@ -115,6 +117,25 @@ function mountVersion(api: any) {
   )
   return { root, get, set }
 }
+it("sidebar version and modloader search boxes use translated placeholders", () => {
+  const { root } = mountVersion("curseforge")
+  const modloaders = document.createElement("div")
+  document.body.append(modloaders)
+  const disposeModloaders = render(() => <ModloadersFilter />, modloaders)
+  try {
+    expect(
+      [...document.querySelectorAll("[data-placeholder]")].map((list) =>
+        list.getAttribute("data-placeholder")
+      )
+    ).toEqual([
+      "search:_trn_search_versions_placeholder",
+      "search:_trn_search_modloaders_placeholder"
+    ])
+    expect(root.isConnected).toBe(true)
+  } finally {
+    disposeModloaders()
+  }
+})
 it("actual CF checkbox and badges replace previous version; Modrinth preserves OR", async () => {
   const { root, get, set } = mountVersion("curseforge")
   root.querySelector<HTMLButtonElement>('[data-choice="1.20.1"]')!.click()

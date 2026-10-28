@@ -1,5 +1,5 @@
 import { Collapsable } from "@gd/ui"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import { Show, createMemo } from "solid-js"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import useSearchContext from "@/components/SearchInputContext"
@@ -10,6 +10,7 @@ import { SearchableCheckboxList } from "./SearchableCheckboxList"
 import type { FEUnifiedModLoaderType } from "@gd/core_module/bindings"
 
 export function ModloadersFilter() {
+  const [t] = useTransContext()
   const globalStore = useGlobalStore()
   const searchResults = useSearchContext()
 
@@ -73,7 +74,7 @@ export function ModloadersFilter() {
           items={modloaders()}
           selectedValues={() => searchResults?.searchQuery().modloaders || []}
           onToggle={handleToggle}
-          searchPlaceholder="Search modloaders..."
+          searchPlaceholder={t("search:_trn_search_modloaders_placeholder")}
           emptyMessage={<Trans key="content:_trn_common.no_modloaders_found" />}
         />
       </div>
