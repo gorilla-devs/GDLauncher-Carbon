@@ -235,6 +235,9 @@ const RuntimePath = () => {
                   >
                     <Trans key="ui:_trn_tooltip.rtp_other_incomplete_migration" />
                   </Match>
+                  <Match when={refusalKey(currentValidation()?.classification)}>
+                    {(key) => <Trans key={key()} />}
+                  </Match>
                   <Match
                     when={
                       !currentValidation() ||

@@ -274,3 +274,55 @@ describe("a folder the user frees outside the launcher", () => {
     expect(m.checks("/d/GDL")).toBe(1)
   })
 })
+
+it("says why a folder is refused instead of calling it not a folder or not empty", async () => {
+  const reasons = {
+    "Z:\\": ["filesystem_root", "rtp_drive_root"],
+    "\\\\nas\\share\\GDL": ["network_path", "rtp_network_path"],
+    relative: ["not_absolute", "rtp_not_absolute"],
+    "/usr/gdl": ["system_dir", "rtp_system_dir"],
+    "C/nested": ["nested", "rtp_nested"],
+    "/opt/GDLauncher/data": ["install_overlap", "rtp_install_overlap"],
+    "/run/media/me/USB/gdl": ["removable_not_mounted", "rtp_not_mounted"],
+    "/home/me/file": ["not_a_folder", "rtp_not_a_folder"],
+    "/locked/gdl": ["not_writable", "rtp_not_writable"]
+  } as Record<string, [string, string]>
+  Object.assign(window, {
+    getRuntimePath: async () => "C",
+    getInitialRuntimePath: async () => "initial",
+    validateRuntimePath: vi.fn(
+      async (path: string) => reasons[path]?.[0] ?? "invalid"
+    ),
+    openFileDialog: async () => ({ canceled: true, filePaths: [] })
+  })
+  const root = document.createElement("div")
+  document.body.append(root)
+  dispose = render(() => <RuntimePath />, root)
+  await flush()
+  const input = root.querySelector("input")!
+  for (const [value, [, key]] of Object.entries(reasons)) {
+    input.value = value
+    input.dispatchEvent(new Event("input", { bubbles: true }))
+    await flush()
+    expect(c.apply.disabled, value).toBe(true)
+    expect(root.textContent, value).toContain(`ui:_trn_tooltip.${key}`)
+    expect(root.textContent, value).not.toContain(
+      "ui:_trn_tooltip.rtp_not_valid"
+    )
+  }
+  // A refusal without a reason of its own keeps the general tooltip.
+  input.value = "unreadable"
+  input.dispatchEvent(new Event("input", { bubbles: true }))
+  await flush()
+  expect(root.textContent).toContain("ui:_trn_tooltip.rtp_not_valid")
+  // Every reason is translated in every shipped language.
+  const locales = path.resolve("../../packages/i18n/locale")
+  for (const language of fss.readdirSync(locales)) {
+    if (!fss.statSync(path.join(locales, language)).isDirectory()) continue
+    const ui = JSON.parse(
+      fss.readFileSync(path.join(locales, language, "ui.json"), "utf8")
+    )
+    for (const [, key] of Object.values(reasons))
+      expect(ui[`_trn_tooltip.${key}`], `${language} ${key}`).toMatch(/\S/)
+  }
+})
