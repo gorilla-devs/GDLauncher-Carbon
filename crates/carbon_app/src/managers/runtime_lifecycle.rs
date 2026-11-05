@@ -539,6 +539,22 @@ impl RuntimeActivity {
         // No identity leaves the pre-spawn empty intent Unknown.
         Ok(())
     }
+    /// [`Self::record_child_pid`] for a game or server that has started.
+    /// A record that cannot be written leaves the empty intent on disk, which
+    /// a later start reads as Unknown, as when no identity can be captured.
+    /// The program runs on and stays supervised through its live handle and
+    /// the identity kept in memory: failing the start here would drop a
+    /// running game or server untracked, free to be started a second time.
+    pub fn record_spawned_child(&self, pid: Option<u32>) {
+        if let Err(error) = self.record_child_pid(pid) {
+            // Through anyhow, so the line names the cause (disk full, access
+            // denied) and not only what failed.
+            tracing::warn!(
+                "{:#}; the started program stays tracked",
+                anyhow::Error::from(error)
+            );
+        }
+    }
     pub fn child_identity(&self) -> Option<ProcessRecord> {
         *self.child_identity.lock().unwrap()
     }
@@ -704,12 +720,46 @@ fn decode_child_record(bytes: &[u8]) -> Result<ProcessRecord> {
     record.process.validate_identity()
 }
 fn persist_child_record(path: &std::path::Path, identity: ProcessRecord) -> Result<()> {
+    #[cfg(test)]
+    tests_support::child_record_fault()?;
     let mut file = std::fs::OpenOptions::new()
         .write(true)
         .truncate(true)
         .open(path)?;
     std::io::Write::write_all(&mut file, &encode_child_record(identity)?)?;
-    file.sync_all()?;
+    crate::util::durable::sync_file_plain(&file)?;
+    Ok(())
+}
+/// Creates the folder of durable child records, and says whether it is new.
+fn create_records_folder(root: &Path) -> Result<bool> {
+    let new_folder = !root.is_dir();
+    std::fs::create_dir_all(root)?;
+    Ok(new_folder)
+}
+/// Syncs a record just created in `root`: the file, the folder's entry for
+/// it, and the folder's own entry in the data folder when it is new.
+///
+/// Plain syncs: these records name programs that may outlive the launcher,
+/// never the computer. A power cut ends every program they could name, so
+/// F_FULLFSYNC's drive-cache flush on Apple platforms would buy nothing and
+/// cost every Java check, hook and launch a full flush. Windows and Linux
+/// have no lighter flush (see [`crate::util::durable`]), so there a record
+/// still gets a full flush of its file, twice per child (the empty record,
+/// then the identity), as before. That flush is also what lets a record
+/// written just before the computer stopped be read and cleared at the next
+/// start, rather than kept as unreadable, which holds up moving the data
+/// folder until it is deleted.
+/// A volume that does not sync folders (a VirtualBox shared folder, some
+/// network mounts) leaves the entries to the system.
+fn sync_new_record(file: &std::fs::File, root: &Path, new_folder: bool) -> Result<()> {
+    use crate::util::durable;
+    durable::sync_file_plain(file)?;
+    durable::sync_dir_plain(root)?;
+    if new_folder {
+        if let Some(parent) = root.parent() {
+            durable::sync_dir_plain(parent)?;
+        }
+    }
     Ok(())
 }
 pub(crate) fn recorded_identity_confirmed_gone(record: ProcessRecord) -> bool {
