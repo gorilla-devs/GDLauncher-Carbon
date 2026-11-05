@@ -314,4 +314,35 @@ describe("describeTaskWarnings", () => {
       hint: "If the server does not start, try another version of Cobblemon Addon or remove it."
     })
   })
+
+  it("says which links a server's modpack files were not written through, and the way out", async () => {
+    const i18n = i18next.createInstance()
+    await i18n.init({
+      lng: "en",
+      ns: ["notifications"],
+      resources: { en: { notifications: english } }
+    })
+    const translate: Translate = (key, options) =>
+      i18n.t(key as string, options)
+    const entry: FETaskWarnings = {
+      id: 15,
+      name: {
+        translation: "ServerTaskInstallFromModpack",
+        args: { server_name: "Steve's SMP" }
+      },
+      subject: null,
+      warnings: [
+        { type: "PackFilesSkippedAtLink", value: { path: "config" } },
+        { type: "PackFilesSkippedAtLink", value: { path: "kubejs/assets" } }
+      ]
+    }
+    expect(describeTaskWarnings(entry, translate)).toEqual({
+      title: "Some modpack files were not installed on Steve's SMP",
+      lines: [
+        "config: this is a link to a file or folder stored elsewhere, and GDLauncher does not write through links",
+        "kubejs/assets: this is a link to a file or folder stored elsewhere, and GDLauncher does not write through links"
+      ],
+      hint: "What the link points to was not changed. Copy the modpack's files there yourself, or replace the link with a normal folder and run Repair again."
+    })
+  })
 })

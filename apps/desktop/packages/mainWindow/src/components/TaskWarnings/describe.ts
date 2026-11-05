@@ -101,6 +101,11 @@ function describeWarning(warning: FETaskWarning, t: Translate): string {
         installed: warning.value.installed,
         interpolation: noEscape
       })
+    case "PackFilesSkippedAtLink":
+      return t("notifications:_trn_pack_files_skipped_at_link", {
+        path: warning.value.path,
+        interpolation: noEscape
+      })
     case "WorldNameTaken":
       return t("notifications:_trn_world_name_taken", {
         name: warning.value.name,
@@ -132,6 +137,21 @@ export function describeTaskWarnings(
     (warning) => warning.type === "SkippedDependency"
   )
   if (server !== null) {
+    // Only a server's modpack install raises this, and never with the others.
+    if (
+      entry.warnings.every(
+        (warning) => warning.type === "PackFilesSkippedAtLink"
+      )
+    ) {
+      return {
+        title: t("notifications:_trn_pack_files_skipped_on_server", {
+          server,
+          interpolation: noEscape
+        }),
+        lines,
+        hint: t("notifications:_trn_pack_files_skipped_hint")
+      }
+    }
     return {
       title: t(
         skipped

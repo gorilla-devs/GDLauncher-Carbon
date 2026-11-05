@@ -543,7 +543,7 @@ async fn resolve(
             if row.addon_type == "mods" {
                 recorded.insert(row.filename.clone());
             }
-            if let Err(error) = world::validate_relative(&row.location) {
+            if let Err(error) = world::validate_local(&row.location) {
                 tracing::debug!(
                     filename = %row.filename,
                     "Server addon location is not usable: {error:#}"
@@ -2863,7 +2863,7 @@ async fn check_destination(
         // It replaces the copy at its destination.
         return Ok(());
     }
-    world::validate_relative(&item.location)?;
+    world::validate_local(&item.location)?;
     let destination = data.join(&item.location);
     let folder = destination
         .parent()

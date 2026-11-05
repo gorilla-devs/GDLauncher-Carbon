@@ -79,6 +79,13 @@ pub enum TaskWarning {
         /// The version number that was installed, as the platform shows it.
         installed: String,
     },
+    /// A modpack's files under a link in the server folder (a `config/`
+    /// shared with another server) were not installed, as GDLauncher does
+    /// not write through links.
+    PackFilesSkippedAtLink {
+        /// The link, as a `/`-separated path inside the server folder.
+        path: String,
+    },
     /// A world was installed as a new save under another name, because a
     /// save already has its own (an earlier install of the same map, or a
     /// map called "New World"). The existing save is not touched.

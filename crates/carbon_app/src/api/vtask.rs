@@ -96,6 +96,9 @@ pub enum FETaskWarning {
         project_id: String,
         installed: String,
     },
+    /// A modpack's files under a link in the server folder were not
+    /// installed; `path` is the link, `/`-separated, inside the server folder.
+    PackFilesSkippedAtLink { path: String },
     /// A world was installed as the new save `saved_as`, because a save
     /// named `name` already exists; that save was not changed.
     WorldNameTaken { name: String, saved_as: String },
@@ -197,6 +200,9 @@ impl From<domain::TaskWarning> for FETaskWarning {
                 project_id,
                 installed,
             },
+            domain::TaskWarning::PackFilesSkippedAtLink { path } => {
+                Self::PackFilesSkippedAtLink { path }
+            }
             domain::TaskWarning::WorldNameTaken { name, saved_as } => {
                 Self::WorldNameTaken { name, saved_as }
             }
