@@ -1321,7 +1321,7 @@ pub async fn publish_replacement(root: &Path, next: &Path) -> anyhow::Result<()>
     if entry_metadata(&setup)?.is_some() {
         bail!("a setup is still pending where its replacement goes");
     }
-    tokio::fs::rename(next, &setup).await?;
+    crate::util::publish::rename_dir(next, &setup).await?;
     sync_dir(root).await
 }
 
@@ -1431,7 +1431,7 @@ impl Retired {
         if entry_metadata(&setup)?.is_some() {
             bail!("another setup took the replaced one's place");
         }
-        tokio::fs::rename(&self.path, &setup).await?;
+        crate::util::publish::rename_dir(&self.path, &setup).await?;
         if let Some(name) = self.moved_target {
             let temporary = root.join("tmp-packinfo.json");
             if entry_metadata(&temporary)?.is_none() {
@@ -2337,7 +2337,7 @@ mod task33_shader_recovery_tests {
     #[tokio::test]
     async fn task33_later_reload_rejects_a_valid_replacement_and_rebound_authority() {
         let (expected, config) = bound();
-        let root = tempfile::tempdir_in(std::env::var("TMPDIR").unwrap()).unwrap();
+        let root = tempfile::tempdir().unwrap();
         tokio::fs::create_dir(root.path().join(".setup"))
             .await
             .unwrap();
@@ -2385,7 +2385,7 @@ mod task33_shader_recovery_tests {
     #[tokio::test]
     async fn task33_actual_session_publication_keeps_binding_and_old_record_default() {
         let (mut session, config) = bound();
-        let root = tempfile::tempdir_in(std::env::var("TMPDIR").unwrap()).unwrap();
+        let root = tempfile::tempdir().unwrap();
         tokio::fs::create_dir(root.path().join(".setup"))
             .await
             .unwrap();
@@ -2457,6 +2457,71 @@ mod no_replace_volume_tests {
     }
 }
 
+/// An instance folder moved to another drive and linked back: records in it
+/// are written through the link, while a link in place of a folder the setup
+/// made is still refused.
+#[cfg(all(test, unix))]
+mod linked_root_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn root_records_are_written_through_a_linked_instance_folder() {
+        let drive = tempfile::tempdir().unwrap();
+        let moved = drive.path().join("Pack");
+        std::fs::create_dir_all(moved.join(".setup")).unwrap();
+        let instances = tempfile::tempdir().unwrap();
+        let root = instances.path().join("Pack");
+        std::os::unix::fs::symlink(&moved, &root).unwrap();
+
+        atomic_bytes_in_root(&root.join("tmp-packinfo.json"), b"first".to_vec(), false)
+            .await
+            .unwrap();
+        atomic_bytes_in_root(&root.join("tmp-packinfo.json"), b"target".to_vec(), false)
+            .await
+            .unwrap();
+        assert_eq!(
+            std::fs::read(moved.join("tmp-packinfo.json")).unwrap(),
+            b"target"
+        );
+        // The setup's own folder inside it is a plain folder, as before.
+        atomic_bytes(&root.join(".setup").join(RECORD), b"record".to_vec(), true)
+            .await
+            .unwrap();
+        assert_eq!(
+            std::fs::read(moved.join(".setup").join(RECORD)).unwrap(),
+            b"record"
+        );
+        assert!(
+            std::fs::symlink_metadata(&root)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+
+        // A link in place of a folder the setup made stays refused.
+        let elsewhere = drive.path().join("elsewhere");
+        std::fs::create_dir(&elsewhere).unwrap();
+        std::os::unix::fs::symlink(&elsewhere, moved.join("staging")).unwrap();
+        let error = atomic_bytes(&moved.join("staging/record"), b"x".to_vec(), true)
+            .await
+            .unwrap_err();
+        assert!(
+            format!("{error:#}").contains("plain directory"),
+            "{error:#}"
+        );
+        assert!(!elsewhere.join("record").exists());
+        // A record never lands where the instance folder link no longer leads.
+        std::fs::remove_dir_all(&moved).unwrap();
+        let error = atomic_bytes_in_root(&root.join("tmp-packinfo.json"), b"x".to_vec(), false)
+            .await
+            .unwrap_err();
+        assert!(
+            format!("{error:#}").contains("could not open the instance folder"),
+            "{error:#}"
+        );
+    }
+}
+
 #[cfg(test)]
 mod legacy_setup_tests {
     use super::*;
@@ -2477,7 +2542,7 @@ mod legacy_setup_tests {
                     .strip_prefix(root)
                     .unwrap()
                     .to_string_lossy()
-                    .into_owned();
+                    .replace('\\', "/");
                 let bytes = entry
                     .file_type()
                     .is_file()
@@ -2999,7 +3064,9 @@ mod legacy_setup_tests {
             .unwrap()
             .unwrap();
         assert_eq!(source.producer, Producer::Repair);
-        // The source owns it; only the copy qualifies it.
+        // The source owns it. The instance the folder is registered to after
+        // a database reset (or a copy made outside the launcher) qualifies it,
+        // like a duplicate does.
         assert_eq!(
             source
                 .copy_qualification(root.path(), InstanceId(7))
@@ -3007,12 +3074,14 @@ mod legacy_setup_tests {
                 .unwrap(),
             None
         );
+        assert!(!source.binds_to(InstanceId(7)));
+        assert!(source.binds_to(InstanceId(8)));
         assert_eq!(
             source
                 .copy_qualification(root.path(), InstanceId(8))
                 .await
                 .unwrap(),
-            None
+            Some(true)
         );
         source.copied_to = Some(8);
         assert!(source.binds_to(InstanceId(8)));
@@ -3238,6 +3307,60 @@ mod legacy_setup_tests {
         }
     }
 
+    /// Only a record bound to the instance, and not marked as a duplicate's
+    /// copy, is the instance's own. Any other record in the instance's folder
+    /// is provenance it may continue: one written before it had an id, one a
+    /// duplicate copied, or one the folder kept from an earlier registration,
+    /// which a database reset or an outside copy, move or rename leaves
+    /// naming an id the folder no longer has. Such a record used to be
+    /// refused as another instance's, for Play, Edit and addon changes alike.
+    #[tokio::test]
+    async fn a_record_from_an_earlier_registration_is_provenance() {
+        let config = config();
+        let root = legacy_root(&[], &[]);
+        let mut original =
+            Session::new(&config, Producer::Create, Kind::VersionOnly, None).unwrap();
+        original.instance_id = Some(7);
+        original.create(root.path()).await.unwrap();
+        let mut copied = original.clone();
+        copied.copied_to = Some(8);
+        let mut unbound = original.clone();
+        unbound.instance_id = None;
+        for (name, session, instance, owned) in [
+            ("its own", &original, 7, true),
+            ("under a new id", &original, 9, false),
+            ("unbound", &unbound, 7, false),
+            ("copied, seen from the copy", &copied, 8, false),
+            ("copied, under a new id", &copied, 9, false),
+            ("copied, under the original's id", &copied, 7, false),
+        ] {
+            assert_eq!(session.owned_by(InstanceId(instance)), owned, "{name}");
+            assert_eq!(session.binds_to(InstanceId(instance)), !owned, "{name}");
+            // A content-free record is continued as the instance's own.
+            assert_eq!(
+                session
+                    .copy_qualification(root.path(), InstanceId(instance))
+                    .await
+                    .unwrap(),
+                (!owned).then_some(true),
+                "{name}"
+            );
+        }
+        // Continuing it makes it the new id's own, keeping where it came from.
+        let continued = original
+            .qualify_copy(root.path(), InstanceId(9))
+            .await
+            .unwrap();
+        assert!(continued.owned_by(InstanceId(9)));
+        assert_eq!(continued.adopted_from, original.owner().ok());
+        assert_ne!(continued.operation, original.operation);
+        let saved = Session::load(root.path()).await.unwrap().unwrap();
+        assert_eq!(
+            serde_json::to_value(saved).unwrap(),
+            serde_json::to_value(&continued).unwrap()
+        );
+    }
+
     /// A content-free record that the instance continues as its own (copied
     /// by a duplicate, or written before the instance had an id) may be
     /// replaced once it does, as Play would continue it. Anything Play would
@@ -3255,7 +3378,16 @@ mod legacy_setup_tests {
         copied.copied_to = Some(8);
         let mut unbound = original.clone();
         unbound.instance_id = None;
-        for (name, session, instance) in [("copied", &copied, 8), ("unbound", &unbound, 7)] {
+        // The folder kept it from an earlier registration: another id took
+        // over the original's folder or the copy's (a database reset or
+        // restore, or the folder copied or moved outside the launcher).
+        for (name, session, instance) in [
+            ("copied", &copied, 8),
+            ("unbound", &unbound, 7),
+            ("the original's, under a new id", &original, 9),
+            ("copied, under a new id", &copied, 9),
+            ("copied, under the original's id", &copied, 7),
+        ] {
             assert!(
                 !session
                     .supersedable(root.path(), InstanceId(instance))
@@ -3276,8 +3408,6 @@ mod legacy_setup_tests {
         copied_pack.phase = Phase::Reserved;
         for (name, session, instance) in [
             ("the original's own", &original, 7),
-            ("seen from another instance", &copied, 9),
-            ("seen from the original", &copied, 7),
             ("a copied pack request", &copied_pack, 8),
         ] {
             assert!(
@@ -3367,17 +3497,19 @@ mod legacy_setup_tests {
                 "{producer:?}"
             );
         }
-        // Not this instance's own. Only a copy, or a record from before the
-        // instance had an id, is still a pack installed for it.
+        // Not this instance's own: a copy, a record from before the instance
+        // had an id, or one the folder kept from an earlier registration
+        // (another id, or a copy's, after a database reset). Each is still a
+        // pack installed for the instance the folder is registered to now.
         let mut copied = pack.clone();
         copied.copied_to = Some(8);
         let mut unbound = pack.clone();
         unbound.instance_id = None;
         for (name, session, instance, installed_for_it) in [
-            ("another instance", &pack, 8, false),
-            ("copied", &copied, 7, false),
+            ("another instance's id", &pack, 8, true),
+            ("copied, now under the original's id", &copied, 7, true),
             ("copied, seen from the copy", &copied, 8, true),
-            ("copied, seen from a third instance", &copied, 9, false),
+            ("copied, now under a third id", &copied, 9, true),
             ("unbound", &unbound, 7, true),
         ] {
             assert!(
@@ -3789,6 +3921,38 @@ mod legacy_setup_tests {
                     .starts_with(".setup-cancelled-op-")
             );
         }
+    }
+
+    /// Windows refuses to rename a setup folder while a scanner holds a file
+    /// in it. Retiring, publishing a replacement and putting a retired setup
+    /// back wait that out instead of failing the request.
+    #[tokio::test(start_paused = true)]
+    async fn setup_folder_renames_wait_out_a_busy_folder() {
+        use crate::util::publish::fault::{SHARING_VIOLATION, Step, inject, pending};
+        let root = legacy_root(&[(".setup/setup-session.json", b"old")], &[]);
+        let setup = root.path().join(".setup");
+        for _ in 0..2 {
+            inject(Step::RenameDir, &setup, SHARING_VIOLATION);
+        }
+        let retired = retire_replaced(root.path(), "op").await.unwrap();
+        assert!(!pending(Step::RenameDir, &setup));
+        assert!(!setup.exists());
+
+        let next = begin_replacement(root.path()).await.unwrap();
+        atomic_bytes(&next.join(RECORD), b"new".to_vec(), true)
+            .await
+            .unwrap();
+        inject(Step::RenameDir, &next, 5);
+        publish_replacement(root.path(), &next).await.unwrap();
+        assert!(!pending(Step::RenameDir, &next));
+        assert_eq!(std::fs::read(setup.join(RECORD)).unwrap(), b"new");
+
+        std::fs::remove_dir_all(&setup).unwrap();
+        inject(Step::RenameDir, &retired.path, SHARING_VIOLATION);
+        let path = retired.path.clone();
+        retired.restore(root.path()).await.unwrap();
+        assert!(!pending(Step::RenameDir, &path));
+        assert_eq!(std::fs::read(setup.join(RECORD)).unwrap(), b"old");
     }
 
     fn pack(version: &str) -> info::Modpack {
@@ -4364,6 +4528,71 @@ mod legacy_setup_tests {
                 "{producer:?}: {message}"
             );
         }
+    }
+
+    /// On a volume without hard links the apply moves staged files into
+    /// place, as 2.0.40 did. A resumed apply counts one that is gone from
+    /// staging while its live file (or twin) is there as published, and
+    /// leaves that file to the planner. A missing source with nothing in its
+    /// place, or one missing before the apply started, is still refused.
+    #[tokio::test]
+    async fn a_resumed_apply_counts_a_source_moved_into_place_as_published() {
+        let root = legacy_root(&[], &[".setup/staging/instance"]);
+        let staged = root.path().join(".setup/staging");
+        let live = root.path().join("instance");
+        let hashes = |seed: u8| packinfo::FileHashes {
+            sha512: [seed; 64],
+            md5: [seed; 16],
+        };
+        let target = packinfo::PackInfo {
+            files: std::collections::HashMap::from([
+                ("/mods/a.jar".to_string(), hashes(1)),
+                ("/mods/off.jar".to_string(), hashes(2)),
+            ]),
+        };
+        let (digest, options_digest) = binding(&target, None).unwrap();
+        let mut session = Session::new(&config(), Producer::Change, Kind::Pack, None).unwrap();
+        session.target = Some(Target {
+            packinfo: packinfo::make_packinfo(target).unwrap(),
+            digest,
+            options_digest,
+            sources: BTreeMap::from([
+                ("/mods/a.jar".to_string(), "/mods/a.jar".to_string()),
+                (
+                    "/mods/off.jar".to_string(),
+                    "/mods/off.jar.disabled".to_string(),
+                ),
+            ]),
+            skipped: Vec::new(),
+        });
+        std::fs::create_dir_all(live.join("mods")).unwrap();
+        // Edited since: the planner judges it, not this check.
+        std::fs::write(live.join("mods/a.jar"), b"moved, then edited").unwrap();
+        std::fs::write(live.join("mods/off.jar.disabled"), b"moved").unwrap();
+
+        session.phase = Phase::Applying;
+        let check = session.verify_sources(&staged, &live).await.unwrap();
+        assert_eq!(
+            check.published,
+            [live.join("mods/a.jar"), live.join("mods/off.jar.disabled")]
+        );
+        assert!(check.changed.is_empty());
+
+        session.phase = Phase::Resolved;
+        let message = format!(
+            "{:#}",
+            session.verify_sources(&staged, &live).await.unwrap_err()
+        );
+        assert!(message.contains("mods/a.jar"), "{message}");
+
+        session.phase = Phase::Applying;
+        std::fs::remove_file(live.join("mods/a.jar")).unwrap();
+        let message = format!(
+            "{:#}",
+            session.verify_sources(&staged, &live).await.unwrap_err()
+        );
+        assert!(message.contains("mods/a.jar"), "{message}");
+        assert!(message.contains("went missing"), "{message}");
     }
 
     /// What Repair installs over a pending setup, and whether that setup may
