@@ -384,6 +384,9 @@ pub struct RuntimeActivity {
     record: Option<std::path::PathBuf>,
     detached_game: bool,
     child_identity: Mutex<Option<ProcessRecord>>,
+    /// A child process was started under this activity, or is about to be
+    /// (`external_child`). It may outlive the code that owns the activity.
+    owns_child: bool,
 }
 impl RuntimeActivity {
     /// Final no-await spawn authorization shares the freeze mutex. The caller
@@ -520,11 +523,51 @@ impl RuntimeActivity {
         self.owns_child = true;
         Ok(())
     }
-    pub fn record_child_pid(&self, pid: Option<u32>) -> Result<()> {
+    fn persist_intent(&mut self, root: &Path) -> Result<()> {
+        let new_folder = create_records_folder(root)?;
+        let record = root.join(format!("{}.json", uuid::Uuid::new_v4()));
+        // Claimed before the file exists, so the startup reconcile that
+        // runs beside the startup Java scan never reads this still-empty
+        // intent as a record from an earlier session.
+        self.lifecycle
+            .state
+            .lock()
+            .unwrap()
+            .own_records
+            .insert(record.clone());
+        let file = match std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&record)
+        {
+            Ok(file) => file,
+            Err(error) => {
+                self.lifecycle
+                    .state
+                    .lock()
+                    .unwrap()
+                    .own_records
+                    .remove(&record);
+                return Err(error.into());
+            }
+        };
+        self.record = Some(record);
+        // The empty record is explicitly Unknown, never completion.
+        sync_new_record(&file, root, new_folder)
+    }
+    /// Writes a started child's identity into its record. Private: a game or
+    /// server goes through [`Self::record_spawned_child`], which cannot fail
+    /// the start, and a temporary child through [`tracked_output_observed`],
+    /// which stops the child when this fails.
+    fn record_child_pid(
+        &self,
+        pid: Option<u32>,
+    ) -> std::result::Result<(), ChildBookkeepingFailed> {
         let Some(pid) = pid else {
             return Ok(());
         };
         self.record_child_observed(pid, orphan_pid::observe_process(pid))
+            .map_err(ChildBookkeepingFailed::after_spawn)
     }
     fn record_child_observed(
         &self,
@@ -987,6 +1030,7 @@ impl RuntimeLifecycle {
             record: None,
             detached_game: false,
             child_identity: Mutex::new(None),
+            owns_child: false,
         })
     }
     /// [`Self::admit`] for work a blocked quit or move names by `policy`
@@ -1585,15 +1629,7 @@ impl RuntimeLifecycle {
             Err(error) => return Err(error.into()),
         };
         std::io::Write::write_all(&mut file, &encode_child_record(identity)?)?;
-        file.sync_all()?;
-        #[cfg(unix)]
-        {
-            std::fs::File::open(root)?.sync_all()?;
-            if let Some(parent) = root.parent() {
-                std::fs::File::open(parent)?.sync_all()?;
-            }
-        }
-        Ok(())
+        sync_new_record(&file, root, new_folder)
     }
 
     /// Runs before best-effort UI reconciliation can discard corrupt pidfiles.
@@ -3294,5 +3330,304 @@ mod task22_invalid_token_tests {
             decode_child_record(bytes).is_err(),
             "Malformed stable token must remain Unknown, never prove reuse or gain epoch fallback"
         );
+    }
+}
+
+/// What a quit, restart or update does to this core's own work besides
+/// games and servers: a hook the user set up runs to its end, lookups and
+/// panicked workers never keep the launcher from closing.
+#[cfg(test)]
+mod owned_activities_during_quit_tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn ready() -> Arc<RuntimeLifecycle> {
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle
+    }
+    /// Polls like Electron does until the request leaves Draining.
+    async fn settled(lifecycle: &RuntimeLifecycle, request: &str) -> ShutdownStatus {
+        tokio::time::timeout(Duration::from_secs(120), async {
+            loop {
+                let status = lifecycle
+                    .shutdown_status(request, ShutdownPurpose::Quit)
+                    .unwrap();
+                if status.phase != ShutdownPhase::Draining {
+                    return status;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("shutdown never settled")
+    }
+    fn hook_blocker() -> RuntimeBlocker {
+        RuntimeBlocker::new(RuntimeBlockerKind::Hook, "temporary child")
+    }
+
+    #[test]
+    fn a_quit_leaves_a_hook_running_and_names_it_as_one() {
+        let lifecycle = ready();
+        let hook = lifecycle
+            .admit_owned("temporary child", ActivityPolicy::Hook)
+            .unwrap();
+        let installer = lifecycle
+            .admit_owned("instance 3 preparation", ActivityPolicy::Installer)
+            .unwrap();
+        assert_eq!(
+            lifecycle.relocation_blockers("move"),
+            [
+                hook_blocker(),
+                RuntimeBlocker::new(RuntimeBlockerKind::Install, "instance 3 preparation")
+            ]
+        );
+        assert!(
+            lifecycle
+                .begin_shutdown("quit", ShutdownPurpose::Quit)
+                .unwrap()
+        );
+        assert!(
+            !hook.cancellation().is_cancelled(),
+            "the user's script is left to finish"
+        );
+        assert!(
+            installer.cancellation().is_cancelled(),
+            "other work is still cancelled as the quit begins"
+        );
+        assert_eq!(
+            lifecycle
+                .shutdown_status("quit", ShutdownPurpose::Quit)
+                .unwrap()
+                .blockers,
+            [
+                hook_blocker(),
+                RuntimeBlocker::new(RuntimeBlockerKind::Install, "instance 3 preparation")
+            ]
+        );
+        installer.finish();
+        hook.finish();
+        assert_eq!(
+            lifecycle.settle_shutdown("quit", Ok(())).unwrap().phase,
+            ShutdownPhase::Ready
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_hook_longer_than_the_budget_is_named_and_the_retry_finishes_once_it_ends() {
+        let lifecycle = ready();
+        let hook = lifecycle
+            .admit_owned("temporary child", ActivityPolicy::Hook)
+            .unwrap();
+        lifecycle
+            .prepare_shutdown("quit", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        let status = settled(&lifecycle, "quit").await;
+        assert_eq!(status.phase, ShutdownPhase::Unresolved);
+        assert_eq!(status.blockers, [hook_blocker()]);
+        assert!(!hook.cancellation().is_cancelled());
+        // Try again (or Wait) re-joins the same request.
+        lifecycle
+            .prepare_shutdown("quit", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        tokio::time::sleep(Duration::from_secs(4)).await;
+        hook.finish();
+        assert_eq!(
+            settled(&lifecycle, "quit").await.phase,
+            ShutdownPhase::Ready
+        );
+        lifecycle
+            .commit_prepared_shutdown("quit", ShutdownPurpose::Quit)
+            .unwrap();
+    }
+
+    /// The real child path: a post-exit backup script that is still running
+    /// when the user quits finishes its work and reports success, and the
+    /// quit goes through right after it.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_running_hook_finishes_its_work_through_a_quit() {
+        let lifecycle = ready();
+        let folder = tempfile::tempdir().unwrap();
+        let mut command = tokio::process::Command::new("sh");
+        command
+            .args(["-c", "sleep 1; echo backed up > done.txt; echo finished"])
+            .current_dir(folder.path());
+        let hook = tokio::spawn({
+            let lifecycle = lifecycle.clone();
+            async move {
+                tracked_output_reserved(&lifecycle, &mut command, ActivityPolicy::Hook, None).await
+            }
+        });
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while !lifecycle
+                .state
+                .lock()
+                .unwrap()
+                .activities
+                .values()
+                .any(|entry| {
+                    entry.policy == ActivityPolicy::Hook && entry.phase == ActivityPhase::Running
+                })
+            {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("the hook started");
+        let status = lifecycle
+            .prepare_shutdown("quit", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        assert_eq!(status.blockers, [hook_blocker()]);
+        let output = hook
+            .await
+            .unwrap()
+            .expect("the quit does not stop the hook");
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"finished\n");
+        assert_eq!(
+            std::fs::read_to_string(folder.path().join("done.txt")).unwrap(),
+            "backed up\n"
+        );
+        assert_eq!(
+            settled(&lifecycle, "quit").await.phase,
+            ShutdownPhase::Ready
+        );
+        lifecycle
+            .commit_prepared_shutdown("quit", ShutdownPurpose::Quit)
+            .unwrap();
+    }
+
+    /// A hook that pauses or asks for input (`pause`, `set /p`, `read`) gets
+    /// an empty input at once instead of waiting out its 300 s timeout on
+    /// the core's own stdin, which the launcher never writes to or closes.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_hook_that_reads_input_gets_none_at_once() {
+        let lifecycle = ready();
+        // Stands in for the inherited stdin: a pipe nobody writes to or
+        // closes. (A piped stdin would not do: the wait closes its handle.)
+        let (input, _held_open) = std::io::pipe().unwrap();
+        let mut command = tokio::process::Command::new("sh");
+        command
+            .args(["-c", "read line; echo \"read: $?\""])
+            .stdin(input);
+        let output = tokio::time::timeout(
+            Duration::from_secs(10),
+            tracked_output_reserved(&lifecycle, &mut command, ActivityPolicy::Hook, None),
+        )
+        .await
+        .expect("the hook does not wait for input")
+        .unwrap();
+        assert!(output.status.success());
+        assert_eq!(output.stdout, b"read: 1\n");
+        assert!(lifecycle.state.lock().unwrap().activities.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_lookup_is_dropped_once_cancelled_and_never_started_after() {
+        let cancel = tokio_util::sync::CancellationToken::new();
+        let lookup = tokio::spawn({
+            let cancel = cancel.clone();
+            async move { lookup_or_cancel(&cancel, std::future::pending::<Result<()>>()).await }
+        });
+        tokio::task::yield_now().await;
+        assert!(!lookup.is_finished());
+        cancel.cancel();
+        let result = tokio::time::timeout(Duration::from_secs(5), lookup)
+            .await
+            .expect("a cancelled lookup ends at once")
+            .unwrap();
+        assert!(result.is_err());
+        let started = std::sync::atomic::AtomicBool::new(false);
+        let result = lookup_or_cancel(&cancel, async {
+            started.store(true, std::sync::atomic::Ordering::SeqCst);
+            Ok(())
+        })
+        .await;
+        assert!(result.is_err());
+        assert!(!started.load(std::sync::atomic::Ordering::SeqCst));
+        assert_eq!(
+            lookup_or_cancel(&tokio_util::sync::CancellationToken::new(), async { Ok(7) })
+                .await
+                .unwrap(),
+            7
+        );
+    }
+
+    #[tokio::test]
+    async fn a_worker_that_panics_without_starting_a_program_does_not_block_quit_or_move() {
+        let lifecycle = ready();
+        let activity = lifecycle
+            .admit_owned("panicking installer", ActivityPolicy::Installer)
+            .unwrap();
+        let worker = spawn_retained(activity, move |_| {
+            Box::pin(async move {
+                if lifecycle_fixture_panics() {
+                    panic!("fixture worker panic");
+                }
+            })
+        });
+        assert!(worker.await.unwrap_err().is_panic(), "the panic is kept");
+        assert!(lifecycle.state.lock().unwrap().activities.is_empty());
+        lifecycle.begin_relocation("move").unwrap();
+        lifecycle.cancel_relocation("move").unwrap();
+
+        let activity = lifecycle
+            .admit_owned(
+                "borrowed create/import instance setup",
+                ActivityPolicy::Installer,
+            )
+            .unwrap();
+        let requester = tokio::spawn(run_borrowed_owned(activity, async {
+            if lifecycle_fixture_panics() {
+                panic!("fixture setup panic");
+            }
+        }));
+        assert!(requester.await.unwrap_err().is_panic());
+        lifecycle
+            .prepare_shutdown("quit", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        assert_eq!(
+            settled(&lifecycle, "quit").await.phase,
+            ShutdownPhase::Ready
+        );
+    }
+
+    #[tokio::test]
+    async fn a_worker_that_panics_after_starting_a_program_stays_unconfirmed() {
+        for already_unknown in [false, true] {
+            let lifecycle = ready();
+            let activity = lifecycle
+                .admit_owned("server run", ActivityPolicy::CoreWork)
+                .unwrap();
+            let worker = spawn_retained(activity, move |slot| {
+                Box::pin(async move {
+                    let activity = slot.as_mut().unwrap();
+                    if already_unknown {
+                        activity.unknown("wait failed".into());
+                    } else {
+                        activity.external_child().unwrap();
+                    }
+                    if lifecycle_fixture_panics() {
+                        panic!("fixture worker panic");
+                    }
+                })
+            });
+            assert!(worker.await.unwrap_err().is_panic());
+            assert_eq!(
+                lifecycle.relocation_blockers("move"),
+                [RuntimeBlocker::new(
+                    RuntimeBlockerKind::Unconfirmed,
+                    "server run"
+                )],
+                "a program it started may still run"
+            );
+        }
+    }
+
+    /// Keeps the fixtures' panics reachable for the compiler.
+    fn lifecycle_fixture_panics() -> bool {
+        true
     }
 }
