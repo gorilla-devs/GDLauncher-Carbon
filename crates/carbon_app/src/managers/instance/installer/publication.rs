@@ -704,8 +704,40 @@ pub(super) async fn publish_file_owned(
     Ok(())
 }
 
-/// Fully extract privately, accepting either a root save or one wrapped save.
-/// No archive entry is ever extracted directly into the user's saves directory.
+/// Gives the addon `resource` published, found under its install name, the
+/// platform identity its installer knows (see
+/// [`ResourceInstaller::record_identity`]). Best effort: the file is in place
+/// either way, and the lookup that follows may still identify it.
+pub(super) async fn record_identity(
+    resource: &dyn ResourceInstaller,
+    app: &Arc<AppInner>,
+    id: InstanceId,
+) {
+    let recorded = async {
+        let path = current_path(app, id).await?;
+        let name = filename(resource, &path)?;
+        let row = mfcdb::get_mod_file_cache_by_instance_kind_filename(
+            &app.db,
+            *id,
+            resource.addon_type().to_db_string(),
+            &name,
+        )
+        .await?
+        .context("published addon has no row")?;
+        resource.record_identity(app, &row.metadata_id).await
+    }
+    .await;
+    if let Err(error) = recorded {
+        tracing::warn!(
+            { ?error, addon = %resource.id() },
+            "Could not record the platform identity of an installed addon"
+        );
+    }
+}
+
+/// Installs every world in a downloaded archive as a new save. The archive is
+/// extracted privately first: nothing is ever extracted straight into the
+/// saves folder.
 pub(super) async fn publish_world(
     archive: &Path,
     saves: &Path,

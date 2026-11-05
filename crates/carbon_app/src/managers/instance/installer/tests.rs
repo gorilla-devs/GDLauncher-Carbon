@@ -12,10 +12,20 @@ fn cf(filename: &str, bytes: &[u8], kind: curseforge::ClassId) -> CurseforgeModI
         "sortableGameVersions": [], "dependencies": [], "fileFingerprint": 0
     }))
     .unwrap();
+    let mod_info = serde_json::from_value(serde_json::json!({
+        "id": 10, "gameId": 432, "name": "fixture", "slug": "fixture", "summary": "fixture", "status": 4,
+        "links": {"websiteUrl": null, "wikiUrl": null, "issuesUrl": null, "sourceUrl": null},
+        "downloadCount": 0, "isFeatured": false, "primaryCategoryId": 0, "categories": [], "classId": 6,
+        "authors": [{"id": 1, "name": "fixture", "url": "https://fixture.invalid"}], "logo": null, "screenshots": [],
+        "mainFileId": 2, "latestFiles": [], "latestFilesIndexes": [],
+        "dateCreated": "2026-01-01T00:00:00Z", "dateModified": "2026-01-01T00:00:00Z", "dateReleased": "2026-01-01T00:00:00Z",
+        "allowModDistribution": true, "gamePopularityRank": 0, "isAvailable": true, "thumbsUpCount": 0
+    }))
+    .unwrap();
     CurseforgeModInstaller {
         exact_dependency: true,
         previous: None,
-        project_name: "fixture".into(),
+        mod_info,
         addon_type: kind,
         file,
         download_url: "https://fixture.invalid/never-requested".into(),
@@ -1407,6 +1417,136 @@ async fn task05_round1_scanner_ignores_saves_files_and_refreshes_changed_mod() {
     assert_eq!(
         std::fs::read(saves.join("World/level.dat")).unwrap(),
         b"world"
+    );
+}
+
+/// A platform's hash lookup can come back without a file it just served (seen
+/// in CI as a successful Modrinth response missing the entry), and the file
+/// is then left out of lookups for a while. An install still lists with the
+/// project and version it installed, which the addon page's Download button
+/// and the installer's own checks for what the instance has match on.
+#[tokio::test]
+async fn an_install_keeps_its_platform_identity_when_the_lookup_misses() {
+    let app = crate::setup_managers_for_test().await;
+    let (id, _, base) = super::super::mods::tests::addon_fixture(
+        &app,
+        "lookup-miss",
+        instance::AddonType::Mods,
+        "base.jar",
+        b"base",
+    )
+    .await;
+    app.meta_cache_manager().miss_lookups(&base).await;
+
+    let source = tempfile::Builder::new().suffix(".jar").tempfile().unwrap();
+    std::fs::write(source.path(), b"from modrinth").unwrap();
+    app.meta_cache_manager().miss_lookups(source.path()).await;
+    let mut installer = mr("from-modrinth.jar", b"from modrinth").into_installer();
+    installer.download_fixture = Some(source.path().into());
+    let task = installer.install(&app, id, false, None).await.unwrap();
+    wait_for_install(&installer, &app, task).await;
+    assert!(matches!(
+        settled_outcome(&app, task).await,
+        crate::managers::vtask::TaskOutcome::Succeeded
+    ));
+
+    let source = tempfile::Builder::new().suffix(".jar").tempfile().unwrap();
+    std::fs::write(source.path(), b"from curseforge").unwrap();
+    let fingerprint = app.meta_cache_manager().miss_lookups(source.path()).await;
+    let mut resource = cf(
+        "from-curseforge.jar",
+        b"from curseforge",
+        curseforge::ClassId::Mods,
+    );
+    resource.file.file_fingerprint = fingerprint;
+    let mut installer = resource.into_installer();
+    installer.download_fixture = Some(source.path().into());
+    let task = installer.install(&app, id, false, None).await.unwrap();
+    wait_for_install(&installer, &app, task).await;
+    assert!(matches!(
+        settled_outcome(&app, task).await,
+        crate::managers::vtask::TaskOutcome::Succeeded
+    ));
+
+    let listed = app.instance_manager().list_mods(id, None).await.unwrap();
+    let installed = |name: &str| listed.iter().find(|m| m.filename == name).unwrap();
+    let modrinth = installed("from-modrinth.jar")
+        .modrinth
+        .clone()
+        .expect("the Modrinth install lists with its project");
+    assert_eq!(
+        (
+            modrinth.project_id.as_str(),
+            modrinth.version_id.as_str(),
+            modrinth.title.as_str()
+        ),
+        ("fixture", "v2", "fixture")
+    );
+    let curseforge = installed("from-curseforge.jar")
+        .curseforge
+        .clone()
+        .expect("the CurseForge install lists with its project");
+    assert_eq!(
+        (
+            curseforge.project_id,
+            curseforge.file_id,
+            curseforge.name.as_str(),
+            curseforge.authors.as_str()
+        ),
+        (10, 2, "fixture", "fixture")
+    );
+    assert!(installed("base.jar").modrinth.is_none());
+    assert!(
+        mfcdb::instance_mod_exists_by_mr_project(&app.db, *id, "fixture")
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert!(
+        mfcdb::instance_mod_exists_by_cf_project(&app.db, *id, 10)
+            .await
+            .unwrap()
+            .is_some()
+    );
+}
+
+/// An update records the version it put in place of the replaced one.
+#[tokio::test]
+async fn an_update_keeps_its_platform_identity_when_the_lookup_misses() {
+    let app = crate::setup_managers_for_test().await;
+    let (id, row, path) = super::super::mods::tests::addon_fixture(
+        &app,
+        "update-lookup-miss",
+        instance::AddonType::Mods,
+        "same.jar",
+        b"v1",
+    )
+    .await;
+    app.meta_cache_manager().miss_lookups(&path).await;
+    let source = tempfile::Builder::new().suffix(".jar").tempfile().unwrap();
+    std::fs::write(source.path(), b"v2").unwrap();
+    app.meta_cache_manager().miss_lookups(source.path()).await;
+    let mut installer = mr("same.jar", b"v2").into_installer();
+    installer.download_fixture = Some(source.path().into());
+    let task = installer
+        .install(&app, id, false, Some(row.id.clone()))
+        .await
+        .unwrap();
+    wait_for_install(&installer, &app, task).await;
+    assert!(matches!(
+        settled_outcome(&app, task).await,
+        crate::managers::vtask::TaskOutcome::Succeeded
+    ));
+    assert_eq!(std::fs::read(&path).unwrap(), b"v2");
+    let listed = app.instance_manager().list_mods(id, None).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    let modrinth = listed[0]
+        .modrinth
+        .clone()
+        .expect("the update lists with its project");
+    assert_eq!(
+        (modrinth.project_id.as_str(), modrinth.version_id.as_str()),
+        ("fixture", "v2")
     );
 }
 
@@ -7433,6 +7573,26 @@ mod dependency_rule {
                 b"new parent"
             );
             assert_eq!(std::fs::read(mods.join("sodium.jar")).unwrap(), b"test");
+            // The update and the library it brought list with the Modrinth
+            // versions installed, whatever the hash lookups answered.
+            let listed = app.instance_manager().list_mods(id, None).await.unwrap();
+            let version = |name: &str| {
+                listed
+                    .iter()
+                    .find(|m| m.filename == name)
+                    .and_then(|m| m.modrinth.as_ref())
+                    .map(|m| (m.project_id.clone(), m.version_id.clone()))
+            };
+            assert_eq!(
+                version("parent.jar"),
+                Some(("parent".into(), "parent-2".into())),
+                "{label}"
+            );
+            assert_eq!(
+                version("sodium.jar"),
+                Some((SODIUM.into(), "OihdIimA".into())),
+                "{label}"
+            );
         } else {
             assert_eq!(files, vec!["parent.jar.disabled"], "{label}");
             assert_eq!(

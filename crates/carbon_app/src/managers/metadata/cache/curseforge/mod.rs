@@ -21,6 +21,7 @@ use carbon_repos::repos::mod_file_cache as mfcdb;
 use carbon_repos::repos::mod_metadata as metarepo;
 use itertools::Itertools;
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 use std::time::Duration;
 use std::time::Instant;
@@ -30,6 +31,46 @@ use tracing::trace;
 use tracing::warn;
 
 pub mod modpack;
+
+/// The files of `entity_id` a CurseForge lookup is due for, keyed by
+/// fingerprint, each with its metadata id and fingerprint. A file is due when
+/// its metadata has no CurseForge cache row, or one cached more than a day
+/// ago, unless a lookup found no match for it within
+/// [`super::IGNORED_HASH_TTL`]. Worlds are directories with name-derived
+/// pseudo-hashes, so there is nothing to match on the platform (the instance
+/// query excludes them; the server table has no world addons).
+async fn due_for_lookup(
+    app: &App,
+    entity_id: CacheEntityId,
+) -> anyhow::Result<VecDeque<(u32, (String, u32))>> {
+    let cutoff = DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset());
+    let modlist = match entity_id {
+        CacheEntityId::Instance(instance_id) => {
+            let instance_id_val = *instance_id;
+            mfcdb::instance_mods_needing_cf_refresh(&app.db, instance_id_val, cutoff)
+                .await?
+                .into_iter()
+                .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
+                .collect::<Vec<_>>()
+        }
+        CacheEntityId::Server(server_id) => {
+            mfcdb::server_mods_needing_cf_refresh(&app.db, server_id, cutoff)
+                .await?
+                .into_iter()
+                .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
+                .collect::<Vec<_>>()
+        }
+    };
+
+    let mcm = app.meta_cache_manager();
+    let now = mcm.now();
+    let ignored_hashes = mcm.ignored_remote_cf_hashes.read().await;
+
+    Ok(modlist
+        .into_iter()
+        .filter(|(_, (_, murmur2))| !ignored_hashes.contains(murmur2, now))
+        .collect())
+}
 
 pub struct CurseforgeModCacher;
 
@@ -49,38 +90,7 @@ impl ModplatformCacher for CurseforgeModCacher {
         entity_id: CacheEntityId,
         sender: &mut BundleSender<Self::SaveBundle>,
     ) -> anyhow::Result<()> {
-        // Worlds are directories with name-derived pseudo-hashes, so there is
-        // nothing to match on the platform (instance variant excludes them; the
-        // server table has no world addons). A file needs a refresh when its
-        // metadata has no CurseForge cache row, or one cached more than a day ago.
-        let cutoff = DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset());
-        let modlist = match entity_id {
-            CacheEntityId::Instance(instance_id) => {
-                let instance_id_val = *instance_id;
-                mfcdb::instance_mods_needing_cf_refresh(&app.db, instance_id_val, cutoff)
-                    .await?
-                    .into_iter()
-                    .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
-                    .collect::<Vec<_>>()
-            }
-            CacheEntityId::Server(server_id) => {
-                mfcdb::server_mods_needing_cf_refresh(&app.db, server_id, cutoff)
-                    .await?
-                    .into_iter()
-                    .map(|m| (m.murmur2 as u32, (m.metadata_id, m.murmur2 as u32)))
-                    .collect::<Vec<_>>()
-            }
-        };
-
-        let mcm = app.meta_cache_manager();
-        let ignored_hashes = mcm.ignored_remote_cf_hashes.read().await;
-
-        let mut modlist = modlist
-            .into_iter()
-            .filter(|(_, (_, murmur2))| !ignored_hashes.contains(murmur2))
-            .collect::<VecDeque<_>>();
-
-        drop(ignored_hashes);
+        let mut modlist = due_for_lookup(app, entity_id).await?;
 
         if modlist.is_empty() {
             return Ok(());
@@ -92,6 +102,7 @@ impl ModplatformCacher for CurseforgeModCacher {
             total_mod_count
         );
 
+        let mcm = app.meta_cache_manager();
         let failed_instances = mcm.failed_cf_instances.read().await;
         let delay = failed_instances.get(&entity_id);
 
@@ -195,9 +206,20 @@ impl ModplatformCacher for CurseforgeModCacher {
             .collect::<HashMap<_, _>>();
 
         let mcm = app.meta_cache_manager();
-        let mut ignored_hashes = mcm.ignored_remote_cf_hashes.write().await;
-        ignored_hashes.extend(fingerprints.iter().filter(|fp| !matches.contains_key(fp)));
-        drop(ignored_hashes);
+        let now = mcm.now();
+        mcm.ignored_remote_cf_hashes.write().await.ignore(
+            fingerprints
+                .iter()
+                .filter(|fp| !matches.contains_key(fp))
+                .copied(),
+            now,
+        );
+        let unmatched = batch
+            .iter()
+            .filter(|(_, murmur2)| !matches.contains_key(murmur2))
+            .map(|(metadata_id, _)| metadata_id.clone())
+            .collect::<HashSet<_>>();
+        super::log_unmatched(app, "CurseForge", entity_id, fingerprints.len(), &unmatched).await;
 
         let futures = batch.into_iter().filter_map(|(metadata_id, murmur2)| {
             let fp_match = matches.get(&murmur2);
@@ -223,13 +245,13 @@ impl ModplatformCacher for CurseforgeModCacher {
                     // there is nothing left to cache for it here.
                     //
                     // Blacklisting on that is actively harmful: the ignore set
-                    // is keyed by fingerprint and lives for the whole session,
-                    // so one unrelated deletion would stop the *same mod* ever
-                    // being cached again — including for instances that still
+                    // is keyed by fingerprint, so one unrelated deletion would
+                    // stop the *same mod* being cached for
+                    // `IGNORED_HASH_TTL` — including for instances that still
                     // have it installed, and including installs that have not
-                    // happened yet. Observed in a full e2e run as 48
-                    // violations followed by a mod install that never
-                    // completed. See `carbon_repos`'
+                    // happened yet. Observed, when entries lasted the whole
+                    // session, in a full e2e run as 48 violations followed by
+                    // a mod install that never completed. See `carbon_repos`'
                     // `cf_cache_write_for_gced_metadata_violates_the_fk`.
                     if e.chain().any(|cause| {
                         cause
@@ -241,9 +263,10 @@ impl ModplatformCacher for CurseforgeModCacher {
                             "Skipping curseforge mod metadata for a mod whose metadata row was reclaimed while this batch was in flight"
                         );
                     } else {
-                        error!({ error = ?e, metadata_id, file_id = ?fp_match.file.id }, "Could not store curseforge mod metadata. Will not attempt to download again for this session.");
+                        error!({ error = ?e, metadata_id, file_id = ?fp_match.file.id }, "Could not store curseforge mod metadata. Will not look it up again for {} minutes.", super::IGNORED_HASH_TTL.as_secs() / 60);
 
-                        mcm.ignored_remote_cf_hashes.write().await.insert(murmur2);
+                        let now = mcm.now();
+                        mcm.ignored_remote_cf_hashes.write().await.ignore([murmur2], now);
                     }
                 }
                 }
@@ -485,4 +508,260 @@ async fn cache_curseforge_meta_unchecked(
     }
 
     Ok(())
+}
+
+/// Records the CurseForge file an install just published as the identity of
+/// its file's metadata row, from what the installer downloaded. The
+/// fingerprint lookup that follows can miss the file, and the addon would then
+/// lack its CurseForge project until a later lookup matched.
+///
+/// A row a lookup or an earlier install wrote is kept, and nothing is recorded
+/// unless the row's own fingerprint is `file`'s. The record has no update
+/// paths and is due for a lookup from the start, which fills them in and
+/// replaces it, even with another file holding the same bytes.
+pub(crate) async fn record_installed_file(
+    app: &App,
+    metadata_id: &str,
+    file: &File,
+    modinfo: &Mod,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        file.mod_id == modinfo.id,
+        "CurseForge file {} is not of project {}",
+        file.id,
+        modinfo.id
+    );
+    let recorded = metarepo::record_installed_cf_file(
+        &app.db,
+        metadata_id,
+        file.file_fingerprint as i32,
+        modinfo.id,
+        file.id,
+        &modinfo.name,
+        &file.display_name,
+        &modinfo.slug,
+        &modinfo.summary,
+        &modinfo.authors.iter().map(|a| &a.name).join(", "),
+        ModChannel::from(file.release_type) as i32,
+    )
+    .await?;
+    if recorded == 0 {
+        debug!(
+            "Kept the CurseForge identity of {metadata_id}: it already has one, or its fingerprint is not that of {}",
+            file.file_name
+        );
+        return Ok(());
+    }
+
+    if let Some(logo) = &modinfo.logo {
+        metarepo::upsert_cf_image(&app.db, metadata_id, &logo.url).await?;
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::domain::instance::AddonType;
+    use std::time::Duration;
+
+    fn file(id: i32, fingerprint: u32) -> File {
+        serde_json::from_value(serde_json::json!({
+            "id": id, "gameId": 432, "modId": 10, "isAvailable": true,
+            "displayName": format!("file {id}"), "fileName": "mod.jar", "releaseType": 1,
+            "fileStatus": 4, "hashes": [], "fileDate": "2026-01-01T00:00:00Z", "fileLength": 4,
+            "downloadCount": 0, "downloadUrl": null, "gameVersions": ["1.20.1", "Forge"],
+            "sortableGameVersions": [], "dependencies": [], "fileFingerprint": fingerprint
+        }))
+        .unwrap()
+    }
+
+    fn project() -> Mod {
+        serde_json::from_value(serde_json::json!({
+            "id": 10, "gameId": 432, "name": "Project", "slug": "project", "summary": "", "status": 4,
+            "links": {"websiteUrl": null, "wikiUrl": null, "issuesUrl": null, "sourceUrl": null},
+            "downloadCount": 0, "isFeatured": false, "primaryCategoryId": 0, "categories": [], "classId": 6,
+            "authors": [{"id": 1, "name": "author", "url": "https://fixture.invalid"}], "logo": null,
+            "screenshots": [], "mainFileId": 0, "latestFiles": [], "latestFilesIndexes": [],
+            "dateCreated": "2026-01-01T00:00:00Z", "dateModified": "2026-01-01T00:00:00Z",
+            "dateReleased": "2026-01-01T00:00:00Z", "allowModDistribution": true,
+            "gamePopularityRank": 0, "isAvailable": true, "thumbsUpCount": 0
+        }))
+        .unwrap()
+    }
+
+    fn matching(files: &[File]) -> FingerprintsMatchesResult {
+        serde_json::from_value(serde_json::json!({
+            "isCacheBuilt": true,
+            "exactMatches": files
+                .iter()
+                .map(|file| serde_json::json!({"id": file.mod_id, "file": file, "latestFiles": []}))
+                .collect::<Vec<_>>(),
+            "exactFingerprints": files.iter().map(|file| file.file_fingerprint).collect::<Vec<_>>(),
+            "partialMatches": [], "partialMatchFingerprints": {}, "installedFingerprints": [],
+            "unmatchedFingerprints": null
+        }))
+        .unwrap()
+    }
+
+    async fn installed(app: &App, name: &str) -> (InstanceId, String, u32) {
+        let (id, _) = super::super::tests::addon_fixture(
+            app,
+            name,
+            AddonType::Mods,
+            "mod.jar",
+            format!("{name} jar").as_bytes(),
+        )
+        .await;
+        app.meta_cache_manager()
+            .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        let metadata_id = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0)
+            .metadata_id;
+        let fingerprint = metarepo::get_metadata_by_id(&app.db, &metadata_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .murmur2 as u32;
+        (id, metadata_id, fingerprint)
+    }
+
+    /// A miss leaves the file out of lookups for `IGNORED_HASH_TTL`, not for
+    /// the rest of the session.
+    #[tokio::test]
+    async fn a_missed_file_is_looked_up_again_once_its_ignore_entry_expires() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, metadata_id, fingerprint) = installed(&app, "cf-miss").await;
+        let entity = CacheEntityId::Instance(id);
+        async fn due(app: &App, entity: CacheEntityId) -> Vec<u32> {
+            due_for_lookup(app, entity)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|(fingerprint, _)| fingerprint)
+                .collect()
+        }
+        assert_eq!(due(&app, entity).await, vec![fingerprint]);
+
+        CurseforgeModCacher::save_batch(
+            &app,
+            entity,
+            (
+                vec![fingerprint],
+                vec![(metadata_id, fingerprint)],
+                matching(&[]),
+                Vec::new(),
+            ),
+        )
+        .await;
+        assert!(
+            due(&app, entity).await.is_empty(),
+            "a miss is not asked about again at once"
+        );
+
+        let mcm = app.meta_cache_manager();
+        mcm.advance_clock(super::super::IGNORED_HASH_TTL - Duration::from_secs(1));
+        assert!(
+            due(&app, entity).await.is_empty(),
+            "nor before its entry expires"
+        );
+        mcm.advance_clock(Duration::from_secs(2));
+        assert_eq!(
+            due(&app, entity).await,
+            vec![fingerprint],
+            "but again once it has"
+        );
+    }
+
+    /// What an install records stands until a lookup answers, which replaces
+    /// it even with another file holding the same bytes; a lookup's answer is
+    /// never overwritten by a later install.
+    #[tokio::test]
+    async fn an_install_record_holds_until_a_lookup_replaces_it() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, metadata_id, fingerprint) = installed(&app, "cf-record").await;
+        let entity = CacheEntityId::Instance(id);
+        async fn listed(app: &App, id: InstanceId) -> (u32, String) {
+            let curseforge = app
+                .instance_manager()
+                .list_mods(id, None)
+                .await
+                .unwrap()
+                .remove(0)
+                .curseforge
+                .expect("the file has a CurseForge identity");
+            (curseforge.file_id, curseforge.authors)
+        }
+
+        // Another file's fingerprint is refused.
+        record_installed_file(
+            &app,
+            &metadata_id,
+            &file(1, fingerprint.wrapping_add(1)),
+            &project(),
+        )
+        .await
+        .unwrap();
+        assert!(
+            metarepo::get_cf_cache_by_metadata(&app.db, &metadata_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+
+        record_installed_file(&app, &metadata_id, &file(1, fingerprint), &project())
+            .await
+            .unwrap();
+        assert_eq!(listed(&app, id).await, (1, "author".into()));
+        assert!(
+            due_for_lookup(&app, entity)
+                .await
+                .unwrap()
+                .iter()
+                .any(|(due, _)| *due == fingerprint),
+            "the record is due for a lookup"
+        );
+
+        let batch = || vec![(metadata_id.clone(), fingerprint)];
+        CurseforgeModCacher::save_batch(
+            &app,
+            entity,
+            (vec![fingerprint], batch(), matching(&[]), Vec::new()),
+        )
+        .await;
+        assert_eq!(listed(&app, id).await, (1, "author".into()));
+
+        let other = file(2, fingerprint);
+        CurseforgeModCacher::save_batch(
+            &app,
+            entity,
+            (
+                vec![fingerprint],
+                batch(),
+                matching(&[other.clone()]),
+                vec![(project(), vec![other])],
+            ),
+        )
+        .await;
+        assert_eq!(listed(&app, id).await, (2, "author".into()));
+        assert!(
+            metarepo::get_cf_cache_by_metadata(&app.db, &metadata_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .cached_at
+                > chrono::Utc::now() - chrono::Duration::days(1),
+            "a lookup's answer is fresh"
+        );
+
+        record_installed_file(&app, &metadata_id, &file(1, fingerprint), &project())
+            .await
+            .unwrap();
+        assert_eq!(listed(&app, id).await, (2, "author".into()));
+    }
 }

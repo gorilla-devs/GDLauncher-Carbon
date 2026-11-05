@@ -141,6 +141,16 @@ pub trait ResourceInstaller: Sync {
     ) -> anyhow::Result<bool>;
     fn display_name(&self) -> String;
     async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()>;
+    /// Records the platform version this addon is as the identity of the file
+    /// just published (its metadata row `metadata_id`), so it keeps its
+    /// project when the platform's hash lookup misses it.
+    async fn record_identity(
+        &self,
+        _app: &Arc<AppInner>,
+        _metadata_id: &str,
+    ) -> anyhow::Result<()> {
+        Ok(())
+    }
 }
 
 #[async_trait::async_trait]
@@ -218,6 +228,11 @@ impl<I: ResourceInstaller + ?Sized + Send> ResourceInstaller for Box<I> {
     #[inline]
     async fn rollback(&self, instance_data: &mut InstanceData) -> anyhow::Result<()> {
         (**self).rollback(instance_data).await
+    }
+
+    #[inline]
+    async fn record_identity(&self, app: &Arc<AppInner>, metadata_id: &str) -> anyhow::Result<()> {
+        (**self).record_identity(app, metadata_id).await
     }
 }
 
@@ -1250,6 +1265,9 @@ impl Installer {
                                         Some(&graph),
                                     )
                                     .await?;
+                                    // Before the lookup pass below, which can
+                                    // miss a file the platform just served.
+                                    publication::record_identity(&**lock, &app_clone, instance_id).await;
                                 }
                             }
                             // What is left of the download (a world's archive, or a
@@ -1478,7 +1496,7 @@ pub struct CurseforgeModInstaller {
     exact_dependency: bool,
     /// The version an update replaces.
     previous: Option<Arc<dependency::Previous>>,
-    project_name: String,
+    mod_info: curseforge::Mod,
     addon_type: curseforge::ClassId,
     file: curseforge::File,
     download_url: String,
@@ -1518,8 +1536,12 @@ impl CurseforgeModInstaller {
         Ok(Self {
             exact_dependency: true,
             previous: None,
-            project_name: addon.data.name.clone(),
-            addon_type: addon.data.class_id.unwrap_or(curseforge::ClassId::Mods),
+            addon_type: addon
+                .data
+                .class_id
+                .clone()
+                .unwrap_or(curseforge::ClassId::Mods),
+            mod_info: addon.data,
             file,
             download_url,
             #[cfg(test)]
@@ -1535,8 +1557,11 @@ impl CurseforgeModInstaller {
         Ok(Self {
             exact_dependency: true,
             previous: None,
-            project_name: mod_info.name.clone(),
-            addon_type: mod_info.class_id.unwrap_or(curseforge::ClassId::Mods),
+            addon_type: mod_info
+                .class_id
+                .clone()
+                .unwrap_or(curseforge::ClassId::Mods),
+            mod_info,
             file,
             download_url,
             #[cfg(test)]
@@ -1692,12 +1717,22 @@ impl ResourceInstaller for CurseforgeModInstaller {
     }
 
     fn project_name(&self) -> String {
-        self.project_name.clone()
+        self.mod_info.name.clone()
     }
 
     async fn rollback(&self, _instance_data: &mut InstanceData) -> anyhow::Result<()> {
         // Installer publication receipts own rollback; a resource ID is not deletion authority.
         Ok(())
+    }
+
+    async fn record_identity(&self, app: &Arc<AppInner>, metadata_id: &str) -> anyhow::Result<()> {
+        crate::managers::metadata::cache::curseforge::record_installed_file(
+            app,
+            metadata_id,
+            &self.file,
+            &self.mod_info,
+        )
+        .await
     }
 }
 
@@ -1926,6 +1961,17 @@ impl ResourceInstaller for ModrinthModInstaller {
     async fn rollback(&self, _instance_data: &mut InstanceData) -> anyhow::Result<()> {
         // Installer publication receipts own rollback; a resource ID is not deletion authority.
         Ok(())
+    }
+
+    async fn record_identity(&self, app: &Arc<AppInner>, metadata_id: &str) -> anyhow::Result<()> {
+        crate::managers::metadata::cache::modrinth::record_installed_version(
+            app,
+            metadata_id,
+            &self.version,
+            &self.file,
+            &self.mod_info,
+        )
+        .await
     }
 }
 

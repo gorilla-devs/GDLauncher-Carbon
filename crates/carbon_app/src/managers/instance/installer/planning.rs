@@ -381,4 +381,11 @@ impl ResourceInstaller for PlannedResource {
     async fn rollback(&self, data: &mut InstanceData) -> anyhow::Result<()> {
         self.resource.lock().await.rollback(data).await
     }
+    async fn record_identity(&self, app: &Arc<AppInner>, metadata_id: &str) -> anyhow::Result<()> {
+        self.resource
+            .lock()
+            .await
+            .record_identity(app, metadata_id)
+            .await
+    }
 }

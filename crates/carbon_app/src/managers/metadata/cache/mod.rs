@@ -111,6 +111,87 @@ impl ModrinthCacheThrottle {
     }
 }
 
+/// How long a file a platform's hash lookup found no match for is left out of
+/// later lookups. Most misses are files the platform does not host, but a
+/// lookup has also answered without a file it serves, and the file then lost
+/// its identity and update checks until the app restarted. Lookups run only
+/// when an instance or server is opened, changed or scanned, and one request
+/// covers a whole batch of files, so asking again about an entity's unknown
+/// files at most every half hour costs a few requests per pass.
+pub(crate) const IGNORED_HASH_TTL: std::time::Duration = std::time::Duration::from_secs(30 * 60);
+
+/// Hashes a platform lookup found no match for, each with when it missed.
+pub(crate) struct IgnoredHashes<K> {
+    missed_at: HashMap<K, std::time::Instant>,
+}
+
+impl<K: Eq + std::hash::Hash> IgnoredHashes<K> {
+    fn new() -> Self {
+        Self {
+            missed_at: HashMap::new(),
+        }
+    }
+
+    /// Leaves `keys` out of lookups for [`IGNORED_HASH_TTL`] from `now`.
+    pub(crate) fn ignore(&mut self, keys: impl IntoIterator<Item = K>, now: std::time::Instant) {
+        // Expired entries go here, so the map only holds recent misses.
+        self.missed_at
+            .retain(|_, missed| now.saturating_duration_since(*missed) < IGNORED_HASH_TTL);
+        self.missed_at
+            .extend(keys.into_iter().map(|key| (key, now)));
+    }
+
+    pub(crate) fn contains(&self, key: &K, now: std::time::Instant) -> bool {
+        self.missed_at
+            .get(key)
+            .is_some_and(|missed| now.saturating_duration_since(*missed) < IGNORED_HASH_TTL)
+    }
+}
+
+/// Logs, in one line, how many of the files a platform lookup asked about got
+/// no match, naming a few (`unmatched` holds their metadata ids).
+async fn log_unmatched(
+    app: &App,
+    platform: &str,
+    entity_id: CacheEntityId,
+    queried: usize,
+    unmatched: &HashSet<String>,
+) {
+    if unmatched.is_empty() {
+        return;
+    }
+    // A failed read only costs the names.
+    let files: Vec<(String, String)> = match entity_id {
+        CacheEntityId::Instance(id) => mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .into_iter()
+            .flatten()
+            .map(|row| (row.metadata_id, row.filename))
+            .collect(),
+        CacheEntityId::Server(id) => mfcdb::get_server_mod_files_by_server(&app.db, id)
+            .await
+            .into_iter()
+            .flatten()
+            .map(|row| (row.metadata_id, row.filename))
+            .collect(),
+    };
+    let names = files
+        .into_iter()
+        .filter(|(metadata_id, _)| unmatched.contains(metadata_id))
+        .map(|(_, filename)| filename)
+        .collect::<Vec<_>>();
+    let more = match names.len().saturating_sub(5) {
+        0 => String::new(),
+        more => format!(" and {more} more"),
+    };
+    info!(
+        "{platform} found no match for {} of {queried} files of {entity_id}, not asking again for {} minutes: {}{more}",
+        unmatched.len(),
+        IGNORED_HASH_TTL.as_secs() / 60,
+        names.iter().take(5).join(", "),
+    );
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CacheEntityId {
     Instance(InstanceId),
@@ -158,10 +239,13 @@ pub(crate) struct ScanPause {
 pub struct MetaCacheManager {
     #[cfg(test)]
     scan_test_state: std::sync::Mutex<ScanTestState>,
+    /// How far tests have moved [`Self::now`] ahead of the real clock.
+    #[cfg(test)]
+    clock_offset: std::sync::Mutex<std::time::Duration>,
     //waiting_instances: RwLock<HashSet<InstanceId>>,
     //scanned_instances: Mutex<HashSet<InstanceId>>,
-    ignored_remote_cf_hashes: RwLock<HashSet<u32>>,
-    ignored_remote_mr_hashes: RwLock<HashSet<String>>,
+    ignored_remote_cf_hashes: RwLock<IgnoredHashes<u32>>,
+    ignored_remote_mr_hashes: RwLock<IgnoredHashes<String>>,
     failed_cf_instances: RwLock<HashMap<CacheEntityId, (std::time::Instant, u32)>>,
     failed_mr_instances: RwLock<HashMap<CacheEntityId, (std::time::Instant, u32)>>,
     failed_cf_thumbs: RwLock<HashMap<i32, (std::time::Instant, u32)>>,
@@ -189,10 +273,12 @@ impl MetaCacheManager {
         Self {
             #[cfg(test)]
             scan_test_state: std::sync::Mutex::new(ScanTestState::default()),
+            #[cfg(test)]
+            clock_offset: std::sync::Mutex::new(std::time::Duration::ZERO),
             //waiting_instances: RwLock::new(HashSet::new()),
             //scanned_instances: Mutex::new(HashSet::new()),
-            ignored_remote_cf_hashes: RwLock::new(HashSet::new()),
-            ignored_remote_mr_hashes: RwLock::new(HashSet::new()),
+            ignored_remote_cf_hashes: RwLock::new(IgnoredHashes::new()),
+            ignored_remote_mr_hashes: RwLock::new(IgnoredHashes::new()),
             failed_cf_instances: RwLock::new(HashMap::new()),
             failed_mr_instances: RwLock::new(HashMap::new()),
             failed_cf_thumbs: RwLock::new(HashMap::new()),
@@ -207,6 +293,20 @@ impl MetaCacheManager {
             modrinth_throttle: ModrinthCacheThrottle::new(210, std::time::Duration::from_secs(60)),
             metadata_hash_locks: dashmap::DashMap::new(),
         }
+    }
+
+    /// The time ignore-list entries are judged by. Tests move it forward
+    /// instead of sleeping.
+    pub(crate) fn now(&self) -> std::time::Instant {
+        let now = std::time::Instant::now();
+        #[cfg(test)]
+        let now = now + *self.clock_offset.lock().unwrap();
+        now
+    }
+
+    #[cfg(test)]
+    pub(crate) fn advance_clock(&self, by: std::time::Duration) {
+        *self.clock_offset.lock().unwrap() += by;
     }
 
     #[cfg(test)]
@@ -2594,6 +2694,31 @@ impl ManagerRef<'_, MetaCacheManager> {
     pub async fn is_entity_being_cached(&self, entity_id: CacheEntityId) -> bool {
         let currently_caching = self.get_currently_caching_entities().await;
         currently_caching.contains(&entity_id)
+    }
+
+    /// Leaves the addon at `path` (named with its extension) out of both
+    /// platforms' lookups, as a lookup that found no match for it does, and
+    /// returns its CurseForge fingerprint.
+    #[cfg(test)]
+    pub(crate) async fn miss_lookups(&self, path: &Path) -> u32 {
+        let parsed = self
+            .hash_and_parse_mod_file(
+                &path.parent().unwrap().to_path_buf(),
+                path.file_name().unwrap().to_str().unwrap(),
+                true,
+            )
+            .await
+            .unwrap();
+        let now = self.now();
+        self.ignored_remote_mr_hashes
+            .write()
+            .await
+            .ignore([hex::encode(parsed.sha512)], now);
+        self.ignored_remote_cf_hashes
+            .write()
+            .await
+            .ignore([parsed.murmur2], now);
+        parsed.murmur2
     }
 }
 
@@ -4991,11 +5116,12 @@ mod tests {
         // Empty provider work after a real local scan: unknown hashes are intentionally ignored here.
         let mut sha = Sha512::new();
         sha.update(b"idle target");
+        let now = app.meta_cache_manager().now();
         app.meta_cache_manager()
             .ignored_remote_mr_hashes
             .write()
             .await
-            .insert(hex::encode(sha.finalize()));
+            .ignore([hex::encode(sha.finalize())], now);
         let parsed = app
             .meta_cache_manager()
             .hash_and_parse_mod_file(&path.parent().unwrap().to_path_buf(), "mod.jar", true)
@@ -5005,7 +5131,7 @@ mod tests {
             .ignored_remote_cf_hashes
             .write()
             .await
-            .insert(parsed.murmur2);
+            .ignore([parsed.murmur2], now);
         let result = tokio::time::timeout(std::time::Duration::from_secs(3), request).await;
         assert!(
             result.is_ok(),

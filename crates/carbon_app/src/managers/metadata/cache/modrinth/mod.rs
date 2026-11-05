@@ -141,6 +141,53 @@ fn build_update_paths(installed: &Version, project_id: &str, candidates: &[Versi
         .join(";")
 }
 
+/// The files of `entity_id` a Modrinth lookup is due for, keyed by hash, each
+/// with its metadata id, hash and addon kind. A file is due when its metadata
+/// has no Modrinth cache row, one cached more than a day ago, or no fresh
+/// update context for what the entity runs (`context`), unless a lookup found
+/// no match for it within [`super::IGNORED_HASH_TTL`]. Worlds are directories
+/// with name-derived pseudo-hashes, so there is nothing to match on the
+/// platform (the instance query excludes them).
+async fn due_for_lookup(
+    app: &App,
+    entity_id: CacheEntityId,
+    context: &str,
+) -> anyhow::Result<VecDeque<(String, (String, String, String))>> {
+    let cutoff = DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset());
+    let modlist = match entity_id {
+        CacheEntityId::Instance(instance_id) => {
+            let instance_id_val = *instance_id;
+            mfcdb::instance_mods_needing_mr_context(&app.db, instance_id_val, context, cutoff)
+                .await?
+                .into_iter()
+                .map(|m| {
+                    let sha512 = hex::encode(&m.sha512);
+                    (sha512.clone(), (m.metadata_id, sha512, m.addon_type))
+                })
+                .collect::<Vec<_>>()
+        }
+        CacheEntityId::Server(server_id) => {
+            mfcdb::server_mods_needing_mr_context(&app.db, server_id, context, cutoff)
+                .await?
+                .into_iter()
+                .map(|m| {
+                    let sha512 = hex::encode(&m.sha512);
+                    (sha512.clone(), (m.metadata_id, sha512, m.addon_type))
+                })
+                .collect::<Vec<_>>()
+        }
+    };
+
+    let mcm = app.meta_cache_manager();
+    let now = mcm.now();
+    let ignored_hashes = mcm.ignored_remote_mr_hashes.read().await;
+
+    Ok(modlist
+        .into_iter()
+        .filter(|(_, (_, sha512, _))| !ignored_hashes.contains(sha512, now))
+        .collect())
+}
+
 pub struct ModrinthModCacher;
 
 #[async_trait::async_trait]
@@ -161,47 +208,12 @@ impl ModplatformCacher for ModrinthModCacher {
         entity_id: CacheEntityId,
         sender: &mut BundleSender<Self::SaveBundle>,
     ) -> anyhow::Result<()> {
-        // Worlds are directories with name-derived pseudo-hashes, so there is
-        // nothing to match on the platform (instance variant excludes them). A
-        // file needs a refresh when its metadata has no Modrinth cache row, or
-        // one cached more than a day ago.
         let target_compat = target_compatibility(app, entity_id).await;
         let context = target_compat
             .as_ref()
             .map(UpdateContext::base_key)
             .unwrap_or_default();
-        let cutoff = DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset());
-        let modlist = match entity_id {
-            CacheEntityId::Instance(instance_id) => {
-                let instance_id_val = *instance_id;
-                mfcdb::instance_mods_needing_mr_context(&app.db, instance_id_val, &context, cutoff)
-                    .await?
-                    .into_iter()
-                    .map(|m| {
-                        let sha512 = hex::encode(&m.sha512);
-                        (sha512.clone(), (m.metadata_id, sha512, m.addon_type))
-                    })
-                    .collect::<Vec<_>>()
-            }
-            CacheEntityId::Server(server_id) => {
-                mfcdb::server_mods_needing_mr_context(&app.db, server_id, &context, cutoff)
-                    .await?
-                    .into_iter()
-                    .map(|m| {
-                        let sha512 = hex::encode(&m.sha512);
-                        (sha512.clone(), (m.metadata_id, sha512, m.addon_type))
-                    })
-                    .collect::<Vec<_>>()
-            }
-        };
-
-        let mcm = app.meta_cache_manager();
-        let ignored_hashes = mcm.ignored_remote_mr_hashes.read().await;
-
-        let mut modlist = modlist
-            .into_iter()
-            .filter(|(_, (_, sha512, _))| !ignored_hashes.contains(sha512))
-            .collect::<VecDeque<_>>();
+        let mut modlist = due_for_lookup(app, entity_id, &context).await?;
 
         if modlist.is_empty() {
             return Ok(());
@@ -213,6 +225,7 @@ impl ModplatformCacher for ModrinthModCacher {
             total_mod_count
         );
 
+        let mcm = app.meta_cache_manager();
         let failed_instances = mcm.failed_mr_instances.read().await;
         let delay = failed_instances.get(&entity_id);
 
@@ -364,14 +377,20 @@ impl ModplatformCacher for ModrinthModCacher {
             })
             .collect::<HashMap<_, _>>();
         let mcm = app.meta_cache_manager();
-        let mut ignored_hashes = mcm.ignored_remote_mr_hashes.write().await;
-        ignored_hashes.extend(
+        let now = mcm.now();
+        mcm.ignored_remote_mr_hashes.write().await.ignore(
             sha512_hashes
                 .iter()
                 .filter(|hash| !matches.contains_key(hash))
                 .cloned(),
+            now,
         );
-        drop(ignored_hashes);
+        let unmatched = batch
+            .iter()
+            .filter(|(_, sha512, _)| !matches.contains_key(sha512))
+            .map(|(metadata_id, _, _)| metadata_id.clone())
+            .collect::<HashSet<_>>();
+        super::log_unmatched(app, "Modrinth", entity_id, sha512_hashes.len(), &unmatched).await;
 
         let combined_versions = &combined_versions;
         let context = &context;
@@ -614,6 +633,59 @@ async fn cache_modrinth_meta_unchecked(
     Ok(())
 }
 
+/// Records the Modrinth version an install just published as the identity of
+/// its file's metadata row, from what the installer downloaded. The hash
+/// lookup that follows can come back without the file, and the addon would
+/// then lack its Modrinth project (the button that installed it reading
+/// Download again) until a later lookup matched.
+///
+/// A row a lookup or an earlier install wrote is kept, and nothing is recorded
+/// unless the row's own hash is `file`'s. The record is due for a lookup from
+/// the start, which fills what the installer does not know (authors, update
+/// paths) and replaces it, even with another version holding the same jar.
+pub(crate) async fn record_installed_version(
+    app: &App,
+    metadata_id: &str,
+    version: &Version,
+    file: &carbon_platforms::modrinth::version::VersionFile,
+    project: &Project,
+) -> anyhow::Result<()> {
+    anyhow::ensure!(
+        version.project_id == project.id,
+        "Modrinth version {} is not of project {}",
+        version.id,
+        project.id
+    );
+    let recorded = metarepo::record_installed_mr_version(
+        &app.db,
+        metadata_id,
+        &file.hashes.sha512,
+        &project.id,
+        &version.id,
+        &project.title,
+        &version.name,
+        &project.slug,
+        &project.description,
+        ModChannel::from(version.version_type) as i32,
+        &file.filename,
+        &file.url,
+    )
+    .await?;
+    if recorded == 0 {
+        debug!(
+            "Kept the Modrinth identity of {metadata_id}: it already has one, or its hash is not that of {}",
+            file.filename
+        );
+        return Ok(());
+    }
+
+    if let Some(icon_url) = &project.icon_url {
+        metarepo::upsert_mr_image(&app.db, metadata_id, icon_url).await?;
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -817,6 +889,237 @@ mod test {
             .unwrap()
             .len(),
             1
+        );
+    }
+
+    /// A miss leaves the file out of lookups for `IGNORED_HASH_TTL`, not for
+    /// the rest of the session: a lookup can answer without a file Modrinth
+    /// serves, and the file then had no identity and no update checks until
+    /// the app restarted.
+    #[tokio::test]
+    async fn a_missed_file_is_looked_up_again_once_its_ignore_entry_expires() {
+        use crate::domain::instance::AddonType;
+        let app = crate::setup_managers_for_test().await;
+        let (id, _) = super::super::tests::addon_fixture(
+            &app,
+            "mr-miss",
+            AddonType::Mods,
+            "unknown.jar",
+            b"not on modrinth",
+        )
+        .await;
+        let entity = CacheEntityId::Instance(id);
+        app.meta_cache_manager()
+            .override_caching_and_wait(entity, false, false)
+            .await
+            .unwrap();
+        let context = target_compatibility(&app, entity)
+            .await
+            .map(|context| context.base_key())
+            .unwrap_or_default();
+        async fn due(app: &App, entity: CacheEntityId, context: &str) -> Vec<String> {
+            due_for_lookup(app, entity, context)
+                .await
+                .unwrap()
+                .into_iter()
+                .map(|(hash, _)| hash)
+                .collect()
+        }
+        let (hash, metadata) = due_for_lookup(&app, entity, &context)
+            .await
+            .unwrap()
+            .pop_front()
+            .expect("an unidentified file is due for a lookup");
+
+        ModrinthModCacher::save_batch(
+            &app,
+            entity,
+            (
+                vec![hash.clone()],
+                vec![metadata],
+                VersionHashesResponse(HashMap::new()),
+                ProjectsResponse(Vec::new()),
+                Vec::new(),
+                Vec::new(),
+                None,
+            ),
+        )
+        .await;
+        assert!(
+            due(&app, entity, &context).await.is_empty(),
+            "a miss is not asked about again at once"
+        );
+
+        let mcm = app.meta_cache_manager();
+        mcm.advance_clock(super::super::IGNORED_HASH_TTL - Duration::from_secs(1));
+        assert!(
+            due(&app, entity, &context).await.is_empty(),
+            "nor before its entry expires"
+        );
+        mcm.advance_clock(Duration::from_secs(2));
+        assert_eq!(
+            due(&app, entity, &context).await,
+            vec![hash],
+            "but again once it has"
+        );
+    }
+
+    /// What an install records stands until a lookup answers, which fills in
+    /// what the installer did not know and may name another version of the
+    /// same jar; a lookup's answer is never overwritten by a later install.
+    #[tokio::test]
+    async fn an_install_record_holds_until_a_lookup_replaces_it() {
+        use crate::domain::instance::{
+            AddonType,
+            info::{ModLoader, StandardVersion},
+        };
+        let app = crate::setup_managers_for_test().await;
+        let (id, _) = super::super::tests::addon_fixture_version(
+            &app,
+            "install-record",
+            AddonType::Mods,
+            "mod.jar",
+            b"installed jar",
+            StandardVersion {
+                release: "1.20.1".into(),
+                modloaders: [ModLoader {
+                    type_: ModLoaderType::Forge,
+                    version: "fixture".into(),
+                }]
+                .into_iter()
+                .collect(),
+            },
+        )
+        .await;
+        let entity = CacheEntityId::Instance(id);
+        app.meta_cache_manager()
+            .override_caching_and_wait(entity, false, false)
+            .await
+            .unwrap();
+        let metadata_id = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0)
+            .metadata_id;
+        let hash = hex::encode(
+            metarepo::get_metadata_by_id(&app.db, &metadata_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .sha512,
+        );
+        /// The listed file's Modrinth version and authors, and its update badge.
+        async fn listed(app: &App, id: InstanceId) -> (String, String, bool) {
+            let listed = app
+                .instance_manager()
+                .list_mods(id, None)
+                .await
+                .unwrap()
+                .remove(0);
+            let modrinth = listed.modrinth.expect("the file has a Modrinth identity");
+            (modrinth.version_id, modrinth.authors, listed.has_update)
+        }
+
+        // Another file's hash is refused.
+        let mut installed = version("installed", "project", 10, VersionType::Release);
+        installed.files = vec![file(&"d".repeat(128))];
+        record_installed_version(
+            &app,
+            &metadata_id,
+            &installed,
+            &installed.files[0],
+            &project("project"),
+        )
+        .await
+        .unwrap();
+        assert!(
+            metarepo::get_mr_cache_by_metadata(&app.db, &metadata_id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+
+        installed.files = vec![file(&hash)];
+        record_installed_version(
+            &app,
+            &metadata_id,
+            &installed,
+            &installed.files[0],
+            &project("project"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            listed(&app, id).await,
+            ("installed".into(), String::new(), false)
+        );
+        let context = target_compatibility(&app, entity).await.unwrap();
+        assert!(
+            due_for_lookup(&app, entity, &context.base_key())
+                .await
+                .unwrap()
+                .iter()
+                .any(|(due, _)| *due == hash),
+            "the record is due for a lookup"
+        );
+
+        // A lookup that misses leaves it as it is.
+        let batch = || vec![(metadata_id.clone(), hash.clone(), "mods".to_string())];
+        ModrinthModCacher::save_batch(
+            &app,
+            entity,
+            (
+                vec![hash.clone()],
+                batch(),
+                VersionHashesResponse(HashMap::new()),
+                ProjectsResponse(Vec::new()),
+                Vec::new(),
+                Vec::new(),
+                None,
+            ),
+        )
+        .await;
+        assert_eq!(
+            listed(&app, id).await,
+            ("installed".into(), String::new(), false)
+        );
+
+        // One that matches, here another version holding the same jar, takes
+        // over with its authors and update context.
+        let mut matched = version("matched", "project", 10, VersionType::Release);
+        matched.files = vec![file(&hash)];
+        let newer = version("newer", "project", 20, VersionType::Release);
+        ModrinthModCacher::save_batch(
+            &app,
+            entity,
+            (
+                vec![hash.clone()],
+                batch(),
+                VersionHashesResponse([(hash.clone(), matched)].into_iter().collect()),
+                ProjectsResponse(vec![project("project")]),
+                vec![team("project")],
+                vec![newer],
+                Some(context),
+            ),
+        )
+        .await;
+        assert_eq!(
+            listed(&app, id).await,
+            ("matched".into(), "author".into(), true)
+        );
+
+        record_installed_version(
+            &app,
+            &metadata_id,
+            &installed,
+            &installed.files[0],
+            &project("project"),
+        )
+        .await
+        .unwrap();
+        assert_eq!(
+            listed(&app, id).await,
+            ("matched".into(), "author".into(), true)
         );
     }
 

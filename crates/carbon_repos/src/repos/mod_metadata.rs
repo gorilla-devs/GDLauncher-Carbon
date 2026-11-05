@@ -126,6 +126,58 @@ queries! {
         "DELETE FROM CurseForgeModImageCache WHERE metadataId IN (SELECT metadataId FROM CurseForgeModCache WHERE projectId=:project_id AND fileId=:file_id AND metadataId NOT IN (SELECT id FROM ModMetadata))";
     fn delete_dead_cf_cache(project_id: i32, file_id: i32) -> usize =
         "DELETE FROM CurseForgeModCache WHERE projectId=:project_id AND fileId=:file_id AND metadataId NOT IN (SELECT id FROM ModMetadata)";
+    // An install's record of this metadata row (see `record_installed_cf_file`)
+    // naming another project or file than the lookup now storing it.
+    fn delete_replaced_installed_cf_images(metadata_id: &str, project_id: i32, file_id: i32) -> usize =
+        "DELETE FROM CurseForgeModImageCache WHERE metadataId IN (SELECT metadataId FROM CurseForgeModCache WHERE metadataId=:metadata_id AND cachedAt=0 AND NOT (projectId=:project_id AND fileId=:file_id))";
+    fn delete_replaced_installed_cf_file(metadata_id: &str, project_id: i32, file_id: i32) -> usize =
+        "DELETE FROM CurseForgeModCache WHERE metadataId=:metadata_id AND cachedAt=0 AND NOT (projectId=:project_id AND fileId=:file_id)";
+
+    // --- Install-time identity ------------------------------------------------
+    // The platform version an install just published, recorded from what the
+    // installer downloaded, because the hash lookup that follows can miss the
+    // file. Only for a metadata row whose own hash is the one the platform
+    // declares for that file, and never over an existing row: a lookup's
+    // answer or an earlier install's record is kept. `cachedAt` is the epoch,
+    // so the row is always due for a lookup, which fills what the installer
+    // does not know (authors, update paths) and replaces the record outright,
+    // even with another version or project holding the same bytes.
+    fn record_installed_mr_version(
+        metadata_id: &str,
+        sha512: &str,
+        project_id: &str,
+        version_id: &str,
+        title: &str,
+        version: &str,
+        urlslug: &str,
+        description: &str,
+        release_type: i32,
+        filename: &str,
+        file_url: &str
+    ) -> usize =
+        "INSERT INTO ModrinthModCache
+           (metadataId, sha512, projectId, versionId, title, version, urlslug, description, authors, releaseType, updatePaths, filename, fileUrl, cachedAt)
+         SELECT id, :sha512, :project_id, :version_id, :title, :version, :urlslug, :description, '', :release_type, '', :filename, :file_url, 0
+         FROM ModMetadata WHERE id = :metadata_id AND lower(hex(sha512)) = lower(:sha512)
+         ON CONFLICT DO NOTHING";
+    fn record_installed_cf_file(
+        metadata_id: &str,
+        murmur2: i32,
+        project_id: i32,
+        file_id: i32,
+        name: &str,
+        version: &str,
+        urlslug: &str,
+        summary: &str,
+        authors: &str,
+        release_type: i32
+    ) -> usize =
+        "INSERT INTO CurseForgeModCache
+           (metadataId, murmur2, projectId, fileId, name, version, urlslug, summary, authors, releaseType, updatePaths, cachedAt)
+         SELECT id, murmur2, :project_id, :file_id, :name, :version, :urlslug, :summary, :authors, :release_type, '', 0
+         FROM ModMetadata WHERE id = :metadata_id AND murmur2 = :murmur2
+         ON CONFLICT DO NOTHING";
+
     // --- ModMetadata ----------------------------------------------------------
     fn get_metadata_by_id(id: &str) -> Option<ModMetadataRow> =
         "SELECT id, lastUpdatedAt, murmur2, sha512, sha1, name, modid, version, description, authors, modloaders FROM ModMetadata WHERE id = :id";
@@ -260,6 +312,9 @@ pub fn upsert_cf_mod_cache_conn(
         // Only dead owners are repairable; a healthy shared owner is retained.
         delete_dead_cf_images_conn(conn, project_id, file_id)?;
         delete_dead_cf_cache_conn(conn, project_id, file_id)?;
+        // An install's record gives way to the lookup, as on Modrinth.
+        delete_replaced_installed_cf_images_conn(conn, metadata_id, project_id, file_id)?;
+        delete_replaced_installed_cf_file_conn(conn, metadata_id, project_id, file_id)?;
         use crate::from_row::FromRow;
         let mut st = conn.prepare_cached(UPSERT_CF_MOD_CACHE_SQL)?;
         let row = st.query_row(
@@ -344,6 +399,9 @@ const UPSERT_CF_MOD_CACHE_CHECK: crate::registry::QueryCheck = crate::registry::
 
 /// SQL executed by `upsert_mr_mod_cache`, shared with its `QueryCheck`. Conflict
 /// target is the physical metadata owner, after verifying the artifact hash.
+/// A row an install recorded (`cachedAt` 0, see `record_installed_mr_version`)
+/// is replaced whatever version it names: one jar can belong to several
+/// versions, and the lookup's answer is what this cache otherwise holds.
 const UPSERT_MR_MOD_CACHE_SQL: &str =
     "INSERT INTO ModrinthModCache
        (metadataId, sha512, projectId, versionId, title, version, urlslug, description, authors, releaseType, updatePaths, filename, fileUrl, cachedAt)
@@ -365,6 +423,7 @@ const UPSERT_MR_MOD_CACHE_SQL: &str =
        cachedAt = excluded.cachedAt
      WHERE (ModrinthModCache.projectId=excluded.projectId AND ModrinthModCache.versionId=excluded.versionId)
         OR lower(ModrinthModCache.sha512) != lower(excluded.sha512)
+        OR ModrinthModCache.cachedAt = 0
      RETURNING metadataId";
 
 /// Refreshes the exact artifact owned by `metadataId`; healthy different
