@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import {
   RESERVED_TEST_OID_PREFIX,
   deleteTestUser,
   mintReservedOid,
+  networkFailure,
   provisionTestUser
 } from "./gdlAccount.js"
 
@@ -160,5 +161,123 @@ describe("deleteTestUser", () => {
     await expect(
       deleteTestUser(CFG, "oid", fetchImpl as unknown as typeof fetch)
     ).rejects.toThrow(/500/)
+  })
+})
+
+/** What Node's fetch rejects with when it gets no response: a TypeError
+ *  "fetch failed" carrying the socket or DNS error as its cause. */
+const noResponse = (code: string) =>
+  new TypeError("fetch failed", {
+    cause: Object.assign(new Error(`getaddrinfo ${code} api-test.invalid`), {
+      code
+    })
+  })
+
+describe("networkFailure", () => {
+  it("names the DNS or socket code behind fetch's TypeError", () => {
+    for (const code of ["ENOTFOUND", "ECONNRESET", "ETIMEDOUT", "EAI_AGAIN"]) {
+      expect(networkFailure(noResponse(code))).toBe(code)
+    }
+  })
+
+  it("counts any other fetch failed as network-level", () => {
+    const refused = noResponse("ECONNREFUSED")
+
+    expect(networkFailure(refused)).toBe("fetch failed")
+  })
+
+  it("leaves every other failure alone", () => {
+    expect(networkFailure(new Error("boom"))).toBeNull()
+    expect(networkFailure(new TypeError("Failed to parse URL"))).toBeNull()
+    expect(networkFailure("ENOTFOUND")).toBeNull()
+  })
+})
+
+describe("retries on a request that got no response", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it("deletes once DNS resolves again", async () => {
+    // The teardown failure seen on macOS CI: getaddrinfo ENOTFOUND
+    // api-test.gdl.gg after the test itself had passed.
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(noResponse("ENOTFOUND"))
+      .mockResolvedValueOnce(ok({ deleted: true }))
+
+    const deleted = deleteTestUser(
+      CFG,
+      "oid",
+      fetchImpl as unknown as typeof fetch
+    )
+    await vi.runAllTimersAsync()
+
+    await expect(deleted).resolves.toBeUndefined()
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it("provisions once a reset connection recovers", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(noResponse("ECONNRESET"))
+      .mockResolvedValueOnce(
+        ok({
+          token: "t",
+          oid: "o",
+          email: "e",
+          display_name: "d",
+          expires_at: 1
+        })
+      )
+
+    const provisioned = provisionTestUser(
+      CFG,
+      fetchImpl as unknown as typeof fetch
+    )
+    await vi.runAllTimersAsync()
+
+    await expect(provisioned).resolves.toMatchObject({ token: "t" })
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+  })
+
+  it("gives up after three retries with the network error", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw noResponse("EAI_AGAIN")
+    })
+
+    const failed = expect(
+      deleteTestUser(CFG, "oid", fetchImpl as unknown as typeof fetch)
+    ).rejects.toThrow("fetch failed")
+    await vi.runAllTimersAsync()
+
+    await failed
+    expect(fetchImpl).toHaveBeenCalledTimes(4)
+  })
+
+  it("does not retry an HTTP error", async () => {
+    const fetchImpl = vi.fn(async () => new Response("", { status: 502 }))
+
+    await expect(
+      deleteTestUser(CFG, "oid", fetchImpl as unknown as typeof fetch)
+    ).rejects.toThrow(/502/)
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not retry a failure that is not network-level", async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error("boom")
+    })
+
+    await expect(
+      provisionTestUser(CFG, fetchImpl as unknown as typeof fetch)
+    ).rejects.toThrow("boom")
+    expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 })

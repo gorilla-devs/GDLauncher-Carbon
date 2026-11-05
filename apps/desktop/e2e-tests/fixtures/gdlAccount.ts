@@ -97,20 +97,84 @@ function describeFailure(status: number, body: string): string {
   return `provisioning failed with ${status}: ${body}`
 }
 
+/** Socket and DNS error codes that mean a request never got an answer. */
+const NETWORK_ERROR_CODES = new Set([
+  "ENOTFOUND",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "EAI_AGAIN"
+])
+
+/**
+ * Names the network-level failure behind `error`, or returns `null` for
+ * anything else. Node's `fetch` rejects with a `TypeError` "fetch failed"
+ * whenever it gets no response at all, with the socket or DNS error as its
+ * `cause`; an HTTP error status is a response, so it never lands here.
+ */
+export function networkFailure(error: unknown): string | null {
+  let current: unknown = error
+  // Bounded, in case a cause chain ever loops back on itself.
+  for (let depth = 0; depth < 5 && current instanceof Error; depth++) {
+    const code = (current as { code?: unknown }).code
+    if (typeof code === "string" && NETWORK_ERROR_CODES.has(code)) return code
+    current = current.cause
+  }
+  if (error instanceof TypeError && error.message === "fetch failed") {
+    return "fetch failed"
+  }
+  return null
+}
+
+/** Pauses before each retry of a request that got no response. A DNS blip
+ *  on a CI runner (ENOTFOUND api-test.gdl.gg in teardown, after the test
+ *  itself had passed) clears within seconds. */
+const NETWORK_RETRY_DELAYS_MS = [1_000, 2_000, 4_000]
+
+/**
+ * Runs `send`, and runs it again after each pause in
+ * `NETWORK_RETRY_DELAYS_MS` for as long as it fails without getting a
+ * response. Any other failure is thrown, and any response, HTTP errors
+ * included, is returned, from the attempt that produced it, as before.
+ */
+async function withNetworkRetry(
+  what: string,
+  send: () => Promise<Response>
+): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await send()
+    } catch (error) {
+      const failure = networkFailure(error)
+      const delay = NETWORK_RETRY_DELAYS_MS[attempt]
+      if (failure === null || delay === undefined) throw error
+      console.warn(
+        `${what}: no response (${failure}), retrying in ${delay}ms ` +
+          `(attempt ${attempt + 2} of ${NETWORK_RETRY_DELAYS_MS.length + 1})`
+      )
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
+  }
+}
+
 async function requestProvision(
   cfg: ProvisionConfig,
   oid: string,
   fetchImpl: typeof fetch
 ): Promise<Response> {
-  return fetchImpl(`${cfg.apiBase}/v1/users/internal/provision-test-user`, {
-    method: "POST",
-    // The internal token is sent bare; these endpoints take no Bearer prefix.
-    headers: {
-      Authorization: cfg.internalToken,
-      "Content-Type": "application/json"
-    },
-    body: JSON.stringify({ oid })
-  })
+  // A retry whose earlier attempt did reach the backend meets the row that
+  // attempt wrote; `provisionTestUser`'s 409 path covers a backend that
+  // refuses that.
+  return withNetworkRetry(`provisioning test user ${oid}`, () =>
+    fetchImpl(`${cfg.apiBase}/v1/users/internal/provision-test-user`, {
+      method: "POST",
+      // The internal token is sent bare; these endpoints take no Bearer prefix.
+      headers: {
+        Authorization: cfg.internalToken,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ oid })
+    })
+  )
 }
 
 export async function provisionTestUser(
@@ -145,16 +209,19 @@ export async function provisionTestUser(
 
 /**
  * Removes a provisioned user. Deleting one that does not exist is a success,
- * so this can run unconditionally in teardown.
+ * so this can run unconditionally in teardown, and so can a retry of a
+ * delete whose response was lost.
  */
 export async function deleteTestUser(
   cfg: ProvisionConfig,
   oid: string,
   fetchImpl: typeof fetch = fetch
 ): Promise<void> {
-  const response = await fetchImpl(
-    `${cfg.apiBase}/v1/users/internal/test-user/${oid}`,
-    { method: "DELETE", headers: { Authorization: cfg.internalToken } }
+  const response = await withNetworkRetry(`tearing down test user ${oid}`, () =>
+    fetchImpl(`${cfg.apiBase}/v1/users/internal/test-user/${oid}`, {
+      method: "DELETE",
+      headers: { Authorization: cfg.internalToken }
+    })
   )
 
   if (!response.ok) {
