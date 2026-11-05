@@ -80,6 +80,7 @@ export function createUpdaterController(io: {
       readyUpdate: downloaded
         ? { id: downloaded.id, version: downloaded.info.version }
         : null,
+      ...(coreStopped ? { restartRequired: true as const } : {}),
       revision: state.revision + 1
     }
     io.broadcast(state)
@@ -149,7 +150,11 @@ export function createUpdaterController(io: {
       if (installing === attempt && attempt.failed) installing = null
     })
   }
-  function unavailable(code: UpdateErrorCode, message: string) {
+  function unavailable(
+    code: UpdateErrorCode,
+    message: string,
+    updateInfo: UpdateStateData["updateInfo"] = null
+  ) {
     locked = false
     set({
       state: "unsupported",
@@ -286,7 +291,7 @@ export function createUpdaterController(io: {
                   progress: 0,
                   error: null
                 })
-              else if (metadata)
+              else if (metadata?.downloadUrl)
                 set({
                   state: "manual-update",
                   updateInfo: metadata,
@@ -296,7 +301,8 @@ export function createUpdaterController(io: {
               else
                 unavailable(
                   "no-manual-download",
-                  "Automatic updates are unavailable for this installation. No matching manual artifact is available; check the official downloads or retry later."
+                  "Automatic updates are unavailable for this installation. No matching manual artifact is available; check the official downloads or retry later.",
+                  metadata
                 )
             } catch {
               if (ownedRevision !== revision)
@@ -365,6 +371,12 @@ export function createUpdaterController(io: {
         // Checks admitted before the click may still publish a replacement.
         // Reconcile all of them before shutdown; newly requested checks are busy.
         if (checkSettlements.size) await Promise.all([...checkSettlements])
+        // Squirrel.Mac may still be fetching the update. If that failed after
+        // the core was stopped, GDLauncher would be left without its core, so
+        // wait for it while the core still runs.
+        const native = captured.operation.native
+        if (native?.pending()) await native.settled
+        const blocker = io.installBlocker ? await io.installBlocker() : null
         if (!admitted())
           refuse(
             "update-changed",
@@ -372,6 +384,17 @@ export function createUpdaterController(io: {
           )
         if (attempt.failed)
           throw new Error("Update failed before installation. Please retry.")
+        if (blocker) {
+          // Nothing was stopped and the update stays ready: once the cause is
+          // fixed, Install works again.
+          const message =
+            BLOCKED_INSTALL[blocker] ?? "The update cannot be installed here."
+          set({
+            state: "error",
+            error: { message, details: "", code: blocker }
+          })
+          throw new Error(message)
+        }
         attempt.stage = "shutdown"
         await io.prepareShutdown()
         if (!admitted())
@@ -393,6 +416,22 @@ export function createUpdaterController(io: {
           attempt.failed = true
           releaseFailedDispatch(attempt)
         } else if (installing === attempt) installing = null
+        // A failure reported before the core finished stopping, or none at
+        // all, still has to tell the player that only a restart helps now.
+        if (coreStopped && !state.restartRequired)
+          set({
+            state: "error",
+            progress: 0,
+            error:
+              state.state === "error" && state.error
+                ? state.error
+                : {
+                    message:
+                      "The update could not be installed. Restart GDLauncher to keep using it.",
+                    details: "",
+                    code: "update-failed"
+                  }
+          })
         throw error
       }
     }

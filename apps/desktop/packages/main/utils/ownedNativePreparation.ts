@@ -5,6 +5,8 @@ interface NativeEmitter {
 }
 export interface OwnedNativePreparation {
   pending(): boolean
+  /** Resolves once preparation completed, failed or was disposed. */
+  settled: Promise<void>
   dispose(): void
 }
 
@@ -39,11 +41,16 @@ export function createOwnedNativePreparation(updater: unknown) {
       )
         return
       let live = true
+      let settle!: () => void
+      const settled = new Promise<void>((resolve) => {
+        settle = resolve
+      })
       const dispose = () => {
         if (!live) return
         live = false
         native.removeListener("error", error)
         native.removeListener("update-downloaded", completed)
+        settle()
       }
       const error = (cause: unknown) => {
         if (!live) return
@@ -58,7 +65,7 @@ export function createOwnedNativePreparation(updater: unknown) {
       // as a generic updater error; later forwards of that object stay fenced.
       native.prependListener("error", error)
       native.on("update-downloaded", completed)
-      return { pending: () => live, dispose }
+      return { pending: () => live, settled, dispose }
     }
   }
 }

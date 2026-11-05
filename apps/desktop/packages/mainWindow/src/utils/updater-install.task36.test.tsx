@@ -29,7 +29,10 @@ afterEach(() => {
   offset += 1000
   vi.unstubAllGlobals()
 })
-async function fixture(shutdown = vi.fn(async () => {})) {
+async function fixture(
+  shutdown = vi.fn(async () => {}),
+  installBlocker?: () => Promise<any>
+) {
   const events: Record<string, (...args: any[]) => void> = {},
     install = vi.fn(),
     checks = vi.fn(async () => ({}))
@@ -40,6 +43,7 @@ async function fixture(shutdown = vi.fn(async () => {})) {
     artifact: () => null,
     manual: async () => ({ noUpdate: true }),
     prepareShutdown: shutdown,
+    installBlocker,
     isDownloaded: () => eligible,
     broadcast: (state: any) =>
       listener?.(null, { ...state, revision: state.revision + offset }),
@@ -237,7 +241,76 @@ it("an installer error during install says the install failed, not to check the 
   expect(f.ready().description).toBe(
     "app:_trn_update_install_failed_description"
   )
-  expect(f.shown("updater-checking")?.description).toBe(
-    "app:_trn_update_install_failed_description"
+})
+// The core was stopped for the install and nothing starts it again, so the
+// launcher cannot be used until it restarts.
+it("an install that fails after the core stopped keeps a notice up whose Restart App restarts GDLauncher", async () => {
+  const relaunch = vi.fn(async () => ({ status: "relaunching" }))
+  const f = await fixture()
+  Object.assign(window, { relaunch })
+  f.install.mockImplementation(() =>
+    f.events.error(Error("Native adapter rejected"))
   )
+  await f.ready().action!.onClick()
+  await flush()
+  expect(f.controller.getState().restartRequired).toBe(true)
+  const notice = f.shown("updater-checking")
+  expect(notice).toMatchObject({
+    type: "error",
+    description: "app:_trn_update_restart_required_description",
+    duration: Infinity,
+    closeButton: true
+  })
+  expect(notice.action.label).toBe("settings:_trn_restart_app")
+  await notice.action.onClick()
+  expect(relaunch).toHaveBeenCalledTimes(1)
+})
+it("after the core stopped, a check the player asks for brings the restart notice back instead of checking", async () => {
+  const f = await fixture()
+  f.install.mockImplementation(() =>
+    f.events.error(Error("Native adapter rejected"))
+  )
+  await f.ready().action!.onClick()
+  await flush()
+  toast.dismiss("updater-checking")
+  await flush()
+  expect(f.shown("updater-checking")).toBeUndefined()
+  await renderer!.manualCheckForUpdates("stable")
+  await flush()
+  expect(f.checks).not.toHaveBeenCalled()
+  expect(f.shown("updater-checking")).toMatchObject({
+    type: "error",
+    description: "app:_trn_update_restart_required_description"
+  })
+})
+it("an install refused before anything stopped does not ask for a restart", async () => {
+  const f = await fixture()
+  f.eligible = false
+  await f.ready().action!.onClick()
+  await flush()
+  expect(f.controller.getState().restartRequired).toBeUndefined()
+  expect(f.shown("updater-checking")).toMatchObject({
+    type: "error",
+    duration: 8000
+  })
+})
+it("an AppImage in a folder GDLauncher cannot write to is refused with its reason before the core stops, and Install Now stays", async () => {
+  let blocked = true
+  const f = await fixture(undefined, async () =>
+    blocked ? "install-folder-read-only" : null
+  )
+  await f.ready().action!.onClick()
+  await flush()
+  expect(f.shutdown).not.toHaveBeenCalled()
+  expect(f.install).not.toHaveBeenCalled()
+  expect(f.ready()).toMatchObject({
+    type: "error",
+    description: "app:_trn_update_install_folder_read_only_description"
+  })
+  expect(f.ready().action).toBeDefined()
+  blocked = false
+  await f.ready().action!.onClick()
+  await flush()
+  expect(f.shutdown).toHaveBeenCalledTimes(1)
+  expect(f.install).toHaveBeenCalledTimes(1)
 })

@@ -514,3 +514,232 @@ describe("updater failures carry a translatable code", () => {
     expect(value.wrapper.getState().error?.code).toBe("download-unavailable")
   })
 })
+// Linux installs without APPIMAGE or a package-type marker (nixpkgs, AUR
+// repackages, unpacked AppImages, self-built zips) have no active
+// electron-updater, so every check reads the channel's metadata instead.
+describe("an installation that cannot update itself", () => {
+  const latest = {
+    version: "2.0.40",
+    releaseDate: "2026-10-01",
+    files: ["AppImage", "deb", "rpm"].map((ext) => ({
+      url: `GDLauncher__2.0.40__linux__x64.${ext}`,
+      sha512: "synthetic"
+    }))
+  } as UpdateInfo
+  function channel(published: UpdateInfo) {
+    const active = provider("https://feed.invalid/")
+    active.getLatestVersion = async () => published
+    return { clientPromise: Promise.resolve(active) } as unknown as AppUpdater
+  }
+  it.each(["zip", null] as const)(
+    "is up to date when it runs the latest version, though the channel has no %s download",
+    async (format) => {
+      const metadata = activeUpdateMetadata(
+        channel(latest),
+        { ...installation, format },
+        "2.0.40"
+      )
+      expect(await metadata.manual()).toEqual({ noUpdate: true })
+      const value = controller(
+        async () => null,
+        () => metadata.manual()
+      )
+      expect((await value.wrapper.check("stable")).status).toBe("no-update")
+      expect(value.wrapper.getState()).toMatchObject({
+        state: "no-update",
+        error: null
+      })
+    }
+  )
+  it("names the newer version when the channel has no download for it", async () => {
+    const metadata = activeUpdateMetadata(
+      channel({ ...latest, version: "2.0.41" }),
+      installation,
+      "2.0.40"
+    )
+    const value = controller(
+      async () => null,
+      () => metadata.manual()
+    )
+    expect((await value.wrapper.check("stable")).status).toBe("unsupported")
+    expect(value.wrapper.getState()).toMatchObject({
+      state: "unsupported",
+      updateInfo: { version: "2.0.41", downloadUrl: null },
+      error: { code: "no-manual-download" }
+    })
+  })
+  it("still links the matching download of a newer version", async () => {
+    const metadata = activeUpdateMetadata(
+      channel({ ...latest, version: "2.0.41" }),
+      { ...installation, format: "deb" },
+      "2.0.40"
+    )
+    expect(await metadata.manual()).toMatchObject({
+      version: "2.0.41",
+      downloadUrl: "https://feed.invalid/GDLauncher__2.0.40__linux__x64.deb"
+    })
+  })
+  it("offers an older version only when the channel switch allows a downgrade", async () => {
+    const older = channel({ ...latest, version: "2.0.39" })
+    expect(
+      await activeUpdateMetadata(older, installation, "2.0.40").manual()
+    ).toEqual({ noUpdate: true })
+    ;(older as { allowDowngrade: boolean }).allowDowngrade = true
+    expect(
+      await activeUpdateMetadata(
+        older,
+        { ...installation, format: "deb" },
+        "2.0.40"
+      ).manual()
+    ).toMatchObject({ version: "2.0.39" })
+  })
+})
+describe("an update install that fails leaves GDLauncher usable or says to restart", () => {
+  function installable(
+    options: {
+      native?: EventEmitter
+      blocker?: () => Promise<any>
+      shutdown?: () => Promise<any>
+      quitAndInstall?: () => void
+    } = {}
+  ) {
+    const events: Record<string, (...args: any[]) => void> = {}
+    const order: string[] = []
+    const wrapper = createUpdaterController({
+      version: "1.0.0",
+      updater: {
+        channel: null as string | null,
+        allowPrerelease: false,
+        allowDowngrade: false,
+        checkForUpdates: async () => null,
+        on: (e: string, f: (...args: any[]) => void) => {
+          events[e] = f
+        },
+        quitAndInstall: () => {
+          order.push("install")
+          options.quitAndInstall?.()
+        },
+        // Squirrel.Mac's emitter, as electron-updater's MacUpdater has it.
+        ...(options.native
+          ? {
+              nativeUpdater: options.native,
+              autoInstallOnAppQuit: true,
+              squirrelDownloadedUpdate: false
+            }
+          : {})
+      } as any,
+      broadcast: () => {},
+      artifact: () => null,
+      manual: async () => ({ noUpdate: true }),
+      isDownloaded: () => true,
+      installBlocker: options.blocker,
+      prepareShutdown: async () => {
+        order.push("core stopped")
+        return options.shutdown ? options.shutdown() : "stopped"
+      }
+    })
+    events["update-available"](info)
+    events["update-downloaded"]()
+    return { wrapper, events, order }
+  }
+  const settle = async () => {
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+  }
+  it("waits for Squirrel.Mac to take the update before stopping the core", async () => {
+    const native = new EventEmitter()
+    const value = installable({ native })
+    const installing = value.wrapper.install()
+    await settle()
+    expect(value.order).toEqual([])
+    native.emit("update-downloaded")
+    await installing
+    expect(value.order).toEqual(["core stopped", "install"])
+    expect(value.wrapper.getState().restartRequired).toBeUndefined()
+  })
+  it("keeps the core running when Squirrel.Mac fails while the install waits for it", async () => {
+    const native = new EventEmitter()
+    const value = installable({ native })
+    const installing = value.wrapper.install()
+    await settle()
+    native.emit("error", Error("Squirrel could not verify the update"))
+    await expect(installing).rejects.toThrow()
+    expect(value.order).toEqual([])
+    expect(value.wrapper.getState()).toMatchObject({
+      state: "error",
+      readyUpdate: null,
+      error: { code: "prepare-failed" }
+    })
+    expect(value.wrapper.getState().restartRequired).toBeUndefined()
+  })
+  it("refuses an AppImage it cannot replace before stopping the core and keeps the update ready", async () => {
+    let blocked = true
+    const value = installable({
+      blocker: async () => (blocked ? "install-folder-read-only" : null)
+    })
+    const ready = value.wrapper.getState().readyUpdate!
+    await expect(value.wrapper.install(ready.id)).rejects.toThrow(
+      "cannot write to the folder"
+    )
+    expect(value.order).toEqual([])
+    expect(value.wrapper.getState()).toMatchObject({
+      state: "error",
+      readyUpdate: ready,
+      error: { code: "install-folder-read-only" }
+    })
+    expect(value.wrapper.getState().restartRequired).toBeUndefined()
+    blocked = false
+    await value.wrapper.install(ready.id)
+    expect(value.order).toEqual(["core stopped", "install"])
+  })
+  it.each([
+    [
+      "reports an error while installing",
+      { quitAndInstall: () => {} },
+      (value: ReturnType<typeof installable>) =>
+        value.events.error(Error("Installer rejected"))
+    ],
+    [
+      "throws",
+      {
+        quitAndInstall: () => {
+          throw Error("Installer could not start")
+        }
+      },
+      () => {}
+    ]
+  ] as const)(
+    "says a restart is needed when the installer %s after the core stopped",
+    async (_, options, fail) => {
+      const value = installable(options as any)
+      await value.wrapper.install().catch(() => {})
+      fail(value)
+      await settle()
+      expect(value.order).toEqual(["core stopped", "install"])
+      expect(value.wrapper.getState()).toMatchObject({
+        state: "error",
+        restartRequired: true
+      })
+    }
+  )
+  it("says a restart is needed when the update fails while the core stops", async () => {
+    const value: ReturnType<typeof installable> = installable({
+      shutdown: async () => {
+        value.events.error(Error("Download replaced during shutdown"))
+        return "stopped"
+      }
+    })
+    await expect(value.wrapper.install()).rejects.toThrow("during shutdown")
+    expect(value.order).toEqual(["core stopped"])
+    expect(value.wrapper.getState()).toMatchObject({
+      state: "error",
+      restartRequired: true,
+      error: { code: "update-failed" }
+    })
+  })
+  it("does not ask for a restart when the player kept GDLauncher open", async () => {
+    const value = installable({ shutdown: async () => "kept" })
+    expect(await value.wrapper.install()).toBe("kept")
+    value.events.error(Error("A later download failed"))
+    expect(value.wrapper.getState().restartRequired).toBeUndefined()
+  })
+})

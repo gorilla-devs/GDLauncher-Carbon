@@ -28,6 +28,8 @@
   "_trn_update_check_error_description": "Impossible de rechercher les mises à jour. Vérifiez votre connexion et réessayez.",
   "_trn_update_unavailable_no_download_description": "Les mises à jour automatiques ne sont pas disponibles pour cette installation, et aucun téléchargement correspondant n’a été trouvé. Téléchargez la dernière version sur gdlauncher.com ou réessayez plus tard.",
   "_trn_update_unavailable_check_failed_description": "Les mises à jour automatiques ne sont pas disponibles pour cette installation, et le dernier téléchargement n’a pas pu être vérifié. Téléchargez la dernière version sur gdlauncher.com ou réessayez.",
+  "_trn_update_install_folder_read_only_description": "GDLauncher ne peut pas remplacer son AppImage, car il ne peut pas écrire dans le dossier qui la contient. Déplacez l’AppImage dans un dossier qui vous appartient et ouvrez-la depuis cet emplacement, ou téléchargez la nouvelle version sur gdlauncher.com.",
+  "_trn_update_restart_required_description": "La mise à jour n’a pas pu être installée, et GDLauncher avait déjà arrêté son service en arrière-plan pour l’installer. Redémarrez GDLauncher pour continuer à l’utiliser.",
   "_trn_update_checking": "Recherche de mises à jour...",
   "_trn_update_checking_description": "Recherche de nouvelles versions",
   "_trn_update_timeout": "Délai d'attente dépassé pour la vérification des mises à jour",

@@ -409,6 +409,7 @@ it("Task23 actual updater wrapper null branch hydrates a packaged-provider manua
   mocks.semver = { gt: () => true }
   mocks["./utils/downloadedUpdate"] = await import("./downloadedUpdate")
   mocks["./utils/ownedInstallDispatch"] = await import("./ownedInstallDispatch")
+  mocks["./utils/appImageInstall"] = await import("./appImageInstall")
   const compiled = ts.transpileModule(
     source("apps/desktop/packages/main/autoUpdater.ts"),
     {
@@ -552,7 +553,8 @@ it("Task36 actual main wrapper owns a queued install callback through error befo
       "./utils/updateProvider": await import("./updateProvider"),
       "./utils/updaterController": await import("./updaterController"),
       "./utils/downloadedUpdate": await import("./downloadedUpdate"),
-      "./utils/ownedInstallDispatch": await import("./ownedInstallDispatch")
+      "./utils/ownedInstallDispatch": await import("./ownedInstallDispatch"),
+      "./utils/appImageInstall": await import("./appImageInstall")
     }
   const compiled = ts.transpileModule(
     source("apps/desktop/packages/main/autoUpdater.ts"),

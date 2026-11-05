@@ -28,6 +28,8 @@
   "_trn_update_check_error_description": "无法检查更新。请检查网络连接后重试。",
   "_trn_update_unavailable_no_download_description": "此安装不支持自动更新，也没有找到适用的下载。请从 gdlauncher.com 获取最新版本，或稍后重试。",
   "_trn_update_unavailable_check_failed_description": "此安装不支持自动更新，且无法检查最新的下载。请从 gdlauncher.com 获取最新版本，或重试。",
+  "_trn_update_install_folder_read_only_description": "GDLauncher 无法写入 AppImage 所在的文件夹，因此无法替换 AppImage。请将 AppImage 移动到你拥有的文件夹并从那里打开，或从 gdlauncher.com 下载新版本。",
+  "_trn_update_restart_required_description": "无法安装更新，而 GDLauncher 已为此停止了后台服务。请重启 GDLauncher 以继续使用。",
   "_trn_update_checking": "正在检查更新...",
   "_trn_update_checking_description": "正在查找新版本",
   "_trn_update_timeout": "更新检查超时",

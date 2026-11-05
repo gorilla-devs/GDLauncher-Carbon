@@ -28,6 +28,8 @@
 "_trn_update_check_error_description": "アップデートを確認できませんでした。接続を確認して、もう一度お試しください。",
 "_trn_update_unavailable_no_download_description": "このインストールでは自動アップデートを利用できず、対応するダウンロードも見つかりませんでした。gdlauncher.com から最新版を入手するか、後でもう一度お試しください。",
 "_trn_update_unavailable_check_failed_description": "このインストールでは自動アップデートを利用できず、最新のダウンロードも確認できませんでした。gdlauncher.com から最新版を入手するか、もう一度お試しください。",
+"_trn_update_install_folder_read_only_description": "GDLauncher は AppImage があるフォルダーに書き込めないため、AppImage を置き換えられません。AppImage を自分が所有するフォルダーに移動してそこから開くか、gdlauncher.com から新しいバージョンをダウンロードしてください。",
+"_trn_update_restart_required_description": "アップデートをインストールできませんでした。GDLauncher はインストールのためにバックグラウンドサービスをすでに停止しています。引き続き使用するには GDLauncher を再起動してください。",
 "_trn_update_checking": "アップデートを確認中...",
 "_trn_update_checking_description": "新しいバージョンを確認しています",
 "_trn_update_timeout": "アップデート確認がタイムアウトしました",

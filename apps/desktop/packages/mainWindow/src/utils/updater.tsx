@@ -105,7 +105,9 @@ const UPDATE_ERROR_TEXT: Record<UpdateErrorCode, string> = {
   "update-failed": "app:_trn_update_connection_failed_description",
   "check-failed": "app:_trn_update_check_error_description",
   "no-manual-download": "app:_trn_update_unavailable_no_download_description",
-  "manual-check-failed": "app:_trn_update_unavailable_check_failed_description"
+  "manual-check-failed": "app:_trn_update_unavailable_check_failed_description",
+  "install-folder-read-only":
+    "app:_trn_update_install_folder_read_only_description"
 }
 const updateErrorText = (
   error: UpdateStateData["error"] | undefined,
@@ -386,7 +388,41 @@ const receiveUpdateState = (stateData: UpdateStateData) => {
       }
       break
 
-    case "unsupported":
+    case "unsupported": {
+      setIsCheckingForUpdates(false)
+      isShowingDownloadToast = false
+      const wasManualCheck = isManualCheck()
+      setIsManualCheck(false)
+      // This copy cannot update itself (a package manager or an unpacked
+      // build owns it). Automatic checks at launch and every 30 minutes stay
+      // quiet; a check the player asked for says why and where to get the
+      // latest version.
+      if (!wasManualCheck) break
+      const version = stateData.updateInfo?.version
+      toast.info(
+        version
+          ? i18n.t("app:_trn_update_version", { version })
+          : i18n.t("app:_trn_update_check_failed"),
+        {
+          id: TOAST_ID_CHECKING,
+          description: updateErrorText(
+            stateData.error,
+            "app:_trn_update_unavailable_check_failed_description"
+          ),
+          duration: 8000,
+          closeButton: true,
+          // Only a check that could not finish is worth repeating.
+          action: version
+            ? undefined
+            : {
+                label: i18n.t("general:_trn_retry"),
+                onClick: () => manualCheckForUpdates(lastReleaseChannel)
+              }
+        }
+      )
+      break
+    }
+
     case "error": {
       setIsCheckingForUpdates(false)
       isShowingDownloadToast = false
@@ -496,6 +532,8 @@ export const manualCheckForUpdates = async (
 
   try {
     const currentState = await window.getUpdateState()
+    // A check cannot bring the stopped core back; the notice says what does.
+    if (currentState?.restartRequired) showRestartRequired()
     if (currentState?.readyUpdate && supportsAutoUpdate()) {
       receiveUpdateState(currentState)
       showPendingUpdateToast()

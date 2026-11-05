@@ -10,6 +10,7 @@ import type { Installation } from "./utils/updateArtifact"
 import { createUpdaterController } from "./utils/updaterController"
 import { ownsDownloadedUpdate } from "./utils/downloadedUpdate"
 import { createOwnedInstallDispatch } from "./utils/ownedInstallDispatch"
+import { appImageInstallBlocker } from "./utils/appImageInstall"
 
 async function installationIdentity(): Promise<Installation> {
   let format: Installation["format"] = null

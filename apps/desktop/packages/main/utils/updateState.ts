@@ -18,6 +18,7 @@ export type UpdateErrorCode =
   | "check-failed"
   | "no-manual-download"
   | "manual-check-failed"
+  | "install-folder-read-only"
 export interface UpdateStateData {
   revision: number
   state: UpdateState
@@ -26,6 +27,9 @@ export interface UpdateStateData {
   error: { message: string; details: string; code?: UpdateErrorCode } | null
   /** Positive completed artifact ownership, independent of the current check phase. */
   readyUpdate?: { id: number; version: string } | null
+  /** The core was stopped for an install that did not go through. It stays
+   *  stopped, so GDLauncher has to restart before it can be used again. */
+  restartRequired?: true
 }
 export interface CheckForUpdatesResult {
   status:

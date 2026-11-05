@@ -28,6 +28,8 @@
   "_trn_update_check_error_description": "Не удалось проверить наличие обновлений. Проверьте подключение и попробуйте снова.",
   "_trn_update_unavailable_no_download_description": "Автоматические обновления недоступны для этой установки, и подходящая загрузка не найдена. Скачайте последнюю версию на gdlauncher.com или попробуйте позже.",
   "_trn_update_unavailable_check_failed_description": "Автоматические обновления недоступны для этой установки, и не удалось проверить последнюю загрузку. Скачайте последнюю версию на gdlauncher.com или попробуйте снова.",
+  "_trn_update_install_folder_read_only_description": "GDLauncher не может заменить свой AppImage, потому что не может записывать в папку, где он находится. Переместите AppImage в папку, которая принадлежит вам, и запустите его оттуда или скачайте новую версию на gdlauncher.com.",
+  "_trn_update_restart_required_description": "Не удалось установить обновление, а фоновая служба GDLauncher уже была остановлена для установки. Перезапустите GDLauncher, чтобы продолжить работу.",
   "_trn_update_checking": "Проверка обновлений...",
   "_trn_update_checking_description": "Поиск новых версий",
   "_trn_update_timeout": "Время ожидания истекло",

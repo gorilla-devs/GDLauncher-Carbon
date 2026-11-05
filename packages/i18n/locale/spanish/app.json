@@ -28,6 +28,8 @@
   "_trn_update_check_error_description": "No se pudieron buscar actualizaciones. Comprueba tu conexión y vuelve a intentarlo.",
   "_trn_update_unavailable_no_download_description": "Las actualizaciones automáticas no están disponibles para esta instalación y no se encontró una descarga para ella. Descarga la última versión desde gdlauncher.com o vuelve a intentarlo más tarde.",
   "_trn_update_unavailable_check_failed_description": "Las actualizaciones automáticas no están disponibles para esta instalación y no se pudo comprobar la última descarga. Descarga la última versión desde gdlauncher.com o vuelve a intentarlo.",
+  "_trn_update_install_folder_read_only_description": "GDLauncher no puede reemplazar su AppImage porque no puede escribir en la carpeta que la contiene. Mueve la AppImage a una carpeta de tu propiedad y ábrela desde allí, o descarga la nueva versión desde gdlauncher.com.",
+  "_trn_update_restart_required_description": "No se pudo instalar la actualización, y GDLauncher ya había detenido su servicio en segundo plano para instalarla. Reinicia GDLauncher para seguir usándolo.",
   "_trn_update_checking": "Comprobando actualizaciones...",
   "_trn_update_checking_description": "Buscando nuevas versiones",
   "_trn_update_timeout": "Comprobación de actualización agotada",

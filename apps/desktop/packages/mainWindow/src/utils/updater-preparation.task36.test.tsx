@@ -10,6 +10,7 @@ import { createUpdaterController } from "../../../main/utils/updaterController"
 import { ownsDownloadedUpdate } from "../../../main/utils/downloadedUpdate"
 import { createOwnedInstallDispatch } from "../../../main/utils/ownedInstallDispatch"
 import { createOwnedNativePreparation } from "../../../main/utils/ownedNativePreparation"
+import { installReadyUpdateAction } from "../../../preload/installReadyUpdate"
 vi.mock("@gd/ui", async () => ({
   toast: (await import("somoto")).toast,
   Progress: () => <span />
@@ -255,7 +256,8 @@ async function fixture(main = false, delayedFirstResult = false) {
           await import("../../../main/utils/updateProvider"),
         "./utils/updaterController": { createUpdaterController },
         "./utils/downloadedUpdate": { ownsDownloadedUpdate },
-        "./utils/ownedInstallDispatch": { createOwnedInstallDispatch }
+        "./utils/ownedInstallDispatch": { createOwnedInstallDispatch },
+        "./utils/appImageInstall": { appImageInstallBlocker: async () => null }
       }
     const source = fs.readFileSync(
       path.join(root, "apps/desktop/packages/main/autoUpdater.ts"),
@@ -381,21 +383,24 @@ it.each(["before click", "during install"])(
     await flush()
     const token = f.getState().readyUpdate.id,
       oldAction = f.presentation().action.onClick
+    let clicked: Promise<void> | undefined
     if (timing === "during install") {
       const before = f.native.listeners("update-downloaded")
       expect(before).toHaveLength(2)
       expect(before[0]).toBe(f.baselineCompletion[0])
-      await oldAction()
+      // Install waits for Squirrel.Mac with the core still running: nothing
+      // is stopped and no install callback is queued yet.
+      clicked = oldAction()
       await flush()
-      const queued = f.native.listeners("update-downloaded")
-      expect(queued).toHaveLength(3)
-      expect(queued.slice(0, 2)).toEqual(before)
-      expect(queued[2]).not.toBe(before[1])
+      expect(f.native.listeners("update-downloaded")).toEqual(before)
+      expect(f.shutdown).not.toHaveBeenCalled()
     }
     f.fail()
     await flush()
+    await clicked
     expect(ownsDownloadedUpdate(f.updater, f.operations[0].info)).toBe(true)
     expect(f.getState().readyUpdate).toBeNull()
+    expect(f.getState().restartRequired).toBeUndefined()
     expect(f.native.listenerCount("update-downloaded")).toBe(1)
     const failed = timing === "during install" ? f.presentation() : f.checking()
     expect(failed).toMatchObject({
@@ -406,9 +411,8 @@ it.each(["before click", "during install"])(
     expect(failed.action).toBeDefined()
     await oldAction()
     await flush()
-    expect(f.updater.quitAndInstall).toHaveBeenCalledTimes(
-      timing === "during install" ? 1 : 0
-    )
+    expect(f.updater.quitAndInstall).not.toHaveBeenCalled()
+    expect(f.shutdown).not.toHaveBeenCalled()
     await failed.action.onClick()
     await flush()
     expect(f.updater.checkForUpdates).toHaveBeenCalledTimes(2)
@@ -416,25 +420,32 @@ it.each(["before click", "during install"])(
     expect(f.operations[1].active).toBe(true)
     expect(f.getState().readyUpdate.id).not.toBe(token)
     expect(f.updater.channel).toBe("beta")
-    await f.presentation().action.onClick()
+    const installing = f.presentation().action.onClick()
     await flush()
     await f.finish(1)
+    await installing
+    expect(f.shutdown).toHaveBeenCalledTimes(1)
     expect(f.handoff).toHaveBeenCalledTimes(1)
     expect(f.updater.squirrelDownloadedUpdate).toBe(true)
-    expect(f.native.listenerCount("update-downloaded")).toBe(2)
+    // Squirrel.Mac already had the update, so no completion callback waits.
+    expect(f.native.listenerCount("update-downloaded")).toBe(1)
   }
 )
-it("healthy outer Mac readiness admits install while known preparation owns check admission, then completes", async () => {
+it("healthy outer Mac readiness waits for native preparation before stopping the core, then completes", async () => {
   const f = await fixture()
   await f.check("stable")
   await flush()
   expect((await f.check("beta")).status).toBe("busy")
   expect(f.updater.checkForUpdates).toHaveBeenCalledTimes(1)
-  await f.presentation().action.onClick()
+  const installing = f.presentation().action.onClick()
   await flush()
-  expect(f.updater.quitAndInstall).toHaveBeenCalledWith(true, true)
+  expect(f.shutdown).not.toHaveBeenCalled()
+  expect(f.updater.quitAndInstall).not.toHaveBeenCalled()
   expect(f.nativeCheck).toHaveBeenCalledTimes(1)
   await f.finish(0)
+  await installing
+  expect(f.shutdown).toHaveBeenCalledTimes(1)
+  expect(f.updater.quitAndInstall).toHaveBeenCalledWith(true, true)
   expect(f.handoff).toHaveBeenCalledTimes(1)
   expect(f.getState().readyUpdate.version).toBe("2.0.0")
 })
@@ -460,9 +471,10 @@ it("a delayed old check's rejected preparation cannot retire a newer same-versio
   expect(f.getState().state).toBe("downloaded")
   expect(f.presentation().type).toBe("success")
   expect(ownsDownloadedUpdate(f.updater, f.operations[1].info)).toBe(true)
-  await f.presentation().action.onClick()
+  const installing = f.presentation().action.onClick()
   await flush()
   await f.finish(1)
+  await installing
   expect(f.handoff).toHaveBeenCalledTimes(1)
 })
 it.each([false, true])(
@@ -487,7 +499,12 @@ it.each([false, true])(
         updateProgressContainer: { style: {} },
         updateProgressBar: { style: {} },
         checkUpdatesBtn: button,
-        installReady: async () => f.install(context.readyDownloadId),
+        // The loading screen's own install action, as loading.ts builds it.
+        installReady: installReadyUpdateAction(
+          () => context.readyDownloadId,
+          (id) => f.install(id),
+          (message) => context.setUpdateState("error", { message })
+        ),
         checkForUpdates: async () => {
           await f.check("stable")
           receive(f.getState())
@@ -497,24 +514,28 @@ it.each([false, true])(
     const receive = evaluate(extract(text, "receiveUpdateState"), context),
       click = evaluate(extract(text, "click", true), context)
     receive(f.getState())
-    await click()
+    const clicked = click()
     await flush()
     if (postServing) await f.transferFinished()
     f.fail()
     await flush()
+    await clicked
     receive(f.getState())
     expect(context.readyDownloadId).toBeUndefined()
     expect(button).toMatchObject({ textContent: "Retry", disabled: false })
+    // The failed preparation was waited for before the core was stopped.
+    expect(f.shutdown).not.toHaveBeenCalled()
     await click()
     await flush()
     expect(f.updater.checkForUpdates).toHaveBeenCalledTimes(2)
     expect(f.nativeCheck).toHaveBeenCalledTimes(2)
     expect(button.textContent).toBe("Apply & Restart")
-    await click()
+    const installing = click()
     await flush()
     await f.finish(1)
+    await installing
     expect(f.handoff).toHaveBeenCalledTimes(1)
-    expect(f.shutdown).toHaveBeenCalledTimes(2)
+    expect(f.shutdown).toHaveBeenCalledTimes(1)
   }
 )
 it.each(["before click", "during install"])(
@@ -525,13 +546,16 @@ it.each(["before click", "during install"])(
     await flush()
     const token = f.getState().readyUpdate.id,
       oldAction = f.presentation().action.onClick
+    let clicked: Promise<void> | undefined
     if (timing === "during install") {
-      await oldAction()
+      clicked = oldAction()
       await flush()
     }
     await f.transferFinished()
     f.fail()
     await flush()
+    await clicked
+    expect(f.shutdown).not.toHaveBeenCalled()
     expect(ownsDownloadedUpdate(f.updater, f.operations[0].info)).toBe(true)
     expect(f.getState().readyUpdate).toBeNull()
     expect(f.native.listeners("update-downloaded")).toEqual(
@@ -547,19 +571,18 @@ it.each(["before click", "during install"])(
     expect(failed.action).toBeDefined()
     await oldAction()
     await flush()
-    expect(f.updater.quitAndInstall).toHaveBeenCalledTimes(
-      timing === "during install" ? 1 : 0
-    )
+    expect(f.updater.quitAndInstall).not.toHaveBeenCalled()
     await failed.action.onClick()
     await flush()
     expect(f.updater.checkForUpdates).toHaveBeenCalledTimes(2)
     expect(f.nativeCheck).toHaveBeenCalledTimes(2)
     expect(f.getState().readyUpdate.id).not.toBe(token)
     expect(f.updater.channel).toBe("beta")
-    await f.presentation().action.onClick()
+    const installing = f.presentation().action.onClick()
     await flush()
     await f.transferFinished(1)
     f.native.emit("update-downloaded")
+    await installing
     await flush()
     expect(f.handoff).toHaveBeenCalledTimes(1)
     expect(f.updater.squirrelDownloadedUpdate).toBe(true)
@@ -573,14 +596,17 @@ it("successful actual response finish retains native ownership until native comp
   await f.transferFinished()
   expect((await f.check("beta")).status).toBe("busy")
   expect(f.updater.checkForUpdates).toHaveBeenCalledTimes(1)
-  await f.presentation().action.onClick()
+  const installing = f.presentation().action.onClick()
   await flush()
-  expect(f.updater.quitAndInstall).toHaveBeenCalledWith(true, true)
+  expect(f.updater.quitAndInstall).not.toHaveBeenCalled()
   f.native.emit("update-downloaded")
+  await installing
+  expect(f.updater.quitAndInstall).toHaveBeenCalledWith(true, true)
   await flush()
   expect(f.handoff).toHaveBeenCalledTimes(1)
   expect(f.native.listeners("error")).toEqual(f.baselineError)
-  expect(f.native.listenerCount("update-downloaded")).toBe(2)
+  // Squirrel.Mac already had the update, so no completion callback waits.
+  expect(f.native.listeners("update-downloaded")).toEqual(f.baselineCompletion)
 })
 it("retired native callbacks and the same known failure cannot corrupt or hand off a newer same-version owner", async () => {
   const f = await fixture()
@@ -625,14 +651,15 @@ it("retired native callbacks and the same known failure cannot corrupt or hand o
   expect(state.readyUpdate.id).toBe(successor)
   expect(f.presentation().type).toBe("success")
   expect(f.handoff).not.toHaveBeenCalled()
-  await f.presentation().action.onClick()
+  const installing = f.presentation().action.onClick()
   await flush()
   await f.transferFinished(2)
   f.native.emit("update-downloaded")
+  await installing
   await flush()
   expect(f.handoff).toHaveBeenCalledTimes(1)
 })
-it("native preparation adapter disposes only its own listeners once on disposal, completion or error", () => {
+it("native preparation adapter disposes only its own listeners once on disposal, completion or error", async () => {
   const native = new EventEmitter(),
     baselineError = vi.fn(),
     baselineCompletion = vi.fn(),
@@ -676,6 +703,8 @@ it("native preparation adapter disposes only its own listeners once on disposal,
   expect(native.listeners("unrelated")).toEqual([unrelated])
   expect(baselineError).toHaveBeenCalledExactlyOnceWith(error)
   expect(baselineCompletion).toHaveBeenCalledTimes(1)
+  // An install waiting on any of them carries on.
+  await Promise.all([first.settled, second.settled, third.settled])
   expect(createOwnedNativePreparation({}).watch(failed)).toBeUndefined()
   expect(
     createOwnedNativePreparation({
