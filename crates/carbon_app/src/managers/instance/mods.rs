@@ -541,6 +541,11 @@ impl ManagerRef<'_, InstanceManager> {
         let enabled_path = folder.join(&m.filename);
         let disabled_path = folder.join(format!("{}.disabled", m.filename));
 
+        if addon_metadata(&enabled_path).await?.is_some()
+            && addon_metadata(&disabled_path).await?.is_some()
+        {
+            return Err(twin_copies_refusal(&folder, &m.filename, "enable"));
+        }
         if enabled_path.exists() {
             bail!("mod is already enabled");
         }
@@ -587,7 +592,7 @@ impl ManagerRef<'_, InstanceManager> {
             .runtime_path
             .get_instances()
             .get_instance_path(&shortpath);
-        super::addon_retry::execute(
+        let outcome = super::addon_retry::execute(
             &self.app.db,
             instance_id,
             &id,
@@ -600,12 +605,47 @@ impl ManagerRef<'_, InstanceManager> {
         )
         .await?;
 
+        let kept = match outcome {
+            super::addon_retry::Outcome::Done => None,
+            super::addon_retry::Outcome::KeptTwin(twin) => {
+                // The row now shows the copy that stayed. Read its own name,
+                // version and size now, under the gate: the queued scan waits
+                // while any game runs.
+                let refreshed = self
+                    .app
+                    .meta_cache_manager()
+                    .refresh_published_addon(
+                        &_operation,
+                        &twin.folder,
+                        twin.filename.clone(),
+                        twin.enabled,
+                        twin.addon_type.clone(),
+                    )
+                    .await;
+                if let Err(error) = refreshed {
+                    tracing::warn!(
+                        filename = %twin.filename,
+                        "Could not read the addon copy a Delete left, rescanning: {error:#}"
+                    );
+                    self.app
+                        .meta_cache_manager()
+                        .queue_caching(
+                            crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
+                            false,
+                        )
+                        .await;
+                }
+                let (deleted, kept) = twin.names();
+                Some(KeptAddonCopy { deleted, kept })
+            }
+        };
+
         // GC orphaned metadata
         self.app.meta_cache_manager().gc_mod_metadata().await;
 
         self.app
             .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
-        Ok(())
+        Ok(kept)
     }
 
     pub async fn disable_mod_retryable(
@@ -627,10 +667,12 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         id: String,
         token: Option<String>,
-    ) -> anyhow::Result<()> {
+    ) -> anyhow::Result<Option<KeptAddonCopy>> {
         if let Some(token) = token {
+            // The token path refuses two copies, so none is ever left.
             self.retryable_file_mod(instance_id, id, super::addon_retry::Action::Delete, token)
                 .await
+                .map(|()| None)
         } else {
             self.delete_mod(instance_id, id).await
         }

@@ -441,13 +441,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation DELETE_MOD[app, imod: RetryableInstanceMod] {
-            app.instance_manager()
+            Ok(app.instance_manager()
                 .delete_mod_retryable(
                     imod.instance_id.into(),
                     imod.mod_id,
                     imod.operation_token,
                 )
-                .await
+                .await?.map(FEKeptAddonCopy::from))
         }
 
         query GET_DATAPACK_WORLDS[app, id: FEInstanceId] {

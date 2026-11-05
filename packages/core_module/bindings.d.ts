@@ -133,7 +133,7 @@ export type Procedures = {
         { key: "instance.deleteGroupWithInstances", input: FEGroupId, result: null } | 
         { key: "instance.deleteInstance", input: FEInstanceId, result: null } | 
         { key: "instance.deleteLog", input: GameLogId, result: null } | 
-        { key: "instance.deleteMod", input: RetryableInstanceMod, result: null } | 
+        { key: "instance.deleteMod", input: RetryableInstanceMod, result: FEKeptAddonCopy | null } | 
         { key: "instance.deleteShare", input: string, result: null } | 
         { key: "instance.disableMod", input: RetryableInstanceMod, result: null } | 
         { key: "instance.duplicateInstance", input: DuplicateInstance, result: FEInstanceId } | 

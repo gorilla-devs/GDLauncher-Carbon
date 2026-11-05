@@ -1,7 +1,7 @@
 //! Owned file-operation boundary. Caller holds the runtime admission and instance gate.
 use super::mods::{
-    InvalidInstanceModIdError, addon_metadata, ensure_toggleable, remove_addon_from_disk,
-    validate_addon_basename,
+    InvalidInstanceModIdError, addon_metadata, ensure_toggleable, remove_addon_entry,
+    remove_addon_from_disk, twin_copies_refusal, validate_addon_basename,
 };
 use crate::domain::instance::{AddonType, InstanceId};
 use anyhow::{anyhow, bail};
@@ -57,6 +57,7 @@ impl KeptTwin {
         }
     }
 }
+
 pub(super) async fn execute<F: Future<Output = ()>>(
     db: &Db,
     instance: InstanceId,
@@ -64,7 +65,7 @@ pub(super) async fn execute<F: Future<Output = ()>>(
     path: &InstancePath,
     action: Action,
     after_effect: impl FnOnce() -> F,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Outcome> {
     let row = repo::get_mod_file_cache_by_id(db, id)
         .await?
         .filter(|row| row.instance_id == instance.0)
@@ -78,8 +79,14 @@ pub(super) async fn execute<F: Future<Output = ()>>(
     let folder = super::installer::publication::checked_folder(path, kind).await?;
     let enabled = folder.join(&row.filename);
     let disabled = folder.join(format!("{}.disabled", row.filename));
+    let twins = kind != AddonType::Worlds
+        && addon_metadata(&enabled).await?.is_some()
+        && addon_metadata(&disabled).await?.is_some();
     match action {
         Action::Disable => {
+            if twins {
+                return Err(twin_copies_refusal(&folder, &row.filename, "disable"));
+            }
             if disabled.exists() {
                 bail!("mod is already disabled")
             }
@@ -90,6 +97,51 @@ pub(super) async fn execute<F: Future<Output = ()>>(
             after_effect().await;
             repo::update_mod_file_enabled(db, id, false, DbDateTime(Utc::now().fixed_offset()))
                 .await?;
+        }
+        Action::Delete if twins => {
+            // Both spellings are there (a hand copy, or a jar dropped again
+            // beside its disabled copy), listed as one row. As in 2.0.40,
+            // Delete removes one copy per click, here the one the row shows;
+            // the row then shows the other, so nothing goes unseen, and a
+            // second Delete removes that one too.
+            let (shown, twin, twin_enabled) = if row.enabled {
+                (&enabled, &disabled, false)
+            } else {
+                (&disabled, &enabled, true)
+            };
+            let meta = addon_metadata(shown)
+                .await?
+                .ok_or_else(|| anyhow!("addon changed while deleting; nothing was removed"))?;
+            if !remove_addon_entry(shown, &meta, false).await? {
+                bail!(
+                    "{} is not a file, so it was not deleted. Remove it in your file manager.",
+                    shown.display()
+                );
+            }
+            after_effect().await;
+            if addon_metadata(shown).await?.is_some() {
+                bail!(
+                    "refusing to update addon cache row: content remains at {}",
+                    shown.display()
+                );
+            }
+            if addon_metadata(twin).await?.is_none() {
+                repo::delete_mod_file_cache_by_id(db, id).await?;
+                return Ok(Outcome::Done);
+            }
+            repo::update_mod_file_enabled(
+                db,
+                id,
+                twin_enabled,
+                DbDateTime(Utc::now().fixed_offset()),
+            )
+            .await?;
+            return Ok(Outcome::KeptTwin(KeptTwin {
+                folder,
+                filename: row.filename,
+                addon_type: row.addon_type,
+                enabled: twin_enabled,
+            }));
         }
         Action::Delete => {
             remove_addon_from_disk(&enabled, &disabled, kind == AddonType::Worlds).await?;
@@ -108,7 +160,7 @@ pub(super) async fn execute<F: Future<Output = ()>>(
             repo::delete_mod_file_cache_by_id(db, id).await?;
         }
     }
-    Ok(())
+    Ok(Outcome::Done)
 }
 
 use sha2::{Digest, Sha512};
