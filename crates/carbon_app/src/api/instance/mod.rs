@@ -341,6 +341,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 &app.db,
             ).await.unwrap_or(false);
 
+            // A 7 GB CI runner often has less free than the check asks for, even
+            // though the heap pinned by GDL_E2E_DEFAULT_XMX_MB fits.
+            #[cfg(feature = "e2e")]
+            let memory_check_dismissed = memory_check_dismissed
+                || std::env::var_os("GDL_E2E_SKIP_MEMORY_CHECK").is_some();
+
             if !args.skip_memory_check && !memory_check_dismissed {
                 let instance_id = crate::domain::instance::InstanceId(args.id.0);
                 let (_xms, xmx) = app.instance_manager()

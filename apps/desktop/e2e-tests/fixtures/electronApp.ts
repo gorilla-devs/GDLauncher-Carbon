@@ -181,7 +181,8 @@ export async function launchApp(opts: LaunchOptions): Promise<{
         // A fresh runtime dir derives its heap from total RAM, which on a
         // 7 GB CI runner exceeds what is available by launch time. Pin one
         // that fits; overridable for roomier runners.
-        GDL_E2E_DEFAULT_XMX_MB: process.env.GDL_E2E_DEFAULT_XMX_MB ?? "1024"
+        GDL_E2E_DEFAULT_XMX_MB: process.env.GDL_E2E_DEFAULT_XMX_MB ?? "1024",
+        GDL_E2E_SKIP_MEMORY_CHECK: "1"
       } as Record<string, string>
     })
     .catch((error) => {

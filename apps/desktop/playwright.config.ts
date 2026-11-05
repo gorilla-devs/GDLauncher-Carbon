@@ -27,8 +27,9 @@ const config: PlaywrightTestConfig = {
   timeout: 15 * 60 * 1000,
   /* Backstop for the whole run, kept below the workflow's timeout-minutes so
      a wedged run is ended here — with a report — rather than by the runner,
-     which kills the job and leaves no results at all. */
-  globalTimeout: 2 * 60 * 60 * 1000,
+     which kills the job and leaves no results at all. The steps before this
+     one take up to an hour of those 160 minutes. */
+  globalTimeout: 90 * 60 * 1000,
   expect: {
     /**
      * Maximum time expect() should wait for the condition to be met.
