@@ -15,7 +15,10 @@ import { parseSearchQuery } from "./utils/searchQueryParser"
 import { checkForUpdates } from "./utils/updater"
 import { windowCloseWarningAcquireLock } from "./managers/ModalsManager/modals/WindowCloseWarning"
 import { ACCOUNT_BANNED_EVENT } from "./utils/bannedEventBridge"
-import { showRuntimeMoveNotice } from "./utils/runtimeMoveNotice"
+import {
+  showRuntimeMoveNotice,
+  showUnavailableRuntimePath
+} from "./utils/runtimeMoveNotice"
 import ShutdownPrompt from "./components/ShutdownPrompt"
 
 interface Props {

@@ -921,7 +921,9 @@ export interface RuntimeRelocationOptions {
    * stopped and the move runs to its end.
    */
   progress?: (value: {
-    action: "check" | "scan" | "copy" | "remove"
+    // "flush" writes the finished copy to the drive; "rollback" removes
+    // what a move that stopped had copied.
+    action: "check" | "scan" | "copy" | "flush" | "remove" | "rollback"
     currentName: string
     current: number
     total: number
@@ -952,8 +954,10 @@ export async function relocateRuntime(
   await options.checkCore?.()
   signal?.throwIfAborted()
   progress?.({ action: "check", currentName: "", current: 0, total: 0 })
-  await inventoryRuntimeTree(source, signal, { liveSource: true })
-  if (options.switchOnly) await inventoryRuntimeTree(target, signal)
+  // A switch copies nothing and never touches the old folder, so what either
+  // folder holds does not matter: `check` already refused an unfinished move.
+  if (!options.switchOnly)
+    await inventoryRuntimeTree(source, signal, { liveSource: true })
   // Last point where closing the app leaves everything as it was.
   options.interruptible?.commit()
   progress?.({ action: "scan", currentName: "", current: 0, total: 0 })

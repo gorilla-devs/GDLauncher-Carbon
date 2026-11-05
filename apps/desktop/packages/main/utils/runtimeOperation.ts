@@ -1,4 +1,5 @@
 let active = false
+let brief = false
 let interruptible: AbortController | undefined
 const whenIdle = new Set<() => void>()
 export function assertRuntimeOperationAvailable() {
@@ -31,6 +32,7 @@ export async function withRuntimeOperation<T>(
     return await operation()
   } finally {
     active = false
+    brief = false
     interruptible = undefined
     const callbacks = [...whenIdle]
     whenIdle.clear()

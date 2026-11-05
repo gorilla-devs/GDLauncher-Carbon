@@ -62,6 +62,7 @@ import {
 } from "./utils/coreShutdown"
 import {
   runtimeOperationActive,
+  runtimeOperationBrief,
   whenRuntimeOperationIdle,
   withRuntimeOperation
 } from "./utils/runtimeOperation"
@@ -1349,6 +1350,32 @@ ipcMain.handle("dismissRuntimeMoveNotice", async () =>
   dismissRuntimeMoveNotice(app.getPath("userData"))
 )
 
+// The data folder could not be opened (its drive not connected, say), so this
+// start uses the default one; every such start says so.
+ipcMain.handle("getUnavailableRuntimePath", async () =>
+  UNAVAILABLE_RUNTIME_PATH && CURRENT_RUNTIME_PATH
+    ? { folder: UNAVAILABLE_RUNTIME_PATH, current: CURRENT_RUNTIME_PATH }
+    : null
+)
+
+// The user keeps the default folder this start uses: later starts open it
+// without asking. Only the folder this start could not open is forgotten,
+// and only while no move runs. A quit meanwhile waits for it.
+ipcMain.handle("keepDefaultRuntimePath", async () =>
+  withRuntimeOperation(
+    async () => {
+      const folder = UNAVAILABLE_RUNTIME_PATH
+      if (!folder) return
+      await forgetUnavailableRuntimePath(
+        path.join(app.getPath("userData"), RUNTIME_PATH_OVERRIDE_NAME),
+        folder
+      )
+      UNAVAILABLE_RUNTIME_PATH = null
+    },
+    { brief: true }
+  )
+)
+
 ipcMain.handle(
   "validateRuntimePath",
   async (_, newPath: string | null): Promise<RuntimePathValidation> => {
@@ -1366,7 +1393,14 @@ ipcMain.handle(
         return error.fromSource
           ? "incomplete_migration"
           : "other_incomplete_migration"
-      return "invalid"
+      // Settings names the reason; the log keeps the details. Settings checks
+      // the folder in use on every visit, which is never a destination.
+      if (
+        !CURRENT_RUNTIME_PATH ||
+        path.resolve(newPath) !== path.resolve(CURRENT_RUNTIME_PATH)
+      )
+        console.warn("Data folder refused:", newPath, String(error))
+      return runtimeTargetRefusal(error)
     }
   }
 )

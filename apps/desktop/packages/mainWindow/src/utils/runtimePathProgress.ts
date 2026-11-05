@@ -1,7 +1,9 @@
 import { createSignal } from "solid-js"
 
 interface Progress {
-  action: "check" | "scan" | "copy" | "remove"
+  // "flush" writes the finished copy to the drive; "rollback" removes what a
+  // move that stopped had copied.
+  action: "check" | "scan" | "copy" | "flush" | "remove" | "rollback"
   currentName: string
   current: number
   total: number

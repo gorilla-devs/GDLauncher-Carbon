@@ -772,6 +772,83 @@ mod tests {
         );
     }
 
+    /// A server whose identity cannot be written into its process record
+    /// once it started (the drive just filled up, say) is still started and
+    /// supervised. Start used to fail there while the JVM ran on untracked,
+    /// holding the port and the world, so a retry could not start it and
+    /// every quit waited on the unconfirmed run. Its marker still names it
+    /// and Kill still stops it.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_started_server_whose_record_cannot_be_written_stays_supervised() {
+        use crate::managers::runtime_lifecycle::{RuntimeLifecycle, tests_support};
+        use std::os::unix::fs::PermissionsExt;
+        use std::time::{Duration, Instant};
+
+        /// Ends the stub server however the test ends.
+        struct StubServer(std::path::PathBuf);
+        impl Drop for StubServer {
+            fn drop(&mut self) {
+                let deadline = Instant::now() + Duration::from_secs(5);
+                while Instant::now() < deadline {
+                    if let Some(pid) = std::fs::read_to_string(&self.0)
+                        .ok()
+                        .and_then(|pid| pid.trim().parse::<i32>().ok())
+                    {
+                        // SAFETY: signals only the stub this test started.
+                        unsafe { libc::kill(pid, libc::SIGKILL) };
+                        return;
+                    }
+                    std::thread::sleep(Duration::from_millis(20));
+                }
+            }
+        }
+
+        let dir = tempfile::tempdir().unwrap();
+        let java = dir.path().join("java");
+        std::fs::write(&java, STUB_SERVER).unwrap();
+        std::fs::set_permissions(&java, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let server_path = ServerPath::new(dir.path().join("server-root"));
+        let data = server_path.get_data_path();
+        std::fs::create_dir_all(&data).unwrap();
+        std::fs::write(server_path.get_server_jar_path(), b"jar").unwrap();
+        let _stub = StubServer(data.join("pid"));
+        let lifecycle = std::sync::Arc::new(RuntimeLifecycle::with_runtime_path(
+            &dir.path().join("runtime"),
+        ));
+        lifecycle.reconciliation_finished(Ok(()));
+
+        let (log_tx, _log_rx) = mpsc::unbounded_channel();
+        let started = {
+            let _fault = tests_support::fail_child_records();
+            LocalServerProvider
+                .start(
+                    &java,
+                    &server_path,
+                    1024,
+                    1024,
+                    "",
+                    &LaunchConfig::vanilla(),
+                    None,
+                    log_tx,
+                    lifecycle.admit("server 1 run").unwrap(),
+                )
+                .await
+        };
+        let handle = started.expect("the server runs, so Start succeeds");
+        assert_ne!(handle.process_id, 0);
+        let marker = super::super::provider::read_process_file(&server_path.get_root())
+            .await
+            .unwrap()
+            .expect("the server's marker names it");
+        assert_eq!(marker.pid, handle.process_id);
+
+        LocalServerProvider.kill(&handle).await.unwrap();
+        handle.exited.clone().wait_confirmed().await.unwrap();
+        handle.finish_publication();
+        lifecycle.begin_relocation("move").unwrap();
+    }
+
     /// Where [`forced_core_stand_in`] finds the stub server and writes.
     #[cfg(unix)]
     const FORCED_CORE_DIR: &str = "GDL_TEST_FORCED_CORE_DIR";
