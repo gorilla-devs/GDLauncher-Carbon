@@ -5,6 +5,8 @@ import os from "node:os"
 import { EventEmitter } from "node:events"
 import type { ChildProcess } from "node:child_process"
 import { resetDatabaseAndRestart } from "../databaseReset"
+import { pruneRecoveryCopies } from "../databaseRecoveryBundles"
+import { restoreDatabaseSnapshot } from "../databaseRestore"
 import { ShutdownBlockedError, forceTerminateCore } from "../coreShutdown"
 import { ShutdownFlow } from "../shutdownFlow"
 const names = [
@@ -481,4 +483,259 @@ it("Reset now after a refused stop still waits for the observed core exit before
   } finally {
     vi.useRealTimers()
   }
+})
+
+it("reset works through a data folder that is a link or junction", async () => {
+  const root = await fixture(),
+    holder = await fs.mkdtemp(path.join(os.tmpdir(), "task24-link-")),
+    link = path.join(holder, "data"),
+    restart = vi.fn()
+  await fs.symlink(root, link, "junction")
+  const result = await resetDatabaseAndRestart(link, {
+    stopCore: async () => {},
+    restart
+  })
+  expect(result).toMatchObject({ ok: true })
+  if (!result.ok) throw Error(result.message)
+  for (const [i, name] of names.entries()) {
+    expect(
+      await fs.readFile(path.join(result.recoveryPath, name), "utf8")
+    ).toBe(`synthetic metadata ${i}`)
+    await expect(fs.lstat(path.join(root, name))).rejects.toMatchObject({
+      code: "ENOENT"
+    })
+  }
+  // The link stays, and the copy lives in the real folder.
+  expect((await fs.lstat(link)).isSymbolicLink()).toBe(true)
+  expect(path.dirname(result.recoveryPath)).toBe(await fs.realpath(root))
+  expect(restart).toHaveBeenCalledOnce()
+})
+it("reset names a linked data folder whose target is gone, and how to fix it", async () => {
+  const holder = await fs.mkdtemp(path.join(os.tmpdir(), "task24-link-")),
+    link = path.join(holder, "data"),
+    restart = vi.fn()
+  await fs.symlink(path.join(holder, "unplugged"), link)
+  const result = await resetDatabaseAndRestart(link, {
+    stopCore: async () => {},
+    restart
+  })
+  expect(result.ok).toBe(false)
+  if (result.ok) throw Error("must fail")
+  expect(result.message).toContain(link)
+  expect(result.message).toContain("reconnect")
+  expect(restart).not.toHaveBeenCalled()
+})
+it("reset goes on when a volume cannot report the folder's final path", async () => {
+  const root = await fixture()
+  const realpath = async () => {
+    throw Object.assign(Error("no final path"), { code: "EISDIR" })
+  }
+  const result = await resetDatabaseAndRestart(root, {
+    stopCore: async () => {},
+    restart: () => {},
+    files: { ...fs, realpath } as unknown as typeof fs
+  })
+  expect(result).toMatchObject({ ok: true })
+})
+it("reset says how much room its copy needs before starting it, and leaves no folder behind", async () => {
+  const root = await fixture(),
+    restart = vi.fn(),
+    mkdtemp = vi.fn(fs.mkdtemp)
+  const statfs = async () => ({ blocks: 100, bavail: 0, bsize: 4096 })
+  const result = await resetDatabaseAndRestart(root, {
+    stopCore: async () => {},
+    restart,
+    files: { ...fs, statfs, mkdtemp } as unknown as typeof fs
+  })
+  expect(result.ok).toBe(false)
+  if (result.ok) throw Error("must fail")
+  expect(result.message).toContain("MB free")
+  expect(result.message).toContain("Free up some space")
+  expect(mkdtemp).not.toHaveBeenCalled()
+  await liveBytes(root)
+  expect(restart).not.toHaveBeenCalled()
+})
+it.each([
+  ["cannot tell its free space", { blocks: 0, bavail: 0, bsize: 0 }],
+  ["has room", { blocks: 100, bavail: 100, bsize: 4096 }]
+])("reset goes ahead on a drive that %s", async (_label, stats) => {
+  const root = await fixture()
+  const result = await resetDatabaseAndRestart(root, {
+    stopCore: async () => {},
+    restart: () => {},
+    files: { ...fs, statfs: async () => stats } as unknown as typeof fs
+  })
+  expect(result).toMatchObject({ ok: true })
+})
+describe("old recovery copies", () => {
+  const DAY = 24 * 60 * 60 * 1000
+  const now = Date.now()
+  // The names a reset (ISO date, mkdtemp suffix) and a restore (UUID) generate.
+  const RESET_A = "gdl_conf.reset-recovery-2026-01-02T03-04-05-678Z-aBc123"
+  const RESET_B = "gdl_conf.reset-recovery-2026-01-02T03-04-05-678Z-dEf456"
+  const RESTORE =
+    "gdl_conf.restore-originals-12345678-9abc-4def-8012-3456789abcde"
+  const age = async (folder: string, days: number) => {
+    const when = new Date(now - days * DAY)
+    await fs.utimes(folder, when, when)
+  }
+  async function bundle(root: string, name: string, ageDays: number) {
+    const folder = path.join(root, name)
+    await fs.mkdir(folder)
+    await fs.writeFile(path.join(folder, "gdl_conf.db"), "old tokens")
+    await fs.writeFile(path.join(folder, "captured-files.json"), "{}")
+    const when = new Date(now - ageDays * DAY)
+    await fs.utimes(folder, when, when)
+    return folder
+  }
+  it("are removed after their 30 days, and recent ones stay", async () => {
+    const root = await fixture()
+    await bundle(root, RESET_A, 31)
+    await bundle(root, RESTORE, 31)
+    const recent = await bundle(root, RESET_B, 29)
+    expect((await pruneRecoveryCopies(root, now)).sort()).toEqual([
+      RESET_A,
+      RESTORE
+    ])
+    expect(
+      (await fs.readdir(root)).filter((n) => n.includes("pruning"))
+    ).toEqual([])
+    expect(await fs.readFile(path.join(recent, "gdl_conf.db"), "utf8")).toBe(
+      "old tokens"
+    )
+    await liveBytes(root)
+    expect(
+      await fs.readFile(path.join(root, "instances", "world"), "utf8")
+    ).toBe("world-kept")
+  })
+  it("stay when the folder holds something the launcher did not put there", async () => {
+    const root = await fixture()
+    const folder = await bundle(root, RESET_A, 90)
+    await fs.writeFile(path.join(folder, "my notes.txt"), "mine")
+    await age(folder, 90)
+    expect(await pruneRecoveryCopies(root, now)).toEqual([])
+    expect(await fs.readFile(path.join(folder, "gdl_conf.db"), "utf8")).toBe(
+      "old tokens"
+    )
+  })
+  it("stay when the name is only a link to a folder", async () => {
+    const root = await fixture()
+    const elsewhere = await fs.mkdtemp(path.join(os.tmpdir(), "task24-away-"))
+    await fs.writeFile(path.join(elsewhere, "gdl_conf.db"), "elsewhere")
+    await fs.symlink(elsewhere, path.join(root, RESET_A), "junction")
+    expect(await pruneRecoveryCopies(root, now + 365 * DAY)).toEqual([])
+    expect(await fs.readFile(path.join(elsewhere, "gdl_conf.db"), "utf8")).toBe(
+      "elsewhere"
+    )
+  })
+  it("stay while a restore is pending, since the startup guard may still need them", async () => {
+    const root = await fixture()
+    const folder = await bundle(root, RESTORE, 90)
+    await fs.writeFile(path.join(root, ".gdl-db-restore.json"), "{}")
+    await expect(pruneRecoveryCopies(root, now)).rejects.toThrow(
+      "needs recovery"
+    )
+    expect(await fs.readFile(path.join(folder, "gdl_conf.db"), "utf8")).toBe(
+      "old tokens"
+    )
+  })
+  it("one that cannot be removed does not hold up the others", async () => {
+    const root = await fixture()
+    await bundle(root, RESET_A, 90)
+    await bundle(root, RESET_B, 90)
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const unlink = async (file: any) => {
+      if (String(file).includes("aBc123")) throw Error("in use")
+      return fs.unlink(file)
+    }
+    expect(
+      await pruneRecoveryCopies(root, now, {
+        ...fs,
+        unlink
+      } as unknown as typeof fs)
+    ).toEqual([RESET_B])
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+  })
+  it("a folder with a file held open keeps every file, and is tried again on the next start", async () => {
+    const root = await fixture()
+    const folder = await bundle(root, RESET_A, 90)
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const held = {
+      ...fs,
+      // What Windows answers while a file in the folder is open.
+      rename: async () => {
+        throw Object.assign(Error("in use"), { code: "EPERM" })
+      }
+    } as unknown as typeof fs
+    expect(await pruneRecoveryCopies(root, now, held)).toEqual([])
+    expect((await fs.readdir(folder)).sort()).toEqual([
+      "captured-files.json",
+      "gdl_conf.db"
+    ])
+    warn.mockRestore()
+    expect(await pruneRecoveryCopies(root, now)).toEqual([RESET_A])
+    await expect(fs.lstat(folder)).rejects.toMatchObject({ code: "ENOENT" })
+  })
+  it("a removal that stopped part way is finished on the next start, whatever the date says", async () => {
+    const root = await fixture()
+    await bundle(root, RESET_A, 90)
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    let failures = 1
+    const flaky = {
+      ...fs,
+      unlink: async (file: any) => {
+        if (String(file).endsWith("gdl_conf.db") && failures-- > 0)
+          throw Error("in use")
+        return fs.unlink(file)
+      }
+    } as unknown as typeof fs
+    expect(await pruneRecoveryCopies(root, now, flaky)).toEqual([])
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
+    // It no longer looks like something to recover from, and its date is new.
+    expect(
+      (await fs.readdir(root)).filter((n) => n.includes("pruning"))
+    ).toHaveLength(1)
+    expect(await fs.readdir(root)).not.toContain(RESET_A)
+    expect(await pruneRecoveryCopies(root, Date.now())).toEqual([RESET_A])
+    expect(
+      (await fs.readdir(root)).filter((n) => n.includes("pruning"))
+    ).toEqual([])
+  })
+  it.each([
+    ["renamed to keep it", "gdl_conf.reset-recovery-KEEP-before-update"],
+    ["duplicated in Explorer", `${RESET_A} - Copy`],
+    ["another name after a restore's prefix", "gdl_conf.restore-originals-old"]
+  ])("stay when the user %s", async (_label, name) => {
+    const root = await fixture()
+    const folder = await bundle(root, name, 90)
+    expect(await pruneRecoveryCopies(root, now)).toEqual([])
+    expect(await fs.readFile(path.join(folder, "gdl_conf.db"), "utf8")).toBe(
+      "old tokens"
+    )
+  })
+  it("recognises the folders a real reset and a real restore create", async () => {
+    const root = await fixture()
+    const reset = await resetDatabaseAndRestart(root, {
+      stopCore: async () => {},
+      restart: () => {}
+    })
+    if (!reset.ok) throw Error(reset.message)
+    await fs.writeFile(path.join(root, "gdl_conf.pre-downgrade.db"), "snapshot")
+    const restore = await restoreDatabaseSnapshot(
+      root,
+      path.join(root, "gdl_conf.pre-downgrade.db"),
+      { stopCore: async () => {}, restart: () => {} }
+    )
+    if (!restore.ok) throw Error(restore.message)
+    await age(reset.recoveryPath, 31)
+    await age(restore.recoveryPath, 31)
+    expect((await pruneRecoveryCopies(root, now)).sort()).toEqual(
+      [
+        path.basename(reset.recoveryPath),
+        path.basename(restore.recoveryPath)
+      ].sort()
+    )
+  })
 })

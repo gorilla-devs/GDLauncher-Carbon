@@ -8,6 +8,13 @@ import vm from "node:vm"
 import { EventEmitter } from "node:events"
 import { resetDatabaseAndRestart } from "../databaseReset"
 import {
+  DatabaseRefusal,
+  assertDatabaseRestoreReady,
+  recoverInterruptedRestore
+} from "../databaseRestore"
+import { pruneRecoveryCopies } from "../databaseRecoveryBundles"
+import { createHash } from "node:crypto"
+import {
   ShutdownBlockedError,
   cancelCoreShutdown,
   forceTerminateCore,
@@ -223,7 +230,13 @@ it("actual reset IPC waits for observed owned pre-READY exit, then retains bytes
 })
 it("actual reset IPC refuses a running external core without touching files", async () => {
   const f = await fixture()
-  const { reset, prompts } = f.resetWith({ coreProcessHandle: null })
+  const { reset, prompts } = f.resetWith({
+    coreProcessHandle: null,
+    coreModule: Promise.resolve({
+      type: "success",
+      result: { port: 1, apiToken: "synthetic" }
+    })
+  })
   const result = await reset()
   expect(result.ok).toBe(false)
   expect(result.message).toContain("launcher-owned")
