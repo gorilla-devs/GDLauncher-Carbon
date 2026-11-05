@@ -1078,3 +1078,35 @@ mod task14_discovery_controls {
         );
     }
 }
+
+#[cfg(test)]
+mod stale_java_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_java_path_that_is_gone_is_left_out() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(
+            t.path().join("instance.json"),
+            serde_json::json!({
+                "name": "Pack",
+                "runtime": { "minecraft": "1.20.1" },
+                "java": "/gdl-no-such-folder/bin/java"
+            })
+            .to_string(),
+        )
+        .unwrap();
+        let Some(InternalImportEntry::Valid(entry)) = XmclImporter::new()
+            .scan_instance(t.path().to_path_buf(), None)
+            .await
+            .unwrap()
+        else {
+            panic!("an instance with a stale Java path was refused")
+        };
+        assert_eq!(entry.settings.java_path, None);
+        assert_eq!(
+            ImportableInstance::from(entry).warnings,
+            [Translation::InstanceImportJavaPathSkipped]
+        );
+    }
+}

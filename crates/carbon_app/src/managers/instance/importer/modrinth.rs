@@ -388,6 +388,7 @@ async fn load_records_from_candidates(
             }
         }
         let selected = selected.clone();
+        let selected_settings_dir = layout.settings_dir.clone();
         let candidate = db_path.clone();
         // Root association and records are read under the same SQLite snapshot.
         let result = tokio::task::spawn_blocking(move || {
@@ -400,21 +401,44 @@ async fn load_records_from_candidates(
                         .parent()
                         .context("Database has no settings directory")?;
                     let custom = read_custom_dir_from_connection(conn)?;
+                    // Only the selected folder's own database speaks for it:
+                    // another install pointing at a drive that is gone says
+                    // nothing about what the user picked.
+                    let unavailable = custom
+                        .as_deref()
+                        .filter(|_| selected_settings_dir.as_deref() == Some(settings_dir))
+                        .map(PathBuf::from)
+                        .filter(|custom| {
+                            matches!(
+                                std::fs::metadata(custom),
+                                Err(e) if e.kind() == std::io::ErrorKind::NotFound
+                            )
+                        });
                     let root = profiles_dir_from_config(settings_dir, custom)?;
                     if path_identity(&root).with_context(|| {
                         format!("Cannot identify Modrinth profiles directory {root:?}")
                     })? != selected
                     {
-                        return Ok(HashMap::new());
+                        return Ok((HashMap::new(), unavailable));
                     }
-                    read_records_from_connection(conn)
+                    Ok((read_records_from_connection(conn)?, unavailable))
                 },
             )
         })
         .await;
         match result {
-            Ok(Ok(records)) if !records.is_empty() => return (records, error),
-            Ok(Ok(_)) => trace!("Modrinth database {db_path:?} has no associated profiles"),
+            Ok(Ok((records, unavailable))) => {
+                if let Some(folder) = unavailable {
+                    error.get_or_insert(anyhow!(
+                        "Modrinth App's data folder {} is not available. Connect its drive, or choose another folder.",
+                        folder.display()
+                    ));
+                }
+                if !records.is_empty() {
+                    return (records, error);
+                }
+                trace!("Modrinth database {db_path:?} has no associated profiles");
+            }
             result => {
                 let failure = match result {
                     Ok(Err(e)) => e,

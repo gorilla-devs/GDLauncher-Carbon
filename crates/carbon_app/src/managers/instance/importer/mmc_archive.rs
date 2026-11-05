@@ -364,6 +364,48 @@ mod test {
         }
     }
 
+    /// A distributed packwiz zip used to scan as importable and then fail on
+    /// Import; now the row warns up front and the import goes through.
+    #[tokio::test]
+    async fn zip_with_launcher_variable_commands_warns_at_scan_time() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("pack.zip");
+        write_zip(&path, &[
+            ("instance.cfg", b"name=Pack\nIntendedVersion=1.20.1\nOverrideCommands=true\nPreLaunchCommand=\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar https://example.invalid/pack.toml\n"),
+            ("mmc-pack.json", br#"{"components":[{"uid":"net.minecraft","version":"1.20.1"}]}"#),
+        ]);
+        let Some(InternalImportEntry::Valid(entry)) =
+            MmcArchiveImporter::new().scan_archive(path).await
+        else {
+            panic!("packwiz zip refused")
+        };
+        assert_eq!(entry.meta.settings.pre_launch_hook, None);
+        assert_eq!(
+            ImportableInstance::from(entry).warnings,
+            [Translation::InstanceImportCommandsSkipped]
+        );
+    }
+
+    #[tokio::test]
+    async fn zip_with_a_java_path_that_is_gone_warns_at_scan_time() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("pack.zip");
+        write_zip(&path, &[
+            ("instance.cfg", b"name=Pack\nIntendedVersion=1.20.1\nOverrideJavaLocation=true\nJavaPath=/gdl-no-such-folder/bin/java\n"),
+            ("mmc-pack.json", br#"{"components":[{"uid":"net.minecraft","version":"1.20.1"}]}"#),
+        ]);
+        let Some(InternalImportEntry::Valid(entry)) =
+            MmcArchiveImporter::new().scan_archive(path).await
+        else {
+            panic!("zip with a stale Java path refused")
+        };
+        assert_eq!(entry.meta.settings.java_path, None);
+        assert_eq!(
+            ImportableInstance::from(entry).warnings,
+            [Translation::InstanceImportJavaPathSkipped]
+        );
+    }
+
     #[test]
     fn instance_prefix_is_found_at_root_or_one_level_down() {
         assert_eq!(

@@ -437,25 +437,25 @@ pub(super) fn game_dir(instance_root: &Path) -> PathBuf {
 }
 
 async fn instances_dir_for_data_dir(data_dir: &Path) -> PathBuf {
-    if let Some(cfg) = read_launcher_cfg(data_dir).await {
-        if let Some(inst_dir) = cfg
-            .get("InstanceDir")
-            .map(|v| v.trim())
-            .filter(|v| !v.is_empty())
-        {
-            let inst_dir = PathBuf::from(inst_dir);
-            let resolved = if inst_dir.is_absolute() {
-                inst_dir
-            } else {
-                data_dir.join(inst_dir)
-            };
-            if resolved.is_dir() {
-                return resolved;
-            }
-        }
-    }
+    configured_instances_dir(data_dir)
+        .await
+        .filter(|dir| dir.is_dir())
+        .unwrap_or_else(|| data_dir.join("instances"))
+}
 
-    data_dir.join("instances")
+/// The `InstanceDir` from the launcher's config, whether or not it exists.
+async fn configured_instances_dir(data_dir: &Path) -> Option<PathBuf> {
+    let cfg = read_launcher_cfg(data_dir).await?;
+    let inst_dir = cfg
+        .get("InstanceDir")
+        .map(|v| v.trim())
+        .filter(|v| !v.is_empty())?;
+    let inst_dir = PathBuf::from(inst_dir);
+    Some(if inst_dir.is_absolute() {
+        inst_dir
+    } else {
+        data_dir.join(inst_dir)
+    })
 }
 
 const LAUNCHER_CFG_NAMES: [&str; 3] = ["prismlauncher.cfg", "polymc.cfg", "multimc.cfg"];
@@ -1128,13 +1128,49 @@ mod task13_tests {
         )
         .unwrap();
         let importer = MmcImporter::new(MmcFlavor::Prism);
-        assert!(matches!(
-            importer
-                .scan_instance(t.path().to_path_buf())
+        let entry = scan_valid(&importer, t.path()).await;
+        assert_eq!(entry.settings.pre_launch_hook, None);
+        assert_eq!(entry.settings.wrapper_command, None);
+        assert_eq!(entry.settings.post_exit_hook.as_deref(), Some("echo done"));
+        // What was dropped stays with the instance: it may hold the pack's URL.
+        assert_eq!(
+            entry.settings.notes.as_deref(),
+            Some(concat!(
+                "PreLaunchCommand=\"$INST_JAVA\" -jar packwiz-installer-bootstrap.jar https://example.invalid/pack.toml\n",
+                "WrapperCommand=%INST_DIR%\\wrap.cmd"
+            ))
+        );
+        assert_eq!(
+            ImportableInstance::from(entry).warnings,
+            [Translation::InstanceImportCommandsSkipped]
+        );
+
+        std::fs::write(
+            t.path().join("instance.cfg"),
+            "name=Synthetic\nnotes=my notes\nOverrideCommands=true\nPostExitCommand=$INST_DIR/clean.sh\n",
+        )
+        .unwrap();
+        assert_eq!(
+            scan_valid(&importer, t.path())
                 .await
-                .unwrap(),
-            Some(InternalImportEntry::Invalid(_))
-        ));
+                .settings
+                .notes
+                .as_deref(),
+            Some("my notes\n\nPostExitCommand=$INST_DIR/clean.sh")
+        );
+
+        std::fs::write(
+            t.path().join("instance.cfg"),
+            "name=Synthetic\nOverrideCommands=true\nPreLaunchCommand=echo ordinary\n",
+        )
+        .unwrap();
+        let entry = scan_valid(&importer, t.path()).await;
+        assert_eq!(
+            entry.settings.pre_launch_hook.as_deref(),
+            Some("echo ordinary")
+        );
+        assert!(ImportableInstance::from(entry).warnings.is_empty());
+
         std::fs::write(
             t.path().join("instance.cfg"),
             "name=Synthetic\nOverrideCommands=false\nPreLaunchCommand=echo $INST_DIR\n",
@@ -1363,6 +1399,147 @@ mod task14_component_controls {
                 DeclaredModLoader::new(ModLoaderType::Fabric, "0.15.6"),
                 DeclaredModLoader::new(ModLoaderType::Quilt, "0.25.0")
             ]
+        );
+    }
+}
+
+#[cfg(test)]
+mod missing_folder_tests {
+    use super::*;
+
+    /// A Prism data folder whose instances folder is gone has nothing to
+    /// import; it used to fail with a bare "No such file or directory".
+    #[tokio::test]
+    async fn a_data_folder_without_instances_is_an_empty_result() {
+        let env = crate::setup_managers_for_test().await;
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(
+            t.path().join("prismlauncher.cfg"),
+            "InstanceDir=instances\n",
+        )
+        .unwrap();
+        let scanner = MmcImporter::new(MmcFlavor::Prism);
+        scanner
+            .scan(&env.app, t.path().to_path_buf())
+            .await
+            .unwrap();
+        assert!(matches!(
+            scanner.get_status().await,
+            ImportScanStatus::NoResults
+        ));
+    }
+
+    /// An instances folder the settings point at but that is not there (an
+    /// unplugged drive) is named, so the user knows what to reconnect.
+    #[tokio::test]
+    async fn a_missing_configured_instances_folder_is_named() {
+        let env = crate::setup_managers_for_test().await;
+        // Prism saves with QSettings and MultiMC with its own writer; both
+        // double every backslash, as in a Windows path typed into the settings.
+        for (flavor, file, header) in [
+            (
+                MmcFlavor::Prism,
+                "prismlauncher.cfg",
+                "[General]\nConfigVersion=1.3\n",
+            ),
+            (MmcFlavor::MultiMC, "multimc.cfg", ""),
+        ] {
+            let t = tempfile::tempdir().unwrap();
+            let elsewhere = t.path().join("unplugged").join("Instances");
+            let saved = elsewhere.display().to_string().replace('\\', "\\\\");
+            std::fs::write(
+                t.path().join(file),
+                format!("{header}InstanceDir={saved}\n"),
+            )
+            .unwrap();
+            let error = MmcImporter::new(flavor)
+                .scan(&env.app, t.path().to_path_buf())
+                .await
+                .unwrap_err();
+            assert!(
+                format!("{error:#}").contains(&elsewhere.display().to_string()),
+                "{error:#}"
+            );
+        }
+    }
+
+    /// The instances folder a Windows install names is read as Prism reads
+    /// it: a path picked with Browse is saved with forward slashes, one typed
+    /// in with its backslashes doubled.
+    #[test]
+    fn a_windows_instances_folder_is_read_as_prism_saved_it() {
+        for saved in [
+            "InstanceDir=D:/Games/Prism Instances\n",
+            "[General]\nConfigVersion=1.3\nInstanceDir=D:/Games/Prism Instances\n",
+            "InstanceDir=D:\\\\Games\\\\Prism Instances\n",
+            "[General]\nConfigVersion=1.3\nInstanceDir=D:\\\\Games\\\\Prism Instances\n",
+        ] {
+            let expected = if saved.contains('\\') {
+                "D:\\Games\\Prism Instances"
+            } else {
+                "D:/Games/Prism Instances"
+            };
+            assert_eq!(
+                parse_instance_cfg(saved)
+                    .get("InstanceDir")
+                    .map(String::as_str),
+                Some(expected),
+                "{saved}"
+            );
+        }
+    }
+
+    /// A game folder that cannot even be checked gets its own row instead of
+    /// stopping the scan.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn an_uncheckable_game_folder_gets_its_own_row() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(
+            t.path().join("instance.cfg"),
+            "name=Looped\nIntendedVersion=1.20.1\n",
+        )
+        .unwrap();
+        // A symlink to itself: checking whether it exists fails with ELOOP.
+        std::os::unix::fs::symlink(".minecraft", t.path().join(".minecraft")).unwrap();
+        assert!(t.path().join(".minecraft").try_exists().is_err());
+        let entry = MmcImporter::new(MmcFlavor::Prism)
+            .scan_instance(t.path().to_path_buf())
+            .await
+            .unwrap();
+        assert!(matches!(
+            entry,
+            Some(InternalImportEntry::Invalid(InvalidImportEntry {
+                reason: Translation::InstanceImportSourceUnavailable,
+                ..
+            }))
+        ));
+    }
+}
+
+#[cfg(test)]
+mod stale_java_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn a_java_path_that_is_gone_is_left_out() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(
+            t.path().join("instance.cfg"),
+            "name=Pack\nIntendedVersion=1.20.1\nOverrideJavaLocation=true\nJavaPath=/gdl-no-such-folder/bin/java\n",
+        )
+        .unwrap();
+        let Some(InternalImportEntry::Valid(entry)) = MmcImporter::new(MmcFlavor::Prism)
+            .scan_instance(t.path().to_path_buf())
+            .await
+            .unwrap()
+        else {
+            panic!("an instance with a stale Java path was refused")
+        };
+        assert_eq!(entry.settings.java_path, None);
+        assert_eq!(
+            ImportableInstance::from(entry).warnings,
+            [Translation::InstanceImportJavaPathSkipped]
         );
     }
 }

@@ -643,8 +643,13 @@ impl ImportedSettings {
 
     /// Source arrays already contain exact tokens. Encode them for the launch
     /// tokenizer without trimming or splitting their literal contents.
+    /// Blank elements are dropped, as XMCL and the Modrinth App do when they
+    /// launch: Java would take one as the main class and refuse to start.
     pub(crate) fn absorb_jvm_argv<'a>(&mut self, args: impl IntoIterator<Item = &'a str>) {
-        let args: Vec<_> = args.into_iter().collect();
+        let args: Vec<_> = args
+            .into_iter()
+            .filter(|arg| !arg.trim().is_empty())
+            .collect();
         let is_heap_arg = |arg: &str| arg.starts_with("-Xmx") || arg.starts_with("-Xms");
         let mut proposed = Self {
             memory_min_mb: self.memory_min_mb,
@@ -673,14 +678,20 @@ impl ImportedSettings {
                 }
             }
         }
+        // GDL always passes its own -Xmx first, so a literal -Xms without any
+        // maximum could exceed it and stop Java from starting. The source's
+        // JVM raised its default maximum to fit instead. Keep such a minimum
+        // only as the managed value, which pairs with a maximum if one comes.
+        let lone_minimum = absorb_heap && proposed.memory_max_mb.is_none_or(|max| max == 0);
         // Check the actual published pair after last-wins planning: memory()
         // otherwise omits a lone minimum or clamps values to the maximum/u16.
-        absorb_heap &= proposed.memory().is_some_and(|(min, max)| {
-            proposed.memory_max_mb == Some(u32::from(max))
-                && proposed
-                    .memory_min_mb
-                    .map_or(true, |value| value == u32::from(min))
-        });
+        absorb_heap &= lone_minimum
+            || proposed.memory().is_some_and(|(min, max)| {
+                proposed.memory_max_mb == Some(u32::from(max))
+                    && proposed
+                        .memory_min_mb
+                        .map_or(true, |value| value == u32::from(min))
+            });
         if absorb_heap {
             self.memory_min_mb = proposed.memory_min_mb;
             self.memory_max_mb = proposed.memory_max_mb;
@@ -1502,14 +1513,21 @@ mod task14_argv_controls {
             ..Default::default()
         };
         settings.absorb_jvm_argv(expected);
-        assert_eq!(task14_persisted_args(&settings), expected);
+        // Blank elements are dropped: Java would read one as the main class.
+        let kept: Vec<_> = expected
+            .iter()
+            .copied()
+            .filter(|arg| !arg.trim().is_empty())
+            .collect();
+        assert_eq!(kept.len(), expected.len() - 3);
+        assert_eq!(task14_persisted_args(&settings), kept);
         settings.absorb_jvm_argv(["-Xmx2G", "-Xms512M", "-Xmx3G"]);
         assert_eq!(settings.memory(), Some((8192, 8192)));
-        let mut appended = expected.to_vec();
+        let mut appended = kept.clone();
         appended.extend(["-Xmx2G", "-Xms512M", "-Xmx3G"]);
         assert_eq!(task14_persisted_args(&settings), appended);
-        settings.absorb_jvm_argv(["", "next"]);
-        appended.extend(["", "next"]);
+        settings.absorb_jvm_argv(["", "next", " "]);
+        appended.push("next");
         assert_eq!(task14_persisted_args(&settings), appended);
         let before = settings.clone();
         settings.absorb_jvm_argv([]);
@@ -1664,16 +1682,20 @@ mod task14_r2_memory_tests {
 
     #[test]
     fn task14_r2_repeated_arrays_preserve_retained_heap_precedence() {
-        for first in ["-Xms512M", "-Xmx65536M"] {
-            let mut settings = ImportedSettings::default();
-            settings.absorb_jvm_argv([first]);
-            settings.absorb_jvm_argv(["-Xmx2G", "-Xms256M", "-Dlabel=My Pack"]);
-            assert_eq!(
-                task14_persisted_args(&settings),
-                [first, "-Xmx2G", "-Xms256M", "-Dlabel=My Pack"]
-            );
-            assert_eq!(task14_persisted_config(&settings).memory, None);
-        }
+        let mut settings = ImportedSettings::default();
+        settings.absorb_jvm_argv(["-Xmx65536M"]);
+        settings.absorb_jvm_argv(["-Xmx2G", "-Xms256M", "-Dlabel=My Pack"]);
+        assert_eq!(
+            task14_persisted_args(&settings),
+            ["-Xmx65536M", "-Xmx2G", "-Xms256M", "-Dlabel=My Pack"]
+        );
+        assert_eq!(task14_persisted_config(&settings).memory, None);
+        // A lone minimum is managed, so a later pair still decides by last-wins.
+        let mut settings = ImportedSettings::default();
+        settings.absorb_jvm_argv(["-Xms512M"]);
+        settings.absorb_jvm_argv(["-Xmx2G", "-Xms256M", "-Dlabel=My Pack"]);
+        assert_eq!(task14_persisted_args(&settings), ["-Dlabel=My Pack"]);
+        assert_eq!(task14_persisted_config(&settings).memory, Some((256, 2048)));
     }
 
     #[test]
@@ -1683,24 +1705,23 @@ mod task14_r2_memory_tests {
         settings.absorb_jvm_argv(args);
         settings.absorb_jvm_argv(["-Xms512M", "-Xmx2G"]);
         settings.absorb_jvm_argv(["-Xmx3G"]);
-        assert_eq!(task14_persisted_args(&settings), args);
+        assert_eq!(task14_persisted_args(&settings), &args[..2]);
         assert_eq!(task14_persisted_config(&settings).memory, Some((512, 3072)));
     }
 
     #[test]
     fn task14_r2_unpublishable_existing_maxima_do_not_consume_minimum() {
-        for maximum in [0, 65536] {
-            let mut settings = ImportedSettings {
-                memory_max_mb: Some(maximum),
-                ..Default::default()
-            };
-            let before = settings.memory();
-            settings.absorb_jvm_argv(["-Xms512M"]);
-            assert_eq!(task14_persisted_args(&settings), ["-Xms512M"]);
-            assert_eq!(settings.memory_min_mb, None);
-            assert_eq!(settings.memory_max_mb, Some(maximum));
-            assert_eq!(task14_persisted_config(&settings).memory, before);
-        }
+        // A zero maximum is no maximum; see lone_minimum_without_a_maximum_is_not_passed_literally.
+        let mut settings = ImportedSettings {
+            memory_max_mb: Some(65536),
+            ..Default::default()
+        };
+        let before = settings.memory();
+        settings.absorb_jvm_argv(["-Xms512M"]);
+        assert_eq!(task14_persisted_args(&settings), ["-Xms512M"]);
+        assert_eq!(settings.memory_min_mb, None);
+        assert_eq!(settings.memory_max_mb, Some(65536));
+        assert_eq!(task14_persisted_config(&settings).memory, before);
     }
 
     #[test]
@@ -1715,13 +1736,27 @@ mod task14_r2_memory_tests {
         }
     }
 
+    /// GDL passes its own -Xmx before extra arguments; a literal -Xms above it
+    /// stops Java ("Initial heap size set to a larger value than the maximum").
     #[test]
-    fn task14_r2_standalone_minimum_keeps_its_literal_value() {
+    fn lone_minimum_without_a_maximum_is_not_passed_literally() {
+        for maximum in [None, Some(0)] {
+            let mut settings = ImportedSettings {
+                memory_max_mb: maximum,
+                ..Default::default()
+            };
+            settings.absorb_jvm_argv(["-Xms4G", "-XX:+UseG1GC"]);
+            assert_eq!(task14_persisted_args(&settings), ["-XX:+UseG1GC"]);
+            assert_eq!(task14_persisted_config(&settings).memory, None);
+            assert_eq!(settings.memory_min_mb, Some(4096));
+        }
         let mut settings = ImportedSettings::default();
         settings.absorb_jvm_argv(["-Xms512M"]);
-        assert_eq!(task14_persisted_config(&settings).memory, None);
-        assert_eq!(task14_persisted_args(&settings), ["-Xms512M"]);
-        assert!(settings.has_launch_overrides());
+        assert!(task14_persisted_args(&settings).is_empty());
+        assert!(!settings.has_launch_overrides());
+        // A maximum that arrives later pairs with the kept minimum.
+        settings.memory_max_mb = Some(2048);
+        assert_eq!(settings.memory(), Some((512, 2048)));
     }
 
     #[test]
