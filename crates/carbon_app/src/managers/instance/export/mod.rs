@@ -52,7 +52,7 @@ fn linked_mod_name(path: &Path) -> String {
     format!("{}/{}", name(path.parent()), name(Some(path)))
 }
 
-/// When a linked mod is read: before the export links it, or in the final
+/// When a linked mod is checked: before the export links it, or in the final
 /// re-read of every linked mod once the archive is written.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum LinkedRead {
@@ -60,16 +60,53 @@ enum LinkedRead {
     FinalCheck,
 }
 
-/// Read a mod the export links to its platform file instead of bundling it,
-/// and confirm it still holds the bytes the link names. Returns the file's
-/// stamp when nothing about it changed during the read.
+/// Confirm a mod the export links to its platform file instead of bundling
+/// it still holds the bytes the link names. `stored` is the mod's row stamp.
+///
+/// The export's addon pass has just read every mod and re-stamped the rows
+/// whose bytes matched, so a file whose stamp still equals its row's is only
+/// opened here, not read again: the final re-read of every linked mod
+/// ([`verify_linked_export_files`]) is the byte guard, also for a change no
+/// stamp shows. Any other file is read now, so a changed mod stops the export
+/// before the archive is written. A missing or unreadable mod fails here either
+/// way.
 ///
 /// Every error is one plain sentence naming the file and what to do: the
 /// export window shows it as is.
-async fn verify_linked_mod(path: &Path, sha512: &[u8]) -> anyhow::Result<Option<String>> {
-    read_linked_mod(path, sha512, LinkedRead::BeforeLinking).await
+async fn verify_linked_mod(path: &Path, sha512: &[u8], stored: Option<&str>) -> anyhow::Result<()> {
+    let unchanged = crate::managers::metadata::cache::opened_stamp_matches(path, stored)
+        .await
+        .map_err(|error| linked_mod_error(path, &error, LinkedRead::BeforeLinking))?;
+    if !unchanged {
+        read_linked_mod(path, sha512, LinkedRead::BeforeLinking).await?;
+    }
+    Ok(())
 }
 
+/// The plain sentence the export window shows when a linked mod cannot be
+/// opened or read.
+fn linked_mod_error(path: &Path, error: &io::Error, when: LinkedRead) -> anyhow::Error {
+    let name = linked_mod_name(path);
+    if error.kind() == io::ErrorKind::NotFound && when == LinkedRead::BeforeLinking {
+        // Also a link whose target was moved, deleted or unmounted:
+        // retrying alone never helps.
+        anyhow::anyhow!(
+            "{name} is missing or links to a file that no longer exists. Restore it, or untick it in the export's file list, then try again."
+        )
+    } else if error.kind() == io::ErrorKind::NotFound {
+        // It was checked before it was linked, so it went during the export.
+        anyhow::anyhow!(
+            "{name} was moved or deleted while the instance was being exported. Try the export again."
+        )
+    } else {
+        anyhow::anyhow!(
+            "Could not read {name} ({error}). Close any program that is using it, or untick it in the export's file list, then try again."
+        )
+    }
+}
+
+/// Read a linked mod and confirm it holds the bytes the link names. Returns
+/// the file's stamp when nothing about it changed during the read.
 async fn read_linked_mod(
     path: &Path,
     sha512: &[u8],
@@ -78,24 +115,7 @@ async fn read_linked_mod(
     let name = linked_mod_name(path);
     let (hash, stamp) = crate::managers::metadata::cache::read_stable_file_hash(path)
         .await
-        .map_err(|error| {
-            if error.kind() == io::ErrorKind::NotFound && when == LinkedRead::BeforeLinking {
-                // Also a link whose target was moved, deleted or unmounted:
-                // retrying alone never helps.
-                anyhow::anyhow!(
-                    "{name} is missing or links to a file that no longer exists. Restore it, or untick it in the export's file list, then try again."
-                )
-            } else if error.kind() == io::ErrorKind::NotFound {
-                // It was read before it was linked, so it went during the export.
-                anyhow::anyhow!(
-                    "{name} was moved or deleted while the instance was being exported. Try the export again."
-                )
-            } else {
-                anyhow::anyhow!(
-                    "Could not read {name} ({error}). Close any program that is using it, or untick it in the export's file list, then try again."
-                )
-            }
-        })?;
+        .map_err(|error| linked_mod_error(path, &error, when))?;
     if hash != sha512 {
         anyhow::bail!(
             "{name} changed while the instance was being exported. Try the export again."
