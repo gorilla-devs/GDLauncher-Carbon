@@ -1086,8 +1086,11 @@ impl Installer {
             }
             {
                 abort_handle.spawn(move |cancel| async move {
-                            // Preserve failed private staging for recovery. Explicit cancellation
-                    // settles download and publication IO before rollback can inspect it.
+                    // This attempt's private folder: its download, and the
+                    // replaced version until the update commits. Explicit
+                    // cancellation settles download and publication IO before
+                    // rollback can inspect it; it is cleared once this worker
+                    // is done (see `settle_staging` below).
                     let staging = tempfile::Builder::new()
                         .prefix(publication::STAGING_PREFIX)
                         .tempdir_in(

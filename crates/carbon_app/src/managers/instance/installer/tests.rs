@@ -2398,6 +2398,349 @@ mod round1_graph {
                 "{} was already cached and must not be read again",
                 path.display()
             );
+        }
+    }
+
+    /// One unrelated file the launcher cannot read never rolls back an install.
+    #[tokio::test]
+    async fn dependency_chain_commits_despite_unrelated_unreadable_files() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, _, first) = crate::managers::instance::mods::tests::addon_fixture(
+            &app,
+            "graph-bad-files",
+            instance::AddonType::Mods,
+            "existing.jar",
+            b"existing",
+        )
+        .await;
+        let mods = first.parent().unwrap().to_owned();
+        let root = mods.parent().unwrap().to_owned();
+        std::fs::write(root.join("resourcepacks"), b"a file where a folder belongs").unwrap();
+        let locked = mods.join("locked.jar");
+        std::fs::write(&locked, b"never readable").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::os::unix::fs::symlink("missing-target.jar", mods.join("broken.jar")).unwrap();
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
+        }
+        let rollbacks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let outcome = install_chain(&app, id, &rollbacks).await;
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o644)).unwrap();
+        }
+        assert_chain_published(&mods, &outcome, &rollbacks);
+        let rows = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap();
+        for name in CHAIN {
+            assert!(
+                rows.iter().any(|row| row.filename == format!("{name}.jar")),
+                "{name} is cached"
+            );
+        }
+        assert!(rows.iter().all(|row| row.filename != "broken.jar"));
+    }
+
+    /// People link an instance, its `instance` folder or its `mods` folder
+    /// elsewhere (a symlink, or a junction on Windows) to share mods between
+    /// instances or to move one big instance to another drive, and 2.0.40
+    /// followed those links. Installing with dependencies, updating,
+    /// disabling, enabling and deleting all keep working through each link,
+    /// the files land in its target, and the link itself stays.
+    async fn assert_addons_work_through_link(
+        link_dir: fn(&std::path::Path, &std::path::Path),
+        linked: &str,
+    ) {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, _) = crate::managers::instance::mods::tests::addon_fixture(
+            &app,
+            &format!("linked-{linked}"),
+            instance::AddonType::Mods,
+            "existing.jar",
+            b"v1",
+        )
+        .await;
+        let path = publication::current_path(&app, id).await.unwrap();
+        let link = match linked {
+            "root" => path.get_root(),
+            "instance" => path.get_data_path(),
+            _ => path.get_mods_path(),
+        };
+        let target = app
+            .settings_manager()
+            .runtime_path
+            .get_root()
+            .to_path()
+            .join("elsewhere")
+            .join(linked);
+        std::fs::create_dir_all(target.parent().unwrap()).unwrap();
+        std::fs::rename(&link, &target).unwrap();
+        link_dir(&link, &target);
+        let moved = match linked {
+            "root" => target.join("instance").join("mods"),
+            "instance" => target.join("mods"),
+            _ => target.clone(),
+        };
+
+        let rollbacks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let outcome = install_chain(&app, id, &rollbacks).await;
+        assert_chain_published(&moved, &outcome, &rollbacks);
+
+        let update = mr("existing.jar", b"v2");
+        let plan =
+            publication::ReplacementPlan::capture(&app, id, &row.id, instance::AddonType::Mods)
+                .await
+                .unwrap();
+        let stage = tempfile::tempdir().unwrap();
+        let bytes = stage.path().join("artifact");
+        std::fs::write(&bytes, b"v2").unwrap();
+        publication::publish_file(&update, &app, id, &bytes, Some(&plan), None)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(moved.join("existing.jar")).unwrap(), b"v2");
+        assert!(update.is_already_installed(&app, id).await.unwrap());
+
+        let manager = app.instance_manager();
+        manager.enable_mod(id, row.id.clone(), false).await.unwrap();
+        assert!(moved.join("existing.jar.disabled").is_file());
+        manager.enable_mod(id, row.id.clone(), true).await.unwrap();
+        assert!(moved.join("existing.jar").is_file());
+        manager.delete_mod(id, row.id.clone()).await.unwrap();
+        assert!(!moved.join("existing.jar").exists());
+        assert!(
+            mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            std::fs::symlink_metadata(&link)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+    }
+
+    #[cfg(unix)]
+    fn symlink(link: &std::path::Path, target: &std::path::Path) {
+        std::os::unix::fs::symlink(target, link).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn linked_instance_folders_keep_every_addon_action_working() {
+        for linked in ["root", "instance", "mods"] {
+            assert_addons_work_through_link(symlink, linked).await;
+        }
+    }
+
+    #[cfg(windows)]
+    fn junction(link: &std::path::Path, target: &std::path::Path) {
+        let status = std::process::Command::new("cmd")
+            .arg("/C")
+            .arg("mklink")
+            .arg("/J")
+            .arg(link)
+            .arg(target)
+            .stdout(std::process::Stdio::null())
+            .status()
+            .unwrap();
+        assert!(status.success(), "mklink /J failed for {}", link.display());
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn junctioned_instance_folders_keep_every_addon_action_working() {
+        for linked in ["root", "instance", "mods"] {
+            assert_addons_work_through_link(junction, linked).await;
+        }
+    }
+
+    /// A linked folder whose target is gone (an unplugged drive), or a file
+    /// where the folder belongs, refuses with a reason and a way out.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_dangling_folder_link_or_a_file_refuses_with_a_reason() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, _, existing) = crate::managers::instance::mods::tests::addon_fixture(
+            &app,
+            "dangling-link",
+            instance::AddonType::Mods,
+            "existing.jar",
+            b"v1",
+        )
+        .await;
+        let path = publication::current_path(&app, id).await.unwrap();
+        let resourcepacks = path.get_resourcepacks_path();
+        std::os::unix::fs::symlink(path.get_root().join("unplugged"), &resourcepacks).unwrap();
+        let error = publication::checked_folder(&path, instance::AddonType::ResourcePacks)
+            .await
+            .unwrap_err();
+        assert!(
+            format!("{error:#}").contains("is a link to a folder that cannot be found"),
+            "{error:#}"
+        );
+        std::fs::write(path.get_shaderpacks_path(), b"a file").unwrap();
+        let error = publication::checked_folder(&path, instance::AddonType::Shaders)
+            .await
+            .unwrap_err();
+        assert!(
+            format!("{error:#}").contains("is a file, not a folder"),
+            "{error:#}"
+        );
+        // Other addon folders are unaffected.
+        assert_eq!(
+            publication::checked_folder(&path, instance::AddonType::Mods)
+                .await
+                .unwrap(),
+            existing.parent().unwrap()
+        );
+    }
+
+    /// Saves shared between instances through a link (a symlink, or a
+    /// junction on Windows): a world installs into the link's target, another
+    /// version of a world installs beside it as a copy, a copy a failed
+    /// install rolls back leaves the target again, and Delete removes a world
+    /// from there. The link itself stays.
+    async fn assert_worlds_work_through_linked_saves(
+        link_dir: fn(&std::path::Path, &std::path::Path),
+    ) {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, original) = crate::managers::instance::mods::tests::addon_fixture(
+            &app,
+            "linked-saves",
+            instance::AddonType::Worlds,
+            "World",
+            b"original",
+        )
+        .await;
+        let path = publication::current_path(&app, id).await.unwrap();
+        let saves = original.parent().unwrap().to_path_buf();
+        let target = app
+            .settings_manager()
+            .runtime_path
+            .get_root()
+            .to_path()
+            .join("shared-saves");
+        std::fs::rename(&saves, &target).unwrap();
+        link_dir(&saves, &target);
+
+        let archive = tempfile::NamedTempFile::new().unwrap();
+        zip(archive.path(), &[("NewWorld/level.dat", b"new world")]);
+        let mut installer = cf(
+            "NewWorld.zip",
+            &std::fs::read(archive.path()).unwrap(),
+            curseforge::ClassId::Worlds,
+        )
+        .into_installer();
+        installer.download_fixture = Some(archive.path().into());
+        let task_id = installer.install(&app, id, false, None).await.unwrap();
+        wait_for_install(&installer, &app, task_id).await;
+        assert_eq!(
+            std::fs::read(target.join("NewWorld/level.dat")).unwrap(),
+            b"new world"
+        );
+
+        let version = tempfile::NamedTempFile::new().unwrap();
+        zip(version.path(), &[("World/level.dat", b"new version")]);
+        let mut installer = cf(
+            "World.zip",
+            &std::fs::read(version.path()).unwrap(),
+            curseforge::ClassId::Worlds,
+        )
+        .into_installer();
+        installer.download_fixture = Some(version.path().into());
+        let task_id = installer
+            .install(&app, id, false, Some(row.id.clone()))
+            .await
+            .unwrap();
+        wait_for_install(&installer, &app, task_id).await;
+        assert_eq!(
+            std::fs::read(target.join("World (copy 1)/level.dat")).unwrap(),
+            b"new version"
+        );
+        assert_eq!(
+            std::fs::read(target.join("World/level.dat")).unwrap(),
+            b"original"
+        );
+
+        let receipt = Arc::new(Mutex::new(None));
+        let operation = app.instance_manager().lock_instance(id).await;
+        let reserved = publication::prepare_world(version.path(), "World")
+            .await
+            .unwrap()
+            .reserve_copy(&saves)
+            .await
+            .unwrap();
+        let rolled_back = target.join(reserved.destinations()[0].file_name().unwrap());
+        reserved
+            .finish_owned(path.get_root(), &receipt)
+            .await
+            .unwrap();
+        drop(operation);
+        assert!(rolled_back.join("level.dat").is_file());
+        publication::rollback_receipt(&app, id, &receipt)
+            .await
+            .unwrap();
+        assert!(!rolled_back.exists());
+
+        app.instance_manager()
+            .delete_mod(id, row.id.clone())
+            .await
+            .unwrap();
+        assert!(!target.join("World").exists());
+        assert_eq!(
+            std::fs::read(target.join("World (copy 1)/level.dat")).unwrap(),
+            b"new version"
+        );
+        assert!(
+            std::fs::symlink_metadata(&saves)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn worlds_install_copy_roll_back_and_delete_through_a_linked_saves_folder() {
+        assert_worlds_work_through_linked_saves(symlink).await;
+    }
+
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn worlds_install_copy_roll_back_and_delete_through_a_junctioned_saves_folder() {
+        assert_worlds_work_through_linked_saves(junction).await;
+    }
+
+    /// The copy an update, a version switch or an install would replace is
+    /// there twice (as `name` and `name.disabled`, one row): GDLauncher does
+    /// not pick one, says so, and points to Delete, which removes one copy
+    /// at a time. Nothing changes.
+    #[tokio::test]
+    async fn updating_or_installing_over_two_copies_explains_the_way_out() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, path) = crate::managers::instance::mods::tests::addon_fixture(
+            &app,
+            "twin-update",
+            instance::AddonType::Mods,
+            "twin.jar",
+            b"v1",
+        )
+        .await;
+        let disabled = path.with_file_name("twin.jar.disabled");
+        std::fs::write(&disabled, b"old").unwrap();
+        let expect = |error: anyhow::Error, verb: &str| {
+            let text = format!("{error:#}");
+            assert!(
+                text.contains("Both twin.jar and twin.jar.disabled are in")
+                    && text.contains(&format!("which copy to {verb}"))
+                    && text.contains("Delete in the Addons tab removes one copy at a time"),
+                "{text}"
+            );
         };
         let staged = tempfile::NamedTempFile::new().unwrap();
         std::fs::write(staged.path(), b"v2").unwrap();
@@ -2439,29 +2782,12 @@ mod round1_graph {
             b"v1",
         )
         .await;
-        let mods = first.parent().unwrap().to_owned();
-        let root = mods.parent().unwrap().to_owned();
-        std::fs::write(root.join("resourcepacks"), b"a file where a folder belongs").unwrap();
-        let locked = mods.join("locked.jar");
-        std::fs::write(&locked, b"never readable").unwrap();
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::os::unix::fs::symlink("missing-target.jar", mods.join("broken.jar")).unwrap();
-            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o000)).unwrap();
-        }
-        let rollbacks = Arc::new(std::sync::atomic::AtomicUsize::new(0));
-        let outcome = install_chain(&app, id, &rollbacks).await;
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(&locked, std::fs::Permissions::from_mode(0o644)).unwrap();
-        }
-        assert_chain_published(&mods, &outcome, &rollbacks);
-        let rows = mfcdb::get_mod_files_by_instance(&app.db, *id)
-            .await
-            .unwrap();
-        for name in CHAIN {
+        let shared = tempfile::tempdir().unwrap();
+        let target = shared.path().join("shared.jar");
+        std::fs::rename(&path, &target).unwrap();
+        std::os::unix::fs::symlink(&target, &path).unwrap();
+        let expect = |error: anyhow::Error| {
+            let text = format!("{error:#}");
             assert!(
                 text.contains("shared.jar in ")
                     && text.contains("is a link to a file stored elsewhere")
