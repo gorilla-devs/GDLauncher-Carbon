@@ -83,70 +83,125 @@ fn task15_populated_legacy_current_and_representable_down_preserve_identities() 
     assert_eq!(identities(&c), before);
 }
 #[test]
-fn task15_artifact_collision_down_refuses_without_mutating_current_state() {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("db");
-    let mut c = Connection::open(&path).unwrap();
-    old(25).to_latest(&mut c).unwrap();
-    seed(&c);
-    carbon_repos::get_migrations()
-        .0
-        .open(&mut c, &path)
-        .unwrap();
-    c.execute_batch("INSERT INTO ModMetadata(id,murmur2,sha512,sha1,modloaders) VALUES('second',2,x'02',x'03','forge');
+fn task15_artifact_collision_down_keeps_one_cache_row_per_version() {
+    // Two files of one Modrinth version. The older schema holds one cache row
+    // per version: the row whose hash matches its file wins, the newer one
+    // breaks a tie, and the loser goes with its image. Files keep their rows.
+    for (second_sha, kept, dropped) in [("02", "second", "physical"), ("03", "physical", "second")]
+    {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("db");
+        let mut c = Connection::open(&path).unwrap();
+        old(25).to_latest(&mut c).unwrap();
+        seed(&c);
+        carbon_repos::get_migrations()
+            .0
+            .open(&mut c, &path)
+            .unwrap();
+        c.execute_batch("INSERT INTO ModMetadata(id,murmur2,sha512,sha1,modloaders) VALUES('second',2,x'02',x'03','forge');
  INSERT INTO ModFileCache(id,instanceId,filename,filesize,enabled,addonType,metadataId) VALUES('second-file',1,'b.jar',4,1,'mods','second')").unwrap();
-    mm::upsert_mr_mod_cache_conn(
-        &wg(&mut c),
-        "02",
-        "project",
-        "version",
-        "title",
-        "v",
-        "slug",
-        "desc",
-        "",
-        0,
-        "",
-        "b.jar",
-        "https://fixture.invalid/b.jar",
-        DbDateTime(from_millis(1).unwrap()),
-        "second",
-    )
-    .unwrap();
-    let schema = dump_schema(&c).unwrap();
-    let rows = c
-        .query_row(
-            "SELECT group_concat(id||':'||metadataId) FROM ModFileCache",
-            [],
-            |r| r.get::<_, String>(0),
-        )
-        .unwrap();
-    assert!(matches!(
-        old(27).open(&mut c, &path).unwrap(),
-        OpenVerdict::Refuse(RefusalKind::DowngradeFailed { .. })
-    ));
-    assert_eq!(dump_schema(&c).unwrap(), schema);
-    assert_eq!(
-        c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+        if second_sha == "02" {
+            mm::upsert_mr_mod_cache_conn(
+                &wg(&mut c),
+                second_sha,
+                "project",
+                "version",
+                "title",
+                "v",
+                "slug",
+                "desc",
+                "",
+                0,
+                "",
+                "b.jar",
+                "https://fixture.invalid/b.jar",
+                DbDateTime(from_millis(1).unwrap()),
+                "second",
+            )
+            .unwrap();
+        } else {
+            // A legacy association whose hash names another file: current
+            // writers refuse it, but 2.0.40 data can still carry one.
+            c.execute("INSERT INTO ModrinthModCache(metadataId,sha512,projectId,versionId,title,version,urlslug,description,authors,releaseType,updatePaths,filename,fileUrl,cachedAt) VALUES('second',?1,'project','version','title','v','slug','desc','',0,'','b.jar','https://fixture.invalid/b.jar',1)", [second_sha])
+                .unwrap();
+        }
+        c.execute_batch("INSERT INTO ModrinthModImageCache VALUES('second','fixture-b',x'03',1)")
+            .unwrap();
+        let rows = c
+            .query_row(
+                "SELECT group_concat(id||':'||metadataId) FROM ModFileCache",
+                [],
+                |r| r.get::<_, String>(0),
+            )
+            .unwrap();
+        assert_eq!(
+            old(27).open(&mut c, &path).unwrap(),
+            OpenVerdict::Downgraded,
+            "second file hash {second_sha}"
+        );
+        assert_eq!(
+            c.query_row(
+                "SELECT group_concat(metadataId) FROM ModrinthModCache",
+                [],
+                |r| r.get::<_, String>(0)
+            )
             .unwrap(),
-        29
-    );
-    assert_eq!(
-        c.query_row("SELECT count(*) FROM _migrations", [], |r| r
-            .get::<_, i32>(0))
+            kept
+        );
+        assert_eq!(
+            c.query_row(
+                "SELECT group_concat(metadataId) FROM ModrinthModImageCache",
+                [],
+                |r| r.get::<_, String>(0)
+            )
             .unwrap(),
-        29
-    );
-    assert_eq!(
-        c.query_row(
-            "SELECT group_concat(id||':'||metadataId) FROM ModFileCache",
-            [],
-            |r| r.get::<_, String>(0)
-        )
-        .unwrap(),
-        rows
-    );
-    fk(&c);
+            kept
+        );
+        assert_eq!(
+            c.query_row(
+                "SELECT count(*) FROM ModMetadata WHERE id=?1",
+                [dropped],
+                |r| r.get::<_, i32>(0)
+            )
+            .unwrap(),
+            1
+        );
+        let reference = {
+            let mut fresh = Connection::open_in_memory().unwrap();
+            old(27).to_latest(&mut fresh).unwrap();
+            dump_schema(&fresh).unwrap()
+        };
+        assert_eq!(dump_schema(&c).unwrap(), reference);
+        assert_eq!(
+            c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
+                .unwrap(),
+            27
+        );
+        assert_eq!(
+            c.query_row("SELECT count(*) FROM _migrations", [], |r| r
+                .get::<_, i32>(0))
+                .unwrap(),
+            27
+        );
+        assert_eq!(
+            c.query_row(
+                "SELECT group_concat(id||':'||metadataId) FROM ModFileCache",
+                [],
+                |r| r.get::<_, String>(0)
+            )
+            .unwrap(),
+            rows
+        );
+        fk(&c);
+        assert_eq!(
+            carbon_repos::get_migrations()
+                .0
+                .open(&mut c, &path)
+                .unwrap(),
+            OpenVerdict::Proceed
+        );
+        fk(&c);
+    }
 }
 #[test]
 fn task15_legacy_fresh_mismatch_is_unusable_but_reversibly_preserved() {
