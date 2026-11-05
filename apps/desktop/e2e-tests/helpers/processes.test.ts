@@ -3,9 +3,16 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
-import { isPidAlive, killGameProcesses } from "./processes.js"
+import {
+  describeLauncherProcesses,
+  isPidAlive,
+  killGameProcesses,
+  killProcessTree,
+  windowsPathSpellings
+} from "./processes.js"
 
 const spawned: ReturnType<typeof spawn>[] = []
+const spawnedPids: number[] = []
 const runtimePaths: string[] = []
 
 /**
@@ -39,6 +46,13 @@ afterEach(() => {
   for (const child of spawned.splice(0)) {
     try {
       child.kill("SIGKILL")
+    } catch {
+      // Already gone.
+    }
+  }
+  for (const pid of spawnedPids.splice(0)) {
+    try {
+      process.kill(pid, "SIGKILL")
     } catch {
       // Already gone.
     }
@@ -97,6 +111,41 @@ describe("killGameProcesses", () => {
     runtimePaths.push(runtimePath)
     expect(killGameProcesses(runtimePath)).toEqual([])
   })
+})
+
+describe("killProcessTree", () => {
+  it.skipIf(process.platform === "win32")(
+    "also kills what the process started in its group, as Electron starts the core",
+    async () => {
+      // A group leader, as Playwright starts Electron, whose child stays in
+      // its group, as the core does.
+      const leader = spawn(
+        process.execPath,
+        [
+          "-e",
+          "const c = require('node:child_process').spawn(process.execPath, " +
+            "['-e', 'setTimeout(() => {}, 30000)'], { stdio: 'ignore' }); " +
+            "console.log(c.pid); setTimeout(() => {}, 30000)"
+        ],
+        { detached: true, stdio: ["ignore", "pipe", "ignore"] }
+      )
+      spawned.push(leader)
+      const child = await new Promise<number>((resolve) =>
+        leader.stdout.once("data", (data) => resolve(Number(String(data))))
+      )
+      spawnedPids.push(child)
+      expect(isPidAlive(child)).toBe(true)
+
+      killProcessTree(leader.pid!)
+
+      // Reaped by init once its parent is gone, which takes a moment.
+      const deadline = Date.now() + 5000
+      while (isPidAlive(child) && Date.now() < deadline)
+        await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(isPidAlive(child)).toBe(false)
+    },
+    PROCESS_TEST_TIMEOUT
+  )
 })
 
 describe("windowsPathSpellings", () => {

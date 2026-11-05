@@ -149,14 +149,31 @@ export function describeLauncherProcesses(binaryPaths: string[]): string {
  * `GDL_RUNTIME_PATH`, before anything is signalled: a pid that cannot be
  * confirmed is left alone.
  */
-/** Kills `pid` and its descendants; Electron's children outlive a bare kill. */
+/**
+ * Kills `pid` and its descendants; Electron's children outlive a bare kill.
+ *
+ * Off Windows that means `pid`'s process group: Playwright starts Electron
+ * as the leader of its own group, and the core and Chromium's helpers stay
+ * in it. Killing Electron alone leaves the core running with Electron's
+ * stdout and stderr open, and Playwright's teardown waits for those to
+ * close until its 15-minute timeout.
+ */
 export function killProcessTree(pid: number): void {
-  try {
-    if (process.platform === "win32") {
+  if (process.platform === "win32") {
+    try {
       execSync(`taskkill /PID ${pid} /T /F`, { stdio: "ignore" })
-    } else {
-      process.kill(pid, "SIGKILL")
+    } catch {
+      // Already gone, or never ours.
     }
+    return
+  }
+  try {
+    process.kill(-pid, "SIGKILL")
+  } catch {
+    // Not a group leader, or the group is already gone.
+  }
+  try {
+    process.kill(pid, "SIGKILL")
   } catch {
     // Already gone, or never ours.
   }
