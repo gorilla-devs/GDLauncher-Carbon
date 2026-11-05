@@ -68,7 +68,12 @@ export const Progress = (p: any) => (
 export const Spinner = () => <span data-testid="spinner">loading</span>
 export const Skeleton = Box
 export const PRESS_CLASSES = ""
-export const toast = { success: vi.fn(), error: vi.fn(), info: vi.fn() }
+export const toast = {
+  success: vi.fn(),
+  error: vi.fn(),
+  info: vi.fn(),
+  warning: vi.fn()
+}
 const Tab = createContext<any>()
 export const Tabs = (p: any) => {
   const [value, setValue] = createSignal(p.defaultValue)

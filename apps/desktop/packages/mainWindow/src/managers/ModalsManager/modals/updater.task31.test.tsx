@@ -193,14 +193,85 @@ it("0036 immediate success uses captured item/instance and originating terminal 
     { instance_id: 7, mod_id: "a" },
     { instance_id: 7, mod_id: "b" }
   ])
-  expect(c.read.mock.calls.map(([v]) => v)).toEqual([
-    ["vtask.getTaskOutcome", 11],
-    ["vtask.getTaskOutcome", 22]
-  ])
+  // Both run at once, so the second one's outcome can be read first.
+  expect(c.read.mock.calls.map(([v]) => v).sort((a, b) => a[1] - b[1])).toEqual(
+    [
+      ["vtask.getTaskOutcome", 11],
+      ["vtask.getTaskOutcome", 22]
+    ]
+  )
   expect(toast.success).toHaveBeenCalledWith(
     "Selected addons updated successfully!"
   )
   expect(refetch).toHaveBeenCalledTimes(1)
   expect(other).not.toHaveBeenCalled()
   expect(c.close).toHaveBeenCalledTimes(1)
+})
+
+const batch = (count: number) =>
+  Array.from({ length: count }, (_, index) => ({
+    id: `m${index}`,
+    filename: `m${index}.jar`,
+    has_update: true,
+    addon_type: "mods"
+  }))
+it("F21 runs several updates at once instead of one after another", async () => {
+  let next = 10
+  c.accept.mockImplementation(async () => next++)
+  const finished = new Set<number>()
+  c.read.mockImplementation(async ([, id]: [string, number]) =>
+    finished.has(id) ? { type: "Succeeded" } : running
+  )
+  const { root, refetch } = mount(batch(6))
+  await settle()
+  expect(c.accept).toHaveBeenCalledTimes(4)
+  // The oldest update still running is the one named.
+  expect(root.textContent).toContain('"mod_name":"m0.jar"')
+  finished.add(10)
+  await vi.advanceTimersByTimeAsync(500)
+  await settle()
+  expect(c.accept).toHaveBeenCalledTimes(5)
+  expect(root.textContent).toContain('"mods":1,"total":6')
+  expect(root.textContent).toContain('"mod_name":"m1.jar"')
+  for (let id = 11; id < 16; id++) finished.add(id)
+  await vi.advanceTimersByTimeAsync(1500)
+  await settle()
+  expect(c.accept).toHaveBeenCalledTimes(6)
+  expect(root.textContent).toContain('"mods":6,"total":6')
+  expect(toast.success).toHaveBeenCalledTimes(1)
+  expect(refetch).toHaveBeenCalledTimes(1)
+  expect(c.close).toHaveBeenCalledTimes(1)
+  expect(toast.warning).not.toHaveBeenCalled()
+})
+it("F21 closing the updater says how many updates never started", async () => {
+  let next = 10
+  c.accept.mockImplementation(async () => next++)
+  c.read.mockResolvedValue(running)
+  mount(batch(6))
+  await settle()
+  expect(c.accept).toHaveBeenCalledTimes(4)
+  dispose?.()
+  dispose = undefined
+  expect(toast.warning).toHaveBeenCalledTimes(1)
+  expect(toast.warning).toHaveBeenCalledWith("2 addons were not updated", {
+    description:
+      "Closing the updater stops the updates that have not started yet. Updates already running will still finish. These addons still show an update, so you can start it again."
+  })
+  // Nothing else starts, nothing is read again and nothing claims success.
+  const reads = c.read.mock.calls.length
+  await vi.advanceTimersByTimeAsync(2000)
+  await settle()
+  expect(c.accept).toHaveBeenCalledTimes(4)
+  expect(c.read).toHaveBeenCalledTimes(reads)
+  expect(toast.success).not.toHaveBeenCalled()
+  expect(toast.error).not.toHaveBeenCalled()
+})
+it("F21 closing the updater once every update has started warns about nothing", async () => {
+  c.accept.mockResolvedValue(11)
+  c.read.mockResolvedValue(running)
+  mount(batch(2))
+  await settle()
+  dispose?.()
+  dispose = undefined
+  expect(toast.warning).not.toHaveBeenCalled()
 })
