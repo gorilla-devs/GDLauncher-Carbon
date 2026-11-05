@@ -188,12 +188,60 @@ pub async fn process_modpack_cancellable(
     app: Arc<AppInner>,
     instance_id: InstanceId,
     deep_check: bool,
+    config: Instance,
+    instance_shortpath: String,
+    task: &VisualTask,
+    has_callback_task: bool,
+    session_owner: &mut Option<Owner>,
+    cancel: &tokio_util::sync::CancellationToken,
+) -> anyhow::Result<(
+    TSubtasks,
+    Option<StandardVersion>,
+    Option<RepairMarkerFile>,
+    Option<disk_scan::DiskScan>,
+)> {
+    // An attempt's preparation folder holds nothing worth keeping until its
+    // downloads start (see `reuse_earlier_downloads`): only overrides, which
+    // every attempt extracts again. Removing it when the attempt fails
+    // before then keeps repeated failures, a full disk among them, from
+    // piling up copies.
+    let mut unclaimed = None;
+    let result = prepare_modpack(
+        app,
+        instance_id,
+        deep_check,
+        config,
+        instance_shortpath,
+        task,
+        has_callback_task,
+        session_owner,
+        cancel,
+        &mut unclaimed,
+    )
+    .await;
+    if let (Err(_), Some(folder)) = (&result, unclaimed) {
+        match tokio::fs::remove_dir_all(&folder).await {
+            Ok(()) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => {
+                tracing::warn!(?error, path = %folder.display(), "failed preparation kept");
+            }
+        }
+    }
+    result
+}
+
+async fn prepare_modpack(
+    app: Arc<AppInner>,
+    instance_id: InstanceId,
+    deep_check: bool,
     mut config: Instance,
     instance_shortpath: String,
     task: &VisualTask,
     has_callback_task: bool,
     session_owner: &mut Option<Owner>,
     cancel: &tokio_util::sync::CancellationToken,
+    unclaimed: &mut Option<PathBuf>,
 ) -> anyhow::Result<(
     TSubtasks,
     Option<StandardVersion>,
@@ -716,6 +764,7 @@ pub async fn process_modpack_cancellable(
         };
 
         // Temporarily create a staging directory and download the modpack files there
+        *unclaimed = Some(staging_dir.clone());
         crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async {
             tokio::fs::create_dir_all(&staging_dir.join("instance")).await?;
             Ok(())
@@ -925,6 +974,13 @@ pub async fn process_modpack_cancellable(
             None => None,
         };
 
+        let reused = crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async {
+            Ok(reuse_earlier_downloads(&setup_path, &staging_dir, &modpack_downloads).await)
+        })
+        .await?;
+        // From here on this attempt's folder holds its downloads.
+        *unclaimed = None;
+
         let concurrency = app
             .settings_manager()
             .get_settings()
@@ -961,7 +1017,8 @@ pub async fn process_modpack_cancellable(
                 .pause("setup_original_acquisition", instance_id)
                 .await;
         }
-        // Actually downloads the modpack files
+        // Actually downloads the modpack files. A reused file is accepted only
+        // when its bytes hash to the pack's, never by its size alone.
         let download_result = carbon_net::download_multiple(
             &modpack_downloads[..],
             DownloadOptions::builder()
