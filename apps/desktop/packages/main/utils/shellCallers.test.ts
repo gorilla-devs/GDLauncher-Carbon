@@ -977,6 +977,7 @@ it("actual macOS link opened during a pending quit shows the hidden window and i
 function realRuntimeOperation(context: Record<string, any>) {
   Object.assign(context, {
     runtimeOperationActive,
+    runtimeOperationBrief,
     interruptRuntimeOperation,
     whenRuntimeOperationIdle
   })
@@ -1096,4 +1097,77 @@ it("actual quit request while a move only checks ends it and quits after; one pa
   // The window stays to show how the move ended, as before.
   expect(quits).toBe(1)
   expect(prepared).toBe(0)
+})
+it("actual quit request during Keep default or another brief step quits once it has ended", async () => {
+  const text = source("apps/desktop/packages/main/index.ts")
+  let quits = 0,
+    prevented = 0
+  let forget!: () => void
+  const context: Record<string, any> = {
+    shutdownApproved: false,
+    shutdownInFlight: undefined,
+    withRuntimeOperation,
+    path,
+    RUNTIME_PATH_OVERRIDE_NAME: "runtime_path_override",
+    UNAVAILABLE_RUNTIME_PATH: "/unplugged/gdl",
+    forgetUnavailableRuntimePath: () =>
+      new Promise<void>((resolve) => (forget = resolve)),
+    app: {
+      getPath: () => "/synthetic",
+      quit: () => {
+        quits++
+      }
+    }
+  }
+  realRuntimeOperation(context)
+  Object.assign(
+    context,
+    evaluate(
+      "(() => {\n" +
+        declarations(text, ["closedBeforeMove", "quitAgain"]) +
+        "\nreturn { closedBeforeMove, quitAgain }\n})()",
+      context
+    )
+  )
+  const beforeQuit = evaluate(
+    callArgument(text, "app.on", "before-quit"),
+    context
+  ) as (event: { preventDefault(): void }) => void
+  const event = {
+    preventDefault() {
+      prevented++
+    }
+  }
+
+  // The user chose Keep the default folder and pressed Cmd+Q right away.
+  const keep = evaluate(
+    callArgument(text, "ipcMain.handle", "keepDefaultRuntimePath"),
+    context
+  )()
+  expect(runtimeOperationBrief()).toBe(true)
+  beforeQuit(event)
+  beforeQuit(event)
+  expect(prevented).toBe(2)
+  await tick()
+  expect(quits).toBe(0)
+  forget()
+  await keep
+  await tick()
+  expect(context.UNAVAILABLE_RUNTIME_PATH).toBeNull()
+  // Once; its own before-quit then runs the normal shutdown.
+  expect(quits).toBe(1)
+
+  // A brief step that fails still lets the quit run.
+  const step = withRuntimeOperation(
+    async () => {
+      await tick()
+      throw new Error("synthetic failure")
+    },
+    { brief: true }
+  )
+  beforeQuit(event)
+  await expect(step).rejects.toThrow("synthetic failure")
+  await tick()
+  expect(runtimeOperationBrief()).toBe(false)
+  expect(quits).toBe(2)
 })
