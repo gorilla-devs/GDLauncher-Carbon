@@ -1123,7 +1123,7 @@ async fn download_file(
                 };
                 match outcome {
                     Ok(()) => {
-                        publish_owned(&part, &downloadable, &options).await?;
+                        publish_owned(&part, &downloadable, &options, &owned.leftovers).await?;
                         current_files_count.fetch_add(1, Ordering::SeqCst);
                         if let Some(sender) = progress {
                             let _ = sender.send(Progress::sized(
@@ -1135,11 +1135,15 @@ async fn download_file(
                         }
                         return Ok(());
                     }
-                    Err(
-                        DownloadError::ChecksumMismatch { .. }
-                        | DownloadError::SizeMismatch { .. }
-                        | DownloadError::RestartPartial,
-                    ) if resumed && attempt == 0 && !options.cancel_token.is_cancelled() => {
+                    Err(error)
+                        if resumed
+                            && attempt == 0
+                            && restarts_resume(&error)
+                            && !options.cancel_token.is_cancelled() =>
+                    {
+                        if resume_proven_stale(&error) {
+                            owned.discard_stale_source(&options).await;
+                        }
                         total_downloaded_size.fetch_sub(
                             file_processed_bytes.swap(0, Ordering::SeqCst),
                             Ordering::SeqCst,
@@ -1176,6 +1180,30 @@ async fn download_file(
         Ok(()) => Ok(()),
         Err(error) => Err(owned.cleanup_error(error).await),
     }
+}
+
+/// Failures of a resumed attempt that one fresh download of the same URL can
+/// fix: the retained bytes or the server's handling of the range was the
+/// problem, not the file. A client error answer to a ranged request is included
+/// because some servers refuse a range they cannot serve with one instead of a
+/// 416; server errors are not, as resuming did not cause them.
+fn restarts_resume(error: &DownloadError) -> bool {
+    match error {
+        DownloadError::Non200StatusCode(_, status) => (400..500).contains(status),
+        error => resume_proven_stale(error),
+    }
+}
+
+/// Failures of a resumed attempt that prove the retained bytes are not a prefix
+/// of the file now served, so the leftover they came from is of no further use.
+fn resume_proven_stale(error: &DownloadError) -> bool {
+    matches!(
+        error,
+        DownloadError::ChecksumMismatch { .. }
+            | DownloadError::SizeMismatch { .. }
+            | DownloadError::RestartPartial
+            | DownloadError::InvalidRange
+    )
 }
 
 fn mirror_failure(error: &DownloadError) -> bool {
@@ -1599,7 +1627,9 @@ async fn validate_file(
     deep_check: bool,
     cancel: &CancellationToken,
 ) -> Result<(), DownloadError> {
-    if !path.exists() {
+    // Any failure to stat counts as missing, as `Path::exists` did, but without
+    // blocking the runtime thread the batch's workers share.
+    let Ok(metadata) = tokio::fs::metadata(path).await else {
         return Err(DownloadError::FileNotFound(
             path.to_string_lossy().to_string(),
         ));
@@ -2792,3 +2822,6 @@ mod task06_tests;
 
 #[cfg(test)]
 mod task09_tests;
+
+#[cfg(test)]
+mod leftover_tests;

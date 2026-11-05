@@ -33,11 +33,13 @@ async fn task09_ordered_mirrors_verify_reset_and_progress() {
             std::fs::write(legacy_partial(&path), b"zz").unwrap();
         }
         let mut server = mockito::Server::new_async().await;
+        // A resumed attempt the range answer cannot serve first retries the same
+        // URL once from zero, as a refused range says nothing about the URL.
         let first = server
             .mock("GET", "/first")
             .with_status(status)
             .with_body(body)
-            .expect(1)
+            .expect(if seed { 2 } else { 1 })
             .create_async()
             .await;
         let second = server
