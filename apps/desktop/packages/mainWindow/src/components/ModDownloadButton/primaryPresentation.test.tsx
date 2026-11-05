@@ -610,3 +610,48 @@ it.each([
     expect(c.error).toHaveBeenCalledTimes(error ? 1 : 0)
   }
 )
+it("a second click on a server install that is sent or runs installs nothing more", async () => {
+  const a = pending()
+  c.mutate.mockReturnValueOnce(a.promise).mockResolvedValueOnce(62)
+  const o = owner({ server: true, fileId: "v-A" })
+  await tick()
+  const clickedA = c.download()
+  await tick()
+  // While the request is sent.
+  await c.download()
+  a.resolve(61)
+  await clickedA
+  await tick()
+  // While its task runs.
+  await c.download()
+  await tick()
+  expect(c.mutate).toHaveBeenCalledTimes(1)
+  expect(c.loading()).toBe(true)
+  // Once it has ended, a click asks again.
+  await complete(o, 61)
+  expect(c.loading()).toBe(false)
+  await c.download()
+  await tick()
+  expect(c.mutate).toHaveBeenCalledTimes(2)
+})
+it("another addon clicked for the same server while one installs is sent", async () => {
+  c.mutate.mockResolvedValueOnce(61).mockResolvedValueOnce(62)
+  const o = owner({ server: true })
+  await tick()
+  await c.download()
+  await tick()
+  o.setProject(addon("B"))
+  await tick()
+  await c.download()
+  await tick()
+  expect(c.mutate.mock.calls).toEqual([
+    [
+      "server.installLatestServerMod",
+      { serverId: 9, modSource: { Modrinth: "A" } }
+    ],
+    [
+      "server.installLatestServerMod",
+      { serverId: 9, modSource: { Modrinth: "B" } }
+    ]
+  ])
+})

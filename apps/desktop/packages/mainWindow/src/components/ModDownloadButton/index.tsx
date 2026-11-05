@@ -80,6 +80,11 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const loading = () => pendingRequest() || acceptedTask() !== undefined
   let active = true
   let requestOwner: symbol | undefined
+  // The server install the newest click asked for. Clicking it again while
+  // it is sent or runs would only install the same addon once more after it
+  // (the core runs a server's installs one after another), so that click is
+  // ignored.
+  let serverRequest: string | undefined
   onCleanup(() => {
     active = false
     requestOwner = undefined
@@ -236,9 +241,10 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
     // Newer clicks own UI observation. Entered work may still finish after a
     // replacement or disposal; its late response must not publish over them.
-    const beginRequest = () => {
+    const beginRequest = (server?: string) => {
       const owner = Symbol()
       requestOwner = owner
+      serverRequest = server
       setPendingRequest(true)
       return () => active && requestOwner === owner
     }
@@ -260,13 +266,20 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     const serverId = props.selectedServerId
     if (serverId) {
       if (isInstalled()) return
+      const request = [
+        serverId,
+        props.addon.platform,
+        props.addon.id,
+        serverFileId() ?? ""
+      ].join(":")
+      if (loading() && serverRequest === request) return
       const presentation = {
         title: props.addon.title,
         type: props.addon.type,
         server: true,
         copy: undefined
       }
-      const current = beginRequest()
+      const current = beginRequest(request)
       try {
         const acceptedTask = await handleServerInstall(serverId)
         if (acceptedTask === undefined)
