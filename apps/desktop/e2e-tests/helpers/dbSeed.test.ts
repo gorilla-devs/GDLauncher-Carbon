@@ -170,7 +170,10 @@ describe("migrationCount() independent cross-check", () => {
   })
 })
 
-describe("seedDatabase", () => {
+// Seeding writes real databases with the whole baseline schema. On a slow
+// Windows runner disk one seed took over 1 s and six of them 7.7 s (run
+// 41970454228), past vitest's 5 s default, though nothing here can hang.
+describe("seedDatabase", { timeout: 30_000 }, () => {
   it("clears a stale WAL sidecar from a previous run before seeding", async () => {
     // Simulate leftovers from a previous app run/seed: a main file plus WAL
     // sidecars containing uncheckpointed data. A seed that merely overwrote
