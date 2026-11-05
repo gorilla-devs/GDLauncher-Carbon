@@ -2398,19 +2398,45 @@ mod round1_graph {
                 "{} was already cached and must not be read again",
                 path.display()
             );
-        }
+        };
+        let staged = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(staged.path(), b"v2").unwrap();
+        let mut installer = cf("twin-2.jar", b"v2", curseforge::ClassId::Mods).into_installer();
+        installer.download_fixture = Some(staged.path().into());
+        expect(
+            installer
+                .install(&app, id, false, Some(row.id.clone()))
+                .await
+                .unwrap_err(),
+            "update",
+        );
+        expect(
+            mr("twin.jar", b"v2")
+                .is_already_installed(&app, id)
+                .await
+                .unwrap_err(),
+            "use",
+        );
+        assert!(!path.with_file_name("twin-2.jar").exists());
+        assert_eq!(std::fs::read(&path).unwrap(), b"v1");
+        assert_eq!(std::fs::read(&disabled).unwrap(), b"old");
     }
 
-    /// One unrelated file the launcher cannot read never rolls back an install.
+    /// A mod that is a link to a jar shared with other instances is not
+    /// replaced in place (the jar it points to may be in use elsewhere):
+    /// updating it, switching its version or installing over it says it is
+    /// a link and points to Delete, which removes only the link. Nothing
+    /// changes, and the shared jar stays.
+    #[cfg(unix)]
     #[tokio::test]
-    async fn dependency_chain_commits_despite_unrelated_unreadable_files() {
+    async fn updating_or_installing_over_a_linked_mod_explains_the_way_out() {
         let app = crate::setup_managers_for_test().await;
-        let (id, _, first) = crate::managers::instance::mods::tests::addon_fixture(
+        let (id, row, path) = crate::managers::instance::mods::tests::addon_fixture(
             &app,
-            "graph-bad-files",
+            "link-update",
             instance::AddonType::Mods,
-            "existing.jar",
-            b"existing",
+            "shared.jar",
+            b"v1",
         )
         .await;
         let mods = first.parent().unwrap().to_owned();
@@ -2437,11 +2463,62 @@ mod round1_graph {
             .unwrap();
         for name in CHAIN {
             assert!(
-                rows.iter().any(|row| row.filename == format!("{name}.jar")),
-                "{name} is cached"
+                text.contains("shared.jar in ")
+                    && text.contains("is a link to a file stored elsewhere")
+                    && text.contains("Delete it in the Addons tab")
+                    && text.contains("only the link is removed"),
+                "{text}"
             );
-        }
-        assert!(rows.iter().all(|row| row.filename != "broken.jar"));
+        };
+        let download = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(download.path(), b"v2").unwrap();
+        let mut installer = cf("shared-2.jar", b"v2", curseforge::ClassId::Mods).into_installer();
+        installer.download_fixture = Some(download.path().into());
+        expect(
+            installer
+                .install(&app, id, false, Some(row.id.clone()))
+                .await
+                .unwrap_err(),
+        );
+        expect(
+            mr("shared.jar", b"v2")
+                .is_already_installed(&app, id)
+                .await
+                .unwrap_err(),
+        );
+        // A download that would land on the link's name.
+        let stage = tempfile::tempdir().unwrap();
+        let staged = stage.path().join("artifact");
+        std::fs::write(&staged, b"v2").unwrap();
+        expect(
+            publication::publish_file(&mr("shared.jar", b"v2"), &app, id, &staged, None, None)
+                .await
+                .unwrap_err(),
+        );
+        assert!(!path.with_file_name("shared-2.jar").exists());
+        assert!(
+            std::fs::symlink_metadata(&path)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(std::fs::read(&target).unwrap(), b"v1");
+        // The way out: Delete removes the link, then the install works.
+        app.instance_manager()
+            .delete_mod(id, row.id.clone())
+            .await
+            .unwrap();
+        publication::publish_file(&mr("shared.jar", b"v2"), &app, id, &staged, None, None)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(&path).unwrap(), b"v2");
+        assert!(
+            !std::fs::symlink_metadata(&path)
+                .unwrap()
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(std::fs::read(&target).unwrap(), b"v1");
     }
 }
 
