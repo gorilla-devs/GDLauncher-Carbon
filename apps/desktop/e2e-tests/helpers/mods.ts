@@ -1749,41 +1749,48 @@ export async function scrollVersionRowIntoView(
       "rendered yet"
   }).toBeVisible({ timeout: VERSIONS_RESPONSE_TIMEOUT })
 
-  for (let step = 0; step < maxSteps; step++) {
-    if ((await target.count()) > 0) {
-      await confirmFound()
-      return
-    }
-
-    const lookupScrollContainer = () =>
-      page.evaluate(() => {
-        const row = document.querySelector('[data-testid="addon-version-row"]')
-        let el: HTMLElement | null = row as HTMLElement | null
-        while (el?.parentElement) {
-          const style = window.getComputedStyle(el.parentElement)
-          const oy = style.overflowY
-          if (
-            style.overflow === "auto" ||
-            style.overflow === "scroll" ||
-            oy === "auto" ||
-            oy === "scroll"
-          ) {
-            const box = el.parentElement
-            const before = box.scrollTop
-            box.scrollTop = before + box.clientHeight
-            return {
-              before,
-              after: box.scrollTop,
-              height: box.clientHeight,
-              scrollHeight: box.scrollHeight
-            }
+  // Looks for the target row and, only if it is not there, scrolls one
+  // viewport, in a single evaluate. The renderer runs that as one task, so a
+  // page cannot land between the look and the scroll. With the two as
+  // separate calls, a page landing in that gap while the list sat at its
+  // old bottom made the scroll jump a full viewport past the new page's
+  // first rows, which then never existed at any look: on macOS CI 4713831,
+  // the first row of CurseForge's 4th page, was reported missing from a list
+  // that had all 75 rows.
+  const checkOrScroll = () =>
+    page.evaluate((targetSelector) => {
+      if (document.querySelector(targetSelector)) {
+        return { found: true as const }
+      }
+      const row = document.querySelector('[data-testid="addon-version-row"]')
+      let el: HTMLElement | null = row as HTMLElement | null
+      while (el?.parentElement) {
+        const style = window.getComputedStyle(el.parentElement)
+        const oy = style.overflowY
+        if (
+          style.overflow === "auto" ||
+          style.overflow === "scroll" ||
+          oy === "auto" ||
+          oy === "scroll"
+        ) {
+          const box = el.parentElement
+          const before = box.scrollTop
+          box.scrollTop = before + box.clientHeight
+          return {
+            found: false as const,
+            before,
+            after: box.scrollTop,
+            height: box.clientHeight,
+            scrollHeight: box.scrollHeight
           }
-          el = el.parentElement
         }
-        return null
-      })
+        el = el.parentElement
+      }
+      return null
+    }, byAddonVersionRow(fileId))
 
-    let advanced = await lookupScrollContainer()
+  for (let step = 0; step < maxSteps; step++) {
+    let advanced = await checkOrScroll()
 
     // A miss here does not by itself mean the container is gone for good —
     // see CONTAINER_LOOKUP_RETRY_WINDOW's doc comment. Retried, bounded, and
@@ -1797,7 +1804,7 @@ export async function scrollVersionRowIntoView(
           .first()
           .waitFor({ state: "attached", timeout: 200 })
           .catch(() => {})
-        advanced = await lookupScrollContainer()
+        advanced = await checkOrScroll()
       }
     }
 
@@ -1809,6 +1816,10 @@ export async function scrollVersionRowIntoView(
           "above, which only proves some row existed once, and stayed " +
           `unreachable for the full ${CONTAINER_LOOKUP_RETRY_WINDOW}ms retry window`
       )
+    }
+    if (advanced.found) {
+      await confirmFound()
+      return
     }
     lastScrollTop = advanced.after
 
