@@ -234,7 +234,8 @@ it("0242 actual second copy failure protects error and full recovery chooses per
   await submit(f)
   expect(f.stop).toHaveBeenCalledTimes(1)
   expect(selectRuntimePath(null, f.root)).toBe(f.source)
-  expect(fss.existsSync(path.join(f.target, MIGRATION_MARKER))).toBe(true)
+  // What the move copied is removed again, marker included.
+  expect(await fs.readdir(f.target)).toEqual([])
   expect(c.protection()).toBe(true)
   expect(document.body.textContent).toContain("Restart")
   expect(
@@ -271,6 +272,118 @@ it("0242 committed pointer survives notice failure and recovery selects NEW poin
   expect(f.restart).toHaveBeenCalledTimes(1)
   expect(f.restart).toHaveBeenCalledWith(f.target)
   expect(selectRuntimePath(null, f.root)).toBe(f.target)
+})
+it("a move that stopped says it removes the unfinished copy, file by file", async () => {
+  await fixture()
+  setIsChangingRuntimePath(true)
+  const file = ["instances", "pack", "mods", "jei.jar"].join("/")
+  RTsetProgress({ action: "rollback", currentName: file, current: 2, total: 5 })
+  await settle()
+  const text = document.body.textContent
+  expect(text).toContain(
+    englishJava._trn_removing_partial_copy.replace("{{file}}", file)
+  )
+  expect(text).toContain("2 / 5")
+  // The overlay still asks not to close the app until the copy is gone.
+  expect(text).toContain("java:_trn_do_not_close_app_or_pc_title")
+  RTsetProgress(undefined)
+})
+it("a start that could not open the data folder says which one and offers a restart", async () => {
+  const f = await fixture()
+  const folder = path.join(f.root, "usb", "gdl"),
+    current = path.join(f.root, "data")
+  window.getUnavailableRuntimePath = async () => ({ folder, current })
+  const relaunch = vi.fn(async () => ({ status: "relaunching" as const }))
+  window.relaunch = relaunch
+  await showUnavailableRuntimePath((value) =>
+    c.manager.openModal({ name: "runtimePathUnavailable" }, value)
+  )
+  await vi.waitFor(() =>
+    expect(document.body.textContent).toContain(
+      englishJava["_trn_runtime_recovery.unavailable"]
+        .replaceAll("{{path}}", folder)
+        .replace("{{defaultPath}}", current)
+    )
+  )
+  button(document.body, "Restart").click()
+  await settle()
+  expect(relaunch).toHaveBeenCalledTimes(1)
+  // Nothing to say when the data folder opened.
+  window.getUnavailableRuntimePath = async () => null
+  const open = vi.fn()
+  await showUnavailableRuntimePath(open)
+  expect(open).not.toHaveBeenCalled()
+})
+it("a start whose data folder is gone for good can keep the default folder, once told what that means", async () => {
+  const f = await fixture()
+  // The drive is gone: the folder the pointer names cannot be made.
+  const drive = path.join(f.root, "usb")
+  await fs.writeFile(drive, "")
+  const folder = path.join(drive, "gdl")
+  await fs.writeFile(f.pointer, folder)
+  const current = path.join(f.root, "data")
+  const unavailable = vi.fn()
+  expect(selectRuntimePath(null, f.root, unavailable)).toBe(current)
+  window.getUnavailableRuntimePath = async () => ({ folder, current })
+  window.keepDefaultRuntimePath = callback(
+    {
+      withRuntimeOperation,
+      forgetUnavailableRuntimePath,
+      path,
+      app: { getPath: () => f.root },
+      RUNTIME_PATH_OVERRIDE_NAME: "runtime_path_override",
+      UNAVAILABLE_RUNTIME_PATH: folder
+    },
+    "keepDefaultRuntimePath"
+  )
+  await showUnavailableRuntimePath((value) =>
+    c.manager.openModal({ name: "runtimePathUnavailable" }, value)
+  )
+  const keep = englishJava["_trn_runtime_recovery.keep_default"]
+  const gone = englishJava["_trn_runtime_recovery.unavailable_gone"]
+  await vi.waitFor(() => expect(document.body.textContent).toContain(gone))
+  // The notice names the way out, and choosing it first says what it does.
+  button(document.body, keep).click()
+  await settle()
+  const confirm = englishJava["_trn_runtime_recovery.keep_default_confirm"]
+    .replace("{{defaultPath}}", current)
+    .replaceAll("{{path}}", folder)
+  expect(document.body.textContent).toContain(confirm)
+  expect(await fs.readFile(f.pointer, "utf8")).toBe(folder)
+  button(document.body, "general:_trn_back").click()
+  await settle()
+  expect(document.body.textContent).toContain(gone)
+  expect(document.body.textContent).not.toContain(confirm)
+  // A choice that cannot be saved says why and stays open.
+  button(document.body, keep).click()
+  await settle()
+  const unlink = fs.unlink.bind(fs)
+  vi.spyOn(fs, "unlink").mockImplementationOnce(async () => {
+    throw Object.assign(new Error("EACCES: permission denied"), {
+      code: "EACCES"
+    })
+  })
+  button(document.body, keep).click()
+  await vi.waitFor(() =>
+    expect(document.body.textContent).toContain(
+      englishJava["_trn_runtime_recovery.keep_default_failed"].replace(
+        "{{error}}",
+        "Error: EACCES: permission denied"
+      )
+    )
+  )
+  expect(await fs.readFile(f.pointer, "utf8")).toBe(folder)
+  vi.mocked(fs.unlink).mockImplementation(unlink)
+  button(document.body, keep).click()
+  await vi.waitFor(() =>
+    expect(document.body.textContent).not.toContain(confirm)
+  )
+  // Later starts use the default folder and say nothing; the drive's data
+  // was never touched.
+  expect(fss.existsSync(f.pointer)).toBe(false)
+  expect(selectRuntimePath(null, f.root, unavailable)).toBe(current)
+  expect(unavailable).toHaveBeenCalledTimes(1)
+  expect(await fs.readFile(drive, "utf8")).toBe("")
 })
 it("0242 ordinary pre-stop validation error remains dismissible", async () => {
   const f = await fixture()
