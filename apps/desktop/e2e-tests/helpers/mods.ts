@@ -234,13 +234,24 @@ export async function openInstanceAddons(
   await goToLibrary(page)
   await page.click(byInstanceName(instanceName))
 
-  const modsResponsePromise = page
-    .waitForResponse((r) => r.url().includes("instance.getInstanceMods"), {
+  // Waits for a request that *finished*, not for the first response headers.
+  // The app aborts an in-flight getInstanceMods fetch whenever it replaces it
+  // with a new one (TanStack Query cancels a running query on an
+  // invalidation's refetch or when its last observer unmounts, and
+  // `utils/rspcClient.ts` hands the query's abort signal to `fetch`). An
+  // aborted fetch has already emitted its `response` event but never gets a
+  // body, so reading it failed with "Protocol error
+  // (Network.getResponseBody): No data found for resource with given
+  // identifier". It ends in `requestfailed` instead, and the refetch that
+  // replaced it is the read this waits for.
+  const modsRequestPromise = page
+    .waitForEvent("requestfinished", {
+      predicate: (r) => r.url().includes("instance.getInstanceMods"),
       timeout: MODS_RESPONSE_TIMEOUT
     })
     .catch((cause) => {
       throw new Error(
-        `openInstanceAddons: no instance.getInstanceMods response observed ` +
+        `openInstanceAddons: no instance.getInstanceMods request finished ` +
           `after opening "${instanceName}"'s Addons tab within ` +
           `${MODS_RESPONSE_TIMEOUT}ms`,
         { cause }
@@ -249,7 +260,13 @@ export async function openInstanceAddons(
 
   await page.getByRole("tab", { name: "Addons" }).click()
 
-  const response = await modsResponsePromise
+  const response = await (await modsRequestPromise).response()
+  if (response === null) {
+    throw new Error(
+      `openInstanceAddons: the finished instance.getInstanceMods request ` +
+        `for "${instanceName}" has no response`
+    )
+  }
   const body = (await response.json()) as {
     result?: { type?: string; data?: unknown }
   }
@@ -728,6 +745,7 @@ interface RspcEnvelope {
  *  or update), so this is a bound on a local rename/unlink plus one DB write,
  *  not a network download — short next to `INSTALL_TIMEOUT`. */
 const LIFECYCLE_MUTATION_TIMEOUT = 15_000
+const ROW_TIMEOUT = 30_000
 
 /**
  * Awaits `mutationName`'s rspc response (already in flight or about to be —
@@ -805,10 +823,27 @@ export async function deleteModViaUi(
   page: Page,
   filename: string
 ): Promise<void> {
+  const row = page.locator(byModRow(filename))
+  // modInstall's Sodium cleanup has waited here for a row that never
+  // rendered, after a read had listed the mod: name what the tab showed.
   // The deleteMod wait starts only once the row is there: started first, its
   // 15s timeout fired before this 30s one could report (Linux, run
   // 41466362930: "no instance.deleteMod response observed", then this
   // report failed on a closed page).
+  await row
+    .waitFor({ state: "visible", timeout: ROW_TIMEOUT })
+    .catch(async (error: unknown) => {
+      const shown = await page
+        .locator(byTestId(TEST_IDS.modRow))
+        .evaluateAll((rows) =>
+          rows.map((r) => r.getAttribute("data-mod-filename"))
+        )
+      throw new Error(
+        `the row of ${filename} did not render within ${ROW_TIMEOUT} ms on ` +
+          `${page.url()}; rows shown: ${JSON.stringify(shown)}`,
+        { cause: error }
+      )
+    })
   const responsePromise = awaitMutationOk(
     page,
     "instance.deleteMod",

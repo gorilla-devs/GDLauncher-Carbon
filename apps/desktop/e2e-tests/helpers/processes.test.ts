@@ -99,6 +99,28 @@ describe("killGameProcesses", () => {
   })
 })
 
+describe("windowsPathSpellings", () => {
+  it("adds the expanded spelling of a short (8.3) runtime path", () => {
+    const short = "C:\\Users\\PLAYER~1\\AppData\\Local\\Temp\\gdl-e2e-x"
+    const long = "C:\\Users\\player-one\\AppData\\Local\\Temp\\gdl-e2e-x"
+    expect(windowsPathSpellings(short, () => long)).toEqual([short, long])
+  })
+
+  it("keeps one spelling when nothing expands", () => {
+    const long = "C:\\Users\\player-one\\gdl-e2e-x"
+    expect(windowsPathSpellings(long, (p) => p)).toEqual([long])
+  })
+
+  it("falls back to the given spelling when the path cannot be resolved", () => {
+    const gone = "C:\\Users\\PLAYER~1\\gone"
+    expect(
+      windowsPathSpellings(gone, () => {
+        throw new Error("ENOENT")
+      })
+    ).toEqual([gone])
+  })
+})
+
 describe("describeLauncherProcesses", () => {
   it.skipIf(process.platform === "win32")(
     "lists a running process with its start and CPU time",
