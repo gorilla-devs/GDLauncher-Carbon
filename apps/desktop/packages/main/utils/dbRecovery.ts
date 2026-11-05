@@ -44,5 +44,6 @@ export function dbRecoveryAdvice(category?: DbRecoveryCategory): string {
       return "Restart and check for updates first. Reset is a last resort for database metadata and may not resolve this failure."
   }
 }
-export const RESET_WARNING =
-  "You'll need to sign in again. Active accounts, settings, preferences, Java configuration, library metadata and server registrations/settings return to defaults. Instance, world, addon and server directories on disk remain. A complete recovery copy of existing database files is retained for manual recovery; it is not automatically merged or guaranteed healthy."
+/** How long a reset or restore keeps its copy of the database once the launcher starts cleanly. */
+export const RECOVERY_COPY_DAYS = 30
+export const RESET_WARNING = `You'll need to sign in again. Active accounts, settings, preferences, Java configuration and library metadata return to defaults. Servers this version of GDLauncher has listed before come back from their folders with their settings. Instance, world, addon and server directories on disk remain. A complete recovery copy of existing database files is retained for manual recovery for ${RECOVERY_COPY_DAYS} days, so the drive needs room for it; it is not automatically merged or guaranteed healthy.`

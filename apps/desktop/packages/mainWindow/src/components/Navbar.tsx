@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import AddonFailures from "./AddonFailures"
 import TaskWarnings from "./TaskWarnings"
+import RestoredServers from "./RestoredServers"
 import { AccountsDropdown } from "./AccountsDropdown"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
 import { apiUrl } from "@/utils/rspcClient"
@@ -111,6 +112,7 @@ const AppNavbar = () => {
         <div class="text-lightSlate-50 flex h-full list-none items-center gap-6">
           <AddonFailures />
           <TaskWarnings />
+          <RestoredServers />
           <Show when={hasPendingUpdate()}>
             <div
               class="animate-icons-on-hover cursor-pointer text-green-500 hover:text-green-400 transition-colors"

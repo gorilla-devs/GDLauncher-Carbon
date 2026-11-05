@@ -2727,12 +2727,12 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let json = schema::make_instance_config(info.clone())?;
 
-        self.app
-            .settings_manager()
-            .runtime_path
-            .get_temp()
-            .write_file_atomic(path.join("instance.json"), json)
-            .await?;
+        crate::util::durable::write_file_atomic(
+            &self.app.settings_manager().runtime_path.get_temp(),
+            path.join("instance.json"),
+            json,
+        )
+        .await?;
 
         // A display-name edit always updates the library row, even when
         // its existing folder already has the requested name. Retain root
@@ -2893,12 +2893,21 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .to_path()
             .join(shortpath);
         let json = schema::make_instance_config(config.clone())?;
-        self.app
-            .settings_manager()
-            .runtime_path
-            .get_temp()
-            .write_file_atomic(path.join("instance.json"), json)
-            .await?;
+        crate::util::durable::write_file_atomic(
+            &self.app.settings_manager().runtime_path.get_temp(),
+            path.join("instance.json"),
+            json,
+        )
+        .await?;
+        Ok(())
+    }
+
+    /// Requires lock_instance for this ID. Publishes a config already written.
+    async fn publish_config(
+        self,
+        instance_id: InstanceId,
+        config: info::Instance,
+    ) -> anyhow::Result<()> {
         self.instances
             .write()
             .await
@@ -3269,16 +3278,28 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             )
             .await?;
 
-        if let Some(mut session) = modpack::session::Session::load(&new_path).await? {
-            // This is provenance of the copy, not authority to run it. The
-            // source owner remains until original-input qualification finishes.
-            session.copied_to = Some(id.0);
-            modpack::session::atomic_json(
-                &new_path.join(".setup").join(modpack::session::RECORD),
-                &session,
-                false,
-            )
-            .await?;
+        // The copied record names the source, so it is provenance of the copy,
+        // not authority to run it, whether or not it is marked (see
+        // `Session::binds_to`); `copied_to` only lets the copy's messages say
+        // it was copied. So a record that can't be read or marked never fails
+        // the duplicate halfway, after its folder and row exist: the copy
+        // keeps it as is, and Play, Edit and Repair handle it on the copy as
+        // they do on the source.
+        match modpack::session::Session::load(&new_path).await {
+            Ok(Some(mut session)) => {
+                session.copied_to = Some(id.0);
+                if let Err(error) = modpack::session::atomic_json(
+                    &new_path.join(".setup").join(modpack::session::RECORD),
+                    &session,
+                    false,
+                )
+                .await
+                {
+                    tracing::warn!(?error, "copied setup record left unmarked");
+                }
+            }
+            Ok(None) => {}
+            Err(error) => tracing::warn!(?error, "copied setup record left as is"),
         }
 
         // Only now reacquire the write lock to insert the new entry.

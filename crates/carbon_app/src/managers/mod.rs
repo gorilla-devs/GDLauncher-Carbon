@@ -298,6 +298,21 @@ mod app {
                 self.runtime_lifecycle.reconciliation_finished(Err(error));
             }
 
+            // Before the instance scan, which can take a while: a user who
+            // quits this first session early and goes back to 2.0.40 still
+            // leaves every server a server.json to come back from after a
+            // reset there. A move of the data folder cannot begin until the
+            // startup check below has finished.
+            let t = std::time::Instant::now();
+            self.clone()
+                .server_manager()
+                .backfill_server_records()
+                .await;
+            debug!(
+                "[startup-timing] server_manager.backfill_server_records completed in {:.2}s",
+                t.elapsed().as_secs_f64()
+            );
+
             let t = std::time::Instant::now();
             self.clone()
                 .instance_manager()

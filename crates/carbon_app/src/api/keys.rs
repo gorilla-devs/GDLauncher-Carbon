@@ -268,6 +268,8 @@ keys! {
         INSTALL_LATEST_SERVER_MOD                   = "installLatestServerMod";
         OPEN_SERVER_FOLDER                          = "openServerFolder";
         PRIORITIZE_SERVER_CACHE                     = "prioritizeServerCache";
+        GET_RESTORED_SERVERS                        = "getRestoredServers";
+        ACKNOWLEDGE_RESTORED_SERVERS                = "acknowledgeRestoredServers";
     }
 
     modplatforms {

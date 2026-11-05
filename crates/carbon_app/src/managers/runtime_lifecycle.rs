@@ -1722,6 +1722,11 @@ impl RuntimeLifecycle {
         let state = self.state.lock().unwrap();
         state.shutdown.is_some() || state.relocation.is_some()
     }
+    /// Whether a move of the runtime folder holds the lease, from its
+    /// refuse-first check until the core exits for the copy.
+    pub fn relocation_in_progress(&self) -> bool {
+        self.state.lock().unwrap().relocation.is_some()
+    }
     pub fn shutdown_committed(&self) -> bool {
         let state = self.state.lock().unwrap();
         state

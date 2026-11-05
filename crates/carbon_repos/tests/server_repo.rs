@@ -670,3 +670,156 @@ async fn task43_unlink_late_delete_failure_rolls_back_and_empty_folder_works() {
     assert!(s::get_server_group(&db, empty).await.unwrap().is_none());
     assert_eq!(s::get_all_servers(&db).await.unwrap(), before);
 }
+
+fn restored(shortpath: &str, group: Option<&str>) -> s::RestoredServer {
+    s::RestoredServer {
+        name: format!("{shortpath} name"),
+        shortpath: shortpath.to_owned(),
+        favorite: true,
+        server_type: "modded".into(),
+        game_version: "1.20.1".into(),
+        port: 25570,
+        motd: "Welcome".into(),
+        max_players: 8,
+        online_mode: false,
+        xmx: 6144,
+        xms: 2048,
+        extra_java_args: "-XX:+UseG1GC".into(),
+        auto_restart: true,
+        date_created: DbDateTime(Utc.timestamp_millis_opt(1_700_000_123_456).unwrap().into()),
+        provider_type: "local".into(),
+        hosted_server_id: Some("hosted".into()),
+        icon_revision: Some(1),
+        modloader_type: Some("fabric".into()),
+        modloader_version: Some("0.15.11".into()),
+        modpack_platform: Some("modrinth".into()),
+        modpack_project_id: Some("1KVo5zza".into()),
+        modpack_file_id: Some("abcdEFGH".into()),
+        group: group.map(str::to_owned),
+    }
+}
+
+/// A server restored from its record keeps every setting and goes to the end
+/// of the library: of the default group's root, or of the folder with its
+/// name, which is created after every other top-level item when missing.
+#[tokio::test]
+async fn restore_server_tx_appends_to_the_library_and_finds_or_creates_its_folder() {
+    let (_d, db) = migrated_db().await;
+    let def = s::find_server_group_by_name(&db, "Default")
+        .await
+        .unwrap()
+        .unwrap()
+        .id;
+    let folder = seed_group(&db, "Friends", 1, Some(4)).await;
+    seed_server(&db, "root", "root", 2, def, Some(6)).await;
+    seed_server(&db, "member", "member", 3, folder, None).await;
+
+    let at_root = s::restore_server_tx(&db, def, restored("a", None))
+        .await
+        .unwrap() as i32;
+    let row = s::get_server(&db, at_root).await.unwrap().unwrap();
+    let expected = restored("a", None);
+    assert_eq!(
+        (
+            row.name.as_str(),
+            row.favorite,
+            row.server_type.as_str(),
+            row.game_version.as_str(),
+            row.port,
+            row.motd.as_str(),
+            row.max_players,
+            row.online_mode,
+        ),
+        (
+            expected.name.as_str(),
+            true,
+            "modded",
+            "1.20.1",
+            25570,
+            "Welcome",
+            8,
+            false
+        )
+    );
+    assert_eq!(
+        (
+            row.xmx,
+            row.xms,
+            row.extra_java_args.as_str(),
+            row.auto_restart,
+            row.date_created,
+            row.provider_type.as_str(),
+            row.hosted_server_id.as_deref(),
+            row.icon_revision,
+        ),
+        (
+            6144,
+            2048,
+            "-XX:+UseG1GC",
+            true,
+            expected.date_created.0,
+            "local",
+            Some("hosted"),
+            Some(1)
+        )
+    );
+    assert_eq!(
+        (
+            row.modloader_type.as_deref(),
+            row.modloader_version.as_deref(),
+            row.modpack_platform.as_deref(),
+            row.modpack_project_id.as_deref(),
+            row.modpack_file_id.as_deref(),
+            row.last_started,
+        ),
+        (
+            Some("fabric"),
+            Some("0.15.11"),
+            Some("modrinth"),
+            Some("1KVo5zza"),
+            Some("abcdEFGH"),
+            None
+        )
+    );
+    assert_eq!(
+        (row.group_id, row.index, row.library_position),
+        (def, 3, Some(7))
+    );
+
+    let in_folder = s::restore_server_tx(&db, def, restored("b", Some("Friends")))
+        .await
+        .unwrap() as i32;
+    let row = s::get_server(&db, in_folder).await.unwrap().unwrap();
+    assert_eq!(
+        (row.group_id, row.index, row.library_position),
+        (folder, 4, None)
+    );
+
+    // "Default" is a folder the user named so, never the default group.
+    let new_folder = s::restore_server_tx(&db, def, restored("c", Some("Default")))
+        .await
+        .unwrap() as i32;
+    let row = s::get_server(&db, new_folder).await.unwrap().unwrap();
+    assert_ne!(row.group_id, def);
+    let created = s::get_server_group(&db, row.group_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        (
+            created.name.as_str(),
+            created.group_index,
+            created.library_position
+        ),
+        ("Default", 2, Some(8))
+    );
+    assert_eq!((row.index, row.library_position), (0, None));
+
+    // The unique shortpath refuses a second row for the same folder.
+    assert!(
+        s::restore_server_tx(&db, def, restored("a", None))
+            .await
+            .is_err()
+    );
+    assert_eq!(s::get_all_servers(&db).await.unwrap().len(), 5);
+}

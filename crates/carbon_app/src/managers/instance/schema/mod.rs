@@ -23,12 +23,12 @@ pub async fn parse_and_update_instance_config(
     let serialized = make_instance_config(config.clone())?;
 
     if &serialized != config_str {
-        let tmpfile = app
-            .settings_manager()
-            .runtime_path
-            .get_temp()
-            .write_file_atomic(config_path, serialized.as_bytes())
-            .await?;
+        crate::util::durable::write_file_atomic(
+            &app.settings_manager().runtime_path.get_temp(),
+            config_path,
+            serialized.as_bytes(),
+        )
+        .await?;
     }
 
     Ok(config)

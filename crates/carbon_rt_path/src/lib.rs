@@ -7,7 +7,6 @@ use std::{
 };
 
 use anyhow::Context;
-use tokio::io::AsyncWriteExt;
 
 #[derive(Clone)]
 pub struct RuntimePath(PathBuf);
@@ -318,22 +317,6 @@ impl TempPath {
 
     pub async fn maketmpfile(&self) -> anyhow::Result<TempEntry<tempentry::File>> {
         self.maketmp().await
-    }
-
-    pub async fn write_file_atomic(
-        &self,
-        path: impl AsRef<Path>,
-        data: impl AsRef<[u8]>,
-    ) -> anyhow::Result<()> {
-        let tmp = self.maketmpfile().await?;
-
-        let mut fd = tokio::fs::File::create(&*tmp).await?;
-        fd.write_all(data.as_ref()).await?;
-        fd.sync_all().await?;
-
-        tmp.try_rename_or_move(path).await?;
-
-        Ok(())
     }
 
     /// Clean up all temp files/folders. Should be called on startup.
@@ -723,7 +706,10 @@ where
             None => break,
         }
     }
-    Ok(())
+    match failure {
+        Some(error) => Err(error),
+        None => Ok(()),
+    }
 }
 
 #[cfg(test)]

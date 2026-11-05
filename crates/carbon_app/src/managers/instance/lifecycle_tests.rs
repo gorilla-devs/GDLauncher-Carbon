@@ -9672,6 +9672,44 @@ async fn a_failed_playtime_write_is_saved_by_the_next_one() -> anyhow::Result<()
     Ok(())
 }
 
+/// A data folder on a macOS network share refuses std's F_FULLFSYNC (the SMB
+/// client answers ENOTSUP), so instance.json was never saved there. Every
+/// save is flushed through `util::durable`, which falls back to the plain
+/// fsync such a share supports. The test stands in for that share on every
+/// platform, with a fresh hook per save so each save is checked on its own.
+#[cfg(unix)]
+#[tokio::test]
+async fn instance_json_is_saved_where_the_drive_refuses_a_full_flush() -> anyhow::Result<()> {
+    use crate::util::durable::test_hooks::FileSyncs;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "network-share").await?;
+    let manager = app.instance_manager();
+    let config = root.join("instance.json");
+
+    // A file not in the form this build writes is rewritten as it loads.
+    let loaded = format!(" {}", tokio::fs::read_to_string(&config).await?);
+    tokio::fs::write(&config, &loaded).await?;
+    let syncs = FileSyncs::refusing_full_flush();
+    schema::parse_and_update_instance_config((*app).clone(), &loaded, config.clone()).await?;
+    assert_ne!(tokio::fs::read_to_string(&config).await?, loaded);
+    assert!(syncs.synced(&config), "rewrite on load");
+    drop(syncs);
+
+    let syncs = FileSyncs::refusing_full_flush();
+    let mut edit = update(id);
+    edit.notes = Some("on a share".into());
+    manager.update_instance(edit).await?;
+    assert_eq!(disk_config(&root).await?.notes, "on a share");
+    assert!(syncs.synced(&config), "settings change");
+    drop(syncs);
+
+    let syncs = FileSyncs::refusing_full_flush();
+    manager.update_playtime(id, 60).await?;
+    assert_eq!(disk_config(&root).await?.seconds_played, 60);
+    assert!(syncs.synced(&config), "playtime");
+    Ok(())
+}
+
 #[tokio::test]
 async fn opening_the_logs_tab_holds_up_nothing_while_past_logs_load() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;

@@ -20,7 +20,7 @@ use chrono::Utc;
 use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use sysinfo::{Pid, ProcessesToUpdate, System};
 use tokio::sync::{Mutex, RwLock, mpsc, watch};
 use tracing::{error, info, warn};
@@ -34,6 +34,7 @@ pub mod modloader_launch;
 pub mod modpack;
 pub mod properties;
 pub mod provider;
+pub(crate) mod record;
 pub(crate) mod world;
 
 const MAX_PATH: usize = if cfg!(windows) { 260 } else { 4096 };
@@ -110,7 +111,6 @@ fn addon_turn(state: &ServerState) -> AddonTurn {
         }
         ServerState::Deleting => AddonTurn::Deleting,
     }
-    Ok(())
 }
 
 /// What a server in a state an addon waits for is doing, and what it is
@@ -326,6 +326,13 @@ pub struct ServerManager {
     /// How often it checks, in milliseconds: `RECOVERED_POLL_INTERVAL`,
     /// which tests shorten or stretch.
     recovered_poll_ms: AtomicU64,
+    /// Serializes every read-row-then-write of a `server.json` with the
+    /// delete that removes it, so a write that read the row before a delete
+    /// never brings the file back after it. See `record`.
+    record_lock: Mutex<()>,
+    /// Servers this session put back from their `server.json` because their
+    /// rows were gone, until the launcher has told the user.
+    restored_servers: AtomicU32,
 }
 
 impl std::fmt::Debug for ServerManager {
@@ -353,6 +360,8 @@ impl ServerManager {
             crash_restart_abandoned: DashMap::new(),
             recovered_watcher: AtomicBool::new(false),
             recovered_poll_ms: AtomicU64::new(RECOVERED_POLL_INTERVAL.as_millis() as u64),
+            record_lock: Mutex::new(()),
+            restored_servers: AtomicU32::new(0),
         }
     }
 
@@ -931,7 +940,16 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     async fn load_servers(self) -> anyhow::Result<()> {
-        let db_servers = server_repo::get_all_servers(&self.app.db).await?;
+        let mut db_servers = server_repo::get_all_servers(&self.app.db).await?;
+
+        // A server whose row was lost (a database reset, a snapshot older
+        // than the server, a deleted gdl_conf.db) comes back from the
+        // server.json beside its data. This runs before the marker check
+        // below, so a JVM such a server left running is caught too.
+        let restored = self.restore_unlisted_servers(&db_servers).await;
+        if restored > 0 {
+            db_servers = server_repo::get_all_servers(&self.app.db).await?;
+        }
 
         // Before any server is registered in memory, check its marker
         // against the live process table: a JVM from a session the core
@@ -992,8 +1010,255 @@ impl ManagerRef<'_, ServerManager> {
         if any_recovered {
             self.watch_recovered_servers();
         }
+        if restored > 0 {
+            self.app.invalidate(GET_ALL_SERVERS, None);
+            self.app.invalidate(GET_GROUPS, None);
+            self.app.invalidate(GET_RESTORED_SERVERS, None);
+        }
 
         Ok(())
+    }
+
+    /// Puts back, at the end of the library, every server whose folder holds
+    /// a valid `server.json` but has no row, and returns how many it put
+    /// back. Never fails the load: a folder it cannot restore is logged and
+    /// left as it is.
+    async fn restore_unlisted_servers(self, rows: &[server_repo::ServerRow]) -> u32 {
+        let servers_dir = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_servers()
+            .to_path();
+        let shortpaths: Vec<String> = rows.iter().map(|row| row.shortpath.clone()).collect();
+        let mut unlisted = match tokio::task::spawn_blocking(move || {
+            record::find_unlisted_servers(&servers_dir, &shortpaths)
+        })
+        .await
+        {
+            Ok(unlisted) => unlisted,
+            Err(error) => {
+                warn!("Not looking for servers to restore: {error}");
+                return 0;
+            }
+        };
+        if unlisted.is_empty() {
+            return 0;
+        }
+        let default_group = match self.get_default_group().await {
+            Ok(group) => group,
+            Err(error) => {
+                warn!("Not restoring {} servers: {error:#}", unlisted.len());
+                return 0;
+            }
+        };
+
+        // A folder copied by hand comes back beside its original, so the two
+        // must not look the same, least of all to a delete.
+        record::name_copies_after_their_folders(&mut unlisted, rows);
+
+        let index_guard = self.index_lock.lock().await;
+        let mut restored = vec![];
+        for server in unlisted {
+            let shortpath = server.shortpath.clone();
+            let icon_revision = server.has_icon.then_some(1);
+            match server_repo::restore_server_tx(
+                &self.app.db,
+                default_group.0,
+                server.record.into_restored(server.shortpath, icon_revision),
+            )
+            .await
+            {
+                Ok(id) => {
+                    info!(
+                        "Restored server {id} from servers/{shortpath}/{}",
+                        record::RECORD_FILE_NAME
+                    );
+                    restored.push(ServerId(id as i32));
+                }
+                Err(error) => warn!("Could not restore the server in servers/{shortpath}: {error}"),
+            }
+        }
+        drop(index_guard);
+        let count = restored.len() as u32;
+        if count > 0 {
+            info!("Restored {count} servers whose rows were missing");
+            self.restored_servers.fetch_add(count, Ordering::SeqCst);
+        }
+        // The record now names a copy as the library does.
+        self.sync_server_records(restored).await;
+        count
+    }
+
+    /// How many servers this session restored from their folders and the
+    /// launcher has not told the user about yet.
+    pub fn restored_server_count(self) -> u32 {
+        self.restored_servers.load(Ordering::SeqCst)
+    }
+
+    pub fn acknowledge_restored_servers(self) {
+        if self.restored_servers.swap(0, Ordering::SeqCst) != 0 {
+            self.app.invalidate(GET_RESTORED_SERVERS, None);
+        }
+    }
+
+    /// Writes the `server.json` of every server whose file is missing or no
+    /// longer matches its row: servers created by a build without it
+    /// (2.0.40, also after a reset there), edits made there, and writes that
+    /// failed earlier. It has to run before a user can go back to 2.0.40, or
+    /// a reset there leaves nothing to restore the servers from, so startup
+    /// runs it before the instance scan, and a quit that already began does
+    /// not stop it. It only needs the rows, never the servers in memory.
+    pub(crate) async fn backfill_server_records(self) {
+        let Some(_runtime_activity) = self.admit_record_write("server record backfill") else {
+            info!("Server records not checked: the data folder is being moved");
+            return;
+        };
+        let _records = self.record_lock.lock().await;
+        let loaded = async {
+            let rows = server_repo::get_all_servers(&self.app.db).await?;
+            let groups: HashMap<i32, String> = server_repo::get_all_server_groups(&self.app.db)
+                .await?
+                .into_iter()
+                .map(|group| (group.id, group.name))
+                .collect();
+            let default_group = self.get_default_group().await?;
+            anyhow::Ok((rows, groups, default_group))
+        }
+        .await;
+        let (rows, groups, default_group) = match loaded {
+            Ok(loaded) => loaded,
+            Err(error) => {
+                warn!("Server records not checked: {error:#}");
+                return;
+            }
+        };
+        for row in rows {
+            let group = (row.group_id != default_group.0)
+                .then(|| groups.get(&row.group_id).cloned())
+                .flatten();
+            let expected = record::ServerRecord::from_row(&row, group);
+            let root = self
+                .app
+                .settings_manager()
+                .runtime_path
+                .get_servers()
+                .get_server_path(&row.shortpath)
+                .get_root();
+            match tokio::fs::read(record::record_path(&root)).await {
+                Ok(bytes) => {
+                    if matches!(
+                        record::parse_record(&bytes),
+                        record::ParsedRecord::Valid(existing) if existing == expected
+                    ) {
+                        continue;
+                    }
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+                Err(error) => warn!(
+                    "Server {}: cannot read its {}: {error}",
+                    row.id,
+                    record::RECORD_FILE_NAME
+                ),
+            }
+            if let Err(error) = self.write_server_record(&root, &expected).await {
+                warn!(
+                    "Server {}: could not write its {}: {error:#}",
+                    row.id,
+                    record::RECORD_FILE_NAME
+                );
+            }
+        }
+    }
+
+    /// Writes `record` as the `server.json` in `root`, through a synced
+    /// temporary file renamed into place. A server folder that is gone is
+    /// never created again for it.
+    async fn write_server_record(
+        self,
+        root: &std::path::Path,
+        record: &record::ServerRecord,
+    ) -> anyhow::Result<()> {
+        if !tokio::fs::metadata(root)
+            .await
+            .is_ok_and(|metadata| metadata.is_dir())
+        {
+            tracing::debug!("No server folder at {}: record not written", root.display());
+            return Ok(());
+        }
+        crate::util::durable::write_file_atomic(
+            &self.app.settings_manager().runtime_path.get_temp(),
+            record::record_path(root),
+            record.to_json()?,
+        )
+        .await
+    }
+
+    /// Rewrites `id`'s `server.json` from its row, after a committed change
+    /// to a setting the file keeps. Never fails the user's action: the
+    /// database stays the source of truth, a failure is logged, and the next
+    /// start's backfill repairs the file.
+    pub(crate) async fn sync_server_record(self, id: ServerId) {
+        if let Err(error) = self.try_sync_server_record(id).await {
+            warn!(
+                "Server {}: could not update its {}: {error:#}",
+                id.0,
+                record::RECORD_FILE_NAME
+            );
+        }
+    }
+
+    /// What a `server.json` write runs under: an activity, so a move of the
+    /// data folder cannot begin while it writes. A quit, restart or update
+    /// that already began admits nothing new, but it never moves the data
+    /// folder, so the write still goes ahead then (`Some(None)`) and a short
+    /// session leaves its records behind; the temporary file it renames into
+    /// place means a process that ends mid-write leaves the old record. Only
+    /// a move of the data folder skips the write (`None`); the next start's
+    /// backfill writes it in the new place.
+    fn admit_record_write(
+        self,
+        owner: &'static str,
+    ) -> Option<Option<crate::managers::runtime_lifecycle::RuntimeActivity>> {
+        match self.app.runtime_lifecycle.admit(owner) {
+            Ok(activity) => Some(Some(activity)),
+            Err(_) if self.app.runtime_lifecycle.relocation_in_progress() => None,
+            Err(_) => Some(None),
+        }
+    }
+
+    async fn try_sync_server_record(self, id: ServerId) -> anyhow::Result<()> {
+        let Some(_runtime_activity) = self.admit_record_write("server record write") else {
+            return Ok(());
+        };
+        let _records = self.record_lock.lock().await;
+        // Gone means deleted meanwhile, and its record with it.
+        let Some(row) = server_repo::get_server(&self.app.db, id.0).await? else {
+            return Ok(());
+        };
+        let default_group = self.get_default_group().await?;
+        let group = if row.group_id == default_group.0 {
+            None
+        } else {
+            server_repo::get_server_group(&self.app.db, row.group_id)
+                .await?
+                .map(|group| group.name)
+        };
+        let root = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_servers()
+            .get_server_path(&row.shortpath)
+            .get_root();
+        self.write_server_record(&root, &record::ServerRecord::from_row(&row, group))
+            .await
+    }
+
+    async fn sync_server_records(self, ids: impl IntoIterator<Item = ServerId>) {
+        for id in ids {
+            self.sync_server_record(id).await;
+        }
     }
 
     /// Notices when a server from an earlier session ends without the
@@ -1443,6 +1708,9 @@ impl ManagerRef<'_, ServerManager> {
         drop(_index_guard);
 
         let server_id = ServerId(new_id as i32);
+        // After the row: a folder from a create that ended before its row
+        // was written has no record and is never restored as a server.
+        self.sync_server_record(server_id).await;
 
         // Create a visual task for install progress
         let task = VisualTask::new(Translation::ServerTaskInstall {
@@ -1734,6 +2002,9 @@ impl ManagerRef<'_, ServerManager> {
         drop(_index_guard);
 
         let server_id = ServerId(new_id as i32);
+        // After the row: a folder from a create that ended before its row
+        // was written has no record and is never restored as a server.
+        self.sync_server_record(server_id).await;
 
         // Create a visual task for install progress
         let task = VisualTask::new(Translation::ServerTaskInstallFromModpack {
@@ -1948,22 +2219,17 @@ impl ManagerRef<'_, ServerManager> {
                     t_install_modloader.complete_opaque();
                 }
 
-                let effective_port = properties::finalize_pack_properties(
-                    &server_path.get_server_properties_path(), requested_port, port,
-                    &pack_result.game_version, repair,
-                ).await?;
-                server_repo::set_server_game_version_and_modloader(
-                    &app.db, server_id.0, &pack_result.game_version,
-                    pack_result.modloader_type.as_deref(), pack_result.modloader_version.as_deref(),
-                ).await?;
-                app.db.write(move |conn| {
-                    let mut patch = ServerPatch::default();
-                    patch.port = Some(effective_port);
-                    if let Some(query) = patch.build(server_id.0) { query.execute(&conn)?; }
-                    Ok(())
-                }).await?;
-
-                Ok(())
+                let properties_path = server_path.get_server_properties_path();
+                app.server_manager()
+                    .store_pack_result(
+                        server_id,
+                        &pack_result,
+                        properties::finalize_pack_properties(
+                            &properties_path, requested_port, port,
+                            &pack_result.game_version, repair,
+                        ),
+                    )
+                    .await
             }
             .await;
 
@@ -2093,23 +2359,15 @@ impl ManagerRef<'_, ServerManager> {
         for name in dirs_to_wipe.into_iter().chain(files_to_wipe) {
             protection.refuse_wipe(name)?;
         }
-        protection.refuse_wipe("launch_config.json")?;
-        for name in dirs_to_wipe {
+        for (name, dir) in dirs_to_wipe
+            .into_iter()
+            .map(|name| (name, true))
+            .chain(files_to_wipe.into_iter().map(|name| (name, false)))
+        {
             let p = data_path.join(name);
-            if p.exists() {
-                tokio::fs::remove_dir_all(&p)
-                    .await
-                    .with_context(|| format!("Failed to wipe {}", p.display()))?;
-            }
-        }
-        let files_to_wipe = ["launch_config.json"];
-        for name in files_to_wipe {
-            let p = data_path.join(name);
-            if p.exists() {
-                tokio::fs::remove_file(&p)
-                    .await
-                    .with_context(|| format!("Failed to wipe {}", p.display()))?;
-            }
+            wipe_entry(&p, dir)
+                .await
+                .with_context(|| format!("Failed to wipe {}", p.display()))?;
         }
         // Remove any .jar at the data root (server.jar, modloader installers,
         // forge/neoforge server jars). Keep recursing only at depth 0 — we
@@ -2162,6 +2420,46 @@ impl ManagerRef<'_, ServerManager> {
         );
 
         Ok(task_id)
+    }
+
+    /// Stores what a server pack set, its game version and loader and the
+    /// port its properties ended on, then rewrites the server's
+    /// `server.json` to match whatever of it was committed. `port` is the
+    /// properties step, run once the version is stored.
+    async fn store_pack_result(
+        self,
+        server_id: ServerId,
+        pack: &modpack::ServerPackResult,
+        port: impl std::future::Future<Output = anyhow::Result<i32>>,
+    ) -> anyhow::Result<()> {
+        let stored = async {
+            // The version first: it is what the server has installed now,
+            // whatever the properties step finds.
+            server_repo::set_server_game_version_and_modloader(
+                &self.app.db,
+                server_id.0,
+                &pack.game_version,
+                pack.modloader_type.as_deref(),
+                pack.modloader_version.as_deref(),
+            )
+            .await?;
+            let port = port.await?;
+            self.app
+                .db
+                .write(move |conn| {
+                    let mut patch = ServerPatch::default();
+                    patch.port = Some(port);
+                    if let Some(query) = patch.build(server_id.0) {
+                        query.execute(&conn)?;
+                    }
+                    Ok(())
+                })
+                .await?;
+            anyhow::Ok(())
+        }
+        .await;
+        self.sync_server_record(server_id).await;
+        stored
     }
 
     pub async fn delete_server(self, id: ServerId) -> anyhow::Result<()> {
@@ -2219,11 +2517,17 @@ impl ManagerRef<'_, ServerManager> {
             .get_server_path(&shortpath)
             .get_root();
         self.refuse_unowned_marker(id, &root).await?;
-        let handle = {
+        let (handle, failed_task) = {
             let mut servers = self.servers.write().await;
             let server = servers.get_mut(&id).context("Server disappeared")?;
+            // A failed install's error stays on the tile if the delete is
+            // refused below.
+            let failed_task = match &server.state {
+                ServerState::Stopped { failed_task } => *failed_task,
+                _ => None,
+            };
             server.state = ServerState::Deleting;
-            server.handle.clone()
+            (server.handle.clone(), failed_task)
         };
         drop(_guard);
         if let Some(handle) = handle {
@@ -2244,9 +2548,28 @@ impl ManagerRef<'_, ServerManager> {
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
 
-        // Delete from DB, together with the server's cached mod rows: the
-        // cascade only clears those while foreign keys are enforced.
-        server_repo::delete_server_tx(&self.app.db, id.0).await?;
+        {
+            // The record goes before the row. With it gone, a folder the
+            // removal below leaves half deleted (a file Windows keeps locked)
+            // is never restored as a server on the next start. Under the
+            // record lock, so a settings write that read the row first
+            // cannot bring the file back.
+            let _records = self.record_lock.lock().await;
+            if let Err(error) = remove_server_record(&root).await {
+                // Nothing was deleted, and a server that was running has
+                // been stopped above, its marker with it: the marker check
+                // before the change to Deleting found no other process.
+                if let Some(server) = self.servers.write().await.get_mut(&id) {
+                    server.state = ServerState::Stopped { failed_task };
+                }
+                self.app.invalidate(GET_ALL_SERVERS, None);
+                self.app.invalidate(GET_SERVER_DETAILS, None);
+                return Err(error);
+            }
+            // Delete from DB, together with the server's cached mod rows: the
+            // cascade only clears those while foreign keys are enforced.
+            server_repo::delete_server_tx(&self.app.db, id.0).await?;
+        }
 
         // Delete files
         let shortpath = {
@@ -2834,6 +3157,7 @@ impl ManagerRef<'_, ServerManager> {
         let server_id = update.server_id;
         let disable_restart = update.auto_restart == Some(false);
         persist_server_settings(&self.app.db, update).await?;
+        self.sync_server_record(server_id).await;
 
         if disable_restart {
             self.cancel_pending_restart(server_id).await;
@@ -2953,6 +3277,7 @@ impl ManagerRef<'_, ServerManager> {
                 Ok(())
             })
             .await?;
+        self.sync_server_record(id).await;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
@@ -3554,6 +3879,7 @@ impl ManagerRef<'_, ServerManager> {
 
     pub async fn set_favorite(self, id: ServerId, favorite: bool) -> anyhow::Result<()> {
         server_repo::set_server_favorite(&self.app.db, id.0, favorite).await?;
+        self.sync_server_record(id).await;
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
@@ -3902,6 +4228,9 @@ impl ManagerRef<'_, ServerManager> {
             new_library_pos,
         )
         .await?;
+        if start_group != target_group {
+            self.sync_server_record(server_id).await;
+        }
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -4313,6 +4642,14 @@ impl ManagerRef<'_, ServerManager> {
         name: String,
     ) -> anyhow::Result<()> {
         server_repo::set_server_group_name(&self.app.db, group.0, &name).await?;
+        // The rename is done; records the next start's backfill repairs.
+        match self.group_members(group).await {
+            Ok(members) => self.sync_server_records(members).await,
+            Err(error) => warn!(
+                "Server folder {} renamed, records not updated: {error:#}",
+                group.0
+            ),
+        }
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_SERVERS, None);
@@ -4320,19 +4657,29 @@ impl ManagerRef<'_, ServerManager> {
         Ok(())
     }
 
+    async fn group_members(self, group: ServerGroupId) -> anyhow::Result<Vec<ServerId>> {
+        Ok(server_repo::get_servers_by_group(&self.app.db, group.0)
+            .await?
+            .into_iter()
+            .map(|row| ServerId(row.id))
+            .collect())
+    }
+
     pub async fn delete_server_group(self, group: ServerGroupId) -> anyhow::Result<()> {
         let _index_lock = self.index_lock.lock().await;
 
         let group_id = group.0;
-        let any_servers = server_repo::count_servers_in_group(&self.app.db, group_id).await? != 0;
+        let members = self.group_members(group).await?;
 
-        if any_servers {
+        if !members.is_empty() {
             let default_group = self.get_default_group().await?;
 
             // The repository allocates separate destination index/root positions
             // in the move/delete transaction while this index lock remains held.
             let default_id = default_group.0;
             server_repo::delete_server_group_tx(&self.app.db, group_id, default_id).await?;
+            // Its servers are in the default group now.
+            self.sync_server_records(members).await;
         } else {
             server_repo::delete_server_group(&self.app.db, group_id).await?;
         }
@@ -4370,6 +4717,39 @@ fn generate_shortpath(name: &str) -> String {
     format!("{}_{}", base, timestamp)
 }
 
+/// Removes the `server.json` in `root`; one already gone is fine. The error
+/// tells the user nothing was deleted, why, and how to retry.
+async fn remove_server_record(root: &std::path::Path) -> anyhow::Result<()> {
+    let path = record::record_path(root);
+    match tokio::fs::remove_file(&path).await {
+        Ok(()) => Ok(()),
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => {
+            let advice = remove_record_advice(error.kind());
+            Err(anyhow::Error::from(error).context(format!(
+                "Nothing was deleted, because {} could not be removed. {advice}",
+                path.display()
+            )))
+        }
+    }
+}
+
+/// The way out of a `server.json` that cannot be removed. Windows reports a
+/// file another program holds open as a sharing violation, which has no
+/// kind of its own, and also as access denied, as when an antivirus scans
+/// it. A read-only attribute does not stop the removal.
+fn remove_record_advice(kind: std::io::ErrorKind) -> &'static str {
+    match kind {
+        std::io::ErrorKind::PermissionDenied => {
+            "GDLauncher is not allowed to remove it. Check that you can change files in that folder and that no other program is using it, or remove the file yourself, then try again."
+        }
+        std::io::ErrorKind::ReadOnlyFilesystem => {
+            "The drive it is on does not allow changes. Make the drive writable, then try again."
+        }
+        _ => "Close any program that may be using it and try again.",
+    }
+}
+
 // Runs only the settings DB publication; lifecycle ownership remains in the manager.
 async fn persist_server_settings(
     db: &carbon_repos::db_exec::Db,
@@ -4403,6 +4783,9 @@ async fn persist_server_settings(
     })
     .await
 }
+
+#[cfg(test)]
+mod record_tests;
 
 #[cfg(test)]
 mod task26_tests;

@@ -131,6 +131,8 @@ queries! {
         "SELECT id, name, groupIndex, libraryPosition FROM ServerGroup WHERE id = :id";
     fn find_server_group_by_name(name: &str) -> Option<ServerGroupRow> =
         "SELECT id, name, groupIndex, libraryPosition FROM ServerGroup WHERE name = :name LIMIT 1";
+    fn find_server_group_by_name_except(name: &str, excluded_id: i32) -> Option<ServerGroupRow> =
+        "SELECT id, name, groupIndex, libraryPosition FROM ServerGroup WHERE name = :name AND id <> :excluded_id ORDER BY groupIndex ASC, id ASC LIMIT 1";
     fn max_library_position_server_group() -> Option<ServerGroupRow> =
         "SELECT id, name, groupIndex, libraryPosition FROM ServerGroup WHERE libraryPosition IS NOT NULL ORDER BY libraryPosition DESC LIMIT 1";
     fn min_library_position_server_group() -> Option<ServerGroupRow> =
@@ -177,6 +179,154 @@ const INSERT_SERVER_SQL: &str =
 /// `INSERT` shared by `insert_server_group` and its `QueryCheck`.
 const INSERT_SERVER_GROUP_SQL: &str = "INSERT INTO ServerGroup (name, groupIndex, libraryPosition)
          VALUES (:name, :group_index, :library_position)";
+
+/// `INSERT` shared by `restore_server_tx` and its `QueryCheck`: a row rebuilt
+/// from the record file in the server's folder, so every setting is listed.
+/// `lastStarted` is a literal `NULL`, since the record does not keep it.
+const RESTORE_SERVER_SQL: &str = "INSERT INTO Server (name, shortpath, favorite, \"index\", libraryPosition, groupId, serverType, gameVersion, port, motd, maxPlayers, onlineMode, xmx, xms, extraJavaArgs, autoRestart, dateCreated, lastStarted, providerType, hostedServerId, iconRevision, modloaderType, modloaderVersion, modpackPlatform, modpackProjectId, modpackFileId)
+         VALUES (:name, :shortpath, :favorite, :index, :library_position, :group_id, :server_type, :game_version, :port, :motd, :max_players, :online_mode, :xmx, :xms, :extra_java_args, :auto_restart, :date_created, NULL, :provider_type, :hosted_server_id, :icon_revision, :modloader_type, :modloader_version, :modpack_platform, :modpack_project_id, :modpack_file_id)";
+
+/// A server to put back in the library from the record file in its folder,
+/// after its row was lost (a database reset, an older snapshot, a deleted
+/// `gdl_conf.db`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct RestoredServer {
+    pub name: String,
+    pub shortpath: String,
+    pub favorite: bool,
+    pub server_type: String,
+    pub game_version: String,
+    pub port: i32,
+    pub motd: String,
+    pub max_players: i32,
+    pub online_mode: bool,
+    pub xmx: i32,
+    pub xms: i32,
+    pub extra_java_args: String,
+    pub auto_restart: bool,
+    pub date_created: DbDateTime,
+    pub provider_type: String,
+    pub hosted_server_id: Option<String>,
+    pub icon_revision: Option<i32>,
+    pub modloader_type: Option<String>,
+    pub modloader_version: Option<String>,
+    pub modpack_platform: Option<String>,
+    pub modpack_project_id: Option<String>,
+    pub modpack_file_id: Option<String>,
+    /// The folder the server was in, by name; `None` for the default group.
+    pub group: Option<String>,
+}
+
+/// One past the last top-level library position: the default group's servers
+/// (a legacy row without a position renders at its index) and every folder.
+fn next_root_library_position(
+    conn: &impl crate::db_exec::ReadAccess,
+    default_group_id: i32,
+) -> DbResult<i32> {
+    let mut last = get_servers_by_group_conn(conn, default_group_id)?
+        .iter()
+        .map(|row| row.library_position.unwrap_or(row.index))
+        .max();
+    for group in get_all_server_groups_conn(conn)? {
+        if group.id != default_group_id {
+            last = last.max(group.library_position);
+        }
+    }
+    next_coordinate(last)
+}
+
+fn next_coordinate(last: Option<i32>) -> DbResult<i32> {
+    last.map_or(Some(0), |value| value.checked_add(1))
+        .ok_or_else(|| {
+            crate::db_error::DbError::Conversion("Server library coordinate overflow".into())
+        })
+}
+
+/// Inserts `server` at the end of the library, in one write transaction: in
+/// the folder named `server.group` (created at the end of the library when no
+/// folder has that name), or in the default group when it names none. The
+/// default group never matches a folder name, so a folder the user called
+/// "Default" comes back as a folder. Returns the new row id.
+pub async fn restore_server_tx(
+    db: &Db,
+    default_group_id: i32,
+    server: RestoredServer,
+) -> DbResult<i64> {
+    db.write(move |mut conn| {
+        let tx = conn.transaction()?;
+        let group_id = match server.group.as_deref() {
+            None => default_group_id,
+            Some(name) => match find_server_group_by_name_except_conn(&tx, name, default_group_id)?
+            {
+                Some(group) => group.id,
+                None => {
+                    let group_index =
+                        i32::try_from(count_server_groups_conn(&tx)?).map_err(|_| {
+                            crate::db_error::DbError::Conversion("Too many server groups".into())
+                        })?;
+                    let position = next_root_library_position(&tx, default_group_id)?;
+                    let id = insert_server_group_conn(&tx, name, group_index, Some(position))?;
+                    i32::try_from(id).map_err(|_| {
+                        crate::db_error::DbError::Conversion("Server group id overflow".into())
+                    })?
+                }
+            },
+        };
+        let index = next_coordinate(
+            get_servers_by_group_conn(&tx, group_id)?
+                .iter()
+                .map(|row| row.index)
+                .max(),
+        )?;
+        let library_position = if group_id == default_group_id {
+            Some(next_root_library_position(&tx, default_group_id)?)
+        } else {
+            None
+        };
+        let id = insert_restored_server_conn(&tx, &server, group_id, index, library_position)?;
+        tx.commit()?;
+        Ok(id)
+    })
+    .await
+}
+
+fn insert_restored_server_conn(
+    conn: &impl crate::db_exec::WriteAccess,
+    server: &RestoredServer,
+    group_id: i32,
+    index: i32,
+    library_position: Option<i32>,
+) -> Result<i64, rusqlite::Error> {
+    let mut st = conn.prepare_cached(RESTORE_SERVER_SQL)?;
+    st.execute(named_params! {
+        ":name": server.name,
+        ":shortpath": server.shortpath,
+        ":favorite": server.favorite,
+        ":index": index,
+        ":library_position": library_position,
+        ":group_id": group_id,
+        ":server_type": server.server_type,
+        ":game_version": server.game_version,
+        ":port": server.port,
+        ":motd": server.motd,
+        ":max_players": server.max_players,
+        ":online_mode": server.online_mode,
+        ":xmx": server.xmx,
+        ":xms": server.xms,
+        ":extra_java_args": server.extra_java_args,
+        ":auto_restart": server.auto_restart,
+        ":date_created": server.date_created,
+        ":provider_type": server.provider_type,
+        ":hosted_server_id": server.hosted_server_id,
+        ":icon_revision": server.icon_revision,
+        ":modloader_type": server.modloader_type,
+        ":modloader_version": server.modloader_version,
+        ":modpack_platform": server.modpack_platform,
+        ":modpack_project_id": server.modpack_project_id,
+        ":modpack_file_id": server.modpack_file_id,
+    })?;
+    Ok(conn.last_insert_rowid())
+}
 
 /// One index shift to run inside `move_server_tx`, mapping to a registered
 /// `shift_server_indexes_*` query. Encodes the conditional index shift applied
@@ -544,13 +694,48 @@ const INSERT_SERVER_GROUP_CHECK: QueryCheck = QueryCheck {
     class: crate::registry::class_of(INSERT_SERVER_GROUP_SQL),
     routes_write: true,
 };
+const RESTORE_SERVER_CHECK: QueryCheck = QueryCheck {
+    name: "restore_server",
+    sql: RESTORE_SERVER_SQL,
+    params: &[
+        ":name",
+        ":shortpath",
+        ":favorite",
+        ":index",
+        ":library_position",
+        ":group_id",
+        ":server_type",
+        ":game_version",
+        ":port",
+        ":motd",
+        ":max_players",
+        ":online_mode",
+        ":xmx",
+        ":xms",
+        ":extra_java_args",
+        ":auto_restart",
+        ":date_created",
+        ":provider_type",
+        ":hosted_server_id",
+        ":icon_revision",
+        ":modloader_type",
+        ":modloader_version",
+        ":modpack_platform",
+        ":modpack_project_id",
+        ":modpack_file_id",
+    ],
+    columns: None,
+    class: crate::registry::class_of(RESTORE_SERVER_SQL),
+    routes_write: true,
+};
 
 /// Every checkable query in this module: the macro-generated `QUERIES` plus the
-/// two hand-written statements.
+/// three hand-written statements.
 pub fn all_queries() -> Vec<QueryCheck> {
     let mut all: Vec<QueryCheck> = QUERIES.to_vec();
     all.push(INSERT_SERVER_CHECK);
     all.push(INSERT_SERVER_GROUP_CHECK);
+    all.push(RESTORE_SERVER_CHECK);
     all
 }
 

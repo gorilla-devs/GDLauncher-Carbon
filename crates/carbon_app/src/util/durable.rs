@@ -68,6 +68,24 @@ pub async fn sync_tokio_file(file: &mut tokio::fs::File) -> io::Result<()> {
         .map_err(io::Error::other)?
 }
 
+/// Saves `data` as `path` through a new file in `temp`, the data folder's
+/// temporary folder: the file is flushed with [`sync_tokio_file`], not
+/// tokio's `sync_all`, which a data folder on a macOS network share refuses,
+/// then renamed into place (or copied next to it and renamed, from another
+/// drive), so `path` never holds half a file.
+pub async fn write_file_atomic(
+    temp: &carbon_rt_path::TempPath,
+    path: impl AsRef<Path>,
+    data: impl AsRef<[u8]>,
+) -> anyhow::Result<()> {
+    use tokio::io::AsyncWriteExt;
+    let tmp = temp.maketmpfile().await?;
+    let mut file = tokio::fs::File::create(&*tmp).await?;
+    file.write_all(data.as_ref()).await?;
+    sync_tokio_file(&mut file).await?;
+    tmp.try_rename_or_move(path).await
+}
+
 /// [`sync_dir`] for async code.
 pub async fn sync_dir_async(dir: &Path) -> io::Result<()> {
     if cfg!(not(unix)) {

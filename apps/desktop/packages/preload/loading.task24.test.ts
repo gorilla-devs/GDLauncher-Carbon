@@ -45,7 +45,9 @@ it("fatal recovery removes universal reset advice and describes locked database 
   )
   expect(document.body.textContent).not.toContain("Most common fix")
   expect(document.body.textContent).toContain("lock")
-  expect(document.body.textContent).toContain("server registrations")
+  expect(document.body.textContent).toContain(
+    "come back from their folders with their settings"
+  )
   expect(document.body.textContent).toContain("recovery copy")
 })
 it.each(["fatal", "backwards"])(

@@ -64,6 +64,34 @@ it.each(ids)(
   }
 )
 
+it.each(ids)(
+  "%s says how many servers were restored for every count",
+  async (id) => {
+    const english = await loadLanguageFiles("english")
+    const resources = await loadLanguageFiles(id)
+    const i18n = createInstance()
+    await i18n.init(createI18nOptions(id, english, resources))
+    for (const count of [1, 2, 3, 5, 11, 21, 22, 25]) {
+      const title = i18n.t("notifications:_trn_servers_restored", { count })
+      expect(title).not.toContain("_trn_")
+      expect(title).toContain(String(count))
+      const hint = i18n.t("notifications:_trn_servers_restored_hint", {
+        count
+      })
+      expect(hint).not.toContain("_trn_")
+      expect(hint.length).toBeGreaterThan(20)
+    }
+    if (id === "english") {
+      expect(i18n.t("notifications:_trn_servers_restored", { count: 1 })).toBe(
+        "Restored 1 server"
+      )
+      expect(i18n.t("notifications:_trn_servers_restored", { count: 3 })).toBe(
+        "Restored 3 servers"
+      )
+    }
+  }
+)
+
 it.each(["toString", "__proto__", "unrecognized"])(
   "GPT0137 startup invalid stored %s falls back safely to English options",
   async (id) => {

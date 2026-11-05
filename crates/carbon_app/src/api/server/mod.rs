@@ -1026,6 +1026,17 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(())
         }
 
+        // Servers this session put back from the server.json in their
+        // folders because their rows were gone; 0 once the user was told.
+        query GET_RESTORED_SERVERS[app, args: ()] {
+            Ok(app.server_manager().restored_server_count())
+        }
+
+        mutation ACKNOWLEDGE_RESTORED_SERVERS[app, args: ()] {
+            app.server_manager().acknowledge_restored_servers();
+            Ok(())
+        }
+
     }
 }
 

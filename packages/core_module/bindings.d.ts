@@ -78,6 +78,7 @@ export type Procedures = {
         { key: "server.getGroups", input: never, result: ListServerGroup[] } | 
         { key: "server.getLegacyDatapacks", input: FEServerId, result: LegacyDatapack[] } | 
         { key: "server.getOps", input: FEServerId, result: OpsEntry[] } | 
+        { key: "server.getRestoredServers", input: never, result: number } | 
         { key: "server.getServerAddons", input: FEServerId, result: ServerAddon[] } | 
         { key: "server.getServerDetails", input: FEServerId, result: FEServerDetails } | 
         { key: "server.getServerMetrics", input: FEServerId, result: FEServerMetrics | null } | 
@@ -178,6 +179,7 @@ export type Procedures = {
         { key: "longRunning", input: never, result: boolean } | 
         { key: "metrics.sendEvent", input: FEMetricsEvent, result: null } | 
         { key: "server.acceptEula", input: FEServerId, result: null } | 
+        { key: "server.acknowledgeRestoredServers", input: never, result: null } | 
         { key: "server.addOp", input: AddOpRequest, result: null } | 
         { key: "server.addToWhitelist", input: AddPlayerRequest, result: null } | 
         { key: "server.arrangeServerLibrary", input: never, result: null } | 
