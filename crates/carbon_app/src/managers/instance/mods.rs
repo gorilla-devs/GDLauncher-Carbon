@@ -2949,11 +2949,12 @@ pub(super) fn ensure_pack_unlocked(
 /// cancelled, in any phase, as 2.0.40 did. So does a completed import that
 /// keeps its platform link: its pack request is never downloaded or applied,
 /// Play only checks that it still matches the record. The same holds for such
-/// a record copied by a duplicate (or written before the instance had an id)
-/// that Play continues as this instance's own. The lock is checked before
-/// this, so only the pack's identity has to match, and a user who unpaired the
-/// pack (no configured pack) may edit too, as after Unlock: Play neither
-/// applies the link nor attaches it again. Read-only.
+/// a record that is not this instance's own (copied by a duplicate, written
+/// before the instance had an id, or kept from an earlier registration of the
+/// folder) that Play continues as this instance's own. The lock is checked
+/// before this, so only the pack's identity has to match, and a user who
+/// unpaired the pack (no configured pack) may edit too, as after Unlock: Play
+/// neither applies the link nor attaches it again. Read-only.
 ///
 /// [`Session::is_content_free`]: super::modpack::session::Session::is_content_free
 async fn setup_allows_addon_edits(
@@ -2965,8 +2966,9 @@ async fn setup_allows_addon_edits(
     if !session.is_content_free() {
         return Ok(false);
     }
-    let owned = session.instance_id == Some(*instance_id) && session.copied_to.is_none();
-    if !owned && session.copy_qualification(root, instance_id).await? != Some(true) {
+    if !session.owned_by(instance_id)
+        && session.copy_qualification(root, instance_id).await? != Some(true)
+    {
         return Ok(false);
     }
     let installed = super::schema::parse_instance_config(&session.installed_config)?;
@@ -3066,6 +3068,48 @@ pub(super) fn unreadable_setup_refusal(config: &info::Instance, change: PendingC
     }
 }
 
+/// Why `change` waits for a pending setup that is not this instance's own
+/// (see [`Session::binds_to`]) and that Play can't continue: it may have
+/// changed files before the instance folder was copied, moved or registered
+/// again, and there is no original archive to rebuild it from. `copied`: a
+/// duplicate made in the launcher copied it, so the original may still finish
+/// it. Names the way out the instance itself has: Repair for a modpack,
+/// otherwise removing the hidden folder, as for the setups Play refuses to
+/// resume.
+///
+/// [`Session::binds_to`]: super::modpack::session::Session::binds_to
+pub(super) fn uncontinued_setup_refusal(
+    config: &info::Instance,
+    change: PendingChange,
+    copied: bool,
+) -> String {
+    let refused = if copied {
+        format!(
+            "This instance was copied while its setup was part-way through, so {} on the copy.",
+            change.not_safe()
+        )
+    } else {
+        format!(
+            "This instance's unfinished install or update began before the instance folder was copied or moved, or before the launcher's database was reset, so {}.",
+            change.not_safe()
+        )
+    };
+    let way_out = if config.modpack.is_some() {
+        "Use Repair on this instance to reinstall the modpack; your worlds are kept."
+    } else if change == PendingChange::GameVersion {
+        "To change it anyway, delete the hidden .setup folder inside the instance folder, then choose the version again."
+    } else {
+        "To install it again, delete the hidden .setup folder inside the instance folder, then press Play."
+    };
+    if copied {
+        format!(
+            "{refused} {way_out} You can also finish the setup on the original instance, then copy it again."
+        )
+    } else {
+        format!("{refused} {way_out}")
+    }
+}
+
 /// Why `change` waits for the pending setup in `root`, naming the way out
 /// that Play, Edit and the Repair dialog actually offer for it. `session` is its
 /// record, if it has one. Read-only: not every caller holds the gate.
@@ -3125,10 +3169,11 @@ pub(super) async fn pending_setup_refusal(
             )
         });
     };
-    // Play and the Repair dialog both continue a copied record that qualifies
-    // as this instance's own, and the dialog offers Cancel for a copied pack
-    // request.
-    let owned = session.instance_id == Some(*instance_id);
+    // Play and the Repair dialog both continue a record that is not this
+    // instance's own (a copied one, or one kept from an earlier registration
+    // of the folder) when it qualifies as this instance's own, and the dialog
+    // offers Cancel for such a pack request.
+    let owned = session.owned_by(instance_id);
     let continued_copy = !owned
         && matches!(
             session.copy_qualification(root, instance_id).await,
@@ -3169,7 +3214,7 @@ pub(super) async fn pending_setup_refusal(
         {
             unfinished
         } else {
-            "This instance was copied while its setup was part-way through, so the copy can't continue it. Finish the setup on the original instance, then copy it again.".into()
+            uncontinued_setup_refusal(config, change, session.copied_to == Some(*instance_id))
         },
     )
 }
