@@ -968,35 +968,68 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         id: String,
     ) -> anyhow::Result<VisualTaskId> {
+        // Each step is logged so a silent update shows where it stopped:
+        // the platform lookups, admission or the install itself.
+        let started = std::time::Instant::now();
+        tracing::debug!(instance = instance_id.0, mod_id = %id, "Addon update requested");
         self.ensure_modpack_not_locked(instance_id).await?;
 
         let update = self.find_mod_update(instance_id, id.clone()).await?;
 
-        match update {
+        let installed = match update {
             Some(RemoteVersion::Curseforge(file)) => {
+                tracing::debug!(
+                    instance = instance_id.0,
+                    mod_id = %id,
+                    platform = "curseforge",
+                    project = file.mod_id,
+                    version = file.id,
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    "Addon update found, installing it"
+                );
                 self.install_curseforge_mod(
                     instance_id,
                     file.mod_id as u32,
                     file.id as u32,
                     false,
-                    Some(id),
+                    Some(id.clone()),
                 )
                 .await
             }
             Some(RemoteVersion::Modrinth(version)) => {
+                tracing::debug!(
+                    instance = instance_id.0,
+                    mod_id = %id,
+                    platform = "modrinth",
+                    project = %version.project_id,
+                    version = %version.id,
+                    elapsed_ms = started.elapsed().as_millis() as u64,
+                    "Addon update found, installing it"
+                );
                 self.install_modrinth_mod(
                     instance_id,
                     version.project_id,
                     version.id,
                     false,
-                    Some(id),
+                    Some(id.clone()),
                 )
                 .await
             }
-            None => Err(anyhow!(
-                "unable to find newer mod version in available update channels"
-            )),
-        }
+            None => {
+                return Err(anyhow!(
+                    "unable to find newer mod version in available update channels"
+                ));
+            }
+        };
+        tracing::debug!(
+            instance = instance_id.0,
+            mod_id = %id,
+            ok = installed.is_ok(),
+            task = installed.as_ref().ok().map(|task| task.0),
+            elapsed_ms = started.elapsed().as_millis() as u64,
+            "Addon update install call returned"
+        );
+        installed
     }
 
     pub async fn update_curseforge_mod(

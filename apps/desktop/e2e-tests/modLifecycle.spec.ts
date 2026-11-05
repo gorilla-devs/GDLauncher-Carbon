@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test"
 import { test } from "./fixtures/index.js"
 import { attachCoreLogOnFailure } from "./fixtures/electronApp.js"
-import { byModRow, byTestId, TEST_IDS } from "./helpers/selectors.js"
+import { byTestId, TEST_IDS } from "./helpers/selectors.js"
 import { ensureLibraryInteractive } from "./helpers/instances.js"
 import {
   cleanupInstalledMod,
@@ -14,7 +14,7 @@ import {
   pickOlderVersion,
   searchForMod,
   toggleModEnabled,
-  waitForModFilenameChange,
+  updateModViaRow,
   waitForModUpdateAvailable,
   type InstalledMod
 } from "./helpers/mods.js"
@@ -305,16 +305,13 @@ test.describe("mod lifecycle", () => {
         // disk checks below, after the update has actually run.
         await waitForModUpdateAvailable(page, instanceName, matchesFabricApi)
 
-        const row = page.locator(byModRow(installed.filename))
-        await row.locator(byTestId(TEST_IDS.modRowUpdate)).click()
-
-        // Same reasoning as the wait above: `waitForModFilenameChange` cannot
-        // return without the filename having changed, so there is nothing to
+        // Same reasoning as the wait above: `updateModViaRow` cannot return
+        // without the filename having changed, so there is nothing to
         // usefully assert about `updated.filename` itself here — the real
         // observation this whole test exists for is that the *disk* — not
         // just the app's own record — reflects a genuinely different,
         // verifiable file, which the two checks below establish.
-        const updated = await waitForModFilenameChange(page, instanceName, {
+        const updated = await updateModViaRow(page, instanceName, {
           oldFilename: installed.filename,
           matches: matchesFabricApi
         })

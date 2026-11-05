@@ -696,6 +696,16 @@ impl Installer {
             return Ok(task_id);
         };
         drop(operation);
+        // One line per step up to publication, so a silent install shows
+        // where it stopped: planning, download, or its turn to publish.
+        let addon = self.inner.lock().await.id();
+        tracing::debug!(
+            instance = instance_id.0,
+            task = task_id.0,
+            %addon,
+            replaces = ?replaces_mod_id,
+            "Admitted addon install, instance gate released"
+        );
         let task = Arc::new(Mutex::new(task));
         // A replacement keeps the replaced copy's state, so that state decides
         // whatever the caller asked: an enabled one gets the libraries its new
@@ -723,6 +733,7 @@ impl Installer {
             }
             // Planning is part of the same Task6 admission authority. Abort
             // drains it, and a dropped planning future remains Unknown.
+            let started = std::time::Instant::now();
             let admission = self.admission.lock().await;
             let record = AdmissionRecord::begin(self.ownership.clone());
             let result = planning::resolve(
@@ -735,6 +746,13 @@ impl Installer {
             .await;
             record.finish();
             drop(admission);
+            tracing::debug!(
+                task = task_id.0,
+                %addon,
+                ok = result.is_ok(),
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "Planned addon dependencies"
+            );
             match result {
                 Ok(resolution) => {
                     let subject = self.inner.lock().await.project_name();
@@ -1087,8 +1105,9 @@ impl Installer {
         let rollback_context = Arc::clone(&self.rollback_context);
         let parent_task = Arc::clone(parent_task);
         let graph = visited_ids.clone();
+        let addon = self.inner.lock().await.id();
         let graph_index = graph.register(
-            self.inner.lock().await.id(),
+            addon.clone(),
             self.ownership.cancel.clone(),
             self.receipt.clone(),
         );
@@ -1163,9 +1182,14 @@ impl Installer {
                                         .progress_sender(progress_watch_tx).build(),
                                 ).await.map(|_| ()).with_context(|| format!("Failed to download addon file {}", downloadable.path.display()))
                             };
+                            // The file's name is enough to tell the downloads apart.
+                            let file = downloadable.url.split(['?', '#']).next().and_then(|url| url.rsplit('/').next()).unwrap_or_default();
+                            tracing::debug!(instance = instance_id.0, %addon, file, size = ?downloadable.size, "Addon download started");
+                            let started = std::time::Instant::now();
                             // Sender closure ends observation, never certifies transfer success.
                             // Both futures settle before publication or failure handling.
                             let (result, progress) = tokio::join!(transfer, progress);
+                            tracing::debug!(instance = instance_id.0, %addon, ok = result.is_ok(), elapsed_ms = started.elapsed().as_millis() as u64, "Addon download finished");
                             result?;
                             progress.complete_download();
 
@@ -1178,7 +1202,9 @@ impl Installer {
                                     .await?;
                                 drop(lock);
                                 graph.ready(graph_index);
+                                tracing::debug!(instance = instance_id.0, %addon, "Addon waiting for its turn to publish");
                                 graph.publication_turn(graph_index, &cancel).await?;
+                                tracing::debug!(instance = instance_id.0, %addon, "Addon's turn to publish");
                                 #[cfg(test)]
                                 {
                                     let identity = inner.lock().await.id();
@@ -1187,6 +1213,7 @@ impl Installer {
                                 #[cfg(test)]
                                 if replacement.is_some() { app_clone.instance_manager().test_hooks.pause("addon_graph_before_root_publish", instance_id).await; }
                                 let lock = inner.lock().await;
+                                tracing::debug!(instance = instance_id.0, %addon, "Publishing addon");
                                 if lock.addon_type() == instance::AddonType::Worlds {
                                     // Extracted before the instance gate: Play, addon
                                     // changes and scans of this instance do not wait

@@ -27,7 +27,15 @@
  */
 
 import fs from "node:fs"
-import { expect, type Page, type Response } from "@playwright/test"
+import {
+  expect,
+  type Locator,
+  type Page,
+  type Request,
+  type Response
+} from "@playwright/test"
+import { appendToError } from "../fixtures/electronApp.js"
+import { rpcRoute } from "./operationObserver.js"
 import {
   byAddonTypeOption,
   byAddonVersionRow,
@@ -290,7 +298,11 @@ export async function openInstanceAddons(
   // the list is empty or not (see `byPrimaryButton`'s doc comment).
   await expect(byPrimaryButton(page, "Add Addons")).toBeVisible()
 
-  return mods.map((m) => ({
+  return mods.map(toInstalledMod)
+}
+
+function toInstalledMod(m: RawModResponse): InstalledMod {
+  return {
     id: m.id,
     filename: m.filename,
     fileSize: m.file_size,
@@ -303,7 +315,7 @@ export async function openInstanceAddons(
     sha1: m.metadata?.sha_1 ?? null,
     modloaders: (m.metadata?.modloaders ?? []).map((l) => l.toLowerCase()),
     hasUpdate: m.has_update
-  }))
+  }
 }
 
 /** How long `dismissSearchOnboardingTip` waits for the spotlight overlay to
@@ -685,6 +697,256 @@ export function isSearchRequestFor(
  *  well under this bound. */
 const SHADER_WIZARD_WAIT = 5_000
 
+/** How long one read straight from the core may take. These reads only
+ *  explain a failure, so a hung core must not hide it behind the test's own
+ *  timeout. */
+const CORE_READ_TIMEOUT = 10_000
+
+/** Where the renderer reaches the core, and the token it sends. */
+interface CoreAddress {
+  origin: string
+  token: string
+}
+
+/** The core's address as the renderer holds it (`window.getCoreModule()`,
+ *  the route `fixtures/login.ts`'s `markSearchTipSeen` takes). */
+async function coreAddressOf(page: Page): Promise<CoreAddress> {
+  const core = await page.evaluate(async () => {
+    const module = await window.getCoreModule()
+    return module.type === "success"
+      ? { port: module.port, apiToken: module.apiToken }
+      : null
+  })
+  if (!core) throw new Error("the core never reported READY")
+  return { origin: `http://127.0.0.1:${core.port}`, token: core.apiToken }
+}
+
+/** Reads the rspc query `key` straight from the core, past the renderer and
+ *  its query cache, so nothing the app shows changes. Sent the way
+ *  `rspcFetch` (`utils/rspcClient.ts`) sends a query. */
+async function readCore(
+  page: Page,
+  core: CoreAddress,
+  key: string,
+  input: unknown
+): Promise<unknown> {
+  const response = await page.request.get(
+    `${core.origin}/rspc/${key}?input=${encodeURIComponent(JSON.stringify(input))}`,
+    { headers: { "x-api-token": core.token }, timeout: CORE_READ_TIMEOUT }
+  )
+  const body = (await response.json().catch(() => null)) as RspcEnvelope | null
+  if (body?.result?.type !== "response") {
+    throw new Error(
+      `${key} answered HTTP ${response.status()}: ${JSON.stringify(body)}`
+    )
+  }
+  return body.result.data
+}
+
+async function readInstanceMods(
+  page: Page,
+  core: CoreAddress,
+  instanceId: number
+): Promise<InstalledMod[]> {
+  const mods = await readCore(
+    page,
+    core,
+    "instance.getInstanceMods",
+    instanceId
+  )
+  if (!Array.isArray(mods)) {
+    throw new Error(
+      `instance.getInstanceMods for instance ${instanceId} returned ` +
+        JSON.stringify(mods)
+    )
+  }
+  return (mods as RawModResponse[]).map(toInstalledMod)
+}
+
+/** The addon an addon page installs and the instance it installs into. */
+export interface AddonPageTarget {
+  projectId: string
+  platform: ModPlatform
+  instanceId: number
+}
+
+/** Reads `AddonPageTarget` off the addon page's hash route,
+ *  `#/addon/:id/:platform[/<tab>]?instanceId=<id>` (`route/index.tsx`; the
+ *  search page adds the query, `Search/List.tsx`, and the page's tabs keep
+ *  it). Undefined anywhere else. */
+export function addonPageTarget(url: string): AddonPageTarget | undefined {
+  try {
+    // Everything after `#`, query included, is the app's own route.
+    const route = new URL(new URL(url).hash.slice(1), "http://route")
+    const [, section, projectId, platform] = route.pathname.split("/")
+    const instanceId = Number(route.searchParams.get("instanceId"))
+    if (
+      section !== "addon" ||
+      !projectId ||
+      (platform !== "modrinth" && platform !== "curseforge") ||
+      !Number.isInteger(instanceId) ||
+      instanceId <= 0
+    ) {
+      return undefined
+    }
+    return { projectId, platform, instanceId }
+  } catch {
+    return undefined
+  }
+}
+
+const PLATFORM_NAMES: Record<ModPlatform, string> = {
+  modrinth: "Modrinth",
+  curseforge: "CurseForge"
+}
+
+/** `mod`'s project and version on `platform`, as strings, the way
+ *  `findInstalledAddon` (`utils/installedAddon.ts`) compares them. */
+function platformIdentity(mod: InstalledMod, platform: ModPlatform) {
+  return platform === "modrinth"
+    ? { project: mod.modrinthProjectId, version: mod.modrinthVersionId }
+    : {
+        project: mod.curseforgeProjectId?.toString() ?? null,
+        version: mod.curseforgeFileId?.toString() ?? null
+      }
+}
+
+/**
+ * Says why an install button for `target` never read "Downloaded", from the
+ * instance's mods listed before the click (`before`, undefined if that read
+ * failed) and after the wait (`after`). `versionId` is set for a Versions-tab
+ * row, whose button also needs that version.
+ *
+ * The button reads "Downloaded" only once a listed file carries the addon's
+ * own platform identity (`findInstalledAddon`). The core learns that identity
+ * from a hash lookup after the file lands, and a lookup that misses leaves
+ * the file installed but anonymous for the rest of the session. On the button
+ * that looks the same as no install at all, so the two are told apart here.
+ */
+export function explainNotDownloaded(
+  target: AddonPageTarget,
+  before: InstalledMod[] | undefined,
+  after: InstalledMod[],
+  versionId?: string
+): string {
+  const platform = PLATFORM_NAMES[target.platform]
+  const identity = (mod: InstalledMod) => platformIdentity(mod, target.platform)
+  const names = (mods: InstalledMod[]) =>
+    mods.map((mod) => `"${mod.filename}"`).join(", ")
+  const describe = (mods: InstalledMod[]) =>
+    mods
+      .map((mod) => {
+        const { project, version } = identity(mod)
+        return project === null
+          ? `"${mod.filename}" (no ${platform} identity)`
+          : `"${mod.filename}" (${platform} project ${project} version ${version})`
+      })
+      .join(", ")
+  const wanted =
+    `${platform} project ${target.projectId}` +
+    (versionId ? ` version ${versionId}` : "")
+
+  const ofProject = after.filter(
+    (mod) => identity(mod).project === target.projectId
+  )
+  const own = ofProject.filter(
+    (mod) => !versionId || identity(mod).version === versionId
+  )
+  if (own.length > 0) {
+    return (
+      `The file ${names(own)} is installed as ${wanted}, yet the button ` +
+      'never read "Downloaded".'
+    )
+  }
+
+  const known = before && new Set(before.map((mod) => mod.filename))
+  const added = known ? after.filter((mod) => !known.has(mod.filename)) : after
+  const anonymous = added.filter((mod) => identity(mod).project === null)
+  if (anonymous.length > 0) {
+    return (
+      `The file ${names(anonymous)} is installed but has no ${platform} ` +
+      `identity, so nothing ties it to ${wanted}.` +
+      (known
+        ? ""
+        : " The mods before the click could not be read, so it may be " +
+          "older than this install.")
+    )
+  }
+
+  let message =
+    `The file is not installed: instance ${target.instanceId} lists no ` +
+    `new file for ${wanted}.`
+  if (ofProject.length > 0) {
+    message += ` Listed for that project: ${describe(ofProject)}.`
+  }
+  if (known && added.length > 0) {
+    message += ` Added since the click: ${describe(added)}.`
+  }
+  const anonymousBefore = (before ?? []).filter(
+    (mod) => identity(mod).project === null
+  )
+  if (anonymousBefore.length > 0) {
+    // An earlier test's file whose lookup missed survives its cleanup, which
+    // matches by identity, and an install of the same file then adds nothing.
+    message +=
+      ` Already there before the click with no ${platform} identity: ` +
+      `${names(anonymousBefore)}.`
+  }
+  return message
+}
+
+/**
+ * Returns a wait for `button` to read "Downloaded" within `timeout`, to start
+ * right after the install click. Call it before the click: it lists the
+ * instance's mods first, so that when the button never flips the error can
+ * say whether the file landed without its identity or did not land, and name
+ * it (`explainNotDownloaded`). These reads never fail the install
+ * themselves; a read that fails is named in the error instead.
+ */
+async function armDownloadedWait(
+  page: Page,
+  button: Locator,
+  message: string,
+  timeout: number,
+  versionId?: string
+): Promise<() => Promise<void>> {
+  const url = page.url()
+  const target = addonPageTarget(url)
+  let core: CoreAddress | undefined
+  let before: InstalledMod[] | undefined
+  if (target) {
+    try {
+      core = await coreAddressOf(page)
+      before = await readInstanceMods(page, core, target.instanceId)
+    } catch {
+      // The list after the wait still tells the cases apart.
+    }
+  }
+
+  const explain = async (): Promise<string> => {
+    if (!target) {
+      return `The page URL ${url} names no addon and instance, so the instance's mods were not checked.`
+    }
+    try {
+      core ??= await coreAddressOf(page)
+      const after = await readInstanceMods(page, core, target.instanceId)
+      return explainNotDownloaded(target, before, after, versionId)
+    } catch (error) {
+      return (
+        `instance.getInstanceMods for instance ${target.instanceId} could ` +
+        `not be read to say whether the file is installed: ${String(error)}`
+      )
+    }
+  }
+
+  return () =>
+    expect(button, { message })
+      .toHaveText(/downloaded/i, { timeout })
+      .catch(async (error: unknown) => {
+        throw appendToError(error, await explain())
+      })
+}
+
 /**
  * Clicks the addon page's install button and waits for it to report success.
  * `instanceName` is not otherwise used (the page is already scoped to a
@@ -795,6 +1057,19 @@ export async function installModIntoInstance(
       "failed cleanup), so a real install here cannot be proven"
   }).not.toHaveText(/downloaded/i)
 
+  // Armed before the click: the text-based wait lists the instance's mods
+  // first, so a button that never reads "Downloaded" can say which file this
+  // install added (see `armDownloadedWait`).
+  const waitForCompletion =
+    opts.waitForCompletion ??
+    (await armDownloadedWait(
+      page,
+      installButton,
+      `installModIntoInstance: install button for "${opts.instanceName}" ` +
+        `never reported success (expected its text to read "Downloaded")`,
+      INSTALL_TIMEOUT
+    ))
+
   await installButton.click()
 
   if (opts.assertLoadingVisible) {
@@ -816,13 +1091,7 @@ export async function installModIntoInstance(
   // shows the wizard at all is satisfied by this one wait alone, and an
   // install that does show it resumes waiting on this exact operation
   // (already in flight) rather than starting a second, fresh one.
-  const completion: Promise<void> = opts.waitForCompletion
-    ? opts.waitForCompletion()
-    : expect(installButton, {
-        message:
-          `installModIntoInstance: install button for "${opts.instanceName}" ` +
-          `never reported success (expected its text to read "Downloaded")`
-      }).toHaveText(/downloaded/i, { timeout: INSTALL_TIMEOUT })
+  const completion: Promise<void> = waitForCompletion()
 
   // Resolves to "wizard" only on a genuine sighting. A "never appeared"
   // outcome is deliberately left pending forever (its own `waitFor`
@@ -970,8 +1239,6 @@ export async function deleteModViaUi(
     "instance.deleteMod",
     LIFECYCLE_MUTATION_TIMEOUT
   )
-
-  const row = page.locator(byModRow(filename))
   await row.locator(byTestId(TEST_IDS.modRowDelete)).click()
 
   await responsePromise
@@ -1627,7 +1894,6 @@ export async function installAddonVersion(
   page: Page,
   version: AddonVersionSummary
 ): Promise<void> {
-  await scrollVersionRowIntoView(page, version.fileId)
   const row = page.locator(byAddonVersionRow(version.fileId))
   // Not just `row.locator("button")`: a version row resolves to three
   // `<button>`s — the row's own name `Tooltip`'s trigger, the install
@@ -1646,13 +1912,19 @@ export async function installAddonVersion(
   // toggles to `data-expanded` once a trigger's tooltip opens, which the
   // click below can trigger incidentally.
   const button = row.locator("button[variant]")
+  // Armed before the scroll, so the click still follows it straight away.
+  const waitForDownloaded = await armDownloadedWait(
+    page,
+    button,
+    `installAddonVersion: file "${version.fileId}" never reported ` +
+      'success (expected its text to read "Downloaded")',
+    VERSION_INSTALL_TIMEOUT,
+    version.fileId
+  )
+  await scrollVersionRowIntoView(page, version.fileId)
   await button.click()
 
-  await expect(button, {
-    message:
-      `installAddonVersion: file "${version.fileId}" never reported ` +
-      'success (expected its text to read "Downloaded")'
-  }).toHaveText(/downloaded/i, { timeout: VERSION_INSTALL_TIMEOUT })
+  await waitForDownloaded()
 }
 
 /** How long `waitForModFilenameChange` polls before giving up. The update
@@ -1701,6 +1973,162 @@ export async function waitForModFilenameChange(
     `waitForModFilenameChange: filename for "${instanceName}" never moved ` +
       `off "${opts.oldFilename}" within ${UPDATE_TIMEOUT}ms`
   )
+}
+
+/** How long the update click's `instance.updateMod` request may take to
+ *  appear. The click handler sends it at once (`handleUpdateMod` ->
+ *  `mutateAsync` -> `fetch`, `Addons/hooks/useAddonMutations.tsx`), so this
+ *  only absorbs a busy runner. */
+const UPDATE_REQUEST_TIMEOUT = 10_000
+
+/** How long `updateModViaRow` listens for the request and its answer. It
+ *  outlasts the click, the request wait and all of `UPDATE_TIMEOUT`, so a
+ *  slow answer is still recorded; it only bounds how long the listeners stay
+ *  on the worker's page. */
+const UPDATE_WATCH_TIMEOUT = 3 * UPDATE_TIMEOUT
+
+/** The task id in an `instance.updateMod` answer body, or undefined when
+ *  there is none (an rspc error, or a body that is not rspc JSON). */
+export function updateTaskId(body: string): number | undefined {
+  try {
+    const result = (JSON.parse(body) as RspcEnvelope).result
+    return result?.type === "response" && Number.isInteger(result.data)
+      ? (result.data as number)
+      : undefined
+  } catch {
+    return undefined
+  }
+}
+
+/**
+ * Clicks the update icon on `opts.oldFilename`'s row of the instance's Addons
+ * tab (must already be there) and waits for the update to land, through
+ * `waitForModFilenameChange` and its `UPDATE_TIMEOUT`.
+ *
+ * An update once sat for the whole 120 s with nothing in the renderer's or
+ * the core's log, and nothing could tell whether the click sent
+ * `instance.updateMod`, whether the core answered it, or whether the task it
+ * started stalled. So this watches the request and its answer, logs both, and
+ * a failure says which of those happened. A click that sends no request fails
+ * after `UPDATE_REQUEST_TIMEOUT`. The answer is only watched: a slow one still
+ * gets all of `UPDATE_TIMEOUT`.
+ */
+export async function updateModViaRow(
+  page: Page,
+  instanceName: string,
+  opts: { oldFilename: string; matches: (mod: InstalledMod) => boolean }
+): Promise<InstalledMod> {
+  // Retires both listeners below once this returns, so a later test's
+  // update in this worker cannot satisfy them.
+  let watching = true
+  const isUpdateMod = (request: Request) =>
+    watching &&
+    request.method() === "POST" &&
+    rpcRoute(request.url()) === "instance.updateMod"
+
+  // Both armed before the click, so a request sent while the click is still
+  // being dispatched is not missed. Each ends in a catch: the click or the
+  // test can end first, and a rejection nothing awaits would be reported
+  // against a later test in this worker.
+  const sent = page
+    .waitForRequest(isUpdateMod, { timeout: UPDATE_WATCH_TIMEOUT })
+    .then((request) => {
+      const at = new Date()
+      console.log(
+        `[updateMod] sent at ${at.toISOString()}: ${request.postData()}`
+      )
+      return { request, at }
+    })
+    .catch(() => null)
+  let answer:
+    | { at: Date; status: number; body: string; taskId?: number }
+    | undefined
+  void page
+    .waitForResponse((response) => isUpdateMod(response.request()), {
+      timeout: UPDATE_WATCH_TIMEOUT
+    })
+    .then(async (response) => {
+      const at = new Date()
+      let body: string
+      try {
+        body = await response.text()
+      } catch (error) {
+        // An aborted request has a response but no body.
+        body = `<no body: ${String(error)}>`
+      }
+      answer = {
+        at,
+        status: response.status(),
+        body,
+        taskId: updateTaskId(body)
+      }
+      console.log(
+        `[updateMod] answered at ${at.toISOString()}: HTTP ${answer.status} ${body}`
+      )
+    })
+    .catch(() => {})
+
+  const describeUpdate = async (
+    request: Request,
+    sentAt: Date
+  ): Promise<string> => {
+    const asked = `The instance.updateMod request sent at ${sentAt.toISOString()}`
+    if (!answer) {
+      const failure = request.failure()
+      return failure
+        ? `${asked} failed without an answer: ${failure.errorText}.`
+        : `${asked} has not been answered.`
+    }
+    const answered = `${asked} was answered at ${answer.at.toISOString()} with HTTP ${answer.status}`
+    if (answer.taskId === undefined) {
+      return `${answered} and no task id: ${answer.body}`
+    }
+    let state: string
+    try {
+      // The same core and token the renderer's own request used.
+      const core = {
+        origin: new URL(request.url()).origin,
+        token: (await request.allHeaders())["x-api-token"] ?? ""
+      }
+      state = JSON.stringify(
+        await readCore(page, core, "vtask.getTaskOutcome", answer.taskId)
+      )
+    } catch (error) {
+      state = `unreadable (${String(error)})`
+    }
+    return `${answered} and task ${answer.taskId}, whose vtask.getTaskOutcome now reads ${state}.`
+  }
+
+  try {
+    await page
+      .locator(byModRow(opts.oldFilename))
+      .locator(byTestId(TEST_IDS.modRowUpdate))
+      .click()
+
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const seen = await Promise.race([
+      sent,
+      new Promise<null>((resolve) => {
+        timer = setTimeout(() => resolve(null), UPDATE_REQUEST_TIMEOUT)
+      })
+    ])
+    clearTimeout(timer)
+    if (!seen) {
+      throw new Error(
+        `updateModViaRow: the update click sent no instance.updateMod ` +
+          `request within ${UPDATE_REQUEST_TIMEOUT}ms (row ` +
+          `"${opts.oldFilename}" in "${instanceName}")`
+      )
+    }
+
+    try {
+      return await waitForModFilenameChange(page, instanceName, opts)
+    } catch (error) {
+      throw appendToError(error, await describeUpdate(seen.request, seen.at))
+    }
+  } finally {
+    watching = false
+  }
 }
 
 /** How long `waitForModUpdateAvailable` polls before giving up. Generous

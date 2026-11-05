@@ -222,7 +222,19 @@ impl InstanceManager {
             #[cfg(test)]
             drop_barrier: self.test_hooks.drop_barrier(id),
         };
+        let started = std::time::Instant::now();
         operation.guard = Some(operation.lock.as_ref().unwrap().clone().lock_owned().await);
+        // Debug, not a warning: modpack work, exports and Play preparation
+        // hold the gate this long by design. It tells a stalled action apart
+        // from one queued behind them.
+        let waited = started.elapsed();
+        if waited > Duration::from_secs(5) {
+            tracing::debug!(
+                instance = id.0,
+                waited_ms = waited.as_millis() as u64,
+                "Waited for the instance gate"
+            );
+        }
         operation
     }
 

@@ -168,10 +168,19 @@ export const useAddonMutations = (
     optimisticUpdates.optimisticUpdateAddon(modId)
 
     try {
+      // Until the task exists this path logs nothing on either side, so an
+      // update that stalls cannot say whether the request ever left or was
+      // accepted. Ids only: the e2e copies this console into the CI job log.
+      console.info(
+        `[addons] updateMod sent: instance ${instanceId}, mod ${modId}`
+      )
       const taskId = await updateModMutation.mutateAsync({
         instance_id: instanceId,
         mod_id: modId
       })
+      console.info(
+        `[addons] updateMod accepted: instance ${instanceId}, mod ${modId}, task ${taskId}`
+      )
       const poll = async () => {
         if (!isCurrentUpdate()) return
         try {

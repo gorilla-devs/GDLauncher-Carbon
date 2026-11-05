@@ -13,7 +13,7 @@ import {
   openInstanceAddons,
   pickOlderVersion,
   searchForMod,
-  waitForModFilenameChange,
+  updateModViaRow,
   waitForModUpdateAvailable,
   type InstalledMod
 } from "./helpers/mods.js"
@@ -981,15 +981,12 @@ test.describe("mod resolution", () => {
         // this wait instead.
         await waitForModUpdateAvailable(page, instanceName, matchesClothConfig)
 
-        const row = page.locator(byModRow(installed.filename))
-        await row.locator(byTestId(TEST_IDS.modRowUpdate)).click()
-
-        // Same reasoning as the wait above: `waitForModFilenameChange` cannot
-        // return without the filename having changed, so there is nothing to
+        // Same reasoning as the wait above: `updateModViaRow` cannot return
+        // without the filename having changed, so there is nothing to
         // usefully assert about `updated.filename` itself — the assertion
         // this test actually needs is WHICH build it changed to, checked
         // next.
-        const updated = await waitForModFilenameChange(page, instanceName, {
+        const updated = await updateModViaRow(page, instanceName, {
           oldFilename: installed.filename,
           matches: matchesClothConfig
         })
@@ -1157,10 +1154,7 @@ test.describe("mod resolution", () => {
 
         await waitForModUpdateAvailable(page, instanceName, matchesClothConfig)
 
-        const row = page.locator(byModRow(installed.filename))
-        await row.locator(byTestId(TEST_IDS.modRowUpdate)).click()
-
-        const updated = await waitForModFilenameChange(page, instanceName, {
+        const updated = await updateModViaRow(page, instanceName, {
           oldFilename: installed.filename,
           matches: matchesClothConfig
         })
