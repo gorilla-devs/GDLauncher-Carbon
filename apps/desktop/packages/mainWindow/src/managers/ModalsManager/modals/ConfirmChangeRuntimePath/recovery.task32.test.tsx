@@ -11,6 +11,7 @@ import {
   forgetUnavailableRuntimePath,
   leftInOldFolder,
   leftPartialCopy,
+  unsupportedRuntimeEntries,
   removedPartialCopy,
   relocateRuntime,
   selectRuntimePath,
@@ -699,6 +700,45 @@ it("a copy that stops early and cannot be removed names the unfinished folder an
   button(document.body, "Restart").click()
   await settle()
   expect(f.restart).toHaveBeenCalledWith(f.source)
+})
+it("a refusal before the core was asked to stop says calmly that nothing was moved", async () => {
+  const f = await fixture()
+  await fs.writeFile(path.join(f.target, "occupied"), "data")
+  await submit(f)
+  const text = document.body.textContent
+  expect(text).toContain(javaText["_trn_runtime_recovery.not_moved_title"])
+  expect(text).toContain(javaText["_trn_runtime_recovery.not_moved_body"])
+  expect(text).not.toContain("java:_trn_migration_errored")
+  expect(document.querySelector(".bg-red-900")).toBeNull()
+  expect(hasButton("general:_trn_dismiss")).toBe(true)
+})
+it("links inside the data folder are named with the way out, and Try again moves once they are gone", async () => {
+  const f = await fixture()
+  const external = path.join(f.root, "external")
+  await fs.mkdir(external)
+  const link = path.join(f.source, "shared-saves")
+  await fs.symlink(external, link, "junction")
+  await submit(f)
+  const text = document.body.textContent
+  expect(text).toContain(javaText["_trn_runtime_recovery.not_moved_title"])
+  expect(text).toContain(javaText["_trn_runtime_recovery.links_inside"])
+  expect(text).toContain("shared-saves")
+  expect(text).not.toContain("Unsupported runtime")
+  expect(text).not.toContain("java:_trn_migration_errored")
+  expect(f.stop).not.toHaveBeenCalled()
+  expect(runtimeRecoveryRequired()).toBe(false)
+  button(
+    document.body,
+    javaText["_trn_runtime_recovery.open_data_folder"]
+  ).click()
+  expect(window.openFolder).toHaveBeenCalledWith(f.source)
+  await fs.rm(link, { recursive: true })
+  button(
+    document.body,
+    javaText["_trn_runtime_relocation_busy.try_again"]
+  ).click()
+  await vi.waitFor(() => expect(f.restart).toHaveBeenCalledTimes(1))
+  expect(selectRuntimePath(null, f.root)).toBe(f.target)
 })
 it("a failure that left no partial copy keeps the generic recovery advice", async () => {
   const f = await fixture()

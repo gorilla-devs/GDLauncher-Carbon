@@ -177,6 +177,10 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
           setShutdownUnresolved(result.recovery === "shutdown_unresolved")
         }
         setIncompleteTarget(!!result.incompleteTarget)
+        setStoppedBeforeMove(
+          result.recovery === "none" && !result.incompleteTarget
+        )
+        setUnsupported(result.unsupported)
         setCopyRemoved(!!result.copyRemoved)
         setMigrationError(result.message)
       } else modalsContext?.closeModal()
@@ -483,6 +487,62 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                       <Trans key="java:_trn_runtime_recovery.not_moved_title" />
                     </Show>
                   </div>
+                  <Show when={notMoved()}>
+                    <p class="mt-4 text-base">
+                      <Trans key="java:_trn_runtime_recovery.not_moved_body" />
+                    </p>
+                  </Show>
+                  <Show
+                    when={unsupported()}
+                    fallback={
+                      <div class="mt-4 text-base opacity-80">
+                        {migrationError()}
+                      </div>
+                    }
+                  >
+                    {(found) => (
+                      <div data-testid="relocation-unsupported">
+                        <p class="mt-4 text-base">
+                          <Trans key="java:_trn_runtime_recovery.links_inside" />
+                        </p>
+                        <ul class="bg-darkSlate-900 mt-4 max-h-48 overflow-y-auto rounded-md p-4 text-left">
+                          <For each={found().entries}>
+                            {(entry) => (
+                              <li class="break-all text-xs" style={selectable}>
+                                {entry}
+                              </li>
+                            )}
+                          </For>
+                          <Show when={found().count > found().entries.length}>
+                            <li class="text-xs">
+                              <Trans
+                                key="java:_trn_runtime_recovery.left_behind_more"
+                                options={{
+                                  number: found().count - found().entries.length
+                                }}
+                              />
+                            </li>
+                          </Show>
+                        </ul>
+                        <div class="mt-4 flex justify-center gap-4">
+                          <Button
+                            type="secondary"
+                            onClick={() => window.openFolder(found().folder)}
+                          >
+                            <Trans key="java:_trn_runtime_recovery.open_data_folder" />
+                          </Button>
+                          <Show when={notMoved()}>
+                            <Button
+                              disabled={isChangingRuntimePath()}
+                              onClick={() => attemptRelocation(false)}
+                            >
+                              <Trans key="java:_trn_runtime_relocation_busy.try_again" />
+                            </Button>
+                          </Show>
+                        </div>
+                      </div>
+                    )}
+                  </Show>
                   <Show when={incompleteTarget()}>
                     <p class="mt-4">
                       <Trans
