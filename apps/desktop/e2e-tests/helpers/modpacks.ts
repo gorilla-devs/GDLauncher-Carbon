@@ -27,7 +27,12 @@ import {
   byTestId,
   TEST_IDS
 } from "./selectors.js"
-import { dismissSearchOnboardingTip, scrollVersionRowIntoView } from "./mods.js"
+import {
+  describeSearchRowClick,
+  dismissSearchOnboardingTip,
+  scrollVersionRowIntoView,
+  searchRowIcon
+} from "./mods.js"
 import {
   armInstallOperation,
   runInstallAndWait,
@@ -435,7 +440,14 @@ export async function openModpackPage(
       "openModpackPage: the first search result row carries no data-project-id"
     )
   }
-  await firstResult.click()
+  // Clicked on its icon, far from the row's own Download button (see
+  // `searchRowIcon`). On Windows CI a click on the row's centre once
+  // installed the pack's latest version and moved the app to /library
+  // instead of opening this page. That the button took it is inferred, not
+  // seen, so what lay under the click is recorded for the error below.
+  const icon = searchRowIcon(firstResult)
+  const clickTarget = await describeSearchRowClick(firstResult, icon)
+  await icon.click()
 
   // `click()` resolving does not mean the app has left `/search`. The row's
   // `onItemClick` is a `navigator.navigate`, and @solidjs/router only writes
@@ -459,7 +471,9 @@ export async function openModpackPage(
       throw new Error(
         `openModpackPage: clicking the first ${platform} result ` +
           `(${projectId}) never reached /addon/${projectId}/${platform} ` +
-          `within ${ADDON_ROUTE_TIMEOUT}ms (still at ${page.url()})`
+          `within ${ADDON_ROUTE_TIMEOUT}ms (still at ${page.url()}; ` +
+          "/library is where a row's Download button lands once it has " +
+          `installed the pack). Just before the click: ${clickTarget}`
       )
     })
 }

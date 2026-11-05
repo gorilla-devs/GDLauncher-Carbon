@@ -137,11 +137,12 @@ export function GridItem(props: GridItemProps) {
           </div>
         </div>
 
-        {/* Action button area - positioned at bottom */}
+        {/* Action button area - positioned at bottom, taking clicks only
+            while shown (see ListItem) */}
         <div
           class="absolute bottom-3 left-3 right-3 flex items-center justify-center transition-all duration-300"
           classList={{
-            "opacity-0 translate-y-2 group-hover:opacity-100 group-hover:translate-y-0":
+            "opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 group-hover:pointer-events-auto":
               !props.isInstalled && !isHoverActive(),
             "opacity-100 translate-y-0": props.isInstalled || isHoverActive()
           }}

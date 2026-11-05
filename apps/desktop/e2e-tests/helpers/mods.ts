@@ -516,6 +516,78 @@ export async function searchForMod(
 }
 
 /**
+ * Where the row helpers click a search result row: its icon, the first
+ * `<img>` in the row (the blurred backdrop behind it is a CSS background, not
+ * an image). The icon sits at the row's left edge, and a click on it bubbles
+ * to the row's own `onClick`. The row's Download button is anchored at the
+ * other end (`Search/ListItem.tsx`), and while its hover slide-in runs it
+ * sits invisible but clickable 4rem left of where it shows, which on a
+ * narrow window, or in a row with a short download count, can reach the
+ * row's centre. A click the button takes installs the addon instead of
+ * opening its page, so the helpers keep well clear of it.
+ */
+export function searchRowIcon(row: Locator): Locator {
+  return row.locator("img").first()
+}
+
+/**
+ * What lies under a click on `target` inside search result `row`, as one line
+ * for an error message: the click point (the centre of `target`, which is
+ * where Playwright clicks), the element `document.elementFromPoint` finds
+ * there, and the boxes of the row and of each of its buttons, the Download
+ * button among them. Taken just before the click, because a click the row's
+ * Download button took installs the addon, and for a modpack that also moves
+ * the app to the library, so the row is gone by the time the wait for its
+ * page fails. Never throws: it only feeds an error message, and must not
+ * fail a click that would have worked.
+ */
+export async function describeSearchRowClick(
+  row: Locator,
+  target: Locator
+): Promise<string> {
+  try {
+    const box = await target.boundingBox({ timeout: 2_000 })
+    if (!box) return "the clicked element has no box"
+    const point = {
+      x: Math.round(box.x + box.width / 2),
+      y: Math.round(box.y + box.height / 2)
+    }
+    const seen = await row.evaluate(
+      (el, at) => {
+        const rect = (e: Element) => {
+          const r = e.getBoundingClientRect()
+          return {
+            x: Math.round(r.x),
+            y: Math.round(r.y),
+            width: Math.round(r.width),
+            height: Math.round(r.height)
+          }
+        }
+        const hit = document.elementFromPoint(at.x, at.y)
+        return {
+          elementAtPoint: hit && {
+            tag: hit.tagName.toLowerCase(),
+            testId: hit.getAttribute("data-testid"),
+            classes: hit.getAttribute("class"),
+            insideRow: el.contains(hit)
+          },
+          row: rect(el),
+          buttons: Array.from(el.querySelectorAll("button"), (button) => ({
+            text: button.textContent?.trim() ?? "",
+            ...rect(button)
+          }))
+        }
+      },
+      point,
+      { timeout: 2_000 }
+    )
+    return JSON.stringify({ clickPoint: point, ...seen })
+  } catch (error) {
+    return `unavailable (${error instanceof Error ? error.message : String(error)})`
+  }
+}
+
+/**
  * Opens the addon page for `identifier` (the platform's own project id, e.g.
  * Modrinth's `"P7dR8mSH"` or CurseForge's `"394468"` — a stable identifier
  * for the mod itself, unlike a build's filename, so hardcoding it at call
@@ -533,18 +605,67 @@ export async function openAddonPage(
     `${byTestId(TEST_IDS.searchResultRow)}[data-project-id="${identifier}"]`
   )
   await expect(row).toBeVisible({ timeout: SEARCH_RESULTS_TIMEOUT })
-  // Hovered and settled before the click. The row lifts on hover
-  // (`hover:scale-[1.02]` over `duration-100`, `Search/ListItem.tsx`) inside a
-  // virtualised list, so a click delivered in the same breath as the hover
-  // arrives while the row is still moving and lands somewhere with no handler:
-  // the route never changes and the addon page never opens. A real user has
-  // long since settled the hover by the time they click.
-  await row.hover()
+  // Clicked on its icon, far from the row's own Download button (see
+  // `searchRowIcon`), and hovered and settled first: the row lifts on hover
+  // (`hover:scale-[1.02]` over `duration-100`, `Search/ListItem.tsx`) inside
+  // a virtualised list, and a click delivered in the same breath as the hover
+  // lands while it is still moving. A real user has long since settled the
+  // hover by the time they click.
+  const icon = searchRowIcon(row)
+  await icon.hover()
   await page.waitForTimeout(HOVER_SETTLE_MS)
-  await row.click()
-  await expect(
-    page.locator(byTestId(TEST_IDS.addonInstallButton))
-  ).toBeVisible()
+  const clickTarget = await describeSearchRowClick(row, icon)
+  await icon.click()
+  await expect(page.locator(byTestId(TEST_IDS.addonInstallButton)))
+    .toBeVisible()
+    .catch(async (error: unknown) => {
+      // The row also holds its own Download button (`Search/ListItem.tsx`),
+      // which installs and stops the click from opening the page. Its label
+      // tells that apart from a click that opened the page or did nothing.
+      const rowButtons = await row
+        .locator("button")
+        .allInnerTexts()
+        .catch(() => [] as string[])
+      throw new Error(
+        `openAddonPage: no addon install button after clicking the search ` +
+          `row of ${identifier}; the page is on ${page.url()} and that ` +
+          `row's own buttons read ${JSON.stringify(rowButtons)} ` +
+          `("Downloaded" or an empty, busy label means the click hit the ` +
+          `row's Download button and installed the addon). Just before ` +
+          `the click: ${clickTarget}`,
+        { cause: error }
+      )
+    })
+}
+
+/** Whether `url` is the app's `modplatforms.unifiedSearch` request for
+ *  `query` on `platform`. `rspcFetch` (`utils/rspcClient.ts`) sends a query's
+ *  input as `?input=<encodeURIComponent(JSON.stringify(input))>`, and
+ *  `platformInfiniteOptions` (`utils/platformSearch.ts`) names the text
+ *  `searchQuery` and the platform `searchApi`. */
+export function isSearchRequestFor(
+  url: string,
+  query: string,
+  platform: ModPlatform
+): boolean {
+  let parsed: URL
+  try {
+    parsed = new URL(url)
+  } catch {
+    return false
+  }
+  if (parsed.pathname !== "/rspc/modplatforms.unifiedSearch") return false
+  const raw = parsed.searchParams.get("input")
+  if (raw === null) return false
+  let input: unknown
+  try {
+    input = JSON.parse(raw)
+  } catch {
+    return false
+  }
+  if (typeof input !== "object" || input === null) return false
+  const fields = input as Record<string, unknown>
+  return fields.searchQuery === query && fields.searchApi === platform
 }
 
 /** Upper bound on how long the `ShaderLoaderSetup` wizard's "Continue

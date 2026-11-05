@@ -118,11 +118,13 @@ export function ListItem(props: SearchResultItemProps) {
                 />
               </div>
 
-              {/* Install button - slides in from left on hover */}
+              {/* Install button - slides in from left on hover. It takes clicks
+                  only while shown, so a click on a row that is not hovered yet
+                  (a list just redrawn under the pointer) opens the addon. */}
               <div
                 class="absolute right-0 flex items-center justify-center transition-all duration-200"
                 classList={{
-                  "opacity-0 -translate-x-16 group-hover:opacity-100 group-hover:translate-x-0":
+                  "opacity-0 -translate-x-16 pointer-events-none group-hover:opacity-100 group-hover:translate-x-0 group-hover:pointer-events-auto":
                     !props.isInstalled && !isHoverActive(),
                   "opacity-100 translate-x-0":
                     props.isInstalled || isHoverActive()
