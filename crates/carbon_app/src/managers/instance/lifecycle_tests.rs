@@ -3227,6 +3227,84 @@ async fn resumed_apply_finishes_after_a_published_file_is_edited_then_removed() 
     Ok(())
 }
 
+/// On a volume without hard links (FAT32, exFAT, some network shares) the
+/// apply moves each staged file into place, as 2.0.40 did, so one stopped
+/// halfway leaves those files gone from staging. The retry finishes instead
+/// of refusing them as missing downloads: it judges their live files as they
+/// are, keeping an edit made in place, and moves the rest.
+#[tokio::test]
+async fn resumed_apply_finishes_after_its_first_attempt_moved_files() -> anyhow::Result<()> {
+    use run::modpack::staging_test::{attempts_under, fail_io, without_hard_links};
+    use std::io::Write;
+    const EDITED: &[u8] = b"{\"edited\":true}";
+    let app = crate::setup_managers_for_test().await;
+    let (id, root, shortpath, files, subtasks, options, owner) =
+        prepared_pack(&app, "resume-moved", config_files(8)).await?;
+    without_hard_links(root.clone());
+    let live = |i: usize| root.join("instance").join(&files[i].0);
+    let staged = |i: usize| {
+        root.join(".setup")
+            .join("staging")
+            .join("instance")
+            .join(&files[i].0)
+    };
+
+    fail_io("move", live(4));
+    assert!(
+        run::modpack::process_modpack_staging(
+            app.clone(),
+            id,
+            shortpath.clone(),
+            &subtasks,
+            options.clone(),
+            None,
+            owner.as_ref(),
+        )
+        .await
+        .is_err()
+    );
+    for (i, (_, bytes)) in files.iter().enumerate().take(4) {
+        assert_eq!(&std::fs::read(live(i))?, bytes);
+        assert!(!staged(i).exists(), "file {i} was copied, not moved");
+    }
+    assert!(!live(4).exists());
+    assert!(staged(4).exists());
+    // One refused link; every other file went straight to a move.
+    assert_eq!(attempts_under("link", &root.join("instance")), 1);
+
+    std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(live(1))?
+        .write_all(EDITED)?;
+
+    run::modpack::process_modpack_staging(
+        app.clone(),
+        id,
+        shortpath,
+        &subtasks,
+        options,
+        None,
+        owner.as_ref(),
+    )
+    .await?;
+
+    for (i, (path, bytes)) in files.iter().enumerate() {
+        let expected = if i == 1 { EDITED } else { bytes.as_slice() };
+        assert_eq!(
+            tokio::fs::read(root.join("instance").join(path)).await?,
+            expected
+        );
+    }
+    assert!(!root.join(".setup/staging").exists());
+    let audit = tokio::fs::read_to_string(root.join(".install_audit/audit.txt")).await?;
+    assert!(
+        audit.contains("/config/pack/f01.json: already present"),
+        "{audit}"
+    );
+    Ok(())
+}
+
 /// Files the first attempt linked before it failed get their folders synced
 /// by the retry, before Applied, although the retry publishes nothing there.
 #[cfg(not(windows))]
