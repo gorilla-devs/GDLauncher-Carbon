@@ -1418,3 +1418,37 @@ mod task33_shader_recovery_tests {
         );
     }
 }
+
+/// A data folder on a VirtualBox shared folder answers every folder sync
+/// with EINVAL, and one on a macOS network share refuses std's F_FULLFSYNC.
+/// 2.0.40 changed an instance's game version in Settings there without a
+/// folder sync, so its setup record is still written and synced there. A
+/// real error still fails.
+#[cfg(all(test, unix))]
+mod sync_refusing_volume_tests {
+    use super::*;
+    use crate::util::durable::test_hooks::{FileSyncs, FolderSyncs};
+
+    #[tokio::test]
+    async fn a_setup_record_is_written_where_folders_cannot_be_synced() {
+        let config = schema::parse_instance_config(r#"{"_version":"1","name":"Synthetic","game_configuration":{"version":{"release":"1.20.1","modloaders":[]}}}"#).unwrap();
+        let session = Session::new(&config, Producer::Settings, Kind::VersionOnly, None).unwrap();
+        let root = tempfile::tempdir().unwrap();
+        let setup = root.path().join(".setup");
+        std::fs::create_dir(&setup).unwrap();
+        let files = FileSyncs::refusing_full_flush();
+        {
+            let folders = FolderSyncs::failing_with(root.path(), libc::EINVAL);
+            session.create(root.path()).await.unwrap();
+            assert_eq!(folders.synced(), [setup.clone(), root.path().to_owned()]);
+        }
+        assert!(files.synced(&setup.join(RECORD)));
+        assert_eq!(
+            Session::load(root.path()).await.unwrap().unwrap().operation,
+            session.operation
+        );
+
+        let _folders = FolderSyncs::failing_with(root.path(), libc::EIO);
+        assert!(sync_dir(&setup).await.is_err());
+    }
+}

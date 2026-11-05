@@ -592,6 +592,15 @@ impl ManagerRef<'_, InstanceManager> {
                         for warning in &session.warnings {
                             task.warn(warning.clone());
                         }
+                        // Not this instance's own: written before it had an id,
+                        // copied by a duplicate, or kept from an earlier
+                        // registration of the folder, such as before a database
+                        // reset (see `Session::binds_to`). Preparation continues
+                        // it as this instance's own when it qualifies, rebuilds
+                        // it from its original archive, or refuses it naming a
+                        // way out.
+                        if session.binds_to(instance_id) { return Ok(None); }
+                        let owner = session.owner()?;
                         if session.producer == super::modpack::session::Producer::Settings && session.kind == super::modpack::session::Kind::VersionOnly {
                             session.bind_preparation(self.app.task_manager().generation(), id, &config)?;
                             session.save(&root, &owner).await?;
