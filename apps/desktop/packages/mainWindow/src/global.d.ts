@@ -80,6 +80,13 @@ declare global {
     takeRuntimeMoveNotice: () => Promise<RuntimeMoveNotice | null>
     // The user acknowledged that notice.
     dismissRuntimeMoveNotice: () => Promise<void>
+    // The data folder this start could not open, and the default one it uses instead.
+    getUnavailableRuntimePath: () => Promise<{
+      folder: string
+      current: string
+    } | null>
+    // Keeps that default folder: later starts open it without asking.
+    keepDefaultRuntimePath: () => Promise<void>
     changeRuntimePathProgress: (
       cb: (event: Electron.IpcRendererEvent, ...args: any[]) => void
     ) => void

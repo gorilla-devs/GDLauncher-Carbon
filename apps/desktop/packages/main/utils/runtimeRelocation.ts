@@ -55,6 +55,14 @@ export interface RuntimeMoveNotice {
 
 export const LEFT_BEHIND_SHOWN = 20
 
+/** What a move refused to carry over, for the dialog that names it. */
+export interface UnsupportedRuntimeEntries {
+  folder: string
+  // The first LEFT_BEHIND_SHOWN, relative to folder.
+  entries: string[]
+  count: number
+}
+
 /** What the user must hear about the old folder, or null when the move emptied it. */
 export function leftInOldFolder(
   oldFolder: string,
@@ -85,6 +93,8 @@ export type RuntimePathValidation =
   | "incomplete_migration"
   // Any other marked folder (2.0.40 markers are empty), which may have been used as a data folder.
   | "other_incomplete_migration"
+  // Refused for a reason Settings names (see RuntimeTargetRefusal).
+  | RuntimeTargetRefusal
   | "invalid"
 
 export const MIGRATION_MARKER = ".gdl_migration_in_progress"

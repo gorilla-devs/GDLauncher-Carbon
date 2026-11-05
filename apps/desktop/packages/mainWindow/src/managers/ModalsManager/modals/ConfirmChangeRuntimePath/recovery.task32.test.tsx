@@ -8,8 +8,10 @@ import ts from "typescript"
 import i18next from "i18next"
 import englishJava from "../../../../../../../../../packages/i18n/locale/english/java.json"
 import {
+  forgetUnavailableRuntimePath,
   leftInOldFolder,
   leftPartialCopy,
+  removedPartialCopy,
   relocateRuntime,
   selectRuntimePath,
   MIGRATION_MARKER
@@ -461,6 +463,11 @@ it("the progress names nested files with plain slashes", async () => {
   RTsetProgress({ action: "copy", currentName: file, current: 1, total: 4 })
   await settle()
   expect(document.body.textContent).toContain(`Copying ${file}`)
+  // The finished copy is written to the drive before anything is removed.
+  RTsetProgress({ action: "flush", currentName: "", current: 2, total: 4 })
+  await settle()
+  expect(document.body.textContent).toContain(englishJava._trn_saving_copy)
+  expect(document.body.textContent).toContain("2 / 4")
   RTsetProgress({ action: "remove", currentName: file, current: 3, total: 4 })
   await settle()
   expect(document.body.textContent).toContain(`Removing ${file}`)
@@ -636,7 +643,7 @@ it("0242 failed actual guarded Restart remains protected and can be retried", as
   expect(f.restart).toHaveBeenCalledTimes(2)
 })
 
-it("a copy that stops early names the unfinished folder and the way out", async () => {
+it("a copy that stops early says what it removed and that nothing was lost", async () => {
   const f = await fixture(),
     copy = fs.copyFile.bind(fs)
   let copies = 0
@@ -644,6 +651,35 @@ it("a copy that stops early names the unfinished folder and the way out", async 
     if (++copies === 2) throw Error("ENOSPC: no space left on device")
     return (copy as any)(...args)
   }) as any)
+  await submit(f)
+  // The space the copy took comes back at once.
+  expect(await fs.readdir(f.target)).toEqual([])
+  const text = document.body.textContent
+  expect(text).toContain("java:_trn_migration_stopped")
+  expect(text).not.toContain("java:_trn_migration_errored")
+  expect(text).toContain(
+    englishJava["_trn_runtime_recovery.copy_removed"].replace(
+      "{{path}}",
+      f.target
+    )
+  )
+  expect(text).not.toContain("unfinished move")
+  expect(text).not.toContain(englishJava["_trn_runtime_recovery.keep_folders"])
+  expect(text).toContain("Error: ENOSPC: no space left on device")
+  expect(c.protection()).toBe(true)
+  button(document.body, "Restart").click()
+  await settle()
+  expect(f.restart).toHaveBeenCalledWith(f.source)
+})
+it("a copy that stops early and cannot be removed names the unfinished folder and the way out", async () => {
+  const f = await fixture(),
+    copy = fs.copyFile.bind(fs)
+  let copies = 0
+  vi.spyOn(fs, "copyFile").mockImplementation((async (...args: any[]) => {
+    if (++copies === 2) throw Error("ENOSPC: no space left on device")
+    return (copy as any)(...args)
+  }) as any)
+  keepOpen(path.join(f.target, "a"))
   await submit(f)
   expect(fss.existsSync(path.join(f.target, MIGRATION_MARKER))).toBe(true)
   const text = document.body.textContent

@@ -177,6 +177,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
           setShutdownUnresolved(result.recovery === "shutdown_unresolved")
         }
         setIncompleteTarget(!!result.incompleteTarget)
+        setCopyRemoved(!!result.copyRemoved)
         setMigrationError(result.message)
       } else modalsContext?.closeModal()
     } catch (error) {
@@ -494,8 +495,20 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                       />
                     </p>
                   </Show>
+                  <Show when={copyRemoved()}>
+                    <p class="mt-4">
+                      <Trans
+                        key="java:_trn_runtime_recovery.copy_removed"
+                        options={{
+                          path: submitted.target,
+                          // Rendered as text; escaping would show "&#x2F;" for "/".
+                          interpolation: { escapeValue: false }
+                        }}
+                      />
+                    </p>
+                  </Show>
                   <Show when={runtimeRecoveryRequired()}>
-                    <Show when={!incompleteTarget()}>
+                    <Show when={!incompleteTarget() && !copyRemoved()}>
                       <p>
                         <Trans key="java:_trn_runtime_recovery.keep_folders" />
                       </p>
