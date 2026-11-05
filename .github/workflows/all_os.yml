@@ -65,6 +65,8 @@ jobs:
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           CURSEFORGE_API_KEY: "${{ secrets.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
+          # GitHub's macOS runners give games no OpenGL context (e2e-tests/helpers/gameLog.ts).
+          GDL_E2E_NO_OPENGL: "1"
         run: pnpm test:all
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
@@ -145,6 +147,9 @@ jobs:
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           CURSEFORGE_API_KEY: "${{ secrets.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
+          # Games get software OpenGL on Xvfb here, so a log naming no OpenGL driver
+          # fails the test instead of skipping it (e2e-tests/helpers/gameLog.ts).
+          GDL_E2E_REQUIRE_OPENGL: "1"
         run: |
           sudo apt-get install -y xvfb
           /usr/bin/Xvfb :1 -screen 0 1280x960x24 &
@@ -233,6 +238,30 @@ jobs:
       - name: Clear target before tests to avoid folder getting too big
         shell: bash
         run: rm -rf target
+      # The runner's only OpenGL is Windows' GDI 1.1 renderer, which GLFW rejects
+      # ("WGL: The driver does not appear to support OpenGL"), so no game could open
+      # its window. Install Mesa as the system OpenGL driver (System32\mesadrv.dll,
+      # registered under OpenGLDrivers\MSOGL): every process then gets it, including
+      # the javaw.exe the launcher downloads into each test's runtime folder. 26.1.3
+      # is a version GLFW is known to open a window with through this action on
+      # windows-2022.
+      - name: Software OpenGL (Mesa, system-wide)
+        uses: ssciwr/setup-mesa-dist-win@2dfeaebfa514f74c2b8cd8d27108c31486d33e72 # v3.0.0
+        with:
+          version: "26.1.3"
+          build-type: release-msvc
+          deployment-choice: "1"
+      # The action only runs Mesa's deploy script. If the driver did not land, stop
+      # here with that cause rather than later as failed game launches.
+      - name: Check the Mesa OpenGL driver is registered
+        shell: pwsh
+        run: |
+          $icd = 'HKLM:\SOFTWARE\Microsoft\Windows NT\CurrentVersion\OpenGLDrivers\MSOGL'
+          $dll = "$env:WINDIR\System32\mesadrv.dll"
+          if (-not (Test-Path -LiteralPath $icd)) { throw "Mesa is not registered as the OpenGL driver: $icd is missing" }
+          if (-not (Test-Path -LiteralPath $dll)) { throw "Mesa's OpenGL driver is missing: $dll" }
+          Get-ItemProperty -LiteralPath $icd
+          Get-Item -LiteralPath $dll
       - name: Test
         shell: bash
         env:
@@ -247,6 +276,11 @@ jobs:
           CURSEFORGE_API_KEY: "${{ secrets.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
           CARGO_NET_GIT_FETCH_WITH_CLI: true
+          # Mesa would pick GL-on-D3D12 over WARP; llvmpipe is what Linux games already run on.
+          GALLIUM_DRIVER: llvmpipe
+          # Mesa above gives games OpenGL, so a log naming no OpenGL driver fails the
+          # test instead of skipping it (e2e-tests/helpers/gameLog.ts).
+          GDL_E2E_REQUIRE_OPENGL: "1"
         run: pnpm test:all
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

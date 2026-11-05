@@ -196,6 +196,57 @@ describe("stopHarness", () => {
   })
 })
 
+describe("game logs", () => {
+  it("keeps each instance's launch capture, game log, crash reports and JVM fatal logs", async () => {
+    const root = makeTempDir()
+    const runtimePath = path.join(root, "runtime")
+    const instance = path.join(runtimePath, "instances", "gdl-e2e-game")
+    const write = (file: string, body: string) => {
+      fs.mkdirSync(path.dirname(file), { recursive: true })
+      fs.writeFileSync(file, body)
+    }
+    write(path.join(instance, "logs", "2026-01-01_00-00-00.log"), "capture")
+    write(path.join(instance, "instance", "logs", "latest.log"), "latest")
+    write(path.join(instance, "instance", "logs", "debug.log"), "debug")
+    write(
+      path.join(instance, "instance", "crash-reports", "crash-1.txt"),
+      "crash"
+    )
+    write(path.join(instance, "instance", "hs_err_pid42.log"), "fatal")
+    write(path.join(instance, "instance", "options.txt"), "options")
+    try {
+      await stopHarness(makeHarness(runtimePath, { mode: "standalone" }), {
+        deleteUser: async () => {},
+        readConfig: () => null,
+        killGames: () => [],
+        debugLogsRoot: path.join(root, "artifacts")
+      })
+      const kept = path.join(
+        root,
+        "artifacts",
+        "runtime",
+        "instances",
+        "gdl-e2e-game"
+      )
+      const read = (...parts: string[]) =>
+        fs.readFileSync(path.join(kept, ...parts), "utf8")
+      expect(read("logs", "2026-01-01_00-00-00.log")).toBe("capture")
+      expect(read("instance", "logs", "latest.log")).toBe("latest")
+      expect(read("instance", "crash-reports", "crash-1.txt.log")).toBe("crash")
+      expect(read("instance", "hs_err_pid42.log")).toBe("fatal")
+      expect(
+        fs.existsSync(path.join(kept, "instance", "logs", "debug.log"))
+      ).toBe(false)
+      expect(fs.existsSync(path.join(kept, "instance", "options.txt"))).toBe(
+        false
+      )
+      expect(fs.existsSync(runtimePath)).toBe(false)
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
 describe("Task43 owned logs", () => {
   it("never opens or copies a fresh foreign main log, even without an app launch", async () => {
     const root = makeTempDir()

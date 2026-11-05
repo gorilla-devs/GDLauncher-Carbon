@@ -18,7 +18,7 @@
 
 import fs from "node:fs"
 import path from "node:path"
-import { expect } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 
 /** Matches one log4j event's message payload, including multi-line ones —
  *  the launcher pretty-prints Rust structs across a dozen lines inside a
@@ -72,6 +72,158 @@ const FATAL_SIGNATURES: RegExp[] = [
   /A fatal error has been detected by the Java Runtime/,
   /Could not (?:find or )?load main class/
 ]
+
+/**
+ * Driver messages that mean the machine gives the game no OpenGL context, so
+ * no launch here can get past window creation and the startup this file
+ * observes cannot happen. Not a launcher failure: the game was found, started
+ * and got as far as asking for a window.
+ *
+ * Seen on GitHub's windows-2022 runners, which have no GPU and no OpenGL
+ * driver of their own, before CI installed Mesa there (`all_os.yml`): Forge's
+ * early window logged "Failed to find a valid GLFW profile" with "GLFW error:
+ * [0x10006]WGL: The driver does not appear to support OpenGL" for every
+ * version from 4.6 down to 3.2 (develop run 32960118348).
+ * GitHub's macOS runners fail the same way with "NSGL: Failed to find a
+ * suitable pixel format" (run 41466362930).
+ * Add a signature only from a real log; a guess would skip real failures.
+ */
+const GRAPHICS_UNAVAILABLE_SIGNATURES: RegExp[] = [
+  /WGL: The driver does not appear to support OpenGL/,
+  /NSGL: Failed to find a suitable pixel format/,
+  // The JVM's fatal-error banner, which it prints raw rather than as a log4j
+  // event, naming the Windows OpenGL driver as the frame that crashed. A
+  // Fabric pack crashed this way inside `GL.createCapabilities` on
+  // windows-2022 without logging a WGL message first (run 41774657124).
+  /^# C {2}\[opengl32\.dll\+0x[0-9a-f]+\]/
+]
+
+/**
+ * Set by CI (`all_os.yml`) on the GitHub runners that have no OpenGL driver
+ * (macOS), where no game can open its window. Unset everywhere else.
+ */
+const NO_OPENGL_DECLARED = process.env.GDL_E2E_NO_OPENGL === "1"
+
+/**
+ * Set by CI (`all_os.yml`) on the runners where games get a software OpenGL
+ * driver (Linux, and Windows through Mesa). There a log naming no driver means
+ * that setup broke, so the test fails instead of skipping: otherwise a broken
+ * install would quietly turn back into skips.
+ */
+const OPENGL_REQUIRED = process.env.GDL_E2E_REQUIRE_OPENGL === "1"
+
+/** Logged as Minecraft starts its window system, just before the window. */
+const WINDOW_STARTING = "Backend library: LWJGL version"
+
+/** Logged only once the window is open: the later `LAUNCH_MARKERS`. */
+const WINDOW_OPENED: RegExp[] = [
+  /Sound engine started/i,
+  /Reloading ResourceManager/,
+  /atlas/i
+]
+
+/** The first log line naming a missing OpenGL driver, or `undefined`. */
+export function findGraphicsUnavailable(
+  messages: string[]
+): string | undefined {
+  for (const message of messages) {
+    const line = message
+      .split("\n")
+      .find((l) => GRAPHICS_UNAVAILABLE_SIGNATURES.some((s) => s.test(l)))
+    if (line !== undefined) return line.trim()
+  }
+  return undefined
+}
+
+/**
+ * For a game that died or went quiet: its window-system line, when it
+ * stopped after starting its window system and before its window opened, on
+ * a machine declared to have no OpenGL driver. Otherwise `undefined`.
+ *
+ * Some packs stop at that step without naming the driver. On macos-15 the
+ * system killed one (SIGKILL, no crash report) right after this line (run
+ * 41774657124), and in the next run the same pack hung there instead (run
+ * 41799780827). Only trusted where `noOpenGl` is declared: on a machine with
+ * a driver, a game stopping there is a real failure.
+ */
+export function findStopOpeningWindow(
+  messages: string[],
+  noOpenGl: boolean
+): string | undefined {
+  if (!noOpenGl) return undefined
+  if (messages.some((m) => WINDOW_OPENED.some((marker) => marker.test(m))))
+    return undefined
+  return messages.find((m) => m.startsWith(WINDOW_STARTING))
+}
+
+/**
+ * What the game log `text` of a game that died or went quiet means for the
+ * running test, given what CI declares about the machine's OpenGL:
+ * - `skip` when the log names no OpenGL driver the game can use (see
+ *   `GRAPHICS_UNAVAILABLE_SIGNATURES`), or shows the game stopped opening its
+ *   window where `noOpenGl` is declared (`findStopOpeningWindow`);
+ * - `fail` instead for a log naming no driver where `openGlRequired` is
+ *   declared: that machine was set up with one, so the setup broke;
+ * - `undefined` for a log without either: the caller's own assertions decide.
+ *
+ * The reason carries the log line that decided it.
+ */
+export function judgeGraphicsUnavailable(
+  text: string,
+  { noOpenGl, openGlRequired }: { noOpenGl: boolean; openGlRequired: boolean }
+): { outcome: "skip" | "fail"; reason: string } | undefined {
+  const messages = parseLogMessages(text)
+  // The raw text last: it also holds what the JVM printed outside any event.
+  const line = findGraphicsUnavailable([...messages, text])
+  if (line !== undefined && openGlRequired) {
+    return {
+      outcome: "fail",
+      reason:
+        "the game found no OpenGL driver it can use, on a machine CI set up " +
+        "to give games one (GDL_E2E_REQUIRE_OPENGL): check that setup in " +
+        `all_os.yml. Game log: ${line}`
+    }
+  }
+  if (line !== undefined) {
+    return {
+      outcome: "skip",
+      reason:
+        "this machine has no OpenGL driver the game can use, so its startup " +
+        `cannot be observed here. Game log: ${line}`
+    }
+  }
+  const windowLine = findStopOpeningWindow(messages, noOpenGl)
+  if (windowLine !== undefined) {
+    return {
+      outcome: "skip",
+      reason:
+        "this machine has no OpenGL driver (GDL_E2E_NO_OPENGL) and the game " +
+        `stopped opening its window, after: ${windowLine}`
+    }
+  }
+  return undefined
+}
+
+/**
+ * Skips the running test, for a game that died or went quiet, when the
+ * newest game log under `logsDir` shows the machine has no OpenGL driver, or
+ * that the game stopped opening its window on a machine declared to have
+ * none. Where CI declares games have OpenGL (`GDL_E2E_REQUIRE_OPENGL`), a log
+ * naming no driver fails the test instead. See `judgeGraphicsUnavailable`.
+ * The reason, with the log line, lands in the report. A log without either
+ * changes nothing: the caller's own assertions still decide.
+ */
+export function skipIfGraphicsUnavailable(logsDir: string): void {
+  const logFile = newestLogFile(logsDir)
+  const text =
+    logFile && fs.existsSync(logFile) ? fs.readFileSync(logFile, "utf8") : ""
+  const verdict = judgeGraphicsUnavailable(text, {
+    noOpenGl: NO_OPENGL_DECLARED,
+    openGlRequired: OPENGL_REQUIRED
+  })
+  if (verdict?.outcome === "fail") throw new Error(verdict.reason)
+  test.skip(verdict?.outcome === "skip", verdict?.reason)
+}
 
 /** Every message payload in `raw`, in file order. */
 export function parseLogMessages(raw: string): string[] {
@@ -171,6 +323,11 @@ function sleep(ms: number): Promise<void> {
  * callers pass a predicate over their own tracked `GAME_CLOSED` count
  * compared against its pre-launch baseline.
  *
+ * Skips the test (`skipIfGraphicsUnavailable`) when the client exited or
+ * went quiet and its log shows the machine has no OpenGL driver, or that it
+ * stopped opening its window on a machine CI declares has none. Where CI
+ * declares games have OpenGL, a log naming no driver fails it instead.
+ *
  * Growth is checked before stillness: a log that never grows at all means
  * the JVM produced nothing, a different failure from one that started and
  * stopped, worth distinguishing in the message.
@@ -208,7 +365,9 @@ export async function waitForLogQuiescence(
     // Checked every poll rather than once at the end: a client that died is
     // not going to start logging again, so continuing to wait for
     // quiescence would just burn the timeout before reporting the real
-    // cause.
+    // cause. A client that died for lack of an OpenGL driver skips instead,
+    // or fails naming the driver where CI declares games have OpenGL.
+    if (!isAlive()) skipIfGraphicsUnavailable(logsDir)
     expect(
       isAlive(),
       "the game exited during the startup-log observation"
@@ -216,6 +375,10 @@ export async function waitForLogQuiescence(
 
     await sleep(LOG_QUIESCENCE_POLL_MS)
   }
+
+  // A client that went quiet because it has no window to open is not one
+  // whose startup can be judged by the callers' marker quorum.
+  skipIfGraphicsUnavailable(logsDir)
 
   expect(
     Date.now() - steadySince,

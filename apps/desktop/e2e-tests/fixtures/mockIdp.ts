@@ -150,6 +150,65 @@ function preserveDebugLogs(harness: Harness, debugLogsRoot: string): void {
   } catch (error) {
     console.error("e2e harness: preserving debug logs failed", error)
   }
+  try {
+    preserveGameLogs(
+      harness.runtimePath,
+      path.join(debugLogsRoot, path.basename(harness.runtimePath))
+    )
+  } catch (error) {
+    console.error("e2e harness: preserving game logs failed", error)
+  }
+}
+
+/**
+ * Copies what a launched game left about its own run: the launcher's capture
+ * (`<instance>/logs/*.log`, what `helpers/gameLog.ts` asserts on), the
+ * game's own `logs/latest.log`, crash reports and JVM fatal-error logs. A
+ * failed launch assertion names what the log lacked, and only the log says
+ * why. CI uploads `e2e-logs/**\/*.log` only, so a crash report keeps its name
+ * with `.log` appended.
+ */
+function preserveGameLogs(runtimePath: string, destDir: string): void {
+  const instancesDir = path.join(runtimePath, "instances")
+  if (!fs.existsSync(instancesDir)) return
+  const copy = (from: string, to: string) => {
+    fs.mkdirSync(path.dirname(to), { recursive: true })
+    fs.copyFileSync(from, to)
+  }
+  const files = (dir: string, keep: (name: string) => boolean) => {
+    try {
+      return fs
+        .readdirSync(dir, { withFileTypes: true })
+        .filter((entry) => entry.isFile() && keep(entry.name))
+        .map((entry) => entry.name)
+    } catch {
+      return []
+    }
+  }
+  for (const instance of fs.readdirSync(instancesDir)) {
+    const root = path.join(instancesDir, instance)
+    const dest = path.join(destDir, "instances", instance)
+    const data = path.join(root, "instance")
+    for (const name of files(path.join(root, "logs"), (n) =>
+      n.endsWith(".log")
+    ))
+      copy(path.join(root, "logs", name), path.join(dest, "logs", name))
+    for (const name of files(
+      path.join(data, "logs"),
+      (n) => n === "latest.log"
+    ))
+      copy(
+        path.join(data, "logs", name),
+        path.join(dest, "instance", "logs", name)
+      )
+    for (const name of files(path.join(data, "crash-reports"), () => true))
+      copy(
+        path.join(data, "crash-reports", name),
+        path.join(dest, "instance", "crash-reports", `${name}.log`)
+      )
+    for (const name of files(data, (n) => /^hs_err_pid\d+\.log$/.test(n)))
+      copy(path.join(data, name), path.join(dest, "instance", name))
+  }
 }
 
 export interface StopHarnessDeps {
