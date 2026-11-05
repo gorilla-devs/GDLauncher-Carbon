@@ -700,7 +700,8 @@ async fn task05_replace_locked_refuses_before_mutation() {
 /// spilled into the saves folder.
 #[tokio::test]
 async fn task05_world_root_and_wrapper_layouts_and_invalid_archives() {
-    for (entries, expected) in [
+    type Files<'a> = Vec<(&'a str, &'a [u8])>;
+    let cases: Vec<(Files, Vec<&str>, Files)> = vec![
         (
             vec![("level.dat", b"root"), ("region/r.mca", b"r")],
             vec!["archive"],
@@ -748,7 +749,17 @@ async fn task05_world_root_and_wrapper_layouts_and_invalid_archives() {
             vec!["World"],
             vec![("World/region/r.0.0.mca", b"r")],
         ),
-    ] {
+        // A folder around the world is looked through.
+        (
+            vec![
+                ("Download/Map/level.dat", b"map"),
+                ("Download/Read me.txt", b"readme"),
+            ],
+            vec!["Map"],
+            vec![("Map/level.dat", b"map")],
+        ),
+    ];
+    for (entries, expected, contents) in cases {
         let dir = tempfile::tempdir().unwrap();
         let path = InstancePath::new(dir.path().join("instance-root"));
         let archive = dir.path().join("archive.zip");
@@ -5626,7 +5637,7 @@ mod dependency_rule {
     }
 
     #[tokio::test]
-    async fn disabled_only_copy_refuses_a_fresh_install_and_names_it() {
+    async fn disabled_only_copy_is_kept_and_named_on_a_fresh_install() {
         let app = crate::setup_managers_for_test().await;
         let id = instance(&app, "disabled-only", "1.20.1", Some(ModLoaderType::Fabric)).await;
         installed(
@@ -5652,20 +5663,237 @@ mod dependency_rule {
             "{message}"
         );
         assert!(message.contains("Enable it in Addons"), "{message}");
-        let error = plan(
-            &app,
-            id,
-            cf_parent("parent.jar", b"parent", 42, &catalogue),
-            false,
-        )
-        .await
-        .err()
-        .unwrap();
-        assert!(
-            error.to_string().contains("installed but disabled"),
-            "{error:#}"
+        // The addon installs next to it, as in 2.0.40, and the user is told.
+        let parent = cf_parent("parent.jar", b"parent", 42, &catalogue);
+        let root_id = parent.id();
+        let resolution = plan(&app, id, parent, false).await.unwrap();
+        assert_eq!(planned_ids(&resolution).await, vec![(root_id, vec![])]);
+        assert_eq!(
+            resolution
+                .skipped
+                .into_iter()
+                .map(TaskWarning::from)
+                .collect::<Vec<_>>(),
+            vec![TaskWarning::SkippedDependency {
+                name: Some("Library".into()),
+                platform: DependencyPlatform::Curseforge,
+                project_id: "42".into(),
+                reason: SkippedDependencyReason::Disabled,
+            }]
         );
         assert!(catalogue.calls().is_empty());
+    }
+
+    #[tokio::test]
+    async fn disabled_library_further_down_is_kept_and_named() {
+        // The addon needs a library that is missing, and that library needs
+        // Fabric API, which the user disabled: both new mods are installed,
+        // Fabric API stays off, and the warning names it.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "disabled-deep", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        installed(
+            &app,
+            id,
+            "fabric-api.jar",
+            false,
+            None,
+            Some((dependency::FABRIC_API.0, "F1", "Fabric API")),
+        )
+        .await;
+        let mut fixture = Fixture::default();
+        fixture
+            .mr_projects
+            .insert("lib".into(), mr_project("lib", "Library", "mod"));
+        fixture.mr_versions.insert(
+            "L1".into(),
+            mr_version(
+                "lib",
+                "L1",
+                "library.jar",
+                b"library",
+                &["1.20.1"],
+                &["fabric"],
+                modrinth_requires(Some(dependency::FABRIC_API.0), None),
+            ),
+        );
+        let catalogue = Arc::new(fixture);
+        let parent = mr_parent(
+            "mod",
+            "parent.jar",
+            b"parent",
+            modrinth_requires(Some("lib"), Some("L1")),
+            &catalogue,
+        );
+        let root_id = parent.id();
+        let resolution = plan(&app, id, parent, false).await.unwrap();
+        assert_eq!(
+            root_children(&resolution, &root_id).await,
+            vec!["modrinth:lib:L1".to_owned()]
+        );
+        assert_eq!(resolution.skipped.len(), 1, "{:?}", resolution.skipped);
+        assert_eq!(resolution.skipped[0].name.as_deref(), Some("Fabric API"));
+        assert_eq!(
+            resolution.skipped[0].reason,
+            SkippedDependencyReason::Disabled
+        );
+        // An update says nothing about it.
+        let resolution = plan(
+            &app,
+            id,
+            mr_parent(
+                "mod",
+                "parent.jar",
+                b"parent",
+                modrinth_requires(Some("lib"), Some("L1")),
+                &catalogue,
+            ),
+            true,
+        )
+        .await
+        .unwrap();
+        assert!(resolution.skipped.is_empty(), "{:?}", resolution.skipped);
+    }
+
+    #[tokio::test]
+    async fn disabled_file_the_scan_has_not_linked_yet_is_kept_and_named() {
+        // library.jar.disabled is the very file the plan would download, but
+        // the scan has not linked it to its project yet.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(
+            &app,
+            "disabled-unlinked",
+            "1.20.1",
+            Some(ModLoaderType::Forge),
+        )
+        .await;
+        let mods = publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_mods_path();
+        std::fs::create_dir_all(&mods).unwrap();
+        std::fs::write(mods.join("library.jar.disabled"), b"library").unwrap();
+        let mut fixture = Fixture::default();
+        fixture.cf_mods.insert(42, cf_mod(42, "Library"));
+        fixture.cf_files.insert(
+            42,
+            vec![cf_file(42, 7, "library.jar", &["1.20.1", "Forge"], true)],
+        );
+        let catalogue = Arc::new(fixture);
+        let parent = cf_parent("parent.jar", b"parent", 42, &catalogue);
+        let root_id = parent.id();
+        let resolution = plan(&app, id, parent, false).await.unwrap();
+        assert_eq!(planned_ids(&resolution).await, vec![(root_id, vec![])]);
+        assert_eq!(
+            resolution
+                .skipped
+                .into_iter()
+                .map(TaskWarning::from)
+                .collect::<Vec<_>>(),
+            vec![TaskWarning::SkippedDependency {
+                name: Some("Library".into()),
+                platform: DependencyPlatform::Curseforge,
+                project_id: "42".into(),
+                reason: SkippedDependencyReason::Disabled,
+            }]
+        );
+        assert_eq!(
+            std::fs::read(mods.join("library.jar.disabled")).unwrap(),
+            b"library"
+        );
+    }
+
+    #[tokio::test]
+    async fn two_pins_of_one_missing_library_install_the_newest_and_say_so() {
+        // The addon needs X and Y; X pins the library at L1 and Y at the newer
+        // L2. One copy can be installed: L2, for both, with a warning.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(&app, "two-pins", "1.20.1", Some(ModLoaderType::Fabric)).await;
+        let mut fixture = Fixture::default();
+        for (project, title) in [("x", "X"), ("y", "Y"), ("lib", "Library")] {
+            fixture
+                .mr_projects
+                .insert(project.into(), mr_project(project, title, "mod"));
+        }
+        for (project, version, requires) in [("x", "X1", "L1"), ("y", "Y1", "L2")] {
+            fixture.mr_versions.insert(
+                version.into(),
+                mr_version(
+                    project,
+                    version,
+                    &format!("{project}.jar"),
+                    project.as_bytes(),
+                    &["1.20.1"],
+                    &["fabric"],
+                    modrinth_requires(Some("lib"), Some(requires)),
+                ),
+            );
+        }
+        for (version, published) in [
+            ("L1", "2026-01-01T00:00:00Z"),
+            ("L2", "2026-02-01T00:00:00Z"),
+        ] {
+            let mut library = mr_version(
+                "lib",
+                version,
+                &format!("library-{version}.jar"),
+                version.as_bytes(),
+                &["1.20.1"],
+                &["fabric"],
+                serde_json::json!([]),
+            );
+            library.version_number = format!("1.{}", &version[1..]);
+            library.date_published = published.parse().unwrap();
+            fixture.mr_versions.insert(version.into(), library);
+        }
+        let catalogue = Arc::new(fixture);
+        let requires = serde_json::json!([
+            {"project_id": "x", "version_id": "X1", "file_name": null, "dependency_type": "required"},
+            {"project_id": "y", "version_id": "Y1", "file_name": null, "dependency_type": "required"}
+        ]);
+        for order in [requires.clone(), {
+            let mut reversed = requires.as_array().unwrap().clone();
+            reversed.reverse();
+            serde_json::Value::Array(reversed)
+        }] {
+            let parent = mr_parent("mod", "parent.jar", b"parent", order, &catalogue);
+            let resolution = plan(&app, id, parent, false).await.unwrap();
+            let mut planned: Vec<_> = planned_ids(&resolution)
+                .await
+                .into_iter()
+                .filter(|(parent, _)| {
+                    parent.starts_with("modrinth:x") || parent.starts_with("modrinth:y")
+                })
+                .collect();
+            planned.sort();
+            assert_eq!(
+                planned,
+                vec![
+                    (
+                        "modrinth:x:X1".to_owned(),
+                        vec!["modrinth:lib:L2".to_owned()]
+                    ),
+                    (
+                        "modrinth:y:Y1".to_owned(),
+                        vec!["modrinth:lib:L2".to_owned()]
+                    ),
+                ]
+            );
+            assert!(!resolution.plan.contains_key("modrinth:lib:L1"));
+            assert_eq!(
+                resolution
+                    .conflicting
+                    .into_iter()
+                    .map(TaskWarning::from)
+                    .collect::<Vec<_>>(),
+                vec![TaskWarning::ConflictingVersions {
+                    name: "Library".into(),
+                    platform: DependencyPlatform::Modrinth,
+                    project_id: "lib".into(),
+                    installed: "1.2".into(),
+                }]
+            );
+            assert!(resolution.skipped.is_empty());
+        }
     }
 
     #[tokio::test]
@@ -7033,20 +7261,82 @@ mod dependency_rule {
         assert!(catalogue.calls().is_empty());
     }
 
+    #[tokio::test]
+    async fn installing_next_to_a_disabled_library_completes_and_names_it() {
+        // 2.0.40 installed the addon next to a library the user disabled; so
+        // does this, and it now also says the library is off.
+        let app = crate::setup_managers_for_test().await;
+        let id = instance(
+            &app,
+            "next-to-disabled",
+            "1.20.1",
+            Some(ModLoaderType::Fabric),
+        )
+        .await;
+        let library = installed(
+            &app,
+            id,
+            "library.jar",
+            false,
+            Some((42, 7, "Library")),
+            None,
+        )
+        .await;
+        let catalogue = Arc::new(Fixture::default());
+        let mut installer =
+            Installer::new(Box::new(cf_parent("parent.jar", b"parent", 42, &catalogue)));
+        let source = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(source.path(), b"parent").unwrap();
+        installer.download_fixture = Some(source.path().into());
+        let task = installer.install(&app, id, true, None).await.unwrap();
+        settle(&installer, &app, task).await;
+        assert!(matches!(
+            app.task_manager().get_task_outcome(task).await,
+            crate::managers::vtask::TaskOutcome::Succeeded
+        ));
+        let mods = publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_mods_path();
+        let mut files: Vec<_> = std::fs::read_dir(&mods)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        files.sort();
+        assert_eq!(files, vec!["library.jar.disabled", "parent.jar"]);
+        assert_eq!(identity(&app, &library.id).await, identity_of(&library));
+        assert!(catalogue.calls().is_empty(), "{:?}", catalogue.calls());
+        let pending = app.task_manager().get_task_warnings().await;
+        assert_eq!(pending.len(), 1, "{pending:?}");
+        assert_eq!(pending[0].id, task);
+        assert_eq!(
+            pending[0].warnings,
+            vec![TaskWarning::SkippedDependency {
+                name: Some("Library".into()),
+                platform: DependencyPlatform::Curseforge,
+                project_id: "42".into(),
+                reason: SkippedDependencyReason::Disabled,
+            }]
+        );
+    }
+
     /// Updates `parent.jar`, whose new version newly requires Sodium, where
     /// its row records `row_enabled` and its file on disk is `file_enabled`
     /// (a rename the scan has not recorded yet when they differ). The update
-    /// follows the file: Sodium is added only next to an enabled copy.
+    /// follows the file: Sodium is added only next to an enabled copy, also
+    /// when the caller asks for dependencies (`install_deps`), as a version
+    /// picked in the addon's Versions list does.
     async fn update_to_a_new_requirement(
         app: &Arc<AppInner>,
         base: &str,
         row_enabled: bool,
         file_enabled: bool,
+        install_deps: bool,
     ) {
-        let label = format!("row {row_enabled}, file {file_enabled}");
+        let label = format!("row {row_enabled}, file {file_enabled}, deps {install_deps}");
         let id = instance(
             app,
-            &format!("new-requirement-{row_enabled}-{file_enabled}"),
+            &format!("new-requirement-{row_enabled}-{file_enabled}-{install_deps}"),
             "1.20.1",
             Some(ModLoaderType::Fabric),
         )
@@ -7118,7 +7408,7 @@ mod dependency_rule {
         std::fs::write(source.path(), b"new parent").unwrap();
         installer.download_fixture = Some(source.path().into());
         let task = installer
-            .install(app, id, false, Some(parent.id))
+            .install(app, id, install_deps, Some(parent.id))
             .await
             .unwrap();
         settle(&installer, app, task).await;
@@ -7166,7 +7456,9 @@ mod dependency_rule {
         let app = crate::setup_managers_for_test().await;
         let base = super::round1_graph::serve_artifacts().await;
         for enabled in [false, true] {
-            update_to_a_new_requirement(&app, &base, enabled, enabled).await;
+            for install_deps in [false, true] {
+                update_to_a_new_requirement(&app, &base, enabled, enabled, install_deps).await;
+            }
         }
 
         // A disabled CurseForge mod whose new file requires a library that
@@ -7221,7 +7513,7 @@ mod dependency_rule {
         let app = crate::setup_managers_for_test().await;
         let base = super::round1_graph::serve_artifacts().await;
         for file_enabled in [true, false] {
-            update_to_a_new_requirement(&app, &base, !file_enabled, file_enabled).await;
+            update_to_a_new_requirement(&app, &base, !file_enabled, file_enabled, false).await;
         }
     }
 
