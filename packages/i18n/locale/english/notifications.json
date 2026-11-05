@@ -14,6 +14,7 @@
   "_trn_datapack_downloaded": "{{title}} downloaded. Add it to a world from the instance's Addons tab.",
   "_trn_addon_outcome_unavailable": "Couldn't confirm whether this addon change finished. Check the instance's addons before trying again.",
   "_trn_addon_attempt_dismissed": "This failed attempt was dismissed.",
+  "_trn_addon_deleted_one_copy": "Deleted {{deleted}}. Another copy, {{kept}}, is still in the folder, so the addon stays in the list. Delete it again to remove that copy too.",
   "_trn_addon_fallback_name": "Addon",
   "_trn_addon_install_failed": "{{title}} installation failed",
   "_trn_shader_install_cancelled": "Shader install cancelled — no compatible shader loader is installed",

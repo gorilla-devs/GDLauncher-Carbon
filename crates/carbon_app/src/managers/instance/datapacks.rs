@@ -128,12 +128,10 @@ impl ManagerRef<'_, InstanceManager> {
         if world_identity(id, &path.get_root(), &world).await? != request.world.identity {
             bail!("Selected world changed. Refresh the world list and select it again");
         }
+        // The world's datapacks folder may be linked to a shared one, as an
+        // addon folder may (`publication::followed_folder`).
         let folder = world.join("datapacks");
-        if let Some(meta) = addon_metadata(&folder).await? {
-            if !meta.is_dir() || meta.file_type().is_symlink() {
-                bail!("World datapacks is not an owned directory");
-            }
-        } else {
+        if !publication::followed_folder(&folder).await? {
             tokio::fs::create_dir(&folder).await?;
         }
         if publication::selected_file(&folder, &row.filename)
@@ -157,11 +155,8 @@ impl ManagerRef<'_, InstanceManager> {
         if world_identity(id, &path.get_root(), &world).await? != request.world.identity {
             bail!("Selected world changed during copying; no datapack published");
         }
-        let meta = addon_metadata(&folder)
-            .await?
-            .context("World datapacks directory disappeared")?;
-        if !meta.is_dir() || meta.file_type().is_symlink() {
-            bail!("World datapacks directory changed during copying");
+        if !publication::followed_folder(&folder).await? {
+            bail!("The world's datapacks folder disappeared during copying; no datapack published");
         }
         if publication::selected_file(&folder, &row.filename)
             .await?
@@ -344,8 +339,10 @@ mod tests {
         );
         #[cfg(unix)]
         {
-            let target = tempfile::tempdir().unwrap();
-            std::os::unix::fs::symlink(target.path(), world.join("datapacks")).unwrap();
+            // A datapacks folder the world links to an absent target refuses
+            // with a reason; nothing is created in its place.
+            let gone = world.with_file_name("gone-datapacks");
+            std::os::unix::fs::symlink(&gone, world.join("datapacks")).unwrap();
             let selected = app
                 .instance_manager()
                 .datapack_worlds(id)
@@ -354,6 +351,15 @@ mod tests {
                 .into_iter()
                 .find(|w| w.name == "World")
                 .unwrap();
+            let error = app
+                .instance_manager()
+                .copy_datapack(CopyDatapack {
+                    instance_id: *id,
+                    mod_id: row.id,
+                    world: selected,
+                })
+                .await
+                .unwrap_err();
             assert!(
                 format!("{error:#}").contains("cannot be found"),
                 "{error:#}"
@@ -492,6 +498,42 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn linked_saves_and_world_datapacks_folders_are_followed() {
+        let app = crate::setup_managers_for_test().await;
+        let bytes = zip_bytes();
+        let (id, row, _) = addon_fixture(
+            &app,
+            "linked-saves",
+            AddonType::DataPacks,
+            "pack.zip",
+            &bytes,
+        )
+        .await;
+        let path = publication::current_path(&app, id).await.unwrap();
+        let elsewhere = tempfile::tempdir().unwrap();
+        let saves = elsewhere.path().join("saves");
+        let shared = elsewhere.path().join("shared-datapacks");
+        std::fs::create_dir_all(saves.join("World")).unwrap();
+        std::fs::create_dir_all(&shared).unwrap();
+        std::fs::write(saves.join("World/level.dat"), b"save").unwrap();
+        std::os::unix::fs::symlink(&shared, saves.join("World/datapacks")).unwrap();
+        std::os::unix::fs::symlink(&saves, path.get_saves_path()).unwrap();
+        let selected = app
+            .instance_manager()
+            .datapack_worlds(id)
+            .await
+            .unwrap()
+            .pop()
+            .expect("the world in the linked saves folder is listed");
+        assert_eq!(selected.name, "World");
+        app.instance_manager()
+            .copy_datapack(CopyDatapack {
+                instance_id: *id,
+                mod_id: row.id,
+                world: selected,
+            })
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(shared.join("pack.zip")).unwrap(), bytes);
     }
     #[tokio::test]
     async fn task10_datapack_copy_rechecks_selected_world_and_late_collision() {

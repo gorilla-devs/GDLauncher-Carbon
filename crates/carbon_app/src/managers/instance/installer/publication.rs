@@ -472,7 +472,7 @@ impl ReplacementPlan {
                 enabled,
             });
         }
-        let (physical, enabled) = selected_file(&folder, &row.filename)
+        let (physical, enabled) = replaceable_file(&folder, &row.filename, "update")
             .await?
             .context("replacement file is missing")?;
         Ok(Self {

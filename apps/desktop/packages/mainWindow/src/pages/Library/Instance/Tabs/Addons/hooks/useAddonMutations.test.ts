@@ -9,7 +9,12 @@ const state = vi.hoisted(() => ({
   openModal: vi.fn(),
   query: vi.fn(),
   updateMod: vi.fn(),
-  errorToast: vi.fn()
+  errorToast: vi.fn(),
+  infoToast: vi.fn(),
+  translate: vi.fn(
+    (key: string, params?: Record<string, unknown>) =>
+      `${key} ${JSON.stringify(params ?? {})}`
+  )
 }))
 
 vi.mock(
@@ -17,7 +22,10 @@ vi.mock(
   () =>
     import("../../../../../../components/ModDownloadButton/hooks/resolveTaskPoll")
 )
-vi.mock("@gd/ui", () => ({ toast: { error: state.errorToast } }))
+vi.mock("@gd/ui", () => ({
+  toast: { error: state.errorToast, info: state.infoToast }
+}))
+vi.mock("@gd/i18n", () => ({ i18n: { t: state.translate } }))
 vi.mock("@solidjs/router", () => ({ useParams: () => state.params }))
 vi.mock("@/utils/rspcClient", () => ({
   queryClient: { ensureQueryData: state.ensureQueryData },
@@ -258,5 +266,48 @@ describe("captured row update outcomes", () => {
     expect(optimistic.stopUpdatingMod).not.toHaveBeenCalled()
     expect(refetch).not.toHaveBeenCalled()
     expect(state.errorToast).not.toHaveBeenCalled()
+  })
+})
+
+describe("deleting one of two copies of an addon", () => {
+  beforeEach(() => {
+    state.preference.isLoading = false
+    state.preference.data = true
+  })
+
+  it("says which copy is still in the folder", async () => {
+    state.deleteMod.mockResolvedValueOnce({
+      deleted: "twin.jar",
+      kept: "twin.jar.disabled"
+    })
+    const { actions, refetch } = setup()
+    await actions.handleDeleteMod(addon("twin", "mods"))
+
+    expect(state.translate).toHaveBeenCalledWith(
+      "notifications:_trn_addon_deleted_one_copy",
+      {
+        deleted: "twin.jar",
+        kept: "twin.jar.disabled",
+        interpolation: { escapeValue: false }
+      }
+    )
+    expect(state.infoToast).toHaveBeenCalledOnce()
+    expect(refetch).toHaveBeenCalledOnce()
+  })
+
+  it("stays quiet for a plain delete and names each copy left in a bulk delete", async () => {
+    const { actions } = setup()
+    await actions.handleDeleteMod(addon("plain", "mods"))
+    expect(state.infoToast).not.toHaveBeenCalled()
+
+    state.deleteMod
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ deleted: "b.jar.disabled", kept: "b.jar" })
+    await actions.handleDeleteSelected([addon("a", "mods"), addon("b", "mods")])
+    expect(state.infoToast).toHaveBeenCalledOnce()
+    expect(state.translate).toHaveBeenCalledWith(
+      "notifications:_trn_addon_deleted_one_copy",
+      expect.objectContaining({ deleted: "b.jar.disabled", kept: "b.jar" })
+    )
   })
 })
