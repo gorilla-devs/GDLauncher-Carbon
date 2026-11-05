@@ -23,24 +23,44 @@ const ModsUpdater = (props: ModalProps) => {
   const captured = { ...data(), mods: [...data().mods] }
   const [modsUpdated, setModsUpdated] = createSignal(0)
   const [isDestroyed, setIsDestroyed] = createSignal(false)
-  let waitTimer: ReturnType<typeof setTimeout> | undefined
-  let releaseWait: (() => void) | undefined
+  // Updates sent so far, and those still waiting for their outcome, oldest
+  // first: several run at once.
+  let started = 0
+  const [running, setRunning] = createSignal<Mod[]>([])
+  // One pending read per running update.
+  const waiters = new Set<{
+    timer: ReturnType<typeof setTimeout>
+    release: () => void
+  }>()
   const waitForNextRead = () =>
     new Promise<void>((resolve) => {
-      releaseWait = resolve
-      waitTimer = setTimeout(() => {
-        waitTimer = undefined
-        releaseWait = undefined
-        resolve()
-      }, 500)
+      const waiter = {
+        release: resolve,
+        timer: setTimeout(() => {
+          waiters.delete(waiter)
+          resolve()
+        }, 500)
+      }
+      waiters.add(waiter)
     })
 
   onCleanup(() => {
     setIsDestroyed(true)
-    if (waitTimer !== undefined) clearTimeout(waitTimer)
-    releaseWait?.()
-    waitTimer = undefined
-    releaseWait = undefined
+    for (const waiter of waiters) {
+      clearTimeout(waiter.timer)
+      waiter.release()
+    }
+    waiters.clear()
+    // Closing the dialog stops the batch: updates already sent finish in the
+    // core (a failure shows under the navbar's failed installs), the rest
+    // never start. Say how many, since their update badges are the only
+    // other sign.
+    const notStarted = captured.mods.length - started
+    if (notStarted > 0)
+      toast.warning(
+        t("content:_trn_mods_updater.not_started", { count: notStarted }),
+        { description: t("content:_trn_mods_updater.not_started_description") }
+      )
   })
 
   // A refused update is reported once per mod, by name, through `settled`
@@ -65,6 +85,7 @@ const ModsUpdater = (props: ModalProps) => {
       () => !isDestroyed(),
       (mod, error) => {
         if (isDestroyed()) return
+        setRunning((list) => list.filter((item) => item !== mod))
         if (error !== undefined)
           toast.error(
             t("content:_trn_mods_updater.update_failed", {
@@ -75,7 +96,13 @@ const ModsUpdater = (props: ModalProps) => {
           )
         setModsUpdated((prev) => prev + 1)
       },
-      waitForNextRead
+      waitForNextRead,
+      {
+        started: (mod) => {
+          started++
+          setRunning((list) => [...list, mod])
+        }
+      }
     )
     if (outcome.abandoned || isDestroyed()) return
     try {

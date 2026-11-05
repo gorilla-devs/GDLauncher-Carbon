@@ -18,8 +18,15 @@ vi.mock("@gd/i18n", async () => {
   const { default: content } =
     await import("../../../../../../../../packages/i18n/locale/english/content.json")
   const translate = (key: string, options?: Record<string, unknown>) => {
+    const bundle = content as Record<string, string>
+    const id = key.slice("content:".length)
+    // English plural forms, as i18next picks them.
+    const plural =
+      typeof options?.count === "number"
+        ? bundle[`${id}_${options.count === 1 ? "one" : "other"}`]
+        : undefined
     const template = key.startsWith("content:")
-      ? (content as Record<string, string>)[key.slice("content:".length)]
+      ? (plural ?? bundle[id])
       : undefined
     return template
       ? template.replace(/\{\{(\w+)\}\}/g, (_, name: string) => {

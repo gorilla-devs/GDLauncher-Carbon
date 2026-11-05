@@ -76,6 +76,9 @@ pub struct InstanceManager {
     pub(crate) instances: RwLock<HashMap<InstanceId, Instance>>,
     running_publication: running_publication::RunningPublication,
     addon_retry_receipts: addon_retry::Receipts,
+    /// Addon install graphs running on each instance (see
+    /// `installer::LiveGraphs`).
+    addon_graphs: installer::LiveGraphs,
     index_lock: Mutex<()>,
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
@@ -283,6 +286,7 @@ impl InstanceManager {
             origin_checks: RwLock::new(HashMap::new()),
             running_publication: running_publication::RunningPublication::default(),
             addon_retry_receipts: Default::default(),
+            addon_graphs: Default::default(),
         }
     }
 }
