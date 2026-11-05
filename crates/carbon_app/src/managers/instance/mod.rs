@@ -2382,6 +2382,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             // Read guard released here - other instances can now operate
         };
 
+        // A rename that moves the folder waits, before writing anything, for
+        // duplicates still copying it (see `hold_root`).
+        let moves_root = update
+            .name
+            .as_ref()
+            .is_some_and(|name| *name != config.name && *name != shortpath);
+        let rename_root = if moves_root {
+            Some(self.hold_root(&_instance_guard, true).await)
+        } else {
+            None
+        };
+
         // A new version or loader choice replaces a pending setup that only
         // waits for its game version install (an unfinished or failed
         // version-only install of a new, edited or imported instance,
@@ -2884,22 +2896,29 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             return Ok(());
         };
 
-        let InstanceType::Valid(data) = &mut instance.type_ else {
-            return Err(anyhow!("Instance {instance_id} is not in a valid state"));
-        };
+        let instance_shortpath = instance.shortpath.clone();
+        // A folder whose instance.json is missing, unreadable or broken shows
+        // as an invalid tile. It has no launch state to check, so deleting it
+        // only removes the folder, if still there, and its library entry.
+        let valid = match &mut instance.type_ {
+            InstanceType::Valid(data) => {
+                // A running/preparing instance must be stopped first (tearing it down
+                // would kill the game and remove its directory mid-session). A second,
+                // redundant delete (double-clicked confirm) is a no-op — see
+                // `DeletePrecheck` — so it never resets the state the in-progress delete
+                // owns nor reports a spurious failure.
+                match delete_precheck(&data.state) {
+                    DeletePrecheck::Proceed => {}
+                    DeletePrecheck::AlreadyInProgress => return Ok(()),
+                    DeletePrecheck::InUse => {
+                        return Err(anyhow!(
+                            "Instance {instance_id} cannot be deleted while it is preparing or running; stop it first"
+                        ));
+                    }
+                }
 
-        // A running/preparing instance must be stopped first (tearing it down
-        // would kill the game and remove its directory mid-session). A second,
-        // redundant delete (double-clicked confirm) is a no-op — see
-        // `DeletePrecheck` — so it never resets the state the in-progress delete
-        // owns nor reports a spurious failure.
-        match delete_precheck(&data.state) {
-            DeletePrecheck::Proceed => {}
-            DeletePrecheck::AlreadyInProgress => return Ok(()),
-            DeletePrecheck::InUse => {
-                return Err(anyhow!(
-                    "Instance {instance_id} cannot be deleted while it is preparing or running; stop it first"
-                ));
+                data.state = LaunchState::Deleting;
+                true
             }
             InstanceType::Invalid(_) => false,
         };
@@ -3000,7 +3019,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .app
             .runtime_lifecycle
             .admit(format!("duplicate instance {instance_id}"))?;
-        let _operation = self.lock_instance(instance_id).await;
+        let operation = self.lock_instance(instance_id).await;
+        // The folder stays where it is until the copy is published: deleting
+        // the original, or a rename that moves its folder, waits for it.
+        let _root = self.hold_root(&operation, false).await;
         // First snapshot what we need from `instances` under a read lock and
         // release it before the long fs copy. Holding `instances` across the
         // copy serializes every other op (prepare_game, list_mods, etc.) for

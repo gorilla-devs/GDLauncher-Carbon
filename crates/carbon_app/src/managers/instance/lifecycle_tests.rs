@@ -7829,3 +7829,392 @@ async fn a_pack_shipping_a_file_enabled_and_disabled_installs_the_enabled_one() 
     assert!(!root.join("instance/mods/both.jar.disabled").exists());
     Ok(())
 }
+
+async fn without_recycle_bin(app: &crate::App) -> anyhow::Result<()> {
+    app.settings_manager()
+        .set(
+            carbon_repos::repos::app_configuration::AppConfigurationPatch {
+                deletion_through_recycle_bin: Some(false),
+                ..Default::default()
+            },
+        )
+        .await?;
+    Ok(())
+}
+
+/// Waits until `operation` reaches the armed `pause`.
+async fn reach<F: Future>(pause: &Pause, operation: std::pin::Pin<&mut F>)
+where
+    F::Output: std::fmt::Debug,
+{
+    tokio::select! {
+        _ = pause.entered.notified() => {},
+        result = operation => panic!("operation finished before its pause: {result:?}"),
+    }
+}
+
+const PROMPTLY: Duration = Duration::from_secs(10);
+
+#[tokio::test]
+async fn deleting_an_instance_holds_up_no_other_instance() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    without_recycle_bin(&app).await?;
+    let (deleted, deleted_root) = fixture(&app, "deleted").await?;
+    let (other_deleted, other_root) = fixture(&app, "also-deleted").await?;
+    let (renamed, _) = fixture(&app, "renamed").await?;
+    let manager = app.instance_manager();
+    let pause = manager.test_hooks.arm("delete", deleted);
+    let delete = manager._delete_instance(deleted);
+    tokio::pin!(delete);
+    reach(&pause, delete.as_mut()).await;
+    assert!(matches!(
+        manager.instances.read().await[&deleted].data()?.state,
+        LaunchState::Deleting
+    ));
+
+    // While the first folder is still being removed, everything else on other
+    // instances goes ahead: creating, renaming, duplicating, and a second
+    // delete of the same batch.
+    let (created, created_root) = tokio::time::timeout(PROMPTLY, fixture(&app, "deleted"))
+        .await
+        .expect("creating waited for another instance's delete")?;
+    assert_eq!(
+        created_root.file_name().unwrap(),
+        "deleted1",
+        "the folder being deleted still reserves its name"
+    );
+    let mut edit = update(renamed);
+    edit.name = Some("renamed-again".into());
+    tokio::time::timeout(PROMPTLY, manager.update_instance(edit))
+        .await
+        .expect("renaming waited for another instance's delete")?;
+    let copy = tokio::time::timeout(PROMPTLY, manager.duplicate_instance(renamed, "copy".into()))
+        .await
+        .expect("duplicating waited for another instance's delete")?;
+    tokio::time::timeout(PROMPTLY, manager._delete_instance(other_deleted))
+        .await
+        .expect("a batch delete waited for the one before it")?;
+    assert!(!other_root.exists());
+
+    pause.release.notify_one();
+    delete.await?;
+    assert!(!deleted_root.exists());
+    assert!(
+        instance_repo::get_instance(&app.db, deleted.0)
+            .await?
+            .is_none()
+    );
+    assert!(!manager.instances.read().await.contains_key(&deleted));
+    for id in [created, renamed, copy] {
+        assert!(instance_repo::get_instance(&app.db, id.0).await?.is_some());
+        assert!(manager.instances.read().await.contains_key(&id));
+    }
+    assert!(manager.instance_op_locks.is_empty());
+    assert!(manager.instance_root_locks.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn duplicating_an_instance_holds_up_nothing_on_the_original() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "original").await?;
+    tokio::fs::write(root.join("instance/world.dat"), b"world").await?;
+    let manager = app.instance_manager();
+    let pause = manager.test_hooks.arm("duplicate_copy", id);
+    let duplicate = manager.duplicate_instance(id, "copy".into());
+    tokio::pin!(duplicate);
+    reach(&pause, duplicate.as_mut()).await;
+
+    // Play, the game's playtime and exit, the Logs tab and settings all take
+    // the original's gate: none of them waits for the copy.
+    let gate = tokio::time::timeout(PROMPTLY, manager.lock_instance(id))
+        .await
+        .expect("the copy held the original's gate");
+    drop(gate);
+    tokio::time::timeout(PROMPTLY, manager.update_playtime(id, 60))
+        .await
+        .expect("playtime waited for the copy")?;
+    tokio::time::timeout(PROMPTLY, manager.get_logs(id))
+        .await
+        .expect("the Logs tab waited for the copy");
+    let mut edit = update(id);
+    edit.notes = Some("edited during the copy".into());
+    tokio::time::timeout(PROMPTLY, manager.update_instance(edit))
+        .await
+        .expect("settings waited for the copy")?;
+
+    pause.release.notify_one();
+    let copy = duplicate.await?;
+    let row = instance_repo::get_instance(&app.db, copy.0).await?.unwrap();
+    let copy_root = root.with_file_name(row.shortpath);
+    assert_eq!(
+        tokio::fs::read(copy_root.join("instance/world.dat")).await?,
+        b"world"
+    );
+    assert_eq!(disk_config(&copy_root).await?.name, "copy");
+    assert_eq!(disk_config(&root).await?.seconds_played, 60);
+    assert!(manager.instance_root_locks.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn deleting_or_renaming_an_original_waits_for_its_copy() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    without_recycle_bin(&app).await?;
+    let (renamed, renamed_root) = fixture(&app, "renamed-source").await?;
+    let (deleted, deleted_root) = fixture(&app, "deleted-source").await?;
+    tokio::fs::write(deleted_root.join("instance/world.dat"), b"kept").await?;
+    let manager = app.instance_manager();
+
+    let pause = manager.test_hooks.arm("duplicate_copy", renamed);
+    let duplicate = manager.duplicate_instance(renamed, "renamed copy".into());
+    tokio::pin!(duplicate);
+    reach(&pause, duplicate.as_mut()).await;
+    let mut edit = update(renamed);
+    edit.name = Some("renamed-later".into());
+    let rename = manager.update_instance(edit);
+    tokio::pin!(rename);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(150), &mut rename)
+            .await
+            .is_err(),
+        "the folder moved while it was being copied"
+    );
+    assert!(renamed_root.exists());
+    pause.release.notify_one();
+    let copy = duplicate.await?;
+    rename.await?;
+    assert!(!renamed_root.exists());
+    assert!(renamed_root.with_file_name("renamed-later").exists());
+    assert!(
+        instance_repo::get_instance(&app.db, copy.0)
+            .await?
+            .is_some()
+    );
+
+    // The user asked for both: the copy is made, then the original goes.
+    let pause = manager.test_hooks.arm("duplicate_copy", deleted);
+    let duplicate = manager.duplicate_instance(deleted, "kept copy".into());
+    tokio::pin!(duplicate);
+    reach(&pause, duplicate.as_mut()).await;
+    let delete = manager._delete_instance(deleted);
+    tokio::pin!(delete);
+    assert!(
+        tokio::time::timeout(Duration::from_millis(150), &mut delete)
+            .await
+            .is_err(),
+        "the folder was deleted while it was being copied"
+    );
+    assert!(matches!(
+        manager.instances.read().await[&deleted].data()?.state,
+        LaunchState::Deleting
+    ));
+    assert!(deleted_root.exists());
+    pause.release.notify_one();
+    let copy = duplicate.await?;
+    delete.await?;
+    assert!(!deleted_root.exists());
+    let row = instance_repo::get_instance(&app.db, copy.0).await?.unwrap();
+    assert_eq!(
+        tokio::fs::read(
+            deleted_root
+                .with_file_name(row.shortpath)
+                .join("instance/world.dat")
+        )
+        .await?,
+        b"kept"
+    );
+    assert!(manager.instance_op_locks.is_empty());
+    assert!(manager.instance_root_locks.is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn an_instance_with_a_broken_instance_json_can_be_unfavorited_and_deleted()
+-> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    without_recycle_bin(&app).await?;
+    let manager = app.instance_manager();
+    let (broken, broken_root) = fixture(&app, "broken").await?;
+    manager.set_favorite(broken, true).await?;
+    tokio::fs::write(broken_root.join("instance.json"), "{").await?;
+    let (missing, missing_root) = fixture(&app, "missing").await?;
+    tokio::fs::remove_file(missing_root.join("instance.json")).await?;
+    manager.instances.write().await.clear();
+    manager.scan_instances().await?;
+
+    manager.set_favorite(broken, false).await?;
+    assert!(
+        !instance_repo::get_instance(&app.db, broken.0)
+            .await?
+            .unwrap()
+            .favorite
+    );
+    manager._delete_instance(broken).await?;
+    assert!(!broken_root.exists());
+    assert!(
+        instance_repo::get_instance(&app.db, broken.0)
+            .await?
+            .is_none()
+    );
+    assert!(!manager.instances.read().await.contains_key(&broken));
+
+    // Its folder already went outside the launcher: only the entry is left.
+    tokio::fs::remove_dir_all(&missing_root).await?;
+    manager._delete_instance(missing).await?;
+    assert!(
+        instance_repo::get_instance(&app.db, missing.0)
+            .await?
+            .is_none()
+    );
+    assert!(!manager.instances.read().await.contains_key(&missing));
+    let groups = manager.list_groups().await?;
+    assert!(groups.iter().all(|group| group.instances.is_empty()));
+    Ok(())
+}
+
+#[tokio::test]
+async fn deleting_a_folder_with_its_instances_finishes_past_a_broken_one() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    without_recycle_bin(&app).await?;
+    let manager = app.instance_manager();
+    let group = manager.create_group("pack folder".into()).await?;
+    let mut members = Vec::new();
+    for name in ["first", "broken member", "last"] {
+        let id = manager
+            .create_instance(
+                group,
+                name.into(),
+                false,
+                InstanceVersionSource::Version(GameVersion::Standard(info::StandardVersion {
+                    release: "1.7.10".into(),
+                    modloaders: HashSet::new(),
+                })),
+                String::new(),
+            )
+            .await?;
+        let row = instance_repo::get_instance(&app.db, id.0).await?.unwrap();
+        members.push((id, row.shortpath));
+    }
+    let instances_root = app
+        .settings_manager()
+        .runtime_path
+        .get_instances()
+        .to_path();
+    tokio::fs::write(
+        instances_root.join(&members[1].1).join("instance.json"),
+        "not json",
+    )
+    .await?;
+    manager.instances.write().await.clear();
+    manager.scan_instances().await?;
+
+    manager._delete_group_with_instances(group).await?;
+    for (id, shortpath) in &members {
+        assert!(!instances_root.join(shortpath).exists());
+        assert!(instance_repo::get_instance(&app.db, id.0).await?.is_none());
+    }
+    assert!(instance_repo::get_group(&app.db, group.0).await?.is_none());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_failed_playtime_write_is_saved_by_the_next_one() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "unsaved-playtime").await?;
+    let manager = app.instance_manager();
+    let json = tokio::fs::read_to_string(root.join("instance.json")).await?;
+    tokio::fs::remove_file(root.join("instance.json")).await?;
+    tokio::fs::create_dir(root.join("instance.json")).await?;
+    assert!(manager.update_playtime(id, 60).await.is_err());
+    // The library shows only what instance.json holds.
+    assert_eq!(
+        manager.instances.read().await[&id]
+            .data()?
+            .config
+            .seconds_played,
+        0
+    );
+    tokio::fs::remove_dir(root.join("instance.json")).await?;
+    tokio::fs::write(root.join("instance.json"), json).await?;
+    manager.update_playtime(id, 10).await?;
+    assert_eq!(disk_config(&root).await?.seconds_played, 70);
+    assert_eq!(
+        manager.instances.read().await[&id]
+            .data()?
+            .config
+            .seconds_played,
+        70
+    );
+    manager.update_playtime(id, 5).await?;
+    assert_eq!(disk_config(&root).await?.seconds_played, 75);
+    Ok(())
+}
+
+#[tokio::test]
+async fn opening_the_logs_tab_holds_up_nothing_while_past_logs_load() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "logs").await?;
+    tokio::fs::create_dir_all(root.join("logs")).await?;
+    tokio::fs::write(
+        root.join("logs/2025-01-14_12-00-00.log"),
+        b"retained history\n",
+    )
+    .await?;
+    let manager = app.instance_manager();
+    let pause = manager.test_hooks.arm("log_history", id);
+    let logs = manager.get_logs(id);
+    tokio::pin!(logs);
+    reach(&pause, logs.as_mut()).await;
+    tokio::time::timeout(PROMPTLY, manager.update_playtime(id, 60))
+        .await
+        .expect("playtime waited for past logs to load")?;
+    let gate = tokio::time::timeout(PROMPTLY, manager.lock_instance(id))
+        .await
+        .expect("loading past logs held the instance gate");
+    drop(gate);
+    pause.release.notify_one();
+    let logs = logs.await;
+    assert_eq!(logs.len(), 1);
+    assert!(!logs[0].active);
+    Ok(())
+}
+
+#[tokio::test]
+async fn past_logs_loaded_while_an_instance_is_deleted_are_not_kept() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    without_recycle_bin(&app).await?;
+    let (id, root) = fixture(&app, "deleted-logs").await?;
+    tokio::fs::create_dir_all(root.join("logs")).await?;
+    let manager = app.instance_manager();
+    let log = root.join("logs/2025-01-14_12-00-00.log");
+    tokio::fs::write(&log, b"retained history\n").await?;
+    // Kept readable for the load after the folder is gone.
+    let kept = tempfile::tempdir()?;
+    tokio::fs::copy(&log, kept.path().join("2025-01-14_12-00-00.log")).await?;
+    let history = manager.log_history_state(id);
+    let pause = manager.test_hooks.arm("log_history", id);
+    let logs = manager.get_logs(id);
+    tokio::pin!(logs);
+    reach(&pause, logs.as_mut()).await;
+    tokio::time::timeout(PROMPTLY, manager._delete_instance(id))
+        .await
+        .expect("deleting waited for past logs to load")?;
+    pause.release.notify_one();
+    logs.await;
+    // A load that started before the delete finishes after it.
+    manager
+        .load_log_history_into(id, kept.path(), &history)
+        .await?;
+    assert!(
+        manager
+            .game_logs
+            .read()
+            .await
+            .values()
+            .all(|(owner, _, _)| *owner != id),
+        "a deleted instance's past logs were added back"
+    );
+    assert!(!manager.log_history.contains_key(&id));
+    Ok(())
+}
