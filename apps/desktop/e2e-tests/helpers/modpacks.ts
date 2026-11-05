@@ -354,7 +354,9 @@ export async function openModpackPage(
   // input (via "Add Addons"), never `.click()`s it, so it never triggers
   // this. One-shot per runtime path (dismissing marks it seen via
   // `settings.markOnboardingTipSeen`, which persists), so this is a fast,
-  // bounded no-op on every call after the first.
+  // bounded no-op on every call after the first. `dismissStartupModals`
+  // now marks it seen right after login, so this is only a backstop: the tip
+  // has opened after this wait gave up and blocked the platform click.
   await dismissSearchOnboardingTip(page)
 
   // The search page's project type defaults to `modpack`

@@ -82,6 +82,9 @@ async function appearsWithin(
  * `AuthFlow.tsx`'s `handleExit` now guards its own deferred post-login
  * `navigate()` against the route having already moved on, so callers no
  * longer need to wait out that window here.
+ *
+ * Also marks the search bar's onboarding tip seen (`markSearchTipSeen`
+ * below), the one first-run interruption that is not a modal.
  */
 export async function dismissStartupModals(page: Page): Promise<void> {
   // `ModalsManager` gives each modal `z-index: index + 1`, so only the
@@ -123,6 +126,98 @@ export async function dismissStartupModals(page: Page): Promise<void> {
   // click timeout inside createInstanceViaUi.
   await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
   await expect(page.locator("#overlay")).toBeHidden()
+
+  await markSearchTipSeen(page)
+}
+
+/** `EnhancedSearchBar`'s `OnboardingTip` id, the one onboarding tip the
+ *  suite's flows can open. */
+const SEARCH_TIP_ID = "search-input-syntax"
+
+/** How long the renderer is given to refetch its seen-tips list once the core
+ *  has marked the tip: a local round trip plus the invalidation push. */
+const SEEN_TIPS_REFETCH_TIMEOUT = 15_000
+
+/**
+ * Marks the search bar's onboarding tip as already seen, through the same
+ * `settings.markOnboardingTipSeen` call dismissing it makes, so no spec
+ * search can open it.
+ *
+ * The tip opens 200ms after the first click inside the search bar, as a
+ * full-screen spotlight backdrop that takes every click until dismissed.
+ * `dismissSearchOnboardingTip` (`helpers/mods.ts`) watches for it for 1s
+ * after that click, but on a busy macOS CI renderer it opened later than
+ * that and blocked the next click for its whole 30s timeout
+ * (modpackInterruptedStaging, modpackLifecycle). Waiting longer there would
+ * add a fixed delay to every search; marking it here means it never opens.
+ * No spec tests the tip itself. One that does can bring it back with
+ * `settings.resetOnboardingTips`.
+ *
+ * Waits until the renderer has refetched its seen-tips list with the tip in
+ * it, so the first search after login cannot act on the old list.
+ */
+async function markSearchTipSeen(page: Page): Promise<void> {
+  const core = await page.evaluate(async () => {
+    const module = await window.getCoreModule()
+    return module.type === "success"
+      ? { port: module.port, apiToken: module.apiToken }
+      : null
+  })
+  if (!core) {
+    throw new Error("markSearchTipSeen: the core never reported READY")
+  }
+
+  // Armed before the mark, since the core's invalidation push is what makes
+  // the renderer refetch, and that can come back before the mark's own reply.
+  const refetched = page.waitForResponse(
+    async (response) => {
+      if (
+        new URL(response.url()).pathname !==
+        "/rspc/settings.getSeenOnboardingTips"
+      ) {
+        return false
+      }
+      const body = (await response.json().catch(() => null)) as {
+        result?: { data?: unknown }
+      } | null
+      const seen = body?.result?.data
+      return Array.isArray(seen) && seen.includes(SEARCH_TIP_ID)
+    },
+    { timeout: SEEN_TIPS_REFETCH_TIMEOUT }
+  )
+  // Awaited below; handled here too, so a failing mark does not also leave
+  // this rejection unhandled.
+  refetched.catch(() => {})
+
+  const response = await fetch(
+    `http://127.0.0.1:${core.port}/rspc/settings.markOnboardingTipSeen`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-api-token": core.apiToken
+      },
+      body: JSON.stringify(SEARCH_TIP_ID)
+    }
+  )
+  const body = (await response.json().catch(() => null)) as {
+    result?: { type?: string; data?: unknown }
+  } | null
+  if (!response.ok || body?.result?.type === "error") {
+    throw new Error(
+      `markSearchTipSeen: settings.markOnboardingTipSeen failed with ` +
+        `${response.status}: ${JSON.stringify(body)}`
+    )
+  }
+
+  await refetched.catch((cause: unknown) => {
+    throw new Error(
+      `markSearchTipSeen: the core marked "${SEARCH_TIP_ID}" seen, but the ` +
+        "renderer did not refetch settings.getSeenOnboardingTips with it " +
+        `within ${SEEN_TIPS_REFETCH_TIMEOUT}ms, so a search could still open it`,
+      { cause }
+    )
+  })
 }
 
 /**

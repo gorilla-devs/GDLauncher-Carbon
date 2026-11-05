@@ -334,6 +334,10 @@ export const ONBOARDING_TIP_WAIT = 1_000
  * (already seen, or `settings.isFirstLaunch` never resolved to `false` — see
  * `OnboardingContext.tsx`'s `isEnabled`).
  *
+ * Only a backstop now: `dismissStartupModals` (`fixtures/login.ts`) marks the
+ * tip seen right after login, because on a busy renderer it has opened after
+ * this wait gave up and then blocked the next click for 30s.
+ *
  * Dismissed via Escape (`SpotlightOverlay`'s own `keydown` handler calls
  * `onboarding.hideTip()`), not a click on the backdrop or its popover:
  * neither carries a `data-testid`, and Escape needs no selector at all. The
