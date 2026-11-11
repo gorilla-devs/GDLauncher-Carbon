@@ -22,6 +22,9 @@ export const [bannerAdSize, _setBannerAdSize] = createStore<BoundsSize>({
 // Signal for hiding the "Why are ads needed" text on constrained displays
 export const [hideAdText, _setHideAdText] = createSignal(false)
 
+/** Whether a page laid out with the ad column (withAdsLayout) is on screen. The login page has none. */
+export const [adLayoutMounted, setAdLayoutMounted] = createSignal(false)
+
 const init = async () => {
   const bounds = await window.getAdSize()
   _setAdSize(bounds.adSize)

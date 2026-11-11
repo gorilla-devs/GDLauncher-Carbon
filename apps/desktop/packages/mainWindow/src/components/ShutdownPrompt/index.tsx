@@ -9,6 +9,7 @@ import {
 import { Portal } from "solid-js/web"
 import { Button } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
+import adSize, { adLayoutMounted } from "@/utils/adhelper"
 import {
   SHUTDOWN_PROMPT_ENGLISH,
   shutdownPromptLines,
@@ -28,8 +29,9 @@ const i18nKey = (key: ShutdownPromptKey) =>
  * a "now" action it shows that GDLauncher is stopping, with nothing to
  * choose, until the background service has exited.
  *
- * It renders straight into the body, above everything else, and not into
- * #overlay: that layer is display:none unless a modal or folder is open.
+ * It renders straight into the body, above everything but the ad column,
+ * which it leaves visible as modals do, and not into #overlay: that layer is
+ * display:none unless a modal or folder is open.
  * Main holds the window's close button while a prompt is open, and asks with
  * a native dialog instead if this does not report the prompt on screen.
  */
@@ -78,6 +80,11 @@ export default function ShutdownPrompt() {
           return last
         }
         const lines = () => shutdownPromptLines(view())
+        // The ad column is drawn above this prompt, so while a page shows it
+        // the content is centred in the area to its left, as modals are;
+        // 32 px is p-8. The login page has no ad column.
+        const paddingRight = () =>
+          adLayoutMounted() ? `${adSize.width + 32}px` : undefined
         let root!: HTMLDivElement
         onMount(() => {
           const visible =
@@ -92,6 +99,7 @@ export default function ShutdownPrompt() {
             <div
               ref={root}
               class="fixed inset-0 z-[10003] flex flex-col items-center justify-center bg-black bg-opacity-65 p-8 backdrop-blur-sm"
+              style={{ "padding-right": paddingRight() }}
               data-testid="shutdown-prompt"
               data-stage={view().stage}
             >

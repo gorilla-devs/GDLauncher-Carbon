@@ -16,14 +16,29 @@ vi.mock("@gd/i18n", () => ({
   Trans: (props: any) => <span>{props.key}</span>,
   useTransContext: () => [(key: string) => `t(${key})`]
 }))
+vi.mock("@/utils/adhelper", async () => {
+  const { createSignal } = await import("solid-js")
+  const { createStore } = await import("solid-js/store")
+  const [adSize, setAdSize] = createStore({
+    width: 400,
+    height: 600,
+    shouldShow: true
+  })
+  const [adLayoutMounted, setAdLayoutMounted] = createSignal(false)
+  return { default: adSize, setAdSize, adLayoutMounted, setAdLayoutMounted }
+})
 
 const { default: ShutdownPrompt } = await import(".")
+const { setAdSize, setAdLayoutMounted } =
+  (await import("@/utils/adhelper")) as any
 
 let dispose = () => {}
 afterEach(() => {
   dispose()
   document.body.innerHTML = ""
   vi.restoreAllMocks()
+  setAdLayoutMounted(false)
+  setAdSize({ width: 400 })
 })
 /**
  * The launcher page's own #overlay, as index.html ships it: hidden
@@ -99,6 +114,36 @@ it("shows over the launcher while no modal is open, outside the hidden #overlay,
   expect(ui.overlay.contains(prompt())).toBe(false)
   expect(displayed(prompt())).toBe(true)
   expect(ui.shown).toEqual([7])
+})
+
+it("keeps its content clear of the ad column while a page with the ad is shown, as modals do", () => {
+  // The ad column is drawn above the prompt, so its content is centred in
+  // the area to the ad's left: the ad's 400 px plus the prompt's own 32 px.
+  setAdLayoutMounted(true)
+  const ui = mount()
+  ui.deliver({ id: 9, view: blocked })
+  expect(prompt()!.style.paddingRight).toBe("432px")
+})
+
+it("stays centred on the whole window on the login page, which has no ad column", () => {
+  const ui = mount()
+  ui.deliver({ id: 10, view: blocked })
+  expect(prompt()!.style.paddingRight).toBe("")
+})
+
+it("moves clear of the ad column when the page or the ad width changes while it is shown", () => {
+  const ui = mount()
+  ui.deliver({ id: 11, view: blocked })
+  expect(prompt()!.style.paddingRight).toBe("")
+  // Signed in from the login page: the library shows the ad column.
+  setAdLayoutMounted(true)
+  expect(prompt()!.style.paddingRight).toBe("432px")
+  // Moved to a smaller display, which gets a narrower ad.
+  setAdSize({ width: 160 })
+  expect(prompt()!.style.paddingRight).toBe("192px")
+  // Signed out: back on the login page.
+  setAdLayoutMounted(false)
+  expect(prompt()!.style.paddingRight).toBe("")
 })
 
 it("does not tell main a prompt is on screen when the page cannot show it", () => {

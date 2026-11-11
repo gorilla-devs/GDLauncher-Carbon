@@ -1,9 +1,13 @@
 import { AdsBanner } from "@/components/AdBanner"
 import { TopBannerAd } from "@/components/TopBannerAd"
 import AppNavbar from "@/components/Navbar"
-import { createSignal, JSX, Show } from "solid-js"
+import { createSignal, JSX, onCleanup, onMount, Show } from "solid-js"
 
-import adSize, { bannerAdSize, hideAdText } from "@/utils/adhelper"
+import adSize, {
+  bannerAdSize,
+  hideAdText,
+  setAdLayoutMounted
+} from "@/utils/adhelper"
 import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { useModal } from "@/managers/ModalsManager"
@@ -27,6 +31,8 @@ const [cacheBannerDismissed, setCacheBannerDismissed] = createSignal(false)
 
 function withAdsLayout(props: { children?: JSX.Element }) {
   const modalContext = useModal()
+  onMount(() => setAdLayoutMounted(true))
+  onCleanup(() => setAdLayoutMounted(false))
   const searchResults = getSearchResults({
     limit: 20,
     offset: 0
