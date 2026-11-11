@@ -599,21 +599,14 @@ fn normalized_mod_id(modid: &str) -> Option<String> {
 }
 
 /// Whether an addon file is there: enabled (`Some(true)`) or only as its
-/// `.disabled` twin (`Some(false)`). A name the system cannot store cannot be
-/// there either: the `.disabled` spelling of a name of 247-255 bytes is too
-/// long, so such an addon is only ever there enabled, as instance addons see
-/// it. Every other error is returned.
+/// `.disabled` twin (`Some(false)`).
 async fn occupant(path: &Path) -> std::io::Result<Option<bool>> {
     let mut disabled = path.as_os_str().to_owned();
     disabled.push(".disabled");
     for (candidate, enabled) in [(path.to_path_buf(), true), (PathBuf::from(disabled), false)] {
         match tokio::fs::symlink_metadata(&candidate).await {
             Ok(_) => return Ok(Some(enabled)),
-            Err(error)
-                if matches!(
-                    error.kind(),
-                    std::io::ErrorKind::NotFound | std::io::ErrorKind::InvalidFilename
-                ) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
             Err(error) => return Err(error),
         }
     }
@@ -4976,50 +4969,6 @@ mod dependency_tests {
         assert_eq!(std::fs::read_dir(data.join("mods")).unwrap().count(), 3);
     }
 
-    // A file name of 247-255 bytes (a long ASCII name, or about 83 CJK
-    // characters) has a `.disabled` spelling too long for the system to
-    // store. A required dependency with such a name is published while the
-    // server does not have it and kept once it does, and a recorded copy with
-    // such a name whose file is gone is not installed.
-    #[tokio::test]
-    async fn dependency_whose_name_is_too_long_to_disable_is_published_while_missing() {
-        use carbon_repos::db_exec::test_support::wg;
-        let root = tempfile::tempdir().unwrap();
-        let data = root.path();
-        let mods = data.join("mods");
-        let mut conn = fixture_db(data);
-        let long = format!("{}.jar", "a".repeat(246));
-        installed_jar(
-            &mut conn,
-            data,
-            &long,
-            b"lib 1",
-            Some("lib"),
-            Some(("mr", "lib")),
-        );
-        std::fs::remove_file(mods.join(&long)).unwrap();
-        let rows = mfcdb::get_server_mods_full_conn(&wg(&mut conn), 7).unwrap();
-        let server = InstalledAddons::read(data, &rows, Some("forge")).await;
-        assert!(server.addons.is_empty(), "{:?}", server.addons);
-
-        let mut dependency = artifact("mr:lib", "2", &long, b"lib 2");
-        dependency.required = true;
-        let items = vec![
-            prepare(data, artifact("mr:addon", "1", "addon.jar", b"a"), &rows).await,
-            prepare(data, dependency, &rows).await,
-        ];
-        let modids = [Some("addon".to_owned()), Some("lib".to_owned())];
-        let publish = || async {
-            settle_dependencies(data, &items, &modids, &server, &flat(&items), false)
-                .await
-                .unwrap()
-                .publish
-        };
-        assert_eq!(publish().await, vec![true, true]);
-        std::fs::write(mods.join(&long), b"by hand").unwrap();
-        assert_eq!(publish().await, vec![true, false]);
-    }
-
     /// The graph of a plan whose selected addon (the first item) requires
     /// every other item directly.
     fn flat(items: &[Prepared]) -> Graph {
@@ -7161,40 +7110,6 @@ mod dependency_tests {
             vec!["lib-1.jar", "lib-2.jar.disabled"],
             "nothing is touched before publication"
         );
-    }
-
-    // A recorded copy whose file is gone is not a copy either when its name
-    // is 247-255 bytes, whose `.disabled` spelling the system cannot store:
-    // the loaded copy is replaced instead of both being named as duplicates.
-    #[tokio::test]
-    async fn a_version_change_skips_a_gone_copy_whose_name_is_too_long_to_disable() {
-        use carbon_repos::db_exec::test_support::wg;
-        let root = tempfile::tempdir().unwrap();
-        let data = root.path();
-        let folder = data.join("mods");
-        let mut conn = fixture_db(data);
-        let long = format!("{}.jar", "a".repeat(246));
-        for (filename, bytes) in [("lib-1.jar", &b"lib 1"[..]), (long.as_str(), &b"lib 2"[..])] {
-            installed_jar(&mut conn, data, filename, bytes, None, Some(("mr", "lib")));
-        }
-        std::fs::remove_file(folder.join(&long)).unwrap();
-        let rows = mfcdb::get_server_mods_full_conn(&wg(&mut conn), 7).unwrap();
-        assert_eq!(rows.len(), 2);
-        let replaced = prepare_artifact(
-            data,
-            &folder,
-            artifact("mr:lib", "9", "lib-9.jar", b"lib 9"),
-            "mods/lib-9.jar".into(),
-            &rows,
-            &data.join("stage"),
-        )
-        .await
-        .unwrap()
-        .unwrap()
-        .old
-        .map(|(row, _)| row.filename);
-        assert_eq!(replaced.as_deref(), Some("lib-1.jar"));
-        assert_eq!(files(&folder), vec!["lib-1.jar"]);
     }
 
     // A destination that holds two copies, or a link or folder, refuses with

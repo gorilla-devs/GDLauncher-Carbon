@@ -571,16 +571,7 @@ fn owned(data: &Path, kind: &str, location: &str, filename: &str) -> Result<Owne
     let disabled = parent.join(format!("{filename}.disabled"));
     let lstat = |path: &Path| match std::fs::symlink_metadata(path) {
         Ok(meta) => Ok(Some(meta)),
-        // A name too long to store (the `.disabled` spelling of a 247-255
-        // byte name) cannot be a copy.
-        Err(error)
-            if matches!(
-                error.kind(),
-                std::io::ErrorKind::NotFound | std::io::ErrorKind::InvalidFilename
-            ) =>
-        {
-            Ok(None)
-        }
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(None),
         Err(error) => {
             Err(anyhow::Error::new(error).context(format!("Could not open {}", path.display())))
         }
@@ -1076,27 +1067,6 @@ mod link_tests {
         assert_eq!(
             destinations.effective("other2/y.toml").unwrap().0,
             "Other2/y.toml"
-        );
-    }
-
-    /// A 250-byte name is valid, but its `.disabled` spelling is too long
-    /// for the system to store, so the enabled file is the addon and Delete,
-    /// update and replace find it.
-    #[test]
-    fn owned_addon_finds_a_server_addon_whose_name_is_too_long_to_disable() {
-        let root = tempfile::tempdir().unwrap();
-        let data = root.path().join("server");
-        let name = format!("{}.jar", "a".repeat(246));
-        write(&data.join("mods").join(&name), b"a");
-        let location = format!("mods/{name}");
-
-        assert_eq!(
-            owned_addon_entry(&data, "mods", &location, &name).unwrap(),
-            data.join("mods").join(&name)
-        );
-        assert_eq!(
-            owned_addon(&data, "mods", &location, &name).unwrap(),
-            data.join("mods").join(&name)
         );
     }
 
