@@ -123,12 +123,26 @@ pub(super) fn twin_copies_refusal(
     )
 }
 
+/// The entry at `path`, without following a link, or `None` when there is
+/// none. A name the system cannot store (over 255 bytes on Linux and macOS;
+/// over 255 UTF-16 units, or with characters Windows refuses, on Windows)
+/// cannot name an entry either, so it is `None` too: the `<name>.disabled`
+/// spelling of an addon whose name is 247-255 bytes is one, and 2.0.40
+/// deleted and installed such addons. Every other error is returned, so an
+/// unreadable folder never passes for an empty one.
 pub(super) async fn addon_metadata(
     path: &std::path::Path,
 ) -> anyhow::Result<Option<std::fs::Metadata>> {
     match tokio::fs::symlink_metadata(path).await {
         Ok(meta) => Ok(Some(meta)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
+        Err(e)
+            if matches!(
+                e.kind(),
+                std::io::ErrorKind::NotFound | std::io::ErrorKind::InvalidFilename
+            ) =>
+        {
+            Ok(None)
+        }
         Err(e) => Err(e.into()),
     }
 }
@@ -1940,6 +1954,68 @@ pub(crate) mod tests {
         }
     }
 
+    /// An enabled addon whose name is 247-255 bytes (about 83 CJK
+    /// characters, or a long ASCII name) has a `.disabled` spelling the
+    /// system cannot store. Delete removes it and its row, as 2.0.40 did,
+    /// also when the file is already gone; Enable says it is enabled.
+    #[tokio::test]
+    async fn deletes_an_addon_whose_name_is_too_long_to_disable() {
+        let app = crate::setup_managers_for_test().await;
+        let cjk = format!("{}.zip", "材".repeat(83));
+        let ascii = format!("{}.jar", "a".repeat(246));
+        let stale = format!("{}.jar", "b".repeat(246));
+        for (fixture, kind, name, gone) in [
+            ("long-cjk", AddonType::ResourcePacks, &cjk, false),
+            ("long-ascii", AddonType::Mods, &ascii, false),
+            ("long-stale", AddonType::Mods, &stale, true),
+        ] {
+            let (id, row, path) = addon_fixture(&app, fixture, kind, name, b"bytes").await;
+            if gone {
+                std::fs::remove_file(&path).unwrap();
+            } else {
+                let enable = app
+                    .instance_manager()
+                    .enable_mod(id, row.id.clone(), true)
+                    .await
+                    .unwrap_err()
+                    .to_string();
+                assert!(enable.contains("already enabled"), "{fixture}: {enable}");
+                // The disabled name cannot be stored, so Disable fails and
+                // changes nothing, as in 2.0.40.
+                #[cfg(unix)]
+                {
+                    app.instance_manager()
+                        .enable_mod(id, row.id.clone(), false)
+                        .await
+                        .unwrap_err();
+                    assert!(path.is_file(), "{fixture}");
+                    assert!(
+                        mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                            .await
+                            .unwrap()
+                            .unwrap()
+                            .enabled,
+                        "{fixture}"
+                    );
+                }
+            }
+            let kept = app
+                .instance_manager()
+                .delete_mod(id, row.id.clone())
+                .await
+                .unwrap();
+            assert_eq!(kept, None, "{fixture}");
+            assert!(std::fs::symlink_metadata(&path).is_err(), "{fixture}");
+            assert!(
+                mfcdb::get_mod_file_cache_by_id(&app.db, &row.id)
+                    .await
+                    .unwrap()
+                    .is_none(),
+                "{fixture}"
+            );
+        }
+    }
+
     #[cfg(unix)]
     #[tokio::test]
     async fn task05_delete_links_preserve_target_and_row() {
@@ -2560,6 +2636,53 @@ pub(crate) mod tests {
 
         assert!(removed);
         assert!(!file.exists());
+    }
+
+    /// A 250-byte name is valid, but its `.disabled` spelling is too long
+    /// for the system to store, so no disabled copy can exist and the
+    /// enabled file is deleted.
+    #[tokio::test]
+    async fn an_addon_name_too_long_to_disable_has_no_disabled_copy() {
+        let dir = tempfile::tempdir().unwrap();
+        let name = format!("{}.jar", "a".repeat(246));
+        let enabled = dir.path().join(&name);
+        let disabled = dir.path().join(format!("{name}.disabled"));
+        std::fs::write(&enabled, b"x").unwrap();
+
+        assert!(super::addon_metadata(&disabled).await.unwrap().is_none());
+        assert!(
+            remove_addon_from_disk(&enabled, &disabled, false)
+                .await
+                .unwrap()
+        );
+        assert!(std::fs::symlink_metadata(&enabled).is_err());
+        assert!(
+            !remove_addon_from_disk(&enabled, &disabled, false)
+                .await
+                .unwrap()
+        );
+    }
+
+    /// Install, update and replace find such a file as enabled, or nothing
+    /// when the folder does not have it yet.
+    #[tokio::test]
+    async fn selected_file_finds_an_addon_whose_name_is_too_long_to_disable() {
+        use crate::managers::instance::installer::publication::{replaceable_file, selected_file};
+        let dir = tempfile::tempdir().unwrap();
+        let name = format!("{}.jar", "a".repeat(246));
+
+        assert!(selected_file(dir.path(), &name).await.unwrap().is_none());
+        assert!(
+            replaceable_file(dir.path(), &name, "replace")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        std::fs::write(dir.path().join(&name), b"x").unwrap();
+        assert_eq!(
+            selected_file(dir.path(), &name).await.unwrap(),
+            Some((dir.path().join(&name), true))
+        );
     }
 
     #[tokio::test]
