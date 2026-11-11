@@ -24,6 +24,7 @@ interface SearchableCheckboxListProps {
   showSearch?: boolean
   maxHeight?: number
   virtualizeThreshold?: number
+  /** Shown when no item matches. Omitted: "No results found"; null: no empty state at all. */
   emptyMessage?: JSX.Element
   /** Hide search when item count is below this threshold (default: 10) */
   searchThreshold?: number
@@ -107,9 +108,11 @@ export function SearchableCheckboxList(props: SearchableCheckboxListProps) {
       <Show
         when={filteredItems().length > 0}
         fallback={
-          <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
-            {props.emptyMessage ?? "No results found"}
-          </div>
+          <Show when={props.emptyMessage !== null}>
+            <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
+              {props.emptyMessage ?? "No results found"}
+            </div>
+          </Show>
         }
       >
         <Show

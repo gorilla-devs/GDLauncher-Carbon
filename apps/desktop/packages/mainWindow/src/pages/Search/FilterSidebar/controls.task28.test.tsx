@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest"
-import { createSignal, For } from "solid-js"
+import { createSignal, For, type JSX } from "solid-js"
 import { render } from "solid-js/web"
 import { Radio } from "../../../../../../../../packages/ui/src/Radio"
 import { Collapsable } from "../../../../../../../../packages/ui/src/Collapsable"
@@ -330,4 +330,20 @@ it("unchanged virtual branch renders through its list adapter", () => {
     />
   ))
   expect(root.querySelector("[data-virtual]")?.textContent).toContain("two")
+})
+it("an empty filter list with a null empty message shows no fallback text or box, and shows the message once one is given", () => {
+  const [message, setMessage] = createSignal<JSX.Element>(null)
+  const root = mount(() => (
+    <SearchableCheckboxList
+      items={[]}
+      selectedValues={() => []}
+      onToggle={() => {}}
+      showSearch={false}
+      emptyMessage={message()}
+    />
+  ))
+  expect(root.textContent).toBe("")
+  expect(root.firstElementChild!.children.length).toBe(0)
+  setMessage(<span>search:_trn_no_categories_found</span>)
+  expect(root.textContent).toContain("search:_trn_no_categories_found")
 })
