@@ -124,6 +124,68 @@ describe("targetDefaults", () => {
     ).toEqual(scope(undefined, "1.20.1"))
   })
 
+  it("lists a server's datapack versions when a datapack declares none of the server's loaders", () => {
+    // Modrinth types a datapack project "mod" and tags its zip versions
+    // with the "datapack" loader, which any server runs.
+    const fabric = { loader: "fabric", gameVersion: "1.20.1" }
+    expect(
+      targetDefaults("server", "loader", fabric, { loaders: ["datapack"] })
+    ).toEqual(scope("datapack", "1.20.1"))
+    expect(
+      targetDefaults("server", "loader", fabric, {
+        loaders: ["datapack", "forge"]
+      })
+    ).toEqual(scope("datapack", "1.20.1"))
+    const forge121 = { loader: "forge", gameVersion: "1.21.1" }
+    expect(
+      targetDefaults("server", "loader", forge121, {
+        loaders: ["datapack", "minecraft"]
+      })
+    ).toEqual(scope("datapack", "1.21.1"))
+    expect(
+      targetDefaults("server", "loader", forge121, {
+        loaders: ["datapack", "fabric", "neoforge"]
+      })
+    ).toEqual(scope("datapack", "1.21.1"))
+  })
+
+  it("keeps the server's or a compatible loader when a datapack also declares it, and leaves instances and vanilla servers alone", () => {
+    expect(
+      targetDefaults(
+        "server",
+        "loader",
+        { loader: "fabric", gameVersion: "1.20.1" },
+        { loaders: ["datapack", "fabric"] }
+      )
+    ).toEqual(scope("fabric", "1.20.1"))
+    expect(
+      targetDefaults("server", "loader", quilt, {
+        loaders: ["datapack", "fabric"]
+      })
+    ).toEqual(scope("fabric", "1.20.1"))
+    expect(
+      targetDefaults("server", "loader", neoforge, {
+        loaders: ["datapack", "forge"]
+      })
+    ).toEqual(scope("forge", "1.20.1"))
+    expect(
+      targetDefaults(
+        "instance",
+        "loader",
+        { loader: "fabric", gameVersion: "1.20.1" },
+        { loaders: ["datapack"] }
+      )
+    ).toEqual(scope(undefined, "1.20.1"))
+    expect(
+      targetDefaults(
+        "server",
+        "loader",
+        { loader: null, gameVersion: "1.20.1" },
+        { loaders: ["datapack"] }
+      )
+    ).toEqual(scope(undefined, "1.20.1"))
+  })
+
   it("filters nothing for values the target does not know", () => {
     // A modpack instance whose first install did not finish has no version.
     expect(

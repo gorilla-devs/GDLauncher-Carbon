@@ -70,7 +70,10 @@ const versionCalls = () =>
   c.query.mock.calls
     .filter(([a]) => a[0] === "modplatforms.modrinth.getProjectVersions")
     .map(([a]) => a[1])
-function mount(params: any) {
+function mount(
+  params: any,
+  support: { loaders?: any[]; gameVersions?: string[] } = {}
+) {
   c.params = params
   client = new QueryClient({
     defaultOptions: {
@@ -94,8 +97,8 @@ function mount(params: any) {
               modId="project"
               modplatform="modrinth"
               addonType="mod"
-              supportedModloaders={["fabric"]}
-              supportedGameVersions={["1.21"]}
+              supportedModloaders={support.loaders ?? ["fabric"]}
+              supportedGameVersions={support.gameVersions ?? ["1.21"]}
             >
               <Versions />
             </Wrapper>
@@ -149,6 +152,48 @@ it("W02#1 an empty server list says what it was filtered by and Show all version
     root.querySelector('[data-testid="addon-versions-target-empty"]')
   ).toBeNull()
   expect(root.textContent).toContain("content:_trn_no_versions_found")
+})
+
+it("a modded server's Versions tab offers a Modrinth datapack's versions instead of saying none fit", async () => {
+  // Modrinth types a datapack project "mod" and tags its zips "datapack".
+  c.query.mockImplementation(([key, input]: any) =>
+    Promise.resolve(
+      key === "server.getServerDetails"
+        ? { name: "Survival", modloaderType: "fabric", gameVersion: "1.20.1" }
+        : key.endsWith("getProject")
+          ? {}
+          : JSON.stringify(input.loaders) === '["datapack"]'
+            ? [
+                {
+                  project_id: "project",
+                  id: "version",
+                  name: "Datapack 1.0",
+                  version_type: "release",
+                  game_versions: ["1.20.1"],
+                  downloads: 1,
+                  date_published: "2024-01-01T00:00:00Z",
+                  files: [
+                    { filename: "pack.zip", size: 1, hashes: { sha512: "h" } }
+                  ],
+                  status: "listed"
+                }
+              ]
+            : []
+    )
+  )
+  const root = mount(
+    { serverId: "7" },
+    { loaders: ["datapack"], gameVersions: ["1.20.1"] }
+  )
+  await settle()
+  expect(
+    root.querySelector('[data-testid="addon-versions-target-empty"]')
+      ?.textContent
+  ).toBeUndefined()
+  expect(root.textContent).not.toContain("content:_trn_no_versions_found")
+  expect(versionCalls()).toEqual([
+    { project_id: "project", game_versions: ["1.20.1"], loaders: ["datapack"] }
+  ])
 })
 
 it("W02#1 an empty list without a target keeps the plain message", async () => {

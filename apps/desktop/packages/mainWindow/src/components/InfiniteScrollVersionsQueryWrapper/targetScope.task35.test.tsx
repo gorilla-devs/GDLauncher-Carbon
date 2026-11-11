@@ -198,6 +198,56 @@ it("W02#1 a server keeps its own loader and version, and Show all versions lists
   })
 })
 
+const datapackVersion = {
+  project_id: "project",
+  id: "version",
+  name: "Datapack 1.0",
+  version_type: "release",
+  game_versions: ["1.20.1"],
+  downloads: 1,
+  date_published: "2024-01-01T00:00:00Z",
+  files: [{ filename: "pack.zip", size: 1, hashes: { sha512: "hash" } }],
+  status: "listed"
+}
+
+it("a modded server lists a Modrinth datapack's datapack versions", async () => {
+  // Modrinth types a datapack project "mod" and declares its "datapack"
+  // loader, not the server's.
+  backend({ loader: "fabric", gameVersion: "1.20.1" }, [datapackVersion])
+  const f = mount(
+    { serverId: "7" },
+    { addonType: "mod", loaders: ["datapack"], gameVersions: ["1.20.1"] }
+  )
+  await settle()
+  expect(versionCalls()).toEqual([
+    { project_id: "project", game_versions: ["1.20.1"], loaders: ["datapack"] }
+  ])
+  expect(f.context.targetFilters).toEqual({
+    modLoaderType: "datapack",
+    gameVersion: "1.20.1"
+  })
+  expect(f.context.allRows()).toHaveLength(1)
+})
+
+it("a datapack's loaders declared after a modded server resolved re-scope its list to the datapack versions", async () => {
+  backend({ loader: "fabric", gameVersion: "1.20.1" }, [datapackVersion])
+  const f = mount({ serverId: "7" })
+  await settle()
+  f.setType("mod")
+  f.setLoaders(["datapack"])
+  f.setGameVersions(["1.20.1"])
+  await settle()
+  expect(versionCalls()).toEqual([
+    { project_id: "project", game_versions: ["1.20.1"], loaders: ["fabric"] },
+    { project_id: "project", game_versions: ["1.20.1"], loaders: ["datapack"] }
+  ])
+  expect(f.context.targetReady).toBe(true)
+  expect(
+    calls("server.getServerDetails"),
+    "the server is not looked up again"
+  ).toHaveLength(1)
+})
+
 it("W02#1 support declared after the target resolved re-scopes the same target once", async () => {
   backend({ loader: "quilt", gameVersion: "1.20.1" })
   const f = mount({ instanceId: "3" })

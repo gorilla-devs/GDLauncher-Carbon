@@ -92,7 +92,9 @@ export const sameAddonSupport = (a: AddonSupport, b: AddonSupport) =>
  *   snapshot instance, a Fabric-only mod on Forge).
  * - A server keeps its own version and loader: its list only offers versions
  *   it can run. The empty list then says what it was filtered by and offers
- *   every version, as the Override checkbox does.
+ *   every version, as the Override checkbox does. A datapack that declares
+ *   none of the server's loaders is listed by its datapack versions, which
+ *   any server runs.
  *
  * A target value that is not known filters nothing, so an instance whose
  * game version is not known yet lists every game version instead of failing.
@@ -117,7 +119,11 @@ export function targetDefaults(
     const pick = declared
       ? runnable.find((value) => declared.includes(value.toLowerCase()))
       : loader
-    modLoaderType = pick ?? (lenient ? undefined : loader)
+    // Modrinth types a datapack project "mod" and tags its datapack
+    // versions "datapack". Those run on any server, so a server whose
+    // loaders the project declares nothing for lists them, not none.
+    const strict = declared?.includes("datapack") ? "datapack" : loader
+    modLoaderType = pick ?? (lenient ? undefined : strict)
   }
 
   const versions = known(support.gameVersions)
