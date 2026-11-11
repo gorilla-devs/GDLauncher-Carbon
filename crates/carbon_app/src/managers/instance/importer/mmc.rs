@@ -1212,6 +1212,50 @@ mod task13_tests {
             assert!(needs_launcher_expansion(command), "{command}");
         }
     }
+
+    /// Neither Prism nor GDLauncher expands `%`, so a hook that downloads a
+    /// percent-encoded URL works as written and imports unchanged.
+    #[tokio::test]
+    async fn commands_with_percent_encoded_urls_import_as_written() {
+        let t = tempfile::tempdir().unwrap();
+        std::fs::write(
+            t.path().join("mmc-pack.json"),
+            r#"{"components":[{"uid":"net.minecraft","version":"1.20.1"}]}"#,
+        )
+        .unwrap();
+        let pre = "java -jar packwiz-installer-bootstrap.jar https://example.invalid/My%20Pack%20v2/pack.toml";
+        let post = "curl -o pack.zip https://example.invalid/Pok%C3%A9mon%20Pack.zip";
+        std::fs::write(
+            t.path().join("instance.cfg"),
+            format!(
+                "name=Synthetic\nOverrideCommands=true\nPreLaunchCommand={pre}\nPostExitCommand={post}\n"
+            ),
+        )
+        .unwrap();
+        let entry = scan_valid(&MmcImporter::new(MmcFlavor::Prism), t.path()).await;
+        assert_eq!(entry.settings.pre_launch_hook.as_deref(), Some(pre));
+        assert_eq!(entry.settings.post_exit_hook.as_deref(), Some(post));
+        assert_eq!(entry.settings.notes, None);
+        assert!(ImportableInstance::from(entry).warnings.is_empty());
+    }
+
+    #[test]
+    fn percent_escapes_are_not_variables_but_variables_beside_them_are() {
+        for command in [
+            "curl -O https://example.invalid/caf%c3%a9.zip",
+            "curl -O https://example.invalid/%E2%80%99s.zip",
+            "curl -O https://example.invalid/a%2Fb%2Fc",
+        ] {
+            assert!(!needs_launcher_expansion(command), "{command}");
+        }
+        for command in [
+            "tool.exe https://example.invalid/My%20Pack%20v2 --dir %APPDATA%",
+            r"tool.exe %DEV_HOME%\bin",
+            "tool.exe %CACHE_DIR%",
+        ] {
+            assert!(needs_launcher_expansion(command), "{command}");
+        }
+    }
 }
 
 /// Prism and MultiMC fill `$INST_JAVA`, `%INST_DIR%` and the environment into
@@ -1289,6 +1333,7 @@ fn is_shell_program(program: &str) -> bool {
     .contains(&name)
 }
 
+/// Finds `$NAME`, `${NAME}` and `%NAME%`.
 fn has_launcher_placeholder(value: &str) -> bool {
     let bytes = value.as_bytes();
     bytes.iter().enumerate().any(|(i, b)| {
@@ -1299,8 +1344,16 @@ fn has_launcher_placeholder(value: &str) -> bool {
         }
         if *b == b'%' {
             let rest = &value[i + 1..];
-            return rest.split_once('%').is_some_and(|(name, _)| {
-                !name.is_empty() && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+            // Percent-encoded text such as a URL's `My%20Pack%20v2` puts two hex
+            // digits after every `%`, so a `%` followed by two hex digits starts an
+            // escape and does not close a variable name.
+            return rest.split_once('%').is_some_and(|(name, after)| {
+                !name.is_empty()
+                    && name.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_')
+                    && !after
+                        .as_bytes()
+                        .get(..2)
+                        .is_some_and(|pair| pair.iter().all(u8::is_ascii_hexdigit))
             });
         }
         false
