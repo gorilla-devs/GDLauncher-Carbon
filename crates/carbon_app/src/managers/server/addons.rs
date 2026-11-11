@@ -57,6 +57,7 @@ use crate::managers::instance::installer::dependency::{
 use crate::managers::instance::installer::publication::{
     SERVER_STAGING_PREFIX, UnclearAddonFile, matches_download, selected_file, settle_staging,
 };
+use crate::managers::metadata::cache::PreparedAddonMetadata;
 use carbon_net::{Checksum, DownloadOptions, Downloadable};
 use carbon_platforms::{
     ModChannel,
@@ -2742,29 +2743,24 @@ async fn install_owned(
                         if !matches_download(&now, &item.download).await? {
                             bail!("Server addon destination changed before publication");
                         }
-                        let metadata_id = app
+                        let mut metadata = app
                             .meta_cache_manager()
                             .prepare_server_addon_metadata(
                                 &item.download.path,
                                 &item.artifact.filename,
                             )
                             .await?;
-                        let identity_artifact = item.artifact.clone();
-                        let location = item.location.clone();
-                        app.db
-                            .write(move |mut conn| {
-                                Ok(publish_selection(
-                                    &mut conn,
-                                    id.0,
-                                    kind,
-                                    &location,
-                                    enabled,
-                                    &metadata_id,
-                                    &identity_artifact,
-                                    None,
-                                ))
-                            })
-                            .await??;
+                        record_selection(
+                            &app,
+                            id.0,
+                            kind,
+                            &item.location,
+                            enabled,
+                            &mut metadata,
+                            &item.artifact,
+                            None,
+                        )
+                        .await?;
                         tokio::fs::remove_file(&item.download.path).await?;
                         continue;
                     }
@@ -2793,19 +2789,16 @@ async fn install_owned(
                         old_path = Some(physical);
                     }
                     selected_source(&item.artifact)?; // source feasibility before retiring any live bytes
-                    let metadata_id = app
+                    let mut metadata = app
                         .meta_cache_manager()
                         .prepare_server_addon_metadata(&item.download.path, &item.artifact.filename)
                         .await?;
-                    let identity_artifact = item.artifact.clone();
-                    let location = item.location.clone();
                     let retired = item
                         .old
                         .as_ref()
                         .filter(|(row, _)| row.location != item.location)
                         .map(|(row, _)| row.id.clone());
                     let backup = staging.join(format!("previous-{index}"));
-                    let db = &app.db;
                     publish_with_metadata(
                         &item.download,
                         &folder,
@@ -2814,20 +2807,18 @@ async fn install_owned(
                         item.old.as_ref().map(|(_, hash)| hash.as_slice()),
                         enabled,
                         &backup,
-                        async move {
-                            db.write(move |mut conn| {
-                                Ok(publish_selection(
-                                    &mut conn,
-                                    id.0,
-                                    kind,
-                                    &location,
-                                    enabled,
-                                    &metadata_id,
-                                    &identity_artifact,
-                                    retired.as_deref(),
-                                ))
-                            })
-                            .await?
+                        async {
+                            record_selection(
+                                &app,
+                                id.0,
+                                kind,
+                                &item.location,
+                                enabled,
+                                &mut metadata,
+                                &item.artifact,
+                                retired.as_deref(),
+                            )
+                            .await
                         },
                     )
                     .await
@@ -3254,6 +3245,66 @@ fn publish_selection(
     }
     transaction.commit()?;
     Ok(())
+}
+/// Records a published addon's row and selected source. Its metadata row is
+/// made before the files move, and a metadata clean-up run by a delete
+/// elsewhere removes it while nothing refers to it yet; the write then fails
+/// on the missing row, so the row is made again and the write retried once,
+/// as `refresh_server_addon` does. A second failure is returned.
+#[allow(clippy::too_many_arguments)]
+async fn record_selection(
+    app: &Arc<AppInner>,
+    server_id: i32,
+    kind: &'static str,
+    location: &str,
+    enabled: bool,
+    metadata: &mut PreparedAddonMetadata,
+    artifact: &Artifact,
+    retired: Option<&str>,
+) -> anyhow::Result<()> {
+    for attempt in 0..2 {
+        let location = location.to_owned();
+        let metadata_id = metadata.id.clone();
+        let artifact = artifact.clone();
+        let retired = retired.map(str::to_owned);
+        let written = app
+            .db
+            .write(move |mut conn| {
+                Ok(publish_selection(
+                    &mut conn,
+                    server_id,
+                    kind,
+                    &location,
+                    enabled,
+                    &metadata_id,
+                    &artifact,
+                    retired.as_deref(),
+                ))
+            })
+            .await?;
+        match written {
+            Err(error) if attempt == 0 && metadata_owner_disappeared(&error) => {
+                app.meta_cache_manager()
+                    .reprepare_server_addon_metadata(metadata)
+                    .await?;
+            }
+            written => return written,
+        }
+    }
+    unreachable!("bounded publication loop returns on its last attempt")
+}
+/// True when a write failed because a row it refers to was missing: SQLite's
+/// foreign-key code, which `require_metadata` also returns.
+fn metadata_owner_disappeared(error: &anyhow::Error) -> bool {
+    error.chain().any(|cause| {
+        matches!(
+            cause.downcast_ref::<rusqlite::Error>(),
+            Some(rusqlite::Error::SqliteFailure(code, _))
+                if code.extended_code == rusqlite::ffi::SQLITE_CONSTRAINT_FOREIGNKEY
+        ) || cause
+            .downcast_ref::<carbon_repos::db_error::DbError>()
+            .is_some_and(carbon_repos::db_error::DbError::is_foreign_key_violation)
+    })
 }
 async fn publish_with_metadata<F>(
     download: &Downloadable,
@@ -9006,5 +9057,226 @@ mod dependency_tests {
                 ));
             }
         }
+    }
+
+    /// How many metadata rows hold `bytes`.
+    async fn metadata_rows(app: &crate::TestEnv, bytes: &[u8]) -> i64 {
+        use carbon_repos::db_exec::ReadAccess;
+        let sha = Sha512::digest(bytes).to_vec();
+        app.db
+            .read(move |conn| {
+                Ok(conn.query_row(
+                    "SELECT count(*) FROM ModMetadata WHERE sha512 = ?1",
+                    [sha],
+                    |row| row.get::<_, i64>(0),
+                )?)
+            })
+            .await
+            .unwrap()
+    }
+
+    /// Installs `selection` as `run_install` does, while a metadata clean-up,
+    /// as deleting a mod, an instance or another server's addon runs one,
+    /// collects the metadata row the installation made for `filename` before
+    /// anything refers to it.
+    async fn run_install_while_its_metadata_is_collected(
+        app: &crate::TestEnv,
+        id: i32,
+        selection: Selection,
+        resolver: Arc<dyn Resolver>,
+        filename: &str,
+        bytes: &[u8],
+    ) -> crate::managers::vtask::TaskOutcome {
+        let prepared = app
+            .meta_cache_manager()
+            .arm_scan_pause(Path::new(filename), "server-addon-prepared");
+        let task = install_with(app, ServerId(id), selection, resolver)
+            .await
+            .unwrap();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            prepared.entered.notified(),
+        )
+        .await
+        .expect("the installation prepares the addon's metadata");
+        assert_eq!(metadata_rows(app, bytes).await, 1, "a new row");
+        app.meta_cache_manager().gc_mod_metadata().await;
+        assert_eq!(metadata_rows(app, bytes).await, 0, "the clean-up took it");
+        prepared.release.notify_one();
+        let mut outcome = app.task_manager().get_task_outcome(task).await;
+        for _ in 0..200 {
+            if !matches!(outcome, crate::managers::vtask::TaskOutcome::Running(_)) {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            outcome = app.task_manager().get_task_outcome(task).await;
+        }
+        outcome
+    }
+
+    // The installation makes the addon's metadata row before it publishes
+    // the addon. A clean-up run by a delete elsewhere meanwhile removes the
+    // row, since nothing refers to it yet; the installation makes it again
+    // and publishes the addon instead of failing.
+    #[tokio::test]
+    async fn an_addon_whose_new_metadata_is_collected_before_publication_is_still_installed() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, mods) = fabric_server(&app).await;
+        let mut platform = mockito::Server::new_async().await;
+        let download = platform
+            .mock("GET", "/addon.jar")
+            .with_body("addon")
+            .create_async()
+            .await;
+        let shelf = Shelf::new(
+            platform.url(),
+            vec![("mr:addon", "1", "addon.jar", b"addon", vec![])],
+        );
+        let outcome = run_install_while_its_metadata_is_collected(
+            &app,
+            id,
+            root(),
+            shelf,
+            "addon.jar",
+            b"addon",
+        )
+        .await;
+        succeeded(&outcome);
+        download.assert_async().await;
+        assert_eq!(files(&mods), vec!["addon.jar"]);
+        assert_eq!(std::fs::read(mods.join("addon.jar")).unwrap(), b"addon");
+        let after = rows(&app, id).await;
+        assert_eq!(after.len(), 1);
+        assert_eq!(after[0].location, "mods/addon.jar");
+        assert_eq!(source(&after[0]), (Some("mr"), Some("addon"), Some("1")));
+        assert_eq!(metadata_rows(&app, b"addon").await, 1);
+        assert_eq!(staging_left(&app), 0);
+    }
+
+    // The same for a new version: the row is made again while the new copy
+    // is in place, so the new copy replaces the old one and its row.
+    #[tokio::test]
+    async fn a_version_change_whose_new_metadata_is_collected_before_publication_replaces_the_old_copy()
+     {
+        let app = crate::setup_managers_for_test().await;
+        let (id, mods) = fabric_server(&app).await;
+        put(
+            &app,
+            id,
+            &mods,
+            Jar {
+                filename: "addon-1.jar",
+                bytes: b"addon 1",
+                mr: Some(("addon", "1")),
+                source: Some(("mr", "addon", "1")),
+                ..Default::default()
+            },
+        )
+        .await;
+        let before = rows(&app, id).await;
+        let mut platform = mockito::Server::new_async().await;
+        let download = platform
+            .mock("GET", "/addon-2.jar")
+            .with_body("addon 2")
+            .create_async()
+            .await;
+        let shelf = Shelf::new(
+            platform.url(),
+            vec![("mr:addon", "2", "addon-2.jar", b"addon 2", vec![])],
+        );
+        let outcome = run_install_while_its_metadata_is_collected(
+            &app,
+            id,
+            Selection::Modrinth("addon".into(), Some("2".into())),
+            shelf,
+            "addon-2.jar",
+            b"addon 2",
+        )
+        .await;
+        succeeded(&outcome);
+        download.assert_async().await;
+        assert_eq!(files(&mods), vec!["addon-2.jar"]);
+        let after = rows(&app, id).await;
+        assert_eq!(after.len(), 1);
+        assert_ne!(after[0].id, before[0].id, "the old row is retired");
+        assert_eq!(after[0].location, "mods/addon-2.jar");
+        assert_eq!(source(&after[0]), (Some("mr"), Some("addon"), Some("2")));
+        assert_eq!(metadata_rows(&app, b"addon 2").await, 1);
+        assert_eq!(staging_left(&app), 0);
+    }
+
+    // The same for the selected addon's own bytes already where it goes, put
+    // there by hand: the file stays as it is and its row records the source.
+    #[tokio::test]
+    async fn an_adopted_addon_whose_new_metadata_is_collected_before_publication_is_still_recorded()
+    {
+        let app = crate::setup_managers_for_test().await;
+        let (id, mods) = fabric_server(&app).await;
+        put(
+            &app,
+            id,
+            &mods,
+            Jar {
+                filename: "addon.jar",
+                bytes: b"addon",
+                unscanned: true,
+                ..Default::default()
+            },
+        )
+        .await;
+        let mut platform = mockito::Server::new_async().await;
+        let download = platform
+            .mock("GET", "/addon.jar")
+            .expect(0)
+            .create_async()
+            .await;
+        let shelf = Shelf::new(
+            platform.url(),
+            vec![("mr:addon", "1", "addon.jar", b"addon", vec![])],
+        );
+        let outcome = run_install_while_its_metadata_is_collected(
+            &app,
+            id,
+            root(),
+            shelf,
+            "addon.jar",
+            b"addon",
+        )
+        .await;
+        succeeded(&outcome);
+        download.assert_async().await;
+        assert_eq!(files(&mods), vec!["addon.jar"]);
+        assert_eq!(std::fs::read(mods.join("addon.jar")).unwrap(), b"addon");
+        let after = rows(&app, id).await;
+        assert_eq!(after.len(), 1);
+        assert_eq!(after[0].location, "mods/addon.jar");
+        assert_eq!(source(&after[0]), (Some("mr"), Some("addon"), Some("1")));
+        assert_eq!(metadata_rows(&app, b"addon").await, 1);
+        assert_eq!(staging_left(&app), 0);
+    }
+
+    // Only a missing referenced row makes the publication write again.
+    #[test]
+    fn only_a_missing_referenced_row_is_a_metadata_owner_that_disappeared() {
+        let sqlite = |code| {
+            rusqlite::Error::SqliteFailure(
+                rusqlite::ffi::Error::new(code),
+                Some("constraint failed".into()),
+            )
+        };
+        let missing = || sqlite(rusqlite::ffi::SQLITE_CONSTRAINT_FOREIGNKEY);
+        assert!(metadata_owner_disappeared(&missing().into()));
+        assert!(metadata_owner_disappeared(
+            &anyhow::Error::from(missing()).context("publication")
+        ));
+        assert!(metadata_owner_disappeared(
+            &carbon_repos::db_error::DbError::Sqlite(missing()).into()
+        ));
+        assert!(!metadata_owner_disappeared(
+            &sqlite(rusqlite::ffi::SQLITE_CONSTRAINT_UNIQUE).into()
+        ));
+        assert!(!metadata_owner_disappeared(&anyhow::anyhow!(
+            "Selected source no longer matches the current owner/hash"
+        )));
     }
 }

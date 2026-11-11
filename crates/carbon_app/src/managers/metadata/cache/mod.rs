@@ -219,6 +219,15 @@ struct ModFileParseResult {
     file_stamp: Option<String>,
 }
 
+/// Metadata prepared for a privately staged server addon. It keeps the parse
+/// result, so the row can be found or made again without reading the file,
+/// which may have moved by then.
+pub(crate) struct PreparedAddonMetadata {
+    pub(crate) id: String,
+    result: ModFileParseResult,
+    filename: String,
+}
+
 #[cfg(test)]
 #[derive(Default)]
 struct ScanTestState {
@@ -2057,7 +2066,7 @@ impl ManagerRef<'_, MetaCacheManager> {
         self,
         staged: &Path,
         selected_filename: &str,
-    ) -> anyhow::Result<String> {
+    ) -> anyhow::Result<PreparedAddonMetadata> {
         let folder = staged
             .parent()
             .context("Staged addon has no parent")?
@@ -2069,7 +2078,29 @@ impl ManagerRef<'_, MetaCacheManager> {
         let result = self
             .hash_and_parse_mod_file(&folder, filename, true)
             .await?;
-        self.ensure_mod_metadata(&result, selected_filename).await
+        let id = self.ensure_mod_metadata(&result, selected_filename).await?;
+        #[cfg(test)]
+        self.scan_test_pause(Path::new(selected_filename), "server-addon-prepared")
+            .await;
+        Ok(PreparedAddonMetadata {
+            id,
+            result,
+            filename: selected_filename.to_owned(),
+        })
+    }
+
+    /// Finds or makes the prepared metadata row again after a metadata
+    /// clean-up (`gc_mod_metadata`, run when a mod, an instance or a server
+    /// addon is deleted elsewhere) removed it because nothing referred to it
+    /// yet.
+    pub(crate) async fn reprepare_server_addon_metadata(
+        self,
+        prepared: &mut PreparedAddonMetadata,
+    ) -> anyhow::Result<()> {
+        prepared.id = self
+            .ensure_mod_metadata(&prepared.result, &prepared.filename)
+            .await?;
+        Ok(())
     }
 
     /// Cache a mod file for a server. Hashes, parses metadata, and upserts into server_mod_file_cache.
