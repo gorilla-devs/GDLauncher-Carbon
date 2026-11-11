@@ -41,6 +41,7 @@ import {
   userWindows
 } from "./utils/windowLifecycle"
 import { ProtocolQueue, isSupportedProtocol } from "./utils/protocolQueue"
+import { relaunchWithoutHandledLinks } from "./utils/relaunchLinks"
 import { buildCoreModuleArgs } from "./utils/coreArgs.js"
 import {
   IncompleteMigrationError,
@@ -662,6 +663,12 @@ let isSpawningWindow = false
 // Every ingress is queued even while the loading window exists.
 for (const url of process.argv.filter(isSupportedProtocol))
   protocolQueue.enqueue(url)
+// A restart must not queue those links again once the App has acted on them.
+relaunchWithoutHandledLinks(
+  app,
+  () => process.argv,
+  () => protocolQueue.pending()
+)
 
 async function createWindow(): Promise<BrowserWindow> {
   console.log("Creating window...")

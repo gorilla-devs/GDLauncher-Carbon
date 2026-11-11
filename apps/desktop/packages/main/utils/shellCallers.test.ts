@@ -6,7 +6,12 @@ import { EventEmitter } from "node:events"
 import ts from "typescript"
 import { createCoreOutput } from "./coreOutput"
 import { AccountIdentityReceiver } from "./accountIdentity"
-import { ProtocolQueue } from "./protocolQueue"
+import {
+  ProtocolQueue,
+  isSupportedProtocol,
+  type ProtocolDelivery
+} from "./protocolQueue"
+import { relaunchWithoutHandledLinks } from "./relaunchLinks"
 import { DatabaseRefusal } from "./databaseRestore"
 import {
   LauncherLifecycle,
@@ -210,6 +215,81 @@ it("Task23 actual main protocol IPC validates current sender frame before ready 
     { subscription: "2", generation: protocolQueue.session(sender) }
   )
   expect(deliveries).toHaveLength(2)
+})
+/** The source of the first node in `text` that `match` accepts. */
+function node(
+  text: string,
+  match: (node: ts.Node, file: ts.SourceFile) => boolean,
+  what: string
+) {
+  const file = ts.createSourceFile(
+    "fixture.tsx",
+    text,
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX
+  )
+  let value: string | undefined
+  function visit(n: ts.Node) {
+    if (value === undefined && match(n, file)) value = n.getText(file)
+    ts.forEachChild(n, visit)
+  }
+  visit(file)
+  if (!value) throw Error("Actual production callback unavailable: " + what)
+  return value
+}
+it("actual main start: a restart after the App acted on the link that started the launcher does not queue it again", () => {
+  const text = source("apps/desktop/packages/main/index.ts")
+  const queueStartLinks = node(
+    text,
+    (n, file) =>
+      ts.isForOfStatement(n) &&
+      ts.isSourceFile(n.parent) &&
+      n.getText(file).includes("process.argv.filter(isSupportedProtocol)"),
+    "start-up link loop"
+  )
+  const wrapRelaunch = node(
+    text,
+    (n, file) =>
+      ts.isCallExpression(n) &&
+      n.expression.getText(file) === "relaunchWithoutHandledLinks",
+    "relaunchWithoutHandledLinks"
+  )
+  const start = (argv: string[], protocolQueue: ProtocolQueue<object>) => {
+    const relaunch = vi.fn()
+    const app = { relaunch }
+    evaluate("(() => {\n" + queueStartLinks + "\n" + wrapRelaunch + "\n})()", {
+      process: { argv },
+      isSupportedProtocol,
+      protocolQueue,
+      relaunchWithoutHandledLinks,
+      app
+    })
+    return { app, relaunch }
+  }
+  const link = "gdlauncher://share/FIXTURE"
+  const deliveries: ProtocolDelivery[] = []
+  const protocolQueue = new ProtocolQueue<object>((_, delivery) =>
+    deliveries.push(delivery)
+  )
+  const { app, relaunch } = start(
+    ["/opt/GDLauncher/gdlauncher", link],
+    protocolQueue
+  )
+  expect(protocolQueue.pending()).toEqual([link])
+  // The App has not acted on it yet (the startup error screen): kept.
+  app.relaunch()
+  expect(relaunch.mock.calls).toEqual([[]])
+  const sender = {}
+  protocolQueue.bind(sender)
+  protocolQueue.ready(sender, "1", protocolQueue.session(sender)!)
+  expect(deliveries.map((d) => d.url)).toEqual([link])
+  protocolQueue.ack(sender, deliveries[0])
+  app.relaunch()
+  expect(relaunch.mock.calls[1]).toEqual([{ args: [] }])
+  const next = new ProtocolQueue<object>(() => {})
+  start(["/opt/GDLauncher/gdlauncher", ...relaunch.mock.calls[1][0].args], next)
+  expect(next.pending()).toEqual([])
 })
 it("Task23 actual main-window update consumer clears busy/manual state and Copy Link uses active artifact", async () => {
   let checking = true,

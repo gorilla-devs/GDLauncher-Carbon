@@ -43,6 +43,10 @@ export class ProtocolQueue<S> {
   session(sender: S) {
     return sender === this.owner ? this.generation : null
   }
+  /** Every URL not yet acknowledged, in order, the delivered one first. */
+  pending() {
+    return this.queue.map((entry) => entry.url)
+  }
   ready(sender: S, subscription: string, generation: number) {
     if (
       sender !== this.owner ||
