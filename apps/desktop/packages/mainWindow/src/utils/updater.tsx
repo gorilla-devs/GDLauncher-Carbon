@@ -76,8 +76,10 @@ function DownloadingTitle() {
   )
 }
 
-function ManualUpdateTitle() {
-  return <>{t("app:_trn_update_version", { version: downloadingVersion() })}</>
+// The notice names the version its Copy Link downloads, also while a later
+// check runs.
+function ManualUpdateTitle(props: { version: string }) {
+  return <>{t("app:_trn_update_version", { version: props.version })}</>
 }
 
 function ManualUpdateDescription() {
@@ -285,7 +287,9 @@ const receiveUpdateState = (stateData: UpdateStateData) => {
     setDownloadingVersion("...")
     setDownloadProgress(0)
     toast.dismiss(TOAST_ID_DOWNLOADING)
-    toast.dismiss(TOAST_ID_MANUAL_UPDATE)
+    // A check in progress leaves the manual download notice up; its result
+    // decides whether the offer still stands.
+    if (stateData.state !== "checking") toast.dismiss(TOAST_ID_MANUAL_UPDATE)
   }
   switch (stateData.state) {
     case "idle":
@@ -326,6 +330,7 @@ const receiveUpdateState = (stateData: UpdateStateData) => {
       setIsCheckingForUpdates(false)
       // A restart notice stays: a later download does not bring the core back.
       if (!stateData.restartRequired) toast.dismiss(TOAST_ID_CHECKING)
+      const wasManualCheck = isManualCheck()
       setIsManualCheck(false)
 
       const version = stateData.updateInfo?.version || "..."
@@ -348,10 +353,15 @@ const receiveUpdateState = (stateData: UpdateStateData) => {
           cancel: undefined,
           className: isUpdate ? "toast-no-animate" : undefined
         })
-      } else if (stateData.updateInfo?.downloadUrl && !isShowingDownloadToast) {
-        // For builds without auto-update, show manual download link
+      } else if (
+        stateData.updateInfo?.downloadUrl &&
+        (!isShowingDownloadToast || wasManualCheck)
+      ) {
+        // For builds without auto-update, show the manual download link.
+        // Automatic checks show it once and leave it closed after the player
+        // closed it; a check the player asks for always answers with it.
         isShowingDownloadToast = true
-        toast(<ManualUpdateTitle />, {
+        toast(<ManualUpdateTitle version={version} />, {
           id: TOAST_ID_MANUAL_UPDATE,
           description: <ManualUpdateDescription />,
           duration: Infinity,
