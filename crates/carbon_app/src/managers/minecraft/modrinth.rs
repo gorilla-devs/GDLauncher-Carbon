@@ -311,12 +311,7 @@ async fn prepare_mrpack_cancellable(
     let required_files: Vec<_> = index
         .files
         .iter()
-        .filter(|&file| {
-            file.env.as_ref().map_or(true, |env| match env.client {
-                ModrinthEnvironmentSupport::Required => true,
-                _ => false,
-            })
-        })
+        .filter(|file| installs_on_client(file))
         .cloned()
         .collect();
 
@@ -477,6 +472,17 @@ async fn prepare_mrpack_cancellable(
     })
 }
 
+/// Whether the launcher installs `file` from a Modrinth pack on the client:
+/// a file without `env`, or one the client requires. Optional files are never
+/// installed, and unsupported ones never belong on the client. The imported
+/// pack baseline uses the same rule, so it owns only what this installer
+/// would have put in place.
+pub(crate) fn installs_on_client(file: &carbon_platforms::modrinth::version::ModrinthFile) -> bool {
+    file.env
+        .as_ref()
+        .is_none_or(|env| matches!(env.client, ModrinthEnvironmentSupport::Required))
+}
+
 /// Required MRPack members must carry a supported, usable digest. Reject every
 /// populated malformed supported field rather than silently downgrade integrity.
 pub(crate) fn required_checksum(
@@ -519,6 +525,40 @@ mod test {
         assert!(!is_symlink_mode(Some(0o040755)));
         // No Unix external attributes at all (e.g. an archive built on Windows).
         assert!(!is_symlink_mode(None));
+    }
+
+    /// The installer and the imported pack baseline both rely on this rule:
+    /// only files without `env` or required on the client are installed.
+    #[test]
+    fn installs_on_client_takes_unmarked_and_client_required_files_only() {
+        for (env, installed) in [
+            (None, true),
+            (
+                Some(serde_json::json!({"client": "required", "server": "unsupported"})),
+                true,
+            ),
+            (
+                Some(serde_json::json!({"client": "optional", "server": "required"})),
+                false,
+            ),
+            (
+                Some(serde_json::json!({"client": "unsupported", "server": "required"})),
+                false,
+            ),
+        ] {
+            let mut file = serde_json::json!({
+                "path": "mods/a.jar",
+                "hashes": {"sha512": "", "sha1": ""},
+                "downloads": [],
+                "fileSize": 1,
+            });
+            if let Some(env) = &env {
+                file["env"] = env.clone();
+            }
+            let file: carbon_platforms::modrinth::version::ModrinthFile =
+                serde_json::from_value(file).unwrap();
+            assert_eq!(installs_on_client(&file), installed, "{env:?}");
+        }
     }
 
     #[test]

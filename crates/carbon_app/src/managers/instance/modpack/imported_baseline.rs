@@ -1514,6 +1514,12 @@ mod task13_controls {
     /// Plans and applies a version change from the root `packinfo.json` to
     /// `root/staging/instance`, as the pack pipeline does.
     async fn change_version(root: &Path) -> Vec<apply_plan::PlanEntry> {
+        apply_staged(root, apply_plan::ApplyMode::VersionChange).await
+    }
+
+    /// Plans and applies `mode` from the root `packinfo.json` to
+    /// `root/staging/instance`, as the pack pipeline does.
+    async fn apply_staged(root: &Path, mode: apply_plan::ApplyMode) -> Vec<apply_plan::PlanEntry> {
         let staging = root.join("staging");
         let old =
             packinfo::parse_packinfo(&std::fs::read_to_string(root.join("packinfo.json")).unwrap())
@@ -1536,7 +1542,7 @@ mod task13_controls {
             staged: &target.files.keys().cloned().collect(),
             disk: &disk.states,
             coexisting_disabled_twin_md5: &disk.coexisting_disabled_twin_md5,
-            mode: apply_plan::ApplyMode::VersionChange,
+            mode,
             fs_case_insensitive: false,
         })
         .unwrap();
@@ -1544,6 +1550,114 @@ mod task13_controls {
             .await
             .unwrap();
         plan
+    }
+
+    /// The launcher's Modrinth installer never puts a file whose index entry
+    /// says `env.client = "optional"` in place, so one on disk was the
+    /// player's (or the source launcher's) choice. The baseline doesn't own
+    /// it, and the first update, or a Repair against the baseline after that
+    /// update failed, keeps it enabled, as 2.0.40 did, instead of deleting it
+    /// as a file the pack dropped.
+    #[tokio::test]
+    async fn enabled_optional_pack_files_survive_the_first_update_and_a_repair() {
+        let entry = |path: &str, env: Option<serde_json::Value>, bytes: &[u8]| {
+            let mut file = serde_json::json!({
+                "path": path,
+                "hashes": {"sha512": hex::encode(Sha512::digest(bytes)), "sha1": ""},
+                "downloads": ["https://cdn.invalid/x"],
+                "fileSize": bytes.len(),
+            });
+            if let Some(env) = env {
+                file["env"] = env;
+            }
+            file
+        };
+        for (mode, staged) in [
+            (apply_plan::ApplyMode::VersionChange, b"req v2".as_slice()),
+            (
+                apply_plan::ApplyMode::Repair {
+                    re_enable_disabled: false,
+                },
+                b"req v1",
+            ),
+        ] {
+            let t = tempfile::tempdir().unwrap();
+            let root = t.path();
+            let instance = root.join("instance");
+            for (path, bytes) in [
+                ("mods/req.jar", b"req v1".as_slice()),
+                ("mods/zoomify.jar", b"zoom"),
+                ("shaderpacks/glow.zip", b"glow"),
+            ] {
+                let path = instance.join(path);
+                std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+                std::fs::write(path, bytes).unwrap();
+            }
+            let archive = root.join("installed.mrpack");
+            let mut zip = zip::ZipWriter::new(std::fs::File::create(&archive).unwrap());
+            zip.start_file(
+                "modrinth.index.json",
+                zip::write::SimpleFileOptions::default(),
+            )
+            .unwrap();
+            let index = serde_json::json!({
+                "formatVersion": 1,
+                "game": "minecraft",
+                "versionId": "synthetic",
+                "name": "Synthetic",
+                "files": [
+                    entry("mods/req.jar", None, b"req v1"),
+                    entry(
+                        "mods/zoomify.jar",
+                        Some(serde_json::json!({"client": "optional", "server": "optional"})),
+                        b"zoom",
+                    ),
+                    entry(
+                        "shaderpacks/glow.zip",
+                        Some(serde_json::json!({"client": "optional", "server": "unsupported"})),
+                        b"glow",
+                    ),
+                ],
+                "dependencies": {},
+            });
+            zip.write_all(index.to_string().as_bytes()).unwrap();
+            zip.finish().unwrap();
+            assert_eq!(
+                ensure(root, MODRINTH, mr_archive(&archive, 1 << 20, 1 << 20))
+                    .await
+                    .unwrap(),
+                Baseline::Recorded
+            );
+            let owned = packinfo::parse_packinfo(
+                &std::fs::read_to_string(root.join("packinfo.json")).unwrap(),
+            )
+            .unwrap()
+            .files
+            .into_keys()
+            .collect::<Vec<_>>();
+            // The installer stages only the required file.
+            let staged_req = root.join("staging/instance/mods/req.jar");
+            std::fs::create_dir_all(staged_req.parent().unwrap()).unwrap();
+            std::fs::write(staged_req, staged).unwrap();
+            let plan = apply_staged(root, mode.clone()).await;
+            assert!(
+                plan.iter()
+                    .all(|entry| entry.action != apply_plan::PlanAction::Delete),
+                "{mode:?}: {plan:?}"
+            );
+            for (path, bytes) in [
+                ("mods/zoomify.jar", b"zoom".as_slice()),
+                ("shaderpacks/glow.zip", b"glow"),
+                ("mods/req.jar", staged),
+            ] {
+                assert_eq!(
+                    std::fs::read(instance.join(path)).ok().as_deref(),
+                    Some(bytes),
+                    "{mode:?}: {path}"
+                );
+            }
+            assert_eq!(owned, vec!["/mods/req.jar"], "{mode:?}");
+        }
     }
 
     /// A pack override shipped disabled (`mods/optional.jar.disabled` in the
@@ -1789,10 +1903,11 @@ mod task13_archive_controls {
     }
 }
 
-/// The files of a Modrinth pack archive, keyed by their paths as the index
-/// and the archive spell them; [`ensure`] validates each before it is used.
+/// The files the launcher's own installer puts on the client from a Modrinth
+/// pack archive: its overrides, plus the index files without `env` or with
+/// `env.client = "required"`. Keyed by their paths as the index and the
+/// archive spell them; [`ensure`] validates each before it is used.
 async fn mr_archive(path: &Path, index_budget: u64, total_budget: u64) -> anyhow::Result<Resolved> {
-    use carbon_platforms::modrinth::version::ModrinthEnvironmentSupport;
     let (index, overrides) =
         super::origin_check::parse_mrpack_inventory(path, index_budget, total_budget).await?;
     ensure!(
@@ -1806,11 +1921,11 @@ async fn mr_archive(path: &Path, index_budget: u64, total_budget: u64) -> anyhow
             .collect::<Inventory>(),
     );
     for file in index.files {
-        if file
-            .env
-            .as_ref()
-            .is_some_and(|env| matches!(env.client, ModrinthEnvironmentSupport::Unsupported))
-        {
+        // The pack owns only what the launcher's installer puts on the
+        // client. An optional file was the player's (or the source
+        // launcher's) choice, so it stays unowned and a version change or
+        // Repair keeps it, as 2.0.40 did.
+        if !crate::managers::minecraft::modrinth::installs_on_client(&file) {
             continue;
         }
         let key = format!("/{}", file.path);
@@ -1903,6 +2018,51 @@ mod task13_round01_tests {
         assert_eq!(
             resolved.files.keys().collect::<Vec<_>>(),
             vec!["/config/b.txt"]
+        );
+    }
+    /// Index files the client may skip are not part of what the launcher
+    /// installs, so they are neither declared nor counted as unchecked, even
+    /// without a usable digest: a version change has no reason to warn that
+    /// it kept them.
+    #[tokio::test]
+    async fn optional_index_files_are_neither_owned_nor_counted_unchecked() {
+        let t = tempfile::tempdir().unwrap();
+        let path = t.path().join("synthetic.mrpack");
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
+        let options = zip::write::SimpleFileOptions::default();
+        zip.start_file("modrinth.index.json", options).unwrap();
+        let index = serde_json::json!({
+            "formatVersion": 1,
+            "game": "minecraft",
+            "versionId": "synthetic",
+            "name": "Synthetic",
+            "files": [
+                {
+                    "path": "mods/opt.jar",
+                    "hashes": {"sha512": "", "sha1": ""},
+                    "env": {"client": "optional", "server": "optional"},
+                    "downloads": [],
+                    "fileSize": 1,
+                },
+                {
+                    "path": "mods/client.jar",
+                    "hashes": {"sha512": hex::encode(Sha512::digest(b"client")), "sha1": ""},
+                    "env": {"client": "optional", "server": "unsupported"},
+                    "downloads": [],
+                    "fileSize": 6,
+                },
+            ],
+            "dependencies": {},
+        });
+        zip.write_all(index.to_string().as_bytes()).unwrap();
+        zip.start_file("overrides/config/a.txt", options).unwrap();
+        zip.write_all(b"a").unwrap();
+        zip.finish().unwrap();
+        let resolved = mr_archive(&path, 1024, 1024).await.unwrap();
+        assert_eq!(resolved.unresolved, 0);
+        assert_eq!(
+            resolved.files.keys().collect::<Vec<_>>(),
+            vec!["/config/a.txt"]
         );
     }
     #[tokio::test]
