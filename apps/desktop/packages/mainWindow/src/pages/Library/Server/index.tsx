@@ -311,7 +311,8 @@ const Server = (props: { children?: any }) => {
                   class="whitespace-pre-wrap text-sm text-red-400"
                   role="alert"
                 >
-                  <Trans key="instances:_trn_repair_failed" />: {taskFailure()}
+                  <Trans key="instances:_trn_server_install_failed" />:{" "}
+                  {taskFailure()}
                 </div>
               </Show>
               {/* Left behind by an earlier session: what it means and the way out */}

@@ -245,6 +245,23 @@ test("direct reactive Installing details show owned progress; failure alone neve
     true
   )
 })
+test("a failed server install is labelled as an installation failure, not a Repair", () => {
+  // Creating a server, creating one from a modpack and Repair all record
+  // their failed install task the same way, so the label must fit all three.
+  dispose = render(() => <Server />, root)
+  setTask(91, failed)
+  setRoute("serverDetails", "data", "state", {
+    status: "stopped",
+    failed_task: 91
+  })
+  const alert = [...root.querySelectorAll('[role="alert"]')].find((el) =>
+    el.textContent?.includes("Synthetic repair failed")
+  )
+  expect(alert?.textContent).toBe(
+    "instances:_trn_server_install_failed: Synthetic repair failed"
+  )
+  expect(root.textContent).not.toContain("_trn_repair_failed")
+})
 test.each(["starting", "stopping", "deleting", "missing"])(
   "%s presentation and direct handlers cannot dispatch lifecycle actions",
   (status) => {

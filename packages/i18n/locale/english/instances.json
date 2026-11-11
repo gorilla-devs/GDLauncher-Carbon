@@ -216,6 +216,7 @@
   "_trn_repair_confirm": "Repair",
   "_trn_repair_started": "Repair started",
   "_trn_repair_failed": "Repair failed",
+  "_trn_server_install_failed": "Installation failed",
   "_trn_repair_counts_modified": "{{count}} files you modified will be reset",
   "_trn_repair_counts_deleted": "{{count}} files you deleted will be restored",
   "_trn_repair_counts_unchanged": "{{count}} files verified intact",

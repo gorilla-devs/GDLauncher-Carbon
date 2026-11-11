@@ -216,6 +216,7 @@
   "_trn_repair_confirm": "修复",
   "_trn_repair_started": "已开始修复",
   "_trn_repair_failed": "修复失败",
+  "_trn_server_install_failed": "安装失败",
   "_trn_repair_counts_modified": "将重置你修改过的文件：{{count}} 个",
   "_trn_repair_counts_deleted": "将恢复你删除过的文件：{{count}} 个",
   "_trn_repair_counts_unchanged": "已确认完好的文件：{{count}} 个",

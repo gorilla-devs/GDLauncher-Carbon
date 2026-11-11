@@ -216,6 +216,7 @@
   "_trn_repair_confirm": "Восстановить",
   "_trn_repair_started": "Восстановление запущено",
   "_trn_repair_failed": "Не удалось восстановить",
+  "_trn_server_install_failed": "Установка не удалась",
   "_trn_repair_counts_modified": "Изменённых вами файлов будет сброшено: {{count}}",
   "_trn_repair_counts_deleted": "Удалённых вами файлов будет восстановлено: {{count}}",
   "_trn_repair_counts_unchanged": "Файлов проверено и в порядке: {{count}}",

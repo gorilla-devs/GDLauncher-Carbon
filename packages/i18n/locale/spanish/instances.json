@@ -216,6 +216,7 @@
   "_trn_repair_confirm": "Reparar",
   "_trn_repair_started": "Reparación iniciada",
   "_trn_repair_failed": "No se pudo reparar",
+  "_trn_server_install_failed": "No se pudo instalar",
   "_trn_repair_counts_modified": "Archivos que modificaste y se restablecerán: {{count}}",
   "_trn_repair_counts_deleted": "Archivos que eliminaste y se restaurarán: {{count}}",
   "_trn_repair_counts_unchanged": "Archivos verificados e intactos: {{count}}",

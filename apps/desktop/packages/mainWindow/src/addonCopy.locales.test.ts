@@ -109,6 +109,7 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_import_error_archive_malformed_manifest",
     "_trn_import_error_not_minecraft_modpack",
     "_trn_server_auto_restart_abandoned",
+    "_trn_server_install_failed",
     "_trn_change_version_failed",
     "_trn_server_recovered_running_notice_force",
     "_trn_server_force_stop_body",

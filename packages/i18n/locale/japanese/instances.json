@@ -216,6 +216,7 @@
   "_trn_repair_confirm": "修復",
   "_trn_repair_started": "修復を開始しました",
   "_trn_repair_failed": "修復に失敗しました",
+  "_trn_server_install_failed": "インストールに失敗しました",
   "_trn_repair_counts_modified": "変更したファイルのうち元に戻されるもの: {{count}} 件",
   "_trn_repair_counts_deleted": "削除したファイルのうち復元されるもの: {{count}} 件",
   "_trn_repair_counts_unchanged": "問題がないことを確認したファイル: {{count}} 件",
