@@ -19,6 +19,8 @@
 //!   the destination and publishes that copy without replacing anything.
 //!   Async callers use [`move_noclobber_async`] and
 //!   [`persist_noclobber_async`], which keep that copy off the runtime.
+//!   The copy gets its source's mode, except on a volume that decides modes
+//!   itself (all files owned by one fixed account, or no modes at all).
 //! - Windows file attributes: tempfile's persist marks the file it moves
 //!   NORMAL first, and TEMPORARY again when the move fails. That suits the
 //!   private files it created, but not a user's file, so [`move_noclobber`]
@@ -466,7 +468,7 @@ fn copy_noclobber(source: &Path, destination: &Path, cross_device: io::Error) ->
     }
     private.flush()?;
     #[cfg(unix)]
-    private.as_file().set_permissions(metadata.permissions())?;
+    copy_mode(private.as_file(), metadata.permissions(), destination)?;
     if let Ok(modified) = metadata.modified() {
         // A rename keeps the modification time; the copy follows suit.
         let _ = private.as_file().set_modified(modified);
@@ -481,6 +483,49 @@ fn copy_noclobber(source: &Path, destination: &Path, cross_device: io::Error) ->
         return Err(error);
     }
     Ok(())
+}
+
+/// Gives a cross-volume copy its source's mode, as a rename keeps it. A
+/// volume whose files all belong to one fixed account (FAT, exFAT or an SMB
+/// share mounted without `uid=`, a VirtualBox shared folder) refuses this
+/// with EPERM even on a file just created, because the caller does not own
+/// it; volumes without modes answer ENOTSUP or EOPNOTSUPP. On those volumes
+/// the mount decides every file's mode, so the copy is published with that
+/// mode, as 2.0.40 wrote addons there without changing any mode. Any other
+/// failure stops the move.
+#[cfg(unix)]
+fn copy_mode(
+    file: &std::fs::File,
+    permissions: std::fs::Permissions,
+    destination: &Path,
+) -> io::Result<()> {
+    #[cfg(test)]
+    let changed = match fault::take(fault::Step::Mode, destination) {
+        Some(error) => Err(error),
+        None => file.set_permissions(permissions),
+    };
+    #[cfg(not(test))]
+    let changed = file.set_permissions(permissions);
+    match changed {
+        Err(error) if mode_set_by_volume(&error) => {
+            tracing::debug!(
+                "{} keeps the mode its drive gives it: {error}",
+                destination.display()
+            );
+            Ok(())
+        }
+        changed => changed,
+    }
+}
+
+/// EPERM, ENOTSUP or EOPNOTSUPP: the volume lets no one but a file's owner
+/// change its mode, or has no modes at all. Not `PermissionDenied`, which
+/// std also gives EACCES.
+#[cfg(unix)]
+fn mode_set_by_volume(error: &io::Error) -> bool {
+    error
+        .raw_os_error()
+        .is_some_and(|code| [libc::EPERM, libc::ENOTSUP, libc::EOPNOTSUPP].contains(&code))
 }
 
 /// Whether `a` and `b` both exist and name one file (hard links of each
@@ -530,6 +575,9 @@ pub(crate) mod fault {
         /// The hard link of the unix fallback.
         #[cfg(unix)]
         Link,
+        /// Copying the source's mode onto a cross-volume copy.
+        #[cfg(unix)]
+        Mode,
         /// Removing the source once its link or copy is published.
         RemoveSource,
         /// tempfile's replacing persist.
@@ -893,6 +941,71 @@ mod tests {
             "the copy is synced through the helper"
         );
         assert!(leftovers(tmp.path()).is_empty());
+    }
+
+    /// A drive whose files all belong to one fixed account (FAT, exFAT or an
+    /// SMB share mounted without `uid=`) refuses to change the mode of a copy
+    /// with EPERM, and a drive without modes answers ENOTSUP or EOPNOTSUPP.
+    /// The copy lands anyway with the mode the drive gives it, as 2.0.40's
+    /// downloads into such a folder did.
+    #[cfg(unix)]
+    #[test]
+    fn cross_device_move_lands_on_a_drive_that_keeps_its_own_modes() {
+        for code in [libc::EPERM, libc::ENOTSUP, libc::EOPNOTSUPP] {
+            let tmp = tempfile::tempdir().unwrap();
+            let staging = tmp.path().join("staging");
+            let mods = tmp.path().join("mods");
+            std::fs::create_dir_all(&staging).unwrap();
+            std::fs::create_dir_all(&mods).unwrap();
+            let source = staging.join("artifact");
+            let destination = mods.join("mod.jar");
+            std::fs::write(&source, b"artifact").unwrap();
+
+            inject(Step::NoReplace, &destination, CROSS_DEVICE);
+            inject(Step::Mode, &destination, code);
+            move_noclobber(&source, &destination).unwrap();
+            assert!(!pending(Step::Mode, &destination), "the mode copy ran");
+            assert_eq!(std::fs::read(&destination).unwrap(), b"artifact");
+            assert!(!source.exists());
+            assert!(leftovers(&mods).is_empty());
+
+            // A private file persisted onto the drive, as a datapack is.
+            let pack = mods.join("pack.zip");
+            inject(Step::NoReplace, &pack, CROSS_DEVICE);
+            inject(Step::Mode, &pack, code);
+            persist_noclobber(private(&staging, b"pack"), &pack).unwrap();
+            assert!(!pending(Step::Mode, &pack), "the mode copy ran");
+            assert_eq!(std::fs::read(&pack).unwrap(), b"pack");
+            assert!(leftovers(&staging).is_empty());
+            assert!(leftovers(&mods).is_empty());
+        }
+    }
+
+    /// Any other refusal to copy the mode still stops the move. EACCES is
+    /// among them although std reports it with the same `PermissionDenied`
+    /// kind as EPERM.
+    #[cfg(unix)]
+    #[test]
+    fn other_mode_failures_still_stop_a_cross_device_move() {
+        for code in [libc::EIO, libc::EACCES] {
+            let tmp = tempfile::tempdir().unwrap();
+            let staging = tmp.path().join("staging");
+            let mods = tmp.path().join("mods");
+            std::fs::create_dir_all(&staging).unwrap();
+            std::fs::create_dir_all(&mods).unwrap();
+            let source = staging.join("artifact");
+            let destination = mods.join("mod.jar");
+            std::fs::write(&source, b"artifact").unwrap();
+
+            inject(Step::NoReplace, &destination, CROSS_DEVICE);
+            inject(Step::Mode, &destination, code);
+            let error = move_noclobber(&source, &destination).unwrap_err();
+            assert!(!pending(Step::Mode, &destination), "the mode copy ran");
+            assert_eq!(error.raw_os_error(), Some(code));
+            assert!(!destination.exists());
+            assert_eq!(std::fs::read(&source).unwrap(), b"artifact");
+            assert!(leftovers(&mods).is_empty());
+        }
     }
 
     /// The datapack copy is written in the instance root and published into

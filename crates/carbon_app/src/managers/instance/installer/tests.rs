@@ -150,6 +150,46 @@ async fn cross_volume_replacement_publishes_copies_and_commits() {
     assert!(resource.is_already_installed(&app, id).await.unwrap());
 }
 
+/// The same update onto a drive whose files all belong to another account
+/// (FAT, exFAT or an SMB share mounted without `uid=`): the copy there
+/// cannot take the staged file's mode, and the update still commits instead
+/// of leaving the mods folder with neither version.
+#[cfg(unix)]
+#[tokio::test]
+async fn cross_volume_update_lands_on_a_drive_that_keeps_its_own_modes() {
+    use crate::util::publish::fault::{CROSS_DEVICE, Step, inject, pending};
+    let app = crate::setup_managers_for_test().await;
+    let (id, row, path) = super::super::mods::tests::addon_fixture(
+        &app,
+        "fixed-owner",
+        instance::AddonType::Mods,
+        "same.jar",
+        b"v1",
+    )
+    .await;
+    let resource = mr("same.jar", b"v2");
+    let plan = publication::ReplacementPlan::capture(&app, id, &row.id, instance::AddonType::Mods)
+        .await
+        .unwrap();
+    let stage = tempfile::tempdir().unwrap();
+    let bytes = stage.path().join("artifact");
+    std::fs::write(&bytes, b"v2").unwrap();
+    let backup = stage.path().join("previous-addon");
+    inject(Step::NoReplace, &backup, CROSS_DEVICE);
+    inject(Step::NoReplace, &path, CROSS_DEVICE);
+    inject(Step::Mode, &path, libc::EPERM);
+    publication::publish_file(&resource, &app, id, &bytes, Some(&plan), None)
+        .await
+        .unwrap();
+    assert!(!pending(Step::NoReplace, &backup));
+    assert!(!pending(Step::NoReplace, &path));
+    assert!(!pending(Step::Mode, &path), "the mode copy ran");
+    assert_eq!(std::fs::read(&path).unwrap(), b"v2");
+    assert!(!bytes.exists());
+    assert!(!backup.exists(), "committed replacement retires its backup");
+    assert!(resource.is_already_installed(&app, id).await.unwrap());
+}
+
 fn zip(path: &std::path::Path, entries: &[(&str, &[u8])]) {
     let mut writer = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
     for (name, bytes) in entries {
