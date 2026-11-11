@@ -1351,6 +1351,55 @@ async fn a_world_name_with_a_colon_keeps_its_datapacks_working() {
     assert!(!datapacks.join("pack.zip.disabled").exists());
 }
 
+/// A mod file named `foo:bar.jar` (as 2.0.40 or a server pack wrote it, or
+/// as a user dropped it in) is listed, toggled and deleted outside Windows,
+/// where `:` is an ordinary character in a file name.
+#[cfg(not(windows))]
+#[tokio::test]
+async fn an_addon_file_with_a_colon_can_be_toggled_and_deleted() {
+    use crate::domain::server::{ServerId, ServerState};
+    let app = crate::setup_managers_for_test().await;
+    let name = "scan-server-colon-addon";
+    let (id, data) = server_fixture(&app, name).await;
+    app.server_manager.servers.write().await.insert(
+        ServerId(id),
+        crate::managers::server::ServerData {
+            shortpath: name.into(),
+            state: ServerState::Stopped { failed_task: None },
+            handle: None,
+            last_log_id: None,
+        },
+    );
+    let mods = data.join("mods");
+    std::fs::write(mods.join("foo:bar.jar"), b"jar").unwrap();
+
+    server_scan(&app, id, name).await;
+    let rows = server_rows(&app, id).await;
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].location, "mods/foo:bar.jar");
+    let servers = app.server_manager();
+    let listed = servers.list_server_addons(ServerId(id)).await.unwrap();
+    assert_eq!(listed.len(), 1);
+    servers
+        .enable_server_addon(ServerId(id), rows[0].id.clone(), false)
+        .await
+        .unwrap();
+    assert!(mods.join("foo:bar.jar.disabled").is_file());
+    assert!(!mods.join("foo:bar.jar").exists());
+    servers
+        .enable_server_addon(ServerId(id), rows[0].id.clone(), true)
+        .await
+        .unwrap();
+    assert!(mods.join("foo:bar.jar").is_file());
+    assert!(!mods.join("foo:bar.jar.disabled").exists());
+    servers
+        .delete_server_addon(ServerId(id), rows[0].id.clone())
+        .await
+        .unwrap();
+    assert!(!mods.join("foo:bar.jar").exists());
+    assert!(server_rows(&app, id).await.is_empty());
+}
+
 /// Files read so far are listed while the scan runs, and a removed jar is
 /// pruned before anything is read.
 #[tokio::test]

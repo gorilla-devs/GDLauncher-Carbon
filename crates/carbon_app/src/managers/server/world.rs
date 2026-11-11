@@ -548,7 +548,9 @@ struct OwnedAddon {
 }
 
 fn owned(data: &Path, kind: &str, location: &str, filename: &str) -> Result<OwnedAddon> {
-    validate_relative(filename)?;
+    // An addon file in this computer's server folder: outside Windows `:` is
+    // an ordinary character in its name, as in the location checked below.
+    validate_local(filename)?;
     if filename.contains('/') {
         bail!("Addon filename must be a basename");
     }
@@ -929,6 +931,50 @@ mod link_tests {
         for unsafe_name in ["..", "a/../b", "/abs", "a\\b", "a\0b", ""] {
             assert!(validate_local(unsafe_name).is_err(), "{unsafe_name:?}");
         }
+    }
+
+    /// Outside Windows an addon file named `foo:bar.jar` (as 2.0.40 or a
+    /// server pack wrote it, or as a user dropped it in) is the addon its
+    /// row names, so it can be toggled, deleted and replaced; Windows reads
+    /// `:` as a stream, so refuses it there as before.
+    #[test]
+    fn an_addon_named_with_a_colon_is_toggled_deleted_and_replaced_outside_windows() {
+        let root = tempfile::tempdir().unwrap();
+        let data = root.path();
+        if cfg!(windows) {
+            let error = owned_addon_entry(data, "mods", "mods/foo:bar.jar", "foo:bar.jar")
+                .unwrap_err()
+                .to_string();
+            assert!(error.contains("Unsafe server relative location"), "{error}");
+            return;
+        }
+        write(&data.join("mods/foo:bar.jar"), b"jar");
+        assert_eq!(
+            owned_addon_entry(data, "mods", "mods/foo:bar.jar", "foo:bar.jar").unwrap(),
+            data.join("mods/foo:bar.jar")
+        );
+        assert_eq!(
+            owned_addon(data, "mods", "mods/foo:bar.jar", "foo:bar.jar").unwrap(),
+            data.join("mods/foo:bar.jar")
+        );
+        std::fs::rename(
+            data.join("mods/foo:bar.jar"),
+            data.join("mods/foo:bar.jar.disabled"),
+        )
+        .unwrap();
+        assert_eq!(
+            owned_addon_entry(data, "mods", "mods/foo:bar.jar", "foo:bar.jar").unwrap(),
+            data.join("mods/foo:bar.jar.disabled")
+        );
+        // No server.properties: the world is `world`.
+        write(&data.join("world/datapacks/p:q.zip"), b"zip");
+        assert_eq!(
+            owned_addon_entry(data, "datapacks", "world/datapacks/p:q.zip", "p:q.zip").unwrap(),
+            data.join("world/datapacks/p:q.zip")
+        );
+        // The name stays one name in the addon's folder.
+        assert!(owned_addon_entry(data, "mods", "mods/a/b.jar", "a/b.jar").is_err());
+        assert!(owned_addon_entry(data, "mods", "mods/a\\b.jar", "a\\b.jar").is_err());
     }
 
     /// A world on another drive, a `mods/` shared between servers, a linked
