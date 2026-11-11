@@ -5,6 +5,7 @@ import {
   findFatalSignature,
   findGraphicsUnavailable,
   judgeGraphicsUnavailable,
+  LAUNCH_MARKER_QUORUM,
   LAUNCH_MARKERS,
   parseLogMessages
 } from "./gameLog.js"
@@ -19,6 +20,26 @@ function event(message: string, level = "INFO"): string {
     `</log4j:Event>`
   ].join("\n")
 }
+
+/** A Forge 47.0.1 launch on windows-2022 whose game logging left the XML
+ *  layout after "Launching target" (run 42060254731), shortened: log4j could
+ *  not parse the Windows path of its config, so the game printed plain lines
+ *  from then on. The game's own events are indented and end in CRLF. */
+const leftXmlLayout = [
+  event("LWJGL Meta org.lwjgl3 - 3.3.1"),
+  [
+    `  <log4j:Event logger="cpw.mods.modlauncher.LaunchServiceHandler" timestamp="1793898823201" level="INFO" thread="main">`,
+    `    <log4j:Message><![CDATA[Launching target 'forgeclient' with arguments [--version, 1.20.1]]]></log4j:Message>`,
+    `  </log4j:Event>`
+  ].join("\r\n"),
+  "2026-11-05 17:13:43,201 main WARN Error parsing URI C:\\Users\\runneradmin\\AppData\\Local\\Temp\\gdl-e2e-xg5t6E\\logging_configs\\client-1.12.xml",
+  "[17:13:50] [Render thread/INFO] [minecraft/Minecraft]: Setting user: e2e_0a44ba86",
+  "[17:13:50] [Render thread/INFO] [minecraft/Minecraft]: Backend library: LWJGL version 3.3.1 build 7",
+  "[17:13:53] [Render thread/INFO] [minecraft/ReloadableResourceManager]: Reloading ResourceManager: vanilla, mod_resources",
+  "[17:13:57] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas",
+  "",
+  event("exit code: 1")
+].join("\r\n")
 
 describe("parseLogMessages", () => {
   it("extracts each event's message payload", () => {
@@ -43,8 +64,24 @@ describe("parseLogMessages", () => {
     expect(messages[0]).toContain("major: 17")
   })
 
-  it("returns nothing for output that is not log4j events", () => {
-    expect(parseLogMessages("plain stdout, no events here")).toEqual([])
+  it("returns each non-blank line of output that is not log4j events", () => {
+    expect(parseLogMessages("first\r\n\r\n  \r\nsecond")).toEqual([
+      "first",
+      "second"
+    ])
+  })
+
+  it("reads the plain lines a game prints after its logging leaves the XML layout, in file order with the events (run 42060254731)", () => {
+    expect(parseLogMessages(leftXmlLayout)).toEqual([
+      "LWJGL Meta org.lwjgl3 - 3.3.1",
+      "Launching target 'forgeclient' with arguments [--version, 1.20.1]",
+      "2026-11-05 17:13:43,201 main WARN Error parsing URI C:\\Users\\runneradmin\\AppData\\Local\\Temp\\gdl-e2e-xg5t6E\\logging_configs\\client-1.12.xml",
+      "[17:13:50] [Render thread/INFO] [minecraft/Minecraft]: Setting user: e2e_0a44ba86",
+      "[17:13:50] [Render thread/INFO] [minecraft/Minecraft]: Backend library: LWJGL version 3.3.1 build 7",
+      "[17:13:53] [Render thread/INFO] [minecraft/ReloadableResourceManager]: Reloading ResourceManager: vanilla, mod_resources",
+      "[17:13:57] [Render thread/INFO] [minecraft/TextureAtlas]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas",
+      "exit code: 1"
+    ])
   })
 })
 
@@ -76,6 +113,17 @@ describe("countMatchedMarkers", () => {
     expect(
       countMatchedMarkers(["something else entirely"], LAUNCH_MARKERS)
     ).toBe(0)
+  })
+
+  it("reaches the quorum from plain lines once the log leaves the XML layout (run 42060254731)", () => {
+    // That runner has no sound device, so "Sound engine started" never
+    // appears: the other four markers are all there is.
+    const matched = countMatchedMarkers(
+      parseLogMessages(leftXmlLayout),
+      LAUNCH_MARKERS
+    )
+    expect(matched).toBe(4)
+    expect(matched).toBeGreaterThanOrEqual(LAUNCH_MARKER_QUORUM)
   })
 })
 
@@ -110,6 +158,18 @@ describe("findFatalSignature", () => {
     ]
 
     expect(findFatalSignature(messages)).toBeUndefined()
+  })
+
+  it("finds a main-thread exception the JVM printed outside any event", () => {
+    const line =
+      'Exception in thread "main" java.lang.NoClassDefFoundError: net/minecraft/client/main/Main'
+    const raw = [
+      event("Setting user: e2e"),
+      line,
+      "\tat Main.main(Main.java:1)"
+    ].join("\r\n")
+
+    expect(findFatalSignature(parseLogMessages(raw))).toBe(line)
   })
 })
 
@@ -177,6 +237,20 @@ describe("findGraphicsUnavailable", () => {
     expect(findGraphicsUnavailable([...parseLogMessages(raw), raw])).toBe(
       "# C  [opengl32.dll+0x294da]"
     )
+  })
+
+  it("finds the driver line in plain output", () => {
+    // A synthetic line: the known WGL message in the plain layout a Forge game
+    // prints once its logging leaves XML. Not a new signature.
+    const line =
+      "[17:13:45] [main/ERROR] [EARLYDISPLAY/]: Trying 4.6: GLFW error: [0x10006]WGL: The driver does not appear to support OpenGL"
+    expect(
+      findGraphicsUnavailable(
+        parseLogMessages(
+          [event("Setting user: e2e"), line, event("exit code: 1")].join("\r\n")
+        )
+      )
+    ).toBe(line)
   })
 
   it("finds nothing in a log that only failed to authenticate", () => {
@@ -317,6 +391,25 @@ describe("judgeGraphicsUnavailable", () => {
       judgeGraphicsUnavailable(stoppedOpeningWindow, {
         noOpenGl: false,
         openGlRequired: true
+      })
+    ).toBeUndefined()
+  })
+
+  it("does not take a raw crash report's system details for a game that stopped opening its window", () => {
+    // A game that crashed before its window prints a crash report raw, and
+    // its System Details repeat the window-system line, indented. That game
+    // failed; it must not be skipped as one that stopped opening its window.
+    const crashed = [
+      event("Setting user: e2e"),
+      "---- Minecraft Crash Report ----",
+      "-- System Details --",
+      "\tBackend library: LWJGL version 3.3.1 build 7",
+      event("exit code: -1")
+    ].join("\r\n")
+    expect(
+      judgeGraphicsUnavailable(crashed, {
+        noOpenGl: true,
+        openGlRequired: false
       })
     ).toBeUndefined()
   })

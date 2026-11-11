@@ -8,6 +8,12 @@
  * the same channel, so the file mixes launcher-authored and game-authored
  * lines. Nothing here distinguishes them; callers assert on content.
  *
+ * The game's own output stays one log4j event per message only until its
+ * logging leaves the XML layout. Forge 47.0.1 on Windows does that after
+ * "Launching target", when log4j cannot parse the Windows path of its config
+ * (run 42060254731); from then on the file holds the game's plain lines, as
+ * it always holds what the JVM prints raw. Both are read here.
+ *
  * The pure parsing and matching live here rather than in the spec so they are
  * unit-testable without a running game, following `installVerify.ts`'s split.
  * `waitForLogQuiescence` is the one exception — a real Playwright polling
@@ -20,10 +26,13 @@ import fs from "node:fs"
 import path from "node:path"
 import { expect, test } from "@playwright/test"
 
-/** Matches one log4j event's message payload, including multi-line ones —
- *  the launcher pretty-prints Rust structs across a dozen lines inside a
- *  single event. */
-const MESSAGE_RE = /<log4j:Message><!\[CDATA\[([\s\S]*?)\]\]><\/log4j:Message>/g
+/** One complete log4j event, from its start tag to its end tag. */
+const EVENT_RE = /<log4j:Event\b[\s\S]*?<\/log4j:Event>/g
+
+/** One event's message payload, including multi-line ones — the launcher
+ *  pretty-prints Rust structs across a dozen lines inside a single event. */
+const EVENT_MESSAGE_RE =
+  /<log4j:Message><!\[CDATA\[([\s\S]*?)\]\]><\/log4j:Message>/
 
 /**
  * Corroborating startup-log markers; they do not witness a menu or response.
@@ -153,6 +162,9 @@ export function findStopOpeningWindow(
   if (!noOpenGl) return undefined
   if (messages.some((m) => WINDOW_OPENED.some((marker) => marker.test(m))))
     return undefined
+  // Only a message that begins with Minecraft's own line counts: a crash
+  // report printed raw repeats it, indented, in its System Details, and a
+  // game that crashed before its window must still fail rather than skip.
   return messages.find((m) => m.startsWith(WINDOW_STARTING))
 }
 
@@ -173,7 +185,8 @@ export function judgeGraphicsUnavailable(
   { noOpenGl, openGlRequired }: { noOpenGl: boolean; openGlRequired: boolean }
 ): { outcome: "skip" | "fail"; reason: string } | undefined {
   const messages = parseLogMessages(text)
-  // The raw text last: it also holds what the JVM printed outside any event.
+  // The raw text last: it also holds the parts of an event other than its
+  // message, such as a logged exception.
   const line = findGraphicsUnavailable([...messages, text])
   if (line !== undefined && openGlRequired) {
     return {
@@ -225,9 +238,24 @@ export function skipIfGraphicsUnavailable(logsDir: string): void {
   test.skip(verdict?.outcome === "skip", verdict?.reason)
 }
 
-/** Every message payload in `raw`, in file order. */
+/** Every event's message, and every non-blank line outside events, in file
+ *  order. Plain lines keep their leading whitespace: see
+ *  `findStopOpeningWindow`. */
 export function parseLogMessages(raw: string): string[] {
-  return [...raw.matchAll(MESSAGE_RE)].map((match) => match[1])
+  const messages: string[] = []
+  let plainStart = 0
+  for (const event of raw.matchAll(EVENT_RE)) {
+    messages.push(...nonBlankLines(raw.slice(plainStart, event.index)))
+    const message = EVENT_MESSAGE_RE.exec(event[0])
+    if (message) messages.push(message[1])
+    plainStart = event.index + event[0].length
+  }
+  messages.push(...nonBlankLines(raw.slice(plainStart)))
+  return messages
+}
+
+function nonBlankLines(text: string): string[] {
+  return text.split(/\r?\n/).filter((line) => line.trim() !== "")
 }
 
 /**
