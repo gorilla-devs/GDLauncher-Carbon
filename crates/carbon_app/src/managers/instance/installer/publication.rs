@@ -369,6 +369,12 @@ pub(super) async fn verify_acquired(path: &Path, download: &Downloadable) -> any
     Ok(())
 }
 
+/// Whether the addon is already in place: its install name in its kind's
+/// folder holds one regular copy, enabled or disabled, whose size and hash
+/// match the download. No cache row is needed: a file copied in by hand,
+/// imported, or added while scans wait for a running game is this artifact
+/// before a scan records it, and a different file under that name never is.
+/// The kind is checked by its folder.
 pub(super) async fn is_satisfied(
     resource: &dyn ResourceInstaller,
     app: &Arc<AppInner>,
@@ -380,13 +386,6 @@ pub(super) async fn is_satisfied(
     let path = current_path(app, id).await?;
     let name = filename(resource, &path)?;
     let folder = checked_folder(&path, resource.addon_type()).await?;
-    let rows = mfcdb::get_instance_mods_full(&app.db, *id).await?;
-    if !rows
-        .iter()
-        .any(|r| r.filename == name && r.addon_type == resource.addon_type().to_db_string())
-    {
-        return Ok(false);
-    }
     let Some((physical, _)) = replaceable_file(&folder, &name, "use").await? else {
         return Ok(false);
     };
@@ -586,6 +585,7 @@ pub(super) async fn publish_file_owned(
                 if required.is_some() {
                     enable_satisfied(resource, app, &_operation).await?;
                 }
+                record_satisfied(resource, app, &_operation).await;
                 return Ok(());
             }
             bail!("addon destination is occupied by another artifact");
@@ -1604,6 +1604,91 @@ pub(super) async fn enable_satisfied(
         )
         .await?;
     Ok(())
+}
+
+/// Gives an addon that [`is_satisfied`] accepted without a cache row (its
+/// identical file was already in the folder: copied in by hand, imported,
+/// or added while a game ran and scans waited) the row and platform
+/// identity a publication gives, so the Addons tab, the shader check and the
+/// Browse page see it at once. Called with the instance gate held. Rows name
+/// files exactly as the folder lists them, so a copy listed under another
+/// spelling (on a case-insensitive drive) is left to a queued scan. Best
+/// effort: the file is in place either way.
+pub(super) async fn record_satisfied(
+    resource: &dyn ResourceInstaller,
+    app: &Arc<AppInner>,
+    ownership: &crate::managers::instance::InstanceOperationGuard,
+) {
+    let id = ownership.instance_id();
+    let kind = resource.addon_type();
+    let rescan = || {
+        app.meta_cache_manager().queue_caching(
+            crate::managers::metadata::cache::CacheEntityId::Instance(id),
+            false,
+        )
+    };
+    let recorded = async {
+        let path = current_path(app, id).await?;
+        let name = filename(resource, &path)?;
+        let row = mfcdb::get_mod_file_cache_by_instance_kind_filename(
+            &app.db,
+            *id,
+            kind.to_db_string(),
+            &name,
+        )
+        .await?;
+        if row.is_some() {
+            return Ok(false);
+        }
+        let folder = checked_folder(&path, kind).await?;
+        let Some((physical, enabled)) = selected_file(&folder, &name).await? else {
+            return Ok(false);
+        };
+        if !listed_exactly(&folder, &physical).await? {
+            rescan().await;
+            return Ok(false);
+        }
+        app.meta_cache_manager()
+            .refresh_published_addon(
+                ownership,
+                &folder,
+                name,
+                enabled,
+                kind.to_db_string().to_owned(),
+            )
+            .await?;
+        anyhow::Ok(true)
+    }
+    .await;
+    match recorded {
+        Ok(true) => {
+            record_identity(resource, app, id).await;
+            app.invalidate(INSTANCE_MODS, Some(id.0.into()));
+        }
+        Ok(false) => {}
+        Err(error) => {
+            tracing::warn!(
+                { ?error, addon = %resource.id() },
+                "Could not record an addon file that was already in place; rescanning"
+            );
+            rescan().await;
+        }
+    }
+}
+
+/// Whether `folder` lists `path`'s file under exactly that spelling. On a
+/// case-insensitive drive a path also opens a file listed as another.
+async fn listed_exactly(folder: &Path, path: &Path) -> std::io::Result<bool> {
+    let Some(wanted) = path.file_name() else {
+        return Ok(false);
+    };
+    let mut entries = tokio::fs::read_dir(folder).await?;
+    while let Some(entry) = entries.next_entry().await? {
+        if entry.file_name() == wanted {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 /// Authority to undo one actual publication, never a project/filename guess.

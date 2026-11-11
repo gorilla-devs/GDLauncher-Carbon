@@ -110,6 +110,19 @@ async fn task05_replace_modrinth_checks_real_artifact_and_kind() {
     mfcdb::delete_mod_file_cache_by_id(&app.db, &row.id)
         .await
         .unwrap();
+    // Without its row the mod is still this artifact: its identical file in
+    // mods/ counts, as one the scan has not recorded yet.
+    assert!(resource.is_already_installed(&app, id).await.unwrap());
+    // The kind is the folder: once the mods copy is gone, the resource pack
+    // row of that name and an identical file in resourcepacks/ do not make
+    // the mod installed.
+    let packs = publication::current_path(&app, id)
+        .await
+        .unwrap()
+        .get_resourcepacks_path();
+    std::fs::create_dir_all(&packs).unwrap();
+    std::fs::write(packs.join("same.jar"), b"v2").unwrap();
+    std::fs::remove_file(path.with_file_name("same.jar.disabled")).unwrap();
     assert!(!resource.is_already_installed(&app, id).await.unwrap());
 }
 
@@ -1370,6 +1383,279 @@ async fn task05_normal_enabled_identical_artifact_is_a_real_noop() {
             .unwrap(),
         Some(row)
     );
+}
+
+/// Settles `id`'s scan, then holds scans as they are while a game runs, so
+/// a file put in its folders from now on has no row until something records it.
+async fn hold_scans(app: &Arc<AppInner>, id: InstanceId) {
+    app.meta_cache_manager()
+        .override_caching_and_wait(
+            crate::managers::metadata::cache::CacheEntityId::Instance(id),
+            false,
+            false,
+        )
+        .await
+        .unwrap();
+    app.instance_manager()
+        .any_instance_running
+        .send_replace(true);
+    app.meta_cache_manager().wait_scans_paused().await;
+}
+
+/// An instance whose `mods/same.jar` holds `bytes` that no scan has recorded:
+/// a jar copied in by hand while a game runs.
+async fn unrecorded_same_jar(
+    app: &Arc<AppInner>,
+    name: &str,
+    bytes: &[u8],
+) -> (InstanceId, std::path::PathBuf) {
+    let (id, _, path) = super::super::mods::tests::addon_fixture(
+        app,
+        name,
+        instance::AddonType::Mods,
+        "same.jar",
+        bytes,
+    )
+    .await;
+    hold_scans(app, id).await;
+    mfcdb::delete_mod_file_cache_by_instance_filename(&app.db, *id, "same.jar")
+        .await
+        .unwrap();
+    (id, path)
+}
+
+/// Fails the test, with how the worker ended, when an install that should
+/// have finished at admission started a download instead.
+async fn assert_finished_without_download(
+    installer: &Installer,
+    app: &Arc<AppInner>,
+    task: VisualTaskId,
+) {
+    if installer.abort_handle.lock().await.handle.is_none() {
+        return;
+    }
+    let outcome = describe_outcome(settled_outcome(app, task).await);
+    panic!("the install started a download: {outcome}");
+}
+
+/// How a task ended, in words for an assertion.
+fn describe_outcome(outcome: crate::managers::vtask::TaskOutcome) -> String {
+    use crate::domain::vtask::Progress;
+    use crate::managers::vtask::TaskOutcome;
+    match outcome {
+        TaskOutcome::Succeeded => "succeeded".into(),
+        TaskOutcome::Failed(task) => match &task.progress {
+            Progress::Failed(error) => format!("failed: {error:#}"),
+            other => format!("failed: {other:?}"),
+        },
+        TaskOutcome::Running(_) => "still running".into(),
+        TaskOutcome::Dismissed => "dismissed".into(),
+        TaskOutcome::Unavailable => "unavailable".into(),
+    }
+}
+
+async fn mods_row(
+    app: &Arc<AppInner>,
+    id: InstanceId,
+    name: &str,
+) -> Option<mfcdb::ModFileCacheRow> {
+    mfcdb::get_mod_file_cache_by_instance_kind_filename(&app.db, *id, "mods", name)
+        .await
+        .unwrap()
+}
+
+#[tokio::test]
+async fn an_identical_file_the_scan_has_not_recorded_installs_as_a_no_op_and_gets_its_row() {
+    let app = crate::setup_managers_for_test().await;
+    let (id, path) = unrecorded_same_jar(&app, "unrecorded", b"same").await;
+    let source = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(source.path(), b"same").unwrap();
+    let mut installer = mr("same.jar", b"same").into_installer();
+    installer.download_fixture = Some(source.path().into());
+    let task = installer.install(&app, id, false, None).await.unwrap();
+    assert_finished_without_download(&installer, &app, task).await;
+    assert_eq!(std::fs::read(&path).unwrap(), b"same");
+    let row = mods_row(&app, id, "same.jar")
+        .await
+        .expect("the adopted file gets its row");
+    assert!(row.enabled);
+    // The Browse page sees the project as installed at once.
+    assert!(
+        mfcdb::instance_mod_exists_by_mr_project(&app.db, *id, "fixture")
+            .await
+            .unwrap()
+            .is_some()
+    );
+}
+
+#[tokio::test]
+async fn an_identical_unrecorded_file_installs_with_dependencies_on() {
+    let app = crate::setup_managers_for_test().await;
+    let (id, path) = unrecorded_same_jar(&app, "unrecorded-deps", b"same").await;
+    let source = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(source.path(), b"same").unwrap();
+    let mut installer = mr("same.jar", b"same").into_installer();
+    installer.download_fixture = Some(source.path().into());
+    let task = installer.install(&app, id, true, None).await.unwrap();
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        wait_install_completion(installer.abort_handle.lock().await.completion.clone()),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        describe_outcome(settled_outcome(&app, task).await),
+        "succeeded"
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), b"same");
+    assert!(mods_row(&app, id, "same.jar").await.unwrap().enabled);
+}
+
+/// The rule the no-op keeps: another file under the install name is never
+/// taken for the requested one, recorded or not.
+#[tokio::test]
+async fn a_different_unrecorded_file_under_the_same_name_is_still_refused() {
+    let app = crate::setup_managers_for_test().await;
+    let (id, path) = unrecorded_same_jar(&app, "unrecorded-foreign", b"foreign").await;
+    let source = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(source.path(), b"same").unwrap();
+    let mut installer = mr("same.jar", b"same").into_installer();
+    installer.download_fixture = Some(source.path().into());
+    let task = installer.install(&app, id, false, None).await.unwrap();
+    let outcome = describe_outcome(settled_outcome(&app, task).await);
+    assert!(
+        outcome.starts_with("failed") && outcome.contains("occupied by another artifact"),
+        "{outcome}"
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), b"foreign");
+    assert!(mods_row(&app, id, "same.jar").await.is_none());
+}
+
+#[tokio::test]
+async fn an_identical_unrecorded_disabled_copy_stays_disabled_and_gets_its_row() {
+    let app = crate::setup_managers_for_test().await;
+    let (id, path) = unrecorded_same_jar(&app, "unrecorded-disabled", b"same").await;
+    let disabled = path.with_file_name("same.jar.disabled");
+    std::fs::rename(&path, &disabled).unwrap();
+    let source = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(source.path(), b"same").unwrap();
+    let mut installer = mr("same.jar", b"same").into_installer();
+    installer.download_fixture = Some(source.path().into());
+    let task = installer.install(&app, id, false, None).await.unwrap();
+    assert_finished_without_download(&installer, &app, task).await;
+    assert!(!path.exists());
+    assert_eq!(std::fs::read(&disabled).unwrap(), b"same");
+    assert!(!mods_row(&app, id, "same.jar").await.unwrap().enabled);
+}
+
+/// Runs shader setup's loader install, as `ensure_shader_loader` does (with
+/// dependencies), for an instance whose mods folder holds the identical loader
+/// that no scan has recorded, enabled or not, and that the platforms' hash
+/// lookups miss. Asserts the loader is then ready for the setup's final check
+/// and keeps its Modrinth project.
+async fn shader_setup_over_unrecorded_loader(name: &str, enabled: bool) {
+    let app = crate::setup_managers_for_test().await;
+    let (id, row, path) = super::super::mods::tests::addon_fixture(
+        &app,
+        name,
+        instance::AddonType::Mods,
+        "iris.jar",
+        b"iris",
+    )
+    .await;
+    hold_scans(&app, id).await;
+    app.meta_cache_manager().miss_lookups(&path).await;
+    if !enabled {
+        std::fs::rename(&path, path.with_file_name("iris.jar.disabled")).unwrap();
+    }
+    mfcdb::delete_mod_file_cache_by_instance_filename(&app.db, *id, &row.filename)
+        .await
+        .unwrap();
+    let source = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(source.path(), b"iris").unwrap();
+    let mut installer = mr("iris.jar", b"iris").into_installer();
+    installer.download_fixture = Some(source.path().into());
+    let verification = super::super::shader_loader::ShaderLoaderVerification {
+        instance_id: *id,
+        mc_version: "1.20.1".into(),
+        modloaders: vec![],
+        filename: "iris.jar".into(),
+        sha1: {
+            use sha1::Digest;
+            hex::encode(sha1::Sha1::digest(b"iris"))
+        },
+        size: 4,
+    };
+    installer.required_enabled = Some(verification.clone());
+    let task = installer.install(&app, id, true, None).await.unwrap();
+    tokio::time::timeout(
+        Duration::from_secs(20),
+        wait_install_completion(installer.abort_handle.lock().await.completion.clone()),
+    )
+    .await
+    .unwrap()
+    .unwrap();
+    assert_eq!(
+        describe_outcome(settled_outcome(&app, task).await),
+        "succeeded"
+    );
+    assert!(
+        app.instance_manager()
+            .verify_shader_loader(verification)
+            .await
+            .unwrap()
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), b"iris");
+    assert!(!path.with_file_name("iris.jar.disabled").exists());
+    assert!(
+        mfcdb::instance_mod_exists_by_mr_project(&app.db, *id, "fixture")
+            .await
+            .unwrap()
+            .is_some()
+    );
+}
+
+#[tokio::test]
+async fn shader_setup_enables_and_records_an_identical_unrecorded_loader() {
+    shader_setup_over_unrecorded_loader("unrecorded-shader-off", false).await;
+}
+
+/// The loader is already enabled, so nothing renames it and the download is
+/// not used: the install records the file it found, platform project included.
+#[tokio::test]
+async fn shader_setup_records_an_identical_unrecorded_enabled_loader() {
+    shader_setup_over_unrecorded_loader("unrecorded-shader-on", true).await;
+}
+
+/// On Windows and macOS a jar named `Same.jar` is also `same.jar`. Rows name
+/// files as the folder lists them, so the install adopts the jar without a
+/// second row under the other spelling.
+#[cfg(any(windows, target_os = "macos"))]
+#[tokio::test]
+async fn a_copy_spelled_otherwise_on_a_case_insensitive_drive_gets_no_second_row() {
+    let app = crate::setup_managers_for_test().await;
+    let (id, _, path) = super::super::mods::tests::addon_fixture(
+        &app,
+        "case-only",
+        instance::AddonType::Mods,
+        "Same.jar",
+        b"same",
+    )
+    .await;
+    hold_scans(&app, id).await;
+    let installer = cf("same.jar", b"same", curseforge::ClassId::Mods).into_installer();
+    let task = installer.install(&app, id, false, None).await.unwrap();
+    assert_finished_without_download(&installer, &app, task).await;
+    assert_eq!(std::fs::read(&path).unwrap(), b"same");
+    let names: Vec<_> = mfcdb::get_mod_files_by_instance(&app.db, *id)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|row| row.addon_type == "mods")
+        .map(|row| row.filename)
+        .collect();
+    assert_eq!(names, vec!["Same.jar".to_owned()]);
 }
 
 #[tokio::test]
@@ -7833,5 +8119,98 @@ mod dependency_rule {
             b"parent.jar"
         );
         assert!(app.task_manager().get_task_warnings().await.is_empty());
+    }
+
+    /// A Fabric instance whose mods folder holds `sodium-OihdIimA.jar` with
+    /// `bytes`, which no scan has recorded: copied in by hand while a game runs.
+    async fn unrecorded_sodium(
+        app: &Arc<AppInner>,
+        name: &str,
+        bytes: &[u8],
+    ) -> (InstanceId, std::path::PathBuf) {
+        let id = instance(app, name, "1.20.1", Some(ModLoaderType::Fabric)).await;
+        hold_scans(app, id).await;
+        let mods = publication::current_path(app, id)
+            .await
+            .unwrap()
+            .get_mods_path();
+        std::fs::create_dir_all(&mods).unwrap();
+        std::fs::write(mods.join("sodium-OihdIimA.jar"), bytes).unwrap();
+        (id, mods)
+    }
+
+    fn sodium_parent(catalogue: &Arc<Fixture>) -> ModrinthModInstaller {
+        mr_parent(
+            "mod",
+            "parent.jar",
+            b"parent",
+            modrinth_requires(Some(SODIUM), Some("OihdIimA")),
+            catalogue,
+        )
+    }
+
+    /// The library the addon needs is already there, byte for byte, before
+    /// any scan recorded it: it is used, not refused as a conflicting file
+    /// and not downloaded again.
+    #[tokio::test]
+    async fn an_identical_library_the_scan_has_not_recorded_is_used_not_refused() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, mods) = unrecorded_sodium(&app, "unrecorded-library", b"OihdIimA").await;
+        let catalogue = Arc::new(sodium_fixture(&[("OihdIimA", &["1.20.1"])]));
+        let root_id = sodium_parent(&catalogue).id();
+        let resolution = plan(&app, id, sodium_parent(&catalogue), false)
+            .await
+            .unwrap();
+        assert_eq!(
+            root_children(&resolution, &root_id).await,
+            vec![format!("modrinth:{SODIUM}:OihdIimA")]
+        );
+        // The library's installer has no download fixture: downloading it
+        // would fail the task.
+        let mut installer = Installer::new(Box::new(sodium_parent(&catalogue)));
+        let source = tempfile::NamedTempFile::new().unwrap();
+        std::fs::write(source.path(), b"parent").unwrap();
+        installer.download_fixture = Some(source.path().into());
+        let task = installer.install(&app, id, true, None).await.unwrap();
+        settle(&installer, &app, task).await;
+        assert_eq!(
+            describe_outcome(app.task_manager().get_task_outcome(task).await),
+            "succeeded"
+        );
+        assert_eq!(
+            std::fs::read(mods.join("sodium-OihdIimA.jar")).unwrap(),
+            b"OihdIimA"
+        );
+        assert_eq!(std::fs::read(mods.join("parent.jar")).unwrap(), b"parent");
+        assert!(
+            mfcdb::get_mod_file_cache_by_instance_kind_filename(
+                &app.db,
+                *id,
+                "mods",
+                "sodium-OihdIimA.jar"
+            )
+            .await
+            .unwrap()
+            .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_different_file_under_the_library_name_is_still_refused() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, mods) = unrecorded_sodium(&app, "foreign-library", b"other").await;
+        let catalogue = Arc::new(sodium_fixture(&[("OihdIimA", &["1.20.1"])]));
+        let error = plan(&app, id, sodium_parent(&catalogue), false)
+            .await
+            .err()
+            .expect("another file under the library's name is refused");
+        assert!(
+            format!("{error:#}").contains("is occupied by another artifact"),
+            "{error:#}"
+        );
+        assert_eq!(
+            std::fs::read(mods.join("sodium-OihdIimA.jar")).unwrap(),
+            b"other"
+        );
     }
 }

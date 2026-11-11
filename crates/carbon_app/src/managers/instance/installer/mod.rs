@@ -626,6 +626,7 @@ impl Installer {
                         if self.required_enabled.is_some() {
                             publication::enable_satisfied(&**lock, app, &operation).await?;
                         }
+                        publication::record_satisfied(&**lock, app, &operation).await;
                         let task = VisualTask::new(Translation::InstanceTaskInstallMod {
                             mod_name: lock.display_name(),
                             instance_name: name.clone(),
@@ -1087,6 +1088,10 @@ impl Installer {
                     .is_already_installed(app, instance_id)
                     .await?
             {
+                // The file may be one no scan has recorded yet. The gate comes
+                // before this installer's lock, as in publication and rollback.
+                let operation = app.instance_manager().lock_instance(instance_id).await;
+                publication::record_satisfied(&**self.inner.lock().await, app, &operation).await;
                 return Ok(());
             }
         }

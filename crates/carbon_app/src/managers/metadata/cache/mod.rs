@@ -366,6 +366,16 @@ impl MetaCacheManager {
             .unwrap_or(0)
     }
 
+    /// Returns once the cache loops hold their scans, as they do while a game
+    /// runs (`any_instance_running`).
+    #[cfg(test)]
+    pub(crate) async fn wait_scans_paused(&self) {
+        let mut paused = self.pause_caching.subscribe();
+        while !*paused.borrow_and_update() {
+            paused.changed().await.unwrap();
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn clear_scan_observations(&self) {
         self.scan_test_state.lock().unwrap().observations.clear();
