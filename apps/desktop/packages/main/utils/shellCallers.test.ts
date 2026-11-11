@@ -1112,6 +1112,46 @@ it("actual window close is held while a shutdown prompt waits for an answer", as
   expect(w.hidden).toBe(false)
   expect(value.appQuits).toBe(0)
 })
+it("actual window close during a shutdown prompt with a game running is held without the game-running warning, which comes back once the prompt is gone", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  value.lifecycle.snapshot('{"revision":1,"instances":[4]}')
+  value.lifecycle.warningReceiver(w.contents, true)
+  // A restart, update, reset or restore prompt.
+  value.context.shutdownPrompts = { open: true, receiver() {} }
+  w.close()
+  expect(w.contents.sent).toEqual([])
+  expect(w.destroyed).toBe(false)
+  expect(w.hidden).toBe(false)
+  expect(value.appQuits).toBe(0)
+  // A quit started outside the window (Cmd+Q on macOS, a signal on Linux).
+  value.lifecycle.quitStarted()
+  w.close()
+  expect(w.contents.sent).toEqual([])
+  expect(w.destroyed).toBe(false)
+  expect(value.appQuits).toBe(0)
+  // Keep GDLauncher open: the prompt is gone and X warns again.
+  value.lifecycle.quitFailed()
+  value.context.shutdownPrompts = { open: false, receiver() {} }
+  w.close()
+  expect(w.contents.sent).toEqual([["showAppCloseWarning"]])
+  expect(w.destroyed).toBe(false)
+  expect(w.hidden).toBe(false)
+})
+it("actual Close Window launch during a shutdown prompt keeps the window and leaves no game keeping a windowless launcher alive", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  value.lifecycle.warningReceiver(w.contents, true)
+  value.context.shutdownPrompts = { open: true, receiver() {} }
+  value.lifecycle.snapshot('{"revision":1,"instances":[1]}')
+  value.lifecycle.event("GAME_LAUNCHED|1|7|closeWindow")
+  expect(w.destroyed).toBe(false)
+  expect(w.contents.sent).toEqual([])
+  expect(value.lifecycle.keepAliveWithoutWindows()).toBe(false)
+  expect(value.appQuits).toBe(0)
+})
 /** The actual quit path: before-quit, ownedShutdown and its helpers. */
 function quitPath(
   value: ReturnType<typeof mainWindow>,

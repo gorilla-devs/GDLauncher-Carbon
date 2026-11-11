@@ -856,7 +856,15 @@ function spawnWindow(): BrowserWindow {
   })
 
   createdWindow.on("close", (e) => {
-    lifecycle.close(createdWindow, e, showAppCloseWarning)
+    // A prompt holds the close below. The game-running warning would open
+    // behind it and be left on screen after Keep GDLauncher open, so it is
+    // not sent then. lifecycle.close still runs first: it records a Close
+    // Window launch's own close, which that launch cancels if this holds it.
+    lifecycle.close(
+      createdWindow,
+      e,
+      showAppCloseWarning && !shutdownPrompts.open
+    )
     if (e.defaultPrevented || shutdownApproved) return
     // A prompt about a quit, restart or update is waiting for an answer.
     if (shutdownPrompts.open) {
