@@ -1,5 +1,6 @@
 import { spawnSync } from "node:child_process"
-import { pathToFileURL } from "node:url"
+import { realpathSync } from "node:fs"
+import { fileURLToPath, pathToFileURL } from "node:url"
 
 /**
  * Platform build driver.
@@ -81,7 +82,23 @@ export function runBuild(name, env, spawn = spawnSync, output = console) {
     { GDL_E2E_BUILD: String(e2e) })
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+/**
+ * Whether `argv1` (`process.argv[1]`) names the module at `moduleUrl`. Node
+ * keeps `process.argv[1]` as typed but loads the entry module from its real
+ * path, so through a symlinked folder or a Windows junction the two differ.
+ * Comparing real paths keeps such a run from exiting 0 without building.
+ * @param {string} argv1
+ * @param {string} moduleUrl
+ */
+function isEntryPoint(argv1, moduleUrl) {
+  try {
+    return realpathSync(argv1) === realpathSync(fileURLToPath(moduleUrl))
+  } catch {
+    return moduleUrl === pathToFileURL(argv1).href
+  }
+}
+
+if (process.argv[1] && isEntryPoint(process.argv[1], import.meta.url)) {
   try { runBuild(process.argv[2], process.env) }
   catch (error) { console.error(error.message); process.exit(error.exitCode ?? 1) }
 }

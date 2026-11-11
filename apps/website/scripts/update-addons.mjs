@@ -17,6 +17,7 @@
  *   pnpm update-addons --dry-run  # print stats without writing
  */
 
+import { realpathSync } from "node:fs"
 import { resolve, dirname } from "node:path"
 import { fileURLToPath } from "node:url"
 import { normalizeExternalWikiUrl } from "../src/lib/addonUrls.mjs"
@@ -556,7 +557,20 @@ async function main() {
   }
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+// Node keeps process.argv[1] as typed but loads the entry module from its
+// real path, so through a symlinked folder or a Windows junction the two
+// differ. Comparing real paths keeps such a run from exiting 0 without
+// updating anything.
+function isEntryPoint(argv1, moduleUrl) {
+  const modulePath = fileURLToPath(moduleUrl)
+  try {
+    return realpathSync(argv1) === realpathSync(modulePath)
+  } catch {
+    return resolve(argv1) === modulePath
+  }
+}
+
+if (process.argv[1] && isEntryPoint(process.argv[1], import.meta.url)) {
   main().catch((err) => {
     console.error(err)
     process.exit(1)
