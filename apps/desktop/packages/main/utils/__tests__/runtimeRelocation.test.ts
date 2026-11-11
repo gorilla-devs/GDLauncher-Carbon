@@ -2688,6 +2688,70 @@ describe("data folder destinations", () => {
     expect(warn).not.toHaveBeenCalled()
   })
 
+  it("moves the data folder back to a snapshot's default folder beside the executable", async () => {
+    const f = await fixture()
+    // A snapshot ZIP keeps its data in gdl_data beside the executable.
+    const install = path.join(f.root, "install")
+    await fs.mkdir(path.join(install, "resources"), { recursive: true })
+    await fs.mkdir(path.join(install, "locales"))
+    await fs.writeFile(path.join(install, "locales", "x.pak"), "pak")
+    await fs.mkdir(path.join(install, "gdl_data"))
+    const def = path.join(install, "gdl_data", "data")
+    const snapshot = {
+      ...f.globals,
+      runtimeDestinationContext: () => ({
+        installationRoots: [install, path.join(install, "resources")],
+        defaultRuntimePath: def
+      })
+    }
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+    const validate = callback("validateRuntimePath", snapshot)
+    expect(await validate(null, def)).toBe("valid")
+    for (const other of ["locales", "gdl_data", path.join("gdl_data", "data2")])
+      expect(await validate(null, path.join(install, other)), other).toBe(
+        "install_overlap"
+      )
+    expect(await callback("changeRuntimePath", snapshot)(null, def)).toEqual({
+      type: "relaunching"
+    })
+    expect(await fs.readFile(f.pointer, "utf8")).toBe(def)
+    expect(await fs.readFile(path.join(def, "save"), "utf8")).toBe("old save")
+    expect(
+      await fs.readFile(path.join(install, "locales", "x.pak"), "utf8")
+    ).toBe("pak")
+  })
+
+  it.skipIf(process.platform === "win32")(
+    "checks the default data folder where it really is",
+    async () => {
+      const f = await fixture()
+      const install = path.join(f.root, "install")
+      await fs.mkdir(path.join(install, "gdl_data"), { recursive: true })
+      const alias = path.join(f.root, "alias")
+      await fs.symlink(install, alias)
+      const def = path.join(install, "gdl_data", "data"),
+        aliased = path.join(alias, "gdl_data", "data")
+      const real = { installationRoots: [install], defaultRuntimePath: def }
+      // The launcher's own folders named through the link.
+      const linked = { installationRoots: [alias], defaultRuntimePath: aliased }
+      expect(await validateRuntimeDestination(aliased, f.source, real)).toBe(
+        "valid"
+      )
+      expect(await validateRuntimeDestination(def, f.source, linked)).toBe(
+        "valid"
+      )
+      await expect(
+        validateRuntimeDestination(path.join(alias, "gdl_data"), f.source, real)
+      ).rejects.toMatchObject({ reason: "install_overlap" })
+      // Switching back to a default folder that still holds data.
+      await fs.mkdir(def)
+      await fs.writeFile(path.join(def, "gdl.db"), "")
+      expect(await validateRuntimeDestination(aliased, f.source, real)).toBe(
+        "potentially_valid"
+      )
+    }
+  )
+
   it("moves a data folder reached through a link again, and back to where it was", async () => {
     const f = await fixture()
     const link = path.join(f.root, "link")

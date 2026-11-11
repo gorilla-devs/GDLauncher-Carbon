@@ -26,6 +26,13 @@ export interface RuntimePathContext {
    * the main process sets this, never the renderer.
    */
   resolved?: boolean
+  /**
+   * The data folder used when none was chosen. A snapshot build keeps it
+   * beside its executable (getPatchedUserData in index.ts), so it is never
+   * refused for lying inside the installation. Only the main process sets
+   * this, and only in snapshot builds.
+   */
+  defaultRuntimePath?: string
 }
 
 /** Why a folder cannot be the data folder; Settings names each one. */
@@ -133,12 +140,18 @@ export function assertSafeRuntimeTarget(
     }
   }
 
+  const fallback =
+    context.defaultRuntimePath && api.resolve(context.defaultRuntimePath)
+  // The same folder: each inside the other, which on Windows ignores case.
+  const isDefault =
+    !!fallback && inside(resolved, fallback) && inside(fallback, resolved)
   // Anything under the user's home is allowed; otherwise reject known system
   // directories (and their descendants).
   for (const root of context.installationRoots ?? []) {
+    const installed = api.resolve(root)
     if (
-      inside(resolved, api.resolve(root)) ||
-      inside(api.resolve(root), resolved)
+      (!isDefault && inside(resolved, installed)) ||
+      inside(installed, resolved)
     ) {
       throw new RuntimeTargetError(
         "install_overlap",

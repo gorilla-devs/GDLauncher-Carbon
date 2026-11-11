@@ -1166,7 +1166,18 @@ function runtimeDestinationContext() {
   ]
   if (process.platform === "darwin")
     installationRoots.push(path.resolve(process.resourcesPath, "../.."))
-  return { installationRoots }
+  return {
+    installationRoots,
+    // A snapshot keeps its data folder beside the executable
+    // (getPatchedUserData), and the user may move back to it.
+    ...(app.isPackaged &&
+      __APP_VERSION__.includes("snapshot") && {
+        defaultRuntimePath: path.join(
+          app.getPath("userData"),
+          RUNTIME_PATH_DEFAULT_NAME
+        )
+      })
+  }
 }
 
 ipcMain.handle(

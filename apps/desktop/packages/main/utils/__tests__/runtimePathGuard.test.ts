@@ -145,3 +145,90 @@ it("checks the share a mapped drive resolves to, but never a typed network or ve
     assertSafeRuntimeTarget("\\\\nas\\share\\GDL", null, "win32")
   ).toThrow(expect.objectContaining({ reason: "network_path" }))
 })
+it("lets a snapshot go back to its default data folder beside the executable, and nowhere else in its installation", () => {
+  // A snapshot ZIP keeps its data in gdl_data beside the executable.
+  const dir = "C:\\Users\\me\\Downloads\\GDLauncher"
+  const windows = {
+    homePath: "C:\\Users\\me",
+    installationRoots: [dir, `${dir}\\resources`],
+    defaultRuntimePath: `${dir}\\gdl_data\\data`
+  }
+  for (const target of [
+    `${dir}\\gdl_data\\data`,
+    "c:/users/ME/downloads/gdlauncher/GDL_DATA/data",
+    `${dir}\\gdl_data\\data\\`,
+    `${dir}\\locales\\..\\gdl_data\\data`
+  ])
+    expect(
+      () => assertSafeRuntimeTarget(target, "D:\\GDL", "win32", windows),
+      target
+    ).not.toThrow()
+  for (const target of [
+    dir,
+    `${dir}\\locales`,
+    `${dir}\\resources`,
+    `${dir}\\gdl_data`,
+    `${dir}\\gdl_data\\data2`,
+    `${dir}\\gdl_data\\data\\sub`,
+    "C:\\Users\\me\\Downloads"
+  ])
+    expect(
+      () => assertSafeRuntimeTarget(target, "D:\\GDL", "win32", windows),
+      target
+    ).toThrow(expect.objectContaining({ reason: "install_overlap" }))
+  // The folder in use is still never a destination.
+  expect(() =>
+    assertSafeRuntimeTarget(
+      `${dir}\\gdl_data\\data`,
+      `${dir}\\gdl_data\\data`,
+      "win32",
+      windows
+    )
+  ).toThrow(expect.objectContaining({ reason: "nested" }))
+
+  const linux = {
+    homePath: "/home/me",
+    installationRoots: ["/opt/GDLauncher", "/opt/GDLauncher/resources"],
+    defaultRuntimePath: "/opt/GDLauncher/gdl_data/data"
+  }
+  for (const target of [
+    "/opt/GDLauncher/gdl_data/data",
+    "/opt/GDLauncher/gdl_data/data/"
+  ])
+    expect(
+      () => assertSafeRuntimeTarget(target, "/mnt/GDL", "linux", linux),
+      target
+    ).not.toThrow()
+  for (const target of [
+    "/opt/GDLauncher",
+    "/opt/GDLauncher/locales",
+    "/opt/GDLauncher/gdl_data",
+    "/opt/GDLauncher/gdl_data/data2",
+    "/opt/GDLauncher/gdl_data/data/sub",
+    "/opt"
+  ])
+    expect(
+      () => assertSafeRuntimeTarget(target, "/mnt/GDL", "linux", linux),
+      target
+    ).toThrow(expect.objectContaining({ reason: "install_overlap" }))
+})
+it("keeps refusing the default data folder inside the installation when no default is given", () => {
+  const dir = "C:\\Users\\me\\Downloads\\GDLauncher"
+  expect(() =>
+    assertSafeRuntimeTarget(`${dir}\\gdl_data\\data`, "D:\\GDL", "win32", {
+      homePath: "C:\\Users\\me",
+      installationRoots: [dir, `${dir}\\resources`]
+    })
+  ).toThrow(expect.objectContaining({ reason: "install_overlap" }))
+  expect(() =>
+    assertSafeRuntimeTarget(
+      "/opt/GDLauncher/gdl_data/data",
+      "/mnt/GDL",
+      "linux",
+      {
+        homePath: "/home/me",
+        installationRoots: ["/opt/GDLauncher", "/opt/GDLauncher/resources"]
+      }
+    )
+  ).toThrow(expect.objectContaining({ reason: "install_overlap" }))
+})

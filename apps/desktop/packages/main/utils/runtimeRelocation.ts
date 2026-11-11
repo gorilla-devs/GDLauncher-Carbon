@@ -370,6 +370,12 @@ export async function validateRuntimeDestination(
   assertSafeRuntimeTarget(canonical, canonicalSource, platform, {
     ...context,
     installationRoots,
+    // A default folder that cannot be resolved only loses its exemption.
+    defaultRuntimePath:
+      context.defaultRuntimePath &&
+      (await canonicalRuntimePath(context.defaultRuntimePath).catch(
+        () => undefined
+      )),
     validatedRemovableMount: await removableMountContext(
       canonical,
       platform,
