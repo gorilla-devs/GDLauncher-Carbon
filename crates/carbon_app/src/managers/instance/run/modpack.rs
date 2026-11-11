@@ -1946,21 +1946,30 @@ fn reuse_earlier_downloads_blocking(
 /// landed — `packinfo_path` (checked by the caller before this is invoked)
 /// already fully describes the target state, so all that is left is
 /// removing the now-superfluous `staging_dir` and recording
-/// `modpack-complete`. Used both for a pass that just promoted
-/// `tmp-packinfo.json` itself and for a resumed pass that finds the promote
-/// already happened (`tmp-packinfo.json` gone, `.setup/apply-started`
-/// present, `packinfo.json` present — see `staging_apply_already_promoted`,
-/// which the caller uses to tell this apart from an apply that simply never
-/// started) — see [`process_modpack_staging`]'s doc comment for the
-/// invariant this is the tail of. Never touches `packinfo_path` or
-/// `tmp_packinfo_path` itself.
+/// `modpack-complete` unless an entry is already there. Used both for a
+/// pass that just promoted `tmp-packinfo.json` itself and for a resumed pass
+/// that finds the promote already happened (`tmp-packinfo.json` gone,
+/// `.setup/apply-started` present, `packinfo.json` present — see
+/// `staging_apply_already_promoted`, which the caller uses to tell this
+/// apart from an apply that simply never started) — see
+/// [`process_modpack_staging`]'s doc comment for the invariant this is the
+/// tail of. Never touches `packinfo_path` or `tmp_packinfo_path` itself.
 async fn finish_promoted_staging(staging_dir: &Path, setup_path: &Path) -> anyhow::Result<()> {
     match tokio::fs::remove_dir_all(staging_dir).await {
         Ok(()) => {}
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(e.into()),
     }
-    tokio::fs::write(setup_path.join("modpack-complete"), "").await?;
+    // Builds before 2025 made this marker a folder; later ones make it an
+    // empty file. Any entry here already says the pack step finished, and a
+    // file can't be written over a folder, so only a missing marker is
+    // created. A link is left as it is rather than written through.
+    let marker = setup_path.join("modpack-complete");
+    match tokio::fs::symlink_metadata(&marker).await {
+        Ok(_) => {}
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => tokio::fs::write(&marker, "").await?,
+        Err(e) => return Err(e.into()),
+    }
     Ok(())
 }
 

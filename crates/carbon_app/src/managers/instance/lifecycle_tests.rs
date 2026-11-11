@@ -6913,6 +6913,101 @@ async fn legacy_applied_pack_adopted_by_play_is_still_replaced_by_a_version_chan
     Ok(())
 }
 
+/// Builds before 2025 made `.setup/modpack-complete` a folder once the pack
+/// files were in place, before natives, assets and the loader processors
+/// ran. Its setup holds the archive, the request, `modpack-skip-overlays`
+/// and that folder. Play adopts it as installed and keeps the folder, on
+/// every Play until the game install succeeds.
+#[tokio::test]
+async fn a_pack_an_older_build_applied_with_a_marker_folder_installs_only_the_game_version()
+-> anyhow::Result<()> {
+    use super::modpack::session::{Kind, Phase, Producer, Session};
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = legacy_applied_update(&app, "legacy-applied-marker-folder").await?;
+    let setup = root.join(".setup");
+    tokio::fs::remove_file(setup.join("apply-started")).await?;
+    tokio::fs::remove_file(setup.join("staging-packinfo.json")).await?;
+    tokio::fs::rename(
+        setup.join("modpack-skip-overrides"),
+        setup.join("modpack-skip-overlays"),
+    )
+    .await?;
+    tokio::fs::remove_file(setup.join("modpack-complete")).await?;
+    tokio::fs::create_dir(setup.join("modpack-complete")).await?;
+    let instance = legacy_tree(&root.join("instance"));
+    let installed = tokio::fs::read(root.join("packinfo.json")).await?;
+
+    let owner = legacy_prepare(&app, id)
+        .await?
+        .expect("Play owns the setup it adopted");
+    let session = Session::require(&root, &owner).await?;
+    assert_eq!(
+        (session.producer, session.kind, session.phase),
+        (Producer::Reconstructed, Kind::Pack, Phase::Committed)
+    );
+    assert!(session.pack_installed(&root).await?);
+    assert_eq!(legacy_tree(&root.join("instance")), instance);
+    assert_eq!(
+        tokio::fs::read(root.join("packinfo.json")).await?,
+        installed
+    );
+    assert!(setup.join("modpack-complete").is_dir());
+    for entry in std::fs::read_dir(&setup)? {
+        let name = entry?.file_name().to_string_lossy().into_owned();
+        assert!(
+            !name.starts_with("preparing-"),
+            "nothing was rebuilt: {name}"
+        );
+    }
+
+    // The game install failed again: the next Play gets past the pack step.
+    legacy_prepare(&app, id).await?;
+    assert!(setup.join("modpack-complete").is_dir());
+
+    super::modpack::session::dispose(&root, &owner).await?;
+    assert!(!setup.exists());
+    assert_eq!(legacy_tree(&root.join("instance")), instance);
+    Ok(())
+}
+
+/// The same marker folder beside an archive and no installed record: Play
+/// rebuilds the setup from its archive, applies it and keeps the folder, on
+/// every Play until the game install succeeds.
+#[tokio::test]
+async fn a_setup_an_older_build_left_with_a_marker_folder_is_rebuilt_from_its_archive_and_finishes()
+-> anyhow::Result<()> {
+    use super::modpack::session::{Kind, Phase, Producer, Session};
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "legacy-marker-folder-rebuilt").await?;
+    let setup = root.join(".setup");
+    tokio::fs::remove_file(setup.join("setup-session.json")).await?;
+    task08_round1_archive(&root, false)?;
+    tokio::fs::create_dir(setup.join("modpack-complete")).await?;
+    assert!(!root.join("packinfo.json").exists());
+
+    let owner = legacy_prepare(&app, id)
+        .await?
+        .expect("Play owns the setup it rebuilt");
+    let session = Session::require(&root, &owner).await?;
+    assert_eq!(
+        (session.producer, session.kind, session.phase),
+        (Producer::Reconstructed, Kind::Pack, Phase::Committed)
+    );
+    assert_eq!(
+        tokio::fs::read(root.join("instance/target.txt")).await?,
+        b"target"
+    );
+    assert!(setup.join("modpack-complete").is_dir());
+
+    legacy_prepare(&app, id).await?;
+    assert!(setup.join("modpack-complete").is_dir());
+    assert_eq!(
+        tokio::fs::read(root.join("instance/target.txt")).await?,
+        b"target"
+    );
+    Ok(())
+}
+
 /// Duplicating an instance leaves what earlier setups left for it alone
 /// with the original: its retired setups and the copies Repair moved aside.
 /// The pending setup and everything else are copied.

@@ -1758,6 +1758,50 @@ async fn resume_after_promote_before_staging_removal_completes_cleanly() {
     );
 }
 
+// Builds before 2025 made `modpack-complete` a folder. A setup they left
+// after the pack step finished keeps that folder through the commit, and
+// writing the marker as a file over it failed every Play.
+#[tokio::test]
+async fn finish_promoted_staging_keeps_a_marker_folder_from_older_builds() {
+    let (_tmp, _instance_root, staging_dir) = scaffold();
+    let setup_path = staging_dir.parent().unwrap().to_path_buf();
+    std::fs::create_dir(setup_path.join("modpack-complete")).unwrap();
+    write_staged(&staging_dir, "/mods/a.jar", b"leftover").await;
+
+    for _ in 0..2 {
+        finish_promoted_staging(&staging_dir, &setup_path)
+            .await
+            .expect("a marker folder already records the pack step as finished");
+    }
+
+    assert!(!staging_dir.exists(), "staging must be fully cleaned up");
+    assert!(setup_path.join("modpack-complete").is_dir());
+}
+
+#[cfg(unix)]
+#[tokio::test]
+async fn finish_promoted_staging_never_writes_through_a_linked_marker() {
+    let (_tmp, _instance_root, staging_dir) = scaffold();
+    let setup_path = staging_dir.parent().unwrap().to_path_buf();
+    let outside = tempfile::tempdir().unwrap();
+    let victim = outside.path().join("victim.txt");
+    std::fs::write(&victim, b"precious").unwrap();
+    let marker = setup_path.join("modpack-complete");
+    std::os::unix::fs::symlink(&victim, &marker).unwrap();
+
+    finish_promoted_staging(&staging_dir, &setup_path)
+        .await
+        .unwrap();
+
+    assert_eq!(std::fs::read(&victim).unwrap(), b"precious");
+    assert!(
+        std::fs::symlink_metadata(&marker)
+            .unwrap()
+            .file_type()
+            .is_symlink()
+    );
+}
+
 // --- the widest window: overrides extracted, apply not yet started --------
 //
 // Override extraction finishing (what used to be the sole `skip_overrides`
