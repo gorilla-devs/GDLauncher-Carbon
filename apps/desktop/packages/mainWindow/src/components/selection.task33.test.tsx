@@ -264,6 +264,108 @@ it("0110 actual table header indeterminate and cell selection preserve one callb
   inputs[1].click()
   expect(toggle).toHaveBeenCalledTimes(1)
 })
+it("tile, folder, addon-row and legacy mod-row checkboxes stay revealed only while keyboard-focused", () => {
+  const [mods, setMods] = createStore<Record<string, boolean>>({})
+  const column = createSelectColumn({
+    selectedCount: () => 0,
+    totalRows: () => 1,
+    onSelectAll: vi.fn()
+  }) as any
+  const root = mount(() => (
+    <>
+      <div data-case="tile">
+        <BaseTile
+          name="Synthetic instance"
+          size={1}
+          isLoading={false}
+          isWaiting={false}
+          isRunning={false}
+          isBusy={false}
+          isDeleting={false}
+          isMultiSelected={false}
+          showCheckbox
+          onToggleSelection={vi.fn()}
+          isDragging={false}
+          isDragActive={false}
+          canDrag
+          onClick={vi.fn()}
+          onPlay={vi.fn()}
+          onDragStart={vi.fn()}
+          shouldSetViewTransition={false}
+          viewTransitionPrefix="synthetic"
+          playButtonContent="Play"
+          infoContent="Info"
+        />
+      </div>
+      <div data-case="folder">
+        <FolderTile
+          groupId={4}
+          kind="instance"
+          isOpen={false}
+          size={1}
+          onToggle={vi.fn()}
+          isSelected={false}
+          onToggleSelection={vi.fn()}
+        />
+      </div>
+      <div data-case="row">
+        {column.cell({
+          row: {
+            id: "row-A",
+            original: { filename: "example.jar" },
+            getIsSelected: () => false,
+            getCanSelect: () => true,
+            getIsSomeSelected: () => false,
+            toggleSelected: vi.fn()
+          }
+        })}
+      </div>
+      <div data-case="mod">
+        <Mod
+          mod={
+            {
+              id: "mod-A",
+              filename: "example.jar",
+              enabled: true,
+              metadata: null,
+              curseforge: null,
+              modrinth: null,
+              has_update: false
+            } as any
+          }
+          selectMods={mods}
+          setSelectedMods={setMods}
+          isInstanceLocked={false}
+        />
+      </div>
+    </>
+  ))
+  const reveal = {
+    tile: (label: HTMLElement) => label.parentElement!,
+    folder: (label: HTMLElement) => label.parentElement!,
+    row: (label: HTMLElement) => label.parentElement!,
+    mod: (label: HTMLElement) => label.parentElement!.parentElement!
+  }
+  for (const [name, wrapper] of Object.entries(reveal)) {
+    const scope = root.querySelector<HTMLElement>(`[data-case="${name}"]`)!
+    const box = input(scope)
+    // A mouse click focuses the input too, so a :focus-within reveal would
+    // keep an unticked box visible after the pointer leaves.
+    for (let node: HTMLElement | null = box; node && node !== scope; ) {
+      const tokens = Array.from(node.classList)
+      expect(
+        tokens.filter((t) => t.startsWith("focus-within:")),
+        name
+      ).toEqual([])
+      node = node.parentElement
+    }
+    const tokens = Array.from(wrapper(box.closest("label")!).classList)
+    expect(tokens, name).toContain("has-[:focus-visible]:opacity-100")
+    if (name === "tile" || name === "folder") {
+      expect(tokens, name).toContain("has-[:focus-visible]:translate-x-0")
+    }
+  }
+})
 it("0110 actual search filter late item replacement uses current label and boolean target", () => {
   const [items, setItems] = createSignal([{ label: "Old", value: "old" }]),
     [selected, setSelected] = createSignal<string[]>([])

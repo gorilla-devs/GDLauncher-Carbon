@@ -285,7 +285,7 @@ const Mod = (props: Props) => {
       <div class="flex w-full items-center justify-between gap-4">
         <div class="flex items-center justify-between gap-4">
           <div
-            class="opacity-0 transition-opacity duration-100 ease-spring group-hover:opacity-100 focus-within:opacity-100"
+            class="opacity-0 transition-opacity duration-100 ease-spring group-hover:opacity-100 has-[:focus-visible]:opacity-100"
             classList={{
               "opacity-100":
                 props.selectMods[props.mod.id] ||

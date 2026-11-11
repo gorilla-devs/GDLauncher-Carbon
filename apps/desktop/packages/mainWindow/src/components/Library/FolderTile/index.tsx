@@ -334,7 +334,7 @@ const FolderTile = (props: FolderTileProps) => {
               {/* Selection checkbox */}
               <Show when={props.onToggleSelection}>
                 <div
-                  class="ease-spring absolute left-2 top-2 z-10 transition-all duration-200 focus-within:translate-x-0 focus-within:opacity-100"
+                  class="ease-spring absolute left-2 top-2 z-10 transition-all duration-200 has-[:focus-visible]:translate-x-0 has-[:focus-visible]:opacity-100"
                   classList={{
                     "translate-x-0 opacity-100":
                       props.isSelected ||

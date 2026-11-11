@@ -34,7 +34,7 @@ export const createSelectColumn = (config: SelectColumnConfig) => {
     },
     cell: (props) => (
       <div
-        class={`ease-spring transition-opacity duration-100 focus-within:opacity-100 ${
+        class={`ease-spring transition-opacity duration-100 has-[:focus-visible]:opacity-100 ${
           props.row.getIsSelected()
             ? "opacity-100"
             : "opacity-0 group-hover/row:opacity-100"

@@ -263,7 +263,7 @@ const BaseTile = (props: BaseTileProps) => {
                 }
               >
                 <div
-                  class="z-10 absolute left-2 top-2 transition-all duration-200 ease-spring focus-within:translate-x-0 focus-within:opacity-100"
+                  class="z-10 absolute left-2 top-2 transition-all duration-200 ease-spring has-[:focus-visible]:translate-x-0 has-[:focus-visible]:opacity-100"
                   classList={{
                     "translate-x-0 opacity-100":
                       props.isMultiSelected ||

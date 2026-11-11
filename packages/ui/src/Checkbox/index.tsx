@@ -55,8 +55,10 @@ function Checkbox(props: Props) {
   })
 
   return (
+    // A mouse click on the label also focuses the input, so the ring keys on
+    // :focus-visible to show for keyboard focus only.
     <label
-      class={`relative flex items-center gap-2 rounded-md focus-within:ring-2 focus-within:ring-primary-400 ${PRESS_CLASSES}`}
+      class={`relative flex items-center gap-2 rounded-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-400 ${PRESS_CLASSES}`}
       classList={{
         "cursor-pointer": !props.disabled,
         "cursor-not-allowed": props.disabled
