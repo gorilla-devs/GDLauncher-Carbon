@@ -635,6 +635,9 @@ async fn count_files_blocking(path: PathBuf) -> std::io::Result<u64> {
 }
 /// Continue independent removals, counting only removed or confirmed-absent
 /// file postconditions. Iterator, metadata and directory failures remain errors.
+/// On Windows a junction or folder symlink below `path` is left in place with
+/// what it points to, and so are the folders that hold it; neither counts as
+/// removed nor as a failure.
 async fn clear_dir_with_progress(
     path: PathBuf,
     progress: Arc<AtomicU64>,
@@ -642,21 +645,24 @@ async fn clear_dir_with_progress(
     total: Option<u32>,
 ) -> std::io::Result<()> {
     tokio::task::spawn_blocking(move || {
+        /// Returns true when a folder link was left somewhere below `path`,
+        /// so `path` itself cannot be removed.
         fn walk(
             path: &Path,
             progress: &AtomicU64,
             subtask: &Subtask,
             total: Option<u32>,
             failures: &mut CleanupFailures,
-        ) {
+        ) -> bool {
             let entries = match std::fs::read_dir(path) {
                 Ok(entries) => entries,
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return,
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => return false,
                 Err(error) => {
                     failures.record(path.display(), error);
-                    return;
+                    return false;
                 }
             };
+            let mut kept_link = false;
             for entry in entries {
                 let entry = match entry {
                     Ok(entry) => entry,
@@ -666,7 +672,6 @@ async fn clear_dir_with_progress(
                     }
                 };
                 let child = entry.path();
-                // Do not traverse symlinked cache directories outside the selected tree.
                 let kind = match entry.file_type() {
                     Ok(kind) => kind,
                     Err(error) => {
@@ -674,8 +679,26 @@ async fn clear_dir_with_progress(
                         continue;
                     }
                 };
+                // On Windows a junction or folder symlink is neither a folder nor a file
+                // to `FileType`, and `remove_file` cannot delete it. It is the user's link,
+                // not cache: leave it and what it points to in place, as 2.0.40 did, and
+                // do not count it as removed or as a failure. Elsewhere `remove_file`
+                // unlinks a link itself; no link is ever followed.
+                #[cfg(windows)]
+                {
+                    use std::os::windows::fs::FileTypeExt;
+                    if kind.is_symlink_dir() {
+                        info!("Cache cleanup keeps the folder link {}", child.display());
+                        kept_link = true;
+                        continue;
+                    }
+                }
                 if kind.is_dir() {
-                    walk(&child, progress, subtask, total, failures);
+                    if walk(&child, progress, subtask, total, failures) {
+                        // It still holds a folder link, so it cannot be removed.
+                        kept_link = true;
+                        continue;
+                    }
                     if let Err(error) = std::fs::remove_dir(&child) {
                         if error.kind() != std::io::ErrorKind::NotFound {
                             failures.record(child.display(), error);
@@ -700,6 +723,7 @@ async fn clear_dir_with_progress(
                     }
                 }
             }
+            kept_link
         }
         let mut failures = CleanupFailures::default();
         walk(&path, &progress, &subtask, total, &mut failures);
@@ -827,6 +851,80 @@ mod tests {
                 0,
                 "{table} must remain empty after cleanup"
             );
+        }
+    }
+
+    /// A folder link inside a cache folder is the user's, for example an
+    /// `assets\indexes` shared with another launcher. Clearing the cache
+    /// never clears what the link points to. On Windows, where such a link
+    /// cannot be removed as a file, the link and the folders that hold it
+    /// stay, and the cleanup still succeeds.
+    #[tokio::test]
+    async fn clearing_a_cache_folder_leaves_what_a_folder_link_points_to() {
+        use crate::managers::server::world::link_folder;
+
+        let dir = tempfile::tempdir().unwrap();
+        let cache = dir.path().join("cache");
+        let nested = cache.join("nested");
+        let shared = dir.path().join("shared");
+        let shared2 = dir.path().join("shared2");
+        for folder in [&nested, &shared, &shared2] {
+            std::fs::create_dir_all(folder).unwrap();
+        }
+        std::fs::write(cache.join("old.bin"), b"old").unwrap();
+        std::fs::write(nested.join("old2.bin"), b"old").unwrap();
+        std::fs::write(shared.join("keep.json"), b"{}").unwrap();
+        std::fs::write(shared2.join("keep2.bin"), b"keep").unwrap();
+        // One link directly in the cleaned folder, one two levels down.
+        let links = [cache.join("indexes"), nested.join("linked")];
+        link_folder(&shared, &links[0]);
+        link_folder(&shared2, &links[1]);
+
+        let task = VisualTask::new(Translation::CacheCleanup);
+        let progress = Arc::new(AtomicU64::new(0));
+        let result = clear_dir_with_progress(
+            cache.clone(),
+            progress.clone(),
+            Arc::new(task.subtask(Translation::CacheCleanup)),
+            None,
+        )
+        .await;
+
+        assert!(
+            result.is_ok(),
+            "a folder link must not fail the cleanup: {result:?}"
+        );
+        assert!(shared.join("keep.json").exists(), "the link target is kept");
+        assert!(
+            shared2.join("keep2.bin").exists(),
+            "the link target is kept"
+        );
+        assert!(!cache.join("old.bin").exists(), "cache files are removed");
+        assert!(!nested.join("old2.bin").exists(), "cache files are removed");
+        #[cfg(windows)]
+        {
+            for link in &links {
+                assert!(
+                    std::fs::symlink_metadata(link).unwrap().is_symlink(),
+                    "{} must stay a link",
+                    link.display()
+                );
+            }
+            assert!(nested.exists(), "the folder holding a link stays");
+            assert_eq!(progress.load(Ordering::Relaxed), 2);
+        }
+        #[cfg(unix)]
+        {
+            for link in &links {
+                assert_eq!(
+                    std::fs::symlink_metadata(link).unwrap_err().kind(),
+                    std::io::ErrorKind::NotFound,
+                    "{} is unlinked",
+                    link.display()
+                );
+            }
+            assert!(!nested.exists(), "the emptied folder is removed");
+            assert_eq!(progress.load(Ordering::Relaxed), 4);
         }
     }
 }
