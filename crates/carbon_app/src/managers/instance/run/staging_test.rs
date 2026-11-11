@@ -4443,6 +4443,137 @@ async fn folders_on_another_drive_get_verified_copies() {
     );
 }
 
+/// A mods folder linked to a drive whose files all belong to another account
+/// (exFAT, FAT or an SMB share mounted without `uid=`), which refuses to
+/// change a copy's mode with EPERM even on a file just created there, or a
+/// drive without modes (ENOTSUP, EOPNOTSUPP): the verified copies keep the
+/// mode that drive gives them and the apply finishes. Any other failure to
+/// copy the mode still stops it, with the staged original kept and nothing
+/// left in the folder.
+#[cfg(unix)]
+#[tokio::test]
+async fn copies_onto_a_drive_that_keeps_its_own_modes_still_publish() {
+    use crate::util::publish::fault::{ENOTSUP, Step, inject, pending};
+    let (_tmp, root, staging) = scaffold();
+    let data = root.join("instance");
+    without_hard_links(root.clone());
+    on_another_drive(data.join("mods"));
+    const CREATE: [&str; 3] = ["/mods/a.jar", "/mods/b.jar", "/mods/c.jar"];
+    for (path, code) in CREATE
+        .into_iter()
+        .zip([libc::EPERM, ENOTSUP, libc::EOPNOTSUPP])
+    {
+        write_staged(&staging, path, path.as_bytes()).await;
+        inject(Step::Mode, &live_path(&root, path), code);
+    }
+    let entries: Vec<_> = CREATE
+        .into_iter()
+        .map(|path| PlanEntry {
+            path: path.into(),
+            action: PlanAction::Create,
+            reason: PlanReason::PackUpdate,
+        })
+        .collect();
+
+    let outcomes = execute_plan(&entries, &root, &staging).await.unwrap();
+
+    assert_eq!(outcomes, entries);
+    for path in CREATE {
+        let live = live_path(&root, path);
+        assert!(!pending(Step::Mode, &live), "the mode copy ran for {path}");
+        assert_eq!(std::fs::read(&live).unwrap(), path.as_bytes());
+        assert_eq!(
+            std::fs::read(staged_path(&staging, path)).unwrap(),
+            path.as_bytes()
+        );
+    }
+    assert_eq!(names(data.join("mods")), ["a.jar", "b.jar", "c.jar"]);
+
+    const FAILED: &str = "/mods/d.jar";
+    write_staged(&staging, FAILED, b"d").await;
+    inject(Step::Mode, &live_path(&root, FAILED), libc::EIO);
+    let error = execute_plan(
+        &[PlanEntry {
+            path: FAILED.into(),
+            action: PlanAction::Create,
+            reason: PlanReason::PackUpdate,
+        }],
+        &root,
+        &staging,
+    )
+    .await
+    .unwrap_err();
+    assert!(!pending(Step::Mode, &live_path(&root, FAILED)));
+    assert!(format!("{error:#}").contains("os error 5"), "{error:#}");
+    assert!(!live_path(&root, FAILED).exists());
+    assert_eq!(names(data.join("mods")), ["a.jar", "b.jar", "c.jar"]);
+    assert_eq!(std::fs::read(staged_path(&staging, FAILED)).unwrap(), b"d");
+}
+
+/// Representation changes publish a private copy of the staged file, also
+/// on the instance's own drive. On a drive whose files all belong to another
+/// account, or one without modes, that copy keeps the mode the drive gives
+/// it, as 2.0.40's rename did there: a pack update that now ships a mod
+/// disabled, and a Repair that re-enables a damaged disabled mod from its
+/// staged bytes, both finish.
+#[cfg(unix)]
+#[tokio::test]
+async fn representation_changes_land_on_a_drive_that_keeps_its_own_modes() {
+    use crate::util::publish::fault::{ENOTSUP, Step, inject, pending};
+    for code in [libc::EPERM, ENOTSUP] {
+        let (_tmp, root, staging) = scaffold();
+        const DISABLED: &str = "/mods/becomes-disabled.jar";
+        write_live(&root, DISABLED, b"old-enabled-bytes").await;
+        write_staged(
+            &staging,
+            &format!("{DISABLED}.disabled"),
+            b"new-disabled-bytes",
+        )
+        .await;
+        inject(Step::Mode, &disabled_path(&root, DISABLED), code);
+        let entries = vec![PlanEntry {
+            path: DISABLED.into(),
+            action: PlanAction::Replace,
+            reason: PlanReason::PackUpdate,
+        }];
+        execute_plan(&entries, &root, &staging)
+            .await
+            .expect("the pack-shipped-disabled copy is published");
+        assert!(
+            !pending(Step::Mode, &disabled_path(&root, DISABLED)),
+            "the mode copy ran"
+        );
+        assert!(!live_path(&root, DISABLED).exists());
+        assert_eq!(
+            std::fs::read(disabled_path(&root, DISABLED)).unwrap(),
+            b"new-disabled-bytes"
+        );
+
+        let (_tmp, root, staging) = scaffold();
+        const REENABLE: &str = "/mods/damaged.jar";
+        write_disabled(&root, REENABLE, b"damaged-disabled-bytes").await;
+        write_staged(&staging, REENABLE, b"fresh-pack-bytes").await;
+        inject(Step::Mode, &live_path(&root, REENABLE), code);
+        let entries = vec![PlanEntry {
+            path: REENABLE.into(),
+            action: PlanAction::ReEnable,
+            reason: PlanReason::ReEnabled,
+        }];
+        execute_plan(&entries, &root, &staging)
+            .await
+            .expect("the re-enabled copy is published from the staged bytes");
+        assert!(
+            !pending(Step::Mode, &live_path(&root, REENABLE)),
+            "the mode copy ran"
+        );
+        assert_eq!(
+            std::fs::read(live_path(&root, REENABLE)).unwrap(),
+            b"fresh-pack-bytes"
+        );
+        assert!(!disabled_path(&root, REENABLE).exists());
+    }
+}
+
 /// A link refused for any other reason, on a volume that has links, still
 /// publishes: by a move, as before the link existed.
 #[tokio::test]

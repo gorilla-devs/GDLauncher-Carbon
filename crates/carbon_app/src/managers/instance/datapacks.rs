@@ -142,8 +142,29 @@ impl ManagerRef<'_, InstanceManager> {
                 "This world already contains that datapack filename; existing content was retained"
             );
         }
-        let temporary = crate::util::publish::temp_in(&path.get_root())?;
-        tokio::fs::copy(&source, temporary.path()).await?;
+        let destination = folder.join(&row.filename);
+        // Not std's copy: it always copies the mode and fails where the drive
+        // refuses that, as one whose files all belong to another account
+        // does. There the copy keeps the mode the drive gives it.
+        let temporary = {
+            let (source, root, destination) =
+                (source.clone(), path.get_root(), destination.clone());
+            tokio::task::spawn_blocking(move || -> std::io::Result<_> {
+                let mut input = std::fs::File::open(&source)?;
+                let mut temporary = crate::util::publish::temp_in(&root)?;
+                std::io::copy(&mut input, temporary.as_file_mut())?;
+                #[cfg(unix)]
+                crate::util::publish::copy_mode(
+                    temporary.as_file(),
+                    input.metadata()?.permissions(),
+                    &destination,
+                )?;
+                #[cfg(not(unix))]
+                let _ = destination;
+                Ok(temporary)
+            })
+            .await??
+        };
         if publication::file_digest(temporary.path()).await? != source_digest
             || publication::file_digest(&source).await? != source_digest
         {
@@ -165,8 +186,7 @@ impl ManagerRef<'_, InstanceManager> {
             bail!("Datapack destination became occupied; existing content retained");
         }
         // Off the runtime: a world folder on another drive makes this a copy.
-        crate::util::publish::persist_noclobber_async(temporary, &folder.join(&row.filename))
-            .await?;
+        crate::util::publish::persist_noclobber_async(temporary, &destination).await?;
         Ok(request.world.name)
     }
 }
@@ -410,6 +430,73 @@ mod tests {
             std::fs::read(world.join("datapacks/pack.zip")).unwrap(),
             bytes
         );
+    }
+
+    /// The copy keeps the staged datapack's mode. An instance on a drive
+    /// whose files all belong to another account (exFAT, FAT or an SMB share
+    /// mounted without `uid=`) refuses that with EPERM even on a file just
+    /// created there; the datapack still lands, with the mode the drive
+    /// gives it, and no private copy is left in the instance folder.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_world_on_a_drive_that_keeps_its_own_modes_takes_the_datapack() {
+        use crate::util::publish::fault::{Step, inject, pending};
+        use std::os::unix::fs::PermissionsExt;
+        let app = crate::setup_managers_for_test().await;
+        let bytes = zip_bytes();
+        let (id, row, source) = addon_fixture(
+            &app,
+            "fixed-owner-drive",
+            AddonType::DataPacks,
+            "pack.zip",
+            &bytes,
+        )
+        .await;
+        std::fs::set_permissions(&source, std::fs::Permissions::from_mode(0o640)).unwrap();
+        let path = publication::current_path(&app, id).await.unwrap();
+        let root_entries = || {
+            let mut names: Vec<_> = std::fs::read_dir(path.get_root())
+                .unwrap()
+                .map(|entry| entry.unwrap().file_name())
+                .collect();
+            names.sort();
+            names
+        };
+        let before = root_entries();
+        for (world_name, refused) in [("Ordinary", false), ("FixedOwner", true)] {
+            let world = path.get_saves_path().join(world_name);
+            std::fs::create_dir_all(&world).unwrap();
+            std::fs::write(world.join("level.dat"), b"save").unwrap();
+            let selected = app
+                .instance_manager()
+                .datapack_worlds(id)
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|world| world.name == world_name)
+                .unwrap();
+            let copied = world.join("datapacks").join("pack.zip");
+            if refused {
+                inject(Step::Mode, &copied, libc::EPERM);
+            }
+            app.instance_manager()
+                .copy_datapack(CopyDatapack {
+                    instance_id: *id,
+                    mod_id: row.id.clone(),
+                    world: selected,
+                })
+                .await
+                .unwrap();
+            assert!(!pending(Step::Mode, &copied), "the mode copy ran");
+            assert_eq!(std::fs::read(&copied).unwrap(), bytes);
+            if !refused {
+                assert_eq!(
+                    std::fs::metadata(&copied).unwrap().permissions().mode() & 0o777,
+                    0o640
+                );
+            }
+            assert_eq!(root_entries(), before);
+        }
     }
 
     /// Listing the saves changes nothing, so the Addons tab shows them (and

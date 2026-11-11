@@ -20,7 +20,8 @@
 //!   Async callers use [`move_noclobber_async`] and
 //!   [`persist_noclobber_async`], which keep that copy off the runtime.
 //!   The copy gets its source's mode, except on a volume that decides modes
-//!   itself (all files owned by one fixed account, or no modes at all).
+//!   itself (all files owned by one fixed account, or no modes at all);
+//!   callers that make their own private copies use [`copy_mode`] for that.
 //! - Windows file attributes: tempfile's persist marks the file it moves
 //!   NORMAL first, and TEMPORARY again when the move fails. That suits the
 //!   private files it created, but not a user's file, so [`move_noclobber`]
@@ -485,16 +486,17 @@ fn copy_noclobber(source: &Path, destination: &Path, cross_device: io::Error) ->
     Ok(())
 }
 
-/// Gives a cross-volume copy its source's mode, as a rename keeps it. A
-/// volume whose files all belong to one fixed account (FAT, exFAT or an SMB
-/// share mounted without `uid=`, a VirtualBox shared folder) refuses this
-/// with EPERM even on a file just created, because the caller does not own
-/// it; volumes without modes answer ENOTSUP or EOPNOTSUPP. On those volumes
-/// the mount decides every file's mode, so the copy is published with that
-/// mode, as 2.0.40 wrote addons there without changing any mode. Any other
-/// failure stops the move.
+/// Gives a private copy (`file`, to be published at `destination`) its
+/// source's mode, as a rename would keep it. A volume whose files all belong
+/// to one fixed account (FAT, exFAT or an SMB share mounted without `uid=`,
+/// a VirtualBox shared folder) refuses this with EPERM even on a file just
+/// created, because the caller does not own it; volumes without modes
+/// answer ENOTSUP or EOPNOTSUPP. On those volumes the mount decides every
+/// file's mode, so the copy is published with that mode, as 2.0.40 wrote
+/// addons and pack files there without changing any mode. Any other failure
+/// is returned, and the caller drops the copy.
 #[cfg(unix)]
-fn copy_mode(
+pub(crate) fn copy_mode(
     file: &std::fs::File,
     permissions: std::fs::Permissions,
     destination: &Path,
@@ -575,7 +577,7 @@ pub(crate) mod fault {
         /// The hard link of the unix fallback.
         #[cfg(unix)]
         Link,
-        /// Copying the source's mode onto a cross-volume copy.
+        /// Copying the source's mode onto a private copy ([`super::copy_mode`]).
         #[cfg(unix)]
         Mode,
         /// Removing the source once its link or copy is published.

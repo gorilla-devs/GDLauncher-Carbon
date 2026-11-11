@@ -2096,9 +2096,13 @@ async fn copy_staged(
         if expected.is_some_and(|hash| hash != actual) {
             return Err(StagedSourceChanged(source).into());
         }
-        private
-            .as_file()
-            .set_permissions(input.metadata()?.permissions())?;
+        let permissions = input.metadata()?.permissions();
+        // On a drive whose files all belong to another account the copy
+        // keeps the mode the drive gives it, as 2.0.40's rename did there.
+        #[cfg(unix)]
+        publish::copy_mode(private.as_file(), permissions, &destination)?;
+        #[cfg(not(unix))]
+        private.as_file().set_permissions(permissions)?;
         private.as_file().sync_all()?;
         #[cfg(test)]
         staging_test::run_hook("publish", &destination);
