@@ -174,9 +174,6 @@ export function Grid() {
 
   return (
     <div ref={containerRef} class="flex h-full flex-col overflow-hidden">
-      <Show when={searchContext?.directErrors().length}>
-        <div role="alert">{searchContext?.directErrors().join("; ")}</div>
-      </Show>
       <div class="flex-1 overflow-hidden">
         <Show
           when={

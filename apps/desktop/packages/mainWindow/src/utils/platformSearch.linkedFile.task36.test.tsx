@@ -771,6 +771,23 @@ it("a modpack link whose file is gone still offers no row", async () => {
   )
 })
 
+it.each(["list", "grid"] as const)(
+  "%s: a modpack link whose file is gone shows its error once",
+  async (view) => {
+    backend({
+      fileError: new Error("synthetic lookup failure"),
+      type: "modpack"
+    })
+    const root = searchLink("", view)
+    await flush()
+    const alerts = root.querySelectorAll('[role="alert"]')
+    expect(alerts).toHaveLength(1)
+    expect(alerts[0].textContent).toContain(
+      "search:_trn_linked_pack_file_failed"
+    )
+  }
+)
+
 it("the addon page drops a mod link's file that cannot be loaded and says so", async () => {
   backend({ fileError: new Error("synthetic lookup failure") })
   const root = addonPage(1)
