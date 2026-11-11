@@ -969,10 +969,23 @@ fn selected_native_outputs(
     Ok(outputs)
 }
 
+/// Whether this extracted native is already in place. A link that leads to a
+/// regular file counts, so a library the user pointed elsewhere (for example
+/// at the system GLFW) is kept as it is. A folder, or a link that is dangling
+/// or leads to anything but a file, is refused rather than replaced.
 fn native_output_present(path: &Path) -> anyhow::Result<bool> {
     match std::fs::symlink_metadata(path) {
         Ok(meta) if meta.is_file() => Ok(true),
-        Ok(_) => anyhow::bail!("Native output is not a regular file: {}", path.display()),
+        Ok(meta)
+            if meta.file_type().is_symlink()
+                && std::fs::metadata(path).is_ok_and(|target| target.is_file()) =>
+        {
+            Ok(true)
+        }
+        Ok(_) => anyhow::bail!(
+            "Native output is not a regular file or a link to one: {}",
+            path.display()
+        ),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(false),
         Err(e) => Err(e.into()),
     }
@@ -1071,6 +1084,15 @@ fn extract_native_cache(dest: &Path, archives: &[PathBuf], arch_tag: &str) -> an
         } else {
             // Keep the existing different/unknown-architecture replacement policy.
             // The shared version path does not provide cross-architecture live isolation.
+            // A link is replaced, never written through: copying onto it would
+            // overwrite the file it points to, such as a system library.
+            if std::fs::symlink_metadata(&target).is_ok_and(|meta| meta.file_type().is_symlink()) {
+                warn!(
+                    "Replacing the linked native {} with the extracted one",
+                    target.display()
+                );
+                std::fs::remove_file(&target)?;
+            }
             std::fs::copy(staging.path().join(path), &target)?;
         }
     }
@@ -1962,5 +1984,147 @@ mod task17_native_tests {
             b"competing parent occupant"
         );
         assert_eq!(std::fs::read(&source).unwrap(), b"complete archive output");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn native_output_present_accepts_files_and_links_to_files_only() {
+        use std::os::unix::fs::symlink;
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("file");
+        let folder = dir.path().join("folder");
+        let missing = dir.path().join("missing");
+        std::fs::write(&file, b"file").unwrap();
+        std::fs::create_dir(&folder).unwrap();
+        let file_link = dir.path().join("file-link");
+        let dangling_link = dir.path().join("dangling-link");
+        let folder_link = dir.path().join("folder-link");
+        symlink(&file, &file_link).unwrap();
+        symlink(&missing, &dangling_link).unwrap();
+        symlink(&folder, &folder_link).unwrap();
+        assert!(native_output_present(&file).unwrap());
+        assert!(native_output_present(&file_link).unwrap());
+        assert!(!native_output_present(&missing).unwrap());
+        for refused in [&folder, &dangling_link, &folder_link] {
+            assert!(
+                native_output_present(refused).is_err(),
+                "{}",
+                refused.display()
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn native_cache_keeps_a_library_the_user_linked_elsewhere() {
+        let (_dir, runtime, version, group) = fixture();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        let dest = runtime.get_natives().get_versioned(&version.id);
+        let one = dest.join(format!("one.{}", std::env::consts::DLL_EXTENSION));
+        let two = dest.join(format!("nested/two.{}", std::env::consts::DLL_EXTENSION));
+        let outside = tempfile::tempdir().unwrap();
+        let system = outside
+            .path()
+            .join(format!("libsystem.{}", std::env::consts::DLL_EXTENSION));
+        std::fs::write(&system, b"system").unwrap();
+        std::fs::remove_file(&one).unwrap();
+        std::os::unix::fs::symlink(&system, &one).unwrap();
+        let link_untouched = || {
+            assert!(
+                std::fs::symlink_metadata(&one)
+                    .unwrap()
+                    .file_type()
+                    .is_symlink()
+            );
+            assert_eq!(std::fs::read_link(&one).unwrap(), system);
+            assert_eq!(std::fs::read(&system).unwrap(), b"system");
+        };
+
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .expect("a link to a library counts as a native in place");
+        link_untouched();
+
+        // A missing sibling is restored next to the link, which stays as it is.
+        std::fs::remove_file(&two).unwrap();
+        extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+            .await
+            .unwrap();
+        assert_eq!(std::fs::read(&two).unwrap(), b"two");
+        link_untouched();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn native_cache_architecture_change_replaces_a_link_without_writing_through_it() {
+        for marker in [Some("different-arch"), None] {
+            let (_dir, runtime, version, group) = fixture();
+            extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+                .await
+                .unwrap();
+            let dest = runtime.get_natives().get_versioned(&version.id);
+            let one = dest.join(format!("one.{}", std::env::consts::DLL_EXTENSION));
+            let outside = tempfile::tempdir().unwrap();
+            let system = outside
+                .path()
+                .join(format!("libsystem.{}", std::env::consts::DLL_EXTENSION));
+            std::fs::write(&system, b"system").unwrap();
+            std::fs::remove_file(&one).unwrap();
+            std::os::unix::fs::symlink(&system, &one).unwrap();
+            let marker_path = dest.join(".gdl_natives_extracted");
+            match marker {
+                Some(contents) => std::fs::write(&marker_path, contents).unwrap(),
+                None => std::fs::remove_file(&marker_path).unwrap(),
+            }
+
+            extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+                .await
+                .unwrap();
+            assert_eq!(
+                std::fs::read(&system).unwrap(),
+                b"system",
+                "marker {marker:?}: the linked library must not be overwritten"
+            );
+            assert!(std::fs::symlink_metadata(&one).unwrap().is_file());
+            assert_eq!(std::fs::read(&one).unwrap(), b"one");
+            assert_eq!(std::fs::read_to_string(&marker_path).unwrap(), "X86_64");
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn native_cache_refuses_a_dangling_link_or_a_folder_link_without_touching_it() {
+        for marker in ["X86_64", "different-arch"] {
+            let (_dir, runtime, version, group) = fixture();
+            extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+                .await
+                .unwrap();
+            let dest = runtime.get_natives().get_versioned(&version.id);
+            let one = dest.join(format!("one.{}", std::env::consts::DLL_EXTENSION));
+            std::fs::write(dest.join(".gdl_natives_extracted"), marker).unwrap();
+            let outside = tempfile::tempdir().unwrap();
+            let missing = outside
+                .path()
+                .join(format!("missing.{}", std::env::consts::DLL_EXTENSION));
+            let folder = outside.path().join("folder");
+            std::fs::create_dir(&folder).unwrap();
+            std::fs::remove_file(&one).unwrap();
+            for link_target in [&missing, &folder] {
+                std::os::unix::fs::symlink(link_target, &one).unwrap();
+                assert!(
+                    extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
+                        .await
+                        .is_err(),
+                    "marker {marker}: link to {}",
+                    link_target.display()
+                );
+                assert_eq!(std::fs::read_link(&one).unwrap(), *link_target);
+                assert!(std::fs::symlink_metadata(&missing).is_err());
+                assert_eq!(std::fs::read_dir(&folder).unwrap().count(), 0);
+                std::fs::remove_file(&one).unwrap();
+            }
+        }
     }
 }
