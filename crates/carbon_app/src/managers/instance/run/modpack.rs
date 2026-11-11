@@ -2012,17 +2012,39 @@ async fn sync_recovery_hierarchy(root: &Path, batch: &Path) -> anyhow::Result<()
     fsync_dir(batch).await
 }
 
+#[cfg(windows)]
+const ERROR_ACCESS_DENIED: i32 = 5;
+
 async fn sync_recovery_payload(payload: &Path) -> anyhow::Result<()> {
     #[cfg(test)]
     staging_test::io_fault("sync-file", payload)?;
     let mut options = tokio::fs::OpenOptions::new();
     options.read(true);
     // Windows FlushFileBuffers requires a write-capable handle. Do not
-    // change permissions: an unsupported/denied flush preserves the payload
-    // and reports failure rather than claiming durable completion.
+    // change attributes or permissions: a flush refused for any reason other
+    // than the one below keeps the payload and reports the failure rather
+    // than claiming durable completion.
     #[cfg(windows)]
     options.write(true);
-    options.open(payload).await?.sync_all().await?;
+    let file = options.open(payload).await;
+    // A file the user marked read-only keeps that attribute through the move
+    // (as 2.0.40's renames kept it), and Windows refuses it a write handle.
+    // This apply wrote none of its bytes and the move has already landed, so
+    // there is nothing of ours to flush. 2.0.40 deleted such a file outright.
+    #[cfg(windows)]
+    if let Err(error) = &file
+        && error.raw_os_error() == Some(ERROR_ACCESS_DENIED)
+        && tokio::fs::metadata(payload)
+            .await
+            .is_ok_and(|m| m.is_file() && m.permissions().readonly())
+    {
+        tracing::debug!(
+            "{} is read-only; its move is not flushed",
+            payload.display()
+        );
+        return Ok(());
+    }
+    file?.sync_all().await?;
     Ok(())
 }
 

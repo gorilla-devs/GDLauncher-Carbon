@@ -3301,6 +3301,146 @@ async fn task03_r1_completion_record_failure_reuses_original_payload_and_audit()
     }
 }
 
+/// Sets or clears the read-only attribute (on Unix, every write bit).
+fn set_readonly(path: &std::path::Path, readonly: bool) {
+    let mut permissions = std::fs::metadata(path).unwrap().permissions();
+    permissions.set_readonly(readonly);
+    std::fs::set_permissions(path, permissions).unwrap();
+}
+
+/// A mod file the user marked read-only keeps that attribute through its move
+/// aside, so Windows refuses to open the moved copy for writing. Switching
+/// the mod between its enabled and disabled spelling still finishes, on a
+/// first apply and on one resumed after an interruption, as 2.0.40's apply
+/// did, and the copy moved aside stays read-only.
+#[tokio::test]
+async fn a_read_only_original_is_kept_aside_when_its_mod_switches_between_enabled_and_disabled() {
+    for disabled in [false, true] {
+        for interrupted in [false, true] {
+            let (_tmp, root, staging) = scaffold();
+            let path = "/mods/a.jar";
+            let (original, destination) = if disabled {
+                (live_path(&root, path), disabled_path(&root, path))
+            } else {
+                (disabled_path(&root, path), live_path(&root, path))
+            };
+            std::fs::create_dir_all(original.parent().unwrap()).unwrap();
+            std::fs::write(&original, b"original").unwrap();
+            set_readonly(&original, true);
+            write_staged(
+                &staging,
+                if disabled {
+                    "/mods/a.jar.disabled"
+                } else {
+                    path
+                },
+                b"target",
+            )
+            .await;
+            let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+                .await
+                .unwrap();
+            let options = super::RepairMarkerFile {
+                re_enable_disabled: true,
+                ..Default::default()
+            };
+            if interrupted {
+                // Leaves the original moved aside and its record not yet
+                // completed, so the next apply resumes at the flush.
+                fail_io("transition-complete", super::transition_path(&root, path));
+                assert!(
+                    round1_apply(&root, &staging, &target, &options)
+                        .await
+                        .is_err()
+                );
+            }
+            round1_apply(&root, &staging, &target, &options)
+                .await
+                .unwrap();
+            let record = super::read_transition(&super::transition_path(&root, path))
+                .await
+                .unwrap();
+            assert!(
+                record.completed && !record.conflict,
+                "{disabled} {interrupted}"
+            );
+            let payload = super::transition_batch(&root, &record)
+                .join(super::record_key(path))
+                .join("payload");
+            assert_eq!(std::fs::read(&payload).unwrap(), b"original");
+            assert!(
+                std::fs::metadata(&payload)
+                    .unwrap()
+                    .permissions()
+                    .readonly()
+            );
+            assert_eq!(std::fs::read(&destination).unwrap(), b"target");
+            assert!(!original.exists());
+            set_readonly(&payload, false);
+        }
+    }
+}
+
+/// A read-only file the user ticked for removal leaves the instance, and its
+/// copy in `.repair-recovery` goes once the setup is done with it, instead of
+/// staying pending for good because Windows refuses to open it for writing.
+#[tokio::test]
+async fn a_read_only_file_ticked_for_cleanup_leaves_and_its_copy_is_pruned() {
+    let (_tmp, root, _) = scaffold();
+    let path = "/config/retired.cfg";
+    write_live(&root, path, b"retired").await;
+    set_readonly(&live_path(&root, path), true);
+    let options = cleanup_options(&root, path).await;
+    std::fs::write(
+        root.join(".setup/repair"),
+        serde_json::to_vec(&options).unwrap(),
+    )
+    .unwrap();
+    let report = bound_cleanup(
+        &options,
+        None,
+        &packinfo(&[("/config/current.cfg", 1)]),
+        &root,
+        false,
+    )
+    .await;
+    assert_eq!(report.removed, [path], "{:?}", report.notes);
+    assert!(!live_path(&root, path).exists());
+    let entry = root
+        .join(".repair-recovery")
+        .join(options.cleanup_batch.as_ref().unwrap())
+        .join(super::record_key(path));
+    let record: serde_json::Value =
+        serde_json::from_slice(&std::fs::read(entry.join("entry.json")).unwrap()).unwrap();
+    assert_eq!(record["status"], super::CLEANUP_REMOVED);
+
+    super::prune_settled_recovery(&root, &root.join(".setup")).await;
+    assert!(!entry.exists());
+}
+
+/// On Windows only a recovery copy that is read-only skips its flush: one
+/// that another program holds open without sharing still reports the
+/// refusal.
+#[cfg(windows)]
+#[tokio::test]
+async fn only_a_read_only_recovery_copy_skips_its_flush() {
+    use std::os::windows::fs::OpenOptionsExt;
+    let tmp = tempfile::tempdir().unwrap();
+    let payload = tmp.path().join("payload");
+    std::fs::write(&payload, b"moved aside").unwrap();
+    let held = std::fs::OpenOptions::new()
+        .read(true)
+        .share_mode(0)
+        .open(&payload)
+        .unwrap();
+    assert!(super::sync_recovery_payload(&payload).await.is_err());
+    drop(held);
+
+    set_readonly(&payload, true);
+    super::sync_recovery_payload(&payload).await.unwrap();
+    set_readonly(&payload, false);
+}
+
 #[cfg(unix)]
 #[tokio::test]
 async fn task03_r1_intent_and_manifest_write_failure_preserve_live_and_resume() {
