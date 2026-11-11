@@ -185,6 +185,14 @@ it("GPT-0127 native Language activation reaches its real changeLanguage handler"
   root.querySelectorAll<HTMLInputElement>("input")[1].click()
   expect(c.changeLanguage).toHaveBeenCalledExactlyOnceWith("de")
 })
+it("Language calls changeLanguage again when the same language is clicked after its save did not apply", async () => {
+  // The mocked settings stay on "en", as after a failed save.
+  const root = mount(() => <Language />)
+  root.querySelectorAll<HTMLInputElement>("input")[1].click()
+  await Promise.resolve()
+  root.querySelectorAll<HTMLInputElement>("input")[1].click()
+  expect(c.changeLanguage.mock.calls).toEqual([["de"], ["de"]])
+})
 it("GPT-0127 inactive sidebar copies and collapsed descendants are inert", () => {
   const { query, setDocked, setReady } = searchFixture()
   const root = mount(() => <FilterSidebar />)

@@ -31,6 +31,28 @@ interface Option {
 
 type ButtonStyle = "standard" | "button"
 
+/** Sets one radio input's native checked state back to its `checked` prop. */
+const restoreChecked = new WeakMap<HTMLInputElement, () => void>()
+
+/**
+ * The browser checks a clicked radio, and unchecks the rest of its group,
+ * before `onChange` runs, and clicking a radio that is already checked fires
+ * no change. Once the handler has run, set every radio of the group back to
+ * its `checked` prop: if the parent did not apply the choice (a refused or
+ * failed save), a second click then fires change again, and the browser
+ * reports the option that is drawn as selected. Solid sets the new state
+ * when the parent's value changes.
+ */
+const restoreGroup = (input: HTMLInputElement) =>
+  queueMicrotask(() => {
+    const root = input.getRootNode() as ParentNode
+    root
+      .querySelectorAll<HTMLInputElement>('input[type="radio"]')
+      .forEach((radio) => {
+        if (radio.name === input.name) restoreChecked.get(radio)?.()
+      })
+  })
+
 interface GroupProps {
   onChange?: OnChange
   value?: string | number | string[] | undefined
@@ -62,7 +84,13 @@ const Radio = (props: Props) => {
         }
         checked={props.checked}
         id={id}
-        onChange={() => {
+        ref={(el) =>
+          restoreChecked.set(el, () => {
+            el.checked = props.checked
+          })
+        }
+        onChange={(event) => {
+          restoreGroup(event.currentTarget)
           if (props.disabled) return
           if (props.buttonStyle !== "button") props.onChange?.(props.value)
         }}
