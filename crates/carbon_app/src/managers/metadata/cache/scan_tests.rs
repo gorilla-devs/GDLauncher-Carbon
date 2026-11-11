@@ -744,6 +744,68 @@ async fn an_interrupted_pass_keeps_what_it_already_read() {
     drop(pause);
 }
 
+/// Reopening an instance's Addons tab while a pass of it is still reading
+/// lists the files added to the folder after that pass took its snapshot: the
+/// running pass finishes without being restarted, and one more pass reads
+/// what it could not see before the second visit is answered.
+#[tokio::test]
+async fn a_visit_during_a_pass_lists_files_added_after_it_started() {
+    let app = crate::setup_managers_for_test().await;
+    let (id, first) = addon_fixture(
+        &app,
+        "scan-late-visit",
+        AddonType::Mods,
+        "mod-00.jar",
+        b"mod 0",
+    )
+    .await;
+    let slow = first.with_file_name("slow.jar");
+    std::fs::write(&slow, b"slow").unwrap();
+    let mcm = app.meta_cache_manager();
+    mcm.clear_scan_observations();
+    let pause = mcm.arm_scan_pause(&slow, "hash");
+    // The first visit.
+    start_background_pass(&app, id).await;
+    tokio::time::timeout(Duration::from_secs(5), pause.entered.notified())
+        .await
+        .expect("the first visit's pass reaches slow.jar");
+
+    let late = first.with_file_name("late.jar");
+    std::fs::write(&late, b"late").unwrap();
+    // The second visit, made while the first visit's pass is still reading.
+    let (tx, rx) = oneshot::channel();
+    mcm.local_targets
+        .send_modify_always(|targets| {
+            targets.set_priority(CacheTarget {
+                entity_id: CacheEntityId::Instance(id),
+                callback: Some(Box::new(move |r| {
+                    let _ = tx.send(r);
+                })),
+            })
+        })
+        .await;
+    pause.release.notify_one();
+    tokio::time::timeout(Duration::from_secs(5), rx)
+        .await
+        .expect("the second visit is answered")
+        .unwrap()
+        .unwrap();
+
+    assert!(
+        rows(&app, id)
+            .await
+            .iter()
+            .any(|row| row.filename == "late.jar"),
+        "a file added before the second visit is listed once it is answered"
+    );
+    assert_eq!(mcm.scan_observations(&late, "hash"), 1);
+    assert_eq!(
+        mcm.scan_observations(&slow, "hash"),
+        1,
+        "the first pass is not restarted by the second visit"
+    );
+}
+
 /// A freshly imported pack fills the addon list while it is read, instead of
 /// showing "No addons installed" until the last file is done.
 #[tokio::test]

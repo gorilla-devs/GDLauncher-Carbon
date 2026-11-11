@@ -598,6 +598,10 @@ struct CacheTargets {
     /// and cleared when a pass that observed them completes.
     verify: HashMap<CacheEntityId, VerifyScope>,
     generations: HashMap<CacheEntityId, u64>,
+    /// Priority and background requests made per entity. Not part of a
+    /// pass's identity, so a repeated request never interrupts a running
+    /// pass; a pass that ends after one was made runs once more instead.
+    requests: HashMap<CacheEntityId, u64>,
 }
 
 struct CacheTarget {
@@ -611,6 +615,7 @@ struct CacheTargetInfo {
     is_priority: bool,
     verify: VerifyScope,
     generation: u64,
+    requests: u64,
 }
 
 impl CacheTargets {
@@ -621,7 +626,12 @@ impl CacheTargets {
             waiting: VecDeque::new(),
             verify: HashMap::new(),
             generations: HashMap::new(),
+            requests: HashMap::new(),
         }
+    }
+
+    fn request_count(&self, entity_id: CacheEntityId) -> u64 {
+        self.requests.get(&entity_id).copied().unwrap_or(0)
     }
 
     fn verify_scope(&self, entity_id: CacheEntityId) -> VerifyScope {
@@ -643,6 +653,7 @@ impl CacheTargets {
                     .priority
                     .as_ref()
                     .is_some_and(|p| p.entity_id == target.entity_id),
+                requests: self.request_count(target.entity_id),
             })
         } else if let Some(target) = &self.priority {
             Some(CacheTargetInfo {
@@ -655,6 +666,7 @@ impl CacheTargets {
                     .get(&target.entity_id)
                     .copied()
                     .unwrap_or(0),
+                requests: self.request_count(target.entity_id),
             })
         } else {
             self.waiting.front().map(|&entity_id| CacheTargetInfo {
@@ -663,6 +675,7 @@ impl CacheTargets {
                 is_priority: false,
                 verify: self.verify_scope(entity_id),
                 generation: self.generations.get(&entity_id).copied().unwrap_or(0),
+                requests: self.request_count(entity_id),
             })
         }
     }
@@ -671,32 +684,69 @@ impl CacheTargets {
         &mut self,
         entity_id: CacheEntityId,
         generation: u64,
+        requests: u64,
         r: anyhow::Result<()>,
     ) -> bool {
         if self.generations.get(&entity_id).copied().unwrap_or(0) != generation {
             return true; // Re-run the live request; this pass did not observe it.
         }
+        let queued = self.waiting.contains(&entity_id);
+        let prioritized = self
+            .priority
+            .as_ref()
+            .is_some_and(|t| t.entity_id == entity_id);
+        if self.request_count(entity_id) != requests && (queued || prioritized) {
+            // A priority or background request made after this pass was chosen
+            // may be about files its snapshot missed. Answer the overrides this
+            // pass observed and keep that request for one more pass.
+            self.release_override(entity_id, &r);
+            if !queued {
+                // Priority requests never ask for verification, so this pass
+                // read everything the stored scope asked for.
+                self.verify.remove(&entity_id);
+            }
+            return true;
+        }
         self.release_target(entity_id, r)
+    }
+
+    fn complete_target(target: &mut CacheTarget, r: &anyhow::Result<()>) {
+        let entity_id = target.entity_id;
+        if let Some(callback) = target.callback.take() {
+            callback.complete(
+                r.as_ref()
+                    .map(|_| ())
+                    .map_err(|error| anyhow!("error caching mods for {entity_id}: {error:#}")),
+            );
+        }
+    }
+
+    fn release_override(&mut self, entity_id: CacheEntityId, r: &anyhow::Result<()>) -> bool {
+        if let Some(index) = self
+            .backend_override
+            .iter()
+            .position(|t| t.entity_id == entity_id)
+        {
+            let mut target = self.backend_override.remove(index).unwrap();
+            Self::complete_target(&mut target, r);
+            true
+        } else {
+            false
+        }
     }
 
     fn release_target(&mut self, entity_id: CacheEntityId, r: anyhow::Result<()>) -> bool {
         self.verify.remove(&entity_id);
-        let mut changed = false;
+        let mut changed = self.release_override(entity_id, &r);
 
-        let check_target_callback =
-            |target: &mut CacheTarget| {
-                if target.entity_id == entity_id {
-                    if let Some(callback) = target.callback.take() {
-                        callback.complete(r.as_ref().map(|_| ()).map_err(|error| {
-                            anyhow!("error caching mods for {entity_id}: {error:#}")
-                        }));
-                    }
-
-                    true
-                } else {
-                    false
-                }
-            };
+        let check_target_callback = |target: &mut CacheTarget| {
+            if target.entity_id == entity_id {
+                Self::complete_target(target, &r);
+                true
+            } else {
+                false
+            }
+        };
 
         let release_target = |target_option: &mut Option<CacheTarget>| {
             if let Some(target) = target_option {
@@ -710,15 +760,6 @@ impl CacheTargets {
             false
         };
 
-        if let Some(index) = self
-            .backend_override
-            .iter()
-            .position(|t| t.entity_id == entity_id)
-        {
-            let mut target = self.backend_override.remove(index).unwrap();
-            check_target_callback(&mut target);
-            changed = true;
-        }
         changed |= release_target(&mut self.priority);
 
         let mut i = 0;
@@ -787,7 +828,14 @@ impl CacheTargets {
 
     fn set_priority(&mut self, target: CacheTarget) {
         self.cancel_priority();
+        *self.requests.entry(target.entity_id).or_default() += 1;
         self.priority = Some(target);
+    }
+
+    /// Queue a background pass for `entity_id`.
+    fn queue(&mut self, entity_id: CacheEntityId) {
+        *self.requests.entry(entity_id).or_default() += 1;
+        self.waiting.push_back(entity_id);
     }
 
     /// Queue an explicit pass that also re-reads the bytes of `verify`'s
@@ -1061,6 +1109,7 @@ fn cache_modplatform<C: ModplatformCacher>(
                 is_override,
                 verify: _,
                 generation,
+                requests,
             }| async move {
                 let mut pause = app.meta_cache_manager().pause_caching.subscribe();
                 let r = loop {
@@ -1142,7 +1191,9 @@ fn cache_modplatform<C: ModplatformCacher>(
                     };
                 };
 
-                move |targets: &mut CacheTargets| targets.release_pass(entity_id, generation, r)
+                move |targets: &mut CacheTargets| {
+                    targets.release_pass(entity_id, generation, requests, r)
+                }
             },
         );
 
@@ -1369,7 +1420,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                     let scope = targets.verify.entry(entity_id).or_default();
                     *scope = scope.union(VerifyScope::ALL);
                 }
-                targets.waiting.push_back(entity_id);
+                targets.queue(entity_id);
             })
             .await;
     }
@@ -4199,6 +4250,7 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                 is_priority,
                 verify,
                 generation,
+                requests,
             }| async move {
                 let mut pause = app.meta_cache_manager().pause_caching.subscribe();
                 let r = loop {
@@ -4241,8 +4293,8 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                             let mcm = app.meta_cache_manager();
 
                             join!(
-                                mcm.curseforge_targets.send_modify_always(|targets| targets.waiting.push_back(entity_id)),
-                                mcm.modrinth_targets.send_modify_always(|targets| targets.waiting.push_back(entity_id)),
+                                mcm.curseforge_targets.send_modify_always(|targets| targets.queue(entity_id)),
+                                mcm.modrinth_targets.send_modify_always(|targets| targets.queue(entity_id)),
                             );
                         }
 
@@ -4270,7 +4322,9 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
                     };
                 };
 
-                move |targets: &mut CacheTargets| targets.release_pass(entity_id, generation, r)
+                move |targets: &mut CacheTargets| {
+                    targets.release_pass(entity_id, generation, requests, r)
+                }
             }
         ).await;
     });
@@ -4920,14 +4974,235 @@ mod tests {
                 let _ = tx.send(r);
             })),
         });
-        targets.release_pass(entity, first_pass.generation, Ok(()));
+        targets.release_pass(entity, first_pass.generation, first_pass.requests, Ok(()));
         assert!(
             matches!(rx.try_recv(), Err(oneshot::error::TryRecvError::Empty)),
             "late request cannot complete from an earlier snapshot"
         );
         let next_pass = targets.target().unwrap();
-        targets.release_pass(entity, next_pass.generation, Ok(()));
+        targets.release_pass(entity, next_pass.generation, next_pass.requests, Ok(()));
         assert!(rx.try_recv().unwrap().is_ok());
+    }
+
+    #[test]
+    fn a_late_priority_request_waits_for_a_pass_that_can_see_its_files() {
+        let mut targets = CacheTargets::new();
+        let a = CacheEntityId::Instance(InstanceId(1));
+        targets.set_priority(CacheTarget {
+            entity_id: a,
+            callback: None,
+        });
+        let pass = targets.target().unwrap();
+        let (tx, mut rx) = oneshot::channel();
+        targets.set_priority(CacheTarget {
+            entity_id: a,
+            callback: Some(Box::new(move |r| {
+                let _ = tx.send(r);
+            })),
+        });
+        assert!(targets.release_pass(a, pass.generation, pass.requests, Ok(())));
+        assert!(
+            matches!(rx.try_recv(), Err(oneshot::error::TryRecvError::Empty)),
+            "a pass chosen before the request cannot answer it"
+        );
+        let next_pass = targets.target().unwrap();
+        assert!(next_pass.entity_id == a && next_pass.is_priority);
+        targets.release_pass(a, next_pass.generation, next_pass.requests, Ok(()));
+        assert!(rx.try_recv().unwrap().is_ok());
+        assert!(targets.target().is_none());
+    }
+
+    #[test]
+    fn an_override_is_answered_by_its_pass_when_a_visit_arrives_late() {
+        let mut targets = CacheTargets::new();
+        let a = CacheEntityId::Instance(InstanceId(1));
+        let (override_tx, mut override_rx) = oneshot::channel();
+        targets.set_override_verified(
+            CacheTarget {
+                entity_id: a,
+                callback: Some(Box::new(move |r| {
+                    let _ = override_tx.send(r);
+                })),
+            },
+            VerifyScope::MODS,
+        );
+        let pass = targets.target().unwrap();
+        assert!(pass.is_override && pass.verify == VerifyScope::MODS);
+        let (visit_tx, mut visit_rx) = oneshot::channel();
+        targets.set_priority(CacheTarget {
+            entity_id: a,
+            callback: Some(Box::new(move |r| {
+                let _ = visit_tx.send(r);
+            })),
+        });
+        assert!(targets.release_pass(a, pass.generation, pass.requests, Ok(())));
+        assert!(
+            override_rx.try_recv().unwrap().is_ok(),
+            "an override is answered by the pass that observed it"
+        );
+        assert!(matches!(
+            visit_rx.try_recv(),
+            Err(oneshot::error::TryRecvError::Empty)
+        ));
+        let next_pass = targets.target().unwrap();
+        assert!(next_pass.entity_id == a && next_pass.is_priority && !next_pass.is_override);
+        assert_eq!(
+            next_pass.verify,
+            VerifyScope::NONE,
+            "the visit's pass does not read again what the override's pass verified"
+        );
+        targets.release_pass(a, next_pass.generation, next_pass.requests, Ok(()));
+        assert!(visit_rx.try_recv().unwrap().is_ok());
+        assert!(targets.target().is_none());
+    }
+
+    #[test]
+    fn a_late_forced_rescan_keeps_its_verification_for_the_next_pass() {
+        let mut targets = CacheTargets::new();
+        let a = CacheEntityId::Instance(InstanceId(1));
+        let force = |targets: &mut CacheTargets| {
+            let scope = targets.verify.entry(a).or_default();
+            *scope = scope.union(VerifyScope::ALL);
+            targets.queue(a);
+        };
+        force(&mut targets);
+        let pass = targets.target().unwrap();
+        assert_eq!(pass.verify, VerifyScope::ALL);
+        force(&mut targets);
+        assert!(targets.release_pass(a, pass.generation, pass.requests, Ok(())));
+        let next_pass = targets.target().unwrap();
+        assert_eq!(next_pass.entity_id, a);
+        assert_eq!(
+            next_pass.verify,
+            VerifyScope::ALL,
+            "a forced rescan made during a pass re-reads every file on the next one"
+        );
+        targets.release_pass(a, next_pass.generation, next_pass.requests, Ok(()));
+        assert_eq!(targets.verify_scope(a), VerifyScope::NONE);
+        assert!(targets.target().is_none());
+    }
+
+    #[test]
+    fn other_entities_and_cancelled_requests_do_not_repeat_a_pass() {
+        let a = CacheEntityId::Instance(InstanceId(1));
+        let b = CacheEntityId::Instance(InstanceId(2));
+
+        let mut targets = CacheTargets::new();
+        targets.set_priority(CacheTarget {
+            entity_id: a,
+            callback: None,
+        });
+        let pass = targets.target().unwrap();
+        targets.queue(b);
+        targets.release_pass(a, pass.generation, pass.requests, Ok(()));
+        assert_eq!(targets.target().unwrap().entity_id, b);
+        assert!(targets.priority.is_none() && !targets.waiting.contains(&a));
+
+        // A visit to A made during A's override pass, then left for B.
+        let mut targets = CacheTargets::new();
+        let (tx, mut rx) = oneshot::channel();
+        targets.set_override_verified(
+            CacheTarget {
+                entity_id: a,
+                callback: Some(Box::new(move |r| {
+                    let _ = tx.send(r);
+                })),
+            },
+            VerifyScope::MODS,
+        );
+        let pass = targets.target().unwrap();
+        targets.set_priority(CacheTarget {
+            entity_id: a,
+            callback: None,
+        });
+        targets.set_priority(CacheTarget {
+            entity_id: b,
+            callback: None,
+        });
+        targets.release_pass(a, pass.generation, pass.requests, Ok(()));
+        assert!(rx.try_recv().unwrap().is_ok());
+        assert_eq!(targets.verify_scope(a), VerifyScope::NONE);
+        assert_eq!(targets.target().unwrap().entity_id, b);
+    }
+
+    #[tokio::test]
+    async fn a_repeated_request_does_not_interrupt_the_running_queue_pass() {
+        /// Flags a pass that is dropped before it completes.
+        struct Unfinished(Arc<std::sync::atomic::AtomicBool>, bool);
+        impl Drop for Unfinished {
+            fn drop(&mut self) {
+                if self.1 {
+                    self.0.store(true, std::sync::atomic::Ordering::SeqCst);
+                }
+            }
+        }
+        let targets = LockNotify::new(CacheTargets::new());
+        let worker_targets = targets.clone();
+        let (entered, mut events) = mpsc::unbounded_channel();
+        let release = Arc::new(tokio::sync::Notify::new());
+        let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let worker_release = release.clone();
+        let worker_dropped = dropped.clone();
+        let worker = tokio::spawn(async move {
+            let mut watcher = LoopWatcher::new(worker_targets).await;
+            watcher
+                .loop_interrupt(|info: CacheTargetInfo| {
+                    let entered = entered.clone();
+                    let release = worker_release.clone();
+                    let dropped = worker_dropped.clone();
+                    async move {
+                        let mut unfinished = Unfinished(dropped, true);
+                        entered.send(info.entity_id).unwrap();
+                        release.notified().await;
+                        unfinished.1 = false;
+                        let (entity_id, generation, requests) =
+                            (info.entity_id, info.generation, info.requests);
+                        move |t: &mut CacheTargets| {
+                            t.release_pass(entity_id, generation, requests, Ok(()))
+                        }
+                    }
+                })
+                .await;
+        });
+        let a = CacheEntityId::Instance(InstanceId(1));
+        let visit = || {
+            targets.send_modify_always(move |t| {
+                t.set_priority(CacheTarget {
+                    entity_id: a,
+                    callback: None,
+                })
+            })
+        };
+        visit().await;
+        assert_eq!(events.recv().await.unwrap(), a);
+        visit().await;
+        visit().await;
+        tokio::task::yield_now().await;
+        tokio::task::yield_now().await;
+        assert!(
+            !dropped.load(std::sync::atomic::Ordering::SeqCst),
+            "a repeated request must not interrupt the running pass"
+        );
+        assert_eq!(
+            events.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty),
+            "a repeated request must not restart the running pass"
+        );
+        release.notify_one();
+        let next = tokio::time::timeout(std::time::Duration::from_millis(200), events.recv()).await;
+        assert_eq!(
+            next.expect("a request made during a pass runs once more after it"),
+            Some(a)
+        );
+        release.notify_one();
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(100), events.recv())
+                .await
+                .is_err(),
+            "requests made during one pass are answered by one more pass"
+        );
+        assert!(!dropped.load(std::sync::atomic::Ordering::SeqCst));
+        worker.abort();
     }
 
     #[test]
