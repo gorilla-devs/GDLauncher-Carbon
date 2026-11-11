@@ -861,6 +861,29 @@ async function unchanged(root: string) {
   ])
     expect(await fs.readFile(path.join(root, name), "utf8")).toBe(bytes)
 }
+/**
+ * The file system calls of a volume whose folders answer a sync with EINVAL,
+ * as a VirtualBox shared folder does. Files sync as usual.
+ */
+function refusingFolderSyncs() {
+  const refused: string[] = []
+  const open = async (file: any, ...args: any[]) => {
+    const handle = await (fs.open as any)(file, ...args)
+    if ((await handle.stat()).isDirectory())
+      handle.sync = async () => {
+        refused.push(String(file))
+        throw Object.assign(Error("EINVAL: invalid argument, fsync"), {
+          code: "EINVAL",
+          errno: -os.constants.errno.EINVAL,
+          syscall: "fsync"
+        })
+      }
+    return handle
+  }
+  return { refused, files: { ...fs, open } as typeof fs }
+}
+// Windows does not sync folders at all.
+const syncsFolders = process.platform !== "win32"
 describe("Task23 data preserving restore and recovery retry", () => {
   it("missing allowed snapshot preserves all bytes without shutdown and retry through actual button succeeds", async () => {
     const value = await fixture(),
@@ -1306,6 +1329,37 @@ describe("restore on a volume without hard links", () => {
     await assertDatabaseRestoreReady(value.root)
     expect(value.restarted).toBe(0)
   })
+  it.runIf(syncsFolders)(
+    "a failed restore on a volume that refuses folder syncs puts the originals back without asking for recovery",
+    async () => {
+      const value = await fixture()
+      await fs.writeFile(value.snapshot, "snapshot")
+      const volume = refusingFolderSyncs()
+      const files = {
+        ...volume.files,
+        link: async () => {
+          throw Object.assign(Error("no hard links here"), { code: "EPERM" })
+        },
+        copyFile: async (from: string, to: string, flags?: number) => {
+          if (from.endsWith("snapshot-staged.db"))
+            throw Object.assign(Error("disk trouble"), { code: "EIO" })
+          return fs.copyFile(from, to, flags)
+        }
+      }
+      const result = await restoreDatabaseSnapshot(value.root, value.snapshot, {
+        ...value,
+        files: files as typeof fs
+      })
+      expect(volume.refused).toContain(await fs.realpath(value.root))
+      expect(result.ok).toBe(false)
+      if (result.ok) throw Error("must fail")
+      expect(result.message).toContain("Current database files were retained")
+      expect(result.message).not.toContain("manual recovery")
+      await unchanged(value.root)
+      await assertDatabaseRestoreReady(value.root)
+      expect(value.restarted).toBe(0)
+    }
+  )
   it("a moved original with a new file number still rolls back by its bytes", async () => {
     const value = await fixture()
     await fs.writeFile(value.snapshot, "snapshot")
@@ -1585,6 +1639,28 @@ describe("Recover Database after an interrupted restore", () => {
     ).toBe("snapshot")
     await assertDatabaseRestoreReady(value.root)
   })
+  it.runIf(syncsFolders).each([
+    ["with every file in place", []],
+    ["after putting back originals left in the bundle", allMoved]
+  ])(
+    "finishes on a volume that refuses folder syncs, %s",
+    async (_label, moved) => {
+      const value = await interrupted(moved),
+        volume = refusingFolderSyncs()
+      const result = await recoverInterruptedRestore(value.root, {
+        ...value,
+        files: volume.files
+      })
+      expect(volume.refused).toContain(await fs.realpath(value.root))
+      expect(result).toMatchObject({ ok: true, restored: false })
+      await expect(
+        fs.lstat(path.join(value.root, INTENT))
+      ).rejects.toMatchObject({ code: "ENOENT" })
+      await unchanged(value.root)
+      await assertDatabaseRestoreReady(value.root)
+      expect(value.restarted).toBe(1)
+    }
+  )
   it("removes a partial copy of the snapshot and puts the originals back", async () => {
     const value = await interrupted(allMoved)
     await fs.writeFile(path.join(value.root, "gdl_conf.db"), "snap")

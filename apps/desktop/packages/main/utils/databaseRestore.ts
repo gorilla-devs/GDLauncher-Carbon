@@ -1,5 +1,6 @@
 import fs from "node:fs/promises"
 import { constants, lstatSync } from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { createHash, randomUUID } from "node:crypto"
 
@@ -64,12 +65,49 @@ export async function resolveRuntimeRoot(
     )
   return resolved
 }
+/**
+ * How a volume says it does not sync folders, rather than that data did not
+ * reach the drive: VirtualBox shared folders answer EINVAL; network and FUSE
+ * mounts answer ENOTSUP, EOPNOTSUPP, ENOTTY or ENOSYS; some systems answer
+ * EBADF for a folder opened read-only. This is the set the core's
+ * util/durable.rs folder_sync_unsupported uses. Node has no name for macOS's
+ * EOPNOTSUPP, so the number is compared as well.
+ */
+const FOLDER_SYNC_UNSUPPORTED = [
+  "EINVAL",
+  "ENOTSUP",
+  "EOPNOTSUPP",
+  "ENOTTY",
+  "ENOSYS",
+  "EBADF"
+] as const
+function folderSyncUnsupported(error: unknown) {
+  const { code, errno } = (error ?? {}) as NodeJS.ErrnoException
+  return FOLDER_SYNC_UNSUPPORTED.some(
+    (name) => code === name || errno === -os.constants.errno[name]
+  )
+}
+let folderSyncRefusalLogged = false
+/**
+ * Makes the entries of `directory` durable. A volume that does not sync
+ * folders leaves them to the system, as the core and SQLite do; any other
+ * error fails.
+ */
 export async function syncDirectory(files: typeof fs, directory: string) {
   // Node does not support a portable Windows directory flush. File sync remains required.
   if (process.platform === "win32") return
   const handle = await files.open(directory, "r")
   try {
     await handle.sync()
+  } catch (error) {
+    if (!folderSyncUnsupported(error)) throw error
+    // Once: a data folder move syncs every folder it copies.
+    if (!folderSyncRefusalLogged) {
+      folderSyncRefusalLogged = true
+      console.info(
+        `${directory} does not support folder syncs (${(error as NodeJS.ErrnoException).code}); its entries are left to the system`
+      )
+    }
   } finally {
     await handle.close()
   }

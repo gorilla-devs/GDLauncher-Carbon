@@ -384,6 +384,91 @@ describe("runtime relocation production IPC", () => {
 // Real filesystem operations; only the indicated fault boundary is injected.
 // Windows skips directory syncs in the relocation code, so these faults can't fire there.
 const syncsDirectories = process.platform !== "win32"
+/**
+ * Folder syncs on `refuses` folders answer `code`, as a VirtualBox shared
+ * folder answers EINVAL. Files sync as usual. Returns the folders refused.
+ */
+function refuseFolderSyncs(refuses: (folder: string) => boolean, code: string) {
+  const refused: string[] = [],
+    open = fs.open.bind(fs)
+  vi.spyOn(fs, "open").mockImplementation((async (
+    file: any,
+    ...args: any[]
+  ) => {
+    const handle = await (open as any)(file, ...args)
+    if (refuses(String(file)) && (await handle.stat()).isDirectory())
+      handle.sync = async () => {
+        refused.push(String(file))
+        throw Object.assign(Error(`${code}: fsync`), {
+          code,
+          errno: -os.constants.errno[code as keyof typeof os.constants.errno],
+          syscall: "fsync"
+        })
+      }
+    return handle
+  }) as any)
+  return refused
+}
+describe.runIf(syncsDirectories)(
+  "a new folder on a volume that refuses folder syncs",
+  () => {
+    beforeEach(flushFileByFile)
+    async function onRefusingVolume(code: string) {
+      const f = await fixture()
+      await fs.mkdir(path.join(f.source, "instances", "world"), {
+        recursive: true
+      })
+      await fs.writeFile(
+        path.join(f.source, "instances", "world", "level.dat"),
+        "level"
+      )
+      const inTarget = (folder: string) =>
+        folder === f.target || folder.startsWith(f.target + path.sep)
+      return { f, refused: refuseFolderSyncs(inTarget, code) }
+    }
+    it("takes the move", async () => {
+      const { f, refused } = await onRefusingVolume("EINVAL")
+      const outcome = await relocateRuntime({
+        source: f.source,
+        target: f.target,
+        pointer: f.pointer,
+        stopCore: f.stop
+      })
+      expect(refused).toEqual(
+        expect.arrayContaining([
+          f.target,
+          path.join(f.target, "instances", "world")
+        ])
+      )
+      expect(outcome).toMatchObject({ warnings: [], keptOldFolder: false })
+      expect(selectRuntimePath(null, f.root)).toBe(f.target)
+      expect(await fs.readFile(path.join(f.target, "save"), "utf8")).toBe(
+        "old save"
+      )
+      expect(
+        await fs.readFile(
+          path.join(f.target, "instances", "world", "level.dat"),
+          "utf8"
+        )
+      ).toBe("level")
+      await expect(fs.lstat(path.join(f.source, "save"))).rejects.toMatchObject(
+        { code: "ENOENT" }
+      )
+    })
+    it("still stops the move and removes the copy when a folder sync fails for real", async () => {
+      const { f, refused } = await onRefusingVolume("EIO")
+      await expect(f.move(null, f.target)).rejects.toThrow(/EIO/)
+      expect(refused).not.toHaveLength(0)
+      expect(selectRuntimePath(null, f.root)).toBe(f.source)
+      expect(await fs.readFile(path.join(f.source, "save"), "utf8")).toBe(
+        "old save"
+      )
+      expect(fss.existsSync(path.join(f.target, "save"))).toBe(false)
+      expect(fss.existsSync(path.join(f.target, "instances"))).toBe(false)
+      expect(f.relaunch).not.toHaveBeenCalled()
+    })
+  }
+)
 
 describe("runtime relocation transaction controls", () => {
   it.each(["absolute", "relative", "dangling", "directory"])(
@@ -666,6 +751,30 @@ describe("runtime relocation transaction controls", () => {
       )
       expect(await fs.readFile(path.join(f.source, "save"), "utf8")).toBe(
         "old save"
+      )
+    }
+  )
+  it.runIf(syncsDirectories)(
+    "a pointer folder that refuses folder syncs commits without keeping the old folder",
+    async () => {
+      const f = await fixture()
+      const refused = refuseFolderSyncs((folder) => folder === f.root, "EINVAL")
+      const outcome = await relocateRuntime({
+        source: f.source,
+        target: f.target,
+        pointer: f.pointer,
+        stopCore: f.stop
+      })
+      expect(refused).toContain(f.root)
+      // The volume leaves its folders' entries to the system, as the core
+      // does; it says nothing about whether the data reached the drive.
+      expect(outcome).toMatchObject({ warnings: [], keptOldFolder: false })
+      expect(selectRuntimePath(null, f.root)).toBe(f.target)
+      expect(await fs.readFile(path.join(f.target, "save"), "utf8")).toBe(
+        "old save"
+      )
+      await expect(fs.lstat(path.join(f.source, "save"))).rejects.toMatchObject(
+        { code: "ENOENT" }
       )
     }
   )

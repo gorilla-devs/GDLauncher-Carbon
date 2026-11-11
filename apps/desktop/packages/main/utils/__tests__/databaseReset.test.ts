@@ -567,6 +567,90 @@ it.each([
   })
   expect(result).toMatchObject({ ok: true })
 })
+/**
+ * `open` on a volume whose folders answer a sync with `code`, as a VirtualBox
+ * shared folder answers EINVAL. Files sync as usual.
+ */
+function folderSyncsAnswer(
+  code: string,
+  errno = -os.constants.errno[code as keyof typeof os.constants.errno]
+) {
+  const refused: string[] = []
+  const open = async (file: any, ...args: any[]) => {
+    const handle = await (fs.open as any)(file, ...args)
+    if ((await handle.stat()).isDirectory())
+      handle.sync = async () => {
+        refused.push(String(file))
+        throw Object.assign(Error(`${code}: fsync`), {
+          code,
+          errno,
+          syscall: "fsync"
+        })
+      }
+    return handle
+  }
+  return { refused, files: { ...fs, open } as typeof fs }
+}
+// Windows does not sync folders at all.
+describe.runIf(process.platform !== "win32")("folder syncs", () => {
+  it.each([
+    ...["EINVAL", "ENOTSUP", "ENOTTY", "ENOSYS", "EBADF"].map((code) => [
+      code,
+      code
+    ]),
+    // Node has no name for macOS's EOPNOTSUPP, so only its number says what it is.
+    [
+      "EOPNOTSUPP, by number",
+      `Unknown system error -${os.constants.errno.EOPNOTSUPP}`,
+      -os.constants.errno.EOPNOTSUPP
+    ]
+  ] as [string, string, number?][])(
+    "reset finishes where the volume refuses folder syncs (%s)",
+    async (_label, code, errno) => {
+      const root = await fixture(),
+        restart = vi.fn(),
+        volume = folderSyncsAnswer(code, errno)
+      const result = await resetDatabaseAndRestart(root, {
+        stopCore: async () => {},
+        restart,
+        files: volume.files
+      })
+      expect(volume.refused).not.toHaveLength(0)
+      expect(result).toMatchObject({ ok: true })
+      if (!result.ok) throw Error(result.message)
+      expect(restart).toHaveBeenCalledExactlyOnceWith(result.recoveryPath)
+      for (const [i, name] of names.entries()) {
+        expect(
+          await fs.readFile(path.join(result.recoveryPath, name), "utf8")
+        ).toBe(`synthetic metadata ${i}`)
+        await expect(fs.lstat(path.join(root, name))).rejects.toMatchObject({
+          code: "ENOENT"
+        })
+      }
+      await fs.access(path.join(result.recoveryPath, "captured-files.json"))
+    }
+  )
+  it.each(["EIO", "ENOSPC"])(
+    "a folder sync that fails for real (%s) still stops the reset with every database file kept",
+    async (code) => {
+      const root = await fixture(),
+        restart = vi.fn(),
+        volume = folderSyncsAnswer(code)
+      const result = await resetDatabaseAndRestart(root, {
+        stopCore: async () => {},
+        restart,
+        files: volume.files
+      })
+      expect(volume.refused).not.toHaveLength(0)
+      expect(result).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("Current database files were retained")
+      })
+      await liveBytes(root)
+      expect(restart).not.toHaveBeenCalled()
+    }
+  )
+})
 describe("old recovery copies", () => {
   const DAY = 24 * 60 * 60 * 1000
   const now = Date.now()

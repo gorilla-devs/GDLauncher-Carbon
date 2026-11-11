@@ -13,6 +13,7 @@ import {
   type RuntimeTargetRefusal
 } from "./runtimePathGuard"
 import type { RuntimeBlocker } from "./coreShutdown"
+import { syncDirectory as syncFolder } from "./databaseRestore"
 
 export type RuntimeRelocationResult =
   // Main restarts on its own once the new folder is selected, whatever the window does.
@@ -507,16 +508,10 @@ export async function inventoryRuntimeTree(
   return result
 }
 
+// Windows cannot open directories with this API, so syncFolder skips them there. Atomic
+// rename is still the commit; native power-loss durability is not promised on that platform.
 async function syncDirectory(directory: string) {
-  // Windows cannot open directories with this API. Atomic rename is still the commit;
-  // native power-loss durability is not promised on that platform.
-  if (process.platform === "win32") return
-  const handle = await fs.open(directory, "r")
-  try {
-    await handle.sync()
-  } finally {
-    await handle.close()
-  }
+  await syncFolder(fs, directory)
 }
 
 /** Rename is the commit. A postcommit durability warning must never roll back destination data. */
