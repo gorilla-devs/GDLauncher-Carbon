@@ -643,6 +643,12 @@ impl ManagerRef<'_, InstanceManager> {
                     .state = LaunchState::Inactive {
                     failed_task: Some(id),
                 };
+                // The library and instance page must show the failed task, and
+                // drop a Queued they may have fetched while the setup ran.
+                self.app.invalidate(GET_GROUPS, None);
+                self.app.invalidate(GET_ALL_INSTANCES, None);
+                self.app
+                    .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
                 return Err(anyhow!(message));
             }
         };

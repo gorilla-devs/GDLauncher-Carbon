@@ -7307,6 +7307,51 @@ async fn versiononly_unreadable_setup_names_the_way_out() -> anyhow::Result<()> 
     Ok(())
 }
 
+/// A Play the setup step refuses leaves the instance failed, and the library
+/// and instance page are told to refetch it: they show the failed task instead
+/// of the state from before Play, or a Queued they fetched while the setup ran.
+#[tokio::test]
+async fn play_refused_by_its_setup_step_shows_the_failed_task_in_the_library() -> anyhow::Result<()>
+{
+    use super::modpack::session::RECORD;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = versiononly_installed(&app, "refused-play-refreshes", None).await?;
+    tokio::fs::create_dir(root.join(".setup")).await?;
+    tokio::fs::write(root.join(".setup").join(RECORD), br#"{"schema_version":2}"#).await?;
+    let mut events = app.invalidation_channel.subscribe();
+
+    app.instance_manager()
+        .prepare_game(id, None, None, false)
+        .await
+        .err()
+        .expect("Play cannot finish a setup it cannot read");
+
+    assert!(matches!(
+        app.instance_manager.instances.read().await[&id]
+            .data()?
+            .state,
+        run::LaunchState::Inactive {
+            failed_task: Some(_)
+        }
+    ));
+    let mut seen = Vec::new();
+    loop {
+        match events.try_recv() {
+            Ok(event) => seen.push((event.key, event.args)),
+            Err(tokio::sync::broadcast::error::TryRecvError::Lagged(_)) => {}
+            Err(_) => break,
+        }
+    }
+    let keys: Vec<_> = seen.iter().map(|(key, _)| *key).collect();
+    assert!(keys.contains(&GET_GROUPS.full), "{keys:?}");
+    assert!(keys.contains(&GET_ALL_INSTANCES.full), "{keys:?}");
+    assert!(
+        seen.contains(&(INSTANCE_DETAILS.full, Some(serde_json::Value::from(id.0)))),
+        "{seen:?}"
+    );
+    Ok(())
+}
+
 // Repair is the way out of every pending setup: it retires whatever is pending
 // (keeping it as `.setup-cancelled-<operation|legacy>-<uuid>`) and reinstalls
 // the configured pack, or the pack an interrupted apply was installing, from
