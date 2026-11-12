@@ -416,17 +416,8 @@ pub async fn convert_cf_version_to_standard_version(
                     "quilt" => {
                         let quilt_manifest = app.minecraft_manager().get_quilt_manifest().await?;
 
-                        let loaders = quilt_manifest
-                            .game_versions
-                            .into_iter()
-                            .find(|v| v.id == mc_version)
-                            .ok_or_else(|| {
-                                anyhow::anyhow!(
-                                    "quilt manifest does not contain version '{}'",
-                                    mc_version
-                                )
-                            })?
-                            .loaders;
+                        let loaders =
+                            quilt_loaders_for(quilt_manifest, &mc_version, &dummy_string)?;
                         let quilt_version = super::select_pinned_loader(
                             loaders,
                             |l| l.id.as_str(),
@@ -501,6 +492,75 @@ pub fn convert_standard_version_to_cf_version(
     };
 
     Ok(cf_version)
+}
+
+/// The Quilt loaders a pack on `mc_version` can pin.
+///
+/// The Quilt manifest lists its loaders once, under the placeholder game
+/// version, because every loader runs on every supported Minecraft version;
+/// the entries for real game versions only say that Quilt supports them.
+fn quilt_loaders_for(
+    manifest: daedalus::modded::Manifest,
+    mc_version: &str,
+    placeholder: &str,
+) -> anyhow::Result<Vec<daedalus::modded::LoaderVersion>> {
+    if !manifest.game_versions.iter().any(|v| v.id == mc_version) {
+        bail!("quilt manifest does not contain version '{mc_version}'");
+    }
+    Ok(manifest
+        .game_versions
+        .into_iter()
+        .find(|v| v.id == placeholder)
+        .ok_or_else(|| anyhow::anyhow!("quilt manifest does not list its loaders"))?
+        .loaders)
+}
+
+#[cfg(test)]
+mod quilt_loader_tests {
+    use super::quilt_loaders_for;
+
+    const PLACEHOLDER: &str = "${gdlauncher.gameVersion}";
+
+    /// Shaped like the live manifest: loaders only under the placeholder.
+    fn manifest() -> daedalus::modded::Manifest {
+        serde_json::from_value(serde_json::json!({
+            "gameVersions": [
+                {
+                    "id": PLACEHOLDER,
+                    "stable": true,
+                    "loaders": [
+                        { "id": "0.26.4", "url": "quilt/v2/versions/0.26.4.json", "stable": true },
+                        { "id": "0.26.1", "url": "quilt/v2/versions/0.26.1.json", "stable": true }
+                    ]
+                },
+                { "id": "1.20.1", "stable": true, "loaders": [] }
+            ]
+        }))
+        .unwrap()
+    }
+
+    #[test]
+    fn a_quilt_pack_finds_its_pinned_loader() {
+        let loaders = quilt_loaders_for(manifest(), "1.20.1", PLACEHOLDER).unwrap();
+        let picked = super::super::select_pinned_loader(
+            loaders,
+            |l| l.id.as_str(),
+            "0.26.1",
+            "1.20.1",
+            "quilt",
+        )
+        .unwrap();
+        assert_eq!(picked.id, "0.26.1");
+    }
+
+    #[test]
+    fn a_minecraft_version_quilt_does_not_support_is_named() {
+        let error = quilt_loaders_for(manifest(), "1.7.10", PLACEHOLDER).unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "quilt manifest does not contain version '1.7.10'"
+        );
+    }
 }
 
 #[cfg(test)]
