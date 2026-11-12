@@ -1,4 +1,8 @@
-import { leaveEnrollment } from "./flow/enrollmentTransitions"
+import {
+  continueAfterSignIn,
+  gdlAccountStepHasBack,
+  leaveEnrollment
+} from "./flow/enrollmentTransitions"
 import {
   Switch,
   Match,
@@ -403,9 +407,7 @@ function AuthFlowContent() {
         setUsernameError(t("auth:_trn_profile_creation.verification_failed"))
         return
       }
-      const gdlState = await flow.checkGDLAccount()
-      if (!flow.ownsEnrollment(revision)) return
-      await flow.goToStep({ type: "gdl-account", gdlAccount: gdlState })
+      await continueAfterSignIn(flow, revision)
     } catch (err: any) {
       if (!flow.ownsEnrollment(revision)) return
       const retry = flow.profileVerificationPending(step.flowId)
@@ -653,7 +655,7 @@ function AuthFlowContent() {
             return false
           case "gdl-account":
             // Show back button when adding from settings (allows cancel)
-            return flow.data.isAddingGdlFromSettings
+            return gdlAccountStepHasBack(flow.data)
           default:
             return false
         }

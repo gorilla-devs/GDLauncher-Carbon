@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { FlowControllerImpl } from "./FlowController"
 import {
   completeEnrollment,
+  gdlAccountStepHasBack,
   switchEnrollment,
   leaveEnrollment
 } from "./enrollmentTransitions"
@@ -16,7 +17,10 @@ function deferred<T = void>() {
   })
   return { promise, resolve }
 }
-function fixture(create: () => Promise<unknown>) {
+function fixture(
+  create: () => Promise<unknown>,
+  from: { microsoft?: boolean; gdl?: boolean } = { microsoft: true, gdl: true }
+) {
   const resume = vi.fn(async () => "complete" as const)
   const refetch = vi.fn(async () => ({ data: [] }))
   const mutateAsync = vi.fn(async () => null)
@@ -33,9 +37,9 @@ function fixture(create: () => Promise<unknown>) {
       termsAndPrivacyAccepted: true,
       gdlAccountId: null,
       reducedMotion: true,
-      isAddingMicrosoftFromSettings: true,
-      isAddingGdlFromSettings: false,
-      shouldSetupGdlAfterAuth: false,
+      isAddingMicrosoftFromSettings: !!from.microsoft,
+      isAddingGdlFromSettings: !!from.gdl,
+      shouldSetupGdlAfterAuth: !!from.microsoft && !!from.gdl,
       returnPath: null,
       currentOccasion: null
     },
@@ -327,4 +331,36 @@ it("round1 current finalize failure remains actionable", async () => {
     warning.mockRestore()
     flow.cleanup()
   }
+})
+describe("signing in to a Microsoft account from Settings", () => {
+  it("returns to Settings once the account is saved, without the GDLauncher account step", async () => {
+    const { flow, finalize } = fixture(async () => null, { microsoft: true })
+    const check = vi.spyOn(flow, "checkGDLAccount")
+    await completeEnrollment(flow, "flow-a")
+    expect(finalize).toHaveBeenCalledWith(["account.enroll.finalize", "flow-a"])
+    expect(check).not.toHaveBeenCalled()
+    expect(flow.state()).toMatchObject({
+      phase: "exiting",
+      destination: "settings",
+      showSeasonal: false
+    })
+    flow.cleanup()
+  })
+  it("still reaches the GDLauncher account step when that was asked for too", async () => {
+    const { flow } = fixture(async () => null, { microsoft: true, gdl: true })
+    vi.spyOn(flow, "checkGDLAccount").mockResolvedValue({ type: "none" })
+    await completeEnrollment(flow, "flow-a")
+    expect(flow.state()).toMatchObject({ step: { type: "gdl-account" } })
+    flow.cleanup()
+  })
+  it("gives the GDLauncher account step a Back for any flow from Settings only", () => {
+    const from = (gdl: boolean, microsoft: boolean) =>
+      gdlAccountStepHasBack({
+        isAddingGdlFromSettings: gdl,
+        isAddingMicrosoftFromSettings: microsoft
+      })
+    expect(from(false, true)).toBe(true)
+    expect(from(true, false)).toBe(true)
+    expect(from(false, false)).toBe(false)
+  })
 })
