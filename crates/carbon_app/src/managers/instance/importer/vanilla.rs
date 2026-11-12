@@ -1344,6 +1344,11 @@ fn volume_is_present(path: &Path) -> bool {
 /// macOS and Linux. Anywhere else the drive cannot be told from the path, so `/`
 /// is all there is to check.
 fn volume_root(path: &Path) -> &Path {
+    volume_root_with(path, is_mount_point)
+}
+
+/// [`volume_root`], told which folders are mount points.
+fn volume_root_with(path: &Path, mounted: impl Fn(&Path) -> bool) -> &Path {
     let root = path.ancestors().last().unwrap_or(path);
     let mut components = path.components();
     if components.next() != Some(std::path::Component::RootDir) {
@@ -1354,12 +1359,36 @@ fn volume_root(path: &Path) -> &Path {
         .collect();
     let depth = match names.as_slice() {
         ["Volumes" | "mnt", _, ..] | ["media", _] => 2,
+        // A drive mounted straight at `/media/<drive>` (an fstab entry, older
+        // udisks) rather than at udisks' `/media/<user>/<drive>`. The folder
+        // itself is checked, as a name that is not UTF-8 is "" in `names`.
+        ["media", _, _, ..] if path.ancestors().nth(names.len() - 2).is_some_and(&mounted) => 2,
         // `/media/<user>/<drive>` and `/run/media/<user>/<drive>`.
         ["media", _, _, ..] => 3,
         ["run", "media", _, _, ..] => 4,
         _ => return root,
     };
     path.ancestors().nth(names.len() - depth).unwrap_or(root)
+}
+
+/// Whether a folder is on another filesystem than the folder that holds it,
+/// meaning a drive is mounted there.
+#[cfg(unix)]
+fn is_mount_point(dir: &Path) -> bool {
+    use std::os::unix::fs::MetadataExt;
+    let Some(parent) = dir.parent() else {
+        return false;
+    };
+    match (std::fs::metadata(dir), std::fs::metadata(parent)) {
+        (Ok(dir), Ok(parent)) => dir.dev() != parent.dev(),
+        _ => false,
+    }
+}
+
+/// Windows drives are told apart by their path prefix instead.
+#[cfg(not(unix))]
+fn is_mount_point(_: &Path) -> bool {
+    false
 }
 
 #[cfg(test)]
@@ -1688,6 +1717,50 @@ mod installed_version_tests {
         ] {
             assert_eq!(volume_root(Path::new(path)), Path::new(volume), "{path}");
         }
+    }
+
+    /// A drive mounted at `/media/<drive>` (an fstab entry, older udisks) used
+    /// to be taken for udisks' `/media/<user>` folder, so a never-created game
+    /// folder on it was called unavailable.
+    #[test]
+    fn a_drive_mounted_straight_under_media_is_the_volume() {
+        let games_is_mounted = |dir: &Path| dir == Path::new("/media/games");
+        for (path, volume) in [
+            ("/media/games/mc-modded", "/media/games"),
+            ("/media/games/packs/mc", "/media/games"),
+            ("/media/me/USB/mc", "/media/me/USB"),
+        ] {
+            assert_eq!(
+                volume_root_with(Path::new(path), games_is_mounted),
+                Path::new(volume),
+                "{path}"
+            );
+        }
+        for (path, volume) in [
+            ("/media/usb", "/media/usb"),
+            ("/run/media/me/USB/mc", "/run/media/me/USB"),
+            ("/mnt/usb/games/mc", "/mnt/usb"),
+            ("/Volumes/USB/mc", "/Volumes/USB"),
+            ("/home/me/mc", "/"),
+        ] {
+            assert_eq!(
+                volume_root_with(Path::new(path), |_| true),
+                Path::new(volume),
+                "{path}"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn only_a_folder_on_another_filesystem_is_a_mount_point() {
+        assert!(is_mount_point(Path::new("/dev")));
+        let t = tempfile::tempdir().unwrap();
+        let plain = t.path().join("plain");
+        std::fs::create_dir(&plain).unwrap();
+        assert!(!is_mount_point(&plain));
+        assert!(!is_mount_point(&t.path().join("missing")));
+        assert!(!is_mount_point(Path::new("/")));
     }
 
     /// An unplugged drive must not look like a game folder that was never
