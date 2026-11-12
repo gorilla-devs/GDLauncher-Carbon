@@ -202,7 +202,13 @@ fn validate_pack_zip(path: &Path) -> anyhow::Result<()> {
     }
     let mut bytes = Vec::new();
     metadata.take(1024 * 1024 + 1).read_to_end(&mut bytes)?;
-    let value: serde_json::Value = serde_json::from_slice(&bytes)?;
+    // Read the file as Minecraft does: UTF-8 with malformed bytes replaced
+    // (a description saved in a Windows code page still loads), after one
+    // leading byte order mark, which Notepad and PowerShell 5.1 write.
+    let text = String::from_utf8_lossy(&bytes);
+    let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
+    let value: serde_json::Value =
+        serde_json::from_str(text).context("Datapack pack.mcmeta is not valid JSON")?;
     if !value.get("pack").is_some_and(serde_json::Value::is_object) {
         bail!("Invalid datapack metadata");
     }
@@ -214,13 +220,86 @@ mod tests {
     use super::*;
     use crate::managers::instance::mods::tests::addon_fixture;
     use std::io::Write;
-    fn zip_bytes() -> Vec<u8> {
+    fn zip_with_metadata(metadata: &[u8]) -> Vec<u8> {
         let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
         zip.start_file("pack.mcmeta", zip::write::SimpleFileOptions::default())
             .unwrap();
-        zip.write_all(br#"{"pack":{"pack_format":15,"description":"fixture"}}"#)
-            .unwrap();
+        zip.write_all(metadata).unwrap();
         zip.finish().unwrap().into_inner()
+    }
+    fn zip_bytes() -> Vec<u8> {
+        zip_with_metadata(br#"{"pack":{"pack_format":15,"description":"fixture"}}"#)
+    }
+
+    /// Notepad and PowerShell 5.1 start a "UTF-8" file with a byte order
+    /// mark, and older Notepad saves in the Windows code page (`\xA7` is §,
+    /// `\xFC` is ü there). Minecraft loads both, so Add to world takes them.
+    #[tokio::test]
+    async fn a_datapack_whose_pack_mcmeta_was_saved_by_windows_tools_is_added_to_the_world() {
+        let app = crate::setup_managers_for_test().await;
+        let with_bom = [
+            b"\xEF\xBB\xBF".as_slice(),
+            br#"{"pack":{"pack_format":15,"description":"fixture"}}"#,
+        ]
+        .concat();
+        let code_page: &[u8] =
+            b"{\"pack\":{\"pack_format\":15,\"description\":\"\xA7aPack f\xFCr\"}}";
+        for (name, metadata) in [("bom-pack", with_bom.as_slice()), ("ansi-pack", code_page)] {
+            let bytes = zip_with_metadata(metadata);
+            let (id, row, _) =
+                addon_fixture(&app, name, AddonType::DataPacks, "pack.zip", &bytes).await;
+            let path = publication::current_path(&app, id).await.unwrap();
+            let world = path.get_saves_path().join("World");
+            std::fs::create_dir_all(&world).unwrap();
+            std::fs::write(world.join("level.dat"), b"save").unwrap();
+            let selected = app
+                .instance_manager()
+                .datapack_worlds(id)
+                .await
+                .unwrap()
+                .pop()
+                .unwrap();
+            assert_eq!(
+                app.instance_manager()
+                    .copy_datapack(CopyDatapack {
+                        instance_id: *id,
+                        mod_id: row.id,
+                        world: selected,
+                    })
+                    .await
+                    .unwrap(),
+                "World",
+                "{name}"
+            );
+            assert_eq!(
+                std::fs::read(world.join("datapacks/pack.zip")).unwrap(),
+                bytes,
+                "{name}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_pack_mcmeta_that_is_not_json_is_refused_with_a_plain_reason() {
+        let validate = |metadata: &[u8]| {
+            let mut file = tempfile::NamedTempFile::new().unwrap();
+            file.write_all(&zip_with_metadata(metadata)).unwrap();
+            validate_pack_zip(file.path())
+        };
+        let error = validate(b"pack_format=15").unwrap_err();
+        assert_eq!(error.to_string(), "Datapack pack.mcmeta is not valid JSON");
+        // Minecraft skips one byte order mark, not two.
+        let two_marks = [
+            b"\xEF\xBB\xBF\xEF\xBB\xBF".as_slice(),
+            br#"{"pack":{"pack_format":15,"description":"x"}}"#,
+        ]
+        .concat();
+        assert!(validate(&two_marks).is_err());
+        assert_eq!(
+            validate(br#"{"description":"x"}"#).unwrap_err().to_string(),
+            "Invalid datapack metadata"
+        );
+        validate(br#"{"pack":{"pack_format":15,"description":"x"}}"#).unwrap();
     }
     #[tokio::test]
     async fn task10_datapack_real_selected_copy_collision_and_independent_mutations() {
