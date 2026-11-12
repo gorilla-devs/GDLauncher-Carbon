@@ -78,6 +78,13 @@ pub fn is_rule_allowed(rule: &Rule, java_arch: &JavaArch) -> bool {
 }
 
 pub fn os_rule(rule: &OsRule, java_arch: &JavaArch) -> bool {
+    os_rule_on(rule, java_arch, sysinfo::System::os_version().as_deref())
+}
+
+/// `os_version` is `None` on systems that do not report one (Linux without
+/// `VERSION_ID` in /etc/os-release). The version part of the rule is then
+/// left out; the name and architecture parts still decide.
+fn os_rule_on(rule: &OsRule, java_arch: &JavaArch, os_version: Option<&str>) -> bool {
     let mut rule_match = true;
 
     if let Some(ref arch) = rule.arch {
@@ -88,17 +95,58 @@ pub fn os_rule(rule: &OsRule, java_arch: &JavaArch) -> bool {
         rule_match &= &Os::native_arch(java_arch) == name;
     }
 
-    if let Some(version) = &rule.version {
-        let Some(os_version) = sysinfo::System::os_version() else {
-            return true;
-        };
-
-        if let Ok(regex) = regex::Regex::new(version.as_str()) {
-            rule_match &= regex.is_match(&os_version);
-        }
+    if let (Some(version), Some(os_version)) = (&rule.version, os_version)
+        && let Ok(regex) = regex::Regex::new(version.as_str())
+    {
+        rule_match &= regex.is_match(os_version);
     }
 
     rule_match
+}
+
+#[cfg(test)]
+mod os_rule_tests {
+    use super::*;
+
+    fn another_os() -> Os {
+        if cfg!(windows) {
+            Os::Linux
+        } else {
+            Os::Windows
+        }
+    }
+
+    fn rule(name: Os, version: &str) -> OsRule {
+        OsRule {
+            name: Some(name),
+            version: Some(version.to_string()),
+            arch: None,
+        }
+    }
+
+    #[test]
+    fn a_rule_for_another_os_does_not_match_when_the_os_version_is_unknown() {
+        let windows_10 = rule(another_os(), "^10\\.");
+        assert!(!os_rule_on(&windows_10, &JavaArch::X86_64, None));
+    }
+
+    #[test]
+    fn a_rule_for_this_os_still_matches_when_the_os_version_is_unknown() {
+        let this_os = Os::native_arch(&JavaArch::X86_64);
+        assert!(os_rule_on(
+            &rule(this_os, "^10\\."),
+            &JavaArch::X86_64,
+            None
+        ));
+    }
+
+    #[test]
+    fn a_known_os_version_is_compared_with_the_rule() {
+        let this_os = Os::native_arch(&JavaArch::X86_64);
+        let r = rule(this_os, "^10\\.");
+        assert!(os_rule_on(&r, &JavaArch::X86_64, Some("10.0.19045")));
+        assert!(!os_rule_on(&r, &JavaArch::X86_64, Some("6.1")));
+    }
 }
 
 pub fn library_into_lib_downloadable(
