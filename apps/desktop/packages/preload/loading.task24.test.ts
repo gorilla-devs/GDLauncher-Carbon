@@ -185,3 +185,12 @@ it("the reset warning says how long the recovery copy is kept and that it needs 
   expect(document.body.textContent).toContain("30 days")
   expect(document.body.textContent).toContain("room")
 })
+it("the fatal screen leaves the update channel to main, which never downgrades from it", async () => {
+  await bridge.api.fatalError("synthetic failure", "CoreModule")
+  document.querySelector<HTMLButtonElement>("#check-updates-btn")!.click()
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  const calls = bridge.invoke.mock.calls.map((call) => call[0])
+  expect(bridge.invoke).toHaveBeenCalledWith("checkForUpdatesFromRecovery")
+  expect(calls).not.toContain("checkForUpdates")
+  expect(calls).not.toContain("getSettings")
+})

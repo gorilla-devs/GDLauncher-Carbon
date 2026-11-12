@@ -49,7 +49,11 @@ async function installationIdentity(): Promise<Installation> {
 }
 export default function initAutoUpdater(
   updateFeedOverride?: string | null,
-  prepareShutdown?: () => Promise<"stopped" | "forced" | "kept">
+  prepareShutdown?: () => Promise<"stopped" | "forced" | "kept">,
+  channelMemory?: {
+    rememberChannel(channel: FEReleaseChannel): Promise<void>
+    recalledChannel(): Promise<FEReleaseChannel | null>
+  }
 ) {
   log.transports.file.level = "info"
   autoUpdater.logger = log
@@ -79,6 +83,7 @@ export default function initAutoUpdater(
       return metadata!.manual()
     },
     installBlocker: () => appImageInstallBlocker(process.env.APPIMAGE),
+    ...channelMemory,
     prepareShutdown: async () => {
       assertRuntimeOperationAvailable()
       if (!prepareShutdown)
@@ -89,6 +94,10 @@ export default function initAutoUpdater(
   ipcMain.handle("checkForUpdates", async (_, channel: FEReleaseChannel) => {
     await metadataReady
     return controller.check(channel)
+  })
+  ipcMain.handle("checkForUpdatesFromRecovery", async () => {
+    await metadataReady
+    return controller.checkForRecovery()
   })
   ipcMain.handle("installUpdate", (_, expectedId?: number) =>
     controller.install(expectedId)

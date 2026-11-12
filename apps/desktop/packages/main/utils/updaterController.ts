@@ -1,4 +1,5 @@
 import type { FEReleaseChannel } from "@gd/core_module/bindings"
+import { buildChannel, isReleaseChannel } from "./updateChannelMemory"
 import type { UpdateInfo } from "electron-updater"
 import type {
   CheckForUpdatesResult,
@@ -57,6 +58,10 @@ export function createUpdaterController(io: {
   prepareShutdown(): Promise<void | "stopped" | "forced" | "kept">
   isDownloaded(info: UpdateInfo): boolean
   dispatchInstall?(): () => void
+  /** Keeps the channel of a normal check for checkForRecovery. Never rejects. */
+  rememberChannel?(channel: FEReleaseChannel): Promise<void>
+  /** The channel last kept, or null. Never rejects. */
+  recalledChannel?(): Promise<FEReleaseChannel | null>
 }) {
   let locked = false
   let installing: InstallAttempt | null = null
@@ -249,9 +254,11 @@ export function createUpdaterController(io: {
     // error releases admission only after known native download callbacks end.
     if (attempt?.stage === "pending") releaseFailedDispatch(attempt)
   })
-  return {
-    getState: () => state,
-    async check(channel: FEReleaseChannel): Promise<CheckForUpdatesResult> {
+  async function check(
+    channel: FEReleaseChannel,
+    mayDowngrade: boolean
+  ): Promise<CheckForUpdatesResult> {
+    {
       if (
         locked ||
         installing ||
@@ -280,7 +287,7 @@ export function createUpdaterController(io: {
             : 0
         io.updater.channel = channel === "stable" ? "latest" : channel
         io.updater.allowPrerelease = channel !== "stable"
-        io.updater.allowDowngrade = numbers[channel] < current
+        io.updater.allowDowngrade = mayDowngrade && numbers[channel] < current
         try {
           const result = await io.updater.checkForUpdates()
           retainDownloadSettlement(result)
@@ -351,6 +358,25 @@ export function createUpdaterController(io: {
         checkSettlements.delete(settlement)
         settled()
       }
+    }
+  }
+  return {
+    getState: () => state,
+    check(channel: FEReleaseChannel): Promise<CheckForUpdatesResult> {
+      // Not awaited: the check must be admitted in the caller's own turn.
+      if (isReleaseChannel(channel)) void io.rememberChannel?.(channel)
+      return check(channel, true)
+    },
+    /**
+     * The check of the screen shown when the core cannot start, which cannot read the
+     * release channel setting: the channel last checked, else the build's own. It
+     * never installs an older release, since the user is not there to have chosen one.
+     */
+    async checkForRecovery(): Promise<CheckForUpdatesResult> {
+      return check(
+        (await io.recalledChannel?.()) ?? buildChannel(io.version),
+        false
+      )
     },
     async install(expectedId?: number): Promise<"kept" | undefined> {
       const captured = downloaded

@@ -16,7 +16,11 @@ import { ShutdownFlow, type ShutdownChoice } from "./shutdownFlow"
 function controller(
   check: () => Promise<unknown> = async () => null,
   manual: () => Promise<any> = async () => null,
-  version = "1.0.0"
+  version = "1.0.0",
+  memory: {
+    rememberChannel?(channel: string): Promise<void>
+    recalledChannel?(): Promise<any>
+  } = {}
 ) {
   const events: Record<string, (...args: any[]) => void> = {},
     states: UpdateStateData[] = []
@@ -47,7 +51,8 @@ function controller(
     isDownloaded: () => true,
     prepareShutdown: async () => {
       shutdowns++
-    }
+    },
+    ...memory
   })
   return {
     wrapper,
@@ -741,5 +746,42 @@ describe("an update install that fails leaves GDLauncher usable or says to resta
     expect(await value.wrapper.install()).toBe("kept")
     value.events.error(Error("A later download failed"))
     expect(value.wrapper.getState().restartRequired).toBeUndefined()
+  })
+})
+describe("an update check from the screen shown when the core cannot start", () => {
+  function recovery(version: string, kept: string | null) {
+    const remembered: string[] = []
+    const c = controller(undefined, undefined, version, {
+      rememberChannel: async (channel: string) => {
+        remembered.push(channel)
+      },
+      recalledChannel: async () => kept
+    })
+    return { ...c, remembered }
+  }
+  it("checks the channel the user last chose", async () => {
+    const c = recovery("2.0.41", "beta")
+    await c.wrapper.checkForRecovery()
+    expect(c.updater.channel).toBe("beta")
+    expect(c.updater.allowPrerelease).toBe(true)
+    expect(c.remembered).toEqual([])
+  })
+  it("checks the build's own channel when no choice was kept", async () => {
+    const c = recovery("2.0.41-beta.3", null)
+    await c.wrapper.checkForRecovery()
+    expect(c.updater.channel).toBe("beta")
+    expect(c.updater.allowDowngrade).toBe(false)
+  })
+  it("never moves a beta build back to an older stable release", async () => {
+    const c = recovery("2.0.41-beta.3", "stable")
+    await c.wrapper.checkForRecovery()
+    expect(c.updater.channel).toBe("latest")
+    expect(c.updater.allowDowngrade).toBe(false)
+  })
+  it("a normal check keeps the channel and still allows the downgrade the user chose", async () => {
+    const c = recovery("2.0.41-beta.3", null)
+    await c.wrapper.check("stable")
+    expect(c.remembered).toEqual(["stable"])
+    expect(c.updater.allowDowngrade).toBe(true)
   })
 })

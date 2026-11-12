@@ -373,20 +373,9 @@ function useLoading() {
         setUpdateState("checking")
 
         try {
-          let releaseChannel = "stable"
-          try {
-            const settings = await ipcRenderer.invoke("getSettings")
-            if (settings?.releaseChannel) {
-              releaseChannel = settings.releaseChannel
-            }
-          } catch (_e) {
-            // Use stable channel if settings unavailable
-          }
-
-          const result = await ipcRenderer.invoke(
-            "checkForUpdates",
-            releaseChannel
-          )
+          // The core is down, so main picks the channel: the one last checked,
+          // else this build's own, and never an older release.
+          const result = await ipcRenderer.invoke("checkForUpdatesFromRecovery")
           if (result?.status === "snapshot-version")
             setUpdateState("unsupported", {
               message: "Snapshot builds do not support update checks."

@@ -113,6 +113,10 @@ import "./preloadListeners"
 import getAdSize from "./adSize"
 import handleUncaughtException from "./handleUncaughtException"
 import initAutoUpdater from "./autoUpdater"
+import {
+  recallUpdateChannel,
+  rememberUpdateChannel
+} from "./utils/updateChannelMemory"
 import "./appMenu"
 
 console.log("Modules imported successfully")
@@ -1468,7 +1472,11 @@ app.whenReady().then(async () => {
     }
   )
 
-  initAutoUpdater(e2eUpdateFeed?.value, () => ownedShutdown("update"))
+  initAutoUpdater(e2eUpdateFeed?.value, () => ownedShutdown("update"), {
+    rememberChannel: (channel) =>
+      rememberUpdateChannel(app.getPath("userData"), channel),
+    recalledChannel: () => recallUpdateChannel(app.getPath("userData"))
+  })
 })
 
 /**
