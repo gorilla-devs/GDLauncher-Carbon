@@ -126,6 +126,26 @@ async fn task05_replace_modrinth_checks_real_artifact_and_kind() {
     assert!(!resource.is_already_installed(&app, id).await.unwrap());
 }
 
+/// The addon's cache row, not only its file, was committed by the update:
+/// the same row is still there, enabled, and now records the new bytes.
+/// `is_already_installed` alone does not show this, because it accepts
+/// matching bytes under the name even without a row.
+async fn assert_row_records_the_update(
+    app: &std::sync::Arc<crate::managers::AppInner>,
+    before: &mfcdb::ModFileCacheRow,
+) {
+    let after = mfcdb::get_mod_file_cache_by_id(&app.db, &before.id)
+        .await
+        .unwrap()
+        .expect("the update keeps the addon's cache row");
+    assert!(after.enabled);
+    assert_eq!(after.filename, before.filename);
+    assert_ne!(
+        after.metadata_id, before.metadata_id,
+        "the row records the new bytes"
+    );
+}
+
 /// Staging lives in the data folder; an instance junctioned or linked to
 /// another drive makes both renames of a replacement cross volumes. They
 /// become copies, and the receipt must still own (and commit) what landed.
@@ -161,6 +181,7 @@ async fn cross_volume_replacement_publishes_copies_and_commits() {
     assert!(!bytes.exists());
     assert!(!backup.exists(), "committed replacement retires its backup");
     assert!(resource.is_already_installed(&app, id).await.unwrap());
+    assert_row_records_the_update(&app, &row).await;
 }
 
 /// The same update onto a drive whose files all belong to another account
@@ -201,6 +222,7 @@ async fn cross_volume_update_lands_on_a_drive_that_keeps_its_own_modes() {
     assert!(!bytes.exists());
     assert!(!backup.exists(), "committed replacement retires its backup");
     assert!(resource.is_already_installed(&app, id).await.unwrap());
+    assert_row_records_the_update(&app, &row).await;
 }
 
 fn zip(path: &std::path::Path, entries: &[(&str, &[u8])]) {
