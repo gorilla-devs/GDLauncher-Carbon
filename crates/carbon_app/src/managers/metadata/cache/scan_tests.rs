@@ -1967,3 +1967,189 @@ async fn upgraded_rows_are_stamped_together_except_files_changed_meanwhile() {
         }
     }
 }
+
+/// A server with `mods/a.jar`, `mods/b.jar` and a datapack in its world,
+/// scanned and listed.
+#[cfg(test)]
+async fn server_with_addons(
+    app: &App,
+    name: &str,
+) -> (
+    crate::domain::server::ServerId,
+    PathBuf,
+    Vec<mfcdb::ServerModFileCacheRow>,
+) {
+    use crate::domain::server::{ServerId, ServerState};
+    let (id, data) = server_fixture(app, name).await;
+    app.server_manager.servers.write().await.insert(
+        ServerId(id),
+        crate::managers::server::ServerData {
+            shortpath: name.into(),
+            state: ServerState::Stopped { failed_task: None },
+            handle: None,
+            last_log_id: None,
+        },
+    );
+    std::fs::write(data.join("mods/a.jar"), b"a").unwrap();
+    std::fs::write(data.join("mods/b.jar"), b"b").unwrap();
+    std::fs::create_dir_all(data.join("world/datapacks")).unwrap();
+    std::fs::write(data.join("world/datapacks/pack.zip"), b"pack").unwrap();
+    std::fs::write(data.join("server.properties"), "level-name=world\n").unwrap();
+    server_scan(app, id, name).await;
+    let mut rows = server_rows(app, id).await;
+    rows.sort_by(|a, b| a.location.cmp(&b.location));
+    assert_eq!(
+        rows.iter()
+            .map(|row| row.location.as_str())
+            .collect::<Vec<_>>(),
+        ["mods/a.jar", "mods/b.jar", "world/datapacks/pack.zip"]
+    );
+    (ServerId(id), data, rows)
+}
+
+#[cfg(test)]
+async fn servers_without_recycle_bin(app: &App) {
+    app.settings_manager()
+        .set(
+            carbon_repos::repos::app_configuration::AppConfigurationPatch {
+                deletion_through_recycle_bin: Some(false),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+}
+
+/// With "Deletion through Recycle Bin" on, which it is by default, a deleted
+/// server addon is moved there instead of erased.
+#[tokio::test]
+async fn a_deleted_server_addon_goes_to_the_recycle_bin_by_default() {
+    use crate::util::recycle_bin::bin_under_test;
+    let app = crate::setup_managers_for_test().await;
+    let (id, data, rows) = server_with_addons(&app, "binned-server-addon").await;
+
+    app.server_manager()
+        .delete_server_addon(id, rows[0].id.clone())
+        .await
+        .unwrap();
+    app.server_manager()
+        .delete_server_addon(id, rows[2].id.clone())
+        .await
+        .unwrap();
+
+    let jar = data.join("mods/a.jar");
+    let pack = data.join("world/datapacks/pack.zip");
+    assert!(!jar.exists() && !pack.exists());
+    assert_eq!(
+        std::fs::read(bin_under_test(&jar).join("a.jar")).unwrap(),
+        b"a"
+    );
+    assert_eq!(
+        std::fs::read(bin_under_test(&pack).join("pack.zip")).unwrap(),
+        b"pack"
+    );
+    let left = server_rows(&app, id.0).await;
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].location, "mods/b.jar");
+}
+
+/// A selection is one step with a result for each addon, in the order asked;
+/// one that does not exist does not stop the others.
+#[tokio::test]
+async fn a_selection_of_server_addons_is_deleted_in_one_step() {
+    use crate::util::recycle_bin::bin_under_test;
+    let app = crate::setup_managers_for_test().await;
+    let (id, data, rows) = server_with_addons(&app, "binned-server-selection").await;
+
+    let results = app
+        .server_manager()
+        .delete_server_addons(
+            id,
+            vec![
+                rows[0].id.clone(),
+                "no-such-addon".into(),
+                rows[1].id.clone(),
+                rows[0].id.clone(),
+            ],
+        )
+        .await
+        .unwrap();
+
+    let ids: Vec<&str> = results.iter().map(|(id, _)| id.as_str()).collect();
+    assert_eq!(ids, [&rows[0].id, "no-such-addon", &rows[1].id]);
+    assert!(results[0].1.is_ok() && results[2].1.is_ok());
+    assert!(results[1].1.is_err());
+    let bin = bin_under_test(&data.join("mods/a.jar"));
+    assert_eq!(std::fs::read(bin.join("a.jar")).unwrap(), b"a");
+    assert_eq!(std::fs::read(bin.join("b.jar")).unwrap(), b"b");
+    let left = server_rows(&app, id.0).await;
+    assert_eq!(left.len(), 1);
+    assert_eq!(left[0].location, "world/datapacks/pack.zip");
+    assert!(data.join("world/datapacks/pack.zip").exists());
+}
+
+/// A Recycle Bin that refuses deletes nothing and keeps the rows; with the
+/// setting off the same addons are erased.
+#[tokio::test]
+async fn a_recycle_bin_that_refuses_keeps_server_addons_and_off_erases_them() {
+    use crate::util::recycle_bin::bin_under_test;
+    let app = crate::setup_managers_for_test().await;
+    let (id, data, rows) = server_with_addons(&app, "refused-server-addon").await;
+    let jar = data.join("mods/a.jar");
+    // A file where the Recycle Bin's folder would be.
+    std::fs::write(bin_under_test(&jar), b"").unwrap();
+
+    let error = app
+        .server_manager()
+        .delete_server_addon(id, rows[0].id.clone())
+        .await
+        .unwrap_err();
+    let error = format!("{error:#}");
+    assert!(error.contains("Nothing was deleted"), "{error}");
+    assert!(error.contains("turn off"), "{error}");
+    let results = app
+        .server_manager()
+        .delete_server_addons(id, vec![rows[0].id.clone(), rows[1].id.clone()])
+        .await
+        .unwrap();
+    assert!(results.iter().all(|(_, result)| result.is_err()));
+    assert!(jar.exists() && data.join("mods/b.jar").exists());
+    assert_eq!(server_rows(&app, id.0).await.len(), 3);
+
+    servers_without_recycle_bin(&app).await;
+    std::fs::remove_file(bin_under_test(&jar)).unwrap();
+    let results = app
+        .server_manager()
+        .delete_server_addons(id, vec![rows[0].id.clone(), rows[1].id.clone()])
+        .await
+        .unwrap();
+    assert!(results.iter().all(|(_, result)| result.is_ok()));
+    assert!(!jar.exists() && !data.join("mods/b.jar").exists());
+    assert!(!bin_under_test(&jar).exists());
+    assert_eq!(server_rows(&app, id.0).await.len(), 1);
+}
+
+/// A server mod that is a link to a jar kept elsewhere: only the link is
+/// removed, directly, never through the Recycle Bin.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_linked_server_addon_is_removed_as_a_link() {
+    use crate::util::recycle_bin::bin_under_test;
+    let app = crate::setup_managers_for_test().await;
+    let (id, data, rows) = server_with_addons(&app, "linked-server-addon").await;
+    let jar = data.join("mods/a.jar");
+    let outside = tempfile::tempdir().unwrap();
+    let target = outside.path().join("a.jar");
+    std::fs::write(&target, b"a").unwrap();
+    std::fs::remove_file(&jar).unwrap();
+    std::os::unix::fs::symlink(&target, &jar).unwrap();
+
+    app.server_manager()
+        .delete_server_addon(id, rows[0].id.clone())
+        .await
+        .unwrap();
+
+    assert!(std::fs::symlink_metadata(&jar).is_err());
+    assert_eq!(std::fs::read(&target).unwrap(), b"a");
+    assert!(!bin_under_test(&jar).exists());
+}

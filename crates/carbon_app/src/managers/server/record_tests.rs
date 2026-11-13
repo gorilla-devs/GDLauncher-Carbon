@@ -857,7 +857,7 @@ async fn a_deleted_server_goes_to_the_recycle_bin_and_comes_back_when_restored()
     assert!(!root.exists());
     assert!(rows_by_shortpath(&app).await.is_empty());
     assert!(!app.server_manager.servers.read().await.contains_key(&id));
-    let binned = recycle::bin_under_test(&root).join("binned_1");
+    let binned = crate::util::recycle_bin::bin_under_test(&root).join("binned_1");
     assert_eq!(
         std::fs::read(binned.join("server").join("world.dat")).unwrap(),
         b"world"
@@ -901,7 +901,7 @@ async fn a_recycle_bin_that_refuses_the_folder_leaves_the_server_as_it_was() {
         .unwrap()
         .state = failed_install.clone();
     // A file where the Recycle Bin's folder would be.
-    std::fs::write(recycle::bin_under_test(&root), b"").unwrap();
+    std::fs::write(crate::util::recycle_bin::bin_under_test(&root), b"").unwrap();
 
     let error = app.server_manager().delete_server(id).await.unwrap_err();
 
@@ -940,7 +940,7 @@ async fn a_server_deleted_with_the_recycle_bin_off_is_erased() {
     app.server_manager().delete_server(id).await.unwrap();
 
     assert!(!root.exists());
-    assert!(!recycle::bin_under_test(&root).exists());
+    assert!(!crate::util::recycle_bin::bin_under_test(&root).exists());
     assert!(rows_by_shortpath(&app).await.is_empty());
 }
 
@@ -956,7 +956,7 @@ async fn a_server_without_a_folder_is_deleted_through_the_recycle_bin_too() {
     app.server_manager().delete_server(id).await.unwrap();
 
     assert!(rows_by_shortpath(&app).await.is_empty());
-    assert!(!recycle::bin_under_test(&root).exists());
+    assert!(!crate::util::recycle_bin::bin_under_test(&root).exists());
 }
 
 #[test]

@@ -53,6 +53,8 @@ use tracing::{error, info, trace, warn};
 use unicode_segmentation::UnicodeSegmentation;
 
 #[cfg(test)]
+mod addon_recycle_tests;
+#[cfg(test)]
 mod lifecycle_tests;
 
 mod addon_retry;

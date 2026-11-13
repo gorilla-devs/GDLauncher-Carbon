@@ -1,15 +1,12 @@
 import { describe, expect, it } from "vitest"
-import {
-  deletionStopsServer,
-  serverDeleteLabelKey,
-  serverDeletionTarget
-} from "./serverDeletion"
+import { deletionTarget } from "./deletionTarget"
+import { deletionStopsServer, serverDeleteLabelKey } from "./serverDeletion"
 
 describe("what deleting a server is said to do", () => {
   it("follows the Recycle Bin setting, and says nothing until it is known", () => {
-    expect(serverDeletionTarget(undefined)).toBeUndefined()
-    expect(serverDeletionTarget(true)).toBe("recycleBin")
-    expect(serverDeletionTarget(false)).toBe("permanent")
+    expect(deletionTarget(undefined)).toBeUndefined()
+    expect(deletionTarget(true)).toBe("recycleBin")
+    expect(deletionTarget(false)).toBe("permanent")
   })
   it("stops only a server this session is running", () => {
     expect(deletionStopsServer("running")).toBe(true)

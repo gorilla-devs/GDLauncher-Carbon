@@ -10,10 +10,8 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { createSignal, For, Show } from "solid-js"
 import { ListServer, ListServerGroup } from "@gd/core_module/bindings"
-import {
-  deletionStopsServer,
-  serverDeletionTarget
-} from "@/utils/serverDeletion"
+import { deletionTarget } from "@/utils/deletionTarget"
+import { deletionStopsServer } from "@/utils/serverDeletion"
 import ServerDeletionNote from "./ServerDeletionNote"
 
 export async function deleteServerSelection(
@@ -196,9 +194,7 @@ const ConfirmBatchServerDeletion = (props: ModalProps) => {
           </div>
           <ServerDeletionNote
             several
-            target={serverDeletionTarget(
-              settings.data?.deletionThroughRecycleBin
-            )}
+            target={deletionTarget(settings.data?.deletionThroughRecycleBin)}
             stopsFirst={stopsFirst()}
           />
           <div class="flex w-full justify-between pt-2">

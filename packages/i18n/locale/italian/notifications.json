@@ -24,6 +24,7 @@
   "_trn_addon_outcome_unavailable": "Impossibile confermare se questa modifica all’addon è stata completata. Controlla gli addon dell’istanza prima di riprovare.",
   "_trn_addon_attempt_dismissed": "Questo tentativo non riuscito è stato ignorato.",
   "_trn_addon_deleted_one_copy": "{{deleted}} è stato eliminato. Un'altra copia, {{kept}}, è ancora nella cartella, quindi l'addon resta nell'elenco. Eliminalo di nuovo per rimuovere anche quella copia.",
+  "_trn_addons_not_deleted": "Non è stato possibile eliminare tutti gli addon",
   "_trn_addon_fallback_name": "Addon",
   "_trn_addon_install_failed": "Installazione di {{title}} non riuscita",
   "_trn_shader_install_cancelled": "Installazione dello shader annullata — nessun loader di shader compatibile è installato",

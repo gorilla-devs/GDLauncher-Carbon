@@ -458,6 +458,26 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await?.map(FEKeptAddonCopy::from))
         }
 
+        mutation DELETE_MODS[app, request: DeleteInstanceMods] {
+            Ok(app.instance_manager()
+                .delete_mods(request.instance_id.into(), request.mod_ids)
+                .await?
+                .into_iter()
+                .map(|(mod_id, deleted)| match deleted {
+                    Ok(kept) => FEDeletedMod {
+                        mod_id,
+                        kept: kept.map(FEKeptAddonCopy::from),
+                        error: None,
+                    },
+                    Err(error) => FEDeletedMod {
+                        mod_id,
+                        kept: None,
+                        error: Some(format!("{error:#}")),
+                    },
+                })
+                .collect::<Vec<_>>())
+        }
+
         query GET_DATAPACK_WORLDS[app, id: FEInstanceId] {
             app.instance_manager().datapack_worlds(id.into()).await
         }
@@ -1625,6 +1645,23 @@ struct RetryableInstanceMod {
     mod_id: String,
     #[serde(default)]
     operation_token: Option<String>,
+}
+
+/// A selection of an instance's addons to delete in one step.
+#[derive(Type, Debug, Deserialize)]
+struct DeleteInstanceMods {
+    instance_id: FEInstanceId,
+    mod_ids: Vec<String>,
+}
+
+/// What a delete of a selection did with one addon.
+#[derive(Type, Debug, Serialize)]
+struct FEDeletedMod {
+    mod_id: String,
+    /// Set when the folder held a second copy, which stays.
+    kept: Option<FEKeptAddonCopy>,
+    /// Why this addon was not deleted.
+    error: Option<String>,
 }
 
 #[derive(Type, Debug, Deserialize)]

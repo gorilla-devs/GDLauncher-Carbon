@@ -379,6 +379,23 @@ struct DeleteServerAddonRequest {
     addon_id: String,
 }
 
+/// A selection of a server's addons to delete in one step.
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct DeleteServerAddonsRequest {
+    server_id: FEServerId,
+    addon_ids: Vec<String>,
+}
+
+/// What a delete of a selection did with one addon.
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FEDeletedServerAddon {
+    addon_id: String,
+    /// Why this addon was not deleted.
+    error: Option<String>,
+}
+
 #[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct InstallServerMod {
@@ -979,6 +996,18 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.server_manager()
                 .delete_server_addon(req.server_id.into(), req.addon_id)
                 .await
+        }
+
+        mutation DELETE_SERVER_ADDONS[app, req: DeleteServerAddonsRequest] {
+            Ok(app.server_manager()
+                .delete_server_addons(req.server_id.into(), req.addon_ids)
+                .await?
+                .into_iter()
+                .map(|(addon_id, deleted)| FEDeletedServerAddon {
+                    addon_id,
+                    error: deleted.err().map(|error| format!("{error:#}")),
+                })
+                .collect::<Vec<_>>())
         }
 
         mutation INSTALL_SERVER_MOD[app, req: InstallServerMod] {

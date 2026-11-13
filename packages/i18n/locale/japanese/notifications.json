@@ -24,6 +24,7 @@
   "_trn_addon_outcome_unavailable": "このアドオンの変更が完了したか確認できませんでした。再試行する前にインスタンスのアドオンを確認してください。",
   "_trn_addon_attempt_dismissed": "この失敗した試行は閉じられました。",
   "_trn_addon_deleted_one_copy": "{{deleted}} を削除しました。別のコピー {{kept}} がフォルダーに残っているため、アドオンは一覧に残ります。そのコピーも削除するには、もう一度削除してください。",
+  "_trn_addons_not_deleted": "一部のアドオンを削除できませんでした",
   "_trn_addon_fallback_name": "アドオン",
   "_trn_addon_install_failed": "{{title}} のインストールに失敗しました",
   "_trn_shader_install_cancelled": "シェーダーのインストールをキャンセルしました — 互換性のあるシェーダーローダーがインストールされていません",

@@ -10,6 +10,7 @@ use crate::managers::instance::InstanceType;
 use crate::managers::metadata::cache::eligibility::{
     Installed, InstalledId, UpdateContext, choose_update, installed_channel,
 };
+use crate::util::recycle_bin::Removal;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
 use anyhow::Context;
 use anyhow::{anyhow, bail};
@@ -37,6 +38,7 @@ pub(super) async fn remove_addon_from_disk(
     enabled_path: &std::path::Path,
     disabled_path: &std::path::Path,
     is_directory: bool,
+    removal: Removal,
 ) -> anyhow::Result<bool> {
     let enabled = addon_metadata(enabled_path).await?;
     let disabled = if is_directory {
@@ -51,7 +53,7 @@ pub(super) async fn remove_addon_from_disk(
         .map(|m| (enabled_path, m))
         .or_else(|| disabled.map(|m| (disabled_path, m)));
     match selected {
-        Some((path, meta)) => remove_addon_entry(path, &meta, is_directory).await,
+        Some((path, meta)) => remove_addon_entry(path, &meta, is_directory, removal).await,
         None => Ok(false),
     }
 }
@@ -60,11 +62,13 @@ pub(super) async fn remove_addon_from_disk(
 /// A file addon may be a link to a jar or pack kept elsewhere: only the link
 /// is removed, never what it points to, as 2.0.40 did. A save that is a link
 /// is refused: the scanner never lists one, and the save it points to is not
-/// this instance's to delete.
+/// this instance's to delete. Anything else goes the way `removal` says: to
+/// the Recycle Bin, or erased.
 pub(super) async fn remove_addon_entry(
     path: &std::path::Path,
     meta: &std::fs::Metadata,
     is_directory: bool,
+    removal: Removal,
 ) -> anyhow::Result<bool> {
     if meta.file_type().is_symlink() {
         if is_directory {
@@ -86,14 +90,28 @@ pub(super) async fn remove_addon_entry(
         tokio::fs::remove_file(path).await?;
         return Ok(true);
     }
-    if is_directory && meta.is_dir() {
-        tokio::fs::remove_dir_all(path).await?;
-    } else if !is_directory && meta.is_file() {
-        tokio::fs::remove_file(path).await?;
-    } else {
+    if !is_recyclable_addon(meta, is_directory) {
         return Ok(false);
     }
+    match removal {
+        Removal::RecycleBin => {
+            crate::util::recycle_bin::move_to_recycle_bin(path.to_owned()).await?
+        }
+        Removal::Permanent if is_directory => tokio::fs::remove_dir_all(path).await?,
+        Removal::Permanent => tokio::fs::remove_file(path).await?,
+    }
     Ok(true)
+}
+
+/// Whether the entry is the addon itself, a world's folder or an addon's
+/// file, and no link to one: what the Recycle Bin is asked to take.
+pub(super) fn is_recyclable_addon(meta: &std::fs::Metadata, is_directory: bool) -> bool {
+    !meta.file_type().is_symlink()
+        && if is_directory {
+            meta.is_dir()
+        } else {
+            meta.is_file()
+        }
 }
 
 /// What a Delete left when the folder held an addon twice, as `name` and
@@ -581,6 +599,18 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(())
     }
 
+    /// How a user's Delete of an addon takes it away, as the "Deletion
+    /// through Recycle Bin" setting asks.
+    async fn addon_removal(self) -> anyhow::Result<Removal> {
+        Ok(Removal::from_setting(
+            self.app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .deletion_through_recycle_bin,
+        ))
+    }
+
     /// Deletes the copy of an addon its row shows. `Some` when the folder
     /// held a second copy (`name` beside `name.disabled`), which stays and
     /// which the row now shows.
@@ -589,6 +619,23 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         id: String,
     ) -> anyhow::Result<Option<KeptAddonCopy>> {
+        self.delete_mods(instance_id, vec![id])
+            .await?
+            .pop()
+            .context("the addon was not deleted")?
+            .1
+    }
+
+    /// Deletes the copies of the addons their rows show, as one step: with
+    /// the Recycle Bin on, the whole selection goes there in one request.
+    /// Each addon has its own result, in the order asked, so one that cannot
+    /// be deleted does not hide what happened to the others. An addon asked
+    /// for twice is deleted once.
+    pub async fn delete_mods(
+        self,
+        instance_id: InstanceId,
+        ids: Vec<String>,
+    ) -> anyhow::Result<Vec<(String, anyhow::Result<Option<KeptAddonCopy>>)>> {
         let _activity = self.app.runtime_lifecycle.admit("addon mutation")?;
         let _operation = self.lock_instance(instance_id).await;
         self.ensure_modpack_not_locked(instance_id).await?;
@@ -606,60 +653,80 @@ impl ManagerRef<'_, InstanceManager> {
             .runtime_path
             .get_instances()
             .get_instance_path(&shortpath);
-        let outcome = super::addon_retry::execute(
-            &self.app.db,
-            instance_id,
-            &id,
-            &instance_path,
-            super::addon_retry::Action::Delete,
-            || async {
-                #[cfg(test)]
-                self.test_hooks.pause("addon_removed", instance_id).await;
-            },
-        )
-        .await?;
+        let removal = self.addon_removal().await?;
 
-        let kept = match outcome {
-            super::addon_retry::Outcome::Done => None,
-            super::addon_retry::Outcome::KeptTwin(twin) => {
-                // The row now shows the copy that stayed. Read its own name,
-                // version and size now, under the gate: the queued scan waits
-                // while any game runs.
-                let refreshed = self
-                    .app
-                    .meta_cache_manager()
-                    .refresh_published_addon(
-                        &_operation,
-                        &twin.folder,
-                        twin.filename.clone(),
-                        twin.enabled,
-                        twin.addon_type.clone(),
-                    )
-                    .await;
-                if let Err(error) = refreshed {
-                    tracing::warn!(
-                        filename = %twin.filename,
-                        "Could not read the addon copy a Delete left, rescanning: {error:#}"
-                    );
-                    self.app
+        let mut seen = std::collections::HashSet::new();
+        let ids: Vec<String> = ids
+            .into_iter()
+            .filter(|id| seen.insert(id.clone()))
+            .collect();
+        let mut results: Vec<(String, anyhow::Result<Option<KeptAddonCopy>>)> = vec![];
+        let mut planned = vec![];
+        for id in ids {
+            use super::addon_retry::PlannedDelete;
+            match PlannedDelete::of(&self.app.db, instance_id, &id, &instance_path).await {
+                Ok(plan) => {
+                    planned.push((results.len(), plan));
+                    results.push((id, Ok(None)));
+                }
+                Err(error) => results.push((id, Err(error))),
+            }
+        }
+        let (indexes, plans): (Vec<usize>, Vec<_>) = planned.into_iter().unzip();
+        let removed = super::addon_retry::PlannedDelete::remove_all(&plans, removal).await;
+        #[cfg(test)]
+        self.test_hooks.pause("addon_removed", instance_id).await;
+
+        for ((index, plan), removed) in indexes.into_iter().zip(plans).zip(removed) {
+            let outcome = match removed {
+                Ok(()) => plan.finish(&self.app.db, || async {}).await,
+                Err(error) => Err(error),
+            };
+            results[index].1 = match outcome {
+                Ok(super::addon_retry::Outcome::Done) => Ok(None),
+                Ok(super::addon_retry::Outcome::KeptTwin(twin)) => {
+                    // The row now shows the copy that stayed. Read its own
+                    // name, version and size now, under the gate: the queued
+                    // scan waits while any game runs.
+                    let refreshed = self
+                        .app
                         .meta_cache_manager()
-                        .queue_caching(
-                            crate::managers::metadata::cache::CacheEntityId::Instance(instance_id),
-                            false,
+                        .refresh_published_addon(
+                            &_operation,
+                            &twin.folder,
+                            twin.filename.clone(),
+                            twin.enabled,
+                            twin.addon_type.clone(),
                         )
                         .await;
+                    if let Err(error) = refreshed {
+                        tracing::warn!(
+                            filename = %twin.filename,
+                            "Could not read the addon copy a Delete left, rescanning: {error:#}"
+                        );
+                        self.app
+                            .meta_cache_manager()
+                            .queue_caching(
+                                crate::managers::metadata::cache::CacheEntityId::Instance(
+                                    instance_id,
+                                ),
+                                false,
+                            )
+                            .await;
+                    }
+                    let (deleted, kept) = twin.names();
+                    Ok(Some(KeptAddonCopy { deleted, kept }))
                 }
-                let (deleted, kept) = twin.names();
-                Some(KeptAddonCopy { deleted, kept })
-            }
-        };
+                Err(error) => Err(error),
+            };
+        }
 
         // GC orphaned metadata
         self.app.meta_cache_manager().gc_mod_metadata().await;
 
         self.app
             .invalidate(INSTANCE_MODS, Some(instance_id.0.into()));
-        Ok(kept)
+        Ok(results)
     }
 
     pub async fn disable_mod_retryable(
@@ -714,6 +781,7 @@ impl ManagerRef<'_, InstanceManager> {
             .runtime_path
             .get_instances()
             .get_instance_path(&shortpath);
+        let removal = self.addon_removal().await?;
         super::addon_retry::execute_with_token(
             &self.app.db,
             &self.addon_retry_receipts,
@@ -721,6 +789,7 @@ impl ManagerRef<'_, InstanceManager> {
             &id,
             &path,
             action,
+            removal,
             &token,
             || async {
                 #[cfg(test)]
@@ -1458,7 +1527,7 @@ mod test {
 
 #[cfg(test)]
 pub(crate) mod tests {
-    use super::{InvalidInstanceModIdError, ensure_toggleable, remove_addon_from_disk};
+    use super::{InvalidInstanceModIdError, Removal, ensure_toggleable, remove_addon_from_disk};
     use crate::domain::instance::AddonType;
     use crate::domain::instance::info;
     use crate::managers::AppInner;
@@ -2616,9 +2685,14 @@ pub(crate) mod tests {
         std::fs::create_dir_all(world.join("region")).unwrap();
         std::fs::write(world.join("level.dat"), b"x").unwrap();
 
-        let removed = remove_addon_from_disk(&world, &dir.path().join("MyWorld.disabled"), true)
-            .await
-            .unwrap();
+        let removed = remove_addon_from_disk(
+            &world,
+            &dir.path().join("MyWorld.disabled"),
+            true,
+            Removal::Permanent,
+        )
+        .await
+        .unwrap();
 
         assert!(removed, "a world directory must be reported as removed");
         assert!(
@@ -2633,9 +2707,14 @@ pub(crate) mod tests {
         let file = dir.path().join("pack.zip");
         std::fs::write(&file, b"x").unwrap();
 
-        let removed = remove_addon_from_disk(&file, &dir.path().join("pack.zip.disabled"), false)
-            .await
-            .unwrap();
+        let removed = remove_addon_from_disk(
+            &file,
+            &dir.path().join("pack.zip.disabled"),
+            false,
+            Removal::Permanent,
+        )
+        .await
+        .unwrap();
 
         assert!(removed);
         assert!(!file.exists());
@@ -2654,13 +2733,13 @@ pub(crate) mod tests {
 
         assert!(super::addon_metadata(&disabled).await.unwrap().is_none());
         assert!(
-            remove_addon_from_disk(&enabled, &disabled, false)
+            remove_addon_from_disk(&enabled, &disabled, false, Removal::Permanent)
                 .await
                 .unwrap()
         );
         assert!(std::fs::symlink_metadata(&enabled).is_err());
         assert!(
-            !remove_addon_from_disk(&enabled, &disabled, false)
+            !remove_addon_from_disk(&enabled, &disabled, false, Removal::Permanent)
                 .await
                 .unwrap()
         );
@@ -2694,9 +2773,14 @@ pub(crate) mod tests {
         let disabled = dir.path().join("pack.zip.disabled");
         std::fs::write(&disabled, b"x").unwrap();
 
-        let removed = remove_addon_from_disk(&dir.path().join("pack.zip"), &disabled, false)
-            .await
-            .unwrap();
+        let removed = remove_addon_from_disk(
+            &dir.path().join("pack.zip"),
+            &disabled,
+            false,
+            Removal::Permanent,
+        )
+        .await
+        .unwrap();
 
         assert!(removed);
         assert!(!disabled.exists());
@@ -2710,6 +2794,7 @@ pub(crate) mod tests {
             &dir.path().join("gone.zip"),
             &dir.path().join("gone.zip.disabled"),
             false,
+            Removal::Permanent,
         )
         .await
         .unwrap();
@@ -2725,9 +2810,14 @@ pub(crate) mod tests {
         let path = dir.path().join("weird");
         std::fs::create_dir(&path).unwrap();
 
-        let removed = remove_addon_from_disk(&path, &dir.path().join("weird.disabled"), false)
-            .await
-            .unwrap();
+        let removed = remove_addon_from_disk(
+            &path,
+            &dir.path().join("weird.disabled"),
+            false,
+            Removal::Permanent,
+        )
+        .await
+        .unwrap();
 
         assert!(!removed);
         assert!(

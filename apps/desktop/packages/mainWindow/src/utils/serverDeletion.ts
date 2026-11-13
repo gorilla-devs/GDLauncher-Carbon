@@ -1,15 +1,4 @@
-/**
- * Where a deleted server's folder goes: `undefined` until the "Deletion
- * through Recycle Bin" setting is known.
- */
-export type ServerDeletionTarget = "recycleBin" | "permanent" | undefined
-
-export function serverDeletionTarget(
-  deletionThroughRecycleBin: boolean | undefined
-): ServerDeletionTarget {
-  if (deletionThroughRecycleBin === undefined) return undefined
-  return deletionThroughRecycleBin ? "recycleBin" : "permanent"
-}
+import type { DeletionTarget } from "./deletionTarget"
 
 /**
  * Whether deleting a server in `status` stops it first. Only a server this
@@ -23,7 +12,7 @@ export function deletionStopsServer(status: string | undefined) {
 /** The confirm button's label: it says everything the click does. */
 export function serverDeleteLabelKey(
   stopsFirst: boolean,
-  target: ServerDeletionTarget
+  target: DeletionTarget
 ) {
   if (target === "permanent") {
     return stopsFirst

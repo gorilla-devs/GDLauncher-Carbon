@@ -24,6 +24,7 @@
   "_trn_addon_outcome_unavailable": "No se pudo confirmar si este cambio de complemento terminó. Revisa los complementos de la instancia antes de volver a intentarlo.",
   "_trn_addon_attempt_dismissed": "Este intento fallido se descartó.",
   "_trn_addon_deleted_one_copy": "Se eliminó {{deleted}}. Otra copia, {{kept}}, sigue en la carpeta, así que el complemento sigue en la lista. Elimínalo de nuevo para quitar también esa copia.",
+  "_trn_addons_not_deleted": "No se pudieron eliminar todos los complementos",
   "_trn_addon_fallback_name": "Complemento",
   "_trn_addon_install_failed": "No se pudo instalar {{title}}",
   "_trn_shader_install_cancelled": "Instalación del shader cancelada — no hay ningún cargador de shaders compatible instalado",

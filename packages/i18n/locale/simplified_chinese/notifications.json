@@ -24,6 +24,7 @@
   "_trn_addon_outcome_unavailable": "无法确认此附加组件的更改是否已完成。请先检查该实例的附加组件，再重试。",
   "_trn_addon_attempt_dismissed": "此失败的尝试已被忽略。",
   "_trn_addon_deleted_one_copy": "已删除 {{deleted}}。文件夹中还有另一个副本 {{kept}}，因此该附加组件仍显示在列表中。再次删除即可移除该副本。",
+  "_trn_addons_not_deleted": "部分附加组件无法删除",
   "_trn_addon_fallback_name": "附加组件",
   "_trn_addon_install_failed": "{{title}} 安装失败",
   "_trn_shader_install_cancelled": "光影安装已取消 — 未安装兼容的光影加载器",

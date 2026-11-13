@@ -8,10 +8,10 @@ import ModalLayout from "../ModalLayout"
 import { Button } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import { deletionTarget } from "@/utils/deletionTarget"
 import {
   deletionStopsServer,
-  serverDeleteLabelKey,
-  serverDeletionTarget
+  serverDeleteLabelKey
 } from "@/utils/serverDeletion"
 import ServerDeletionNote from "./ServerDeletionNote"
 
@@ -38,8 +38,7 @@ const ConfirmServerDeletion = (props: ModalProps) => {
     queryKey: ["server.getAllServers"]
   }))
 
-  const target = () =>
-    serverDeletionTarget(settings.data?.deletionThroughRecycleBin)
+  const target = () => deletionTarget(settings.data?.deletionThroughRecycleBin)
   const stopsFirst = () =>
     deletionStopsServer(
       servers.data?.find((server) => server.id === data().id)?.state.status

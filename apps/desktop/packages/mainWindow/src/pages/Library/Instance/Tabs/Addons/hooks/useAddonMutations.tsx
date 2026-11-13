@@ -17,14 +17,26 @@ import { useModal } from "@/managers/ModalsManager"
 import { requiresDeletionConfirmation } from "@/pages/Library/shared/addons/addonCapabilities"
 import { createEffect, on, onCleanup } from "solid-js"
 import { resolveBooleanPreference } from "./resolveBooleanPreference"
+import { asksBeforeDeletingAddons } from "@/utils/addonDeletion"
+import { deletionTarget } from "@/utils/deletionTarget"
 
-type AddonDeletionTarget = Pick<ModType, "id" | "filename" | "addon_type">
+type AddonDeletionTarget = Pick<ModType, "id" | "filename" | "addon_type"> & {
+  /** Known on CurseForge or Modrinth, so it can be installed again. */
+  downloadable: boolean
+}
 
 const snapshotDeletionTarget = (mod: ModType): AddonDeletionTarget => ({
   id: mod.id,
   filename: mod.filename,
-  addon_type: mod.addon_type
+  addon_type: mod.addon_type,
+  downloadable: !!(mod.curseforge || mod.modrinth)
 })
+
+const asQuestion = (targets: AddonDeletionTarget[]) =>
+  targets.map((target) => ({
+    name: target.filename,
+    downloadable: target.downloadable
+  }))
 
 // The folder held the addon twice (`x.jar` beside `x.jar.disabled`, listed
 // as one row), and Delete removed only the copy the row showed. The row comes
@@ -65,6 +77,12 @@ export const useAddonMutations = (
   const worldWarningDismissed = rspc.createQuery(() => ({
     queryKey: ["settings.getWorldDeletionWarningDismissed"]
   }))
+  const settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }))
+  // Unknown while the settings load, which asks as if the Recycle Bin is off.
+  const whereDeleted = () =>
+    deletionTarget(settings.data?.deletionThroughRecycleBin)
 
   // `worldWarningDismissed.data` is `undefined` until the query resolves, so
   // reading it raw conflates "still loading" with "not dismissed" — a user
@@ -114,6 +132,9 @@ export const useAddonMutations = (
   // Mutations
   const deleteModMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteMod"]
+  }))
+  const deleteModsMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.deleteMods"]
   }))
   const disableModMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.disableMod"]
@@ -273,6 +294,21 @@ export const useAddonMutations = (
       )
       return
     }
+    // A world asks through its own dialog above, or not at all once the
+    // user chose "Don't ask me again".
+    if (
+      !requiresDeletionConfirmation(target.addon_type) &&
+      asksBeforeDeletingAddons(asQuestion([target]), whereDeleted())
+    ) {
+      modalsContext?.openModal(
+        { name: "confirmAddonDeletion" },
+        {
+          addons: asQuestion([target]),
+          onConfirm: () => void performDeleteMod(instanceId, target)
+        }
+      )
+      return
+    }
 
     await performDeleteMod(instanceId, target)
   }
@@ -288,16 +324,24 @@ export const useAddonMutations = (
     }
 
     try {
-      const kept = await Promise.all(
-        selectedMods.map((mod) =>
-          deleteModMutation.mutateAsync({
-            instance_id: instanceId,
-            mod_id: mod.id
-          })
-        )
-      )
-      kept.forEach(announceKeptCopy)
-      if (isCurrentInstance(instanceId)) await refetchAddons()
+      // One request for the whole selection: with the Recycle Bin on, the
+      // files go there together.
+      const deleted = await deleteModsMutation.mutateAsync({
+        instance_id: instanceId,
+        mod_ids: selectedIds
+      })
+      deleted.forEach((addon) => announceKeptCopy(addon.kept))
+      const failed = deleted.filter((addon) => addon.error)
+      if (failed.length > 0) {
+        toast.error(i18n.t("notifications:_trn_addons_not_deleted"), {
+          description: failed[0].error ?? undefined
+        })
+      }
+      if (isCurrentInstance(instanceId)) {
+        await refetchAddons()
+        // What could not be deleted is still there: show it again.
+        if (failed.length > 0) optimisticUpdates.rollbackToServerState()
+      }
     } catch (error) {
       console.error("Failed to delete selected mods:", error)
       if (isCurrentInstance(instanceId)) {
@@ -324,6 +368,22 @@ export const useAddonMutations = (
           // `performDeleteSelected` below removes every selected addon. The
           // dialog names that total so it describes what the button does.
           totalCount: targets.length,
+          onConfirm: () => void performDeleteSelected(instanceId, targets)
+        }
+      )
+      return
+    }
+    const onlyWorld =
+      targets.length === 1 &&
+      requiresDeletionConfirmation(targets[0].addon_type)
+    if (
+      !onlyWorld &&
+      asksBeforeDeletingAddons(asQuestion(targets), whereDeleted())
+    ) {
+      modalsContext?.openModal(
+        { name: "confirmAddonDeletion" },
+        {
+          addons: asQuestion(targets),
           onConfirm: () => void performDeleteSelected(instanceId, targets)
         }
       )

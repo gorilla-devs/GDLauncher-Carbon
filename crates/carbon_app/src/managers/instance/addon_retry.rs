@@ -1,9 +1,10 @@
 //! Owned file-operation boundary. Caller holds the runtime admission and instance gate.
 use super::mods::{
-    InvalidInstanceModIdError, addon_metadata, ensure_toggleable, remove_addon_entry,
-    remove_addon_from_disk, twin_copies_refusal, validate_addon_basename,
+    InvalidInstanceModIdError, addon_metadata, ensure_toggleable, is_recyclable_addon,
+    remove_addon_entry, remove_addon_from_disk, twin_copies_refusal, validate_addon_basename,
 };
 use crate::domain::instance::{AddonType, InstanceId};
+use crate::util::recycle_bin::Removal;
 use anyhow::{anyhow, bail};
 use carbon_repos::{db_exec::Db, dbtypes::DbDateTime, repos::mod_file_cache as repo};
 use carbon_rt_path::InstancePath;
@@ -58,6 +59,8 @@ impl KeptTwin {
     }
 }
 
+/// Disables one addon, or deletes it for good. A user's Delete goes through
+/// [`PlannedDelete`] instead, which can also use the Recycle Bin.
 pub(super) async fn execute<F: Future<Output = ()>>(
     db: &Db,
     instance: InstanceId,
@@ -66,6 +69,11 @@ pub(super) async fn execute<F: Future<Output = ()>>(
     action: Action,
     after_effect: impl FnOnce() -> F,
 ) -> anyhow::Result<Outcome> {
+    if action == Action::Delete {
+        let planned = PlannedDelete::of(db, instance, id, path).await?;
+        planned.remove(Removal::Permanent).await?;
+        return planned.finish(db, after_effect).await;
+    }
     let row = repo::get_mod_file_cache_by_id(db, id)
         .await?
         .filter(|row| row.instance_id == instance.0)
@@ -73,52 +81,156 @@ pub(super) async fn execute<F: Future<Output = ()>>(
     let kind =
         AddonType::from_db_string(&row.addon_type).ok_or_else(|| anyhow!("unknown addon kind"))?;
     validate_addon_basename(&row.filename)?;
-    if action == Action::Disable {
-        ensure_toggleable(kind)?;
-    }
+    ensure_toggleable(kind)?;
     let folder = super::installer::publication::checked_folder(path, kind).await?;
     let enabled = folder.join(&row.filename);
     let disabled = folder.join(format!("{}.disabled", row.filename));
     let twins = kind != AddonType::Worlds
         && addon_metadata(&enabled).await?.is_some()
         && addon_metadata(&disabled).await?.is_some();
-    match action {
-        Action::Disable => {
-            if twins {
-                return Err(twin_copies_refusal(&folder, &row.filename, "disable"));
-            }
-            if disabled.exists() {
-                bail!("mod is already disabled")
-            }
-            if !enabled.exists() {
-                bail!("mod does not exist on disk")
-            }
-            tokio::fs::rename(&enabled, &disabled).await?;
-            after_effect().await;
-            repo::update_mod_file_enabled(db, id, false, DbDateTime(Utc::now().fixed_offset()))
-                .await?;
+    if twins {
+        return Err(twin_copies_refusal(&folder, &row.filename, "disable"));
+    }
+    if disabled.exists() {
+        bail!("mod is already disabled")
+    }
+    if !enabled.exists() {
+        bail!("mod does not exist on disk")
+    }
+    tokio::fs::rename(&enabled, &disabled).await?;
+    after_effect().await;
+    repo::update_mod_file_enabled(db, id, false, DbDateTime(Utc::now().fixed_offset())).await?;
+    Ok(Outcome::Done)
+}
+
+/// One addon a Delete is about to remove: its row checked and the entry to
+/// remove chosen, with nothing changed yet. Split from the removal so a
+/// whole selection can go to the Recycle Bin in one request.
+pub(super) struct PlannedDelete {
+    row: repo::ModFileCacheRow,
+    kind: AddonType,
+    folder: std::path::PathBuf,
+    enabled: std::path::PathBuf,
+    disabled: std::path::PathBuf,
+    /// Both spellings are there (a hand copy, or a jar dropped again beside
+    /// its disabled copy), listed as one row. As in 2.0.40, Delete removes
+    /// one copy per click, the one the row shows; the row then shows the
+    /// other, so nothing goes unseen, and a second Delete removes that one.
+    twins: bool,
+    /// What is removed; `None` when neither spelling is in the folder.
+    target: Option<(std::path::PathBuf, std::fs::Metadata)>,
+}
+
+impl PlannedDelete {
+    pub(super) async fn of(
+        db: &Db,
+        instance: InstanceId,
+        id: &str,
+        path: &InstancePath,
+    ) -> anyhow::Result<Self> {
+        let row = repo::get_mod_file_cache_by_id(db, id)
+            .await?
+            .filter(|row| row.instance_id == instance.0)
+            .ok_or_else(|| InvalidInstanceModIdError(instance, id.to_owned()))?;
+        let kind = AddonType::from_db_string(&row.addon_type)
+            .ok_or_else(|| anyhow!("unknown addon kind"))?;
+        validate_addon_basename(&row.filename)?;
+        let folder = super::installer::publication::checked_folder(path, kind).await?;
+        let enabled = folder.join(&row.filename);
+        let disabled = folder.join(format!("{}.disabled", row.filename));
+        // A world has only its exact spelling.
+        let enabled_meta = addon_metadata(&enabled).await?;
+        let disabled_meta = if kind == AddonType::Worlds {
+            None
+        } else {
+            addon_metadata(&disabled).await?
+        };
+        let twins = enabled_meta.is_some() && disabled_meta.is_some();
+        let shows_enabled = if twins {
+            row.enabled
+        } else {
+            enabled_meta.is_some()
+        };
+        let target = if shows_enabled {
+            enabled_meta.map(|meta| (enabled.clone(), meta))
+        } else {
+            disabled_meta.map(|meta| (disabled.clone(), meta))
+        };
+        Ok(Self {
+            row,
+            kind,
+            folder,
+            enabled,
+            disabled,
+            twins,
+            target,
+        })
+    }
+
+    fn is_world(&self) -> bool {
+        self.kind == AddonType::Worlds
+    }
+
+    /// The entry to hand to the Recycle Bin: the addon itself, not a link
+    /// to one, which is removed as a link.
+    fn recyclable(&self) -> Option<&std::path::Path> {
+        self.target
+            .as_ref()
+            .filter(|(_, meta)| is_recyclable_addon(meta, self.is_world()))
+            .map(|(path, _)| path.as_path())
+    }
+
+    /// Removes the chosen entry.
+    pub(super) async fn remove(&self, removal: Removal) -> anyhow::Result<()> {
+        let Some((path, meta)) = &self.target else {
+            return Ok(());
+        };
+        let removed = remove_addon_entry(path, meta, self.is_world(), removal).await?;
+        if self.twins && !removed {
+            bail!(
+                "{} is not a file, so it was not deleted. Remove it in your file manager.",
+                path.display()
+            );
         }
-        Action::Delete if twins => {
-            // Both spellings are there (a hand copy, or a jar dropped again
-            // beside its disabled copy), listed as one row. As in 2.0.40,
-            // Delete removes one copy per click, here the one the row shows;
-            // the row then shows the other, so nothing goes unseen, and a
-            // second Delete removes that one too.
-            let (shown, twin, twin_enabled) = if row.enabled {
-                (&enabled, &disabled, false)
-            } else {
-                (&disabled, &enabled, true)
-            };
-            let meta = addon_metadata(shown)
-                .await?
-                .ok_or_else(|| anyhow!("addon changed while deleting; nothing was removed"))?;
-            if !remove_addon_entry(shown, &meta, false).await? {
-                bail!(
-                    "{} is not a file, so it was not deleted. Remove it in your file manager.",
-                    shown.display()
-                );
+        Ok(())
+    }
+
+    /// Removes every entry of `planned`, in the Recycle Bin's case with one
+    /// request for all of them. The result has one entry per plan, in order.
+    pub(super) async fn remove_all(planned: &[Self], removal: Removal) -> Vec<anyhow::Result<()>> {
+        let mut results = Vec::with_capacity(planned.len());
+        let mut recycled = vec![];
+        for (index, plan) in planned.iter().enumerate() {
+            match plan.recyclable() {
+                Some(path) if removal == Removal::RecycleBin => {
+                    recycled.push((index, path.to_owned()));
+                    results.push(Ok(()));
+                }
+                _ => results.push(plan.remove(removal).await),
             }
-            after_effect().await;
+        }
+        let paths = recycled.iter().map(|(_, path)| path.clone()).collect();
+        let moved = crate::util::recycle_bin::move_all_to_recycle_bin(paths).await;
+        for ((index, _), result) in recycled.into_iter().zip(moved) {
+            results[index] = result;
+        }
+        results
+    }
+
+    /// Brings the row in line with the folder once the entry was removed,
+    /// and refuses while anything the row stood for is still there.
+    pub(super) async fn finish<F: Future<Output = ()>>(
+        self,
+        db: &Db,
+        after_effect: impl FnOnce() -> F,
+    ) -> anyhow::Result<Outcome> {
+        after_effect().await;
+        if self.twins {
+            let (shown, twin, twin_enabled) = if self.row.enabled {
+                (&self.enabled, &self.disabled, false)
+            } else {
+                (&self.disabled, &self.enabled, true)
+            };
             if addon_metadata(shown).await?.is_some() {
                 bail!(
                     "refusing to update addon cache row: content remains at {}",
@@ -126,41 +238,37 @@ pub(super) async fn execute<F: Future<Output = ()>>(
                 );
             }
             if addon_metadata(twin).await?.is_none() {
-                repo::delete_mod_file_cache_by_id(db, id).await?;
+                repo::delete_mod_file_cache_by_id(db, &self.row.id).await?;
                 return Ok(Outcome::Done);
             }
             repo::update_mod_file_enabled(
                 db,
-                id,
+                &self.row.id,
                 twin_enabled,
                 DbDateTime(Utc::now().fixed_offset()),
             )
             .await?;
             return Ok(Outcome::KeptTwin(KeptTwin {
-                folder,
-                filename: row.filename,
-                addon_type: row.addon_type,
+                folder: self.folder,
+                filename: self.row.filename,
+                addon_type: self.row.addon_type,
                 enabled: twin_enabled,
             }));
         }
-        Action::Delete => {
-            remove_addon_from_disk(&enabled, &disabled, kind == AddonType::Worlds).await?;
-            after_effect().await;
-            for p in [&enabled, &disabled]
-                .into_iter()
-                .take(if kind == AddonType::Worlds { 1 } else { 2 })
-            {
-                if addon_metadata(p).await?.is_some() {
-                    bail!(
-                        "refusing to drop addon cache row: content remains at {}",
-                        p.display()
-                    )
-                }
+        for p in [&self.enabled, &self.disabled]
+            .into_iter()
+            .take(if self.is_world() { 1 } else { 2 })
+        {
+            if addon_metadata(p).await?.is_some() {
+                bail!(
+                    "refusing to drop addon cache row: content remains at {}",
+                    p.display()
+                )
             }
-            repo::delete_mod_file_cache_by_id(db, id).await?;
         }
+        repo::delete_mod_file_cache_by_id(db, &self.row.id).await?;
+        Ok(Outcome::Done)
     }
-    Ok(Outcome::Done)
 }
 
 use sha2::{Digest, Sha512};
@@ -497,6 +605,7 @@ pub(super) async fn execute_with_token<F: Future<Output = ()>>(
     id: &str,
     path: &InstancePath,
     action: Action,
+    removal: Removal,
     token: &str,
     after_effect: impl FnOnce() -> F,
 ) -> anyhow::Result<()> {
@@ -605,7 +714,7 @@ pub(super) async fn execute_with_token<F: Future<Output = ()>>(
                 Effect::Disabled(observed)
             }
             Action::Delete => {
-                if !remove_addon_from_disk(&a, &b, false).await? {
+                if !remove_addon_from_disk(&a, &b, false, removal).await? {
                     bail!("no positively completed removal");
                 }
                 if addon_metadata(&a).await?.is_some() || addon_metadata(&b).await?.is_some() {
@@ -663,6 +772,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Disable,
+                Removal::Permanent,
                 &token,
                 || async {}
             )
@@ -689,6 +799,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Disable,
+                Removal::Permanent,
                 &token,
                 || async {}
             )
@@ -716,6 +827,7 @@ mod task32_tests {
             "owned",
             &path,
             Action::Delete,
+            Removal::Permanent,
             &token,
             || async {},
         )
@@ -735,6 +847,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Delete,
+                Removal::Permanent,
                 &token,
                 || async {}
             )
@@ -807,6 +920,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 action,
+                Removal::Permanent,
                 &token,
                 || async {},
             )
@@ -829,6 +943,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 action,
+                Removal::Permanent,
                 &token,
                 || async {},
             )
@@ -849,6 +964,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Disable,
+                Removal::Permanent,
                 &token,
                 || async {},
             )
@@ -866,6 +982,7 @@ mod task32_tests {
                     "owned",
                     &path,
                     Action::Disable,
+                    Removal::Permanent,
                     &token,
                     || async {}
                 )
@@ -886,6 +1003,7 @@ mod task32_tests {
                 "owned",
                 path,
                 action,
+                Removal::Permanent,
                 &token,
                 || async {},
             )
@@ -1020,6 +1138,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Disable,
+                Removal::Permanent,
                 &token,
                 || async {},
             )
@@ -1083,6 +1202,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Delete,
+                Removal::Permanent,
                 &token,
                 || async {},
             )
@@ -1098,6 +1218,7 @@ mod task32_tests {
                     "owned",
                     &path,
                     Action::Disable,
+                    Removal::Permanent,
                     &uuid::Uuid::new_v4().to_string(),
                     || async {},
                 )
@@ -1139,6 +1260,7 @@ mod task32_tests {
                     "owned",
                     &path,
                     Action::Delete,
+                    Removal::Permanent,
                     &token,
                     || async {
                         // A real external process cannot create and delete the
@@ -1176,6 +1298,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Delete,
+                Removal::Permanent,
                 &token,
                 || async {},
             )
@@ -1202,6 +1325,7 @@ mod task32_tests {
                     "owned",
                     &path,
                     Action::Delete,
+                    Removal::Permanent,
                     &token,
                     || async {}
                 )
@@ -1222,6 +1346,7 @@ mod task32_tests {
             "owned",
             &path,
             Action::Disable,
+            Removal::Permanent,
             &token,
             || async {},
         )
@@ -1235,6 +1360,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Delete,
+                Removal::Permanent,
                 &token,
                 || async {}
             )
@@ -1249,6 +1375,7 @@ mod task32_tests {
                 "other",
                 &path,
                 Action::Disable,
+                Removal::Permanent,
                 &token,
                 || async {}
             )
@@ -1263,6 +1390,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Disable,
+                Removal::Permanent,
                 &token,
                 || async {}
             )
@@ -1277,6 +1405,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Disable,
+                Removal::Permanent,
                 &"x".repeat(4096),
                 || async {}
             )
@@ -1296,6 +1425,7 @@ mod task32_tests {
             "owned",
             &path,
             Action::Delete,
+            Removal::Permanent,
             &token,
             || async {},
         )
@@ -1317,6 +1447,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Delete,
+                Removal::Permanent,
                 &token,
                 || async {}
             )
@@ -1343,6 +1474,7 @@ mod task32_tests {
                 "owned",
                 &path,
                 Action::Delete,
+                Removal::Permanent,
                 &token,
                 || async {}
             )
@@ -1388,6 +1520,7 @@ mod task32_tests {
                 "world",
                 &path,
                 Action::Delete,
+                Removal::Permanent,
                 &uuid::Uuid::new_v4().to_string(),
                 || async {}
             )

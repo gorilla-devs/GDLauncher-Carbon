@@ -36,7 +36,6 @@ mod pack_loader;
 pub mod properties;
 pub mod provider;
 pub(crate) mod record;
-mod recycle;
 mod repair_backup;
 pub(crate) mod world;
 
@@ -2574,7 +2573,7 @@ impl ManagerRef<'_, ServerManager> {
             // record lock is not held: emptying a large folder into the
             // Recycle Bin can take long, and a record written meanwhile
             // only lands in the folder that is leaving.
-            if let Err(error) = recycle::move_to_recycle_bin(root.clone()).await {
+            if let Err(error) = crate::util::recycle_bin::move_to_recycle_bin(root.clone()).await {
                 return Err(not_deleted(error).await);
             }
             server_repo::delete_server_tx(&self.app.db, id.0).await?;
@@ -3719,24 +3718,31 @@ impl ManagerRef<'_, ServerManager> {
 
     /// Delete a server addon file
     pub async fn delete_server_addon(self, id: ServerId, addon_id: String) -> anyhow::Result<()> {
+        self.delete_server_addons(id, vec![addon_id])
+            .await?
+            .pop()
+            .context("the addon was not deleted")?
+            .1
+    }
+
+    /// Deletes server addon files as one step: with "Deletion through
+    /// Recycle Bin" on, the whole selection goes there in one request. Each
+    /// addon has its own result, in the order asked, so one that cannot be
+    /// deleted does not hide what happened to the others. An addon asked for
+    /// twice is deleted once.
+    pub async fn delete_server_addons(
+        self,
+        id: ServerId,
+        addon_ids: Vec<String>,
+    ) -> anyhow::Result<Vec<(String, anyhow::Result<()>)>> {
+        use crate::util::recycle_bin::{Removal, move_all_to_recycle_bin};
+
         let _activity = self.app.runtime_lifecycle.admit("server addon mutation")?;
         let lock = self.get_op_lock(id);
         let _guard = lock.lock().await;
         let db_server = server_repo::get_server(&self.app.db, id.0)
             .await?
             .ok_or_else(|| anyhow!("Server not found"))?;
-
-        // Look up the cache entry to get the filename
-        let lookup_id = addon_id.clone();
-        let cache_entry = mfcdb::get_server_mod_file_cache_by_id(&self.app.db, &lookup_id)
-            .await?
-            .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
-
-        if cache_entry.server_id != id.0 {
-            bail!("Addon {} does not belong to server {}", addon_id, id.0);
-        }
-
-        let base_filename = &cache_entry.filename;
 
         let runtime_path = &self.app.settings_manager().runtime_path;
         let server_path = runtime_path
@@ -3745,25 +3751,82 @@ impl ManagerRef<'_, ServerManager> {
 
         self.ensure_addon_publication(id, &server_path.get_root())
             .await?;
-        let file_path = world::owned_addon_entry(
-            &server_path.get_data_path(),
-            &cache_entry.addon_type,
-            &cache_entry.location,
-            base_filename,
-        )?;
+        let removal = Removal::from_setting(
+            self.app
+                .settings_manager()
+                .get_settings()
+                .await?
+                .deletion_through_recycle_bin,
+        );
 
-        // A link is removed itself, never the file it points to.
-        tokio::fs::remove_file(&file_path).await?;
+        let mut seen = std::collections::HashSet::new();
+        let addon_ids: Vec<String> = addon_ids
+            .into_iter()
+            .filter(|addon_id| seen.insert(addon_id.clone()))
+            .collect();
+        let mut results: Vec<(String, anyhow::Result<()>)> = vec![];
+        // The addons the Recycle Bin is asked to take, by their place in
+        // `results`.
+        let mut recycled: Vec<(usize, std::path::PathBuf)> = vec![];
+        for addon_id in addon_ids {
+            let removed = async {
+                // Look up the cache entry to get the filename
+                let cache_entry = mfcdb::get_server_mod_file_cache_by_id(&self.app.db, &addon_id)
+                    .await?
+                    .ok_or_else(|| anyhow!("Addon cache entry not found: {}", addon_id))?;
+                if cache_entry.server_id != id.0 {
+                    bail!("Addon {} does not belong to server {}", addon_id, id.0);
+                }
+                let file_path = world::owned_addon_entry(
+                    &server_path.get_data_path(),
+                    &cache_entry.addon_type,
+                    &cache_entry.location,
+                    &cache_entry.filename,
+                )?;
+                // A link is removed itself, never the file it points to, and
+                // never through the Recycle Bin.
+                let link = tokio::fs::symlink_metadata(&file_path)
+                    .await?
+                    .file_type()
+                    .is_symlink();
+                if link || removal == Removal::Permanent {
+                    tokio::fs::remove_file(&file_path).await?;
+                    return Ok(None);
+                }
+                Ok(Some(file_path))
+            }
+            .await;
+            match removed {
+                Ok(Some(file_path)) => {
+                    recycled.push((results.len(), file_path));
+                    results.push((addon_id, Ok(())));
+                }
+                Ok(None) => results.push((addon_id, Ok(()))),
+                Err(error) => results.push((addon_id, Err(error))),
+            }
+        }
+        let paths = recycled.iter().map(|(_, path)| path.clone()).collect();
+        let moved = move_all_to_recycle_bin(paths).await;
+        for ((index, _), moved) in recycled.into_iter().zip(moved) {
+            results[index].1 = moved;
+        }
 
-        // Remove cache entry
-        mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, &addon_id).await?;
+        // Remove the cache entries of what is gone
+        for (addon_id, result) in &mut results {
+            if result.is_ok() {
+                *result = mfcdb::delete_server_mod_file_cache_by_id(&self.app.db, addon_id)
+                    .await
+                    .map(|_| ())
+                    .map_err(Into::into);
+            }
+        }
 
         // GC orphaned metadata
         self.app.meta_cache_manager().gc_mod_metadata().await;
 
         self.app.invalidate(GET_SERVER_ADDONS, None);
 
-        Ok(())
+        Ok(results)
     }
 
     /// Install a CurseForge mod on a server by project_id + file_id

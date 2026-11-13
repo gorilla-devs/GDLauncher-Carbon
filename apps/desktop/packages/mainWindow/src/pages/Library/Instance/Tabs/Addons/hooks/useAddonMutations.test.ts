@@ -4,8 +4,14 @@ import type { Mod } from "@gd/core_module/bindings"
 const state = vi.hoisted(() => ({
   params: { id: "1" },
   preference: { isLoading: true, data: undefined as boolean | undefined },
+  settings: {
+    data: { deletionThroughRecycleBin: true } as
+      | { deletionThroughRecycleBin: boolean }
+      | undefined
+  },
   ensureQueryData: vi.fn(),
   deleteMod: vi.fn(),
+  deleteMods: vi.fn(),
   openModal: vi.fn(),
   query: vi.fn(),
   updateMod: vi.fn(),
@@ -22,6 +28,14 @@ vi.mock(
   () =>
     import("../../../../../../components/ModDownloadButton/hooks/resolveTaskPoll")
 )
+vi.mock(
+  "@/utils/addonDeletion",
+  () => import("../../../../../../utils/addonDeletion")
+)
+vi.mock(
+  "@/utils/deletionTarget",
+  () => import("../../../../../../utils/deletionTarget")
+)
 vi.mock("@gd/ui", () => ({
   toast: { error: state.errorToast, info: state.infoToast }
 }))
@@ -31,12 +45,17 @@ vi.mock("@/utils/rspcClient", () => ({
   queryClient: { ensureQueryData: state.ensureQueryData },
   rspc: {
     useContext: () => ({ client: { query: state.query } }),
-    createQuery: () => state.preference,
+    createQuery: (options: () => { queryKey: string[] }) =>
+      options().queryKey[0] === "settings.getSettings"
+        ? state.settings
+        : state.preference,
     createMutation: (options: () => { mutationKey: string[] }) => ({
       mutateAsync:
         options().mutationKey[0] === "instance.deleteMod"
           ? state.deleteMod
-          : state.updateMod,
+          : options().mutationKey[0] === "instance.deleteMods"
+            ? state.deleteMods
+            : state.updateMod,
       mutate: vi.fn()
     })
   }
@@ -105,7 +124,11 @@ beforeEach(() => {
   state.params.id = "1"
   state.preference.isLoading = true
   state.preference.data = undefined
+  state.settings.data = { deletionThroughRecycleBin: true }
   state.deleteMod.mockResolvedValue(undefined)
+  state.deleteMods.mockImplementation(async (request: { mod_ids: string[] }) =>
+    request.mod_ids.map((mod_id) => ({ mod_id, kept: null, error: null }))
+  )
 })
 
 describe("addon deletion target identity", () => {
@@ -154,11 +177,20 @@ describe("addon deletion target identity", () => {
     selected.splice(1, 1, addon("mod-b", "mods"))
     resolve(true)
     await pending
-
-    expect(state.deleteMod.mock.calls.map(([target]) => target)).toEqual([
-      { instance_id: 1, mod_id: "world-a" },
-      { instance_id: 1, mod_id: "mod-a" }
+    // The world warning is off, so the selection asks its own question.
+    const [modal, question] = state.openModal.mock.calls[0]
+    expect(modal).toEqual({ name: "confirmAddonDeletion" })
+    expect(question.addons.map((a: { name: string }) => a.name)).toEqual([
+      "name-world-a",
+      "name-mod-a"
     ])
+    await question.onConfirm()
+    await Promise.resolve()
+
+    expect(state.deleteMods.mock.calls.map(([target]) => target)).toEqual([
+      { instance_id: 1, mod_ids: ["world-a", "mod-a"] }
+    ])
+    expect(state.deleteMod).not.toHaveBeenCalled()
     expect(refetch).not.toHaveBeenCalled()
     expect(optimistic.optimisticDeleteAddons).not.toHaveBeenCalled()
     expect(selection).not.toHaveBeenCalled()
@@ -176,9 +208,10 @@ describe("addon deletion target identity", () => {
     selected.length = 0
     confirmation.onConfirm()
 
-    expect(state.deleteMod.mock.calls.map(([target]) => target)).toEqual([
-      { instance_id: 1, mod_id: "world-a" },
-      { instance_id: 1, mod_id: "mod-a" }
+    // One request for the whole selection, asked once by the world dialog.
+    expect(state.openModal).toHaveBeenCalledOnce()
+    expect(state.deleteMods.mock.calls.map(([target]) => target)).toEqual([
+      { instance_id: 1, mod_ids: ["world-a", "mod-a"] }
     ])
   })
 
@@ -303,14 +336,128 @@ describe("deleting one of two copies of an addon", () => {
     await actions.handleDeleteMod(addon("plain", "mods"))
     expect(state.infoToast).not.toHaveBeenCalled()
 
-    state.deleteMod
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ deleted: "b.jar.disabled", kept: "b.jar" })
+    state.deleteMods.mockResolvedValueOnce([
+      { mod_id: "a", kept: null, error: null },
+      {
+        mod_id: "b",
+        kept: { deleted: "b.jar.disabled", kept: "b.jar" },
+        error: null
+      }
+    ])
     await actions.handleDeleteSelected([addon("a", "mods"), addon("b", "mods")])
-    expect(state.infoToast).toHaveBeenCalledOnce()
+    await state.openModal.mock.calls[0][1].onConfirm()
+    await vi.waitFor(() => expect(state.infoToast).toHaveBeenCalledOnce())
     expect(state.translate).toHaveBeenCalledWith(
       "notifications:_trn_addon_deleted_one_copy",
       expect.objectContaining({ deleted: "b.jar.disabled", kept: "b.jar" })
     )
+  })
+})
+
+describe("asking before addons are deleted", () => {
+  const fromPlatform = (id: string): Mod => ({
+    ...addon(id, "mods"),
+    modrinth: {} as Mod["modrinth"]
+  })
+
+  it("deletes one mod from a platform without asking, Recycle Bin on or off", async () => {
+    for (const deletionThroughRecycleBin of [true, false]) {
+      state.settings.data = { deletionThroughRecycleBin }
+      const { actions } = setup()
+      await actions.handleDeleteMod(fromPlatform("sodium"))
+    }
+    expect(state.openModal).not.toHaveBeenCalled()
+    expect(state.deleteMod).toHaveBeenCalledTimes(2)
+  })
+
+  it("deletes one file of the user's own without asking while it goes to the Recycle Bin", async () => {
+    const { actions } = setup()
+    await actions.handleDeleteMod(addon("own", "mods"))
+    expect(state.openModal).not.toHaveBeenCalled()
+    expect(state.deleteMod).toHaveBeenCalledWith({
+      instance_id: 1,
+      mod_id: "own"
+    })
+  })
+
+  it.each([
+    ["off", { deletionThroughRecycleBin: false }],
+    ["not known yet", undefined]
+  ])(
+    "asks for one file of the user's own with the Recycle Bin %s",
+    async (_label, settings) => {
+      state.settings.data = settings
+      const { actions } = setup()
+      const own = addon("own", "resourcepacks")
+      await actions.handleDeleteMod(own)
+
+      expect(state.deleteMod).not.toHaveBeenCalled()
+      const [modal, question] = state.openModal.mock.calls[0]
+      expect(modal).toEqual({ name: "confirmAddonDeletion" })
+      expect(question.addons).toEqual([
+        { name: "name-own", downloadable: false }
+      ])
+      // The addon and instance shown in the question are the ones deleted.
+      state.params.id = "2"
+      own.id = "other"
+      question.onConfirm()
+      expect(state.deleteMod).toHaveBeenCalledWith({
+        instance_id: 1,
+        mod_id: "own"
+      })
+    }
+  )
+
+  it("asks once for a selection and says which files cannot be downloaded again", async () => {
+    const { actions } = setup()
+    await actions.handleDeleteSelected([
+      fromPlatform("sodium"),
+      addon("own", "mods")
+    ])
+
+    expect(state.deleteMods).not.toHaveBeenCalled()
+    expect(state.openModal).toHaveBeenCalledOnce()
+    const [modal, question] = state.openModal.mock.calls[0]
+    expect(modal).toEqual({ name: "confirmAddonDeletion" })
+    expect(question.addons).toEqual([
+      { name: "name-sodium", downloadable: true },
+      { name: "name-own", downloadable: false }
+    ])
+    await question.onConfirm()
+    expect(state.deleteMods).toHaveBeenCalledWith({
+      instance_id: 1,
+      mod_ids: ["sodium", "own"]
+    })
+  })
+
+  it("does not ask twice for a world the user chose not to be asked about", async () => {
+    state.preference.isLoading = false
+    state.preference.data = true
+    state.settings.data = { deletionThroughRecycleBin: false }
+    const { actions } = setup()
+    await actions.handleDeleteMod(addon("world-a"))
+    await actions.handleDeleteSelected([addon("world-b")])
+    expect(state.openModal).not.toHaveBeenCalled()
+    expect(state.deleteMod).toHaveBeenCalledOnce()
+    expect(state.deleteMods).toHaveBeenCalledOnce()
+  })
+
+  it("says so when part of a selection could not be deleted and shows those rows again", async () => {
+    state.deleteMods.mockResolvedValueOnce([
+      { mod_id: "a", kept: null, error: null },
+      { mod_id: "b", kept: null, error: "Nothing was deleted, because …" }
+    ])
+    const { actions, refetch, optimistic } = setup()
+    await actions.handleDeleteSelected([addon("a", "mods"), addon("b", "mods")])
+    await state.openModal.mock.calls[0][1].onConfirm()
+
+    await vi.waitFor(() => expect(state.errorToast).toHaveBeenCalledOnce())
+    expect(state.errorToast.mock.calls[0][1]).toEqual({
+      description: "Nothing was deleted, because …"
+    })
+    await vi.waitFor(() =>
+      expect(optimistic.rollbackToServerState).toHaveBeenCalledOnce()
+    )
+    expect(refetch).toHaveBeenCalledOnce()
   })
 })

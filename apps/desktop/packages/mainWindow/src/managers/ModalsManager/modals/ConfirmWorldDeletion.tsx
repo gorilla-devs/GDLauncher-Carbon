@@ -26,6 +26,13 @@ function ConfirmWorldDeletion(props: ModalProps) {
   const deletesMoreThanWorlds = () => (totalCount() ?? 0) > (worldCount() ?? 1)
   const onConfirm = () => props.data?.onConfirm as () => void
 
+  // With "Deletion through Recycle Bin" on the world can be taken back out,
+  // so the dialog must not say it is gone for good.
+  const settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }))
+  const toRecycleBin = () => settings.data?.deletionThroughRecycleBin === true
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title} width="w-120">
       <div class="flex min-h-40 flex-col justify-between gap-6 overflow-hidden">
@@ -44,13 +51,22 @@ function ConfirmWorldDeletion(props: ModalProps) {
           <div class="text-lightSlate-300 flex flex-col gap-2">
             <Show
               when={isPlural()}
-              fallback={t("instances:_trn_confirm_world_deletion_body", {
-                name: worldName(),
-                interpolation: { escapeValue: false }
-              })}
+              fallback={t(
+                toRecycleBin()
+                  ? "instances:_trn_confirm_world_deletion_body_recycle_bin"
+                  : "instances:_trn_confirm_world_deletion_body",
+                {
+                  name: worldName(),
+                  interpolation: { escapeValue: false }
+                }
+              )}
             >
               <Trans
-                key="instances:_trn_confirm_world_deletion_body_plural"
+                key={
+                  toRecycleBin()
+                    ? "instances:_trn_confirm_world_deletion_body_plural_recycle_bin"
+                    : "instances:_trn_confirm_world_deletion_body_plural"
+                }
                 options={{ count: worldCount() }}
               />
             </Show>

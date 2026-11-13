@@ -135,6 +135,7 @@ keys! {
         ENABLE_MOD                                  = "enableMod";
         DISABLE_MOD                                 = "disableMod";
         DELETE_MOD                                  = "deleteMod";
+        DELETE_MODS                                 = "deleteMods";
         INSTALL_MOD                                 = "installMod";
         INSTALL_LATEST_MOD                          = "installLatestMod";
         CHECK_SHADER_REQUIREMENTS                   = "checkShaderRequirements";
@@ -265,6 +266,7 @@ keys! {
         GET_SERVER_ADDONS                           = "getServerAddons";
         ENABLE_SERVER_ADDON                         = "enableServerAddon";
         DELETE_SERVER_ADDON                         = "deleteServerAddon";
+        DELETE_SERVER_ADDONS                        = "deleteServerAddons";
         INSTALL_SERVER_MOD                          = "installServerMod";
         INSTALL_LATEST_SERVER_MOD                   = "installLatestServerMod";
         OPEN_SERVER_FOLDER                          = "openServerFolder";
