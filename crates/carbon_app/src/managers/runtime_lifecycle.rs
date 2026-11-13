@@ -13,10 +13,12 @@ use std::{
 use sysinfo::{Pid, ProcessesToUpdate, System};
 
 /// How long shutdown waits for in-flight operations other than server runs,
-/// concurrently with the server drain. The drain's own worst case (30 s
-/// grace, kill, log settle) is about 42 s; handing running games over
-/// afterwards adds up to [`FOLLOWER_SETTLE_BUDGET`]. Electron polls for 60 s,
-/// and shows the user what it waits for after 3 s.
+/// concurrently with the server drain. The drain itself has no limit: a
+/// local server is given as long as it takes to save and exit, never killed
+/// on a timer. Handing running games over afterwards adds up to
+/// [`FOLLOWER_SETTLE_BUDGET`]. Electron polls each attempt for 60 s, shows
+/// the user what it waits for after 3 s, and keeps waiting or ends the core
+/// as the user chooses.
 const OPERATION_SETTLE_BUDGET: std::time::Duration = std::time::Duration::from_secs(15);
 /// How long shutdown waits for the session workers of running games, and for
 /// the watcher of games from an earlier session, once they are cancelled.

@@ -231,6 +231,7 @@ keys! {
         START_SERVER                                = "startServer";
         STOP_SERVER                                 = "stopServer";
         KILL_SERVER                                 = "killServer";
+        GET_SERVER_STOP_PROGRESS                    = "getServerStopProgress";
         STOP_RECOVERED_SERVER                       = "stopRecoveredServer";
         CLEAR_SERVER_MARKER                         = "clearServerMarker";
         SEND_CONSOLE_COMMAND                        = "sendConsoleCommand";

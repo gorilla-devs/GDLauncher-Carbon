@@ -16,7 +16,7 @@ use carbon_repos::dbtypes::DbDateTime;
 use carbon_repos::repos::mod_file_cache as mfcdb;
 use carbon_repos::repos::server::{self as server_repo, IndexShift, ServerPatch};
 use carbon_rt_path::ServerPath;
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use dashmap::DashMap;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -303,6 +303,20 @@ pub struct ServerManager {
     /// Servers this session put back from their `server.json` because their
     /// rows were gone, until the launcher has told the user.
     restored_servers: AtomicU32,
+    /// When each server was last asked to stop, for the time its page shows
+    /// while it is Stopping.
+    stop_requested: DashMap<ServerId, DateTime<Utc>>,
+    /// When each console last received a line.
+    last_output: Arc<DashMap<ServerLogId, DateTime<Utc>>>,
+}
+
+/// How a stop that is under way is going, for the user to judge whether the
+/// server is still saving or is stuck.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServerStopProgress {
+    pub stopping_seconds: i32,
+    pub last_output_seconds: Option<i32>,
+    pub last_output: Option<String>,
 }
 
 impl std::fmt::Debug for ServerManager {
@@ -332,6 +346,8 @@ impl ServerManager {
             recovered_poll_ms: AtomicU64::new(RECOVERED_POLL_INTERVAL.as_millis() as u64),
             record_lock: Mutex::new(()),
             restored_servers: AtomicU32::new(0),
+            stop_requested: DashMap::new(),
+            last_output: Arc::new(DashMap::new()),
         }
     }
 
@@ -471,7 +487,8 @@ impl ServerManager {
                 if skip.contains(&handle.generation) {
                     return None;
                 }
-                if !matches!(data.state, ServerState::Deleting) {
+                if !matches!(data.state, ServerState::Deleting | ServerState::Stopping) {
+                    self.stop_requested.insert(*id, Utc::now());
                     data.state = ServerState::Stopping;
                 }
                 Some((*id, handle))
@@ -484,7 +501,9 @@ impl ServerManager {
     }
     async fn drain_for_shutdown(&self, handles: &[(ServerId, ServerHandle)]) -> anyhow::Result<()> {
         let outcomes = futures::future::join_all(handles.iter().map(|(id, handle)| async move {
-            provider::drain(handle, false, std::time::Duration::from_secs(30)).await?;
+            // No limit: a quit, restart or update waits for the save, and
+            // the prompt's Quit now is the way out.
+            provider::drain(handle, false, None).await?;
             self.finalize_run(*id, handle).await?;
             Ok::<_, anyhow::Error>(())
         }))
@@ -588,6 +607,10 @@ impl ServerManager {
 /// exit after SIGTERM before it is killed: the graceful budget of an
 /// ordinary Stop (`provider::drain`).
 const RECOVERED_STOP_GRACE: std::time::Duration = std::time::Duration::from_secs(30);
+/// How long deleting a running server waits for it to stop by itself before
+/// ending it. Its world is about to be removed with it, so this only has to
+/// keep a server that ignores 'stop' from holding the delete forever.
+const DELETE_STOP_GRACE: std::time::Duration = std::time::Duration::from_secs(120);
 /// How long a kill gets to be confirmed.
 const RECOVERED_KILL_CONFIRM: std::time::Duration = std::time::Duration::from_secs(5);
 /// How often servers from an earlier session are checked for having ended
@@ -2519,7 +2542,7 @@ impl ManagerRef<'_, ServerManager> {
         };
         drop(_guard);
         if let Some(handle) = handle {
-            provider::drain(&handle, false, std::time::Duration::from_secs(30)).await?;
+            provider::drain(&handle, false, Some(DELETE_STOP_GRACE)).await?;
             self.finalize_run(id, &handle).await?;
         }
         let _guard = lock.lock().await;
@@ -2579,8 +2602,10 @@ impl ManagerRef<'_, ServerManager> {
         // Remove from memory, including the server's log-broadcast channel
         // (keyed by its last log id) so it isn't leaked for the session.
         let removed = self.servers.write().await.remove(&id);
+        self.stop_requested.remove(&id);
         if let Some(log_id) = removed.and_then(|server| server.last_log_id) {
             self.server_logs.write().await.remove(&log_id);
+            self.last_output.remove(&log_id);
         }
         // Gates remain stable for all holders/waiters throughout the manager lifetime.
         self.crash_restart_state.remove(&id);
@@ -2715,6 +2740,7 @@ impl ManagerRef<'_, ServerManager> {
             if let Some(server) = servers.get(&id) {
                 if let Some(old_log_id) = server.last_log_id {
                     self.server_logs.write().await.remove(&old_log_id);
+                    self.last_output.remove(&old_log_id);
                 }
             }
         }
@@ -2730,8 +2756,10 @@ impl ManagerRef<'_, ServerManager> {
         let (log_drained_tx, log_drained) = provider::exit_signal();
         // Spawn log collector
         let log_watch = log_watch_tx.clone();
+        let last_output = self.last_output.clone();
         tokio::spawn(async move {
             while let Some(line) = log_rx.recv().await {
+                last_output.insert(log_id, Utc::now());
                 log_watch.send_modify(|logs| {
                     logs.push(line);
                     // Cap log buffer
@@ -2901,6 +2929,50 @@ impl ManagerRef<'_, ServerManager> {
         Ok(())
     }
 
+    /// Adds a line of the launcher's own to the console of server `id`.
+    async fn note_in_console(&self, id: ServerId, line: &str) {
+        let log_id = self
+            .servers
+            .read()
+            .await
+            .get(&id)
+            .and_then(|s| s.last_log_id);
+        let Some(log_id) = log_id else { return };
+        if let Some(log) = self.server_logs.read().await.get(&log_id) {
+            self.last_output.insert(log_id, Utc::now());
+            log.send_modify(|logs| logs.push(line.to_string()));
+        }
+    }
+
+    /// How the stop of server `id` is going, or None when it is not stopping.
+    pub async fn stop_progress(self, id: ServerId) -> Option<ServerStopProgress> {
+        let log_id = {
+            let servers = self.servers.read().await;
+            let server = servers.get(&id)?;
+            if !matches!(server.state, ServerState::Stopping) {
+                return None;
+            }
+            server.last_log_id
+        };
+        let now = Utc::now();
+        let seconds = |since: DateTime<Utc>| (now - since).num_seconds().max(0) as i32;
+        let last_output = match log_id {
+            Some(log_id) => self
+                .server_logs
+                .read()
+                .await
+                .get(&log_id)
+                .and_then(|log| log.borrow().last().cloned()),
+            None => None,
+        };
+        Some(ServerStopProgress {
+            stopping_seconds: self.stop_requested.get(&id).map_or(0, |at| seconds(*at)),
+            last_output_seconds: log_id
+                .and_then(|log_id| self.last_output.get(&log_id).map(|at| seconds(*at))),
+            last_output,
+        })
+    }
+
     pub async fn stop_server(self, id: ServerId) -> anyhow::Result<()> {
         self.drain_server(id, false).await
     }
@@ -2914,14 +2986,24 @@ impl ManagerRef<'_, ServerManager> {
             let mut servers = self.servers.write().await;
             let server = servers.get_mut(&id).context("Server not found")?;
             let handle = server.handle.clone().context("Server is not running")?;
-            if !matches!(server.state, ServerState::Deleting) {
+            if !matches!(server.state, ServerState::Deleting | ServerState::Stopping) {
+                self.stop_requested.insert(id, Utc::now());
                 server.state = ServerState::Stopping;
             }
             handle
         };
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
-        provider::drain(&handle, force, std::time::Duration::from_secs(30)).await?;
+        if force && !handle.exited.is_confirmed() {
+            self.note_in_console(
+                id,
+                "[GDLauncher] Force-stopped before the server finished shutting down",
+            )
+            .await;
+        }
+        // A Stop waits for as long as the server takes to save and exit; it
+        // is ended early only by a Force stop of the same run.
+        provider::drain(&handle, force, None).await?;
         self.finalize_run(id, &handle).await?;
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);

@@ -386,10 +386,11 @@ export async function stopCoreForShutdown(
       "unreachable"
     )
   }
-  // Longer than the core's own worst case, so a core that is still working
-  // is never cut off: about 42 s for a server to save, be killed and log its
-  // last lines, then up to 5 s to hand running games over. The user sees
-  // what it waits for long before this, and can stop or keep it at any time.
+  // One attempt's wait. The core never kills a local server on a timer, so a
+  // server still saving can outlast this: the attempt then ends as "slow",
+  // which the flow retries for as long as the user keeps waiting. The user
+  // sees what it waits for long before this, and can stop or keep it at any
+  // time.
   const deadline = Date.now() + (options.deadlineMs ?? 60000)
   let status = seen(preparation.status)
   while (

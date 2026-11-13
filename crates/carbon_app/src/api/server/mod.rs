@@ -441,6 +441,18 @@ enum FEServerModpackSource {
     },
 }
 
+/// How a stop that is under way is going. The launcher never ends a stop
+/// by itself, so this is what the user judges a Force stop by.
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FEServerStopProgress {
+    /// Since the server was asked to stop.
+    stopping_seconds: i32,
+    /// Since the console last received a line, if it has any.
+    last_output_seconds: Option<i32>,
+    last_output: Option<String>,
+}
+
 fn convert_state(state: &domain::ServerState) -> FEServerState {
     match state {
         domain::ServerState::Stopped { failed_task } => FEServerState::Stopped {
@@ -651,6 +663,17 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.server_manager()
                 .send_console_command(cmd.id.into(), cmd.command)
                 .await
+        }
+
+        query GET_SERVER_STOP_PROGRESS[app, id: FEServerId] {
+            Ok(app.server_manager()
+                .stop_progress(id.into())
+                .await
+                .map(|progress| FEServerStopProgress {
+                    stopping_seconds: progress.stopping_seconds,
+                    last_output_seconds: progress.last_output_seconds,
+                    last_output: progress.last_output,
+                }))
         }
 
         query GET_SERVER_DETAILS[app, id: FEServerId] {

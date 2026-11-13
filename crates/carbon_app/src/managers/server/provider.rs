@@ -36,6 +36,12 @@ pub(crate) const FORCED_EXIT_CONFIRM: std::time::Duration = std::time::Duration:
 
 /// Bounded channels and confirmed completion; disappearance is never success.
 ///
+/// A stop that is not forced asks the server to stop and waits for it. With
+/// no `graceful` limit it waits for as long as the server takes to save and
+/// exit: a kill is then only ever the user's own choice (a forced drain of
+/// the same run ends this wait too). With a limit, a server still running
+/// after it is killed.
+///
 /// A run whose exit is already confirmed is drained: its supervisor closes
 /// the stdin and kill channels once it has published the exit, which can be
 /// before the exit watcher clears the handle. Closed channels are an error
@@ -43,7 +49,7 @@ pub(crate) const FORCED_EXIT_CONFIRM: std::time::Duration = std::time::Duration:
 pub async fn drain(
     handle: &ServerHandle,
     force: bool,
-    graceful: std::time::Duration,
+    graceful: Option<std::time::Duration>,
 ) -> Result<()> {
     let enqueue = std::time::Duration::from_secs(1);
     let mut exited = handle.exited.clone();
@@ -53,6 +59,9 @@ pub async fn drain(
     if !force {
         let sent = tokio::time::timeout(enqueue, handle.stdin_tx.send("stop".into())).await;
         if matches!(sent, Ok(Ok(()))) {
+            let Some(graceful) = graceful else {
+                return exited.wait_confirmed().await;
+            };
             match tokio::time::timeout(graceful, exited.wait_confirmed()).await {
                 Ok(result) => return result,
                 Err(_) => tracing::warn!(
@@ -335,7 +344,7 @@ mod task07_tests {
             exit_tx.send(true).unwrap();
         };
         let (drained, ()) = tokio::join!(
-            drain(&handle, false, std::time::Duration::from_millis(1)),
+            drain(&handle, false, Some(std::time::Duration::from_millis(1))),
             result
         );
         drained.unwrap();
@@ -344,7 +353,7 @@ mod task07_tests {
         let mut unknown = handle.clone();
         unknown.exited = signal;
         assert!(
-            drain(&unknown, false, std::time::Duration::from_millis(1))
+            drain(&unknown, false, Some(std::time::Duration::from_millis(1)))
                 .await
                 .is_err()
         );
@@ -378,7 +387,7 @@ mod task07_tests {
         for force in [false, true] {
             tokio::time::timeout(
                 std::time::Duration::from_secs(1),
-                drain(&handle, force, std::time::Duration::from_secs(30)),
+                drain(&handle, force, Some(std::time::Duration::from_secs(30))),
             )
             .await
             .expect("an exit already confirmed needs no waiting")
@@ -391,11 +400,88 @@ mod task07_tests {
         let error = drain(
             &handle_with_closed_channels(exited),
             false,
-            std::time::Duration::from_secs(30),
+            Some(std::time::Duration::from_secs(30)),
         )
         .await
         .unwrap_err();
         assert!(error.to_string().contains("exit Unknown"), "{error:#}");
+    }
+
+    fn live_handle() -> (
+        ServerHandle,
+        mpsc::Receiver<()>,
+        mpsc::Receiver<String>,
+        watch::Sender<bool>,
+    ) {
+        let (kill_tx, kill_rx) = mpsc::channel(1);
+        let (stdin_tx, stdin_rx) = mpsc::channel(1);
+        let (exit_tx, exited) = exit_signal();
+        let handle = ServerHandle {
+            generation: uuid::Uuid::new_v4(),
+            runtime_activity: Default::default(),
+            log_drained: None,
+            marker_root: None,
+            process_id: 42,
+            kill_tx,
+            stdin_tx,
+            exited,
+        };
+        (handle, kill_rx, stdin_rx, exit_tx)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_stop_without_a_limit_never_kills_a_server_that_is_still_saving() {
+        let (handle, mut kill_rx, mut stdin_rx, exit_tx) = live_handle();
+        let stop = tokio::spawn({
+            let handle = handle.clone();
+            async move { drain(&handle, false, None).await }
+        });
+        assert_eq!(stdin_rx.recv().await.as_deref(), Some("stop"));
+        // Ten minutes of saving: far past the 30 s that used to end in a kill.
+        tokio::time::sleep(std::time::Duration::from_secs(600)).await;
+        assert!(!stop.is_finished());
+        assert!(kill_rx.try_recv().is_err(), "the server was never killed");
+        exit_tx.send(true).unwrap();
+        stop.await.unwrap().unwrap();
+        assert!(kill_rx.try_recv().is_err());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_force_stop_ends_a_stop_that_is_still_waiting() {
+        let (handle, mut kill_rx, mut stdin_rx, exit_tx) = live_handle();
+        let stop = tokio::spawn({
+            let handle = handle.clone();
+            async move { drain(&handle, false, None).await }
+        });
+        assert_eq!(stdin_rx.recv().await.as_deref(), Some("stop"));
+        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        let supervisor = async {
+            kill_rx.recv().await.unwrap();
+            exit_tx.send(true).unwrap();
+        };
+        let (forced, ()) = tokio::join!(drain(&handle, true, None), supervisor);
+        forced.unwrap();
+        stop.await.unwrap().unwrap();
+        assert!(
+            stdin_rx.try_recv().is_err(),
+            "a force stop sends no second 'stop'"
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_stop_with_a_limit_still_kills_after_it() {
+        let (handle, mut kill_rx, mut stdin_rx, exit_tx) = live_handle();
+        let supervisor = async {
+            assert_eq!(stdin_rx.recv().await.as_deref(), Some("stop"));
+            kill_rx.recv().await.unwrap();
+            exit_tx.send(true).unwrap();
+            tokio::time::Instant::now()
+        };
+        let started = tokio::time::Instant::now();
+        let limit = std::time::Duration::from_secs(120);
+        let (drained, killed_at) = tokio::join!(drain(&handle, false, Some(limit)), supervisor);
+        drained.unwrap();
+        assert!(killed_at - started >= limit);
     }
 }
 

@@ -20,6 +20,7 @@ import DetailPageLayout, {
 import { useEntityGoneGuard } from "@/pages/Library/shared/useEntityGoneGuard"
 import { isConsoleFullScreen } from "./Tabs/ConsoleTab"
 import { useRecoveredServerAction } from "./useRecoveredServerAction"
+import { useServerStop } from "./useServerStop"
 import {
   recoveredServerAction,
   recoveredServerPid
@@ -120,6 +121,7 @@ const Server = (props: { children?: any }) => {
     (isStopped() || isRunning() || recoveredAction() !== undefined)
   const showStop = () => isRunning() || isRecoveredRunning()
   const recovered = useRecoveredServerAction()
+  const stop = useServerStop(serverId, isStopping)
   const taskId = () => {
     const state = details()?.state
     if (state?.status === "installing") return state.task_id
@@ -280,6 +282,14 @@ const Server = (props: { children?: any }) => {
                   </Match>
                   <Match when={isStopping()}>
                     <Trans key="instances:_trn_server_status_stopping" />
+                    <Show when={stop.clock()}>
+                      <span
+                        class="text-lightSlate-300 font-normal tabular-nums"
+                        data-testid="server-stop-clock"
+                      >
+                        {stop.clock()}
+                      </span>
+                    </Show>
                   </Match>
                   <Match when={isInstalling()}>
                     <Trans
@@ -422,6 +432,27 @@ const Server = (props: { children?: any }) => {
               </TooltipTrigger>
               <TooltipContent>
                 <Trans key="instances:_trn_instance_settings.repair" />
+              </TooltipContent>
+            </Tooltip>
+          </Show>
+          {/* The Stopping button stays as the sign that the stop is still
+              going; ending the server early is a separate, confirmed action. */}
+          <Show when={isStopping() && stop.canForce()}>
+            <Tooltip placement="bottom">
+              <TooltipTrigger as="div">
+                <Button
+                  type="secondary"
+                  textColor="!text-red-400"
+                  size="large"
+                  data-testid="server-force-stop"
+                  onClick={() => stop.askForceStop(details()?.name ?? "")}
+                >
+                  <div class="i-hugeicons:stop text-xl" />
+                  <Trans key="instances:_trn_server_action_force_stop" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent class="max-w-70">
+                <Trans key="instances:_trn_server_stop_waiting_hint" />
               </TooltipContent>
             </Tooltip>
           </Show>

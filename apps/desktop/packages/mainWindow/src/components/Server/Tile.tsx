@@ -26,6 +26,7 @@ import { getServerImageUrl } from "@/utils/instances"
 import { BaseTile } from "../BaseTile"
 import { recoveredServerAction } from "@/utils/recoveredServer"
 import { useRecoveredServerAction } from "@/pages/Library/Server/useRecoveredServerAction"
+import { useServerStop } from "@/pages/Library/Server/useServerStop"
 
 export const [clickedServerId, setClickedServerId] = createSignal<
   string | undefined
@@ -100,6 +101,10 @@ const ServerTile = (props: Props) => {
     recovered.isPending()
   const isDeleting = () => statusKey() === "deleting"
   const isInstalling = () => statusKey() === "installing"
+  const stop = useServerStop(
+    () => props.server.id,
+    () => statusKey() === "stopping"
+  )
 
   const taskId = () =>
     props.server.state.status === "installing"
@@ -267,6 +272,15 @@ const ServerTile = (props: Props) => {
                     {recoveredAction() === "forceStop"
                       ? t("instances:_trn_server_action_force_stop")
                       : t("instances:_trn_server_stop")}
+                  </ContextMenuItem>
+                </Match>
+                <Match when={statusKey() === "stopping" && stop.canForce()}>
+                  <ContextMenuItem
+                    class="flex items-center gap-2 text-red-400"
+                    onClick={() => stop.askForceStop(props.server.name)}
+                  >
+                    <div class="i-hugeicons:stop h-4 w-4" />
+                    {t("instances:_trn_server_action_force_stop")}
                   </ContextMenuItem>
                 </Match>
                 <Match when={!isRunning()}>

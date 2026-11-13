@@ -667,7 +667,7 @@ mod tests {
             stdin_tx: supervised.stdin_tx,
             exited: supervised.exited,
         };
-        super::super::provider::drain(&handle, false, std::time::Duration::from_secs(1))
+        super::super::provider::drain(&handle, false, Some(std::time::Duration::from_secs(1)))
             .await
             .unwrap();
     }
@@ -903,7 +903,8 @@ done
         // What a quit's drain does with a running server: 'stop', then up
         // to 30 s for it to save and exit.
         let _ =
-            super::super::provider::drain(&handle, false, std::time::Duration::from_secs(30)).await;
+            super::super::provider::drain(&handle, false, Some(std::time::Duration::from_secs(30)))
+                .await;
         std::future::pending::<()>().await;
     }
 
@@ -1029,7 +1030,7 @@ done
             .unwrap();
         let drained = handle.clone();
         runtime.spawn(async move {
-            super::super::provider::drain(&drained, false, Duration::from_secs(30)).await
+            super::super::provider::drain(&drained, false, Some(Duration::from_secs(30))).await
         });
         wait_for("stop-received", Duration::from_secs(30));
         let pid: u32 = std::fs::read_to_string(data.join("pid"))

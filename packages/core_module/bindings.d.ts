@@ -83,6 +83,7 @@ export type Procedures = {
         { key: "server.getServerDetails", input: FEServerId, result: FEServerDetails } | 
         { key: "server.getServerMetrics", input: FEServerId, result: FEServerMetrics | null } | 
         { key: "server.getServerProperties", input: FEServerId, result: { [key: string]: string } } | 
+        { key: "server.getServerStopProgress", input: FEServerId, result: FEServerStopProgress | null } | 
         { key: "server.getWhitelist", input: FEServerId, result: WhitelistEntry[] } | 
         { key: "settings.getCacheSizes", input: never, result: CacheSizes } | 
         { key: "settings.getDbSize", input: never, result: number } | 
@@ -342,6 +343,8 @@ export type CurseForgeModMetadata = { project_id: number; file_id: number; name:
  */
 export type ServerAddon = { id: string; filename: string; displayName: string; enabled: boolean; addonType: string; fileSize: number; hasImage: boolean; curseforgeProjectId: number | null; modrinthProjectId: string | null }
 
+export type LegacyDatapack = { filename: string; sha512: string; selectedWorld: string }
+
 export type FEModrinthSearchIndex = "relevance" | "downloads" | "follows" | "newest" | "updated"
 
 export type FEGroupId = number
@@ -468,8 +471,6 @@ export type ListServer = { id: FEServerId; groupId: FEServerGroupId; index: numb
 export type ImportScanStatus = "NoResults" | { SingleResult: ImportEntry } | { MultiResult: ImportEntry[] }
 
 export type InstanceFolder = "Root" | "Data" | "Mods" | "Configs" | "Screenshots" | "Saves" | "Logs" | "CrashReports" | "ResourcePacks" | "TexturePacks" | "ShaderPacks"
-
-export type LegacyDatapack = { filename: string; sha512: string; selectedWorld: string }
 
 export type MoveGroupTarget = { BeforeGroup: FEGroupId } | { BeforeInstance: FEInstanceId } | "EndOfLibrary"
 
@@ -669,6 +670,12 @@ export type MoveServerGroup = { group: FEServerGroupId; target: FEMoveServerGrou
  * the user a multi-GB re-download on next launch, so it's opt-in.
  */
 export type CacheCleanupSelection = { gdlauncher: boolean; minecraft: boolean }
+
+/**
+ * How a stop that is under way is going. The launcher never ends a stop
+ * by itself, so this is what the user judges a Force stop by.
+ */
+export type FEServerStopProgress = { stoppingSeconds: number; lastOutputSeconds: number | null; lastOutput: string | null }
 
 export type FEDependencyPlatform = "Curseforge" | "Modrinth"
 
