@@ -563,15 +563,30 @@ where
     let mut directories = Vec::new();
     let mut files = Vec::new();
     {
-        // Encountered directory links are not traversed (the root is followed, as walkdir
-        // does). Pathname file copying below dereferences regular-file links; this is not
-        // an outside-source containment policy.
+        // A link to a folder is copied as that folder's contents and a link to a file as
+        // the file, so the copy does not depend on where the source's links lead. Links
+        // that cannot be followed are left out, each with a warning, instead of failing
+        // the copy: a link whose target is gone, a link back to a folder it is inside
+        // of, and a link to a folder that holds the source or meets the destination.
+        let source_root = std::fs::canonicalize(from).ok();
+        let destination_root = canonical_destination(to);
         let entries = walkdir::WalkDir::new(from)
-            .follow_links(false)
+            .follow_links(true)
             .into_iter()
             .filter_entry(|entry| {
                 if entry.depth() == 0 {
                     return true;
+                }
+                if entry.path_is_symlink()
+                    && entry.file_type().is_dir()
+                    && let Some(reason) = unusable_folder_link(
+                        entry.path(),
+                        source_root.as_deref(),
+                        destination_root.as_deref(),
+                    )
+                {
+                    tracing::warn!("Not copying the link {}: {reason}", entry.path().display());
+                    return false;
                 }
                 match entry.path().strip_prefix(from) {
                     Ok(relative) => holder.as_deref() != Some(relative) && filter(relative),
@@ -579,8 +594,17 @@ where
                 }
             });
         for entry in entries {
-            let entry =
-                entry.with_context(|| format!("Traversing included source {}", from.display()))?;
+            let entry = match entry {
+                Ok(entry) => entry,
+                Err(error) if error.depth() > 0 && is_unfollowable_link(&error) => {
+                    tracing::warn!("Not copying a link that leads nowhere usable: {error}");
+                    continue;
+                }
+                Err(error) => {
+                    return Err(error)
+                        .with_context(|| format!("Traversing included source {}", from.display()));
+                }
+            };
             let source = entry.path().to_path_buf();
             if entry.depth() == 0 {
                 if source.is_dir() {
@@ -631,6 +655,37 @@ where
         },
     )
     .await
+}
+
+/// Why the folder a link leads to can't be copied into `destination`, if it can't.
+fn unusable_folder_link(
+    link: &Path,
+    source: Option<&Path>,
+    destination: Option<&Path>,
+) -> Option<&'static str> {
+    let target = std::fs::canonicalize(link).ok()?;
+    if source.is_some_and(|source| source.starts_with(&target)) {
+        return Some("it leads to a folder that holds the folder being copied");
+    }
+    if destination.is_some_and(|destination| {
+        destination.starts_with(&target) || target.starts_with(destination)
+    }) {
+        return Some("it leads to the folder being copied into");
+    }
+    None
+}
+
+/// A walk failure that is only a link to skip: one that loops back to a folder it is
+/// inside of, or one whose target does not exist.
+fn is_unfollowable_link(error: &walkdir::Error) -> bool {
+    if error.loop_ancestor().is_some() {
+        return true;
+    }
+    error.path().is_some_and(|path| {
+        std::fs::symlink_metadata(path).is_ok_and(|metadata| metadata.file_type().is_symlink())
+            && std::fs::metadata(path)
+                .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+    })
 }
 
 /// The top-level entry of `from` whose subtree holds `to`, if any. A destination that
@@ -984,6 +1039,101 @@ mod copy_and_temp_tests {
             std::fs::read(destination.join("saves/level.dat")).unwrap(),
             b"world"
         );
+    }
+
+    #[cfg(unix)]
+    fn link(target: &Path, link: &Path) {
+        std::os::unix::fs::symlink(target, link).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn linked_folders_are_copied_as_folders_through_nested_links() {
+        let root = fresh("nested-links");
+        let source = root.join("source");
+        let shared = root.join("shared-saves");
+        let elsewhere = root.join("elsewhere/MyWorld");
+        std::fs::create_dir_all(&source).unwrap();
+        std::fs::create_dir_all(&shared).unwrap();
+        std::fs::create_dir_all(&elsewhere).unwrap();
+        std::fs::write(shared.join("notes.txt"), b"notes").unwrap();
+        std::fs::write(elsewhere.join("level.dat"), b"world").unwrap();
+        link(&elsewhere, &shared.join("MyWorld"));
+        let hop = root.join("hop");
+        link(&shared, &hop);
+        link(&hop, &source.join("saves"));
+        link(&shared, &source.join("saves-again"));
+        let destination = root.join("destination");
+        copy_dir_filter(&source, &destination, |_| true)
+            .await
+            .unwrap();
+        for saves in ["saves", "saves-again"] {
+            let world = destination.join(saves).join("MyWorld");
+            assert!(!world.is_symlink() && !destination.join(saves).is_symlink());
+            assert_eq!(std::fs::read(world.join("level.dat")).unwrap(), b"world");
+            assert_eq!(
+                std::fs::read(destination.join(saves).join("notes.txt")).unwrap(),
+                b"notes"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn broken_and_looping_links_are_left_out_of_the_copy() {
+        let root = fresh("bad-links");
+        let source = root.join("source");
+        std::fs::create_dir_all(source.join("saves/world")).unwrap();
+        std::fs::write(source.join("saves/world/level.dat"), b"world").unwrap();
+        std::fs::write(source.join("options.txt"), b"options").unwrap();
+        link(&root.join("deleted"), &source.join("saves/world/old"));
+        link(&root.join("deleted.txt"), &source.join("gone.txt"));
+        link(&source, &source.join("saves/back"));
+        link(&source.join("saves"), &source.join("saves/world/up"));
+        link(&root, &source.join("above"));
+        let destination = root.join("destination");
+        copy_dir_filter(&source, &destination, |_| true)
+            .await
+            .unwrap();
+        assert_eq!(
+            std::fs::read(destination.join("saves/world/level.dat")).unwrap(),
+            b"world"
+        );
+        assert_eq!(
+            std::fs::read(destination.join("options.txt")).unwrap(),
+            b"options"
+        );
+        for left_out in [
+            "saves/world/old",
+            "gone.txt",
+            "saves/back",
+            "saves/world/up",
+            "above",
+        ] {
+            assert!(
+                std::fs::symlink_metadata(destination.join(left_out)).is_err(),
+                "{left_out} was copied"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_link_to_the_folder_being_copied_into_is_left_out() {
+        let root = fresh("destination-link");
+        let source = root.join("source");
+        let instances = root.join("instances");
+        std::fs::create_dir_all(&source).unwrap();
+        std::fs::create_dir_all(instances.join("other")).unwrap();
+        std::fs::write(source.join("options.txt"), b"options").unwrap();
+        std::fs::write(instances.join("other/big.bin"), b"big").unwrap();
+        link(&instances, &source.join("all-instances"));
+        let destination = instances.join("new/instance");
+        copy_dir_filter(&source, &destination, |_| true)
+            .await
+            .unwrap();
+        assert!(destination.join("options.txt").is_file());
+        assert!(!destination.join("all-instances").exists());
     }
 
     #[tokio::test]
