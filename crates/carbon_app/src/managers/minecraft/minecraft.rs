@@ -388,6 +388,57 @@ fn replace_placeholder(replacer_args: &ReplacerArgs, placeholder: ArgPlaceholder
     }
 }
 
+/// One argument of a version file with its `${placeholders}` filled in.
+///
+/// The `\"` and `\\` escapes of the version file's text are undone before the values go
+/// in, never on the result: a value is passed to Java as it is. Undoing them afterwards
+/// collapsed the leading `\\` of a network share path (`\\server\share`,
+/// `\\?\UNC\server\share`) in the classpath and every folder argument, so no game on a
+/// data folder there could start.
+fn substitute_launch_argument(
+    regex: &Regex,
+    replacer_args: &ReplacerArgs,
+    ignore_list_jar: &str,
+    argument: &str,
+) -> String {
+    let mut argument = argument.replace("\\\"", "\"").replace("\\\\", "\\");
+    if argument.starts_with("-DignoreList=") {
+        argument.push_str(&format!(",{ignore_list_jar}.jar"));
+    }
+
+    regex
+        .replace_all(&argument, |caps: &Captures| {
+            if let Some(value) = caps.name("value") {
+                let value = match value.as_str().try_into() {
+                    Ok(value) => replace_placeholder(replacer_args, value),
+                    Err(err) => {
+                        warn!("Failed to parse argument: {}", err);
+                        return String::new();
+                    }
+                };
+                return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
+            } else if let Some(standalone) = caps.name("standalone") {
+                return match standalone.as_str().try_into() {
+                    Ok(standalone) => replace_placeholder(replacer_args, standalone),
+                    Err(err) => {
+                        warn!("Failed to parse argument: {}", err);
+                        return String::new();
+                    }
+                };
+            }
+            if let Some(arg) = caps.name("arg") {
+                arg.as_str().to_string()
+            } else {
+                unreachable!("No capturing group matched")
+            }
+        })
+        .into_owned()
+}
+
+fn launch_argument_regex() -> Regex {
+    Regex::new(r"--(?P<arg>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})").unwrap()
+}
+
 fn wraps_in_quotes_if_necessary(arg: impl AsRef<str>) -> String {
     let arg = arg.as_ref();
     if arg.contains('=') {
@@ -492,9 +543,7 @@ pub async fn generate_startup_command(
         .reduce(|a, b| format!("{a}{CLASSPATH_SEPARATOR}{b}"))
         .unwrap();
 
-    let regex =
-        Regex::new(r"--(?P<arg>\S+)\s+\$\{(?P<value>[^}]+)\}|(\$\{(?P<standalone>[^}]+)\})")
-            .unwrap();
+    let regex = launch_argument_regex();
 
     let player_token = match full_account.type_ {
         FullAccountType::Offline => "offline".to_owned(),
@@ -536,43 +585,9 @@ pub async fn generate_startup_command(
         user_properties: "{}".to_owned(),
     };
 
+    let ignore_list_jar = version.inherits_from.as_ref().unwrap_or(&version.id);
     let substitute_argument = |argument: &str| {
-        let mut argument = argument.to_string();
-        if argument.starts_with("-DignoreList=") {
-            argument.push_str(&format!(
-                ",{}.jar",
-                version.inherits_from.as_ref().unwrap_or(&version.id)
-            ));
-        }
-
-        regex
-            .replace_all(&argument, |caps: &Captures| {
-                if let Some(value) = caps.name("value") {
-                    let value = match value.as_str().try_into() {
-                        Ok(value) => replace_placeholder(&replacer_args, value),
-                        Err(err) => {
-                            warn!("Failed to parse argument: {}", err);
-                            return String::new();
-                        }
-                    };
-                    return format!("--{} {}", caps.name("arg").unwrap().as_str(), value);
-                } else if let Some(standalone) = caps.name("standalone") {
-                    return match standalone.as_str().try_into() {
-                        Ok(standalone) => replace_placeholder(&replacer_args, standalone),
-                        Err(err) => {
-                            warn!("Failed to parse argument: {}", err);
-                            return String::new();
-                        }
-                    };
-                }
-                if let Some(arg) = caps.name("arg") {
-                    return arg.as_str().to_string();
-                } else {
-                    unreachable!("No capturing group matched")
-                }
-            })
-            .replace("\\\"", "\"")
-            .replace("\\\\", "\\")
+        substitute_launch_argument(&regex, &replacer_args, ignore_list_jar, argument)
     };
 
     let substitute_arguments = |command: &mut Vec<String>, arguments: &Vec<Argument>| {
@@ -1134,6 +1149,10 @@ async fn natives_dir_has_libraries(dest: &Path) -> bool {
 
     false
 }
+
+#[cfg(test)]
+#[path = "launch_argument_tests.rs"]
+mod launch_argument_tests;
 
 #[cfg(test)]
 mod tests {

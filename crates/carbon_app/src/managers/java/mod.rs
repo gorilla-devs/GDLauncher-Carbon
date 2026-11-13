@@ -287,8 +287,13 @@ impl ManagerRef<'_, JavaManager> {
                     .to_path();
                 let java_bin_path = PathBuf::from(java_from_db.path);
 
+                // A Java installed while a data folder on a network share was still
+                // resolved to its `\\?\UNC\` form is stored under that form.
+                let plain_java_bin_path =
+                    crate::runtime_path_override::plain_share_path(&java_bin_path);
                 let managed_java_dir_name = java_bin_path
-                    .strip_prefix(&root_managed_path)?
+                    .strip_prefix(&root_managed_path)
+                    .or_else(|_| plain_java_bin_path.strip_prefix(&root_managed_path))?
                     .components()
                     .next()
                     .ok_or_else(|| anyhow::anyhow!("Could not strip prefix"))?;
