@@ -36,6 +36,7 @@ mod pack_loader;
 pub mod properties;
 pub mod provider;
 pub(crate) mod record;
+mod recycle;
 mod repair_backup;
 pub(crate) mod world;
 
@@ -2516,6 +2517,12 @@ impl ManagerRef<'_, ServerManager> {
             .get_server_path(&shortpath)
             .get_root();
         self.refuse_unowned_marker(id, &root).await?;
+        let through_recycle_bin = self
+            .app
+            .settings_manager()
+            .get_settings()
+            .await?
+            .deletion_through_recycle_bin;
         let (handle, failed_task) = {
             let mut servers = self.servers.write().await;
             let server = servers.get_mut(&id).context("Server disappeared")?;
@@ -2547,39 +2554,46 @@ impl ManagerRef<'_, ServerManager> {
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
 
-        {
-            // The record goes before the row. With it gone, a folder the
-            // removal below leaves half deleted (a file Windows keeps locked)
-            // is never restored as a server on the next start. Under the
-            // record lock, so a settings write that read the row first
-            // cannot bring the file back.
-            let _records = self.record_lock.lock().await;
-            if let Err(error) = remove_server_record(&root).await {
-                // Nothing was deleted, and a server that was running has
-                // been stopped above, its marker with it: the marker check
-                // before the change to Deleting found no other process.
-                if let Some(server) = self.servers.write().await.get_mut(&id) {
-                    server.state = ServerState::Stopped { failed_task };
-                }
-                self.app.invalidate(GET_ALL_SERVERS, None);
-                self.app.invalidate(GET_SERVER_DETAILS, None);
-                return Err(error);
+        // Nothing was deleted when either way of removing the folder refuses
+        // at its first step, and a server that was running has been stopped
+        // above, its marker with it: the marker check before the change to
+        // Deleting found no other process.
+        let not_deleted = |error: anyhow::Error| async move {
+            if let Some(server) = self.servers.write().await.get_mut(&id) {
+                server.state = ServerState::Stopped { failed_task };
             }
-            // Delete from DB, together with the server's cached mod rows: the
-            // cascade only clears those while foreign keys are enforced.
-            server_repo::delete_server_tx(&self.app.db, id.0).await?;
-        }
-
-        // Delete files
-        let shortpath = {
-            let servers = self.servers.read().await;
-            servers.get(&id).map(|s| s.shortpath.clone())
+            self.app.invalidate(GET_ALL_SERVERS, None);
+            self.app.invalidate(GET_SERVER_DETAILS, None);
+            error
         };
 
-        if let Some(shortpath) = shortpath {
-            let runtime_path = &self.app.settings_manager().runtime_path;
-            let server_path = runtime_path.get_servers().get_server_path(&shortpath);
-            let root = server_path.get_root();
+        if through_recycle_bin {
+            // The folder goes first and whole, its record with it, so one
+            // the Recycle Bin refuses stays a server, and one taken back out
+            // of the Recycle Bin is listed again on the next start. The
+            // record lock is not held: emptying a large folder into the
+            // Recycle Bin can take long, and a record written meanwhile
+            // only lands in the folder that is leaving.
+            if let Err(error) = recycle::move_to_recycle_bin(root.clone()).await {
+                return Err(not_deleted(error).await);
+            }
+            server_repo::delete_server_tx(&self.app.db, id.0).await?;
+        } else {
+            {
+                // The record goes before the row. With it gone, a folder the
+                // removal below leaves half deleted (a file Windows keeps
+                // locked) is never restored as a server on the next start.
+                // Under the record lock, so a settings write that read the
+                // row first cannot bring the file back.
+                let _records = self.record_lock.lock().await;
+                if let Err(error) = remove_server_record(&root).await {
+                    return Err(not_deleted(error).await);
+                }
+                // Delete from DB, together with the server's cached mod
+                // rows: the cascade only clears those while foreign keys
+                // are enforced.
+                server_repo::delete_server_tx(&self.app.db, id.0).await?;
+            }
             if root.exists() {
                 tokio::fs::remove_dir_all(&root)
                     .await

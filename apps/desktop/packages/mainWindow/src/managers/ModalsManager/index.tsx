@@ -111,6 +111,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ConfirmBatchInstanceDeletion")),
     title: t("modals:_trn_confirm_batch_instance_deletion")
   },
+  confirmServerDeletion: {
+    component: lazy(() => import("./modals/ConfirmServerDeletion")),
+    title: t("modals:_trn_confirm_server_deletion")
+  },
   confirmBatchServerDeletion: {
     component: lazy(() => import("./modals/ConfirmBatchServerDeletion")),
     title: t("modals:_trn_confirm_batch_server_deletion")

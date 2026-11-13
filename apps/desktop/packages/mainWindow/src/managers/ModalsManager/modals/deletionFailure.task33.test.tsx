@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/solid-query"
 import { toast } from "@/task33.fixture"
 import { queryClient } from "@/utils/rspcClient"
 import ConfirmInstanceDeletion from "./ConfirmInstanceDeletion"
+import ConfirmServerDeletion from "./ConfirmServerDeletion"
 
 // The real rspc client and query client, so the global error handler runs
 // with the dialog's own mutation options; only the core's reply is faked.
@@ -30,27 +31,38 @@ beforeEach(() => {
   vi.clearAllMocks()
   vi.spyOn(console, "error").mockImplementation(() => {})
   vi.stubGlobal("fetch", fetchMock)
-  // The core refuses: rspc's error body, whose message is the core's error
-  // with its debug text and backtrace.
-  fetchMock.mockResolvedValue({
+  // The core refuses the delete: rspc's error body, whose message is the
+  // core's error with its debug text and backtrace. What the server dialog
+  // reads first (the settings and the server list) is answered.
+  fetchMock.mockImplementation(async (url: unknown) => ({
     ok: true,
-    json: async () => ({
-      result: {
-        type: "error",
-        data: {
-          code: 500,
-          message: JSON.stringify(
-            {
-              cause: [{ display: "It is still running", debug: "Debug" }],
-              backtrace: "0: carbon_app::error::make_rspc"
-            },
-            null,
-            2
-          )
-        }
-      }
-    })
-  })
+    json: async () =>
+      /\/rspc\/(settings\.getSettings|server\.getAllServers)/.test(String(url))
+        ? {
+            result: {
+              type: "response",
+              data: String(url).includes("getAllServers")
+                ? []
+                : { deletionThroughRecycleBin: true }
+            }
+          }
+        : {
+            result: {
+              type: "error",
+              data: {
+                code: 500,
+                message: JSON.stringify(
+                  {
+                    cause: [{ display: "It is still running", debug: "Debug" }],
+                    backtrace: "0: carbon_app::error::make_rspc"
+                  },
+                  null,
+                  2
+                )
+              }
+            }
+          }
+  }))
 })
 afterEach(() => {
   dispose?.()
@@ -63,12 +75,14 @@ afterEach(() => {
 
 it.each([
   {
-    isServer: false,
+    Dialog: ConfirmInstanceDeletion,
+    confirm: "confirm-instance-deletion",
     procedure: "instance.deleteInstance",
     title: "notifications:_trn_cannot_delete_instance"
   },
   {
-    isServer: true,
+    Dialog: ConfirmServerDeletion,
+    confirm: "confirm-server-deletion",
     procedure: "server.deleteServer",
     title: "notifications:_trn_cannot_delete_server"
   }
@@ -80,25 +94,22 @@ it.each([
     dispose = render(
       () => (
         <QueryClientProvider client={queryClient}>
-          <ConfirmInstanceDeletion
-            title="Delete"
-            data={{ id: 7, name: "Synthetic", isServer: step.isServer }}
-          />
+          <step.Dialog title="Delete" data={{ id: 7, name: "Synthetic" }} />
         </QueryClientProvider>
       ),
       root
     )
     root
-      .querySelector<HTMLButtonElement>(
-        '[data-testid="confirm-instance-deletion"]'
-      )!
+      .querySelector<HTMLButtonElement>(`[data-testid="${step.confirm}"]`)!
       .click()
     await vi.waitFor(() => expect(toast.error).toHaveBeenCalled())
     // Let the global handler and any later toast run too.
     await new Promise((resolve) => setTimeout(resolve, 10))
-    expect(String(fetchMock.mock.calls[0][0])).toMatch(
-      new RegExp(`/rspc/${step.procedure}$`)
-    )
+    expect(
+      fetchMock.mock.calls.filter(([url]) =>
+        new RegExp(`/rspc/${step.procedure}$`).test(String(url))
+      )
+    ).toHaveLength(1)
     expect(toast.error).toHaveBeenCalledTimes(1)
     const [title, options] = (toast.error as any).mock.calls[0]
     expect(title).toBe(step.title)

@@ -19,6 +19,7 @@
   "_trn_confirm_reinstall": "Переустановка модпака",
   "_trn_confirm_batch_instance_deletion": "Удаление выбранных экземпляров",
   "_trn_confirm_batch_server_deletion": "Удаление выбранных серверов",
+  "_trn_confirm_server_deletion": "Удаление сервера",
   "_trn_server_eula_acceptance": "Принять EULA Minecraft",
   "_trn_server_force_stop_title": "Принудительная остановка сервера",
   "_trn_server_clear_record_title": "Удаление записи о процессе",

@@ -19,6 +19,7 @@
   "_trn_confirm_reinstall": "Modパックを再インストール",
   "_trn_confirm_batch_instance_deletion": "インスタンスを削除",
   "_trn_confirm_batch_server_deletion": "サーバーを削除",
+  "_trn_confirm_server_deletion": "サーバーを削除",
   "_trn_server_eula_acceptance": "Minecraft EULAに同意",
   "_trn_server_force_stop_title": "サーバーを強制停止",
   "_trn_server_clear_record_title": "プロセスの記録を消去",

@@ -200,8 +200,8 @@ const ServerTile = (props: Props) => {
 
   const handleDelete = () => {
     modalsContext?.openModal(
-      { name: "confirmInstanceDeletion" },
-      { id: props.server.id, name: props.server.name, isServer: true }
+      { name: "confirmServerDeletion" },
+      { id: props.server.id, name: props.server.name }
     )
   }
 

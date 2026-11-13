@@ -14,8 +14,6 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
   const modalsContext = useModal()
   const navigator = useGDNavigate()
 
-  const isServer = () => !!props.data?.isServer
-
   const deleteInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteInstance"],
     onSuccess: async () => {
@@ -35,20 +33,6 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
     meta: LOCAL_ERROR_TOAST,
     onError: (error) => {
       toastMutationError(t("notifications:_trn_cannot_delete_instance"), error)
-    }
-  }))
-
-  const deleteServerMutation = rspc.createMutation(() => ({
-    mutationKey: ["server.deleteServer"],
-    onSuccess: async () => {
-      await queryClient.cancelQueries({
-        queryKey: ["server.getServerDetails", props?.data?.id]
-      })
-      navigator.navigate("/library?mode=servers")
-    },
-    meta: LOCAL_ERROR_TOAST,
-    onError: (error) => {
-      toastMutationError(t("notifications:_trn_cannot_delete_server"), error)
     }
   }))
 
@@ -84,11 +68,7 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
             type="secondary"
             onClick={() => {
               modalsContext?.closeModal()
-              if (isServer()) {
-                deleteServerMutation.mutate(props?.data?.id)
-              } else {
-                deleteInstanceMutation.mutate(props?.data?.id)
-              }
+              deleteInstanceMutation.mutate(props?.data?.id)
             }}
           >
             <div class="i-hugeicons:delete-02" />

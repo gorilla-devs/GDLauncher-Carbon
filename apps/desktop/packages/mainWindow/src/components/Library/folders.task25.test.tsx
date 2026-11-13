@@ -52,7 +52,14 @@ vi.mock("@/managers/NavigationManager", () => ({
 vi.mock("@/utils/rspcClient", () => ({
   queryClient: { cancelQueries: vi.fn() },
   rspc: {
-    createQuery: () => ({ data: 1 }),
+    createQuery: (opts: any) => ({
+      data:
+        opts().queryKey[0] === "server.getAllServers"
+          ? []
+          : opts().queryKey[0] === "settings.getSettings"
+            ? { deletionThroughRecycleBin: true }
+            : 1
+    }),
     createMutation: (opts: any) => ({
       mutate: (value: any) => control.mutation(opts().mutationKey[0], value),
       mutateAsync: (value: any) =>

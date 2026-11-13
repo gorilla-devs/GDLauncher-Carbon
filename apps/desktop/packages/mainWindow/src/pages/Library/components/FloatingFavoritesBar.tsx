@@ -585,12 +585,12 @@ function DockAvatar(props: DockAvatarProps) {
 
   const handleDelete = () => {
     modalsContext?.openModal(
-      { name: "confirmInstanceDeletion" },
       {
-        id: props.instanceId,
-        name: itemName() || "",
-        isServer: isServerMode()
-      }
+        name: isServerMode()
+          ? "confirmServerDeletion"
+          : "confirmInstanceDeletion"
+      },
+      { id: props.instanceId, name: itemName() || "" }
     )
   }
 

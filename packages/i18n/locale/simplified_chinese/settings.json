@@ -32,7 +32,7 @@
   "_trn_potato_mode_title": "土豆电脑模式",
   "_trn_potato_mode_text": "您的电脑配置较差？无需担心！我们为您考虑到了。启用此项后，所有动画和特效都会被禁用。",
   "_trn_deletion_through_recycle_bin_title": "通过回收站删除",
-  "_trn_deletion_through_recycle_bin_text": "启用此项可将实例移至回收站，而不是永久删除。",
+  "_trn_deletion_through_recycle_bin_text": "启用此项可将实例和服务器移至回收站，而不是永久删除。",
   "_trn_show_world_deletion_warning_title": "删除存档前确认",
   "_trn_show_world_deletion_warning_text": "删除存档前请求确认，因为存档数据无法恢复。",
   "_trn_rerun_onboarding": "重新运行引导",

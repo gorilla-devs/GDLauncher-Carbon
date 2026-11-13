@@ -18,6 +18,7 @@
   "_trn_repair_modpack": "Repair Modpack",
   "_trn_confirm_batch_instance_deletion": "Delete Instances",
   "_trn_confirm_batch_server_deletion": "Delete Servers",
+  "_trn_confirm_server_deletion": "Delete server",
   "_trn_server_eula_acceptance": "Accept Minecraft EULA",
   "_trn_server_force_stop_title": "Force stop server",
   "_trn_server_clear_record_title": "Clear process record",

@@ -19,6 +19,7 @@
   "_trn_confirm_reinstall": "Réinstaller le modpack",
   "_trn_confirm_batch_instance_deletion": "Supprimer les instances",
   "_trn_confirm_batch_server_deletion": "Supprimer les serveurs",
+  "_trn_confirm_server_deletion": "Supprimer le serveur",
   "_trn_server_eula_acceptance": "Accepter l'EULA Minecraft",
   "_trn_server_force_stop_title": "Forcer l'arrêt du serveur",
   "_trn_server_clear_record_title": "Effacer l'enregistrement du processus",

@@ -10,6 +10,11 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { createSignal, For, Show } from "solid-js"
 import { ListServer, ListServerGroup } from "@gd/core_module/bindings"
+import {
+  deletionStopsServer,
+  serverDeletionTarget
+} from "@/utils/serverDeletion"
+import ServerDeletionNote from "./ServerDeletionNote"
 
 export async function deleteServerSelection(
   servers: readonly { id: number }[],
@@ -67,6 +72,19 @@ const ConfirmBatchServerDeletion = (props: ModalProps) => {
     servers: new Set<number>(),
     folders: new Set<number>()
   }
+
+  const settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
+  }))
+  const liveServers = rspc.createQuery(() => ({
+    queryKey: ["server.getAllServers"]
+  }))
+  // The selection is a snapshot; a server started since still gets stopped.
+  const statusOf = (selected: ListServer) =>
+    (liveServers.data?.find((server) => server.id === selected.id) ?? selected)
+      .state?.status
+  const stopsFirst = () =>
+    servers().some((selected) => deletionStopsServer(statusOf(selected)))
 
   const deleteServerMutation = rspc.createMutation(() => ({
     mutationKey: ["server.deleteServer"],
@@ -170,12 +188,19 @@ const ConfirmBatchServerDeletion = (props: ModalProps) => {
             <For each={servers()}>
               {(server) => (
                 <div class="text-lightSlate-200 flex items-center gap-2 py-1">
-                  <div class="i-hugeicons:server-01 h-4 w-4 shrink-0" />
+                  <div class="i-hugeicons:server-stack-01 h-4 w-4 shrink-0" />
                   <span class="truncate">{server.name}</span>
                 </div>
               )}
             </For>
           </div>
+          <ServerDeletionNote
+            several
+            target={serverDeletionTarget(
+              settings.data?.deletionThroughRecycleBin
+            )}
+            stopsFirst={stopsFirst()}
+          />
           <div class="flex w-full justify-between pt-2">
             <Button
               onClick={() => {

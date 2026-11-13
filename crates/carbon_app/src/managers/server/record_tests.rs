@@ -115,6 +115,19 @@ async fn start(app: &crate::managers::App) {
     app.server_manager().load_servers().await.unwrap();
 }
 
+/// Deletes for good, as with "Deletion through Recycle Bin" switched off.
+async fn without_recycle_bin(app: &crate::managers::App) {
+    app.settings_manager()
+        .set(
+            carbon_repos::repos::app_configuration::AppConfigurationPatch {
+                deletion_through_recycle_bin: Some(false),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+}
+
 async fn root_of(app: &crate::managers::App, id: ServerId) -> PathBuf {
     let row = server_repo::get_server(&app.db, id.0)
         .await
@@ -378,6 +391,7 @@ fn set_mode(path: &Path, mode: u32) {
 async fn a_server_whose_folder_could_not_be_removed_does_not_come_back() {
     let env = crate::setup_managers_for_test().await;
     let app = env.app.clone();
+    without_recycle_bin(&app).await;
     let (id, root) = insert(&app, "deleted_1", None).await;
     tokio::fs::write(root.join("server").join("world.dat"), b"world")
         .await
@@ -419,6 +433,7 @@ async fn a_server_whose_folder_could_not_be_removed_does_not_come_back() {
 async fn a_record_that_cannot_be_removed_stops_the_delete_before_anything_is_lost() {
     let env = crate::setup_managers_for_test().await;
     let app = env.app.clone();
+    without_recycle_bin(&app).await;
     let (id, root) = insert(&app, "locked_1", None).await;
     start(&app).await;
     let failed_install = ServerState::Stopped {
@@ -820,6 +835,128 @@ async fn records_are_written_where_the_drive_refuses_a_full_flush() {
     app.server_manager().set_favorite(id, true).await.unwrap();
     assert!(record_on_disk(&root).await.unwrap().favorite);
     assert!(syncs.synced(&record_path(&root)), "settings change");
+}
+
+/// With "Deletion through Recycle Bin" on, which it is by default, a deleted
+/// server's folder is moved there whole instead of erased: the world is
+/// still in it, and so is the record, so a folder taken back out of the
+/// Recycle Bin is a server again on the next start.
+#[tokio::test]
+async fn a_deleted_server_goes_to_the_recycle_bin_and_comes_back_when_restored() {
+    let env = crate::setup_managers_for_test().await;
+    let app = env.app.clone();
+    let (id, root) = insert(&app, "binned_1", None).await;
+    tokio::fs::write(root.join("server").join("world.dat"), b"world")
+        .await
+        .unwrap();
+    start(&app).await;
+    let before = rows_by_shortpath(&app).await;
+
+    app.server_manager().delete_server(id).await.unwrap();
+
+    assert!(!root.exists());
+    assert!(rows_by_shortpath(&app).await.is_empty());
+    assert!(!app.server_manager.servers.read().await.contains_key(&id));
+    let binned = recycle::bin_under_test(&root).join("binned_1");
+    assert_eq!(
+        std::fs::read(binned.join("server").join("world.dat")).unwrap(),
+        b"world"
+    );
+    assert!(record_on_disk(&binned).await.is_some());
+
+    // Still in the Recycle Bin: nothing comes back by itself.
+    start(&app).await;
+    assert!(rows_by_shortpath(&app).await.is_empty());
+    assert_eq!(app.server_manager().restored_server_count(), 0);
+
+    // The user restores the folder from the Recycle Bin.
+    std::fs::rename(&binned, &root).unwrap();
+    start(&app).await;
+    assert_eq!(rows_by_shortpath(&app).await, before);
+    assert_eq!(app.server_manager().restored_server_count(), 1);
+    assert!(root.join("server").join("world.dat").exists());
+}
+
+/// A Recycle Bin that refuses the folder (a drive without one, a folder the
+/// user may not move) deletes nothing: the server stays listed and usable
+/// with a failed install's error still on its tile, the error says what to
+/// do, and the same delete goes through once the setting is off.
+#[tokio::test]
+async fn a_recycle_bin_that_refuses_the_folder_leaves_the_server_as_it_was() {
+    let env = crate::setup_managers_for_test().await;
+    let app = env.app.clone();
+    let (id, root) = insert(&app, "refused_1", None).await;
+    tokio::fs::write(root.join("server").join("world.dat"), b"world")
+        .await
+        .unwrap();
+    start(&app).await;
+    let failed_install = ServerState::Stopped {
+        failed_task: Some(VisualTaskId(41)),
+    };
+    app.server_manager
+        .servers
+        .write()
+        .await
+        .get_mut(&id)
+        .unwrap()
+        .state = failed_install.clone();
+    // A file where the Recycle Bin's folder would be.
+    std::fs::write(recycle::bin_under_test(&root), b"").unwrap();
+
+    let error = app.server_manager().delete_server(id).await.unwrap_err();
+
+    let error = format!("{error:#}");
+    assert!(error.contains("Nothing was deleted"), "{error}");
+    assert!(error.contains("Recycle Bin"), "{error}");
+    assert!(error.contains("turn off"), "{error}");
+    assert!(root.join("server").join("world.dat").exists());
+    assert!(record_on_disk(&root).await.is_some());
+    assert!(
+        server_repo::get_server(&app.db, id.0)
+            .await
+            .unwrap()
+            .is_some()
+    );
+    assert_eq!(
+        app.server_manager().get_server_state(id).await.unwrap(),
+        failed_install
+    );
+
+    without_recycle_bin(&app).await;
+    app.server_manager().delete_server(id).await.unwrap();
+    assert!(!root.exists());
+    assert!(rows_by_shortpath(&app).await.is_empty());
+}
+
+/// With the setting off the folder is erased, not moved.
+#[tokio::test]
+async fn a_server_deleted_with_the_recycle_bin_off_is_erased() {
+    let env = crate::setup_managers_for_test().await;
+    let app = env.app.clone();
+    without_recycle_bin(&app).await;
+    let (id, root) = insert(&app, "erased_1", None).await;
+    start(&app).await;
+
+    app.server_manager().delete_server(id).await.unwrap();
+
+    assert!(!root.exists());
+    assert!(!recycle::bin_under_test(&root).exists());
+    assert!(rows_by_shortpath(&app).await.is_empty());
+}
+
+/// A server whose folder is already gone is still removed from the library.
+#[tokio::test]
+async fn a_server_without_a_folder_is_deleted_through_the_recycle_bin_too() {
+    let env = crate::setup_managers_for_test().await;
+    let app = env.app.clone();
+    let (id, root) = insert(&app, "gone_1", None).await;
+    start(&app).await;
+    std::fs::remove_dir_all(&root).unwrap();
+
+    app.server_manager().delete_server(id).await.unwrap();
+
+    assert!(rows_by_shortpath(&app).await.is_empty());
+    assert!(!recycle::bin_under_test(&root).exists());
 }
 
 #[test]
