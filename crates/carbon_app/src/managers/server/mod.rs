@@ -36,6 +36,7 @@ mod pack_loader;
 pub mod properties;
 pub mod provider;
 pub(crate) mod record;
+mod repair_backup;
 pub(crate) mod world;
 
 const MAX_PATH: usize = if cfg!(windows) { 260 } else { 4096 };
@@ -156,38 +157,6 @@ fn server_addon_dir(
     } else {
         Ok(server_path.get_mods_path())
     }
-}
-
-/// Removes `path`, a folder (`dir`) or file Repair reinstalls, if it is
-/// there. A link, or a junction on Windows, is removed itself and what it
-/// points to is kept (a `mods/` shared between servers stays as it is for
-/// the others), as 2.0.40 did; the pack is then installed into a new folder.
-async fn wipe_entry(path: &std::path::Path, dir: bool) -> anyhow::Result<()> {
-    let meta = match tokio::fs::symlink_metadata(path).await {
-        Ok(meta) => meta,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
-        Err(error) => return Err(error.into()),
-    };
-    if meta.file_type().is_symlink() {
-        info!(
-            "Repair removes the link {} and keeps what it points to",
-            path.display()
-        );
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::FileTypeExt;
-            if meta.file_type().is_symlink_dir() {
-                return Ok(tokio::fs::remove_dir(path).await?);
-            }
-        }
-        return Ok(tokio::fs::remove_file(path).await?);
-    }
-    if dir {
-        tokio::fs::remove_dir_all(path).await?;
-    } else {
-        tokio::fs::remove_file(path).await?;
-    }
-    Ok(())
 }
 
 /// Narrows a CurseForge file search by the server's modloader, but only when
@@ -992,6 +961,23 @@ impl ManagerRef<'_, ServerManager> {
 
         let any_recovered = recovered.values().any(watched_while_recovered);
         {
+            // A Repair the launcher was closed during: its server gets back
+            // what the Repair had set aside.
+            let server_paths = self.app.settings_manager().runtime_path.get_servers();
+            for db_server in &db_servers {
+                let data_path = server_paths
+                    .get_server_path(&db_server.shortpath)
+                    .get_data_path();
+                let restored =
+                    tokio::task::spawn_blocking(move || repair_backup::restore(&data_path)).await;
+                if let Ok(Err(error)) = restored {
+                    warn!(
+                        "Could not put back what Repair replaced in {}: {error:#}",
+                        db_server.shortpath
+                    );
+                }
+            }
+
             let mut servers = self.servers.write().await;
             for db_server in db_servers {
                 let id = ServerId(db_server.id);
@@ -2234,6 +2220,27 @@ impl ManagerRef<'_, ServerManager> {
             }
             .await;
 
+            // A Repair keeps what it replaced until here: gone once the new
+            // install is in place, back where it was when it is not.
+            if repair {
+                let data_path = server_path.get_data_path();
+                let succeeded = result.is_ok();
+                let settled = tokio::task::spawn_blocking(move || {
+                    if succeeded {
+                        repair_backup::discard(&data_path)
+                    } else {
+                        repair_backup::restore(&data_path).map(|_| ())
+                    }
+                })
+                .await;
+                if let Err(error) = settled
+                    .map_err(anyhow::Error::from)
+                    .and_then(|settled| settled)
+                {
+                    error!("Failed to settle what Repair replaced: {error:#}");
+                }
+            }
+
             let failed_task = match result {
                 Ok(()) => {
                     info!("Server modpack install completed: {}", server_id.0);
@@ -2348,47 +2355,27 @@ impl ManagerRef<'_, ServerManager> {
         self.refuse_unowned_marker(id, &server_path.get_root())
             .await?;
 
-        // Wipe modpack-installed content. Anything not in this list (worlds,
+        // Set aside what the modpack installed. Anything else (worlds,
         // server.properties, eula.txt, whitelist/ops/banned-*, logs) is left
-        // alone so the operator's state survives a reinstall.
+        // alone so the operator's state survives a reinstall. Nothing is
+        // deleted until the reinstall has succeeded: a Repair that fails
+        // puts all of it back (`spawn_modpack_install`).
         let protection = {
             let data_path = data_path.clone();
             tokio::task::spawn_blocking(move || world::SaveProtection::read(&data_path)).await??
         };
-        let dirs_to_wipe = ["mods", "libraries", "defaultconfigs"];
-        let files_to_wipe = ["launch_config.json"];
-        for name in dirs_to_wipe.into_iter().chain(files_to_wipe) {
+        for name in repair_backup::replaced_names() {
             protection.refuse_wipe(name)?;
         }
-        for (name, dir) in dirs_to_wipe
-            .into_iter()
-            .map(|name| (name, true))
-            .chain(files_to_wipe.into_iter().map(|name| (name, false)))
-        {
-            let p = data_path.join(name);
-            wipe_entry(&p, dir)
-                .await
-                .with_context(|| format!("Failed to wipe {}", p.display()))?;
-        }
-        // Remove any .jar at the data root (server.jar, modloader installers,
-        // forge/neoforge server jars). Keep recursing only at depth 0 — we
-        // don't want to delete jars users dropped into mods/ etc, but mods/
-        // was already wiped above.
-        let mut entries = tokio::fs::read_dir(&data_path)
-            .await
-            .context("Failed to read server data dir")?;
-        while let Some(entry) = entries.next_entry().await? {
-            let path = entry.path();
-            if path.is_file()
-                && path
-                    .extension()
-                    .and_then(|e| e.to_str())
-                    .map(|e| e.eq_ignore_ascii_case("jar"))
-                    .unwrap_or(false)
-            {
-                let _ = tokio::fs::remove_file(&path).await;
-            }
-        }
+        tokio::task::spawn_blocking(move || {
+            // What a Repair cut short by the launcher closing left behind.
+            repair_backup::restore(&data_path)?;
+            repair_backup::set_aside(&data_path).or_else(|error| {
+                repair_backup::restore(&data_path)?;
+                Err(error)
+            })
+        })
+        .await??;
 
         // Spin up the install task and flip state to Installing.
         let task = VisualTask::new(Translation::ServerTaskInstallFromModpack {
@@ -6570,9 +6557,41 @@ mod link_repair_tests {
 
         assert!(
             std::fs::symlink_metadata(data.join("mods")).is_err(),
-            "the linked mods folder is removed as a link"
+            "the linked mods folder is moved out of the way as a link"
         );
         assert!(std::fs::symlink_metadata(data.join("libraries")).is_err());
+
+        // The pack does not exist, so this Repair fails: everything it set
+        // aside is back, the link as a link.
+        for _ in 0..600 {
+            let stopped = matches!(
+                app.server_manager
+                    .servers
+                    .read()
+                    .await
+                    .get(&id)
+                    .map(|server| &server.state),
+                Some(ServerState::Stopped {
+                    failed_task: Some(_)
+                })
+            );
+            if stopped {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+        }
+        assert!(
+            std::fs::symlink_metadata(data.join("mods"))
+                .unwrap()
+                .file_type()
+                .is_symlink(),
+            "the linked mods folder is back"
+        );
+        assert_eq!(
+            std::fs::read(data.join("libraries/own.jar")).unwrap(),
+            b"own"
+        );
+        assert!(!data.join(".gdl-repair-backup").exists());
         for (kept, bytes) in [
             ("shared-mods/shared.jar", &b"shared"[..]),
             ("shared-lib.jar", b"lib"),
