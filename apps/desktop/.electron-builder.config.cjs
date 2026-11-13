@@ -2,6 +2,7 @@ const fs = require("fs")
 const path = require("path")
 const dotenv = require("dotenv")
 const { notarize } = require("@electron/notarize")
+const { installLinuxSandboxStart } = require("./scripts/linuxSandboxStart.cjs")
 
 dotenv.config({
   path: "../../.env",
@@ -157,6 +158,12 @@ module.exports = {
       `${JSON.stringify(packageJson, null, 2)}\n`,
       "utf8"
     )
+  },
+  afterPack: async (context) => {
+    if (context.electronPlatformName !== "linux") return
+    // Every Linux target is built from this folder, so all of them start
+    // through the script.
+    installLinuxSandboxStart(context.appOutDir, context.packager.executableName)
   },
   afterSign: async (context) => {
     const { electronPlatformName, appOutDir } = context
