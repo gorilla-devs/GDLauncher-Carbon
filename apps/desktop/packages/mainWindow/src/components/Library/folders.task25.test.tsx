@@ -13,6 +13,7 @@ const control = vi.hoisted(() => ({
   header: null as any,
   error: vi.fn(),
   dragState: null as any,
+  recycleBin: true,
   buttonActions: new Map<any, () => unknown>()
 }))
 vi.mock("@gd/ui", async () => {
@@ -57,7 +58,7 @@ vi.mock("@/utils/rspcClient", () => ({
         opts().queryKey[0] === "server.getAllServers"
           ? []
           : opts().queryKey[0] === "settings.getSettings"
-            ? { deletionThroughRecycleBin: true }
+            ? { deletionThroughRecycleBin: control.recycleBin }
             : 1
     }),
     createMutation: (opts: any) => ({
@@ -131,7 +132,12 @@ vi.mock("./ExpandedFolderContent/FolderHeader", async (importOriginal) => {
 })
 vi.mock("@/utils/adhelper", () => ({ default: { width: 0 } }))
 vi.mock("@/managers/ModalsManager/ModalLayout", () => ({
-  default: (props: any) => <div>{props.children}</div>
+  default: (props: any) => (
+    <div>
+      <h2>{props.title}</h2>
+      {props.children}
+    </div>
+  )
 }))
 
 import FolderTile from "./FolderTile"
@@ -183,6 +189,7 @@ beforeEach(() => {
   control.buttonActions.clear()
   control.header = null
   control.dragState = null
+  control.recycleBin = true
   control.mutation.mockResolvedValue(undefined)
   const [store] = createStore({
     instanceGroups: {
@@ -252,9 +259,208 @@ test("equal-ID server folder tile renders server preview, carries its namespace 
     { name: "confirmBatchFolderDeletion" },
     expect.objectContaining({
       kind: "server",
+      mode: "unlink",
       folders: [expect.objectContaining({ id: 2, name: "Server hosting" })]
     })
   )
+})
+test("each entry of an instance folder's menu asks only about what it names", () => {
+  tile("instance")
+  button("_trn_unlink_folder").click()
+  button("_trn_delete_folder_all").click()
+  expect(control.open.mock.calls).toEqual([
+    [
+      { name: "confirmBatchFolderDeletion" },
+      expect.objectContaining({
+        kind: "instance",
+        mode: "unlink",
+        folders: [expect.objectContaining({ id: 2, name: "Survival" })]
+      })
+    ],
+    [
+      { name: "confirmBatchFolderDeletion" },
+      expect.objectContaining({
+        kind: "instance",
+        mode: "deleteAll",
+        folders: [expect.objectContaining({ id: 2, name: "Survival" })]
+      })
+    ]
+  ])
+})
+function folderDialog(data: Record<string, unknown>) {
+  dispose = render(
+    () => <ConfirmBatchFolderDeletion {...({ data } as any)} />,
+    root
+  )
+}
+const DELETING_BUTTONS = [
+  "_trn_folder_delete_all_button",
+  "_trn_folders_delete_all_button",
+  "_trn_server_delete_permanently"
+]
+const KEEPING_BUTTONS = [
+  "_trn_folder_remove_title",
+  "_trn_folders_remove_title",
+  "_trn_folder_choice_keep",
+  "_trn_folders_choice_keep"
+]
+test("removing a folder from its menu offers nothing that deletes an instance", async () => {
+  folderDialog({
+    kind: "instance",
+    mode: "unlink",
+    folders: control.store.instanceGroups.data
+  })
+  expect(root.querySelector("h2")?.textContent).toBe(
+    "instances:_trn_folder_remove_title"
+  )
+  expect(root.textContent).toContain("_trn_folder_remove_instances_stay")
+  expect(root.textContent).toContain("_trn_folder_no_instance_deleted")
+  for (const key of DELETING_BUTTONS) expect(button(key)).toBeUndefined()
+  expect(root.querySelectorAll("button")).toHaveLength(2)
+  button("_trn_folder_remove_title").click()
+  await vi.waitFor(() => expect(control.close).toHaveBeenCalledTimes(1))
+  expect(control.mutation).toHaveBeenCalledExactlyOnceWith(
+    "instance.deleteGroup",
+    2
+  )
+})
+test("deleting a folder with its instances names them, says where they go and offers nothing else", async () => {
+  folderDialog({
+    kind: "instance",
+    mode: "deleteAll",
+    folders: control.store.instanceGroups.data
+  })
+  expect(root.querySelector("h2")?.textContent).toBe(
+    "instances:_trn_delete_folder_all_title"
+  )
+  expect(root.textContent).toContain("_trn_folder_delete_all_intro")
+  expect(
+    root.querySelector('[data-testid="folder-deletion-instances"]')?.textContent
+  ).toBe("Client nine")
+  expect(root.textContent).toContain("_trn_folder_instances_to_recycle_bin")
+  expect(root.textContent).not.toContain("_trn_folder_instances_permanent")
+  for (const key of KEEPING_BUTTONS) expect(button(key)).toBeUndefined()
+  expect(root.querySelectorAll("button")).toHaveLength(2)
+  const confirm = button("_trn_folder_delete_all_button_single")
+  expect(confirm.textContent).toContain('"count":1')
+  confirm.click()
+  await vi.waitFor(() => expect(control.close).toHaveBeenCalledTimes(1))
+  expect(control.mutation).toHaveBeenCalledExactlyOnceWith(
+    "instance.deleteGroupWithInstances",
+    2
+  )
+})
+test("deleting a folder with its instances says they are erased when the Recycle Bin is off", () => {
+  control.recycleBin = false
+  folderDialog({
+    kind: "instance",
+    mode: "deleteAll",
+    folders: control.store.instanceGroups.data
+  })
+  expect(root.textContent).toContain("_trn_folder_instances_permanent")
+  expect(root.textContent).not.toContain("_trn_folder_instances_to_recycle_bin")
+  expect(button("_trn_server_delete_permanently")).toBeDefined()
+  expect(button("_trn_folder_delete_all_button")).toBeUndefined()
+})
+test("a folder with many instances lists the first five and counts the rest", () => {
+  const [store] = createStore({
+    ...control.store,
+    instances: {
+      data: Array.from({ length: 8 }, (_, index) => ({
+        ...client,
+        id: 20 + index,
+        name: `Pack ${index + 1}`
+      }))
+    }
+  })
+  control.store = store
+  folderDialog({
+    kind: "instance",
+    mode: "deleteAll",
+    folders: control.store.instanceGroups.data
+  })
+  const names = root.querySelector('[data-testid="folder-deletion-instances"]')!
+  expect([...names.children].map((row) => row.textContent)).toEqual([
+    "Pack 1",
+    "Pack 2",
+    "Pack 3",
+    "Pack 4",
+    "Pack 5",
+    'instances:_trn_confirm_addon_deletion_more{"count":3}'
+  ])
+  expect(button("_trn_folder_delete_all_button").textContent).toContain(
+    '"count":8'
+  )
+})
+test("an empty folder is only ever removed, whichever menu entry opened the dialog", async () => {
+  const [store] = createStore({ ...control.store, instances: { data: [] } })
+  control.store = store
+  folderDialog({
+    kind: "instance",
+    mode: "deleteAll",
+    folders: control.store.instanceGroups.data
+  })
+  expect(root.querySelector("h2")?.textContent).toBe(
+    "instances:_trn_folder_remove_title"
+  )
+  expect(root.textContent).not.toContain("_trn_folder_remove_instances_stay")
+  for (const key of DELETING_BUTTONS) expect(button(key)).toBeUndefined()
+  button("_trn_folder_remove_title").click()
+  await vi.waitFor(() => expect(control.close).toHaveBeenCalledTimes(1))
+  expect(control.mutation).toHaveBeenCalledExactlyOnceWith(
+    "instance.deleteGroup",
+    2
+  )
+})
+test("a selection of folders asks what happens to the instances, each button saying what it does", () => {
+  folderDialog({
+    kind: "instance",
+    folders: [
+      { id: 2, name: "First" },
+      { id: 3, name: "Second" }
+    ]
+  })
+  expect(root.querySelector("h2")?.textContent).toBe(
+    "instances:_trn_folders_remove_title"
+  )
+  expect(root.textContent).toContain("_trn_folders_choice_question")
+  expect(root.textContent).toContain("_trn_folder_instances_to_recycle_bin")
+  expect(button("_trn_folders_choice_keep")).toBeDefined()
+  expect(button("_trn_folders_delete_all_button_single").textContent).toContain(
+    '"count":1'
+  )
+  expect(root.querySelectorAll("button")).toHaveLength(3)
+})
+test("a retry after a partial delete keeps the dialog it was started from, even once the instances are gone", async () => {
+  const [store, setStore] = createStore({ ...control.store })
+  control.store = store
+  let rejectSecond = true
+  control.mutation.mockImplementation(async (_key: string, id: number) => {
+    if (id === 3 && rejectSecond) throw new Error("Busy folder")
+  })
+  folderDialog({
+    kind: "instance",
+    folders: [
+      { id: 2, name: "First" },
+      { id: 3, name: "Second" }
+    ]
+  })
+  button("_trn_folders_delete_all_button_single").click()
+  await vi.waitFor(() =>
+    expect(root.querySelector('[role="alert"]')).not.toBeNull()
+  )
+  // The first folder's instances are deleted: none is left in the selection.
+  setStore("instances", { data: [] })
+  expect(root.textContent).toContain("_trn_folders_choice_question")
+  expect(button("_trn_folders_choice_keep").disabled).toBe(true)
+  rejectSecond = false
+  button("_trn_folders_delete_all_button").click()
+  await vi.waitFor(() => expect(control.close).toHaveBeenCalledTimes(1))
+  expect(control.mutation.mock.calls).toEqual([
+    ["instance.deleteGroupWithInstances", 2],
+    ["instance.deleteGroupWithInstances", 3],
+    ["instance.deleteGroupWithInstances", 3]
+  ])
 })
 test("server unlink confirmation dispatches only server namespace with naturally colliding IDs", async () => {
   dispose = render(
@@ -267,7 +473,9 @@ test("server unlink confirmation dispatches only server namespace with naturally
     ),
     root
   )
-  button("_trn_unlink_folders_button").click()
+  expect(root.textContent).toContain("_trn_folder_remove_servers_stay")
+  expect(root.textContent).toContain("_trn_folder_no_server_deleted")
+  button("_trn_folder_remove_title").click()
   await Promise.resolve()
   await Promise.resolve()
   expect(control.mutation).toHaveBeenCalledExactlyOnceWith(
@@ -288,8 +496,9 @@ test("server confirmation counts current full server membership and exposes no c
     ),
     root
   )
-  expect(root.textContent).toContain('"count":2')
-  expect(button("_trn_delete_folders_with_instances_button")).toBeUndefined()
+  expect(root.textContent).toContain("2 instances:_trn_servers")
+  for (const key of DELETING_BUTTONS) expect(button(key)).toBeUndefined()
+  expect(root.textContent).not.toContain("_trn_folders_choice_question")
 })
 test.each(["unlink", "deleteAll"])(
   "client confirmation preserves %s endpoint",
@@ -309,8 +518,8 @@ test.each(["unlink", "deleteAll"])(
     )
     button(
       mode === "unlink"
-        ? "_trn_unlink_folders_button"
-        : "_trn_delete_folders_with_instances_button"
+        ? "_trn_folder_choice_keep"
+        : "_trn_folder_delete_all_button_single"
     ).click()
     await Promise.resolve()
     await Promise.resolve()
@@ -510,9 +719,11 @@ test.each([
       root
     )
     const key =
-      mode === "unlink"
-        ? "_trn_unlink_folders_button"
-        : "_trn_delete_folders_with_instances_button"
+      kind === "server"
+        ? "_trn_folders_remove_title"
+        : mode === "unlink"
+          ? "_trn_folders_choice_keep"
+          : "_trn_folders_delete_all_button_single"
     button(key).click()
     await vi.waitFor(() =>
       expect(root.querySelector('[role="alert"]')).not.toBeNull()
@@ -712,14 +923,14 @@ test("mixed folder failure retry preserves both successful server and folder ack
 test.each([
   {
     mode: "unlink",
-    chosen: "_trn_unlink_folders_button",
-    alternate: "_trn_delete_folders_with_instances_button",
+    chosen: "_trn_folders_choice_keep",
+    alternate: "_trn_folders_delete_all_button_single",
     endpoint: "instance.deleteGroup"
   },
   {
     mode: "deleteAll",
-    chosen: "_trn_delete_folders_with_instances_button",
-    alternate: "_trn_unlink_folders_button",
+    chosen: "_trn_folders_delete_all_button_single",
+    alternate: "_trn_folders_choice_keep",
     endpoint: "instance.deleteGroupWithInstances"
   }
 ] as const)(
@@ -818,7 +1029,7 @@ test("R1 a partial pinned operation still permits cancellation without completin
     ),
     root
   )
-  button("_trn_unlink_folders_button").click()
+  button("_trn_folders_choice_keep").click()
   await vi.waitFor(() =>
     expect(root.querySelector('[role="alert"]')).not.toBeNull()
   )

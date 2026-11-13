@@ -700,7 +700,7 @@ const deferredKeys = [
   "instances:_trn_repair_origin_read_failed",
   "notifications:_trn_shader_setup_closed_work_may_finish",
   "instances:_trn_batch_server_folder_unlink_confirmation",
-  "instances:_trn_batch_folder_total_servers",
+  "instances:_trn_folders_remove_servers_stay",
   "instances:_trn_server_singular",
   "instances:_trn_servers",
   "instances:_trn_folder_deletion_partial",

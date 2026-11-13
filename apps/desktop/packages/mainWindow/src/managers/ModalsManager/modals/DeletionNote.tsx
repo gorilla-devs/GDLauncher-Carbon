@@ -3,6 +3,7 @@ import { DeletionTarget } from "@/utils/deletionTarget"
 
 const DOTS = {
   green: "bg-green-400",
+  grey: "bg-lightSlate-600",
   red: "bg-red-400",
   yellow: "bg-yellow-400"
 }

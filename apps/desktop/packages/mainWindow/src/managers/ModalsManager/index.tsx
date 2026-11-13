@@ -134,7 +134,8 @@ const getDefaultModals = (t: TypedTFunction) => ({
   },
   confirmBatchFolderDeletion: {
     component: lazy(() => import("./modals/ConfirmBatchFolderDeletion")),
-    title: t("modals:_trn_confirm_batch_folder_deletion")
+    // The dialog sets its own title for the action it confirms.
+    title: t("instances:_trn_folder_remove_title")
   },
   confirmBatchMixedDeletion: {
     component: lazy(() => import("./modals/ConfirmBatchMixedDeletion")),

@@ -11,6 +11,7 @@ import { useDragContext } from "@/pages/Library/DragContext"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { getInstanceImageUrl, getServerImageUrl } from "@/utils/instances"
 import type { FolderKind } from "@/pages/Library/types"
+import type { FolderDeletionMode } from "@/utils/folderDeletion"
 import { useModal } from "@/managers/ModalsManager"
 import {
   Checkbox,
@@ -156,13 +157,14 @@ const FolderTile = (props: FolderTileProps) => {
   const sizeClasses = () => TILE_SIZES[props.size].container
   const iconSizeClasses = () => TILE_SIZES[props.size].icon
 
-  // Context menu handler - opens batch folder deletion modal with unlink/delete options
-  const handleManageFolder = () => {
+  // Each context menu entry asks only about what it names: removing the
+  // folder alone, or deleting the instances in it as well.
+  const openFolderDeletion = (mode: FolderDeletionMode) => {
     const g = group()
     if (!g) return
     modalsContext?.openModal(
       { name: "confirmBatchFolderDeletion" },
-      { kind: props.kind, folders: [g], onComplete: () => {} }
+      { kind: props.kind, folders: [g], mode, onComplete: () => {} }
     )
   }
 
@@ -184,7 +186,7 @@ const FolderTile = (props: FolderTileProps) => {
               <ContextMenuSeparator />
               <ContextMenuItem
                 class="flex items-center gap-2"
-                onClick={handleManageFolder}
+                onClick={() => openFolderDeletion("unlink")}
               >
                 <div class="i-hugeicons:folder-remove h-4 w-4" />
                 {t("instances:_trn_unlink_folder")}
@@ -193,7 +195,7 @@ const FolderTile = (props: FolderTileProps) => {
                 <ContextMenuSeparator />
                 <ContextMenuItem
                   class="flex items-center gap-2 text-red-400"
-                  onClick={handleManageFolder}
+                  onClick={() => openFolderDeletion("deleteAll")}
                 >
                   <div class="i-hugeicons:delete-02 h-4 w-4" />
                   {t("instances:_trn_delete_folder_all")}
