@@ -408,16 +408,12 @@ async fn install_neoforge(
     lifecycle: &std::sync::Arc<crate::managers::runtime_lifecycle::RuntimeLifecycle>,
     reqwest_client: &ClientWithMiddleware,
     server_path: &ServerPath,
-    _game_version: &str,
+    game_version: &str,
     neoforge_version: &str,
     java_path: &Path,
     progress: Option<&Subtask>,
 ) -> Result<LaunchConfig> {
-    // NeoForge installer URL: https://maven.neoforged.net/releases/net/neoforged/neoforge/{version}/neoforge-{version}-installer.jar
-    let url = format!(
-        "https://maven.neoforged.net/releases/net/neoforged/neoforge/{}/neoforge-{}-installer.jar",
-        neoforge_version, neoforge_version
-    );
+    let (url, vendor_path, installed_version) = neoforge_installer(game_version, neoforge_version);
 
     info!("Downloading NeoForge installer from {}", url);
 
@@ -464,7 +460,7 @@ async fn install_neoforge(
 
     // NeoForge always launches through an argument file under libraries/.
     if let Some(args_file) =
-        find_loader_args_file(&data_path, "net/neoforged/neoforge", Some(neoforge_version)).await
+        find_loader_args_file(&data_path, vendor_path, Some(&installed_version)).await
     {
         info!("Using NeoForge argument file {}", args_file);
         return Ok(LaunchConfig::from_args_file(args_file));
@@ -478,6 +474,29 @@ async fn install_neoforge(
         neoforge_version,
         platform_args_file_name()
     )
+}
+
+/// Where a NeoForge installer is published, with the `libraries/` folder and
+/// version it installs under. NeoForge for Minecraft 1.20.1 kept Forge's
+/// naming (`net/neoforged/forge/1.20.1-47.1.106`); later versions have their own.
+fn neoforge_installer(
+    game_version: &str,
+    neoforge_version: &str,
+) -> (String, &'static str, String) {
+    const MAVEN: &str = "https://maven.neoforged.net/releases";
+    if game_version == "1.20.1" {
+        let version = if neoforge_version.starts_with("1.20.1-") {
+            neoforge_version.to_string()
+        } else {
+            format!("1.20.1-{neoforge_version}")
+        };
+        let url = format!("{MAVEN}/net/neoforged/forge/{version}/forge-{version}-installer.jar");
+        return (url, "net/neoforged/forge", version);
+    }
+    let url = format!(
+        "{MAVEN}/net/neoforged/neoforge/{neoforge_version}/neoforge-{neoforge_version}-installer.jar"
+    );
+    (url, "net/neoforged/neoforge", neoforge_version.to_string())
 }
 
 /// Run a Forge/NeoForge installer jar with --installServer, streaming stdout to track
@@ -594,9 +613,20 @@ pub async fn existing_install_launch_config(
 
     match modloader_type {
         "neoforge" => {
-            find_loader_args_file(&data_path, "net/neoforged/neoforge", modloader_version)
-                .await
-                .map(LaunchConfig::from_args_file)
+            let mut found = None;
+            for vendor_path in super::pack_loader::NEOFORGE_VENDOR_PATHS {
+                let file = find_loader_args_file(&data_path, vendor_path, modloader_version).await;
+                // A file at the data root is the last resort for either folder.
+                if file
+                    .as_ref()
+                    .is_some_and(|file| file.starts_with("libraries/"))
+                {
+                    found = file;
+                    break;
+                }
+                found = found.or(file);
+            }
+            found.map(LaunchConfig::from_args_file)
         }
         "forge" => {
             if let Some(jar) = find_forge_launcher_jar(&data_path).await {
@@ -609,8 +639,12 @@ pub async fn existing_install_launch_config(
                 .await
                 .map(LaunchConfig::from_args_file)
         }
-        "fabric" | "quilt" => {
-            let jar = format!("{modloader_type}-server-launch.jar");
+        "fabric" => super::pack_loader::fabric_launcher_jar(&data_path).map(|jar| LaunchConfig {
+            jar_path: Some(jar),
+            ..LaunchConfig::vanilla()
+        }),
+        "quilt" => {
+            let jar = "quilt-server-launch.jar".to_string();
             data_path.join(&jar).exists().then(|| LaunchConfig {
                 jar_path: Some(jar),
                 ..LaunchConfig::vanilla()
@@ -791,5 +825,69 @@ mod tests {
             config.jar_path.as_deref(),
             Some("forge-1.20.1-47.4.10-shim.jar")
         );
+    }
+
+    #[test]
+    fn neoforge_for_minecraft_1_20_1_is_fetched_from_its_forge_named_folder() {
+        for version in ["47.1.106", "1.20.1-47.1.106"] {
+            assert_eq!(
+                neoforge_installer("1.20.1", version),
+                (
+                    "https://maven.neoforged.net/releases/net/neoforged/forge/1.20.1-47.1.106/forge-1.20.1-47.1.106-installer.jar".to_string(),
+                    "net/neoforged/forge",
+                    "1.20.1-47.1.106".to_string()
+                )
+            );
+        }
+        assert_eq!(
+            neoforge_installer("1.21.1", "21.1.77"),
+            (
+                "https://maven.neoforged.net/releases/net/neoforged/neoforge/21.1.77/neoforge-21.1.77-installer.jar".to_string(),
+                "net/neoforged/neoforge",
+                "21.1.77".to_string()
+            )
+        );
+    }
+
+    #[tokio::test]
+    async fn preinstalled_neoforge_for_minecraft_1_20_1_skips_the_installer() {
+        let dir = tempfile::tempdir().unwrap();
+        let server_path = ServerPath::new(dir.path().to_path_buf());
+        let data_path = server_path.get_data_path();
+        let loader = data_path.join("libraries/net/neoforged/forge/1.20.1-47.1.106");
+        std::fs::create_dir_all(&loader).unwrap();
+        std::fs::write(loader.join(platform_args_file_name()), "-p x").unwrap();
+
+        let config =
+            existing_install_launch_config(&server_path, "neoforge", Some("1.20.1-47.1.106"))
+                .await
+                .expect("installed NeoForge is reused");
+        assert_eq!(
+            config.args_file,
+            Some(format!(
+                "libraries/net/neoforged/forge/1.20.1-47.1.106/{}",
+                platform_args_file_name()
+            ))
+        );
+    }
+
+    #[tokio::test]
+    async fn preinstalled_fabric_launches_the_jar_the_pack_ships() {
+        let dir = tempfile::tempdir().unwrap();
+        let server_path = ServerPath::new(dir.path().to_path_buf());
+        let data_path = server_path.get_data_path();
+        std::fs::create_dir_all(&data_path).unwrap();
+        assert!(
+            existing_install_launch_config(&server_path, "fabric", None)
+                .await
+                .is_none()
+        );
+
+        let served = "fabric-server-mc.1.20.1-loader.0.15.11-launcher.1.0.1.jar";
+        std::fs::write(data_path.join(served), b"jar").unwrap();
+        let config = existing_install_launch_config(&server_path, "fabric", Some("0.15.11"))
+            .await
+            .expect("the shipped launcher is reused");
+        assert_eq!(config.jar_path.as_deref(), Some(served));
     }
 }

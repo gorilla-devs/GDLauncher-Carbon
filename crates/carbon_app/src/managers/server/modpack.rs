@@ -199,7 +199,6 @@ pub async fn process_curseforge_server_pack(
         })
         .await?;
     warn_skipped_links(task, skipped_links);
-    t_extract.complete_opaque();
 
     anyhow::ensure!(
         !cancel.is_cancelled(),
@@ -210,7 +209,22 @@ pub async fn process_curseforge_server_pack(
         detect_game_version_from_files(&data_path, &file_info.data.game_versions).await;
 
     // Detect modloader from extracted files
-    let (modloader_type, modloader_version) = detect_modloader_from_files(&data_path).await?;
+    let (modloader_type, modloader_version) = match detect_modloader_from_files(&data_path).await? {
+        (None, _) => {
+            let client_file_id = file_info.data.parent_project_file_id;
+            let manifest = async {
+                let file_id = client_file_id.context("Server pack names no modpack file")?;
+                download_client_manifest(app, project_id, file_id, cancel).await
+            };
+            undetected_modloader(&data_path, manifest).await?
+        }
+        detected => detected,
+    };
+    anyhow::ensure!(
+        !cancel.is_cancelled(),
+        "Server pack preparation cancelled after its modloader was read"
+    );
+    t_extract.complete_opaque();
 
     info!(
         "CurseForge server pack processed: game_version={}, modloader={:?}",
@@ -668,7 +682,11 @@ fn extract_zip_to_dir_with(
             Err(_) => continue,
         };
         if let Some(first_component) = name.split('/').next() {
-            if !first_component.is_empty() {
+            // Left out of the count so a pack folder zipped on a Mac is still
+            // recognised as the only root; never part of a server either way.
+            if !first_component.is_empty()
+                && !super::pack_loader::is_archive_clutter(first_component)
+            {
                 root_dirs.insert(first_component.to_string());
             }
         }
@@ -712,7 +730,9 @@ fn extract_zip_to_dir_with(
             name.clone()
         };
 
-        if relative.is_empty() {
+        if relative.is_empty()
+            || super::pack_loader::is_archive_clutter(relative.split('/').next().unwrap_or(""))
+        {
             continue;
         }
 
@@ -825,7 +845,12 @@ async fn detect_modloader_from_files(
 ) -> anyhow::Result<(Option<String>, Option<String>)> {
     // Pre-installed Forge/NeoForge — check before the root-jar scan, since these
     // packs frequently ship no versioned jar at the root whatsoever.
-    let neoforge = loader_version_from_libraries(data_path, "net/neoforged/neoforge").await;
+    let mut neoforge = None;
+    for vendor_path in super::pack_loader::NEOFORGE_VENDOR_PATHS {
+        if neoforge.is_none() {
+            neoforge = loader_version_from_libraries(data_path, vendor_path).await;
+        }
+    }
     let forge = loader_version_from_libraries(data_path, "net/minecraftforge/forge").await;
 
     match (neoforge, forge) {
@@ -840,8 +865,11 @@ async fn detect_modloader_from_files(
 
     // Fabric and Quilt ship a self-contained launcher jar with no version in the
     // name. The loader is already installed, so a missing version is fine here.
-    if data_path.join("fabric-server-launch.jar").exists() {
-        return Ok((Some("fabric".to_string()), None));
+    if let Some(jar) = super::pack_loader::fabric_launcher_jar(data_path) {
+        return Ok((
+            Some("fabric".to_string()),
+            super::pack_loader::fabric_loader_version(&jar),
+        ));
     }
 
     if data_path.join("quilt-server-launch.jar").exists() {
@@ -866,6 +894,101 @@ async fn detect_modloader_from_files(
     }
 
     Ok((None, None))
+}
+
+/// The modloader of a pack whose files do not show one: read from the notes
+/// its start script uses, then from the modpack the server pack was built
+/// from. A pack with mods and no loader to be found is refused, since it
+/// would install as a vanilla server that cannot run them.
+async fn undetected_modloader(
+    data_path: &Path,
+    client_manifest: impl std::future::Future<Output = anyhow::Result<String>>,
+) -> anyhow::Result<(Option<String>, Option<String>)> {
+    let (has_mods, own_launcher, variables) = {
+        let data_path = data_path.to_path_buf();
+        tokio::task::spawn_blocking(move || {
+            (
+                super::pack_loader::has_mods(&data_path),
+                super::pack_loader::ships_own_launcher(&data_path),
+                std::fs::read_to_string(data_path.join("variables.txt")).ok(),
+            )
+        })
+        .await?
+    };
+    if !has_mods {
+        return Ok((None, None));
+    }
+    if own_launcher {
+        info!("Server pack starts its mods from its own server.jar, installing no modloader");
+        return Ok((None, None));
+    }
+    let noted = variables
+        .as_deref()
+        .and_then(super::pack_loader::loader_from_variables);
+    let found = match noted {
+        Some(found) => Some(found),
+        None => match client_manifest.await {
+            Ok(manifest) => super::pack_loader::loader_from_manifest(&manifest),
+            Err(error) => {
+                warn!("Could not read the modpack's own manifest: {error:#}");
+                None
+            }
+        },
+    };
+    let (loader, version) = found.context(
+        "Could not tell which modloader this server pack needs. It contains mods but no \
+         modloader the launcher recognises, so it would run as a plain vanilla server.",
+    )?;
+    info!("Server pack names no modloader in its files, using {loader} {version}");
+    Ok((Some(loader), Some(version)))
+}
+
+/// Downloads the modpack a server pack was built from and returns its
+/// `manifest.json`.
+async fn download_client_manifest(
+    app: &crate::managers::AppInner,
+    project_id: u32,
+    file_id: i32,
+    cancel: &tokio_util::sync::CancellationToken,
+) -> anyhow::Result<String> {
+    let file = crate::managers::runtime_lifecycle::wait_or_cancel(cancel, async {
+        app.modplatforms_manager
+            .curseforge
+            .get_mod_file(ModFileParameters {
+                mod_id: project_id as i32,
+                file_id,
+            })
+            .await
+            .context("Failed to fetch modpack file info")
+    })
+    .await??;
+    let url = file
+        .data
+        .download_url
+        .as_ref()
+        .context("Modpack file has no download URL")?;
+    let mut request = app.reqwest_client.get(url);
+    if let Some(api_key) = carbon_net::curseforge_cdn_auth(url) {
+        request = request.header("x-api-key", api_key);
+    }
+    let response = crate::managers::runtime_lifecycle::wait_or_cancel(cancel, async {
+        request.send().await.context("Failed to download modpack")
+    })
+    .await??;
+    anyhow::ensure!(
+        response.status().is_success(),
+        "Failed to download modpack: HTTP {}",
+        response.status()
+    );
+    let directory = tempfile::Builder::new()
+        .prefix("gdl-server-pack-source-")
+        .tempdir()?;
+    let archive = directory.path().join("modpack.zip");
+    let mut output = tokio::fs::File::create(&archive).await?;
+    let mut stream = response.bytes_stream();
+    copy_archive_stream(&mut stream, &mut output, cancel, |_| {}).await?;
+    drop(output);
+    tokio::task::spawn_blocking(move || super::pack_loader::client_manifest(&archive)).await?
 }
 
 #[cfg(test)]
@@ -2117,5 +2240,204 @@ mod task21_stream_tests {
         assert_eq!(task.progress_float().await, 0.0);
         unknown.finish(5_368_709_120);
         assert_eq!(task.progress_float().await, 1.0);
+    }
+}
+
+#[cfg(test)]
+mod undetected_loader_tests {
+    use super::*;
+    use std::io::Write;
+
+    const MANIFEST: &str = r#"{"minecraft":{"version":"1.20.1","modLoaders":[{"id":"forge-47.2.0","primary":true}]},"manifestType":"minecraftModpack","manifestVersion":1,"name":"Pack","author":"A","overrides":"overrides","files":[]}"#;
+
+    fn pack_with_mods() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("mods")).unwrap();
+        std::fs::write(dir.path().join("mods/create.jar"), b"jar").unwrap();
+        std::fs::write(dir.path().join("startserver.sh"), "#!/bin/sh").unwrap();
+        dir
+    }
+
+    fn server_jar(data_path: &Path, main_class: &str) {
+        let mut zip =
+            zip::ZipWriter::new(std::fs::File::create(data_path.join("server.jar")).unwrap());
+        zip.start_file(
+            "META-INF/MANIFEST.MF",
+            zip::write::SimpleFileOptions::default(),
+        )
+        .unwrap();
+        write!(zip, "Manifest-Version: 1.0\r\nMain-Class: {main_class}\r\n").unwrap();
+        zip.finish().unwrap();
+    }
+
+    async fn no_manifest() -> anyhow::Result<String> {
+        anyhow::bail!("Server pack names no modpack file")
+    }
+
+    async fn unread() -> anyhow::Result<String> {
+        panic!("the modpack must not be downloaded for this pack")
+    }
+
+    fn found(loader: &str, version: &str) -> (Option<String>, Option<String>) {
+        (Some(loader.to_string()), Some(version.to_string()))
+    }
+
+    #[tokio::test]
+    async fn a_script_bootstrapped_pack_takes_its_loader_from_the_modpack() {
+        let dir = pack_with_mods();
+        assert_eq!(
+            detect_modloader_from_files(dir.path()).await.unwrap(),
+            (None, None)
+        );
+        let loader = undetected_modloader(dir.path(), async { Ok(MANIFEST.to_string()) })
+            .await
+            .unwrap();
+        assert_eq!(loader, found("forge", "47.2.0"));
+    }
+
+    #[tokio::test]
+    async fn a_pack_with_start_script_notes_needs_no_modpack_download() {
+        let dir = pack_with_mods();
+        std::fs::write(
+            dir.path().join("variables.txt"),
+            "MINECRAFT_VERSION=1.21.1\nMODLOADER=NeoForge\nMODLOADER_VERSION=21.1.77\n",
+        )
+        .unwrap();
+        let loader = undetected_modloader(dir.path(), unread()).await.unwrap();
+        assert_eq!(loader, found("neoforge", "21.1.77"));
+    }
+
+    #[tokio::test]
+    async fn a_modded_pack_with_no_loader_to_be_found_is_refused() {
+        let dir = pack_with_mods();
+        for manifest in [
+            None,
+            Some("not json".to_string()),
+            Some(MANIFEST.replace("forge-47.2.0", "liteloader-1")),
+        ] {
+            let error = match manifest {
+                None => undetected_modloader(dir.path(), no_manifest()).await,
+                Some(manifest) => undetected_modloader(dir.path(), async { Ok(manifest) }).await,
+            }
+            .unwrap_err();
+            assert!(
+                format!("{error:#}").contains("Could not tell which modloader"),
+                "{error:#}"
+            );
+        }
+        // A vanilla server.jar next to the mods changes nothing.
+        server_jar(dir.path(), "net.minecraft.bundler.Main");
+        assert!(
+            undetected_modloader(dir.path(), no_manifest())
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_pack_without_mods_stays_a_vanilla_server() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("mods")).unwrap();
+        std::fs::create_dir_all(dir.path().join("world/datapacks")).unwrap();
+        server_jar(dir.path(), "net.minecraft.bundler.Main");
+        assert_eq!(
+            undetected_modloader(dir.path(), unread()).await.unwrap(),
+            (None, None)
+        );
+    }
+
+    #[tokio::test]
+    async fn a_pack_whose_server_jar_is_its_own_launcher_installs_as_before() {
+        let dir = pack_with_mods();
+        server_jar(dir.path(), "net.fabricmc.installer.ServerLauncher");
+        assert_eq!(
+            undetected_modloader(dir.path(), unread()).await.unwrap(),
+            (None, None)
+        );
+    }
+
+    #[tokio::test]
+    async fn detects_neoforge_installed_for_minecraft_1_20_1() {
+        let dir = tempfile::tempdir().unwrap();
+        let loader_dir = dir
+            .path()
+            .join("libraries/net/neoforged/forge/1.20.1-47.1.106");
+        std::fs::create_dir_all(&loader_dir).unwrap();
+        std::fs::write(loader_dir.join("unix_args.txt"), "-p libraries/foo.jar").unwrap();
+        std::fs::write(loader_dir.join("win_args.txt"), "-p libraries/foo.jar").unwrap();
+        assert_eq!(
+            detect_modloader_from_files(dir.path()).await.unwrap(),
+            found("neoforge", "1.20.1-47.1.106")
+        );
+    }
+
+    #[tokio::test]
+    async fn detects_a_fabric_launcher_under_the_name_the_fabric_site_serves() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::write(
+            dir.path()
+                .join("fabric-server-mc.1.20.1-loader.0.15.11-launcher.1.0.1.jar"),
+            b"jar",
+        )
+        .unwrap();
+        assert_eq!(
+            detect_modloader_from_files(dir.path()).await.unwrap(),
+            found("fabric", "0.15.11")
+        );
+    }
+
+    fn archive(path: &Path, names: &[&str]) {
+        let mut zip = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
+        for name in names {
+            zip.start_file(*name, zip::write::SimpleFileOptions::default())
+                .unwrap();
+            zip.write_all(b"BUNDLED").unwrap();
+        }
+        zip.finish().unwrap();
+    }
+
+    #[test]
+    fn a_pack_folder_zipped_on_a_mac_is_unwrapped() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip = dir.path().join("pack.zip");
+        archive(
+            &zip,
+            &[
+                "Pack-1.0/mods/create.jar",
+                "Pack-1.0/forge-1.20.1-47.2.0-installer.jar",
+                "__MACOSX/Pack-1.0/._forge-1.20.1-47.2.0-installer.jar",
+                "__MACOSX/._Pack-1.0",
+                ".DS_Store",
+            ],
+        );
+        let target = dir.path().join("data");
+        std::fs::create_dir_all(&target).unwrap();
+        extract_zip_to_dir(&zip, &target).unwrap();
+        let mut names: Vec<_> = std::fs::read_dir(&target)
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name().into_string().unwrap())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["forge-1.20.1-47.2.0-installer.jar", "mods"]);
+    }
+
+    #[test]
+    fn mac_clutter_is_left_out_of_a_pack_with_no_wrapper_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let zip = dir.path().join("pack.zip");
+        archive(
+            &zip,
+            &[
+                "mods/create.jar",
+                "config/a.toml",
+                "__MACOSX/mods/._create.jar",
+            ],
+        );
+        let target = dir.path().join("data");
+        std::fs::create_dir_all(&target).unwrap();
+        extract_zip_to_dir(&zip, &target).unwrap();
+        assert!(target.join("mods/create.jar").is_file());
+        assert!(target.join("config/a.toml").is_file());
+        assert!(!target.join("__MACOSX").exists());
     }
 }

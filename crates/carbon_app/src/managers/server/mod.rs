@@ -32,6 +32,7 @@ pub mod local;
 pub mod modloader_install;
 pub mod modloader_launch;
 pub mod modpack;
+mod pack_loader;
 pub mod properties;
 pub mod provider;
 pub(crate) mod record;
