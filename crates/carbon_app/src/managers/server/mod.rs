@@ -306,17 +306,6 @@ pub struct ServerManager {
     /// When each server was last asked to stop, for the time its page shows
     /// while it is Stopping.
     stop_requested: DashMap<ServerId, DateTime<Utc>>,
-    /// When each console last received a line.
-    last_output: Arc<DashMap<ServerLogId, DateTime<Utc>>>,
-}
-
-/// How a stop that is under way is going, for the user to judge whether the
-/// server is still saving or is stuck.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ServerStopProgress {
-    pub stopping_seconds: i32,
-    pub last_output_seconds: Option<i32>,
-    pub last_output: Option<String>,
 }
 
 impl std::fmt::Debug for ServerManager {
@@ -347,7 +336,6 @@ impl ServerManager {
             record_lock: Mutex::new(()),
             restored_servers: AtomicU32::new(0),
             stop_requested: DashMap::new(),
-            last_output: Arc::new(DashMap::new()),
         }
     }
 
@@ -2605,7 +2593,6 @@ impl ManagerRef<'_, ServerManager> {
         self.stop_requested.remove(&id);
         if let Some(log_id) = removed.and_then(|server| server.last_log_id) {
             self.server_logs.write().await.remove(&log_id);
-            self.last_output.remove(&log_id);
         }
         // Gates remain stable for all holders/waiters throughout the manager lifetime.
         self.crash_restart_state.remove(&id);
@@ -2740,7 +2727,6 @@ impl ManagerRef<'_, ServerManager> {
             if let Some(server) = servers.get(&id) {
                 if let Some(old_log_id) = server.last_log_id {
                     self.server_logs.write().await.remove(&old_log_id);
-                    self.last_output.remove(&old_log_id);
                 }
             }
         }
@@ -2756,10 +2742,8 @@ impl ManagerRef<'_, ServerManager> {
         let (log_drained_tx, log_drained) = provider::exit_signal();
         // Spawn log collector
         let log_watch = log_watch_tx.clone();
-        let last_output = self.last_output.clone();
         tokio::spawn(async move {
             while let Some(line) = log_rx.recv().await {
-                last_output.insert(log_id, Utc::now());
                 log_watch.send_modify(|logs| {
                     logs.push(line);
                     // Cap log buffer
@@ -2939,37 +2923,21 @@ impl ManagerRef<'_, ServerManager> {
             .and_then(|s| s.last_log_id);
         let Some(log_id) = log_id else { return };
         if let Some(log) = self.server_logs.read().await.get(&log_id) {
-            self.last_output.insert(log_id, Utc::now());
             log.send_modify(|logs| logs.push(line.to_string()));
         }
     }
 
-    /// How the stop of server `id` is going, or None when it is not stopping.
-    pub async fn stop_progress(self, id: ServerId) -> Option<ServerStopProgress> {
-        let log_id = {
-            let servers = self.servers.read().await;
-            let server = servers.get(&id)?;
-            if !matches!(server.state, ServerState::Stopping) {
-                return None;
-            }
-            server.last_log_id
-        };
-        let now = Utc::now();
-        let seconds = |since: DateTime<Utc>| (now - since).num_seconds().max(0) as i32;
-        let last_output = match log_id {
-            Some(log_id) => self
-                .server_logs
-                .read()
-                .await
-                .get(&log_id)
-                .and_then(|log| log.borrow().last().cloned()),
-            None => None,
-        };
-        Some(ServerStopProgress {
-            stopping_seconds: self.stop_requested.get(&id).map_or(0, |at| seconds(*at)),
-            last_output_seconds: log_id
-                .and_then(|log_id| self.last_output.get(&log_id).map(|at| seconds(*at))),
-            last_output,
+    /// How many seconds server `id` has been stopping for, or None when it
+    /// is not stopping.
+    pub async fn stopping_seconds(self, id: ServerId) -> Option<i32> {
+        let stopping = matches!(
+            self.servers.read().await.get(&id)?.state,
+            ServerState::Stopping
+        );
+        stopping.then(|| {
+            self.stop_requested
+                .get(&id)
+                .map_or(0, |at| (Utc::now() - *at).num_seconds().max(0) as i32)
         })
     }
 

@@ -1,10 +1,9 @@
 import { Trans, useTransContext } from "@gd/i18n"
 import { Button } from "@gd/ui"
-import { Show, createEffect } from "solid-js"
+import { createEffect } from "solid-js"
 import ModalLayout from "../ModalLayout"
 import { ModalProps, useModal } from ".."
 import { rspc } from "@/utils/rspcClient"
-import { stopClock } from "@/utils/serverStop"
 
 export interface ForceStopServerData {
   id: number
@@ -12,10 +11,8 @@ export interface ForceStopServerData {
 }
 
 /**
- * Confirms ending a server that is still shutting down. The launcher never
- * does that by itself, so the dialog shows how long the stop has taken and
- * when the server last printed something: what tells a server that is still
- * saving from one that is stuck. It closes by itself once the server stopped.
+ * Confirms ending a server that is still shutting down, which the launcher
+ * never does by itself. It closes by itself once the server stopped.
  */
 function ForceStopServer(props: ModalProps) {
   const [t] = useTransContext()
@@ -61,46 +58,6 @@ function ForceStopServer(props: ModalProps) {
         <p class="text-lightSlate-300 m-0 text-sm">
           <Trans key="instances:_trn_server_force_stop_running_body" />
         </p>
-        <Show when={progress.data}>
-          {(current) => (
-            <div
-              class="bg-darkSlate-900 grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 rounded-lg px-4 py-3 text-sm"
-              data-testid="server-force-stop-progress"
-            >
-              <span class="text-lightSlate-600">
-                <Trans key="instances:_trn_server_stop_progress_elapsed" />
-              </span>
-              <span class="text-lightSlate-100 tabular-nums">
-                {stopClock(current().stoppingSeconds)}
-              </span>
-              <span class="text-lightSlate-600">
-                <Trans key="instances:_trn_server_stop_progress_last_output" />
-              </span>
-              <span class="text-lightSlate-100 min-w-0">
-                <Show
-                  when={current().lastOutputSeconds != null}
-                  fallback={
-                    <Trans key="instances:_trn_server_stop_progress_no_output" />
-                  }
-                >
-                  <span class="tabular-nums">
-                    <Trans
-                      key="instances:_trn_server_stop_progress_ago"
-                      options={{
-                        time: stopClock(current().lastOutputSeconds ?? 0)
-                      }}
-                    />
-                  </span>
-                  <Show when={current().lastOutput}>
-                    <code class="text-lightSlate-400 mt-1 block truncate font-mono text-xs">
-                      {current().lastOutput}
-                    </code>
-                  </Show>
-                </Show>
-              </span>
-            </div>
-          )}
-        </Show>
         <div class="flex w-full justify-between pt-2">
           <Button
             onClick={() => modalsContext?.closeModal()}

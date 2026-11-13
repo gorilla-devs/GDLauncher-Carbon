@@ -672,10 +672,10 @@ export type MoveServerGroup = { group: FEServerGroupId; target: FEMoveServerGrou
 export type CacheCleanupSelection = { gdlauncher: boolean; minecraft: boolean }
 
 /**
- * How a stop that is under way is going. The launcher never ends a stop
- * by itself, so this is what the user judges a Force stop by.
+ * A stop that is under way. The launcher never ends one by itself, so the
+ * time it has taken is what the server's page shows while it waits.
  */
-export type FEServerStopProgress = { stoppingSeconds: number; lastOutputSeconds: number | null; lastOutput: string | null }
+export type FEServerStopProgress = { stoppingSeconds: number }
 
 export type FEDependencyPlatform = "Curseforge" | "Modrinth"
 

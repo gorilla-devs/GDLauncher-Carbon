@@ -441,16 +441,13 @@ enum FEServerModpackSource {
     },
 }
 
-/// How a stop that is under way is going. The launcher never ends a stop
-/// by itself, so this is what the user judges a Force stop by.
+/// A stop that is under way. The launcher never ends one by itself, so the
+/// time it has taken is what the server's page shows while it waits.
 #[derive(Type, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FEServerStopProgress {
     /// Since the server was asked to stop.
     stopping_seconds: i32,
-    /// Since the console last received a line, if it has any.
-    last_output_seconds: Option<i32>,
-    last_output: Option<String>,
 }
 
 fn convert_state(state: &domain::ServerState) -> FEServerState {
@@ -667,13 +664,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
 
         query GET_SERVER_STOP_PROGRESS[app, id: FEServerId] {
             Ok(app.server_manager()
-                .stop_progress(id.into())
+                .stopping_seconds(id.into())
                 .await
-                .map(|progress| FEServerStopProgress {
-                    stopping_seconds: progress.stopping_seconds,
-                    last_output_seconds: progress.last_output_seconds,
-                    last_output: progress.last_output,
-                }))
+                .map(|stopping_seconds| FEServerStopProgress { stopping_seconds }))
         }
 
         query GET_SERVER_DETAILS[app, id: FEServerId] {
