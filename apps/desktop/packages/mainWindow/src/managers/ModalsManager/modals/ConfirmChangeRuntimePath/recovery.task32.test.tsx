@@ -210,8 +210,14 @@ async function fixture(relocate: typeof relocateRuntime = relocateRuntime) {
   const move = callback(globals)
   window.getRuntimePath = async () => source
   window.openFolder = vi.fn()
+  // These moves take everything in the old folder, as the user may choose to.
   window.changeRuntimePath = (target, switchOnly) =>
-    move(null, target, switchOnly)
+    move(null, target, switchOnly, true)
+  window.describeRuntimePathChange = async () => ({
+    found: null,
+    unfamiliar: [],
+    unfamiliarCount: 0
+  })
   // The next start asks main, which reads the pointer the move left.
   window.takeRuntimeMoveNotice = () =>
     callback(
@@ -261,6 +267,12 @@ async function fixture(relocate: typeof relocateRuntime = relocateRuntime) {
   )
   await vi.waitFor(() =>
     expect(document.body.textContent).toContain("confirm_change_confirm_button")
+  )
+  // The dialog first reads what the folders hold; until then it cannot be confirmed.
+  await vi.waitFor(() =>
+    expect(
+      button(document.body, "confirm_change_confirm_button").disabled
+    ).toBe(false)
   )
   c.protection = () => {
     const before = c.manager.hasOpenModals()
@@ -851,7 +863,7 @@ it("a stopped core still offers only Restart", async () => {
   const f = await fixture()
   const move = f.move
   window.changeRuntimePath = async (target, switchOnly) => {
-    const result = await move(null, target, switchOnly)
+    const result = await move(null, target, switchOnly, true)
     return { ...result, recovery: "restart" }
   }
   f.stop.mockRejectedValue(Error("Core exit was not confirmed"))

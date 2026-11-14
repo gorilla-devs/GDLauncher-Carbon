@@ -1,7 +1,7 @@
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
-import { Button, Progress } from "@gd/ui"
-import { Trans } from "@gd/i18n"
+import { Button, Progress, Radio } from "@gd/ui"
+import { Trans, useTransContext } from "@gd/i18n"
 import {
   For,
   Match,
@@ -14,6 +14,7 @@ import { Portal } from "solid-js/web"
 import { RTprogress, RTsetProgress } from "@/utils/runtimePathProgress"
 import type { RuntimeBlocker } from "../../../../../../main/utils/coreShutdown"
 import type { UnsupportedRuntimeEntries } from "../../../../../../main/utils/runtimeRelocation"
+import { DeletionNoteBox, DeletionNoteLine } from "../DeletionNote"
 import {
   isChangingRuntimePath,
   setIsChangingRuntimePath,
@@ -171,6 +172,25 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
     return window.getRuntimePath()
   })
 
+  const [t] = useTransContext()
+  // What a switch would open, and what in the old folder is not the
+  // launcher's. Nothing can be confirmed until this is known; if it cannot
+  // be read, nothing is shown and a move leaves those items where they are.
+  const [change] = createResource(async () => {
+    try {
+      return await window.describeRuntimePathChange(submitted.target)
+    } catch {
+      return undefined
+    }
+  })
+  const found = () => (submitted.switchOnly ? change()?.found : undefined)
+  const unfamiliarCount = () =>
+    submitted.switchOnly ? 0 : (change()?.unfamiliarCount ?? 0)
+  const unfamiliar = () => change()?.unfamiliar ?? []
+  // Only this choice makes a move take what is not the launcher's.
+  const [moveUnfamiliar, setMoveUnfamiliar] = createSignal(false)
+  const locked = () => isChangingRuntimePath() || runtimeRecoveryRequired()
+
   const attemptRelocation = async (retry: boolean) => {
     if (
       isChangingRuntimePath() ||
@@ -188,7 +208,8 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
     try {
       const result = await window.changeRuntimePath(
         submitted.target,
-        submitted.switchOnly
+        submitted.switchOnly,
+        !submitted.switchOnly && moveUnfamiliar()
       )
       if (result.type === "failed") {
         if (result.refused) {
@@ -230,54 +251,174 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
     <>
       <ModalLayout
         noHeader={props.noHeader}
-        title={props.title}
-        preventClose={isChangingRuntimePath() || runtimeRecoveryRequired()}
-        height="h-120"
+        title={
+          submitted.switchOnly
+            ? t("java:_trn_runtime_switch.title")
+            : props.title
+        }
+        preventClose={locked()}
         width="w-180"
       >
-        <div class="flex h-full flex-col justify-between">
-          <div>
-            <Switch>
-              <Match when={props.data.isTargetFolderAlreadyUsed}>
-                <Trans key="java:_trn_confirm_change_runtime_path_already_used_text" />
-              </Match>
-              <Match when={!props.data.isTargetFolderAlreadyUsed}>
-                <Trans key="java:_trn_confirm_change_runtime_path_text" />
-              </Match>
-            </Switch>
-          </div>
-          <div>
-            <div class="font-bold text-red-400">
-              <Trans key="java:_trn_runtime_path_old_path" />
+        <div class="flex flex-col gap-4" data-testid="runtime-path-dialog">
+          {/* The window may be lower than all of this; the buttons stay in view. */}
+          <div class="flex max-h-[60vh] flex-col gap-4 overflow-y-auto pr-1">
+            <div>
+              <Switch>
+                <Match when={submitted.switchOnly}>
+                  <Trans key="java:_trn_runtime_switch.text" />
+                </Match>
+                <Match when={!submitted.switchOnly}>
+                  <Trans key="java:_trn_confirm_change_runtime_path_text" />
+                </Match>
+              </Switch>
             </div>
-            <div class="bg-darkSlate-900 mt-4 break-all p-4">
-              {currentRuntimePath()?.replaceAll("\\\\", "/")}
+            <div>
+              <div class="font-bold text-red-400">
+                <Trans
+                  key={
+                    submitted.switchOnly
+                      ? "java:_trn_runtime_switch.current_folder"
+                      : "java:_trn_runtime_path_old_path"
+                  }
+                />
+              </div>
+              <div class="bg-darkSlate-900 mt-2 break-all rounded-md p-3">
+                {currentRuntimePath()?.replaceAll("\\\\", "/")}
+              </div>
             </div>
-          </div>
-          <div>
-            <div
-              class="font-bold"
-              classList={{
-                "text-green-400": !props.data.isTargetFolderAlreadyUsed,
-                "text-yellow-400": props.data.isTargetFolderAlreadyUsed
-              }}
-            >
-              <Trans key="java:_trn_runtime_path_new_path" />
+            <div>
+              <div
+                class="font-bold"
+                classList={{
+                  "text-green-400": !submitted.switchOnly,
+                  "text-yellow-400": submitted.switchOnly
+                }}
+              >
+                <Trans
+                  key={
+                    submitted.switchOnly
+                      ? "java:_trn_runtime_switch.new_folder"
+                      : "java:_trn_runtime_path_new_path"
+                  }
+                />
+              </div>
+              <div class="bg-darkSlate-900 mt-2 break-all rounded-md p-3">
+                {submitted.target.replaceAll("\\\\", "/")}
+              </div>
             </div>
-            <div
-              class="bg-darkSlate-900 mt-4 break-all p-4"
-              classList={{
-                "text-yellow-400": props.data.isTargetFolderAlreadyUsed
-              }}
-            >
-              {props.data.runtimePath.replaceAll("\\\\", "/")}
-            </div>
+            <Show when={submitted.switchOnly}>
+              <DeletionNoteBox testId="runtime-switch-notes">
+                <Show when={found()}>
+                  {(data) => (
+                    <>
+                      <DeletionNoteLine tone="green">
+                        <Trans
+                          key="java:_trn_runtime_switch.found_instances"
+                          options={{ number: data().instances }}
+                        />
+                      </DeletionNoteLine>
+                      <DeletionNoteLine tone="green">
+                        <Trans
+                          key="java:_trn_runtime_switch.found_servers"
+                          options={{ number: data().servers }}
+                        />
+                      </DeletionNoteLine>
+                      <Show
+                        when={data().database}
+                        fallback={
+                          <DeletionNoteLine
+                            tone="yellow"
+                            testId="runtime-switch-no-database"
+                          >
+                            <Trans key="java:_trn_runtime_switch.no_database" />
+                          </DeletionNoteLine>
+                        }
+                      >
+                        <DeletionNoteLine tone="green">
+                          <Trans key="java:_trn_runtime_switch.found_database" />
+                        </DeletionNoteLine>
+                      </Show>
+                    </>
+                  )}
+                </Show>
+                <DeletionNoteLine tone="grey">
+                  <Trans key="java:_trn_runtime_switch.nothing_moved" />
+                </DeletionNoteLine>
+              </DeletionNoteBox>
+            </Show>
+            <Show when={unfamiliarCount() > 0}>
+              <div data-testid="runtime-unfamiliar">
+                <div>
+                  <Trans
+                    key={
+                      unfamiliarCount() === 1
+                        ? "java:_trn_runtime_unfamiliar.title_single"
+                        : "java:_trn_runtime_unfamiliar.title"
+                    }
+                    options={{ number: unfamiliarCount() }}
+                  />
+                </div>
+                <ul class="bg-darkSlate-900 mt-2 max-h-24 overflow-y-auto rounded-md p-3 text-sm">
+                  <For each={unfamiliar()}>
+                    {(name) => (
+                      <li class="break-all" style={selectable}>
+                        {name}
+                      </li>
+                    )}
+                  </For>
+                  <Show when={unfamiliarCount() > unfamiliar().length}>
+                    <li class="text-lightSlate-600">
+                      <Trans
+                        key="java:_trn_runtime_unfamiliar.more"
+                        options={{
+                          number: unfamiliarCount() - unfamiliar().length
+                        }}
+                      />
+                    </li>
+                  </Show>
+                </ul>
+                <div class="mt-2 flex flex-col gap-1">
+                  <div data-testid="runtime-unfamiliar-leave">
+                    <Radio
+                      name="runtime-unfamiliar"
+                      value="leave"
+                      checked={!moveUnfamiliar()}
+                      disabled={locked()}
+                      onChange={() => setMoveUnfamiliar(false)}
+                    >
+                      <div class="font-bold">
+                        <Trans key="java:_trn_runtime_unfamiliar.leave" />
+                      </div>
+                      <div class="text-lightSlate-600 text-sm">
+                        <Trans key="java:_trn_runtime_unfamiliar.leave_text" />
+                      </div>
+                    </Radio>
+                  </div>
+                  <div data-testid="runtime-unfamiliar-move">
+                    <Radio
+                      name="runtime-unfamiliar"
+                      value="move"
+                      checked={moveUnfamiliar()}
+                      disabled={locked()}
+                      onChange={() => setMoveUnfamiliar(true)}
+                    >
+                      <div class="font-bold">
+                        <Trans key="java:_trn_runtime_unfamiliar.move" />
+                      </div>
+                      <div class="text-lightSlate-600 text-sm">
+                        <Trans key="java:_trn_runtime_unfamiliar.move_text" />
+                      </div>
+                    </Radio>
+                  </div>
+                </div>
+              </div>
+            </Show>
           </div>
           <div class="flex w-full justify-between">
             <Button
-              disabled={isChangingRuntimePath() || runtimeRecoveryRequired()}
+              disabled={locked()}
               onClick={() => {
-                if (isChangingRuntimePath() || runtimeRecoveryRequired()) return
+                if (locked()) return
                 modalsContext?.closeModal()
               }}
             >
@@ -285,10 +426,19 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
             </Button>
             <Button
               type="secondary"
-              disabled={isChangingRuntimePath() || runtimeRecoveryRequired()}
-              onClick={() => attemptRelocation(false)}
+              disabled={locked() || change.loading}
+              onClick={() => {
+                if (change.loading) return
+                void attemptRelocation(false)
+              }}
             >
-              <Trans key="settings:_trn_confirm_change_confirm_button" />
+              <Trans
+                key={
+                  submitted.switchOnly
+                    ? "java:_trn_runtime_switch.confirm"
+                    : "settings:_trn_confirm_change_confirm_button"
+                }
+              />
             </Button>
           </div>
         </div>

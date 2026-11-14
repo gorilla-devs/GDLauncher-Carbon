@@ -285,7 +285,8 @@ it("says why a folder is refused instead of calling it not a folder or not empty
     "/opt/GDLauncher/data": ["install_overlap", "rtp_install_overlap"],
     "/run/media/me/USB/gdl": ["removable_not_mounted", "rtp_not_mounted"],
     "/home/me/file": ["not_a_folder", "rtp_not_a_folder"],
-    "/locked/gdl": ["not_writable", "rtp_not_writable"]
+    "/locked/gdl": ["not_writable", "rtp_not_writable"],
+    "D:\\Games": ["has_other_files", "rtp_has_other_files"]
   } as Record<string, [string, string]>
   Object.assign(window, {
     getRuntimePath: async () => "C",

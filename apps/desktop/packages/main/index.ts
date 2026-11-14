@@ -49,11 +49,13 @@ import {
   leftInOldFolder,
   leftPartialCopy,
   relocateRuntime,
+  describeRuntimePathChange,
   removedPartialCopy,
   runtimeTargetRefusal,
   selectRuntimePath,
   unsupportedRuntimeEntries,
   validateRuntimeDestination,
+  type RuntimePathChange,
   type RuntimePathValidation
 } from "./utils/runtimeRelocation"
 import {
@@ -1197,7 +1199,9 @@ ipcMain.handle(
   async (
     _,
     newPath: string,
-    switchOnly = false
+    switchOnly = false,
+    // Only an explicit choice in the dialog moves what is not the launcher's.
+    moveUnfamiliar = false
   ): Promise<import("./utils/runtimeRelocation").RuntimeRelocationResult> => {
     return withRuntimeOperation(async () => {
       let recovery: "none" | "restart" | "shutdown_unresolved" = "none"
@@ -1217,6 +1221,7 @@ ipcMain.handle(
           source,
           target: newPath,
           switchOnly,
+          leaveUnfamiliar: moveUnfamiliar !== true,
           pointer: path.join(
             app.getPath("userData"),
             RUNTIME_PATH_OVERRIDE_NAME
@@ -1376,6 +1381,14 @@ ipcMain.handle(
       return runtimeTargetRefusal(error)
     }
   }
+)
+
+// What the confirmation shows: the data a switch would open, and what in the
+// folder in use is not the launcher's. Reads only; the change checks again.
+ipcMain.handle(
+  "describeRuntimePathChange",
+  async (_, newPath: string): Promise<RuntimePathChange> =>
+    describeRuntimePathChange(newPath, CURRENT_RUNTIME_PATH)
 )
 
 ipcMain.handle("getCoreModule", async () => {

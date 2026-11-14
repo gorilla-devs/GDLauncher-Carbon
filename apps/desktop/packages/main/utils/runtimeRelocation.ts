@@ -12,6 +12,13 @@ import {
   type RuntimePathContext,
   type RuntimeTargetRefusal
 } from "./runtimePathGuard"
+import {
+  isLauncherEntry,
+  isSystemLeftover,
+  launcherDataIn,
+  unfamiliarRuntimeEntries,
+  type RuntimeDataFound
+} from "./runtimeFolderContents"
 import type { RuntimeBlocker } from "./coreShutdown"
 import { syncDirectory as syncFolder } from "./databaseRestore"
 
@@ -423,9 +430,48 @@ export async function validateRuntimeDestination(
     ancestor = parent
   }
   await fs.access(ancestor, fss.constants.W_OK).catch(refusedAt(ancestor))
-  return st && (await fs.readdir(target).catch(refusedByFilesystem)).length
-    ? "potentially_valid"
-    : "valid"
+  if (!st) return "valid"
+  const names = await fs.readdir(target).catch(refusedByFilesystem)
+  // Empty, or only what the system keeps in a folder: a move goes there.
+  if (names.every(isSystemLeftover)) return "valid"
+  // A launcher's data: used as it is, nothing is moved. 2.0.40 took any
+  // folder with something in it for one, started on an empty library there
+  // and emptied its "temp" folder at every start.
+  if (await launcherDataIn(target)) return "potentially_valid"
+  throw new RuntimeTargetError(
+    "has_other_files",
+    `Folder holds files that are not a launcher's data: ${target}`
+  )
+}
+
+/** What the confirmation shows before a data folder change. */
+export interface RuntimePathChange {
+  // What the new folder holds of a launcher's data; null when it holds none.
+  found: RuntimeDataFound | null
+  // What someone else keeps at the top of the data folder in use, and how many.
+  unfamiliar: string[]
+  unfamiliarCount: number
+}
+
+/**
+ * What a change from `source` to `target` would meet: the data a switch
+ * would open, and what a move would find in the old folder that is not the
+ * launcher's. Read-only, and never fails: a folder that cannot be read has
+ * nothing to show, and the change itself checks again.
+ */
+export async function describeRuntimePathChange(
+  target: string,
+  source: string | null
+): Promise<RuntimePathChange> {
+  const [found, unfamiliar] = await Promise.all([
+    launcherDataIn(target).catch(() => null),
+    source ? unfamiliarRuntimeEntries(source).catch(() => []) : []
+  ])
+  return {
+    found,
+    unfamiliar: unfamiliar.slice(0, LEFT_BEHIND_SHOWN),
+    unfamiliarCount: unfamiliar.length
+  }
 }
 
 /**
@@ -481,6 +527,12 @@ export async function inventoryRuntimeTree(
      * is neither copied nor deleted, instead of refusing the move.
      */
     liveSource?: boolean
+    /**
+     * What is at the top of `root` and not the launcher's (the user's own
+     * files, another program's folder) is left out, so it is neither copied
+     * nor deleted and stays where it is, links included.
+     */
+    leaveUnfamiliar?: boolean
   } = {}
 ): Promise<Entry[]> {
   const marker = await statOrMissing(path.join(root, MIGRATION_MARKER))
@@ -503,7 +555,12 @@ export async function inventoryRuntimeTree(
     if (relative) result.push({ relative, directory: st.isDirectory() })
     if (st.isDirectory())
       for (const name of await fs.readdir(full)) {
-        if (staleMarker && !relative && name === MIGRATION_MARKER) continue
+        if (!relative) {
+          if (staleMarker && name === MIGRATION_MARKER) continue
+          // The system's own files stay: the new folder may hold its own.
+          if (isSystemLeftover(name)) continue
+          if (options.leaveUnfamiliar && !isLauncherEntry(name)) continue
+        }
         await visit(path.join(relative, name))
       }
   }
@@ -993,6 +1050,11 @@ export interface RuntimeRelocationOptions {
   target: string
   pointer: string
   switchOnly?: boolean
+  /**
+   * A move leaves what is at the top of the old folder and is not the
+   * launcher's where it is, instead of moving it along.
+   */
+  leaveUnfamiliar?: boolean
   context?: RuntimeDestinationContext
   /**
    * Asks the core, without stopping or freezing anything, whether something
@@ -1036,7 +1098,9 @@ export async function relocateRuntime(
     )
     if (options.switchOnly) {
       if (classification !== "potentially_valid")
-        throw new Error("Switch target is empty; choose a full move instead")
+        throw new Error(
+          "Switch target is empty and holds no launcher data; choose a full move instead"
+        )
     } else if (classification !== "valid")
       throw new Error(
         "Destination is populated; confirm switching to it instead"
@@ -1051,7 +1115,10 @@ export async function relocateRuntime(
   // A switch copies nothing and never touches the old folder, so what either
   // folder holds does not matter: `check` already refused an unfinished move.
   if (!options.switchOnly)
-    await inventoryRuntimeTree(source, signal, { liveSource: true })
+    await inventoryRuntimeTree(source, signal, {
+      liveSource: true,
+      leaveUnfamiliar: options.leaveUnfamiliar
+    })
   // Last point where closing the app leaves everything as it was.
   options.interruptible?.commit()
   progress?.({ action: "scan", currentName: "", current: 0, total: 0 })
@@ -1065,7 +1132,8 @@ export async function relocateRuntime(
       keptOldFolder: false
     }
   const entries = await inventoryRuntimeTree(source, undefined, {
-    liveSource: true
+    liveSource: true,
+    leaveUnfamiliar: options.leaveUnfamiliar
   })
   // The old folder as the remove phase must still reach it: nothing inside is a link.
   const canonicalSource = await resolvedPath(source)

@@ -1,5 +1,6 @@
 import type {
   RuntimeMoveNotice,
+  RuntimePathChange,
   RuntimePathValidation,
   RuntimeRelocationResult
 } from "../main/utils/runtimeRelocation"
@@ -17,9 +18,16 @@ contextBridge.exposeInMainWorld(
   "changeRuntimePath",
   async (
     newPath: string | null,
-    switchOnly?: boolean
+    switchOnly?: boolean,
+    moveUnfamiliar?: boolean
   ): Promise<RuntimeRelocationResult> =>
-    ipcRenderer.invoke("changeRuntimePath", newPath, switchOnly)
+    ipcRenderer.invoke("changeRuntimePath", newPath, switchOnly, moveUnfamiliar)
+)
+
+contextBridge.exposeInMainWorld(
+  "describeRuntimePathChange",
+  async (newPath: string): Promise<RuntimePathChange> =>
+    ipcRenderer.invoke("describeRuntimePathChange", newPath)
 )
 
 contextBridge.exposeInMainWorld(

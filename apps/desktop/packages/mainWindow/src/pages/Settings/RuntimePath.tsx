@@ -27,7 +27,8 @@ const refusalTooltip = {
   system_dir: "ui:_trn_tooltip.rtp_system_dir",
   removable_not_mounted: "ui:_trn_tooltip.rtp_not_mounted",
   not_a_folder: "ui:_trn_tooltip.rtp_not_a_folder",
-  not_writable: "ui:_trn_tooltip.rtp_not_writable"
+  not_writable: "ui:_trn_tooltip.rtp_not_writable",
+  has_other_files: "ui:_trn_tooltip.rtp_has_other_files"
 } as const satisfies Record<RuntimeTargetRefusal, string>
 const refusalKey = (classification: string | undefined) =>
   classification && Object.hasOwn(refusalTooltip, classification)

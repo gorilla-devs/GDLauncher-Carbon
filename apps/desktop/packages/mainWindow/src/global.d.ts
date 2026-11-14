@@ -1,5 +1,6 @@
 import type {
   RuntimeMoveNotice,
+  RuntimePathChange,
   RuntimePathValidation,
   RuntimeRelocationResult
 } from "../../main/utils/runtimeRelocation"
@@ -80,8 +81,12 @@ declare global {
     getRuntimePath: () => Promise<string>
     changeRuntimePath: (
       newPath: string | null,
-      switchOnly?: boolean
+      switchOnly?: boolean,
+      // Also move what is in the old folder and is not the launcher's.
+      moveUnfamiliar?: boolean
     ) => Promise<RuntimeRelocationResult>
+    // What a switch to this folder would open, and what a move would leave.
+    describeRuntimePathChange: (newPath: string) => Promise<RuntimePathChange>
     // What a move left in the old folder, on every start from the new one until dismissed.
     takeRuntimeMoveNotice: () => Promise<RuntimeMoveNotice | null>
     // The user acknowledged that notice.

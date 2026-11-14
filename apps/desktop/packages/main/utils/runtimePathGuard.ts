@@ -46,6 +46,8 @@ export type RuntimeTargetRefusal =
   | "removable_not_mounted"
   | "not_a_folder"
   | "not_writable"
+  // Holds files, and nothing that says it is a launcher's data folder.
+  | "has_other_files"
 
 export class RuntimeTargetError extends Error {
   constructor(

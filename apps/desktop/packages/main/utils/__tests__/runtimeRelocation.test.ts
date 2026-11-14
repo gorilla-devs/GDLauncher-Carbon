@@ -9,6 +9,7 @@ import fg from "fast-glob"
 import ts from "typescript"
 import { assertSafeRuntimeTarget } from "../runtimePathGuard"
 import {
+  describeRuntimePathChange,
   inventoryRuntimeTree,
   relocateRuntime,
   validateRuntimeDestination,
@@ -86,6 +87,15 @@ function flushFileByFile() {
     type: 0x4d44
   })) as any)
 }
+/**
+ * The move handler as these tests call it: the user chose to take along what
+ * is in the old folder and is not the launcher's, so everything moves.
+ */
+function changeCallback(globals: Record<string, unknown>) {
+  const change = callback("changeRuntimePath", globals)
+  return (event: unknown, target: unknown, switchOnly?: unknown) =>
+    change(event, target, switchOnly, true)
+}
 const roots: string[] = []
 afterEach(async () => {
   vi.restoreAllMocks()
@@ -152,7 +162,14 @@ async function fixture() {
       return "stopped"
     }
   }
-  const rawMove = callback("changeRuntimePath", globals)
+  const change = callback("changeRuntimePath", globals) as (
+    ...args: unknown[]
+  ) => Promise<any>
+  // These moves take everything in the old folder, as the user may choose
+  // to; `leaving` is the move the dialog offers first.
+  const rawMove = (...args: unknown[]) =>
+    change(args[0], args[1], args[2], true)
+  const leaving = (target: string) => change(null, target)
   const move = async (...args: unknown[]) => {
     const result = await rawMove(...args)
     if (result?.type === "failed") throw new Error(result.message)
@@ -170,6 +187,7 @@ async function fixture() {
     globals,
     move,
     rawMove,
+    leaving,
     validate: callback("validateRuntimePath", globals)
   }
 }
@@ -525,20 +543,20 @@ describe("runtime relocation transaction controls", () => {
   })
   it("switches to complete populated data without deleting either tree", async () => {
     const f = await fixture()
-    await fs.writeFile(path.join(f.target, "existing"), "complete")
+    await fs.writeFile(path.join(f.target, "gdl_conf.db"), "complete")
     expect(await f.validate(null, f.target)).toBe("potentially_valid")
     await f.move(null, f.target, true)
     expect(await fs.readFile(path.join(f.source, "save"), "utf8")).toBe(
       "old save"
     )
-    expect(await fs.readFile(path.join(f.target, "existing"), "utf8")).toBe(
+    expect(await fs.readFile(path.join(f.target, "gdl_conf.db"), "utf8")).toBe(
       "complete"
     )
     expect(selectRuntimePath(null, f.root)).toBe(f.target)
   })
   it("rejects a stale move flag for populated targets", async () => {
     const f = await fixture()
-    await fs.writeFile(path.join(f.target, "existing"), "complete")
+    await fs.writeFile(path.join(f.target, "gdl_conf.db"), "complete")
     await expect(f.move(null, f.target, false)).rejects.toThrow(/populated/)
     expect(f.stop).not.toHaveBeenCalled()
   })
@@ -554,7 +572,9 @@ describe("runtime relocation transaction controls", () => {
     f.stop.mockImplementation(async () => {
       await fs.writeFile(path.join(f.target, "new"), "foreign")
     })
-    await expect(f.move(null, f.target)).rejects.toThrow(/populated/)
+    await expect(f.move(null, f.target)).rejects.toThrow(
+      /not a launcher's data/
+    )
     expect(await fs.readFile(path.join(f.target, "new"), "utf8")).toBe(
       "foreign"
     )
@@ -677,7 +697,7 @@ describe("runtime relocation transaction controls", () => {
           const f = await fixture()
           if (absent) await fs.unlink(f.pointer)
           if (switchOnly)
-            await fs.writeFile(path.join(f.target, "existing"), "complete")
+            await fs.writeFile(path.join(f.target, "gdl_conf.db"), "complete")
           const open = fs.open.bind(fs)
           vi.spyOn(fs, "open").mockImplementation((async (
             file: any,
@@ -981,6 +1001,7 @@ it("changes during copy leave the source and old authority intact and remove the
 it("complete unselected crash-stage destination remains switchable", async () => {
   const f = await fixture()
   await fs.writeFile(path.join(f.target, "save"), "complete snapshot")
+  await fs.writeFile(path.join(f.target, "gdl_conf.db"), "complete snapshot")
   // Persistent state after marker removal but before pointer rename.
   expect(selectRuntimePath(null, f.root)).toBe(f.source)
   await f.move(null, f.target, true)
@@ -991,7 +1012,7 @@ it("complete unselected crash-stage destination remains switchable", async () =>
 })
 it("explicit runtime overrides reject before core shutdown", async () => {
   const f = await fixture()
-  const move = callback("changeRuntimePath", {
+  const move = changeCallback({
     ...f.globals,
     overrideCLIDataPath: { value: f.source }
   })
@@ -1013,7 +1034,7 @@ describe("a move refused by the core", () => {
     f.stop.mockRejectedValue(
       new ShutdownRefusedError("Core relocation refused", blockers as any)
     )
-    const move = callback("changeRuntimePath", f.globals)
+    const move = changeCallback(f.globals)
     await expect(move(null, f.target)).resolves.toEqual({
       type: "failed",
       recovery: "none",
@@ -1034,7 +1055,7 @@ describe("a move refused by the core", () => {
     f.stop.mockRejectedValue(
       new ShutdownRefusedError("Core runtime differs from the selected source")
     )
-    const move = callback("changeRuntimePath", f.globals)
+    const move = changeCallback(f.globals)
     await expect(move(null, f.target)).resolves.toMatchObject({
       type: "failed",
       recovery: "none",
@@ -1045,7 +1066,7 @@ describe("a move refused by the core", () => {
   it("an unverified stop still keeps the move protected", async () => {
     const f = await fixture()
     f.stop.mockRejectedValue(new Error("core unreachable"))
-    const move = callback("changeRuntimePath", f.globals)
+    const move = changeCallback(f.globals)
     const result = await move(null, f.target)
     expect(result).toMatchObject({
       type: "failed",
@@ -1059,7 +1080,7 @@ describe("a move refused by the core", () => {
       new ShutdownRefusedError("Core relocation refused", blockers as any)
     )
     const lstat = vi.spyOn(fs, "lstat")
-    const move = callback("changeRuntimePath", f.globals)
+    const move = changeCallback(f.globals)
     await expect(move(null, f.target)).resolves.toEqual({
       type: "failed",
       recovery: "none",
@@ -1105,7 +1126,7 @@ describe("a move refused by the core", () => {
   it("a check that fails otherwise ends the move while the core runs on, so it stays dismissible", async () => {
     const f = await fixture()
     f.check.mockRejectedValue(new Error("Relocation requires a live core"))
-    const move = callback("changeRuntimePath", f.globals)
+    const move = changeCallback(f.globals)
     const result = await move(null, f.target)
     expect(result).toMatchObject({ type: "failed", recovery: "none" })
     expect(result.refused).toBeUndefined()
@@ -1114,7 +1135,7 @@ describe("a move refused by the core", () => {
   it("a core found gone by the check before the scan asks for a restart", async () => {
     const f = await fixture()
     f.check.mockRejectedValue(new Error("Relocation requires a live core"))
-    const move = callback("changeRuntimePath", {
+    const move = changeCallback({
       ...f.globals,
       coreProcessHandle: { exitCode: 1, signalCode: null }
     })
@@ -1127,7 +1148,7 @@ describe("a move refused by the core", () => {
   it("a core that already exited asks for a restart even when it refused", async () => {
     const f = await fixture()
     f.stop.mockRejectedValue(new ShutdownRefusedError("refused", []))
-    const move = callback("changeRuntimePath", {
+    const move = changeCallback({
       ...f.globals,
       coreProcessHandle: { exitCode: 1, signalCode: null }
     })
@@ -1159,7 +1180,7 @@ describe("closing the app while a move only checks the data folder", () => {
       }
       return (lstat as any)(entry, ...rest)
     }) as any)
-    const move = callback("changeRuntimePath", f.globals)
+    const move = changeCallback(f.globals)
     const result = await move(null, f.target)
     expect(result).toEqual({
       type: "failed",
@@ -1181,7 +1202,7 @@ describe("closing the app while a move only checks the data folder", () => {
     f.check.mockImplementation(async () => {
       interruptRuntimeOperation(closed())
     })
-    const move = callback("changeRuntimePath", f.globals)
+    const move = changeCallback(f.globals)
     await expect(move(null, f.target)).resolves.toMatchObject({
       type: "failed",
       recovery: "none",
@@ -1194,7 +1215,7 @@ describe("closing the app while a move only checks the data folder", () => {
     f.check.mockImplementation(async () => {
       interruptRuntimeOperation(closed())
     })
-    const move = callback("changeRuntimePath", {
+    const move = changeCallback({
       ...f.globals,
       relocationLeaseHeld: () => true
     })
@@ -1350,9 +1371,9 @@ describe("review transaction boundaries", () => {
     async (emptiedDuringShutdown) => {
       const f = await fixture()
       if (emptiedDuringShutdown) {
-        await fs.writeFile(path.join(f.target, "existing"), "data")
+        await fs.writeFile(path.join(f.target, "gdl_conf.db"), "data")
         f.stop.mockImplementation(async () => {
-          await fs.unlink(path.join(f.target, "existing"))
+          await fs.unlink(path.join(f.target, "gdl_conf.db"))
         })
       }
       await expect(f.move(null, f.target, true)).rejects.toThrow(
@@ -1525,7 +1546,7 @@ describe("unfinished moves are named, not just refused", () => {
     expect(await f.validate(null, f.target)).toBe("incomplete_migration")
     const populated = path.join(f.root, "populated")
     await fs.mkdir(populated)
-    await fs.writeFile(path.join(populated, "existing"), "complete")
+    await fs.writeFile(path.join(populated, "gdl_conf.db"), "complete")
     expect(await f.validate(null, populated)).toBe("potentially_valid")
     const file = path.join(f.root, "not-a-folder")
     await fs.writeFile(file, "")
@@ -1605,7 +1626,7 @@ describe("unfinished moves are named, not just refused", () => {
   })
   it("failures that leave no partial copy are not reported as unfinished moves", async () => {
     const populated = await fixture()
-    await fs.writeFile(path.join(populated.target, "existing"), "complete")
+    await fs.writeFile(path.join(populated.target, "gdl_conf.db"), "complete")
     expect(await populated.rawMove(null, populated.target)).toMatchObject({
       type: "failed",
       incompleteTarget: false
@@ -1632,7 +1653,7 @@ describe("unfinished moves are named, not just refused", () => {
         return original(file, ...args)
       }) as any)
     }
-    const windows = callback("changeRuntimePath", {
+    const windows = changeCallback({
       ...f.globals,
       runtimeDestinationContext: () => ({ platform: "win32" })
     })
@@ -1688,7 +1709,7 @@ describe("a data folder in use that still holds an old move's marker", () => {
     const f = await fixture()
     await fs.writeFile(path.join(f.source, MIGRATION_MARKER), "")
     await fs.writeFile(path.join(f.target, MIGRATION_MARKER), "")
-    await fs.writeFile(path.join(f.target, "existing"), "complete")
+    await fs.writeFile(path.join(f.target, "gdl_conf.db"), "complete")
     expect(await f.rawMove(null, f.target, true)).toMatchObject({
       type: "failed",
       recovery: "none",
@@ -1702,7 +1723,7 @@ describe("a data folder in use that still holds an old move's marker", () => {
     )
     expect(
       await inventoryRuntimeTree(f.target, undefined, { liveSource: true })
-    ).toEqual([{ relative: "existing", directory: false }])
+    ).toEqual([{ relative: "gdl_conf.db", directory: false }])
   })
   it("a marker that is not a plain file still refuses the move", async () => {
     const f = await fixture()
@@ -2178,7 +2199,7 @@ describe("the move's result on the extracted IPC callback", () => {
         }
       })
     )
-    const move = callback("changeRuntimePath", {
+    const move = changeCallback({
       ...f.globals,
       relocateRuntime: relocate
     })
@@ -2319,7 +2340,7 @@ describe("the move's result on the extracted IPC callback", () => {
 
   it("a switch to a folder already in use never touches the old one", async () => {
     const f = await fixture()
-    await fs.writeFile(path.join(f.target, "existing"), "complete")
+    await fs.writeFile(path.join(f.target, "gdl_conf.db"), "complete")
     expect(await f.rawMove(null, f.target, true)).toEqual({
       type: "relaunching"
     })
@@ -2711,7 +2732,7 @@ describe("data folder destinations", () => {
       expect(await validate(null, path.join(install, other)), other).toBe(
         "install_overlap"
       )
-    expect(await callback("changeRuntimePath", snapshot)(null, def)).toEqual({
+    expect(await changeCallback(snapshot)(null, def)).toEqual({
       type: "relaunching"
     })
     expect(await fs.readFile(f.pointer, "utf8")).toBe(def)
@@ -2745,7 +2766,7 @@ describe("data folder destinations", () => {
       ).rejects.toMatchObject({ reason: "install_overlap" })
       // Switching back to a default folder that still holds data.
       await fs.mkdir(def)
-      await fs.writeFile(path.join(def, "gdl.db"), "")
+      await fs.writeFile(path.join(def, "gdl_conf.db"), "")
       expect(await validateRuntimeDestination(aliased, f.source, real)).toBe(
         "potentially_valid"
       )
@@ -2764,9 +2785,9 @@ describe("data folder destinations", () => {
     expect(await callback("validateRuntimePath", fromLink)(null, next)).toBe(
       "valid"
     )
-    expect(
-      await callback("changeRuntimePath", fromLink)(null, next)
-    ).toMatchObject({ type: "relaunching" })
+    expect(await changeCallback(fromLink)(null, next)).toMatchObject({
+      type: "relaunching"
+    })
     expect(selectRuntimePath(null, f.root)).toBe(next)
     expect(await fs.readFile(path.join(next, "save"), "utf8")).toBe("old save")
     expect(await fs.readdir(f.target)).toEqual([])
@@ -2776,9 +2797,9 @@ describe("data folder destinations", () => {
     await fs.unlink(path.join(next, "inner"))
     // The emptied old folder takes the data back.
     const fromNext = { ...f.globals, CURRENT_RUNTIME_PATH: next }
-    expect(
-      await callback("changeRuntimePath", fromNext)(null, f.source)
-    ).toMatchObject({ type: "relaunching" })
+    expect(await changeCallback(fromNext)(null, f.source)).toMatchObject({
+      type: "relaunching"
+    })
     expect(await fs.readFile(path.join(f.source, "save"), "utf8")).toBe(
       "old save"
     )
@@ -3359,7 +3380,7 @@ describe("a move's copy is checked and flushed without repeating work", () => {
 describe("a switch to a folder already in use", () => {
   it("never reads the old folder", async () => {
     const f = await fixture()
-    await fs.writeFile(path.join(f.target, "existing"), "complete")
+    await fs.writeFile(path.join(f.target, "gdl_conf.db"), "complete")
     // The old folder holds something a move could not take; a switch leaves it be.
     await fs.symlink(
       path.join(f.root, "elsewhere"),
@@ -3384,7 +3405,7 @@ describe("a switch to a folder already in use", () => {
 
   it("switches to a folder that holds links, as 2.0.40 did", async () => {
     const f = await fixture()
-    await fs.writeFile(path.join(f.target, "existing"), "complete")
+    await fs.writeFile(path.join(f.target, "gdl_conf.db"), "complete")
     await fs.symlink(f.root, path.join(f.target, "shared"))
     await f.move(null, f.target, true)
     expect(selectRuntimePath(null, f.root)).toBe(f.target)
@@ -3395,7 +3416,7 @@ describe("a switch to a folder already in use", () => {
 
   it("switches to a link to a folder in use", async () => {
     const f = await fixture()
-    await fs.writeFile(path.join(f.target, "existing"), "complete")
+    await fs.writeFile(path.join(f.target, "gdl_conf.db"), "complete")
     const link = path.join(f.root, "link")
     await fs.symlink(f.target, link)
     expect(await f.validate(null, link)).toBe("potentially_valid")
@@ -3493,7 +3514,8 @@ describe("a start that cannot open the data folder", () => {
     await fs.unlink(f.drive)
     await fs.mkdir(f.folder, { recursive: true })
     await fs.writeFile(path.join(f.folder, "save"), "kept on the drive")
-    const fromDefault = callback("changeRuntimePath", {
+    await fs.writeFile(path.join(f.folder, "gdl_conf.db"), "kept on the drive")
+    const fromDefault = changeCallback({
       ...f.globals,
       CURRENT_RUNTIME_PATH: path.join(f.root, "data")
     })
@@ -3541,5 +3563,244 @@ describe("a start that cannot open the data folder", () => {
     )
     await expect(f.keep()).rejects.toThrow(/EACCES/)
     expect(await fs.readFile(f.pointer, "utf8")).toBe(f.folder)
+  })
+})
+
+describe("a folder that is not only the launcher's", () => {
+  const write = async (file: string, content = "") => {
+    await fs.mkdir(path.dirname(file), { recursive: true })
+    await fs.writeFile(file, content)
+  }
+  // What Finder, Explorer and a drive put in a folder on their own.
+  const leftovers = async (folder: string) => {
+    await write(path.join(folder, ".DS_Store"), "finder")
+    await write(path.join(folder, "desktop.ini"), "explorer")
+    await write(path.join(folder, "Thumbs.db"), "thumbnails")
+    await write(path.join(folder, "._notes"), "attributes")
+    await fs.mkdir(path.join(folder, "lost+found"))
+    await fs.mkdir(path.join(folder, ".Trash-1000"))
+  }
+
+  it("refuses a folder that holds other files, for a move and for a switch", async () => {
+    const f = await fixture()
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+    await write(path.join(f.target, "Steam", "game.bin"), "game")
+    await write(path.join(f.target, "notes.txt"), "mine")
+    // Names every launcher uses say nothing about whose folder this is.
+    await write(path.join(f.target, "temp", "download.part"), "theirs")
+    await write(path.join(f.target, "assets", "logo.png"), "theirs")
+    expect(await f.validate(null, f.target)).toBe("has_other_files")
+    for (const switchOnly of [false, true])
+      expect(await f.rawMove(null, f.target, switchOnly)).toMatchObject({
+        type: "failed",
+        recovery: "none",
+        message: expect.stringMatching(/not a launcher's data/)
+      })
+    expect(f.stop).not.toHaveBeenCalled()
+    expect(selectRuntimePath(null, f.root)).toBe(f.source)
+    expect(
+      await fs.readFile(path.join(f.target, "temp", "download.part"), "utf8")
+    ).toBe("theirs")
+  })
+
+  it("moves into a folder that holds only what the system put there", async () => {
+    const f = await fixture()
+    await leftovers(f.target)
+    // The old folder has its own: they stay, the new folder keeps its own.
+    await write(path.join(f.source, ".DS_Store"), "old finder")
+    await write(path.join(f.source, "instances", "a", ".DS_Store"), "inner")
+    expect(await f.validate(null, f.target)).toBe("valid")
+    await f.move(null, f.target)
+    expect(selectRuntimePath(null, f.root)).toBe(f.target)
+    expect(await fs.readFile(path.join(f.target, "save"), "utf8")).toBe(
+      "old save"
+    )
+    expect(await fs.readFile(path.join(f.target, ".DS_Store"), "utf8")).toBe(
+      "finder"
+    )
+    expect(await fs.readFile(path.join(f.source, ".DS_Store"), "utf8")).toBe(
+      "old finder"
+    )
+    // Inside the data folder such a file is data like any other.
+    expect(
+      await fs.readFile(
+        path.join(f.target, "instances", "a", ".DS_Store"),
+        "utf8"
+      )
+    ).toBe("inner")
+    expect(await fs.readdir(f.source)).toEqual([".DS_Store"])
+  })
+
+  it("leaves what the system put in the new folder when a move stops and is undone", async () => {
+    const f = await fixture()
+    await leftovers(f.target)
+    const before = (await fs.readdir(f.target)).sort()
+    vi.spyOn(fs, "copyFile").mockRejectedValue(
+      new Error("ENOSPC: no space left on device")
+    )
+    expect(await f.rawMove(null, f.target)).toMatchObject({
+      type: "failed",
+      incompleteTarget: false,
+      copyRemoved: true
+    })
+    expect((await fs.readdir(f.target)).sort()).toEqual(before)
+    expect(await fs.readFile(path.join(f.target, ".DS_Store"), "utf8")).toBe(
+      "finder"
+    )
+    expect(await f.validate(null, f.target)).toBe("valid")
+  })
+
+  it.each([
+    ["an instance", path.join("instances", "My pack", "instance.json")],
+    ["a server", path.join("servers", "Survival", "server.json")],
+    ["the launcher's Java", path.join("managed_javas", "17", "release")],
+    ["the launcher's logs", path.join("__gdl_logs__", "latest.log")]
+  ])(
+    "switches to a data folder that lost its database but holds %s",
+    async (_what, file) => {
+      const f = await fixture()
+      await write(path.join(f.target, file), "{}")
+      // Whatever else is there does not hide the launcher's data.
+      await write(path.join(f.target, "notes.txt"), "mine")
+      expect(await f.validate(null, f.target)).toBe("potentially_valid")
+      expect(
+        (await describeRuntimePathChange(f.target, f.source)).found
+      ).toEqual({
+        instances: file.startsWith("instances") ? 1 : 0,
+        servers: file.startsWith("servers") ? 1 : 0,
+        database: false
+      })
+      await f.move(null, f.target, true)
+      expect(selectRuntimePath(null, f.root)).toBe(f.target)
+      expect(await fs.readFile(path.join(f.target, file), "utf8")).toBe("{}")
+      expect(await fs.readFile(path.join(f.source, "save"), "utf8")).toBe(
+        "old save"
+      )
+    }
+  )
+
+  it("does not take an empty instances folder, or a file by that name, for launcher data", async () => {
+    const f = await fixture()
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+    await fs.mkdir(path.join(f.target, "instances"))
+    await write(path.join(f.target, "servers"), "a file")
+    await write(path.join(f.target, "instances", "readme.txt"), "a file")
+    expect(await f.validate(null, f.target)).toBe("has_other_files")
+    expect((await describeRuntimePathChange(f.target, f.source)).found).toBe(
+      null
+    )
+  })
+
+  it("says what a complete data folder holds", async () => {
+    const f = await fixture()
+    await write(path.join(f.target, "gdl_conf.db"), "db")
+    for (const name of ["a", "b", "c"])
+      await write(path.join(f.target, "instances", name, "instance.json"))
+    await write(path.join(f.target, "servers", "s", "server.json"))
+    expect(await describeRuntimePathChange(f.target, f.source)).toEqual({
+      found: { instances: 3, servers: 1, database: true },
+      // The fixture's own file is not the launcher's.
+      unfamiliar: ["save"],
+      unfamiliarCount: 1
+    })
+  })
+
+  /** A data folder someone else also keeps their things in. */
+  async function shared() {
+    const f = await fixture()
+    await write(path.join(f.source, "gdl_conf.db"), "db")
+    await write(path.join(f.source, "gdl_conf.db-wal"), "wal")
+    await write(path.join(f.source, "instances", "a", "instance.json"), "{}")
+    await write(path.join(f.source, "__gdl_logs__", "latest.log"), "log")
+    await write(path.join(f.source, "temp", "part"), "temp")
+    await write(path.join(f.source, "Steam", "game.bin"), "game")
+    await write(path.join(f.source, "notes.txt"), "mine")
+    await leftovers(f.source)
+    return f
+  }
+  const launchers = [
+    "__gdl_logs__",
+    "gdl_conf.db",
+    "gdl_conf.db-wal",
+    "instances",
+    "temp"
+  ]
+  const others = ["Steam", "notes.txt", "save"]
+
+  it("names what is not the launcher's, without the system's own files", async () => {
+    const f = await shared()
+    expect(await describeRuntimePathChange(f.target, f.source)).toEqual({
+      found: null,
+      // Sorted as a file manager lists them.
+      unfamiliar: ["notes.txt", "save", "Steam"],
+      unfamiliarCount: 3
+    })
+    for (let i = 0; i < LEFT_BEHIND_SHOWN; i++)
+      await write(path.join(f.source, `mine-${i}`))
+    const many = await describeRuntimePathChange(f.target, f.source)
+    expect(many.unfamiliar).toHaveLength(LEFT_BEHIND_SHOWN)
+    expect(many.unfamiliarCount).toBe(LEFT_BEHIND_SHOWN + 3)
+    // A folder that is not there has nothing to show.
+    expect(
+      await describeRuntimePathChange(f.target, path.join(f.root, "gone"))
+    ).toEqual({ found: null, unfamiliar: [], unfamiliarCount: 0 })
+  })
+
+  it("leaves what is not the launcher's where it is unless told to move it", async () => {
+    const f = await shared()
+    // A move cannot carry a link; one of the user's own is not its business.
+    await fs.symlink(f.root, path.join(f.source, "Shortcut"))
+    expect(await f.leaving(f.target)).toEqual({ type: "relaunching" })
+    expect(selectRuntimePath(null, f.root)).toBe(f.target)
+    expect((await fs.readdir(f.target)).sort()).toEqual(launchers)
+    expect(
+      await fs.readFile(
+        path.join(f.target, "instances", "a", "instance.json"),
+        "utf8"
+      )
+    ).toBe("{}")
+    // Neither copied nor deleted.
+    const left = (await fs.readdir(f.source)).sort()
+    for (const name of [...others, "Shortcut", ".DS_Store", "lost+found"])
+      expect(left).toContain(name)
+    for (const name of launchers) expect(left).not.toContain(name)
+    expect(
+      await fs.readFile(path.join(f.source, "Steam", "game.bin"), "utf8")
+    ).toBe("game")
+    expect(await fs.readFile(path.join(f.source, "save"), "utf8")).toBe(
+      "old save"
+    )
+  })
+
+  it("moves them along when the user chose to, and never the system's own files", async () => {
+    const f = await shared()
+    await f.move(null, f.target)
+    expect((await fs.readdir(f.target)).sort()).toEqual(
+      [...launchers, ...others].sort()
+    )
+    expect(
+      await fs.readFile(path.join(f.target, "Steam", "game.bin"), "utf8")
+    ).toBe("game")
+    expect((await fs.readdir(f.source)).sort()).toEqual(
+      [
+        ".DS_Store",
+        ".Trash-1000",
+        "._notes",
+        "Thumbs.db",
+        "desktop.ini",
+        "lost+found"
+      ].sort()
+    )
+  })
+
+  it("only moves them when the request says so itself", async () => {
+    const f = await shared()
+    const change = callback("changeRuntimePath", f.globals)
+    // Anything but an explicit yes leaves them.
+    expect(await change(null, f.target, false, "yes")).toEqual({
+      type: "relaunching"
+    })
+    expect(await fs.readdir(f.source)).toContain("Steam")
+    expect(await fs.readdir(f.target)).not.toContain("Steam")
   })
 })
