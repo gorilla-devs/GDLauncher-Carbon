@@ -1553,8 +1553,10 @@ function startedCore(signal: AbortSignal) {
 /**
  * One attempt to stop the launcher-owned core for `action`. An external
  * development core is left running, as before, except for a reset or restore,
- * which must see the exit. A core that never reported READY is only ended for
- * a restart, reset or restore, and one that was never started has nothing to end.
+ * which must see the exit. A core that never reported READY is ended for
+ * every action: a restart, reset or restore waits to see it exit, a quit or
+ * update ends it without holding the user up. One that was never started has
+ * nothing to end.
  */
 async function stopOwnedCore(
   action: ShutdownAction,
@@ -1586,6 +1588,18 @@ async function stopOwnedCore(
     )
   else if (action !== "quit" && action !== "update")
     await terminateAndObserveCoreExit(owned)
+  else
+    // The core never reported READY (it took too long to start, or its
+    // READY line was unusable) and may still be running. Left alone it would
+    // outlive the launcher and the next start would run a second core on the
+    // same data folder. It has nothing to save, so it is asked to stop and
+    // ended shortly after, well inside the time a stop may take before the
+    // prompt comes up: the window is already gone and stays gone. The user
+    // is quitting from an error screen, so a core that cannot be seen to end
+    // does not hold the quit up either.
+    await forceTerminateCore(owned, 1500, 1000).catch((error) =>
+      console.warn("Could not end the core that never became ready", error)
+    )
 }
 /**
  * Stops the owned core for a quit, update, restart or database reset or

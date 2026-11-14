@@ -380,6 +380,89 @@ it("actual reset accepts observed already-exited owned core without signaling", 
   expect((await f.reset()).ok).toBe(true)
   expect(f.child.kill).not.toHaveBeenCalled()
 })
+describe("a core that never became ready is ended when the launcher quits or installs an update", () => {
+  /** The actual ownedShutdown over a launcher-owned core whose start failed
+   *  (it took too long, or its READY line was unusable) and whose process
+   *  reacts to the signals in `exitsOn`. */
+  function neverReady(exitsOn: string[]) {
+    const signals: string[] = []
+    const child = Object.assign(new EventEmitter(), {
+      exitCode: null as number | null,
+      signalCode: null as string | null,
+      kill: (signal = "SIGTERM") => {
+        signals.push(signal)
+        if (exitsOn.includes(signal))
+          setTimeout(() => {
+            child.exitCode = 0
+            child.emit("exit", 0)
+          }, 0)
+        return true
+      }
+    })
+    const limits: unknown[][] = []
+    const warnings: unknown[][] = []
+    const shutdown = owned({
+      coreModule: Promise.resolve({ type: "error", logs: [] }),
+      coreProcessHandle: child,
+      terminateAndObserveCoreExit,
+      stopCoreForShutdown,
+      // The limits the launcher asks for are recorded; the fixture then
+      // runs the real helper on a shorter clock.
+      forceTerminateCore: (proc: any, graceMs: number, killWaitMs: number) => {
+        limits.push([graceMs, killWaitMs])
+        return forceTerminateCore(proc, 20, 20)
+      },
+      console: { ...console, warn: (...args: unknown[]) => warnings.push(args) }
+    })
+    return { ...shutdown, child, signals, limits, warnings }
+  }
+  it.each(["quit", "update"] as const)(
+    "%s asks it to stop and goes on once it exited, without a prompt",
+    async (action) => {
+      const f = neverReady(["SIGTERM"])
+      expect(await f.ownedShutdown(action)).toBe("stopped")
+      expect(f.signals).toEqual(["SIGTERM"])
+      expect(f.prompts).toEqual([])
+      expect(f.warnings).toEqual([])
+      // Asked to stop, ended 1.5 s later, given 1 s to be seen ending: inside
+      // the 3 s a stop may take before the prompt would bring the window back.
+      expect(f.limits).toEqual([[1500, 1000]])
+    }
+  )
+  it("one that ignores the request is ended", async () => {
+    const f = neverReady(["SIGKILL"])
+    expect(await f.ownedShutdown("quit")).toBe("stopped")
+    expect(f.signals).toEqual(["SIGTERM", "SIGKILL"])
+    expect(f.prompts).toEqual([])
+    expect(f.warnings).toEqual([])
+  })
+  it("one that cannot be seen to end does not hold the quit up or bring the window back", async () => {
+    const f = neverReady([])
+    expect(await f.ownedShutdown("quit")).toBe("stopped")
+    expect(f.signals).toEqual(["SIGTERM", "SIGKILL"])
+    expect(f.prompts).toEqual([])
+    expect(f.warnings).toHaveLength(1)
+    expect(String(f.warnings[0][0])).toContain("never became ready")
+  })
+  it("one that already exited is not signalled", async () => {
+    const f = neverReady([])
+    f.child.exitCode = 1
+    expect(await f.ownedShutdown("update")).toBe("stopped")
+    expect(f.signals).toEqual([])
+    expect(f.limits).toEqual([[1500, 1000]])
+    expect(f.prompts).toEqual([])
+  })
+  it("a restart still waits to see it exit", async () => {
+    const f = neverReady([])
+    const pending = f.ownedShutdown("restart")
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(f.signals).toEqual(["SIGTERM"])
+    expect(f.limits).toEqual([])
+    f.child.exitCode = 0
+    f.child.emit("exit", 0)
+    expect(await pending).toBe("stopped")
+  })
+})
 it("actual core exit callback retains owned exit evidence and does not replace newer handle", () => {
   const newer = {}
   const globals = {
