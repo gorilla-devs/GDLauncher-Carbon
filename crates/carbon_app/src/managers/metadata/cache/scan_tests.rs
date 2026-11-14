@@ -1463,6 +1463,71 @@ async fn server_scan_commits_what_it_read_while_it_runs() {
     assert_eq!(server_rows(&app, id).await.len(), 11);
 }
 
+/// Crafted archives used to end the core during the scan, and again on every
+/// start: one that declares an impossible size for its descriptor, and ones
+/// whose descriptor or icon inflates past what is read. The scan now lists
+/// them like any other addon it cannot describe, next to the ordinary one.
+#[tokio::test]
+async fn a_scan_lists_crafted_archives_instead_of_ending_the_core() {
+    use crate::managers::metadata::mods::{DESCRIPTOR_LIMIT, ICON_LIMIT, test as archives};
+    let app = crate::setup_managers_for_test().await;
+    let (id, good) = addon_fixture(
+        &app,
+        "scan-crafted",
+        AddonType::Mods,
+        "good.jar",
+        &icon_jar("good"),
+    )
+    .await;
+    let mods = good.parent().unwrap().to_owned();
+    let fabric = |id: &str, extra: &str| {
+        format!(r#"{{"schemaVersion":1,"id":"{id}","version":"1.0.0"{extra}}}"#).into_bytes()
+    };
+    std::fs::write(
+        mods.join("declared.jar"),
+        archives::declare_size(
+            &archives::jar(&[("fabric.mod.json", &fabric("declared", ""))]),
+            1 << 60,
+        ),
+    )
+    .unwrap();
+    std::fs::write(
+        mods.join("descriptor-bomb.jar"),
+        archives::jar(&[(
+            "fabric.mod.json",
+            &vec![b' '; DESCRIPTOR_LIMIT as usize + 1],
+        )]),
+    )
+    .unwrap();
+    std::fs::write(
+        mods.join("icon-bomb.jar"),
+        archives::jar(&[
+            (
+                "fabric.mod.json",
+                &fabric("iconbomb", r#","icon":"icon.png""#),
+            ),
+            ("icon.png", &vec![0u8; ICON_LIMIT as usize + 1]),
+        ]),
+    )
+    .unwrap();
+
+    pass(&app, id, VerifyScope::MODS).await.unwrap();
+
+    let rows = rows(&app, id).await;
+    let names: Vec<_> = rows.iter().map(|row| row.filename.as_str()).collect();
+    assert_eq!(
+        names,
+        [
+            "declared.jar",
+            "descriptor-bomb.jar",
+            "good.jar",
+            "icon-bomb.jar"
+        ]
+    );
+    // A second pass has nothing left to trip over either.
+    pass(&app, id, VerifyScope::MODS).await.unwrap();
+}
+
 /// A jar whose Fabric metadata names an icon. Creating its metadata scales
 /// the icon, which takes the launcher-wide icon permit.
 fn icon_jar(id: &str) -> Vec<u8> {

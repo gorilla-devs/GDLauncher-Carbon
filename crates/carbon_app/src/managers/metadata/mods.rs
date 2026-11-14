@@ -12,6 +12,47 @@ fn sanitize_json_content(content: &str) -> String {
         .collect()
 }
 
+/// The most that is read of a mod's descriptor (`mods.toml`,
+/// `fabric.mod.json` and the like) or of its manifest. Real ones are a few
+/// KB; the limit only has to stop an entry made to fill memory.
+pub(super) const DESCRIPTOR_LIMIT: u64 = 16 * 1024 * 1024;
+/// The most that is read of a mod's icon.
+pub(super) const ICON_LIMIT: u64 = 64 * 1024 * 1024;
+
+/// Reads an archive entry whole, or gives `None` when it cannot be read or
+/// holds more than `limit` bytes.
+///
+/// The size an archive declares for an entry is whatever its author wrote
+/// there, and a few KB of deflate can inflate to gigabytes. So nothing is
+/// reserved from the declared size (an allocation the machine cannot give
+/// aborts the process instead of returning an error) and nothing past the
+/// limit is read.
+fn read_entry(entry: impl Read, limit: u64) -> Option<Vec<u8>> {
+    let mut content = Vec::new();
+    entry
+        .take(limit.saturating_add(1))
+        .read_to_end(&mut content)
+        .ok()?;
+    (content.len() as u64 <= limit).then_some(content)
+}
+
+/// [`read_entry`] for a descriptor, which is text.
+fn read_descriptor(entry: impl Read) -> Option<String> {
+    String::from_utf8(read_entry(entry, DESCRIPTOR_LIMIT)?).ok()
+}
+
+/// The icon a mod's descriptor names, read from the mod's archive. A missing,
+/// damaged or oversized icon only costs the icon, not the addon.
+pub(super) fn read_logo(reader: &mut (impl Read + Seek), logo_file: &str) -> Option<Vec<u8>> {
+    let mut zip = zip::ZipArchive::new(reader).ok()?;
+    let entry = zip.by_name(logo_file).ok()?;
+    let image = read_entry(entry, ICON_LIMIT);
+    if image.is_none() {
+        tracing::debug!("could not read the icon {logo_file}, or it is too large");
+    }
+    image
+}
+
 use anyhow::{anyhow, bail};
 use serde::{Deserialize, Deserializer};
 use zip::read::ZipFile;
@@ -690,13 +731,12 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
     // Used a block and let else instead of an if let to avoid what appears to be a
     // borrow checker life extension bug.
     'modstoml: {
-        let Ok(mut file) = zip.by_name("META-INF/mods.toml") else {
+        let Ok(file) = zip.by_name("META-INF/mods.toml") else {
             break 'modstoml;
         };
-        let mut content = String::with_capacity(file.size() as usize);
-        if file.read_to_string(&mut content).is_err() {
+        let Some(content) = read_descriptor(file) else {
             break 'modstoml;
-        }
+        };
 
         let sanitized_content = sanitize_json_content(&content);
         let Ok(modstoml) = toml::from_str::<ModsToml>(&sanitized_content) else {
@@ -707,11 +747,10 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
             // mods.toml has no entries - try neoforge.mods.toml instead
             break 'modstoml;
         };
-        drop(file);
 
         if modstoml.version == "${file.jarVersion}" {
             if let Ok(mf) = zip.by_name("META-INF/MANIFEST.MF") {
-                let buffered = io::BufReader::new(mf);
+                let buffered = io::BufReader::new(mf.take(DESCRIPTOR_LIMIT));
                 for line in buffered.lines().map_while(Result::ok) {
                     if let Some((_, version)) = line.split_once("Implementation-Version: ") {
                         modstoml.version = version.to_string();
@@ -733,13 +772,12 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
     }
 
     'neoforge_mods_toml: {
-        let Ok(mut file) = zip.by_name("META-INF/neoforge.mods.toml") else {
+        let Ok(file) = zip.by_name("META-INF/neoforge.mods.toml") else {
             break 'neoforge_mods_toml;
         };
-        let mut content = String::with_capacity(file.size() as usize);
-        if file.read_to_string(&mut content).is_err() {
+        let Some(content) = read_descriptor(file) else {
             break 'neoforge_mods_toml;
-        }
+        };
 
         let sanitized_content = sanitize_json_content(&content);
         let Ok(modstoml) = toml::from_str::<ModsToml>(&sanitized_content) else {
@@ -762,13 +800,12 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
     }
 
     'fabric_mod_json: {
-        let Ok(mut file) = zip.by_name("fabric.mod.json") else {
+        let Ok(file) = zip.by_name("fabric.mod.json") else {
             break 'fabric_mod_json;
         };
-        let mut content = String::with_capacity(file.size() as usize);
-        if file.read_to_string(&mut content).is_err() {
+        let Some(content) = read_descriptor(file) else {
             break 'fabric_mod_json;
-        }
+        };
 
         let sanitized_content = sanitize_json_content(&content);
         let Ok(fabric_mod_json) = serde_json::from_str::<FabricModJson>(&sanitized_content) else {
@@ -782,13 +819,12 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
     }
 
     'quilt_mod_json: {
-        let Ok(mut file) = zip.by_name("quilt.mod.json") else {
+        let Ok(file) = zip.by_name("quilt.mod.json") else {
             break 'quilt_mod_json;
         };
-        let mut content = String::with_capacity(file.size() as usize);
-        if file.read_to_string(&mut content).is_err() {
+        let Some(content) = read_descriptor(file) else {
             break 'quilt_mod_json;
-        }
+        };
 
         let sanitized_content = sanitize_json_content(&content);
         let Ok(quilt_mod_json) = serde_json::from_str::<QuiltModJson>(&sanitized_content) else {
@@ -817,9 +853,9 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
             break 'mcmodinfo;
         }
 
-        let mut file = file.expect("we just checked this");
-        let mut content = String::with_capacity(file.size() as usize);
-        file.read_to_string(&mut content).unwrap_or_default();
+        let file = file.expect("we just checked this");
+        // One that cannot be read counts as an empty one, as it always has.
+        let content = read_descriptor(file).unwrap_or_default();
 
         let sanitized_content = sanitize_json_content(&content);
         let mcmod: McModInfo = serde_json::from_str::<McModInfoContainer>(&sanitized_content)
@@ -834,7 +870,7 @@ pub fn parse_metadata(reader: &mut (impl Read + Seek)) -> anyhow::Result<Option<
 }
 
 #[cfg(test)]
-mod test {
+pub(in crate::managers::metadata) mod test {
     use std::io::{Cursor, Write};
 
     use zip::{CompressionMethod, ZipWriter, write::FileOptions};
@@ -856,6 +892,170 @@ mod test {
         let meta = parse_metadata(&mut Cursor::new(&vec));
 
         meta
+    }
+
+    /// A jar with these entries, deflated.
+    pub fn jar(entries: &[(&str, &[u8])]) -> Vec<u8> {
+        let mut vec = Vec::<u8>::new();
+        let mut zip = ZipWriter::new(Cursor::new(&mut vec));
+        let options = FileOptions::<()>::default().compression_method(CompressionMethod::Deflated);
+        for (path, content) in entries {
+            zip.start_file(*path, options).unwrap();
+            zip.write_all(content).unwrap();
+        }
+        zip.finish().unwrap();
+        vec
+    }
+
+    /// Rewrites the central directory of a one-entry archive so that the
+    /// entry declares `size` bytes of content through a zip64 extra field,
+    /// as a crafted archive does. The entry's real content is untouched.
+    pub fn declare_size(archive: &[u8], size: u64) -> Vec<u8> {
+        let u16_at = |at: usize| u16::from_le_bytes(archive[at..at + 2].try_into().unwrap());
+        let u32_at = |at: usize| u32::from_le_bytes(archive[at..at + 4].try_into().unwrap());
+        let end = archive
+            .windows(4)
+            .rposition(|bytes| bytes == b"PK\x05\x06")
+            .expect("end of central directory");
+        assert_eq!(u16_at(end + 10), 1, "one entry");
+        let directory = u32_at(end + 16) as usize;
+        assert_eq!(&archive[directory..directory + 4], b"PK\x01\x02");
+        let name = u16_at(directory + 28) as usize;
+        assert_eq!(u16_at(directory + 30), 0, "the fixture has no extra field");
+        assert_eq!(u16_at(directory + 32), 0, "the fixture has no comment");
+        let mut entry = archive[directory..directory + 46 + name].to_vec();
+        // Uncompressed size: "see the zip64 extra field".
+        entry[24..28].copy_from_slice(&u32::MAX.to_le_bytes());
+        entry[30..32].copy_from_slice(&12u16.to_le_bytes());
+        entry.extend_from_slice(&1u16.to_le_bytes());
+        entry.extend_from_slice(&8u16.to_le_bytes());
+        entry.extend_from_slice(&size.to_le_bytes());
+        let mut forged = archive[..directory].to_vec();
+        forged.extend_from_slice(&entry);
+        let mut tail = archive[end..].to_vec();
+        tail[12..16].copy_from_slice(&(entry.len() as u32).to_le_bytes());
+        forged.extend_from_slice(&tail);
+        forged
+    }
+
+    const FABRIC: &[u8] = br#"{"id":"example","name":"Example","version":"1.0.0"}"#;
+
+    /// An archive can declare any size for an entry. Reserving memory for a
+    /// declared size the machine cannot give ends the whole core, on every
+    /// start, until the file is deleted by hand.
+    #[test]
+    fn a_descriptor_that_declares_an_impossible_size_is_read_for_what_it_holds() {
+        let forged = declare_size(&jar(&[("fabric.mod.json", FABRIC)]), 1 << 60);
+        let mut archive = zip::ZipArchive::new(Cursor::new(&forged)).unwrap();
+        assert_eq!(
+            archive.by_name("fabric.mod.json").unwrap().size(),
+            1 << 60,
+            "the fixture declares the forged size"
+        );
+
+        let parsed = parse_metadata(&mut Cursor::new(&forged)).unwrap();
+        // The entry's content does not match what it declares, so whether
+        // the reader hands it over is its own business; the scan goes on
+        // either way.
+        if let Some(parsed) = parsed {
+            assert_eq!(parsed.modid.as_deref(), Some("example"));
+        }
+    }
+
+    /// A few KB that inflate to more than the limit are not read into
+    /// memory; the other descriptors of the jar still are.
+    #[test]
+    fn a_descriptor_that_inflates_past_the_limit_is_treated_as_missing() {
+        let huge = vec![b' '; super::DESCRIPTOR_LIMIT as usize + 1];
+        for path in [
+            "META-INF/mods.toml",
+            "META-INF/neoforge.mods.toml",
+            "fabric.mod.json",
+            "quilt.mod.json",
+            "mcmod.info",
+        ] {
+            let bomb = jar(&[(path, &huge)]);
+            assert!(bomb.len() < 1024 * 1024, "{path}: the jar itself is small");
+            assert_eq!(
+                parse_metadata(&mut Cursor::new(&bomb)).unwrap(),
+                if path == "mcmod.info" {
+                    // An unreadable mcmod.info has always counted as an
+                    // empty one.
+                    parsemeta("mcmod.info", "").unwrap()
+                } else {
+                    None
+                },
+                "{path}"
+            );
+        }
+        let mixed = jar(&[("quilt.mod.json", &huge), ("fabric.mod.json", FABRIC)]);
+        let parsed = parse_metadata(&mut Cursor::new(&mixed)).unwrap().unwrap();
+        assert_eq!(parsed.modid.as_deref(), Some("example"));
+    }
+
+    #[test]
+    fn a_descriptor_exactly_at_the_limit_is_still_read() {
+        let mut content = FABRIC.to_vec();
+        content.resize(super::DESCRIPTOR_LIMIT as usize, b' ');
+        let parsed = parse_metadata(&mut Cursor::new(&jar(&[("fabric.mod.json", &content)])))
+            .unwrap()
+            .unwrap();
+        assert_eq!(parsed.modid.as_deref(), Some("example"));
+    }
+
+    /// The version of a Forge mod can come from the jar's manifest, which is
+    /// read line by line: one endless line must not fill memory either.
+    #[test]
+    fn a_manifest_that_is_one_endless_line_does_not_give_a_version() {
+        let toml = b"[[mods]]\nmodId = 'example'\nversion = '${file.jarVersion}'\ndisplayName = 'Example'\n";
+        let mut manifest = vec![b'x'; super::DESCRIPTOR_LIMIT as usize + 1];
+        manifest.extend_from_slice(b"\nImplementation-Version: 9.9.9\n");
+        let parsed = parse_metadata(&mut Cursor::new(&jar(&[
+            ("META-INF/mods.toml", toml),
+            ("META-INF/MANIFEST.MF", &manifest),
+        ])))
+        .unwrap()
+        .unwrap();
+        assert_eq!(parsed.modid.as_deref(), Some("example"));
+        assert_eq!(parsed.version, None);
+
+        let ordinary = b"Manifest-Version: 1.0\nImplementation-Version: 2.3.4\n";
+        let parsed = parse_metadata(&mut Cursor::new(&jar(&[
+            ("META-INF/mods.toml", toml),
+            ("META-INF/MANIFEST.MF", ordinary),
+        ])))
+        .unwrap()
+        .unwrap();
+        assert_eq!(parsed.version.as_deref(), Some("2.3.4"));
+    }
+
+    #[test]
+    fn an_icon_is_read_up_to_its_limit_whatever_size_it_declares() {
+        let icon = b"\x89PNG fixture";
+        let ordinary = jar(&[("assets/logo.png", icon)]);
+        assert_eq!(
+            super::read_logo(&mut Cursor::new(&ordinary), "assets/logo.png").as_deref(),
+            Some(&icon[..])
+        );
+        assert_eq!(
+            super::read_logo(&mut Cursor::new(&ordinary), "missing.png"),
+            None
+        );
+
+        // Declares 2^60 bytes: no memory is reserved for that.
+        let forged = declare_size(&ordinary, 1 << 60);
+        if let Some(read) = super::read_logo(&mut Cursor::new(&forged), "assets/logo.png") {
+            assert_eq!(read, icon);
+        }
+
+        // Inflates past the limit: no icon, and the addon is still listed.
+        let huge = vec![0u8; super::ICON_LIMIT as usize + 1];
+        let bomb = jar(&[("assets/logo.png", &huge)]);
+        assert!(bomb.len() < 1024 * 1024);
+        assert_eq!(
+            super::read_logo(&mut Cursor::new(&bomb), "assets/logo.png"),
+            None
+        );
     }
 
     #[test]

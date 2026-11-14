@@ -1585,25 +1585,7 @@ impl ManagerRef<'_, MetaCacheManager> {
                 .as_ref()
                 .map(|m| m.as_ref().map(|m| m.logo_file.as_ref()))
             {
-                Ok(Some(Some(logo_file))) => {
-                    // A damaged icon entry only costs the icon, not the addon.
-                    match zip::ZipArchive::new(&mut file) {
-                        Ok(mut zip) => match zip.by_name(&logo_file) {
-                            Ok(mut file) => {
-                                let mut image = Vec::with_capacity(file.size() as usize);
-                                match file.read_to_end(&mut image) {
-                                    Ok(_) => Some(image),
-                                    Err(error) => {
-                                        debug!(?error, "could not read the icon of {}", logo_file);
-                                        None
-                                    }
-                                }
-                            }
-                            _ => None,
-                        },
-                        Err(_) => None,
-                    }
-                }
+                Ok(Some(Some(logo_file))) => super::mods::read_logo(&mut file, logo_file),
                 _ => None,
             };
 
