@@ -197,8 +197,8 @@ function ShareInstance(props: ModalProps) {
   const [title, setTitle] = createSignal("")
   const [expirationDays, setExpirationDays] = createSignal("1")
   const [maxDownloads, setMaxDownloads] = createSignal<string>("")
-  // The top-level files and folders of the instance. Only the ticked ones
-  // are uploaded; worlds and their backups start unticked.
+  // The top-level files and folders of the instance, under Advanced for
+  // those who want to choose. Worlds and their backups start unticked.
   const shareEntries = rspc.createQuery(() => ({
     queryKey: ["instance.getShareEntries", data()?.instanceId]
   }))
@@ -244,7 +244,7 @@ function ShareInstance(props: ModalProps) {
   })
 
   const handleShare = async () => {
-    if (isLoading() || !shareEntries.data) return
+    if (isLoading()) return
     setShareError(undefined)
     setProgress(0)
     setIsLoading(true)
@@ -266,15 +266,18 @@ function ShareInstance(props: ModalProps) {
       params.set("maxDownloads", maxDownloadsValue.toString())
     }
 
-    // The core shares these names and nothing else of the instance folder.
-    params.set(
-      "entries",
-      JSON.stringify(
-        entries()
-          .filter(isTicked)
-          .map((entry) => entry.name)
+    // Untouched, the core shares its default set: everything but worlds and
+    // their backups. Once the user chose, it shares the ticked names only.
+    if (shareEntries.data && Object.keys(chosen()).length > 0) {
+      params.set(
+        "entries",
+        JSON.stringify(
+          entries()
+            .filter(isTicked)
+            .map((entry) => entry.name)
+        )
       )
-    )
+    }
 
     // Once a terminal message (error or finished) arrives we close the stream
     // ourselves; this flag tells the native "error" listener below to ignore
@@ -422,74 +425,6 @@ function ShareInstance(props: ModalProps) {
                 />
               </div>
 
-              {/* What is shared */}
-              <div class="mb-2">
-                <div class="text-lightSlate-400 mb-1 text-sm">
-                  <Trans key="instances:_trn_instance_share.entries_label" />
-                </div>
-                <Show
-                  when={!shareEntries.error}
-                  fallback={
-                    <div
-                      class="text-red-400 text-sm"
-                      data-testid="share-entries-failed"
-                    >
-                      <Trans key="instances:_trn_instance_share.entries_failed" />
-                    </div>
-                  }
-                >
-                  <div
-                    class="bg-darkSlate-800 flex max-h-64 min-h-10 flex-col gap-1 overflow-y-auto rounded-md px-3 py-2"
-                    data-testid="share-entries"
-                  >
-                    <For each={entries()}>
-                      {(entry) => (
-                        <div
-                          class="flex items-start gap-3 text-sm"
-                          data-testid="share-entry"
-                          data-entry={entry.name}
-                        >
-                          <Checkbox
-                            checked={isTicked(entry)}
-                            disabled={isLoading()}
-                            ariaLabel={entry.name}
-                            onChange={(checked) =>
-                              setChosen((current) => ({
-                                ...current,
-                                [entry.name]: checked
-                              }))
-                            }
-                          >
-                            <span
-                              class="min-w-36 break-all font-mono"
-                              classList={{
-                                "text-lightSlate-50": isTicked(entry),
-                                "text-lightSlate-600": !isTicked(entry)
-                              }}
-                            >
-                              {entry.name}
-                            </span>
-                          </Checkbox>
-                          <Show when={entryHint(entry.kind)}>
-                            {(hint) => (
-                              <span
-                                class="pt-0.5 text-xs"
-                                classList={{
-                                  "text-yellow-400": isPersonal(entry.kind),
-                                  "text-lightSlate-600": !isPersonal(entry.kind)
-                                }}
-                              >
-                                <Trans key={hint()} />
-                              </span>
-                            )}
-                          </Show>
-                        </div>
-                      )}
-                    </For>
-                  </div>
-                </Show>
-              </div>
-
               {/* Advanced Options */}
               <Collapsable
                 title={<Trans key="instances:_trn_instance_share.advanced" />}
@@ -559,6 +494,75 @@ function ShareInstance(props: ModalProps) {
                       inputColor="bg-darkSlate-800"
                       class="w-full"
                     />
+                  </div>
+                  {/* What is shared: for those who want to choose */}
+                  <div>
+                    <div class="text-lightSlate-400 mb-1 text-sm">
+                      <Trans key="instances:_trn_instance_share.entries_label" />
+                    </div>
+                    <Show
+                      when={!shareEntries.error}
+                      fallback={
+                        <div
+                          class="text-red-400 text-sm"
+                          data-testid="share-entries-failed"
+                        >
+                          <Trans key="instances:_trn_instance_share.entries_failed" />
+                        </div>
+                      }
+                    >
+                      <div
+                        class="bg-darkSlate-800 flex max-h-64 min-h-10 flex-col gap-1 overflow-y-auto rounded-md px-3 py-2"
+                        data-testid="share-entries"
+                      >
+                        <For each={entries()}>
+                          {(entry) => (
+                            <div
+                              class="flex items-start gap-3 text-sm"
+                              data-testid="share-entry"
+                              data-entry={entry.name}
+                            >
+                              <Checkbox
+                                checked={isTicked(entry)}
+                                disabled={isLoading()}
+                                ariaLabel={entry.name}
+                                onChange={(checked) =>
+                                  setChosen((current) => ({
+                                    ...current,
+                                    [entry.name]: checked
+                                  }))
+                                }
+                              >
+                                <span
+                                  class="min-w-36 break-all font-mono"
+                                  classList={{
+                                    "text-lightSlate-50": isTicked(entry),
+                                    "text-lightSlate-600": !isTicked(entry)
+                                  }}
+                                >
+                                  {entry.name}
+                                </span>
+                              </Checkbox>
+                              <Show when={entryHint(entry.kind)}>
+                                {(hint) => (
+                                  <span
+                                    class="pt-0.5 text-xs"
+                                    classList={{
+                                      "text-yellow-400": isPersonal(entry.kind),
+                                      "text-lightSlate-600": !isPersonal(
+                                        entry.kind
+                                      )
+                                    }}
+                                  >
+                                    <Trans key={hint()} />
+                                  </span>
+                                )}
+                              </Show>
+                            </div>
+                          )}
+                        </For>
+                      </div>
+                    </Show>
                   </div>
                 </div>
               </Collapsable>
@@ -643,7 +647,7 @@ function ShareInstance(props: ModalProps) {
             </Button>
             <Button
               type="primary"
-              disabled={isLoading() || !shareEntries.data}
+              disabled={isLoading()}
               onClick={handleShare}
               loading={!!fileKey() && isLoading()}
             >

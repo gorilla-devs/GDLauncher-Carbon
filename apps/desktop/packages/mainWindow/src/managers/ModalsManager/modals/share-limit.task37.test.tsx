@@ -50,7 +50,7 @@ vi.mock("@gd/ui", async () => ({
   ...(await import("../../../../../../../../packages/ui/src/Select")),
   ...(await import("../../../../../../../../packages/ui/src/Checkbox")),
   ...(await import("../../../../../../../../packages/ui/src/Progress")),
-  Collapsable: (p: any) => <div>{p.children}</div>,
+  Collapsable: (p: any) => <div data-advanced>{p.children}</div>,
   CopyText: () => <div />,
   toast: { success: io.success, error: io.error }
 }))
@@ -359,20 +359,14 @@ it("lists what the instance holds, with worlds and their backups unticked", asyn
   // The list took the place of the switch.
   expect(root.textContent).not.toContain("include_saves")
 
+  // Left as it is, the share names nothing and the core shares its default
+  // set, which leaves out worlds and their backups.
   button(root, "_trn_instance_share.share_button").click()
   await flush()
-  expect(sentEntries()).toEqual([
-    "config",
-    "logs",
-    "mods",
-    "screenshots",
-    "servers.dat"
-  ])
-  expect(
-    new URL(io.streams[0].url, "https://fixture.invalid").searchParams.has(
-      "includeSaves"
-    )
-  ).toBe(false)
+  const params = new URL(io.streams[0].url, "https://fixture.invalid")
+    .searchParams
+  expect(params.has("entries")).toBe(false)
+  expect(params.has("includeSaves")).toBe(false)
 })
 
 it("uploads exactly what is ticked", async () => {
@@ -400,14 +394,19 @@ it("shares nothing of the folder when everything is unticked", async () => {
   expect(sentEntries()).toEqual([])
 })
 
-it("cannot share before it knows what the instance holds, or when it cannot find out", async () => {
+it("shares the default set when the list is not there yet or cannot be read", async () => {
   io.entries.data = undefined
   const root = share()
   const submit = button(root, "_trn_instance_share.share_button")
-  expect(submit.disabled).toBe(true)
+  expect(submit.disabled).toBe(false)
   submit.click()
   await flush()
-  expect(io.streams).toHaveLength(0)
+  expect(io.streams).toHaveLength(1)
+  expect(
+    new URL(io.streams[0].url, "https://fixture.invalid").searchParams.has(
+      "entries"
+    )
+  ).toBe(false)
   dispose!()
   dispose = undefined
   document.body.textContent = ""
@@ -418,5 +417,22 @@ it("cannot share before it knows what the instance holds, or when it cannot find
     failed.querySelector('[data-testid="share-entries-failed"]')!.textContent
   ).toContain("instances:_trn_instance_share.entries_failed")
   expect(failed.querySelector('[data-testid="share-entries"]')).toBeNull()
-  expect(button(failed, "_trn_instance_share.share_button").disabled).toBe(true)
+  button(failed, "_trn_instance_share.share_button").click()
+  await flush()
+  expect(io.streams).toHaveLength(2)
+  expect(
+    new URL(io.streams[1].url, "https://fixture.invalid").searchParams.has(
+      "entries"
+    )
+  ).toBe(false)
+})
+
+it("keeps the list under Advanced", async () => {
+  io.entries.data = instanceEntries
+  const root = share()
+  expect(
+    root
+      .querySelector('[data-testid="share-entries"]')!
+      .closest("[data-advanced]")
+  ).not.toBeNull()
 })
