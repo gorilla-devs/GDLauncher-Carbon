@@ -342,294 +342,310 @@ function ShareInstance(props: ModalProps) {
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <div class="w-120 flex flex-col gap-4">
-        <Switch>
-          <Match when={!isVerified()}>
-            <VerificationRequiredPlaceholder />
-          </Match>
-          <Match when={!shareObject()}>
-            <div class="text-lightSlate-50">
-              <div class="mb-2 text-lg">
-                <Trans key="instances:_trn_instance_share.title" />
-              </div>
-              <div class="text-lightSlate-500 mb-4 text-sm">
-                <Trans key="instances:_trn_instance_share.description" />
-              </div>
+        {/* With Advanced opened this can be taller than a small window:
+            it scrolls, and the buttons below stay in view. */}
+        <div
+          class="overflow-y-auto pr-1"
+          style={{ "max-height": "calc(100vh - 13rem)" }}
+        >
+          <Switch>
+            <Match when={!isVerified()}>
+              <VerificationRequiredPlaceholder />
+            </Match>
+            <Match when={!shareObject()}>
+              <div class="text-lightSlate-50">
+                <div class="mb-2 text-lg">
+                  <Trans key="instances:_trn_instance_share.title" />
+                </div>
+                <div class="text-lightSlate-500 mb-4 text-sm">
+                  <Trans key="instances:_trn_instance_share.description" />
+                </div>
 
-              <Show when={shareError()}>
-                {(err) => (
-                  <div class="border-red-500/40 bg-red-500/10 mb-4 rounded-md border p-3 text-sm">
-                    <div class="text-red-400 flex items-center gap-2 font-medium">
-                      <div class="i-ri:error-warning-line shrink-0" />
-                      <span>{t(getShareErrorKey(err().code))}</span>
-                    </div>
-                    <Show
-                      when={
-                        err().code === "INSTANCE_TOO_LARGE" && err().details
-                      }
-                    >
-                      {(details) => (
-                        <div class="text-lightSlate-300 mt-2 flex flex-col gap-2">
-                          <div>
-                            {t("instances:_trn_share_errors.too_large_detail", {
-                              size: formatBytes(details().totalBytes),
-                              limit: formatBytes(details().limitBytes)
-                            })}
-                          </div>
-                          <Show when={details().largestFolders.length > 0}>
-                            <div>
-                              <div class="text-lightSlate-400 mb-1 text-xs uppercase">
-                                {t(
-                                  "instances:_trn_share_errors.too_large_folders"
-                                )}
-                              </div>
-                              <ul class="m-0 flex flex-col gap-1 p-0">
-                                <For each={details().largestFolders}>
-                                  {(folder) => (
-                                    <li class="flex list-none justify-between gap-4">
-                                      <span class="truncate font-mono">
-                                        {folder.name}
-                                      </span>
-                                      <span class="text-lightSlate-400 shrink-0">
-                                        {formatBytes(folder.bytes)}
-                                      </span>
-                                    </li>
-                                  )}
-                                </For>
-                              </ul>
-                            </div>
-                          </Show>
-                          <div class="text-lightSlate-400 text-xs">
-                            {t("instances:_trn_share_errors.too_large_hint")}
-                          </div>
-                        </div>
-                      )}
-                    </Show>
-                  </div>
-                )}
-              </Show>
-
-              {/* Title Input */}
-              <div class="mb-2">
-                <label class="text-lightSlate-400 mb-1 block text-sm">
-                  <Trans key="instances:_trn_instance_share.title_label" />
-                </label>
-                <Input
-                  value={title()}
-                  onInput={(e) => setTitle(e.currentTarget.value)}
-                  placeholder={t(
-                    "instances:_trn_instance_share.title_placeholder"
-                  )}
-                  disabled={isLoading()}
-                  inputColor="bg-darkSlate-800"
-                  class="w-full"
-                />
-              </div>
-
-              {/* Advanced Options */}
-              <Collapsable
-                title={<Trans key="instances:_trn_instance_share.advanced" />}
-                defaultOpened={false}
-                noPadding
-                size="small"
-              >
-                <div class="flex flex-col gap-4 py-2">
-                  {/* Expiration Select */}
-                  <div>
-                    <label class="text-lightSlate-400 mb-1 block text-sm">
-                      <Trans key="instances:_trn_instance_share.expiration_label" />
-                    </label>
-                    <Select
-                      value={expirationDays()}
-                      onChange={(val) => val && setExpirationDays(val)}
-                      disabled={isLoading()}
-                      options={EXPIRATION_OPTIONS.map((opt) => opt.value)}
-                      itemComponent={(props) => {
-                        const option = EXPIRATION_OPTIONS.find(
-                          (opt) => opt.value === props.item.rawValue
-                        )
-                        return (
-                          <SelectItem item={props.item}>
-                            {option
-                              ? t(`instances:${option.label}`)
-                              : props.item.rawValue}
-                          </SelectItem>
-                        )
-                      }}
-                    >
-                      <SelectTrigger class="w-full">
-                        <SelectValue<string>>
-                          {(state) => {
-                            const option = EXPIRATION_OPTIONS.find(
-                              (opt) => opt.value === state.selectedOption()
-                            )
-                            return option ? t(`instances:${option.label}`) : ""
-                          }}
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent />
-                    </Select>
-                  </div>
-
-                  {/* Max Downloads Input */}
-                  <div>
-                    <label class="text-lightSlate-400 mb-1 block text-sm">
-                      <Trans key="instances:_trn_instance_share.max_downloads_label" />
-                    </label>
-                    <Input
-                      type="number"
-                      min="1"
-                      max={MAX_DOWNLOADS_LIMIT}
-                      value={maxDownloads()}
-                      onInput={(e) => {
-                        const validated = validateMaxDownloads(
-                          e.currentTarget.value
-                        )
-                        setMaxDownloads(validated)
-                        e.currentTarget.value = validated
-                      }}
-                      placeholder={t(
-                        "instances:_trn_instance_share.max_downloads_placeholder"
-                      )}
-                      disabled={isLoading()}
-                      inputColor="bg-darkSlate-800"
-                      class="w-full"
-                    />
-                  </div>
-                  {/* What is shared: for those who want to choose */}
-                  <div>
-                    <div class="text-lightSlate-400 mb-1 text-sm">
-                      <Trans key="instances:_trn_instance_share.entries_label" />
-                    </div>
-                    <Show
-                      when={!shareEntries.error}
-                      fallback={
-                        <div
-                          class="text-red-400 text-sm"
-                          data-testid="share-entries-failed"
-                        >
-                          <Trans key="instances:_trn_instance_share.entries_failed" />
-                        </div>
-                      }
-                    >
-                      <div
-                        class="bg-darkSlate-800 flex max-h-64 min-h-10 flex-col gap-1 overflow-y-auto rounded-md px-3 py-2"
-                        data-testid="share-entries"
+                <Show when={shareError()}>
+                  {(err) => (
+                    <div class="border-red-500/40 bg-red-500/10 mb-4 rounded-md border p-3 text-sm">
+                      <div class="text-red-400 flex items-center gap-2 font-medium">
+                        <div class="i-ri:error-warning-line shrink-0" />
+                        <span>{t(getShareErrorKey(err().code))}</span>
+                      </div>
+                      <Show
+                        when={
+                          err().code === "INSTANCE_TOO_LARGE" && err().details
+                        }
                       >
-                        <For each={entries()}>
-                          {(entry) => (
-                            <div
-                              class="flex items-start gap-3 text-sm"
-                              data-testid="share-entry"
-                              data-entry={entry.name}
-                            >
-                              <Checkbox
-                                checked={isTicked(entry)}
-                                disabled={isLoading()}
-                                ariaLabel={entry.name}
-                                onChange={(checked) =>
-                                  setChosen((current) => ({
-                                    ...current,
-                                    [entry.name]: checked
-                                  }))
+                        {(details) => (
+                          <div class="text-lightSlate-300 mt-2 flex flex-col gap-2">
+                            <div>
+                              {t(
+                                "instances:_trn_share_errors.too_large_detail",
+                                {
+                                  size: formatBytes(details().totalBytes),
+                                  limit: formatBytes(details().limitBytes)
                                 }
+                              )}
+                            </div>
+                            <Show when={details().largestFolders.length > 0}>
+                              <div>
+                                <div class="text-lightSlate-400 mb-1 text-xs uppercase">
+                                  {t(
+                                    "instances:_trn_share_errors.too_large_folders"
+                                  )}
+                                </div>
+                                <ul class="m-0 flex flex-col gap-1 p-0">
+                                  <For each={details().largestFolders}>
+                                    {(folder) => (
+                                      <li class="flex list-none justify-between gap-4">
+                                        <span class="truncate font-mono">
+                                          {folder.name}
+                                        </span>
+                                        <span class="text-lightSlate-400 shrink-0">
+                                          {formatBytes(folder.bytes)}
+                                        </span>
+                                      </li>
+                                    )}
+                                  </For>
+                                </ul>
+                              </div>
+                            </Show>
+                            <div class="text-lightSlate-400 text-xs">
+                              {t("instances:_trn_share_errors.too_large_hint")}
+                            </div>
+                          </div>
+                        )}
+                      </Show>
+                    </div>
+                  )}
+                </Show>
+
+                {/* Title Input */}
+                <div class="mb-2">
+                  <label class="text-lightSlate-400 mb-1 block text-sm">
+                    <Trans key="instances:_trn_instance_share.title_label" />
+                  </label>
+                  <Input
+                    value={title()}
+                    onInput={(e) => setTitle(e.currentTarget.value)}
+                    placeholder={t(
+                      "instances:_trn_instance_share.title_placeholder"
+                    )}
+                    disabled={isLoading()}
+                    inputColor="bg-darkSlate-800"
+                    class="w-full"
+                  />
+                </div>
+
+                {/* Advanced Options */}
+                <Collapsable
+                  title={<Trans key="instances:_trn_instance_share.advanced" />}
+                  defaultOpened={false}
+                  noPadding
+                  size="small"
+                >
+                  <div class="flex flex-col gap-4 py-2">
+                    {/* Expiration Select */}
+                    <div>
+                      <label class="text-lightSlate-400 mb-1 block text-sm">
+                        <Trans key="instances:_trn_instance_share.expiration_label" />
+                      </label>
+                      <Select
+                        value={expirationDays()}
+                        onChange={(val) => val && setExpirationDays(val)}
+                        disabled={isLoading()}
+                        options={EXPIRATION_OPTIONS.map((opt) => opt.value)}
+                        itemComponent={(props) => {
+                          const option = EXPIRATION_OPTIONS.find(
+                            (opt) => opt.value === props.item.rawValue
+                          )
+                          return (
+                            <SelectItem item={props.item}>
+                              {option
+                                ? t(`instances:${option.label}`)
+                                : props.item.rawValue}
+                            </SelectItem>
+                          )
+                        }}
+                      >
+                        <SelectTrigger class="w-full">
+                          <SelectValue<string>>
+                            {(state) => {
+                              const option = EXPIRATION_OPTIONS.find(
+                                (opt) => opt.value === state.selectedOption()
+                              )
+                              return option
+                                ? t(`instances:${option.label}`)
+                                : ""
+                            }}
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent />
+                      </Select>
+                    </div>
+
+                    {/* Max Downloads Input */}
+                    <div>
+                      <label class="text-lightSlate-400 mb-1 block text-sm">
+                        <Trans key="instances:_trn_instance_share.max_downloads_label" />
+                      </label>
+                      <Input
+                        type="number"
+                        min="1"
+                        max={MAX_DOWNLOADS_LIMIT}
+                        value={maxDownloads()}
+                        onInput={(e) => {
+                          const validated = validateMaxDownloads(
+                            e.currentTarget.value
+                          )
+                          setMaxDownloads(validated)
+                          e.currentTarget.value = validated
+                        }}
+                        placeholder={t(
+                          "instances:_trn_instance_share.max_downloads_placeholder"
+                        )}
+                        disabled={isLoading()}
+                        inputColor="bg-darkSlate-800"
+                        class="w-full"
+                      />
+                    </div>
+                    {/* What is shared: for those who want to choose */}
+                    <div>
+                      <div class="text-lightSlate-400 mb-1 text-sm">
+                        <Trans key="instances:_trn_instance_share.entries_label" />
+                      </div>
+                      <Show
+                        when={!shareEntries.error}
+                        fallback={
+                          <div
+                            class="text-red-400 text-sm"
+                            data-testid="share-entries-failed"
+                          >
+                            <Trans key="instances:_trn_instance_share.entries_failed" />
+                          </div>
+                        }
+                      >
+                        <div
+                          class="bg-darkSlate-800 flex max-h-64 min-h-10 flex-col gap-1 overflow-y-auto rounded-md px-3 py-2"
+                          data-testid="share-entries"
+                        >
+                          <For each={entries()}>
+                            {(entry) => (
+                              <div
+                                class="flex items-start gap-3 text-sm"
+                                data-testid="share-entry"
+                                data-entry={entry.name}
                               >
-                                <span
-                                  class="min-w-36 break-all font-mono"
-                                  classList={{
-                                    "text-lightSlate-50": isTicked(entry),
-                                    "text-lightSlate-600": !isTicked(entry)
-                                  }}
+                                <Checkbox
+                                  checked={isTicked(entry)}
+                                  disabled={isLoading()}
+                                  ariaLabel={entry.name}
+                                  onChange={(checked) =>
+                                    setChosen((current) => ({
+                                      ...current,
+                                      [entry.name]: checked
+                                    }))
+                                  }
                                 >
-                                  {entry.name}
-                                </span>
-                              </Checkbox>
-                              <Show when={entryHint(entry.kind)}>
-                                {(hint) => (
                                   <span
-                                    class="pt-0.5 text-xs"
+                                    class="min-w-36 break-all font-mono"
                                     classList={{
-                                      "text-yellow-400": isPersonal(entry.kind),
-                                      "text-lightSlate-600": !isPersonal(
-                                        entry.kind
-                                      )
+                                      "text-lightSlate-50": isTicked(entry),
+                                      "text-lightSlate-600": !isTicked(entry)
                                     }}
                                   >
-                                    <Trans key={hint()} />
+                                    {entry.name}
                                   </span>
-                                )}
-                              </Show>
-                            </div>
-                          )}
-                        </For>
-                      </div>
-                    </Show>
+                                </Checkbox>
+                                <Show when={entryHint(entry.kind)}>
+                                  {(hint) => (
+                                    <span
+                                      class="pt-0.5 text-xs"
+                                      classList={{
+                                        "text-yellow-400": isPersonal(
+                                          entry.kind
+                                        ),
+                                        "text-lightSlate-600": !isPersonal(
+                                          entry.kind
+                                        )
+                                      }}
+                                    >
+                                      <Trans key={hint()} />
+                                    </span>
+                                  )}
+                                </Show>
+                              </div>
+                            )}
+                          </For>
+                        </div>
+                      </Show>
+                    </div>
                   </div>
+                </Collapsable>
+              </div>
+            </Match>
+            <Match when={shareObject()}>
+              <div class="text-lightSlate-50">
+                <div class="mb-4 text-lg">
+                  <Trans key="instances:_trn_instance_share.share_code_label" />
                 </div>
-              </Collapsable>
-            </div>
-          </Match>
-          <Match when={shareObject()}>
-            <div class="text-lightSlate-50">
-              <div class="mb-4 text-lg">
-                <Trans key="instances:_trn_instance_share.share_code_label" />
-              </div>
-              <div class="text-lightSlate-500 mb-4 text-sm">
-                <Trans key="instances:_trn_instance_share.share_code_details" />
-              </div>
-              <div class="flex items-stretch gap-2">
-                <CopyText
-                  size="large"
-                  value={copyDisplay()}
-                  copyValue={copyValue()}
-                  onCopy={() =>
-                    toast.success(t("general:_trn_general_copied_to_clipboard"))
-                  }
-                  class="!bg-darkSlate-800 flex-1 min-w-0"
-                />
-                <Select
-                  class="flex shrink-0"
-                  value={copyMode()}
-                  onChange={(val) => val && setCopyMode(val)}
-                  options={["code", "link"]}
-                  itemComponent={(itemProps) => (
-                    <SelectItem item={itemProps.item}>
-                      {itemProps.item.rawValue === "code" ? "Code" : "Link"}
-                    </SelectItem>
-                  )}
-                >
-                  <SelectTrigger class="w-24 !h-full">
-                    <SelectValue<string>>
-                      {(state) =>
-                        state.selectedOption() === "code" ? "Code" : "Link"
-                      }
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent />
-                </Select>
-              </div>
-              <div class="text-lightSlate-500 mt-4 text-sm">
-                <Trans key="instances:_trn_instance_share.expires_at" />{" "}
-                {new Date(shareObject()!.expires_at).toLocaleString()}
-              </div>
+                <div class="text-lightSlate-500 mb-4 text-sm">
+                  <Trans key="instances:_trn_instance_share.share_code_details" />
+                </div>
+                <div class="flex items-stretch gap-2">
+                  <CopyText
+                    size="large"
+                    value={copyDisplay()}
+                    copyValue={copyValue()}
+                    onCopy={() =>
+                      toast.success(
+                        t("general:_trn_general_copied_to_clipboard")
+                      )
+                    }
+                    class="!bg-darkSlate-800 flex-1 min-w-0"
+                  />
+                  <Select
+                    class="flex shrink-0"
+                    value={copyMode()}
+                    onChange={(val) => val && setCopyMode(val)}
+                    options={["code", "link"]}
+                    itemComponent={(itemProps) => (
+                      <SelectItem item={itemProps.item}>
+                        {itemProps.item.rawValue === "code" ? "Code" : "Link"}
+                      </SelectItem>
+                    )}
+                  >
+                    <SelectTrigger class="w-24 !h-full">
+                      <SelectValue<string>>
+                        {(state) =>
+                          state.selectedOption() === "code" ? "Code" : "Link"
+                        }
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent />
+                  </Select>
+                </div>
+                <div class="text-lightSlate-500 mt-4 text-sm">
+                  <Trans key="instances:_trn_instance_share.expires_at" />{" "}
+                  {new Date(shareObject()!.expires_at).toLocaleString()}
+                </div>
 
-              <div class="border-darkSlate-600 mt-4 flex items-center justify-end border-t pt-4">
-                <Button
-                  type="text"
-                  size="small"
-                  class="text-sm"
-                  onClick={() => {
-                    modalsContext?.closeModal()
-                    navigate("/settings/accounts")
-                  }}
-                >
-                  <div class="i-ri:settings-3-line" />
-                  <Trans key="instances:_trn_instance_share.manage_shares" />
-                  <div class="i-ri:arrow-right-line" />
-                </Button>
+                <div class="border-darkSlate-600 mt-4 flex items-center justify-end border-t pt-4">
+                  <Button
+                    type="text"
+                    size="small"
+                    class="text-sm"
+                    onClick={() => {
+                      modalsContext?.closeModal()
+                      navigate("/settings/accounts")
+                    }}
+                  >
+                    <div class="i-ri:settings-3-line" />
+                    <Trans key="instances:_trn_instance_share.manage_shares" />
+                    <div class="i-ri:arrow-right-line" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          </Match>
-        </Switch>
+            </Match>
+          </Switch>
+        </div>
 
         <div class="flex justify-between gap-3">
           <Show when={!shareObject()}>
