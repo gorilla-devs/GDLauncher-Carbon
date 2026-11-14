@@ -470,12 +470,33 @@ it("actual core exit callback retains owned exit evidence and does not replace n
     coreOutput: { end: vi.fn(), fail: vi.fn() },
     identitySession: "exited-session",
     lifecycle: { endCore: vi.fn(() => false) },
-    quitAfterCoreExit: vi.fn()
+    quitAfterCoreExit: vi.fn(),
+    shutdownInFlight: undefined as Promise<unknown> | undefined,
+    shutdownApproved: false
   }
   actual("exit", "exit", globals)(0)
   expect(globals.coreProcessHandle).toBe(newer)
-  // A dead core can no longer arm the close warning or keep the launcher alive.
-  expect(globals.lifecycle.endCore).toHaveBeenCalledWith("exited-session")
+  // A dead core can no longer arm the close warning or keep the launcher
+  // alive, and a window hidden for a game may come back: nothing is leaving.
+  expect(globals.lifecycle.endCore).toHaveBeenLastCalledWith(
+    "exited-session",
+    false
+  )
+  // During a quit, restart or update the window stays as that left it.
+  globals.shutdownInFlight = new Promise(() => {})
+  actual("exit", "exit", globals)(0)
+  expect(globals.lifecycle.endCore).toHaveBeenLastCalledWith(
+    "exited-session",
+    true
+  )
+  globals.shutdownInFlight = undefined
+  globals.shutdownApproved = true
+  actual("exit", "exit", globals)(0)
+  expect(globals.lifecycle.endCore).toHaveBeenLastCalledWith(
+    "exited-session",
+    true
+  )
+  globals.shutdownApproved = false
   expect(globals.quitAfterCoreExit).not.toHaveBeenCalled()
   // Its Close Window game was keeping the windowless launcher alive.
   globals.lifecycle.endCore.mockReturnValue(true)

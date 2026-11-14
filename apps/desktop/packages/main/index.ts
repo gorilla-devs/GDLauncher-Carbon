@@ -630,7 +630,10 @@ const loadCoreModule: CoreModule = async () => {
       console.error(`[CORE] Error: ${data.toString()}`)
     })
     coreModule.on("exit", (code) => {
-      const keptAlive = lifecycle.endCore(identitySession)
+      const keptAlive = lifecycle.endCore(
+        identitySession,
+        shutdownInFlight !== undefined || shutdownApproved
+      )
       coreOutput.end()
       // Retain this launcher-owned handle: its observed exit is recovery evidence.
       coreOutput.fail(
@@ -1450,16 +1453,16 @@ app.whenReady().then(async () => {
     for (const url of argv.filter(isSupportedProtocol))
       protocolQueue.enqueue(url)
     if (shutdownInFlight || !win || win.isDestroyed()) revealWindow()
-    else {
-      if (win.isMinimized()) win.restore()
-      win.focus()
-    }
+    else surfaceWindow(win)
   })
 
   // During a quit that is still finishing, the hidden window comes back
-  // with its prompt instead of a second window being created.
+  // with its prompt instead of a second window being created. A window
+  // hidden for a game comes back too; macOS also sends this when the app is
+  // merely activated, which leaves a visible window alone.
   app.on("activate", () => {
     if (shutdownInFlight || !win || win.isDestroyed()) revealWindow()
+    else if (!win.isVisible()) surfaceWindow(win)
   })
 
   await createWindow()
@@ -1516,6 +1519,17 @@ function revealWindow() {
 }
 function hideWindow() {
   if (win && !win.isDestroyed()) win.hide()
+}
+/**
+ * Brings the launcher's live window to the user who asked for it by starting
+ * GDLauncher again, clicking its Dock or taskbar icon or opening a link:
+ * out of the taskbar, and out of hiding when a game launched with Hide
+ * Window put it there. `focus()` alone does not show a hidden window.
+ */
+function surfaceWindow(window: BrowserWindow) {
+  if (window.isMinimized()) window.restore()
+  if (!window.isVisible()) window.show()
+  window.focus()
 }
 
 let shutdownInFlight: Promise<ShutdownOutcome> | undefined
@@ -1756,8 +1770,5 @@ app.on("open-url", (event, url) => {
   if (shutdownInFlight || !win || win.isDestroyed()) {
     // Before ready, the window the launch creates takes the link.
     if (app.isReady()) revealWindow()
-  } else {
-    if (win.isMinimized()) win.restore()
-    win.focus()
-  }
+  } else surfaceWindow(win)
 })

@@ -76,10 +76,30 @@ export class LauncherLifecycle<W extends LauncherWindow> {
    *  quitting once windowless. A window may still be open (a relaunch during
    *  the game), so callers must check for one before quitting. When none is,
    *  'window-all-closed' already deferred the quit for those games and does
-   *  not run again, so the caller makes that decision. */
-  endCore(session = this.coreSession): boolean {
+   *  not run again, so the caller makes that decision.
+   *
+   *  A window hidden for a Hide Window game was waiting for that game's
+   *  exit to be shown again. Nothing reports it now, so the window comes
+   *  back here instead of staying hidden with the launcher running unseen.
+   *  Not while GDLauncher is `leaving` (a quit, restart or update is under
+   *  way): a quit hides the window on purpose. */
+  endCore(session = this.coreSession, leaving = false): boolean {
     if (session !== this.coreSession) return false
     const keptAlive = this.keepAliveWithoutWindows()
+    const current = this.io.current()
+    if (
+      !leaving &&
+      !this.quitting &&
+      !this.quitPending &&
+      current &&
+      !current.isDestroyed() &&
+      [...this.sessions.values()].some(
+        (game) => game.action === "hideWindow" && game.window === current
+      )
+    ) {
+      current.show()
+      current.focus()
+    }
     this.coreEnded = true
     this.revision = -1
     this.running.clear()

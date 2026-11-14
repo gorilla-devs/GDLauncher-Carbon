@@ -1470,8 +1470,8 @@ it("actual second launch during a pending quit shows the hidden window and its p
     value.context,
     evaluate(
       "(() => {\n" +
-        declarations(value.text, ["revealWindow"]) +
-        "\nreturn { revealWindow }\n})()",
+        declarations(value.text, ["revealWindow", "surfaceWindow"]) +
+        "\nreturn { revealWindow, surfaceWindow }\n})()",
       value.context
     )
   )
@@ -1494,6 +1494,63 @@ it("actual second launch during a pending quit shows the hidden window and its p
   expect(revealed).toBe(2)
   expect(ElectronLikeWindow.created).toHaveLength(1)
 })
+it("actual second start, Dock click and link show a window hidden for a Hide Window game", async () => {
+  const value = mainWindow()
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  Object.assign(
+    value.context,
+    evaluate(
+      "(() => {\n" +
+        declarations(value.text, ["revealWindow", "surfaceWindow"]) +
+        "\nreturn { revealWindow, surfaceWindow }\n})()",
+      value.context
+    )
+  )
+  value.context.isSupportedProtocol = (url: string) =>
+    url.startsWith("gdlauncher://")
+  value.context.app.isReady = () => true
+  const secondInstance = evaluate(
+    callArgument(value.text, "app.on", "second-instance"),
+    value.context
+  ) as (event: unknown, argv: string[]) => void
+  const activate = evaluate(
+    callArgument(value.text, "app.on", "activate"),
+    value.context
+  ) as () => void
+  const openUrl = evaluate(
+    callArgument(value.text, "app.on", "open-url"),
+    value.context
+  ) as (event: { preventDefault(): void }, url: string) => void
+  const reopen: [string, () => void][] = [
+    ["second start", () => secondInstance({}, [])],
+    ["Dock click", () => activate()],
+    ["link", () => openUrl({ preventDefault() {} }, "gdlauncher://share/X")]
+  ]
+  for (const [name, action] of reopen) {
+    value.lifecycle.event("GAME_LAUNCHED|1|7|hideWindow")
+    expect(w.hidden, name).toBe(true)
+    const focused = w.focused
+    action()
+    expect(w.hidden, name).toBe(false)
+    expect(w.focused, name).toBe(focused + 1)
+    value.lifecycle.event("GAME_CLOSED|1|7|hideWindow")
+  }
+  expect(ElectronLikeWindow.created).toHaveLength(1)
+
+  // A minimized window is restored, and a visible one is only focused.
+  w.minimize()
+  const shown = w.shown
+  secondInstance({}, [])
+  expect(w.minimized).toBe(false)
+  expect(w.shown).toBe(shown)
+  // macOS sends 'activate' when the app merely becomes active: a visible
+  // window is left as it is.
+  const focused = w.focused
+  activate()
+  expect(w.focused).toBe(focused)
+  expect(w.shown).toBe(shown)
+})
 it("actual macOS link opened during a pending quit shows the hidden window and its prompt, and still reaches it", async () => {
   const value = mainWindow()
   const w = await value.createWindow()
@@ -1509,8 +1566,8 @@ it("actual macOS link opened during a pending quit shows the hidden window and i
     value.context,
     evaluate(
       "(() => {\n" +
-        declarations(value.text, ["revealWindow"]) +
-        "\nreturn { revealWindow }\n})()",
+        declarations(value.text, ["revealWindow", "surfaceWindow"]) +
+        "\nreturn { revealWindow, surfaceWindow }\n})()",
       value.context
     )
   )
@@ -1682,6 +1739,9 @@ it("main index.ts no longer revokes the protocol consumer when a navigation mere
 async function coreProcess(context: {
   lifecycle: unknown
   quitAfterCoreExit: () => void
+  /** A quit, restart or update is under way or was approved. */
+  shutdownInFlight?: unknown
+  shutdownApproved?: boolean
 }) {
   const child = Object.assign(new EventEmitter(), {
     pid: 7,
@@ -1708,6 +1768,8 @@ async function coreProcess(context: {
       e2eEntitlementKey: null,
       crypto: { randomUUID: () => "session-1" },
       accountIdentity: { beginCore() {}, acceptPayload() {} },
+      shutdownInFlight: undefined,
+      shutdownApproved: false,
       ...context,
       spawn: () => child,
       process: { env: {} },
@@ -1754,6 +1816,8 @@ it("actual core load spawns the core before yielding to the event loop", () => {
       accountIdentity: { beginCore() {}, acceptPayload() {} },
       lifecycle: { beginCore() {}, endCore: () => false },
       quitAfterCoreExit() {},
+      shutdownInFlight: undefined,
+      shutdownApproved: false,
       spawn: () => {
         spawned = true
         return child
@@ -1768,6 +1832,38 @@ it("actual core load spawns the core before yielding to the event loop", () => {
   )
   void load()
   expect(spawned).toBe(true)
+})
+it("actual core exit shows a window hidden for a Hide Window game, unless a quit, restart or update is under way", async () => {
+  const value = mainWindow()
+  const { child } = await coreProcess({
+    lifecycle: value.lifecycle,
+    quitAfterCoreExit: value.quitAfterCoreExit
+  })
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  value.lifecycle.event("GAME_LAUNCHED|1|7|hideWindow", "session-1")
+  expect(w.hidden).toBe(true)
+  child.emit("exit", 1)
+  expect(w.hidden).toBe(false)
+  expect(w.focused).toBe(1)
+  expect(value.appQuits).toBe(0)
+
+  for (const leaving of [
+    { shutdownInFlight: new Promise(() => {}) },
+    { shutdownApproved: true }
+  ]) {
+    const quitting = mainWindow()
+    const core = await coreProcess({
+      lifecycle: quitting.lifecycle,
+      quitAfterCoreExit: quitting.quitAfterCoreExit,
+      ...leaving
+    })
+    const hidden = await quitting.createWindow()
+    hidden.emit("ready-to-show")
+    quitting.lifecycle.event("GAME_LAUNCHED|1|7|hideWindow", "session-1")
+    core.child.emit("exit", 0)
+    expect(hidden.hidden).toBe(true)
+  }
 })
 it("actual core exit clears the lifecycle for its own session", async () => {
   for (const keptAlive of [false, true]) {

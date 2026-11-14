@@ -755,6 +755,78 @@ function protocol() {
   }
   return { sender, other, queue, ipc, received, listeners }
 }
+describe("A window hidden for a Hide Window game when the core exits", () => {
+  it("comes back, as nothing can report the game's exit any more", () => {
+    const value = windows(),
+      w = value.make()
+    value.lifecycle.event("GAME_LAUNCHED|1|7|hideWindow")
+    expect(w.hidden).toBe(true)
+    expect(value.lifecycle.endCore()).toBe(false)
+    expect(w.shown).toBe(1)
+    expect(w.focused).toBe(1)
+    // The dead core's late record changes nothing more.
+    value.lifecycle.event("GAME_CLOSED|1|7|hideWindow")
+    expect(w.shown).toBe(1)
+    expect(value.creates).toBe(1)
+  })
+  it("stays hidden while GDLauncher is quitting, restarting or updating", () => {
+    // The caller says a quit, restart or update is under way.
+    const leaving = windows(),
+      l = leaving.make()
+    leaving.lifecycle.event("GAME_LAUNCHED|1|7|hideWindow")
+    leaving.lifecycle.endCore(undefined, true)
+    expect(l.shown).toBe(0)
+    // A quit that started and hid the window.
+    const pending = windows(),
+      p = pending.make()
+    pending.lifecycle.event("GAME_LAUNCHED|1|7|hideWindow")
+    pending.lifecycle.quitStarted()
+    pending.lifecycle.endCore()
+    expect(p.shown).toBe(0)
+    // A quit that was approved.
+    const approved = windows(),
+      a = approved.make()
+    approved.lifecycle.event("GAME_LAUNCHED|1|7|hideWindow")
+    approved.lifecycle.approveQuit()
+    approved.lifecycle.endCore()
+    expect(a.shown).toBe(0)
+  })
+  it("leaves alone a window that was not hidden for a game, and another core's exit", () => {
+    const value = windows(),
+      w = value.make()
+    // Minimize keeps its taskbar entry; no launch action hides nothing.
+    value.lifecycle.event("GAME_LAUNCHED|1|7|minimizeWindow")
+    value.lifecycle.event("GAME_LAUNCHED|2|8|none")
+    value.lifecycle.endCore()
+    expect(w.shown).toBe(0)
+
+    const sessions = windows(),
+      s = sessions.make()
+    sessions.lifecycle.beginCore("session-2")
+    sessions.lifecycle.event("GAME_LAUNCHED|1|7|hideWindow", "session-2")
+    // The exit of the core this one replaced.
+    sessions.lifecycle.endCore("session-1")
+    expect(s.shown).toBe(0)
+    sessions.lifecycle.endCore("session-2")
+    expect(s.shown).toBe(1)
+  })
+  it("does not touch a window that was replaced or is gone", () => {
+    const value = windows(),
+      first = value.make()
+    value.lifecycle.event("GAME_LAUNCHED|1|7|hideWindow")
+    // The user closed it and another window took its place.
+    first.destroy()
+    const second = value.make()
+    value.lifecycle.endCore()
+    expect(second.shown).toBe(0)
+
+    const gone = windows(),
+      g = gone.make()
+    gone.lifecycle.event("GAME_LAUNCHED|1|7|hideWindow")
+    g.destroy()
+    expect(() => gone.lifecycle.endCore()).not.toThrow()
+  })
+})
 describe("Close warning before a quit stops a server or an install", () => {
   const stops = (servers: boolean, installs: boolean, revision = 1) =>
     JSON.stringify({ revision, servers, installs })
