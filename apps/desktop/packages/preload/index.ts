@@ -5,6 +5,7 @@ import {
   type CloseWarningReasons
 } from "./closeWarningBridge"
 import { subscribeShutdownPrompt } from "./shutdownPromptBridge"
+import { coreExit, subscribeCoreExit, type CoreExit } from "./coreExitBridge"
 
 import "./loading"
 import "./core_module_loader"
@@ -43,6 +44,16 @@ contextBridge.exposeInMainWorld("shutdownStops", async () =>
 
 contextBridge.exposeInMainWorld("closeWindow", async () =>
   ipcRenderer.invoke("closeWindow")
+)
+
+// The core stopped by itself: the page says so and offers a restart. The
+// second is for a page that loads after it happened.
+contextBridge.exposeInMainWorld(
+  "onCoreExited",
+  (cb: (exit: CoreExit) => void) => subscribeCoreExit(ipcRenderer, cb)
+)
+contextBridge.exposeInMainWorld("coreExit", async () =>
+  coreExit(await ipcRenderer.invoke("coreExit"))
 )
 
 // The prompt shown when a quit, restart or update does not finish.

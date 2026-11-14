@@ -12,6 +12,7 @@ import {
 } from "@tanstack/solid-query"
 import type { Procedures } from "@gd/core_module"
 import { toast } from "@gd/ui"
+import { coreStopped } from "./coreStopped"
 import { i18n } from "@gd/i18n"
 import { dispatchBannedEvent } from "./bannedEventBridge"
 import { errorToastCopyAction } from "./errorToastCopyAction"
@@ -103,6 +104,9 @@ const ERROR_TOAST_COOLDOWN_MS = { query: 60_000, mutation: 5_000 }
 const errorToastLastShown = new Map<string, number>()
 
 function showDedupedErrorToast(display: string, source: "query" | "mutation") {
+  // The background service stopped: every request fails, which reads as a
+  // network problem. The notice over the launcher says what happened.
+  if (coreStopped()) return
   let key = `message:${display}`
   let message = display
   let description: string | undefined
@@ -529,7 +533,8 @@ export default function initRspc(_port: number, _apiToken: string) {
       current.addEventListener("close", () => {
         if (!ownsSocket()) return
         connected = false
-        if (reconnectTimer !== undefined) return
+        // Nothing to reconnect to once the background service stopped.
+        if (reconnectTimer !== undefined || coreStopped()) return
         console.log(
           "Invalidations channel disconnected. Attempting to reconnect..."
         )

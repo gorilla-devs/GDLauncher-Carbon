@@ -76,5 +76,8 @@
   "_trn_shutdown_prompt.force_restart": "Restart now",
   "_trn_shutdown_prompt.force_reset": "Reset now",
   "_trn_shutdown_prompt.force_restore": "Restore now",
-  "_trn_shutdown_prompt.keep_open": "Keep GDLauncher open"
+  "_trn_shutdown_prompt.keep_open": "Keep GDLauncher open",
+  "_trn_core_stopped.title": "GDLauncher's background service stopped",
+  "_trn_core_stopped.body": "Restart GDLauncher to keep using it.",
+  "_trn_core_stopped.exit_code": "Exit code {{code}}"
 }

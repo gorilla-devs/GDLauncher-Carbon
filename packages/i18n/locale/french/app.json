@@ -76,5 +76,8 @@
   "_trn_shutdown_prompt.force_restart": "Redémarrer maintenant",
   "_trn_shutdown_prompt.force_reset": "Réinitialiser maintenant",
   "_trn_shutdown_prompt.force_restore": "Restaurer maintenant",
-  "_trn_shutdown_prompt.keep_open": "Garder GDLauncher ouvert"
+  "_trn_shutdown_prompt.keep_open": "Garder GDLauncher ouvert",
+  "_trn_core_stopped.title": "Le service en arrière-plan de GDLauncher s’est arrêté",
+  "_trn_core_stopped.body": "Redémarrez GDLauncher pour continuer à l’utiliser.",
+  "_trn_core_stopped.exit_code": "Code de sortie {{code}}"
 }

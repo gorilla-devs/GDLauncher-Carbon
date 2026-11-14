@@ -118,6 +118,15 @@ declare global {
     shutdownStops: () => Promise<{ servers: boolean; installs: boolean }>
     /** Resolves "kept" when the user chose to keep GDLauncher open. */
     relaunch: () => Promise<{ status: "kept" | "relaunching" } | undefined>
+    /** The background service stopped by itself; nothing works until a
+     *  restart. `coreExit` answers for a page loaded after it happened. */
+    onCoreExited: (
+      cb: (exit: { code: number | null; signal: string | null }) => void
+    ) => () => void
+    coreExit: () => Promise<{
+      code: number | null
+      signal: string | null
+    } | null>
     onShutdownPrompt: (
       cb: (message: ShutdownPromptMessage) => void
     ) => () => void

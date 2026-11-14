@@ -472,10 +472,18 @@ it("actual core exit callback retains owned exit evidence and does not replace n
     lifecycle: { endCore: vi.fn(() => false) },
     quitAfterCoreExit: vi.fn(),
     shutdownInFlight: undefined as Promise<unknown> | undefined,
-    shutdownApproved: false
+    shutdownApproved: false,
+    coreExitNotice: { exited: vi.fn() },
+    ready: true
   }
-  actual("exit", "exit", globals)(0)
+  actual("exit", "exit", globals)(0, null)
   expect(globals.coreProcessHandle).toBe(newer)
+  // Whether the window is told is decided from the exit and whether the core
+  // had become ready (utils/coreExitNotice).
+  expect(globals.coreExitNotice.exited).toHaveBeenLastCalledWith(true, {
+    code: 0,
+    signal: null
+  })
   // A dead core can no longer arm the close warning or keep the launcher
   // alive, and a window hidden for a game may come back: nothing is leaving.
   expect(globals.lifecycle.endCore).toHaveBeenLastCalledWith(

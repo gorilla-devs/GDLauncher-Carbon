@@ -74,6 +74,38 @@ describe("handleGlobalError", () => {
   })
 })
 
+describe("handleGlobalError once the background service stopped", () => {
+  beforeEach(() => {
+    toastError.mockClear()
+  })
+  afterEach(async () => {
+    vi.unstubAllGlobals()
+    ;(await import("./coreStopped")).resetCoreStopped()
+  })
+
+  it("no longer reports failed requests: they are not a network problem", async () => {
+    const { watchCoreStopped } = await import("./coreStopped")
+    let report!: (exit: { code: number | null; signal: string | null }) => void
+    vi.stubGlobal("window", {
+      onCoreExited: (cb: typeof report) => {
+        report = cb
+        return () => {}
+      },
+      coreExit: async () => null
+    })
+    watchCoreStopped()
+    handleGlobalError(new TypeError("Failed to fetch"), "query")
+    expect(toastError).toHaveBeenCalledTimes(1)
+    expect(toastError.mock.calls[0][0]).toBe("errors:_trn_network_error_toast")
+
+    toastError.mockClear()
+    report({ code: 101, signal: null })
+    handleGlobalError(new TypeError("Failed to fetch"), "mutation")
+    handleGlobalError(new Error("anything else"), "mutation")
+    expect(toastError).not.toHaveBeenCalled()
+  })
+})
+
 describe("handleGlobalError for a server's record from an earlier session", () => {
   beforeEach(() => {
     toastError.mockClear()

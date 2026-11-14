@@ -76,5 +76,8 @@
   "_trn_shutdown_prompt.force_restart": "Перезапустить сейчас",
   "_trn_shutdown_prompt.force_reset": "Сбросить сейчас",
   "_trn_shutdown_prompt.force_restore": "Восстановить сейчас",
-  "_trn_shutdown_prompt.keep_open": "Оставить GDLauncher открытым"
+  "_trn_shutdown_prompt.keep_open": "Оставить GDLauncher открытым",
+  "_trn_core_stopped.title": "Фоновая служба GDLauncher остановилась",
+  "_trn_core_stopped.body": "Перезапустите GDLauncher, чтобы продолжить работу.",
+  "_trn_core_stopped.exit_code": "Код завершения {{code}}"
 }

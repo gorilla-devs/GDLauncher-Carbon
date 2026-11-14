@@ -35,6 +35,7 @@ import {
   publishE2EMainStart
 } from "./utils/e2eBootstrap"
 import { createCoreOutput } from "./utils/coreOutput"
+import { createCoreExitNotice } from "./utils/coreExitNotice"
 import {
   LauncherLifecycle,
   mainWindowClosed,
@@ -468,6 +469,33 @@ const DEV_API_TOKEN = "dev-mode-only-do-not-use-in-production"
 // core promise via the timeout below while the process itself stays alive.
 let coreProcessHandle: ChildProcessWithoutNullStreams | null = null
 
+/** How long a Windows session-end question counts: it may be cancelled. */
+const SESSION_END_ASKED_MS = 2 * 60 * 1000
+let sessionEnding = false
+let sessionEndAsked: number | undefined
+/**
+ * Whether a core exit now is no surprise: a quit, restart, update, database
+ * reset or restore, or a data folder move stops it on purpose, or the
+ * session is ending and takes the core down with the launcher. A brief
+ * operation (removing old recovery copies) never stops the core.
+ */
+const coreStopExpected = () =>
+  shutdownApproved ||
+  shutdownInFlight !== undefined ||
+  (runtimeOperationActive() && !runtimeOperationBrief()) ||
+  sessionEnding ||
+  (sessionEndAsked !== undefined &&
+    Date.now() - sessionEndAsked < SESSION_END_ASKED_MS)
+/** Tells the window when the core stopped by itself (utils/coreExitNotice). */
+const coreExitNotice = createCoreExitNotice({
+  expected: coreStopExpected,
+  send: (exit) => {
+    const window = getWin()
+    if (window && !window.isDestroyed())
+      window.webContents.send("coreExited", exit)
+  }
+})
+
 const loadCoreModule: CoreModule = async () => {
   // Nothing here may await before the spawn below. Called while this module
   // loads, the core starts before Chromium launches any child process, as in
@@ -561,10 +589,13 @@ const loadCoreModule: CoreModule = async () => {
       return
     }
 
+    // The window is on this core: an exit from here on leaves it on nothing.
+    let ready = false
     const coreOutput = createCoreOutput({
       log: (entry) => console.log(`[CORE] Message: ${entry.message}`),
       settle: (result) => {
         clearTimeout(startupTimer)
+        ready = result.type === "success"
         if (result.type === "success")
           resolve({
             ...result,
@@ -629,7 +660,8 @@ const loadCoreModule: CoreModule = async () => {
       coreOutput.stderr(data.toString())
       console.error(`[CORE] Error: ${data.toString()}`)
     })
-    coreModule.on("exit", (code) => {
+    coreModule.on("exit", (code, signal) => {
+      coreExitNotice.exited(ready, { code, signal })
       const keptAlive = lifecycle.endCore(
         identitySession,
         shutdownInFlight !== undefined || shutdownApproved
@@ -867,6 +899,15 @@ function spawnWindow(): BrowserWindow {
     if (pendingDisplayChange) {
       applyAdLayoutForCurrentDisplay()
     }
+  })
+
+  // Windows only: a logout, restart or shutdown ends the core along with the
+  // launcher, in either order. The question may still be cancelled.
+  createdWindow.on("query-session-end", () => {
+    sessionEndAsked = Date.now()
+  })
+  createdWindow.on("session-end", () => {
+    sessionEnding = true
   })
 
   createdWindow.on("close", (e) => {
@@ -1419,6 +1460,10 @@ ipcMain.handle("getCoreModule", async () => {
     apiToken: cm.type === "success" ? cm.result.apiToken : undefined
   }
 })
+
+// The core stopped by itself after it became ready, for a window that loads
+// afterwards: its getCoreModule answer above is that of the core that ended.
+ipcMain.handle("coreExit", () => coreExitNotice.current)
 
 ipcMain.handle("getCurrentProgress", () => {
   return lastCoreModuleProgress

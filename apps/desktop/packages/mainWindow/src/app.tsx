@@ -20,6 +20,7 @@ import {
   showUnavailableRuntimePath
 } from "./utils/runtimeMoveNotice"
 import ShutdownPrompt from "./components/ShutdownPrompt"
+import CoreStopped from "./components/CoreStopped"
 
 interface Props {
   createInvalidateQuery: () => () => void
@@ -143,6 +144,8 @@ const App = (props: Props) => {
       {/* While mounted, main asks here when a quit, restart or update does
           not finish, instead of in a native dialog. */}
       <ShutdownPrompt />
+      {/* The background service stopped by itself: only a restart helps. */}
+      <CoreStopped />
     </div>
   )
 }

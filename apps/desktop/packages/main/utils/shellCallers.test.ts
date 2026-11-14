@@ -5,6 +5,7 @@ import vm from "node:vm"
 import { EventEmitter } from "node:events"
 import ts from "typescript"
 import { createCoreOutput } from "./coreOutput"
+import { createCoreExitNotice, type CoreExit } from "./coreExitNotice"
 import { AccountIdentityReceiver } from "./accountIdentity"
 import {
   ProtocolQueue,
@@ -840,6 +841,8 @@ function mainWindow() {
     whenRuntimeOperationIdle: () => {},
     shutdownApproved: false,
     shutdownInFlight: undefined,
+    sessionEnding: false,
+    sessionEndAsked: undefined,
     shutdownPrompts: new ShutdownPrompts<any>(async () => null),
     skipIntroAnimation: false,
     protocolQueue,
@@ -1742,6 +1745,7 @@ async function coreProcess(context: {
   /** A quit, restart or update is under way or was approved. */
   shutdownInFlight?: unknown
   shutdownApproved?: boolean
+  coreExitNotice?: unknown
 }) {
   const child = Object.assign(new EventEmitter(), {
     pid: 7,
@@ -1770,6 +1774,7 @@ async function coreProcess(context: {
       accountIdentity: { beginCore() {}, acceptPayload() {} },
       shutdownInFlight: undefined,
       shutdownApproved: false,
+      coreExitNotice: { exited() {} },
       ...context,
       spawn: () => child,
       process: { env: {} },
@@ -1947,6 +1952,175 @@ it("actual core exit during startup leaves the window to show the error", async 
   child.emit("exit", 1)
   expect((await result).type).toBe("error")
   expect(value.appQuits).toBe(0)
+})
+
+/**
+ * The real decision of main/index.ts about a core that exited, over the
+ * state of a `mainWindow()` fixture. `settle` runs the wait it holds an exit
+ * for; `clock` is the time it reads.
+ */
+function coreExitDecision(value: ReturnType<typeof mainWindow>) {
+  const waits: (() => void)[] = []
+  const clock = { now: 1_000_000 }
+  const context = value.context
+  Object.assign(context, {
+    Date: { now: () => clock.now },
+    getWin: () => context.win,
+    runtimeOperationBrief: () => false,
+    SESSION_END_ASKED_MS: evaluate(
+      initializer(value.text, "SESSION_END_ASKED_MS"),
+      {}
+    ),
+    createCoreExitNotice: (io: Parameters<typeof createCoreExitNotice>[0]) =>
+      createCoreExitNotice({ ...io, wait: (run) => waits.push(run) })
+  })
+  context.coreStopExpected = evaluate(
+    initializer(value.text, "coreStopExpected"),
+    context
+  )
+  context.coreExitNotice = evaluate(
+    initializer(value.text, "coreExitNotice"),
+    context
+  )
+  return {
+    clock,
+    notice: context.coreExitNotice as { current: CoreExit | null },
+    settle: () => waits.splice(0).forEach((run) => run()),
+    /** What a window that loads now is told. */
+    asked: evaluate(
+      callArgument(value.text, "ipcMain.handle", "coreExit"),
+      context
+    ) as () => CoreExit | null
+  }
+}
+/** A window on a core that reported READY, with the real exit decision. */
+async function readyCore() {
+  const value = mainWindow()
+  const decision = coreExitDecision(value)
+  const { child, result } = await coreProcess({
+    lifecycle: value.lifecycle,
+    quitAfterCoreExit: value.quitAfterCoreExit,
+    coreExitNotice: decision.notice
+  })
+  const window = await value.createWindow()
+  window.emit("ready-to-show")
+  child.stdout.emit("data", Buffer.from("_STATUS_:READY|1234|synthetic\n"))
+  expect((await result).type).toBe("success")
+  const told = () =>
+    window.contents.sent.filter(([channel]) => channel === "coreExited")
+  return { value, decision, child, window, told }
+}
+it("actual core exit after a clean start tells the window, and a window loaded later, how it ended", async () => {
+  const f = await readyCore()
+  expect(f.decision.asked()).toBeNull()
+  // Ended from Task Manager, by the system, or a crash.
+  f.child.emit("exit", null, "SIGKILL")
+  expect(f.told()).toEqual([])
+  expect(f.decision.asked()).toBeNull()
+  f.decision.settle()
+  const exit = { code: null, signal: "SIGKILL" }
+  expect(f.told()).toEqual([["coreExited", exit]])
+  // A reload gets the dead core's port again from getCoreModule.
+  expect(f.decision.asked()).toEqual(exit)
+  expect(f.value.appQuits).toBe(0)
+
+  const crashed = await readyCore()
+  crashed.child.emit("exit", 101, null)
+  crashed.decision.settle()
+  expect(crashed.told()).toEqual([["coreExited", { code: 101, signal: null }]])
+})
+/** Everything that stops the core on purpose or ends it with the launcher. */
+const expectedStops: [
+  string,
+  (f: Awaited<ReturnType<typeof readyCore>>) => unknown
+][] = [
+  [
+    "quit, restart or update under way",
+    (f) => (f.value.context.shutdownInFlight = new Promise(() => {}))
+  ],
+  [
+    "quit, restart or update approved",
+    (f) => (f.value.context.shutdownApproved = true)
+  ],
+  [
+    "data folder move, database reset or restore",
+    (f) => (f.value.context.runtimeOperationActive = () => true)
+  ],
+  [
+    "Windows asks to end the session",
+    (f) => f.window.emit("query-session-end")
+  ],
+  ["Windows ends the session", (f) => f.window.emit("session-end")]
+]
+it("actual core exit says nothing while a stop of the core is expected", async () => {
+  for (const [name, arrange] of expectedStops) {
+    const f = await readyCore()
+    arrange(f)
+    f.child.emit("exit", 0, null)
+    f.decision.settle()
+    expect(f.told(), name).toEqual([])
+    expect(f.decision.asked(), name).toBeNull()
+  }
+})
+it("actual core exit says nothing when the launcher starts leaving just after", async () => {
+  // The core is in the launcher's process group: Ctrl+C, a logout or a kill
+  // of the whole tree can end it before the launcher's own quit begins.
+  for (const [name, arrange] of expectedStops) {
+    const f = await readyCore()
+    f.child.emit("exit", null, "SIGINT")
+    arrange(f)
+    f.decision.settle()
+    expect(f.told(), name).toEqual([])
+    expect(f.decision.asked(), name).toBeNull()
+  }
+})
+it("actual core exit before READY is left to the startup error screen", async () => {
+  const value = mainWindow()
+  const decision = coreExitDecision(value)
+  const { child, result } = await coreProcess({
+    lifecycle: value.lifecycle,
+    quitAfterCoreExit: value.quitAfterCoreExit,
+    coreExitNotice: decision.notice
+  })
+  const window = await value.createWindow()
+  window.emit("ready-to-show")
+  child.emit("exit", 1, null)
+  decision.settle()
+  expect((await result).type).toBe("error")
+  expect(window.contents.sent).toEqual([])
+  expect(decision.asked()).toBeNull()
+})
+it("actual core exit is still reported during a brief operation and after a session end that was cancelled", async () => {
+  // Removing old recovery copies does not stop the core.
+  const brief = await readyCore()
+  brief.value.context.runtimeOperationActive = () => true
+  brief.value.context.runtimeOperationBrief = () => true
+  brief.child.emit("exit", 101, null)
+  brief.decision.settle()
+  expect(brief.told()).toHaveLength(1)
+
+  // Another program refused the shutdown; the launcher ran on.
+  const cancelled = await readyCore()
+  cancelled.window.emit("query-session-end")
+  cancelled.decision.clock.now +=
+    cancelled.value.context.SESSION_END_ASKED_MS - 1
+  cancelled.child.emit("exit", 101, null)
+  cancelled.decision.settle()
+  expect(cancelled.told()).toEqual([])
+  const later = await readyCore()
+  later.window.emit("query-session-end")
+  later.decision.clock.now += later.value.context.SESSION_END_ASKED_MS
+  later.child.emit("exit", 101, null)
+  later.decision.settle()
+  expect(later.told()).toHaveLength(1)
+})
+it("actual core exit notice is withdrawn for a window loaded while the launcher restarts from it", async () => {
+  const f = await readyCore()
+  f.child.emit("exit", 101, null)
+  f.decision.settle()
+  expect(f.decision.asked()).not.toBeNull()
+  f.value.context.shutdownInFlight = new Promise(() => {})
+  expect(f.decision.asked()).toBeNull()
 })
 
 /** The real runtime-operation guard, as main/index.ts imports it. */

@@ -76,5 +76,8 @@
   "_trn_shutdown_prompt.force_restart": "Riavvia ora",
   "_trn_shutdown_prompt.force_reset": "Reimposta ora",
   "_trn_shutdown_prompt.force_restore": "Ripristina ora",
-  "_trn_shutdown_prompt.keep_open": "Tieni aperto GDLauncher"
+  "_trn_shutdown_prompt.keep_open": "Tieni aperto GDLauncher",
+  "_trn_core_stopped.title": "Il servizio in background di GDLauncher si è arrestato",
+  "_trn_core_stopped.body": "Riavvia GDLauncher per continuare a usarlo.",
+  "_trn_core_stopped.exit_code": "Codice di uscita {{code}}"
 }

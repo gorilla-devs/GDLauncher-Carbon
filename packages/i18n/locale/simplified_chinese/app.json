@@ -76,5 +76,8 @@
   "_trn_shutdown_prompt.force_restart": "立即重启",
   "_trn_shutdown_prompt.force_reset": "立即重置",
   "_trn_shutdown_prompt.force_restore": "立即恢复",
-  "_trn_shutdown_prompt.keep_open": "保持 GDLauncher 打开"
+  "_trn_shutdown_prompt.keep_open": "保持 GDLauncher 打开",
+  "_trn_core_stopped.title": "GDLauncher 的后台服务已停止",
+  "_trn_core_stopped.body": "请重启 GDLauncher 以继续使用。",
+  "_trn_core_stopped.exit_code": "退出代码 {{code}}"
 }

@@ -76,5 +76,8 @@
   "_trn_shutdown_prompt.force_restart": "Reiniciar ahora",
   "_trn_shutdown_prompt.force_reset": "Restablecer ahora",
   "_trn_shutdown_prompt.force_restore": "Restaurar ahora",
-  "_trn_shutdown_prompt.keep_open": "Mantener GDLauncher abierto"
+  "_trn_shutdown_prompt.keep_open": "Mantener GDLauncher abierto",
+  "_trn_core_stopped.title": "El servicio en segundo plano de GDLauncher se detuvo",
+  "_trn_core_stopped.body": "Reinicia GDLauncher para seguir usándolo.",
+  "_trn_core_stopped.exit_code": "Código de salida {{code}}"
 }
