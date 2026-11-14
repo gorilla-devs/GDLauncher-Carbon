@@ -82,7 +82,7 @@
   "_trn_cache_cleanup.retry_failed": "Impossible de relancer le nettoyage. Réessayez.",
   "_trn_cache_cleanup.retry": "Réessayer",
   "_trn_cache_cleanup.gdlauncher_title": "Cache de GDLauncher",
-  "_trn_cache_cleanup.gdlauncher_desc": "Informations en cache des mods et modpacks, images des projets, métadonnées de versions, téléchargements temporaires et anciens logs du lanceur.",
+  "_trn_cache_cleanup.gdlauncher_desc": "Informations en cache des mods et modpacks, images des projets, téléchargements temporaires et anciens logs du lanceur.",
   "_trn_cache_cleanup.minecraft_title": "Cache de Minecraft",
   "_trn_cache_cleanup.minecraft_desc": "Ressources du jeu, bibliothèques Java et bibliothèques natives. Re-téléchargées ou recréées à la demande la prochaine fois que vous lancerez une instance concernée."
 }

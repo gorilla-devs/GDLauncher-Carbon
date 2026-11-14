@@ -82,7 +82,7 @@
   "_trn_cache_cleanup.retry_failed": "无法重新开始清理，请重试。",
   "_trn_cache_cleanup.retry": "重试",
   "_trn_cache_cleanup.gdlauncher_title": "GDLauncher 缓存",
-  "_trn_cache_cleanup.gdlauncher_desc": "缓存的模组和整合包信息、项目图片、版本元数据、临时下载文件和旧的启动器日志。",
+  "_trn_cache_cleanup.gdlauncher_desc": "缓存的模组和整合包信息、项目图片、临时下载文件和旧的启动器日志。",
   "_trn_cache_cleanup.minecraft_title": "Minecraft 缓存",
   "_trn_cache_cleanup.minecraft_desc": "游戏资源、Java 库和本地库。下次启动受影响的实例时会按需重新下载。"
 }

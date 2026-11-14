@@ -288,8 +288,9 @@ impl ManagerRef<'_, SettingsManager> {
 
     /// Two-tier cleanup. Spawns a background task that:
     ///
-    /// 1. If `gdlauncher`: clears every cache table, wipes `temp/` and
-    ///    `__gdl_logs__/`, then VACUUMs.
+    /// 1. If `gdlauncher`: clears the cache tables, except the version
+    ///    metadata a launch needs offline, wipes `temp/` and `__gdl_logs__/`,
+    ///    then VACUUMs.
     /// 2. If `minecraft`: also wipes `assets/`, `libraries/`, `natives/` —
     ///    these are big and opt-in; the next launch re-downloads them and
     ///    re-runs the loader processors for generated files.
@@ -423,6 +424,11 @@ impl std::fmt::Display for CleanupFailures {
     }
 }
 impl std::error::Error for CleanupFailures {}
+/// The tables the `gdlauncher` selection empties. The version metadata tables
+/// (`VersionInfoCache`, `PartialVersionInfoCache`, `LwjglMetaCache`,
+/// `AssetsMetaCache`) are not here: a launch reads them when the meta server
+/// cannot be reached, so emptying them would stop every installed instance
+/// from starting offline. They hold one small row per version launched.
 const CLEANUP_TABLES: &[&str] = &[
     "HTTPCache",
     "ModrinthUpdateCache",
@@ -435,10 +441,6 @@ const CLEANUP_TABLES: &[&str] = &[
     "ModrinthModCache",
     "CurseForgeModpackCache",
     "ModrinthModpackCache",
-    "VersionInfoCache",
-    "PartialVersionInfoCache",
-    "LwjglMetaCache",
-    "AssetsMetaCache",
 ];
 async fn run_cache_cleanup(
     db: &carbon_repos::db_exec::Db,
@@ -765,6 +767,10 @@ mod tests {
         "ModrinthModCache",
         "CurseForgeModpackCache",
         "ModrinthModpackCache",
+    ];
+
+    /// What a launch falls back to when the meta server cannot be reached.
+    const VERSION_METADATA_TABLES: &[&str] = &[
         "VersionInfoCache",
         "PartialVersionInfoCache",
         "LwjglMetaCache",
@@ -851,6 +857,89 @@ mod tests {
                 0,
                 "{table} must remain empty after cleanup"
             );
+        }
+    }
+
+    /// An instance starts without internet from the version metadata stored
+    /// at its last online launch. Neither cleanup option removes it, whichever
+    /// are ticked.
+    #[tokio::test]
+    async fn cleanup_keeps_the_version_metadata_an_offline_launch_reads() {
+        use carbon_repos::dbtypes::DbDateTime;
+        use carbon_repos::repos::version_meta;
+
+        for selection in [
+            CacheCleanupSelection {
+                gdlauncher: true,
+                minecraft: false,
+            },
+            CacheCleanupSelection {
+                gdlauncher: true,
+                minecraft: true,
+            },
+        ] {
+            let app = crate::setup_managers_for_test().await;
+            let now = || DbDateTime(chrono::Utc::now().fixed_offset());
+            version_meta::upsert_version_info(&app.db, "1.20.1", b"{\"id\":\"1.20.1\"}", now())
+                .await
+                .unwrap();
+            version_meta::upsert_partial_version_info(
+                &app.db,
+                "forge-47.2.0",
+                b"{\"loader\":true}",
+                now(),
+            )
+            .await
+            .unwrap();
+            version_meta::upsert_lwjgl_meta(
+                &app.db,
+                "org.lwjgl3-3.3.1",
+                b"{\"lwjgl\":true}",
+                now(),
+            )
+            .await
+            .unwrap();
+            version_meta::upsert_assets_meta(&app.db, "5", b"{\"objects\":{}}", now())
+                .await
+                .unwrap();
+            // A row the cleanup does remove, to show it ran on this database.
+            carbon_repos::repos::http_cache::replace_cached(
+                &app.db,
+                "https://example.test/kept".to_string(),
+                200,
+                vec![1],
+                None,
+                None,
+                None,
+            )
+            .await
+            .unwrap();
+
+            let task_id = app
+                .settings_manager()
+                .cleanup_caches(selection)
+                .await
+                .unwrap();
+            wait_for_task(&app, task_id).await;
+
+            assert_eq!(count_table(&app.db, "HTTPCache").await, 0);
+            for table in VERSION_METADATA_TABLES {
+                assert_eq!(
+                    count_table(&app.db, table).await,
+                    1,
+                    "{table} must keep its row through a cleanup"
+                );
+            }
+            let version = version_meta::get_version_info(&app.db, "1.20.1")
+                .await
+                .unwrap()
+                .expect("the stored game version is still there");
+            assert_eq!(version.version_info, b"{\"id\":\"1.20.1\"}".to_vec());
+            let loader = version_meta::get_partial_version_info(&app.db, "forge-47.2.0")
+                .await
+                .unwrap()
+                .expect("the stored loader version is still there");
+            assert_eq!(loader.partial_version_info, b"{\"loader\":true}".to_vec());
         }
     }
 
