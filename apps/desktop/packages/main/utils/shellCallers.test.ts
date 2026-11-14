@@ -992,6 +992,11 @@ it("actual window wiring: closing the window a relaunch showed during a Close Wi
   value.lifecycle.event("GAME_CLOSED|1|7|closeWindow")
   expect(ElectronLikeWindow.created).toHaveLength(2)
 })
+/** The close warning as main sends it for a running game alone. */
+const gameWarning = [
+  "showAppCloseWarning",
+  { game: true, servers: false, installs: false }
+]
 it("actual close-warning IPC: only a main-frame App acknowledgement holds a close, and a navigation withdraws it", async () => {
   const value = mainWindow()
   const receiver = evaluate(
@@ -1007,11 +1012,11 @@ it("actual close-warning IPC: only a main-frame App acknowledgement holds a clos
   w.close()
   expect(w.destroyed).toBe(false)
   expect(w.hidden).toBe(false)
-  expect(w.contents.sent).toEqual([["showAppCloseWarning"]])
+  expect(w.contents.sent).toEqual([gameWarning])
   w.contents.emit("did-navigate")
   w.close()
   // The close goes ahead: the last window hides and the quit starts.
-  expect(w.contents.sent).toEqual([["showAppCloseWarning"]])
+  expect(w.contents.sent).toEqual([gameWarning])
   expect(w.hidden).toBe(true)
   expect(value.appQuits).toBe(1)
   // Once the quit is approved it closes for good.
@@ -1030,6 +1035,94 @@ it("actual close-warning IPC: only a main-frame App acknowledgement holds a clos
   )
   next.close()
   expect(next.destroyed).toBe(true)
+})
+it("actual close with a local server running or an install in progress is held with what quitting stops", async () => {
+  const value = mainWindow()
+  const receiver = evaluate(
+    callArgument(value.text, "ipcMain.on", "close-warning-receiver"),
+    { lifecycle: value.lifecycle }
+  )
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  receiver({ sender: w.contents, senderFrame: w.contents.mainFrame }, true)
+  value.lifecycle.shutdownStops('{"revision":1,"servers":true,"installs":true}')
+  w.close()
+  // Held: not hidden, no quit started.
+  expect(w.hidden).toBe(false)
+  expect(value.appQuits).toBe(0)
+  expect(w.contents.sent).toEqual([
+    ["showAppCloseWarning", { game: false, servers: true, installs: true }]
+  ])
+  // Once the server stopped and the install ended, X quits as before.
+  w.contents.sent.length = 0
+  value.lifecycle.shutdownStops(
+    '{"revision":2,"servers":false,"installs":false}'
+  )
+  w.close()
+  expect(w.contents.sent).toEqual([])
+  expect(w.hidden).toBe(true)
+  expect(value.appQuits).toBe(1)
+})
+it("actual close with a second window open does not ask about servers: that close does not quit", async () => {
+  const value = mainWindow()
+  const receiver = evaluate(
+    callArgument(value.text, "ipcMain.on", "close-warning-receiver"),
+    { lifecycle: value.lifecycle }
+  )
+  const w = await value.createWindow()
+  w.emit("ready-to-show")
+  receiver({ sender: w.contents, senderFrame: w.contents.mainFrame }, true)
+  value.lifecycle.shutdownStops(
+    '{"revision":1,"servers":true,"installs":false}'
+  )
+  const other = new ElectronLikeWindow()
+  w.close()
+  expect(w.contents.sent).toEqual([])
+  expect(w.destroyed).toBe(true)
+  expect(value.appQuits).toBe(0)
+  other.destroy()
+})
+it("actual core records reach the close question, and Restart and Install Now are told what they would stop unless the warning is off", async () => {
+  const text = source("apps/desktop/packages/main/index.ts")
+  const lifecycle = new LauncherLifecycle<any>({
+    current: () => null,
+    clear() {},
+    create() {},
+    quit() {}
+  })
+  lifecycle.beginCore("fixture")
+  const context: Record<string, any> = {
+    createCoreOutput,
+    clearTimeout() {},
+    startupTimer: 1,
+    console: { log() {} },
+    resolve() {},
+    coreModule: null,
+    getWin: () => null,
+    lastCoreModuleProgress: null,
+    identitySession: "fixture",
+    accountIdentity: { acceptPayload() {} },
+    lifecycle,
+    showAppCloseWarning: true
+  }
+  const core = evaluate(initializer(text, "coreOutput"), context)
+  const asked = evaluate(
+    callArgument(text, "ipcMain.handle", "shutdownStops"),
+    context
+  )
+  expect(await asked()).toEqual({ servers: false, installs: false })
+  core.push(
+    Buffer.from(
+      '_SHUTDOWN_STOPS_:{"revision":1,"servers":true,"installs":false}\n'
+    )
+  )
+  expect(lifecycle.stops).toEqual({ servers: true, installs: false })
+  expect(await asked()).toEqual({ servers: true, installs: false })
+  // "Never show this again": the setting the core reports switches it off.
+  core.push(Buffer.from("_SHOW_APP_CLOSE_WARNING_:false\n"))
+  expect(await asked()).toEqual({ servers: false, installs: false })
+  core.push(Buffer.from("_SHOW_APP_CLOSE_WARNING_:true\n"))
+  expect(await asked()).toEqual({ servers: true, installs: false })
 })
 it("actual last-window close hides the window and starts the quit instead of destroying it", async () => {
   const value = mainWindow()
@@ -1135,7 +1228,7 @@ it("actual window close during a shutdown prompt with a game running is held wit
   value.lifecycle.quitFailed()
   value.context.shutdownPrompts = { open: false, receiver() {} }
   w.close()
-  expect(w.contents.sent).toEqual([["showAppCloseWarning"]])
+  expect(w.contents.sent).toEqual([gameWarning])
   expect(w.destroyed).toBe(false)
   expect(w.hidden).toBe(false)
 })

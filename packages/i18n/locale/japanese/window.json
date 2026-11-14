@@ -1,8 +1,13 @@
 {
-"_trn_window_close_title": "ゲームが実行中です",
-"_trn_window_close_text_1": "アプリを閉じると、一部の機能が正しく動作しなくなる可能性があります。",
-"_trn_window_close_text_2": "<0>ゲーム起動時のデフォルト動作をカスタマイズ</0>することもできます。",
-"_trn_window_close_never_show": "今後表示しない",
-"_trn_window_close_quit_app": "アプリを終了",
-"_trn_view_logs": "ログを表示"
+  "_trn_window_close_title": "ゲームが実行中です",
+  "_trn_window_close_text_1": "アプリを閉じると、一部の機能が正しく動作しなくなる可能性があります。",
+  "_trn_window_close_text_2": "<0>ゲーム起動時のデフォルト動作をカスタマイズ</0>することもできます。",
+  "_trn_window_close_never_show": "今後表示しない",
+  "_trn_window_close_quit_app": "アプリを終了",
+  "_trn_window_close_restart_title": "本当に再起動しますか？",
+  "_trn_window_close_update_title": "今すぐアップデートをインストールしますか？",
+  "_trn_window_close_stops_servers": "実行中のローカルサーバーは停止され、参加中のプレイヤーは切断されます。",
+  "_trn_window_close_stops_installs": "進行中のダウンロードとインストールはキャンセルされます。後でもう一度開始できます。",
+  "_trn_window_close_game_keeps_running": "ゲームは実行されたままですが、GDLauncher をもう一度開くまで一部の機能が正しく動作しません。",
+  "_trn_view_logs": "ログを表示"
 }

@@ -314,3 +314,43 @@ it("an AppImage in a folder GDLauncher cannot write to is refused with its reaso
   expect(f.shutdown).toHaveBeenCalledTimes(1)
   expect(f.install).toHaveBeenCalledTimes(1)
 })
+it("Install Now asks first when it would stop a local server; No keeps the update ready and Yes installs it", async () => {
+  const f = await fixture()
+  const { listenShutdownQuestion } = await import("./shutdownQuestion")
+  const questions: any[] = []
+  const stop = listenShutdownQuestion((question) => questions.push(question))
+  Object.assign(window, {
+    shutdownStops: async () => ({ servers: true, installs: false })
+  })
+  try {
+    const first = f.ready().action!.onClick()
+    await flush()
+    expect(questions).toHaveLength(1)
+    expect(questions[0]).toMatchObject({ action: "update", servers: true })
+    // Nothing started yet, and a second press while asking does nothing.
+    await f.ready()?.action?.onClick()
+    expect(questions).toHaveLength(1)
+    expect(f.shutdown).not.toHaveBeenCalled()
+    expect(f.install).not.toHaveBeenCalled()
+    questions[0].answer(false)
+    await first
+    await flush()
+    expect(f.shutdown).not.toHaveBeenCalled()
+    expect(f.install).not.toHaveBeenCalled()
+    // The notice is back with its Install Now button.
+    expect(f.ready()).toMatchObject({ type: "success" })
+    expect(f.ready().action!.onClick).toBeTypeOf("function")
+
+    const second = f.ready().action!.onClick()
+    await flush()
+    expect(questions).toHaveLength(2)
+    questions[1].answer(true)
+    await second
+    await flush()
+    expect(f.shutdown).toHaveBeenCalledTimes(1)
+    expect(f.install).toHaveBeenCalledTimes(1)
+  } finally {
+    stop()
+    delete (window as any).shutdownStops
+  }
+})

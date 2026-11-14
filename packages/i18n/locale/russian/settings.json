@@ -28,7 +28,7 @@
   "_trn_launcher_action_on_game_launch_minimize_window": "Сворачивать окно",
   "_trn_launcher_action_on_game_launch_none": "Ничего не делать",
   "_trn_show_window_close_warning_title": "Предупреждение при закрытии окна во время игры",
-  "_trn_show_window_close_warning_text": "Показывать предупреждение, если вы закрываете лаунчер во время работы игры.",
+  "_trn_show_window_close_warning_text": "Показывать предупреждение перед закрытием GDLauncher, когда запущена игра или локальный сервер либо идёт загрузка или установка.",
   "_trn_potato_mode_title": "Режим «картошки» (Potato Mode)",
   "_trn_potato_mode_text": "У вас слабый ПК? Не беда! Включите этот режим, и все анимации и спецэффекты будут отключены.",
   "_trn_deletion_through_recycle_bin_title": "Удаление в корзину",

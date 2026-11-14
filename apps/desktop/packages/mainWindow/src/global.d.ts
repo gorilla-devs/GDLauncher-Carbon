@@ -106,7 +106,16 @@ declare global {
     ) => Promise<RuntimePathValidation>
     skipIntroAnimation: boolean
     closeWindow: () => void
-    onShowWindowCloseModal: (cb: () => void) => () => void
+    onShowWindowCloseModal: (
+      cb: (reasons: {
+        game: boolean
+        servers: boolean
+        installs: boolean
+      }) => void
+    ) => () => void
+    /** What a restart or an update install would stop, for the question
+     *  asked before either. Nothing when the close warning is switched off. */
+    shutdownStops: () => Promise<{ servers: boolean; installs: boolean }>
     /** Resolves "kept" when the user chose to keep GDLauncher open. */
     relaunch: () => Promise<{ status: "kept" | "relaunching" } | undefined>
     onShutdownPrompt: (

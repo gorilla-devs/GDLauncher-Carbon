@@ -600,6 +600,11 @@ const loadCoreModule: CoreModule = async () => {
             row.slice("_INSTANCE_STATE_:".length),
             identitySession
           )
+        else if (row.startsWith("_SHUTDOWN_STOPS_:"))
+          lifecycle.shutdownStops(
+            row.slice("_SHUTDOWN_STOPS_:".length),
+            identitySession
+          )
         else if (row.startsWith("_SHOW_APP_CLOSE_WARNING_:"))
           showAppCloseWarning =
             row.slice("_SHOW_APP_CLOSE_WARNING_:".length) === "true"
@@ -866,10 +871,15 @@ function spawnWindow(): BrowserWindow {
     // behind it and be left on screen after Keep GDLauncher open, so it is
     // not sent then. lifecycle.close still runs first: it records a Close
     // Window launch's own close, which that launch cancels if this holds it.
+    const otherWindows = () =>
+      userWindows(BrowserWindow.getAllWindows(), win).filter(
+        (w) => w !== createdWindow
+      ).length
     lifecycle.close(
       createdWindow,
       e,
-      showAppCloseWarning && !shutdownPrompts.open
+      showAppCloseWarning && !shutdownPrompts.open,
+      otherWindows()
     )
     if (e.defaultPrevented || shutdownApproved) return
     // A prompt about a quit, restart or update is waiting for an answer.
@@ -882,13 +892,7 @@ function spawnWindow(): BrowserWindow {
     // to. A move keeps its own close handling (quitUnlessKeptAlive).
     if (
       !runtimeOperationActive() &&
-      lifecycle.quitsOnClose(
-        createdWindow,
-        e,
-        userWindows(BrowserWindow.getAllWindows(), win).filter(
-          (w) => w !== createdWindow
-        ).length
-      )
+      lifecycle.quitsOnClose(createdWindow, e, otherWindows())
     ) {
       e.preventDefault()
       createdWindow.hide()
@@ -1160,6 +1164,11 @@ ipcMain.handle("isCMPWindowAvailable", async () => {
 })
 
 ipcMain.handle("closeWindow", async () => lifecycle.confirmQuit())
+// Asked before a restart or an update install, which stop the same things a
+// quit does. The close warning's setting switches this question off too.
+ipcMain.handle("shutdownStops", async () =>
+  showAppCloseWarning ? lifecycle.stops : { servers: false, installs: false }
+)
 
 ipcMain.handle("getUserData", async () => {
   return app.getPath("userData")

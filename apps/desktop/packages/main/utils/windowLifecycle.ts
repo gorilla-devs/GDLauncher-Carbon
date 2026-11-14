@@ -20,9 +20,21 @@ interface GameSession<W> {
   closeState?: "pending" | "closed" | "canceled"
   exited?: boolean
 }
+/** What the user has running that a quit, restart or update stops as it
+ *  begins: the core's `_SHUTDOWN_STOPS_` record. */
+export interface ShutdownStops {
+  servers: boolean
+  installs: boolean
+}
+/** Why a close was held for the warning, sent with "showAppCloseWarning". */
+export interface CloseReasons extends ShutdownStops {
+  game: boolean
+}
 /** Aggregate snapshots never apply launch actions, particularly for adopted games. */
 export class LauncherLifecycle<W extends LauncherWindow> {
   private revision = -1
+  private stopsRevision = -1
+  private stopped: ShutdownStops = { servers: false, installs: false }
   private coreSession = ""
   private coreEnded = false
   private running = new Set<number>()
@@ -52,6 +64,8 @@ export class LauncherLifecycle<W extends LauncherWindow> {
     this.revision = -1
     this.running.clear()
     this.sessions.clear()
+    this.stopsRevision = -1
+    this.stopped = { servers: false, installs: false }
   }
   /** The core process exited. It can no longer report a game's exit, so
    *  nothing it reported may keep arming the close warning or keep the
@@ -70,10 +84,35 @@ export class LauncherLifecycle<W extends LauncherWindow> {
     this.revision = -1
     this.running.clear()
     this.sessions.clear()
+    this.stopsRevision = -1
+    this.stopped = { servers: false, installs: false }
     return keptAlive
   }
   get gameRunning() {
     return this.running.size > 0
+  }
+  /** What a quit, restart or update would stop right now. */
+  get stops(): ShutdownStops {
+    return { ...this.stopped }
+  }
+  /** The core's `_SHUTDOWN_STOPS_` record: whether a local server is running
+   *  and whether a download or install is in progress. */
+  shutdownStops(payload: string, session = this.coreSession) {
+    if (session !== this.coreSession || this.coreEnded) return
+    try {
+      const value = JSON.parse(payload)
+      if (
+        !Number.isSafeInteger(value.revision) ||
+        value.revision <= this.stopsRevision ||
+        typeof value.servers !== "boolean" ||
+        typeof value.installs !== "boolean"
+      )
+        return
+      this.stopsRevision = value.revision
+      this.stopped = { servers: value.servers, installs: value.installs }
+    } catch {
+      /* A malformed record changes nothing. */
+    }
   }
   snapshot(payload: string, session = this.coreSession) {
     if (session !== this.coreSession || this.coreEnded) return
@@ -163,16 +202,30 @@ export class LauncherLifecycle<W extends LauncherWindow> {
       }
     }
   }
+  /**
+   * Holds the close for the warning while a game runs, and while closing
+   * `window` would quit GDLauncher and so stop a local server or cancel an
+   * install: it is the last window (`otherWindows` is 0) and no Close Window
+   * game keeps the launcher running without one.
+   */
   close(
     window: W,
     event: { preventDefault(): void; defaultPrevented?: boolean },
-    warning: boolean
+    warning: boolean,
+    otherWindows = 0
   ) {
     if (this.closeIntent === window) {
       this.closeEvent = event
       return
     }
-    if (this.quitting || !this.gameRunning || !warning) return
+    if (this.quitting || !warning) return
+    const quits = otherWindows === 0 && !this.keepAliveWithoutWindows()
+    const reasons: CloseReasons = {
+      game: this.gameRunning,
+      servers: quits && this.stopped.servers,
+      installs: quits && this.stopped.installs
+    }
+    if (!reasons.game && !reasons.servers && !reasons.installs) return
     // Only a mounted App can show the warning. Before it mounts (intro,
     // loading, the startup error screen) or after its document is replaced,
     // holding the close would make X silently do nothing, so the close goes
@@ -180,7 +233,7 @@ export class LauncherLifecycle<W extends LauncherWindow> {
     const contents = window.webContents
     if (!this.warningReceivers.has(contents)) return
     event.preventDefault()
-    contents.send("showAppCloseWarning")
+    contents.send("showAppCloseWarning", reasons)
   }
   /**
    * Whether a close that went ahead (the warning did not hold it) would quit

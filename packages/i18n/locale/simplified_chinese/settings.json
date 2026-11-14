@@ -28,7 +28,7 @@
   "_trn_launcher_action_on_game_launch_minimize_window": "最小化窗口",
   "_trn_launcher_action_on_game_launch_none": "无",
   "_trn_show_window_close_warning_title": "启动游戏时显示关闭窗口警告",
-  "_trn_show_window_close_warning_text": "在游戏运行时关闭窗口时显示警告。",
+  "_trn_show_window_close_warning_text": "在游戏或本地服务器运行期间，或者有下载或安装正在进行时，关闭 GDLauncher 前显示警告。",
   "_trn_potato_mode_title": "土豆电脑模式",
   "_trn_potato_mode_text": "您的电脑配置较差？无需担心！我们为您考虑到了。启用此项后，所有动画和特效都会被禁用。",
   "_trn_deletion_through_recycle_bin_title": "通过回收站删除",

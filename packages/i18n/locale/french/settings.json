@@ -28,7 +28,7 @@
   "_trn_launcher_action_on_game_launch_minimize_window": "Réduire la fenêtre",
   "_trn_launcher_action_on_game_launch_none": "Aucune",
   "_trn_show_window_close_warning_title": "Afficher un avertissement de fermeture de fenêtre au lancement du jeu",
-  "_trn_show_window_close_warning_text": "Afficher un avertissement lors de la fermeture de la fenêtre pendant qu'un jeu est en cours d'exécution.",
+  "_trn_show_window_close_warning_text": "Afficher un avertissement avant de fermer GDLauncher lorsqu'un jeu ou un serveur local est en cours d'exécution, ou qu'un téléchargement ou une installation est en cours.",
   "_trn_potato_mode_title": "Mode PC Patate",
   "_trn_potato_mode_text": "Vous avez un PC peu performant ? Ne vous inquiétez pas ! Nous avons ce qu'il vous faut. Activez ceci et toutes les animations ainsi que les effets spéciaux seront désactivés.",
   "_trn_deletion_through_recycle_bin_title": "Suppression via la corbeille",

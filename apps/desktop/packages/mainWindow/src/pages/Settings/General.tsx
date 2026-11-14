@@ -30,6 +30,7 @@ import { useModal } from "@/managers/ModalsManager"
 import { manualCheckForUpdates, isCheckingForUpdates } from "@/utils/updater"
 import { formatBytes } from "@/utils/formatBytes"
 import { createRestart } from "@/utils/restartApp"
+import { confirmShutdownStops } from "@/utils/shutdownQuestion"
 import { createResolutionDraft } from "./resolutionDraft"
 
 const General = () => {
@@ -37,7 +38,10 @@ const General = () => {
   const [t] = useTransContext()
   const modalsContext = useModal()
   const { restarting, restart } = createRestart(
-    () => window.relaunch(),
+    // A restart stops local servers and cancels installs, so it asks first.
+    async () => {
+      if (await confirmShutdownStops("restart")) await window.relaunch()
+    },
     (error) => {
       console.error("Restart failed", error)
       toast.error(t("settings:_trn_restart_failed"))

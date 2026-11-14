@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron"
 import { subscribeProtocol } from "./protocolBridge"
-import { subscribeCloseWarning } from "./closeWarningBridge"
+import {
+  subscribeCloseWarning,
+  type CloseWarningReasons
+} from "./closeWarningBridge"
 import { subscribeShutdownPrompt } from "./shutdownPromptBridge"
 
 import "./loading"
@@ -27,8 +30,15 @@ if (isDev || skipIntroAnimation) {
   )
 }
 
-contextBridge.exposeInMainWorld("onShowWindowCloseModal", (cb: () => void) =>
-  subscribeCloseWarning(ipcRenderer, cb)
+contextBridge.exposeInMainWorld(
+  "onShowWindowCloseModal",
+  (cb: (reasons: CloseWarningReasons) => void) =>
+    subscribeCloseWarning(ipcRenderer, cb)
+)
+// What a restart or an update install would stop, for the question asked
+// before either; nothing when the close warning is switched off.
+contextBridge.exposeInMainWorld("shutdownStops", async () =>
+  ipcRenderer.invoke("shutdownStops")
 )
 
 contextBridge.exposeInMainWorld("closeWindow", async () =>

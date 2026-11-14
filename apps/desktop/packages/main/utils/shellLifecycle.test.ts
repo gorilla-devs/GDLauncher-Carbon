@@ -140,9 +140,12 @@ class FakeWindow {
   private closeAccepted = false
   closed: () => void = () => {}
   closing: (e: { preventDefault(): void }) => void = () => {}
+  /** What each close warning was sent with. */
+  reasons: unknown[] = []
   readonly contents = {
-    send: () => {
+    send: (_channel: string, reasons?: unknown) => {
       this.warnings++
+      this.reasons.push(reasons)
     }
   }
   private live() {
@@ -203,7 +206,12 @@ class FakeWindow {
  *  window's App has mounted and acknowledged the close warning, and the
  *  warning is enabled. */
 function windows(
-  options: { app?: boolean; deferClosed?: boolean; warning?: boolean } = {}
+  options: {
+    app?: boolean
+    deferClosed?: boolean
+    warning?: boolean
+    otherWindows?: number
+  } = {}
 ) {
   let current: FakeWindow | null = null,
     creates = 0,
@@ -231,7 +239,8 @@ function windows(
     const contents = w.webContents
     queue.bind(contents)
     if (options.app ?? true) lifecycle.warningReceiver(contents, true)
-    w.closing = (e) => lifecycle.close(w, e, options.warning ?? true)
+    w.closing = (e) =>
+      lifecycle.close(w, e, options.warning ?? true, options.otherWindows ?? 0)
     w.closed = () =>
       mainWindowClosed(w, contents, {
         current: () => current,
@@ -652,8 +661,9 @@ describe("Close warning needs a mounted App (adopted games)", () => {
     const second = subscribeCloseWarning(ipc, () => {})
     expect(sent).toEqual([["close-warning-receiver", true]])
     for (const listener of listeners) (listener as any)({ sender: "event" })
-    // The IPC event object never reaches App.
-    expect(calls).toEqual([[]])
+    // The IPC event object never reaches App. A warning sent with no reasons
+    // is the game warning.
+    expect(calls).toEqual([[{ game: true, servers: false, installs: false }]])
     first()
     first()
     expect(sent).toHaveLength(1)
@@ -745,6 +755,149 @@ function protocol() {
   }
   return { sender, other, queue, ipc, received, listeners }
 }
+describe("Close warning before a quit stops a server or an install", () => {
+  const stops = (servers: boolean, installs: boolean, revision = 1) =>
+    JSON.stringify({ revision, servers, installs })
+  it("holds the last window's close and says what quitting stops", () => {
+    const value = windows(),
+      w = value.make()
+    value.lifecycle.shutdownStops(stops(true, true))
+    expect(value.lifecycle.stops).toEqual({ servers: true, installs: true })
+    w.close()
+    expect(w.destroyed).toBe(false)
+    expect(w.reasons).toEqual([{ game: false, servers: true, installs: true }])
+  })
+  it("names a running game next to the server", () => {
+    const value = windows(),
+      w = value.make()
+    value.lifecycle.snapshot('{"revision":1,"instances":[4]}')
+    value.lifecycle.shutdownStops(stops(true, false))
+    w.close()
+    expect(w.reasons).toEqual([{ game: true, servers: true, installs: false }])
+  })
+  it("closes without asking once nothing would be stopped", () => {
+    const value = windows(),
+      w = value.make()
+    value.lifecycle.shutdownStops(stops(false, true))
+    value.lifecycle.shutdownStops(stops(false, false, 2))
+    w.close()
+    expect(w.warnings).toBe(0)
+    expect(w.destroyed).toBe(true)
+  })
+  it("the close warning's setting switches the question off", () => {
+    const value = windows({ warning: false }),
+      w = value.make()
+    value.lifecycle.shutdownStops(stops(true, true))
+    w.close()
+    expect(w.warnings).toBe(0)
+    expect(w.destroyed).toBe(true)
+  })
+  it("does not ask when the close does not quit: another window stays open", () => {
+    const value = windows({ otherWindows: 1 }),
+      w = value.make()
+    value.lifecycle.shutdownStops(stops(true, true))
+    w.close()
+    expect(w.warnings).toBe(0)
+    expect(w.destroyed).toBe(true)
+  })
+  it("does not ask about servers while a Close Window game keeps the launcher running, only about the game", () => {
+    const value = windows({ deferClosed: true }),
+      launchedFrom = value.make()
+    value.lifecycle.shutdownStops(stops(true, false))
+    value.lifecycle.event("GAME_LAUNCHED|1|7|closeWindow")
+    launchedFrom.finishClose()
+    // The launch's own close is never held, with a server running or not.
+    expect(launchedFrom.warnings).toBe(0)
+    expect(value.lifecycle.keepAliveWithoutWindows()).toBe(true)
+    value.lifecycle.snapshot('{"revision":1,"instances":[1]}')
+    const shown = value.make()
+    shown.close()
+    expect(shown.reasons).toEqual([
+      { game: true, servers: false, installs: false }
+    ])
+  })
+  it("a confirmed quit is not asked again", () => {
+    const value = windows(),
+      w = value.make()
+    value.lifecycle.shutdownStops(stops(true, false))
+    value.lifecycle.confirmQuit()
+    expect(value.quits).toBe(1)
+    w.close()
+    expect(w.warnings).toBe(0)
+    expect(w.destroyed).toBe(true)
+  })
+  it("X before App mounts closes instead of silently doing nothing", () => {
+    const value = windows({ app: false }),
+      w = value.make()
+    value.lifecycle.shutdownStops(stops(true, true))
+    w.close()
+    expect(w.warnings).toBe(0)
+    expect(w.destroyed).toBe(true)
+  })
+  it("ignores stale, malformed and foreign records", () => {
+    const value = windows()
+    value.lifecycle.beginCore("session-1")
+    value.lifecycle.shutdownStops(stops(true, false, 5), "session-1")
+    // An older record, one from another core, and ones that are not the
+    // record's shape change nothing.
+    value.lifecycle.shutdownStops(stops(false, false, 4), "session-1")
+    value.lifecycle.shutdownStops(stops(false, false, 9), "session-0")
+    value.lifecycle.shutdownStops("{", "session-1")
+    value.lifecycle.shutdownStops(
+      '{"revision":6,"servers":"yes","installs":false}',
+      "session-1"
+    )
+    value.lifecycle.shutdownStops(
+      '{"revision":"7","servers":false,"installs":false}',
+      "session-1"
+    )
+    expect(value.lifecycle.stops).toEqual({ servers: true, installs: false })
+    value.lifecycle.shutdownStops(stops(false, true, 6), "session-1")
+    expect(value.lifecycle.stops).toEqual({ servers: false, installs: true })
+  })
+  it("a core that exited or was replaced no longer arms the question", () => {
+    const value = windows(),
+      w = value.make()
+    value.lifecycle.beginCore("session-1")
+    value.lifecycle.shutdownStops(stops(true, true), "session-1")
+    value.lifecycle.endCore("session-1")
+    expect(value.lifecycle.stops).toEqual({ servers: false, installs: false })
+    // A record it printed before exiting, read afterwards.
+    value.lifecycle.shutdownStops(stops(true, true, 2), "session-1")
+    expect(value.lifecycle.stops).toEqual({ servers: false, installs: false })
+    value.lifecycle.beginCore("session-2")
+    // The new core counts its records from 1 again.
+    value.lifecycle.shutdownStops(stops(false, true, 1), "session-2")
+    expect(value.lifecycle.stops).toEqual({ servers: false, installs: true })
+    value.lifecycle.beginCore("session-3")
+    expect(value.lifecycle.stops).toEqual({ servers: false, installs: false })
+    w.close()
+    expect(w.warnings).toBe(0)
+  })
+  it("the bridge hands App only the three known reasons", () => {
+    const listeners = new Set<(...args: unknown[]) => void>()
+    const ipc = {
+      on: (_: string, f: (...args: unknown[]) => void) => {
+        listeners.add(f)
+      },
+      removeListener: (_: string, f: (...args: unknown[]) => void) => {
+        listeners.delete(f)
+      },
+      send: () => {}
+    }
+    const calls: unknown[] = []
+    subscribeCloseWarning(ipc, (reasons) => calls.push(reasons))
+    const [listener] = listeners
+    listener({ sender: "event" }, { servers: true, installs: 1, extra: "x" })
+    listener({ sender: "event" }, { game: true, servers: true, installs: true })
+    listener({ sender: "event" }, "not an object")
+    expect(calls).toEqual([
+      { game: false, servers: true, installs: false },
+      { game: true, servers: true, installs: true },
+      { game: true, servers: false, installs: false }
+    ])
+  })
+})
 describe("Task23 App callback readiness", () => {
   it("late subscription consumes FIFO share/search only after callback and ACK", async () => {
     const value = protocol(),

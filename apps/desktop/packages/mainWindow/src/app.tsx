@@ -36,11 +36,14 @@ const App = (props: Props) => {
 
   // While subscribed, main holds a close with a running game open for this
   // warning; unsubscribing lets the close go ahead instead.
-  const stopCloseWarning = window.onShowWindowCloseModal(() => {
+  const stopCloseWarning = window.onShowWindowCloseModal((reasons) => {
     if (windowCloseWarningAcquireLock) {
-      modalsContext?.openModal({
-        name: "windowCloseWarning"
-      })
+      modalsContext?.openModal(
+        {
+          name: "windowCloseWarning"
+        },
+        { action: "quit", ...reasons }
+      )
     }
   })
   onCleanup(() => stopCloseWarning?.())

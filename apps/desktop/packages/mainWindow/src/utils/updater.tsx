@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, onCleanup } from "solid-js"
 import { rspc } from "./rspcClient"
 import { toast, Progress } from "@gd/ui"
 import { i18n } from "@gd/i18n"
+import { confirmShutdownStops } from "./shutdownQuestion"
 import type {
   UpdateErrorCode,
   UpdateStateData
@@ -158,6 +159,17 @@ export function showPendingUpdateToast() {
     if (pendingReady?.id !== captured.id || installingReady !== undefined)
       return
     installingReady = captured.id
+    // Installing restarts GDLauncher, which stops local servers and cancels
+    // installs, so it asks first. The notice comes back if the answer is no.
+    if (!(await confirmShutdownStops("update"))) {
+      if (installingReady === captured.id) installingReady = undefined
+      showPendingUpdateToast()
+      return
+    }
+    if (pendingReady?.id !== captured.id) {
+      if (installingReady === captured.id) installingReady = undefined
+      return
+    }
     const presentation: InstallPresentation = {
       id: captured.id,
       retry: install

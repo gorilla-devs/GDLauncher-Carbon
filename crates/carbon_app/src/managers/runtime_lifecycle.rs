@@ -133,11 +133,64 @@ struct State {
     /// Tests shorten [`OPERATION_SETTLE_BUDGET`] with this.
     #[cfg(test)]
     settle_budget: Option<std::time::Duration>,
+    /// What the launcher was last told a quit would stop, and how many
+    /// times it was told; see [`State::publish_stops`].
+    published_stops: ShutdownStops,
+    stops_revision: u64,
+    /// The rows `publish_stops` printed, for tests.
+    #[cfg(test)]
+    stops_rows: Vec<String>,
+}
+/// What the user has running that a quit, restart or update stops as it
+/// begins. The launcher asks before it does so. A running game is not here:
+/// it outlives the launcher.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ShutdownStops {
+    /// A local server is running. One already asked to stop is not counted.
+    pub servers: bool,
+    /// A download or install is in progress.
+    pub installs: bool,
 }
 /// How many cancelled or refused relocation ids are remembered. Each move
 /// attempt uses one, so this covers far more retries than a session sees.
 const CANCELLED_RELOCATIONS_KEPT: usize = 32;
 impl State {
+    fn shutdown_stops(&self) -> ShutdownStops {
+        let mut stops = ShutdownStops::default();
+        for entry in self.activities.values() {
+            match (entry.policy, entry.phase) {
+                (ActivityPolicy::Server, ActivityPhase::Running) => stops.servers = true,
+                (ActivityPolicy::Installer, ActivityPhase::Preparing | ActivityPhase::Running) => {
+                    stops.installs = true
+                }
+                _ => {}
+            }
+        }
+        stops
+    }
+    /// Tells the launcher, on stdout, what a quit would stop whenever that
+    /// changed, so it can ask before closing. Called under the state lock by
+    /// everything that changes an activity's policy or phase or removes one,
+    /// which also keeps the rows in order.
+    fn publish_stops(&mut self) {
+        let stops = self.shutdown_stops();
+        if stops == self.published_stops {
+            return;
+        }
+        self.published_stops = stops;
+        self.stops_revision += 1;
+        let row = format!(
+            "_SHUTDOWN_STOPS_:{}",
+            serde_json::json!({
+                "revision": self.stops_revision,
+                "servers": stops.servers,
+                "installs": stops.installs,
+            })
+        );
+        println!("{row}");
+        #[cfg(test)]
+        self.stops_rows.push(row);
+    }
     /// Every writer and every unverified state that keeps the runtime folder
     /// from being moved, in admission order. Empty means the move may start.
     fn relocation_blockers(&self) -> Vec<RuntimeBlocker> {
@@ -588,6 +641,7 @@ impl RuntimeActivity {
             let entry = state.activities.get_mut(&self.id).expect("owned activity");
             entry.policy = policy;
             entry.phase = ActivityPhase::Running;
+            state.publish_stops();
         }
         result
     }
@@ -612,6 +666,7 @@ impl RuntimeActivity {
         own.policy = ActivityPolicy::CoreWork;
         own.phase = ActivityPhase::Running;
         own.follows = Some(child.id);
+        state.publish_stops();
         Ok(())
     }
     /// Marks this activity as the watcher of games adopted from an earlier
@@ -629,18 +684,13 @@ impl RuntimeActivity {
         }
     }
     pub fn unknown(&self, reason: String) {
-        if let Some(entry) = self
-            .lifecycle
-            .state
-            .lock()
-            .unwrap()
-            .activities
-            .get_mut(&self.id)
-        {
+        let mut state = self.lifecycle.state.lock().unwrap();
+        if let Some(entry) = state.activities.get_mut(&self.id) {
             tracing::error!("{}: {reason}", entry.owner);
             entry.phase = ActivityPhase::Unknown;
             entry.settlement.send_replace(Settlement::Unknown);
         }
+        state.publish_stops();
     }
     /// Detachment preserves Game/Running and durable recovery evidence. It is
     /// neither child exit nor permission to run exit-only cleanup.
@@ -663,16 +713,11 @@ impl RuntimeActivity {
             .clone()
     }
     pub fn settling(&self) {
-        if let Some(entry) = self
-            .lifecycle
-            .state
-            .lock()
-            .unwrap()
-            .activities
-            .get_mut(&self.id)
-        {
+        let mut state = self.lifecycle.state.lock().unwrap();
+        if let Some(entry) = state.activities.get_mut(&self.id) {
             entry.phase = ActivityPhase::Settling;
         }
+        state.publish_stops();
     }
     /// Call immediately before spawning an external writer. Drop/cancellation is
     /// no longer completion. Only observed exit (or a proven spawn failure) clears it.
@@ -804,17 +849,12 @@ impl Drop for RuntimeActivity {
             return;
         }
         if self.retain_on_drop {
-            if let Some(entry) = self
-                .lifecycle
-                .state
-                .lock()
-                .unwrap()
-                .activities
-                .get_mut(&self.id)
-            {
+            let mut state = self.lifecycle.state.lock().unwrap();
+            if let Some(entry) = state.activities.get_mut(&self.id) {
                 entry.phase = ActivityPhase::Unknown;
                 entry.settlement.send_replace(Settlement::Unknown);
             }
+            state.publish_stops();
         } else {
             if let Some(record) = &self.record {
                 if let Err(error) = std::fs::remove_file(record) {
@@ -832,6 +872,7 @@ impl Drop for RuntimeActivity {
             if let Some(entry) = state.activities.remove(&self.id) {
                 entry.settlement.send_replace(Settlement::Complete);
             }
+            state.publish_stops();
         }
     }
 }
@@ -1275,13 +1316,10 @@ impl RuntimeLifecycle {
         policy: ActivityPolicy,
     ) -> Result<RuntimeActivity> {
         let activity = self.admit(owner)?;
-        self.state
-            .lock()
-            .unwrap()
-            .activities
-            .get_mut(&activity.id)
-            .unwrap()
-            .policy = policy;
+        let mut state = self.state.lock().unwrap();
+        state.activities.get_mut(&activity.id).unwrap().policy = policy;
+        state.publish_stops();
+        drop(state);
         Ok(activity)
     }
     /// Whole-operation producer ownership for Task18. Dropping a producer,
@@ -1293,13 +1331,10 @@ impl RuntimeLifecycle {
     ) -> Result<RuntimeActivity> {
         let mut activity = self.admit(owner)?;
         activity.external();
-        self.state
-            .lock()
-            .unwrap()
-            .activities
-            .get_mut(&activity.id)
-            .unwrap()
-            .policy = policy;
+        let mut state = self.state.lock().unwrap();
+        state.activities.get_mut(&activity.id).unwrap().policy = policy;
+        state.publish_stops();
+        drop(state);
         Ok(activity)
     }
     /// Ends the startup check. A failure (a runtime folder that cannot be
@@ -2306,6 +2341,152 @@ pub(crate) mod tests_support {
         ));
         anyhow::Error::from(std::io::Error::other(error))
             .context("Cannot execute java checker command")
+    }
+}
+
+/// The launcher asks before a quit, restart or update only when the core told
+/// it that one would stop a local server or cancel an install.
+#[cfg(test)]
+mod shutdown_stops_tests {
+    use super::*;
+    fn ready() -> Arc<RuntimeLifecycle> {
+        let lifecycle = Arc::new(RuntimeLifecycle::default());
+        lifecycle.reconciliation_finished(Ok(()));
+        lifecycle
+    }
+    fn stops(lifecycle: &RuntimeLifecycle) -> ShutdownStops {
+        let state = lifecycle.state.lock().unwrap();
+        assert_eq!(
+            state.published_stops,
+            state.shutdown_stops(),
+            "the launcher was told the current state"
+        );
+        state.published_stops
+    }
+    fn rows(lifecycle: &RuntimeLifecycle) -> Vec<String> {
+        lifecycle.state.lock().unwrap().stops_rows.clone()
+    }
+    const NOTHING: ShutdownStops = ShutdownStops {
+        servers: false,
+        installs: false,
+    };
+    const INSTALL: ShutdownStops = ShutdownStops {
+        servers: false,
+        installs: true,
+    };
+    const SERVER: ShutdownStops = ShutdownStops {
+        servers: true,
+        installs: false,
+    };
+
+    #[test]
+    fn an_install_counts_from_its_start_until_it_ends() {
+        let l = ready();
+        assert_eq!(stops(&l), NOTHING);
+        let install = l
+            .admit_owned("modpack install", ActivityPolicy::Installer)
+            .unwrap();
+        assert_eq!(stops(&l), INSTALL);
+        // A second one changes nothing the launcher needs to hear about.
+        let second = l
+            .admit_as("addon install", ActivityPolicy::Installer)
+            .unwrap();
+        second.finish();
+        assert_eq!(stops(&l), INSTALL);
+        install.finish();
+        assert_eq!(stops(&l), NOTHING);
+        assert_eq!(
+            rows(&l),
+            [
+                r#"_SHUTDOWN_STOPS_:{"installs":true,"revision":1,"servers":false}"#,
+                r#"_SHUTDOWN_STOPS_:{"installs":false,"revision":2,"servers":false}"#,
+            ]
+        );
+    }
+
+    #[test]
+    fn a_server_counts_while_it_runs_and_not_once_it_was_asked_to_stop() {
+        let l = ready();
+        let mut server = l.admit("server").unwrap();
+        // Queued, not started: a quit has no server to stop yet.
+        assert_eq!(stops(&l), NOTHING);
+        server.spawn(ActivityPolicy::Server, || Ok(())).unwrap();
+        assert_eq!(stops(&l), SERVER);
+        server.settling();
+        assert_eq!(stops(&l), NOTHING);
+        server.finish();
+        assert_eq!(stops(&l), NOTHING);
+    }
+
+    #[test]
+    fn a_server_and_an_install_are_reported_together() {
+        let l = ready();
+        let mut server = l.admit("server").unwrap();
+        server.spawn(ActivityPolicy::Server, || Ok(())).unwrap();
+        let install = l
+            .admit_owned("java install", ActivityPolicy::Installer)
+            .unwrap();
+        assert_eq!(
+            stops(&l),
+            ShutdownStops {
+                servers: true,
+                installs: true,
+            }
+        );
+        install.finish();
+        assert_eq!(stops(&l), SERVER);
+        server.finish();
+    }
+
+    #[test]
+    fn work_that_a_quit_does_not_stop_is_not_reported() {
+        let l = ready();
+        let scan = l.admit("instance scan").unwrap();
+        let deletion = l
+            .admit_as("delete instance", ActivityPolicy::Deletion)
+            .unwrap();
+        let hook = l.admit_as("pre-launch hook", ActivityPolicy::Hook).unwrap();
+        let mut game = l.admit("game").unwrap();
+        game.spawn(ActivityPolicy::Game, || Ok(())).unwrap();
+        assert_eq!(stops(&l), NOTHING);
+        assert!(rows(&l).is_empty());
+        for activity in [scan, deletion, hook, game] {
+            activity.finish();
+        }
+    }
+
+    #[test]
+    fn preparing_a_game_counts_until_the_game_runs() {
+        let l = ready();
+        let preparation = l
+            .admit_owned("instance 1 preparation/session", ActivityPolicy::Installer)
+            .unwrap();
+        assert_eq!(stops(&l), INSTALL);
+        let mut game = l.admit("game").unwrap();
+        game.spawn(ActivityPolicy::Game, || Ok(())).unwrap();
+        preparation.follow_spawned_game(&game).unwrap();
+        assert_eq!(stops(&l), NOTHING);
+        game.finish();
+        preparation.finish();
+    }
+
+    #[test]
+    fn work_whose_end_was_never_confirmed_does_not_keep_the_launcher_asking() {
+        let l = ready();
+        let install = l
+            .admit_owned("lost install", ActivityPolicy::Installer)
+            .unwrap();
+        assert_eq!(stops(&l), INSTALL);
+        // Dropped without `finish`: it stays listed as unconfirmed for the
+        // session, which must not arm the question on every close.
+        drop(install);
+        assert_eq!(stops(&l), NOTHING);
+
+        let mut server = l.admit("lost server").unwrap();
+        server.spawn(ActivityPolicy::Server, || Ok(())).unwrap();
+        assert_eq!(stops(&l), SERVER);
+        server.unknown("its exit was not seen".into());
+        assert_eq!(stops(&l), NOTHING);
     }
 }
 

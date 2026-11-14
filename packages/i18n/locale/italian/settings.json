@@ -28,7 +28,7 @@
   "_trn_launcher_action_on_game_launch_minimize_window": "Riduci Finestra",
   "_trn_launcher_action_on_game_launch_none": "Nessuno",
   "_trn_show_window_close_warning_title": "Mostra Avvertenza Chiusura Finestra al Lancio del Gioco",
-  "_trn_show_window_close_warning_text": "Mostra un avviso quando chiudi la finestra mentre un gioco è in esecuzione.",
+  "_trn_show_window_close_warning_text": "Mostra un avviso prima di chiudere GDLauncher mentre un gioco o un server locale è in esecuzione, oppure un download o un'installazione è in corso.",
   "_trn_potato_mode_title": "Modalità PC Lento",
   "_trn_potato_mode_text": "Hai un PC lento? Non preoccuparti! Abbiamo tutto quello che ti serve. Abilita questo e tutte le animazioni e gli effetti speciali saranno disabilitati.",
   "_trn_deletion_through_recycle_bin_title": "Eliminazione tramite Cestino",

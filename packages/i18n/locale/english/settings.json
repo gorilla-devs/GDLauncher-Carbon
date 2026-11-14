@@ -28,7 +28,7 @@
   "_trn_launcher_action_on_game_launch_minimize_window": "Minimize Window",
   "_trn_launcher_action_on_game_launch_none": "None",
   "_trn_show_window_close_warning_title": "Show Window Close Warning on Game Launch",
-  "_trn_show_window_close_warning_text": "Show a warning when closing the window while a game is running.",
+  "_trn_show_window_close_warning_text": "Show a warning before closing GDLauncher while a game or a local server is running, or a download or install is in progress.",
   "_trn_potato_mode_title": "Potato PC mode",
   "_trn_potato_mode_text": "You got a potato PC? Don't worry! We've got you covered. Enable this and all animations and special effects will be disabled.",
   "_trn_deletion_through_recycle_bin_title": "Deletion through Recycle Bin",

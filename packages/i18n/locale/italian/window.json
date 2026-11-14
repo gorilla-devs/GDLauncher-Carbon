@@ -4,5 +4,10 @@
   "_trn_window_close_text_2": "Puoi anche <0>personalizzare il comportamento di avvio del gioco predefinito</0>.",
   "_trn_window_close_never_show": "Non mostrare più questo messaggio",
   "_trn_window_close_quit_app": "Esci dall'App",
+  "_trn_window_close_restart_title": "Sei sicuro di voler riavviare?",
+  "_trn_window_close_update_title": "Installare l'aggiornamento adesso?",
+  "_trn_window_close_stops_servers": "I server locali in esecuzione verranno arrestati e i giocatori collegati disconnessi.",
+  "_trn_window_close_stops_installs": "I download e le installazioni in corso verranno annullati. Potrai riavviarli in seguito.",
+  "_trn_window_close_game_keeps_running": "Il gioco resta in esecuzione, ma alcune funzionalità non funzioneranno correttamente finché GDLauncher non viene riaperto.",
   "_trn_view_logs": "Visualizza Log"
 }

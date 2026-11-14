@@ -14,6 +14,7 @@ import { useTransContext, TypedTFunction } from "@gd/i18n"
 import { useGDNavigate } from "../NavigationManager"
 import adSize from "@/utils/adhelper"
 import { listenMemoryWarning } from "@/utils/memoryWarningBridge"
+import { listenShutdownQuestion } from "@/utils/shutdownQuestion"
 import { listenServerEula } from "@/utils/serverEulaBridge"
 import { cleanupRunning } from "./modals/CacheCleanup/state"
 import { shaderInstallRunning } from "./modals/ShaderLoaderSetup/state"
@@ -410,6 +411,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     const cleanupEula = listenServerEula((data) => {
       manager.openModal({ name: "serverEulaAcceptance" }, data)
     })
+    // Asked before a restart or an update install stops a local server or
+    // cancels an install.
+    const cleanupShutdownQuestion = listenShutdownQuestion((question) => {
+      manager.openModal({ name: "windowCloseWarning" }, question)
+    })
 
     // Escape closes the top modal, mirroring a backdrop click: skipped when the
     // modal opts out of closing (preventClose), and when an open
@@ -438,6 +444,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     onCleanup(() => {
       cleanupMemory()
       cleanupEula()
+      cleanupShutdownQuestion()
       document.removeEventListener("keydown", onKeyDown)
     })
   })

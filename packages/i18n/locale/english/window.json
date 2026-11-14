@@ -4,5 +4,10 @@
   "_trn_window_close_text_2": "You can also <0>customize the default game launch behavior</0>.",
   "_trn_window_close_never_show": "Never show this again",
   "_trn_window_close_quit_app": "Quit App",
+  "_trn_window_close_restart_title": "Are you sure you want to restart?",
+  "_trn_window_close_update_title": "Install the update now?",
+  "_trn_window_close_stops_servers": "Local servers that are running will be stopped, and players on them disconnected.",
+  "_trn_window_close_stops_installs": "Downloads and installs in progress will be cancelled. You can start them again afterwards.",
+  "_trn_window_close_game_keeps_running": "The game keeps running, but some features will not work properly until GDLauncher is opened again.",
   "_trn_view_logs": "View Logs"
 }
