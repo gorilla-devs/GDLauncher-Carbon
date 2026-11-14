@@ -10,13 +10,18 @@ const io = vi.hoisted(() => ({
   close: vi.fn(),
   success: vi.fn(),
   error: vi.fn(),
-  streams: [] as any[]
+  streams: [] as any[],
+  // What the core lists at the top of the instance folder.
+  entries: { data: [] as any[] | undefined, error: undefined as unknown }
 }))
 vi.mock("@/utils/rspcClient", () => ({
   apiUrl: (path: string) => `/inert${path}`,
   rspc: {
     createMutation: () => ({ mutateAsync: io.update, isPending: false }),
-    createQuery: () => ({ data: undefined, error: undefined })
+    createQuery: (options: () => { queryKey: unknown[] }) =>
+      options().queryKey[0] === "instance.getShareEntries"
+        ? io.entries
+        : { data: undefined, error: undefined }
   }
 }))
 vi.mock("../index", () => ({ useModal: () => ({ closeModal: io.close }) }))
@@ -43,7 +48,7 @@ vi.mock("@gd/ui", async () => ({
   ...(await import("../../../../../../../../packages/ui/src/Input")),
   ...(await import("../../../../../../../../packages/ui/src/Button")),
   ...(await import("../../../../../../../../packages/ui/src/Select")),
-  ...(await import("../../../../../../../../packages/ui/src/Switch")),
+  ...(await import("../../../../../../../../packages/ui/src/Checkbox")),
   ...(await import("../../../../../../../../packages/ui/src/Progress")),
   Collapsable: (p: any) => <div>{p.children}</div>,
   CopyText: () => <div />,
@@ -61,6 +66,8 @@ afterEach(() => {
   io.success.mockReset()
   io.error.mockReset()
   io.streams = []
+  io.entries.data = []
+  io.entries.error = undefined
   document.body.textContent = ""
 })
 const flush = async () => {
@@ -281,3 +288,135 @@ it.each([
     expect(io.streams[0].closed).toBe(true)
   }
 )
+
+const instanceEntries = [
+  { name: "config", directory: true, kind: "other", sharedByDefault: true },
+  { name: "logs", directory: true, kind: "logs", sharedByDefault: true },
+  { name: "mods", directory: true, kind: "other", sharedByDefault: true },
+  {
+    name: "screenshots",
+    directory: true,
+    kind: "screenshots",
+    sharedByDefault: true
+  },
+  {
+    name: "servers.dat",
+    directory: false,
+    kind: "serverList",
+    sharedByDefault: true
+  },
+  { name: "backups", directory: true, kind: "backups", sharedByDefault: false },
+  { name: "saves", directory: true, kind: "worlds", sharedByDefault: false }
+]
+const box = (root: HTMLElement, name: string) =>
+  root.querySelector<HTMLInputElement>(
+    `input[type=checkbox][aria-label="${name}"]`
+  )!
+const row = (root: HTMLElement, name: string) =>
+  root.querySelector<HTMLElement>(
+    `[data-testid="share-entry"][data-entry="${name}"]`
+  )!
+const sentEntries = () =>
+  JSON.parse(
+    new URL(io.streams.at(-1).url, "https://fixture.invalid").searchParams.get(
+      "entries"
+    )!
+  )
+
+it("lists what the instance holds, with worlds and their backups unticked", async () => {
+  io.entries.data = instanceEntries
+  const root = share()
+  expect(
+    [...root.querySelectorAll<HTMLElement>('[data-testid="share-entry"]')].map(
+      (entry) => [entry.dataset.entry, box(root, entry.dataset.entry!).checked]
+    )
+  ).toEqual([
+    ["config", true],
+    ["logs", true],
+    ["mods", true],
+    ["screenshots", true],
+    ["servers.dat", true],
+    ["backups", false],
+    ["saves", false]
+  ])
+  // Each kind a user would want to know about says what it holds.
+  expect(row(root, "saves").textContent).toContain(
+    "instances:_trn_instance_share.hint_worlds"
+  )
+  expect(row(root, "backups").textContent).toContain(
+    "instances:_trn_instance_share.hint_backups"
+  )
+  expect(row(root, "servers.dat").textContent).toContain(
+    "instances:_trn_instance_share.hint_server_list"
+  )
+  expect(row(root, "screenshots").textContent).toContain(
+    "instances:_trn_instance_share.hint_screenshots"
+  )
+  expect(row(root, "logs").textContent).toContain(
+    "instances:_trn_instance_share.hint_logs"
+  )
+  expect(row(root, "mods").textContent).toBe("mods")
+  // The list took the place of the switch.
+  expect(root.textContent).not.toContain("include_saves")
+
+  button(root, "_trn_instance_share.share_button").click()
+  await flush()
+  expect(sentEntries()).toEqual([
+    "config",
+    "logs",
+    "mods",
+    "screenshots",
+    "servers.dat"
+  ])
+  expect(
+    new URL(io.streams[0].url, "https://fixture.invalid").searchParams.has(
+      "includeSaves"
+    )
+  ).toBe(false)
+})
+
+it("uploads exactly what is ticked", async () => {
+  io.entries.data = instanceEntries
+  const root = share()
+  box(root, "logs").click()
+  box(root, "servers.dat").click()
+  box(root, "saves").click()
+  await flush()
+  expect(box(root, "logs").checked).toBe(false)
+  expect(box(root, "saves").checked).toBe(true)
+  button(root, "_trn_instance_share.share_button").click()
+  await flush()
+  expect(sentEntries()).toEqual(["config", "mods", "screenshots", "saves"])
+})
+
+it("shares nothing of the folder when everything is unticked", async () => {
+  io.entries.data = instanceEntries.slice(0, 2)
+  const root = share()
+  box(root, "config").click()
+  box(root, "logs").click()
+  await flush()
+  button(root, "_trn_instance_share.share_button").click()
+  await flush()
+  expect(sentEntries()).toEqual([])
+})
+
+it("cannot share before it knows what the instance holds, or when it cannot find out", async () => {
+  io.entries.data = undefined
+  const root = share()
+  const submit = button(root, "_trn_instance_share.share_button")
+  expect(submit.disabled).toBe(true)
+  submit.click()
+  await flush()
+  expect(io.streams).toHaveLength(0)
+  dispose!()
+  dispose = undefined
+  document.body.textContent = ""
+
+  io.entries.error = new Error("EACCES")
+  const failed = share()
+  expect(
+    failed.querySelector('[data-testid="share-entries-failed"]')!.textContent
+  ).toContain("instances:_trn_instance_share.entries_failed")
+  expect(failed.querySelector('[data-testid="share-entries"]')).toBeNull()
+  expect(button(failed, "_trn_instance_share.share_button").disabled).toBe(true)
+})

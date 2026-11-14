@@ -13,7 +13,9 @@ use crate::managers::account::gdl_account::{
 };
 use crate::managers::instance as manager;
 use crate::managers::instance::InstanceMoveTarget;
-use crate::managers::instance::export::{InstanceTooLargeError, ShareInstanceProgress};
+use crate::managers::instance::export::{
+    InstanceTooLargeError, ShareEntry, ShareEntryKind, ShareInstanceProgress,
+};
 use crate::managers::instance::importer::ImportShareCodeProgress;
 use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
 use crate::managers::{App, AppInner, instance::importer};
@@ -648,6 +650,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .map(FETaskId::from)
         }
 
+        query GET_SHARE_ENTRIES[app, instance_id: FEInstanceId] {
+            app.instance_manager()
+                .export_manager()
+                .share_entries(instance_id.into())
+                .await
+                .map(|entries| entries.into_iter().map(FEShareEntry::from).collect::<Vec<_>>())
+        }
+
         query EXPLORE[app, args: ExploreQuery] {
             app.instance_manager().explore_data(
                 args.instance_id.into(),
@@ -860,6 +870,16 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     ) -> Result<impl IntoResponse, impl IntoResponse> {
         let cancel_token = tokio_util::sync::CancellationToken::new();
 
+        // The entries the user ticked, as a JSON list of names.
+        let entries = query
+            .entries
+            .as_deref()
+            .map(serde_json::from_str::<Vec<String>>)
+            .transpose()
+            .map_err(|e| {
+                FeError::from_anyhow(&anyhow!("Invalid list of entries to share: {e}")).make_axum()
+            })?;
+
         let (mut rx, handle) = app
             .instance_manager()
             .export_manager()
@@ -869,6 +889,7 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 query.expiration_days,
                 query.max_downloads,
                 query.include_saves,
+                entries,
                 cancel_token.clone(),
             )
             .await
@@ -2837,6 +2858,48 @@ struct ShareInstanceQuery {
     max_downloads: Option<i32>,
     #[serde(default)]
     include_saves: bool,
+    /// A JSON list of the top-level entries to share. Without it the default
+    /// set is shared, with `saves` when `include_saves` is set.
+    entries: Option<String>,
+}
+
+#[derive(Type, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct FEShareEntry {
+    name: String,
+    directory: bool,
+    kind: FEShareEntryKind,
+    /// Ticked when the dialog opens: everything but worlds and their backups.
+    shared_by_default: bool,
+}
+
+#[derive(Type, Serialize, Debug)]
+#[serde(rename_all = "camelCase")]
+enum FEShareEntryKind {
+    Worlds,
+    Backups,
+    ServerList,
+    Screenshots,
+    Logs,
+    Other,
+}
+
+impl From<ShareEntry> for FEShareEntry {
+    fn from(entry: ShareEntry) -> Self {
+        Self {
+            shared_by_default: entry.kind.shared_by_default(),
+            kind: match entry.kind {
+                ShareEntryKind::Worlds => FEShareEntryKind::Worlds,
+                ShareEntryKind::Backups => FEShareEntryKind::Backups,
+                ShareEntryKind::ServerList => FEShareEntryKind::ServerList,
+                ShareEntryKind::Screenshots => FEShareEntryKind::Screenshots,
+                ShareEntryKind::Logs => FEShareEntryKind::Logs,
+                ShareEntryKind::Other => FEShareEntryKind::Other,
+            },
+            name: entry.name,
+            directory: entry.directory,
+        }
+    }
 }
 
 #[derive(Debug, Serialize, Type)]

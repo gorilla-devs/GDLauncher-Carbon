@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs::{self, File},
     io::{self, Read, Write},
     path::{Path, PathBuf},
@@ -493,6 +493,24 @@ impl ManagerRef<'_, InstanceExportManager> {
         }
     }
 
+    /// The top-level entries of an instance that a share can include.
+    pub async fn share_entries(self, instance_id: InstanceId) -> anyhow::Result<Vec<ShareEntry>> {
+        let basepath = {
+            let instance_manager = self.app.instance_manager();
+            let instances = instance_manager.instances.read().await;
+            let instance = instances
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?;
+            self.app
+                .settings_manager()
+                .runtime_path
+                .get_instances()
+                .get_instance_path(&instance.shortpath)
+                .get_data_path()
+        };
+        tokio::task::spawn_blocking(move || list_share_entries(&basepath)).await?
+    }
+
     pub async fn share_instance(
         self,
         instance_id: InstanceId,
@@ -500,6 +518,8 @@ impl ManagerRef<'_, InstanceExportManager> {
         expiration_days: Option<i32>,
         max_downloads: Option<i32>,
         include_saves: bool,
+        // The top-level entries the user ticked; `None` shares the default set.
+        entries: Option<Vec<String>>,
         cancel_token: CancellationToken,
     ) -> anyhow::Result<(
         mpsc::Receiver<ShareInstanceProgress>,
@@ -528,7 +548,10 @@ impl ManagerRef<'_, InstanceExportManager> {
             .get_instance_path(&instance.shortpath)
             .get_data_path();
 
-        let filter = build_share_filter(&basepath, include_saves)?;
+        let filter = match &entries {
+            Some(entries) => build_share_selection(&basepath, entries)?,
+            None => build_share_filter(&basepath, include_saves)?,
+        };
 
         drop(instances);
 
@@ -875,6 +898,114 @@ const SHARE_BREAKDOWN_TOP_N: usize = 5;
 /// and are already covered by the `saves` exclusion.
 const SHARE_EXCLUDED_FOLDERS: &[&str] = &["Distant_Horizons_server_data"];
 
+/// Top-level folders backup mods keep full copies of the worlds in (FTB
+/// Backups writes `backups`, Simple Backups `simplebackups`). They follow the
+/// worlds: left out unless the user asks for them. Compared without case, as
+/// Windows and macOS name folders.
+const SHARE_BACKUP_FOLDERS: &[&str] = &["backups", "backup", "simplebackups"];
+
+fn is_share_backup_folder(name: &str) -> bool {
+    SHARE_BACKUP_FOLDERS
+        .iter()
+        .any(|folder| name.eq_ignore_ascii_case(folder))
+}
+
+/// What a top-level entry of an instance is to someone deciding whether to
+/// share it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShareEntryKind {
+    /// The worlds and player data.
+    Worlds,
+    /// Copies of the worlds made by a backup mod.
+    Backups,
+    /// The multiplayer server list.
+    ServerList,
+    Screenshots,
+    /// Game logs and crash reports: user name, folder paths.
+    Logs,
+    Other,
+}
+
+impl ShareEntryKind {
+    fn of(name: &str) -> Self {
+        // Any spelling of `saves`: on Windows and macOS it is the worlds
+        // folder, and elsewhere a second one is the user's to tick.
+        if name.eq_ignore_ascii_case("saves") {
+            Self::Worlds
+        } else if is_share_backup_folder(name) {
+            Self::Backups
+        } else if name == "servers.dat" || name == "servers.dat_old" {
+            Self::ServerList
+        } else if name == "screenshots" {
+            Self::Screenshots
+        } else if name == "logs" || name == "crash-reports" {
+            Self::Logs
+        } else {
+            Self::Other
+        }
+    }
+
+    /// Worlds and their backups are shared only when the user asks.
+    pub fn shared_by_default(self) -> bool {
+        !matches!(self, Self::Worlds | Self::Backups)
+    }
+}
+
+/// One top-level entry of an instance that a share can include.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShareEntry {
+    pub name: String,
+    pub directory: bool,
+    pub kind: ShareEntryKind,
+}
+
+/// The top-level entries of an instance a share can include, for the user to
+/// choose from. What the user would want to look at comes first, so a long
+/// list does not hide it: what can say something about its owner, then the
+/// worlds and their backups, then the rest, each group by name. The
+/// always-excluded cache folders are not listed.
+fn list_share_entries(basepath: &Path) -> anyhow::Result<Vec<ShareEntry>> {
+    let mut entries = Vec::new();
+    for entry in fs::read_dir(basepath)? {
+        let entry = entry?;
+        let name = entry.file_name().to_string_lossy().to_string();
+        if SHARE_EXCLUDED_FOLDERS.contains(&name.as_str()) {
+            continue;
+        }
+        entries.push(ShareEntry {
+            // A link counts as what it leads to, as the archive takes it.
+            directory: fs::metadata(entry.path()).is_ok_and(|metadata| metadata.is_dir()),
+            kind: ShareEntryKind::of(&name),
+            name,
+        });
+    }
+    entries.sort_by_cached_key(|entry| {
+        let group = match entry.kind {
+            ShareEntryKind::ServerList | ShareEntryKind::Screenshots | ShareEntryKind::Logs => 0,
+            ShareEntryKind::Worlds | ShareEntryKind::Backups => 1,
+            ShareEntryKind::Other => 2,
+        };
+        (group, entry.name.to_lowercase(), entry.name.clone())
+    });
+    Ok(entries)
+}
+
+/// The share filter for the entries the user ticked. Only names that are at
+/// the top of the instance now are kept, so an entry that appeared after the
+/// list was shown is not shared, and the always-excluded cache folders stay
+/// out whatever was asked.
+fn build_share_selection(basepath: &Path, entries: &[String]) -> anyhow::Result<ExportEntry> {
+    let chosen: HashSet<&str> = entries.iter().map(String::as_str).collect();
+    let mut hashmap = HashMap::new();
+    for entry in fs::read_dir(basepath)? {
+        let name = entry?.file_name().to_string_lossy().to_string();
+        if chosen.contains(name.as_str()) && !SHARE_EXCLUDED_FOLDERS.contains(&name.as_str()) {
+            hashmap.insert(name, None);
+        }
+    }
+    Ok(ExportEntry(hashmap))
+}
+
 /// Why an [`ArchiveSink`] stopped taking bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ArchiveStop {
@@ -1023,10 +1154,11 @@ fn is_disk_full(error: &anyhow::Error) -> bool {
     })
 }
 
-/// Build the set of top-level instance entries to include in a share. Skips
-/// the always-excluded cache folders (`SHARE_EXCLUDED_FOLDERS`) and, unless the
-/// user opted in, the `saves` directory. Each kept entry maps to `None`,
-/// meaning "include its whole subtree".
+/// Build the set of top-level instance entries to include in a share when the
+/// caller names none. Skips the always-excluded cache folders
+/// (`SHARE_EXCLUDED_FOLDERS`) and, unless the user opted in, the `saves`
+/// directory and the backup mods' copies of it (`SHARE_BACKUP_FOLDERS`). Each
+/// kept entry maps to `None`, meaning "include its whole subtree".
 fn build_share_filter(basepath: &Path, include_saves: bool) -> anyhow::Result<ExportEntry> {
     let mut hashmap = HashMap::new();
     // Open the actual worlds root on this filesystem. A missing root is
@@ -1065,6 +1197,10 @@ fn build_share_filter(basepath: &Path, include_saves: bool) -> anyhow::Result<Ex
         // modpack, I'll start a new world"; opt in via the UI to ship it.
         if !include_saves {
             if name == "saves" {
+                continue;
+            }
+            // A backup mod's folder holds whole copies of the worlds.
+            if is_share_backup_folder(&name) {
                 continue;
             }
             // Open-handle identity is independent of canonical path spelling:
@@ -1255,6 +1391,157 @@ mod share_breakdown_tests {
         let f = build_share_filter(base, true).unwrap();
         assert!(f.0.contains_key("saves"));
         assert!(!f.0.contains_key("Distant_Horizons_server_data"));
+    }
+
+    fn share_fixture() -> tempfile::TempDir {
+        let dir = tempfile::tempdir().unwrap();
+        let base = dir.path();
+        for folder in [
+            "mods",
+            "config",
+            "saves",
+            "backups",
+            "simplebackups",
+            "screenshots",
+            "logs",
+            "crash-reports",
+            "Distant_Horizons_server_data",
+        ] {
+            std::fs::create_dir(base.join(folder)).unwrap();
+        }
+        for file in ["options.txt", "servers.dat"] {
+            std::fs::write(base.join(file), "x").unwrap();
+        }
+        dir
+    }
+
+    #[test]
+    fn world_backups_follow_the_worlds_when_no_entries_are_named() {
+        let dir = share_fixture();
+        let base = dir.path();
+        std::fs::create_dir(base.join("Backup")).unwrap();
+
+        // The worlds stay home, and so do the copies a backup mod made of them.
+        let filter = build_share_filter(base, false).unwrap();
+        for name in ["saves", "backups", "simplebackups", "Backup"] {
+            assert!(!filter.0.contains_key(name), "{name} must not be shared");
+        }
+        for name in ["mods", "config", "logs", "options.txt", "servers.dat"] {
+            assert!(filter.0.contains_key(name), "{name} must be shared");
+        }
+
+        // Asked for, both go.
+        let filter = build_share_filter(base, true).unwrap();
+        for name in ["saves", "backups", "simplebackups", "Backup"] {
+            assert!(filter.0.contains_key(name), "{name} must be shared");
+        }
+    }
+
+    #[test]
+    fn the_entries_to_choose_from_start_with_what_to_look_at_and_leave_worlds_unticked() {
+        let dir = share_fixture();
+        let entries = list_share_entries(dir.path()).unwrap();
+        let names: Vec<&str> = entries.iter().map(|entry| entry.name.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                // What can say something about its owner.
+                "crash-reports",
+                "logs",
+                "screenshots",
+                "servers.dat",
+                // The worlds and their backups.
+                "backups",
+                "saves",
+                "simplebackups",
+                // The rest.
+                "config",
+                "mods",
+                "options.txt",
+            ],
+            "the always-excluded cache folder is not offered"
+        );
+        let kind = |name: &str| {
+            entries
+                .iter()
+                .find(|entry| entry.name == name)
+                .unwrap()
+                .kind
+        };
+        assert_eq!(kind("saves"), ShareEntryKind::Worlds);
+        assert_eq!(kind("backups"), ShareEntryKind::Backups);
+        assert_eq!(kind("simplebackups"), ShareEntryKind::Backups);
+        assert_eq!(kind("servers.dat"), ShareEntryKind::ServerList);
+        assert_eq!(kind("screenshots"), ShareEntryKind::Screenshots);
+        assert_eq!(kind("logs"), ShareEntryKind::Logs);
+        assert_eq!(kind("crash-reports"), ShareEntryKind::Logs);
+        assert_eq!(kind("mods"), ShareEntryKind::Other);
+        for entry in &entries {
+            assert_eq!(
+                entry.kind.shared_by_default(),
+                !matches!(entry.kind, ShareEntryKind::Worlds | ShareEntryKind::Backups),
+                "{}",
+                entry.name
+            );
+            assert_eq!(
+                entry.directory,
+                !["options.txt", "servers.dat"].contains(&entry.name.as_str()),
+                "{}",
+                entry.name
+            );
+        }
+        // What is ticked by default is what a share without a list takes.
+        let default: std::collections::HashSet<String> = entries
+            .iter()
+            .filter(|entry| entry.kind.shared_by_default())
+            .map(|entry| entry.name.clone())
+            .collect();
+        let unlisted: std::collections::HashSet<String> = build_share_filter(dir.path(), false)
+            .unwrap()
+            .0
+            .into_keys()
+            .collect();
+        assert_eq!(default, unlisted);
+    }
+
+    #[test]
+    fn only_the_ticked_entries_are_shared() {
+        let dir = share_fixture();
+        let base = dir.path();
+        let ticked = |names: &[&str]| -> Vec<String> {
+            let chosen: Vec<String> = names.iter().map(|name| name.to_string()).collect();
+            let mut kept: Vec<String> = build_share_selection(base, &chosen)
+                .unwrap()
+                .0
+                .into_iter()
+                .map(|(name, subtree)| {
+                    assert!(subtree.is_none(), "{name} is shared whole");
+                    name
+                })
+                .collect();
+            kept.sort();
+            kept
+        };
+
+        // Logs, screenshots and the server list unticked: none of them goes.
+        assert_eq!(ticked(&["mods", "config"]), ["config", "mods"]);
+        // Worlds and backups go when ticked.
+        assert_eq!(
+            ticked(&["mods", "saves", "backups"]),
+            ["backups", "mods", "saves"]
+        );
+        // Nothing ticked shares nothing of the folder.
+        assert!(ticked(&[]).is_empty());
+        // A name that is not at the top of the instance is not a way in or out.
+        assert_eq!(
+            ticked(&["mods", "gone", "../outside", "mods/inner", ""]),
+            ["mods"]
+        );
+        // The cache folder stays out even when asked for.
+        assert_eq!(ticked(&["mods", "Distant_Horizons_server_data"]), ["mods"]);
+        // An entry that appeared after the list was shown is not shared.
+        std::fs::create_dir(base.join("appeared")).unwrap();
+        assert_eq!(ticked(&["mods", "config"]), ["config", "mods"]);
     }
 
     #[cfg(unix)]

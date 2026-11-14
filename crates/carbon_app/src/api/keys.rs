@@ -148,6 +148,7 @@ keys! {
         IMPORT_INSTANCE_SHARE_CODE                  = "importInstanceShareCode";
         VALIDATE_SHARE_CODE                         = "validateShareCode";
         GET_SHARE_PREVIEW                           = "getSharePreview";
+        GET_SHARE_ENTRIES                           = "getShareEntries";
         GET_IMPORTABLE_ENTITIES                     = "getImportableEntities";
         GET_IMPORT_ENTITY_DEFAULT_PATH              = "getImportEntityDefaultPath";
         SET_IMPORT_SCAN_TARGET                      = "setImportScanTarget";
