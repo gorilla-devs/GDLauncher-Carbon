@@ -58,9 +58,29 @@ function withAdsLayout(props: { children?: JSX.Element }) {
   return (
     <SearchInputContext.Provider value={searchResults}>
       <div class="flex h-screen flex-col">
-        <AppNavbar />
+        {/* On a display too short for the ad under the navbar, the ad column
+            runs beside it: the navbar and the banner end where the column
+            starts. */}
+        <div
+          class="shrink-0"
+          data-testid="ads-layout-top"
+          style={{
+            width: adSize.besideNavbar
+              ? `calc(100vw - ${adSize.width}px)`
+              : undefined
+          }}
+        >
+          <AppNavbar />
+        </div>
         <Show when={showCacheBanner()}>
-          <div class="bg-darkSlate-800 border-b border-darkSlate-700 shrink-0 px-6 py-3">
+          <div
+            class="bg-darkSlate-800 border-b border-darkSlate-700 shrink-0 px-6 py-3"
+            style={{
+              width: adSize.besideNavbar
+                ? `calc(100vw - ${adSize.width}px)`
+                : undefined
+            }}
+          >
             <div class="bg-darkSlate-700/50 border-yellow-500/30 flex items-center gap-4 rounded-lg border-l-4 px-4 py-3">
               <div class="bg-yellow-500/15 text-yellow-400 flex h-9 w-9 shrink-0 items-center justify-center rounded-full">
                 <div class="i-hugeicons:alert-02 h-5 w-5" />
@@ -105,8 +125,21 @@ function withAdsLayout(props: { children?: JSX.Element }) {
                 {props.children}
               </div>
               <Show when={adSize.shouldShow}>
+                {/* Keeps the column's place in the row while the column
+                    itself is taken out of it below. */}
+                <Show when={adSize.besideNavbar}>
+                  <div
+                    class="shrink-0"
+                    style={{ width: `${adSize.width}px` }}
+                  />
+                </Show>
                 <div
-                  class="relative flex h-full flex-col gap-2 items-center"
+                  class="flex flex-col gap-2 items-center"
+                  classList={{
+                    "relative h-full": !adSize.besideNavbar,
+                    "fixed right-0 top-0 h-screen": adSize.besideNavbar
+                  }}
+                  data-testid="ads-column"
                   style={{
                     width: `${adSize.width}px`,
                     "view-transition-name": `ad`,

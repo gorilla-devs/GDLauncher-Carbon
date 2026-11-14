@@ -5,6 +5,9 @@ export interface BoundsSize {
   width: number
   height: number
   shouldShow: boolean
+  /** The display is too short for the ad under the navbar, so the ad column
+   *  runs beside the navbar, the whole height of the window. */
+  besideNavbar?: boolean
 }
 
 export const [adSize, _setAdSize] = createStore<BoundsSize>({

@@ -560,7 +560,12 @@ it("actual ad IPC uses the matching display's DIP workArea", async () => {
     getAdSize
   })()
   expect(screen.getDisplayMatching).toHaveBeenCalledWith(bounds)
-  expect(result.adSize).toEqual({ width: 440, height: 730, shouldShow: true })
+  expect(result.adSize).toEqual({
+    width: 440,
+    height: 730,
+    shouldShow: true,
+    besideNavbar: false
+  })
 })
 describe("actual Recover Database IPC", () => {
   const INTENT = ".gdl-db-restore.json"
