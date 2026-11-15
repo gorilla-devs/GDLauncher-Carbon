@@ -5,10 +5,10 @@ import {
   RESET_WARNING,
   type DbRecoveryCategory
 } from "../main/utils/dbRecovery"
-import { confirmedResetClick } from "./resetButton"
+import { confirmedResetClick, revealedResetClick } from "./resetButton"
 import { restartClick } from "./restartButton"
 import { recoverRestoreClick, restoreSnapshotClick } from "./restoreButton"
-import { installReadyUpdateAction } from "./installReadyUpdate"
+import { recoveryUpdateCheck } from "./recoveryUpdate"
 import { domReady } from "./utils"
 
 export interface Log {
@@ -266,111 +266,6 @@ function useLoading() {
         "#update-progress-text"
       )!
 
-      let updateInfo: any = null
-      let readyDownloadId: number | undefined
-      let updateState:
-        | "idle"
-        | "checking"
-        | "downloading"
-        | "ready"
-        | "error"
-        | "no-update"
-        | "unsupported"
-        | "manual-update" = "idle"
-
-      const setUpdateState = (state: typeof updateState, data?: any) => {
-        updateState = state
-
-        switch (state) {
-          case "idle":
-            updateStatusText.textContent =
-              "An update may have fixed this issue."
-            updateStatusText.style.whiteSpace = "nowrap"
-            updateProgressContainer.style.display = "none"
-            checkUpdatesBtn.textContent = "Check for Updates"
-            checkUpdatesBtn.disabled = false
-            checkUpdatesBtn.style.opacity = "1"
-            checkUpdatesBtn.style.background = "rgb(var(--primary-500))"
-            break
-
-          case "checking":
-            updateStatusText.textContent = "Checking for updates..."
-            updateStatusText.style.whiteSpace = "nowrap"
-            updateProgressContainer.style.display = "none"
-            checkUpdatesBtn.textContent = "Checking..."
-            checkUpdatesBtn.disabled = true
-            checkUpdatesBtn.style.opacity = "0.6"
-            break
-
-          case "manual-update":
-            updateInfo = data
-            updateStatusText.textContent = `Update v${data?.version || "..."} available. Copy the download link to update manually.`
-            updateProgressContainer.style.display = "none"
-            checkUpdatesBtn.textContent = "Copy Link"
-            checkUpdatesBtn.disabled = false
-            checkUpdatesBtn.style.opacity = "1"
-            break
-
-          case "downloading":
-            if (data) {
-              updateInfo = data
-            }
-            updateStatusText.textContent = `Downloading v${updateInfo?.version || "..."}`
-            updateStatusText.style.whiteSpace = "nowrap"
-            updateProgressContainer.style.display = "block"
-            checkUpdatesBtn.textContent = "Downloading..."
-            checkUpdatesBtn.disabled = true
-            checkUpdatesBtn.style.opacity = "0.6"
-            break
-
-          case "ready":
-            updateStatusText.textContent = `Update v${updateInfo?.version || "..."} ready`
-            updateStatusText.style.whiteSpace = "nowrap"
-            updateProgressContainer.style.display = "none"
-            checkUpdatesBtn.textContent = "Apply & Restart"
-            checkUpdatesBtn.disabled = false
-            checkUpdatesBtn.style.opacity = "1"
-            checkUpdatesBtn.style.background = "rgb(var(--green-500))"
-            break
-
-          case "no-update": {
-            updateStatusText.innerHTML =
-              'No update available. Please <a href="#" id="discord-link-inline" style="color: rgb(var(--primary-400)); text-decoration: underline; cursor: pointer;">report this issue on Discord</a> and check again later.'
-            updateStatusText.style.whiteSpace = "normal"
-            updateProgressContainer.style.display = "none"
-            checkUpdatesBtn.textContent = "Check for Updates"
-            checkUpdatesBtn.disabled = false
-            checkUpdatesBtn.style.opacity = "1"
-            checkUpdatesBtn.style.background = "rgb(var(--primary-500))"
-
-            const discordLinkInline: HTMLElement | null =
-              document.querySelector("#discord-link-inline")
-            if (discordLinkInline) {
-              discordLinkInline.onclick = (e: Event) => {
-                e.preventDefault()
-                ipcRenderer.invoke(
-                  "openExternalLink",
-                  "https://discord.gdlauncher.com"
-                )
-              }
-            }
-            break
-          }
-
-          case "unsupported":
-          case "error":
-            updateStatusText.textContent =
-              data?.message || "Update check failed"
-            updateStatusText.style.whiteSpace = "nowrap"
-            updateProgressContainer.style.display = "none"
-            checkUpdatesBtn.textContent = "Retry"
-            checkUpdatesBtn.disabled = false
-            checkUpdatesBtn.style.opacity = "1"
-            checkUpdatesBtn.style.background = "rgb(var(--primary-500))"
-            break
-        }
-      }
-
       const addHoverEffect = (btn: HTMLButtonElement) => {
         btn.addEventListener("mouseenter", () => {
           if (!btn.disabled) {
@@ -390,48 +285,6 @@ function useLoading() {
         copyErrorDetailBtn,
         updateActionBtn
       ].forEach(addHoverEffect)
-
-      const checkForUpdates = async () => {
-        setUpdateState("checking")
-
-        try {
-          // The core is down, so main picks the channel: the one last checked,
-          // else this build's own, and never an older release.
-          const result = await ipcRenderer.invoke("checkForUpdatesFromRecovery")
-          if (result?.status === "snapshot-version")
-            setUpdateState("unsupported", {
-              message: "Snapshot builds do not support update checks."
-            })
-          else if (result?.currentState) receiveUpdateState(result.currentState)
-        } catch (error) {
-          console.error("Update check failed:", error)
-          setUpdateState("error", { message: "Failed to check for updates" })
-        }
-      }
-
-      const installReady = installReadyUpdateAction(
-        () => readyDownloadId,
-        (id) => ipcRenderer.invoke("installUpdate", id),
-        (message) => setUpdateState("error", { message })
-      )
-      checkUpdatesBtn.addEventListener("click", async () => {
-        if (updateState === "error" && readyDownloadId !== undefined) {
-          await installReady()
-          return
-        }
-        if (
-          updateState === "idle" ||
-          updateState === "error" ||
-          updateState === "no-update" ||
-          updateState === "unsupported"
-        ) {
-          await checkForUpdates()
-        } else if (updateState === "manual-update" && updateInfo?.downloadUrl) {
-          await navigator.clipboard.writeText(updateInfo.downloadUrl)
-        } else if (updateState === "ready") {
-          await installReady()
-        }
-      })
 
       restartBtn.addEventListener(
         "click",
@@ -508,61 +361,31 @@ function useLoading() {
         }, 2000)
       })
 
-      let lastUpdateRevision = -1
-      const receiveUpdateState = (
-        stateData: import("../main/utils/updateState").UpdateStateData
-      ) => {
-        if (
-          !Number.isSafeInteger(stateData.revision) ||
-          stateData.revision <= lastUpdateRevision
-        )
-          return
-        lastUpdateRevision = stateData.revision
-        readyDownloadId = stateData.readyUpdate?.id
-        if (
-          stateData.readyUpdate &&
-          !["error", "unsupported"].includes(stateData.state)
-        ) {
-          updateInfo = { version: stateData.readyUpdate.version }
-          setUpdateState("ready")
-          return
-        }
-        if (
-          !["downloading", "downloaded", "manual-update"].includes(
-            stateData.state
+      await recoveryUpdateCheck({
+        ipc: ipcRenderer,
+        button: checkUpdatesBtn,
+        status: updateStatusText,
+        progress: updateProgressContainer,
+        bar: updateProgressBar,
+        idle: "An update may have fixed this issue.",
+        noUpdate: (status) => {
+          status.innerHTML =
+            'No update available. Please <a href="#" id="discord-link-inline" style="color: rgb(var(--primary-400)); text-decoration: underline; cursor: pointer;">report this issue on Discord</a> and check again later.'
+          const discordLinkInline: HTMLElement | null = document.querySelector(
+            "#discord-link-inline"
           )
-        ) {
-          updateInfo = null
-          updateProgressBar.style.width = "0%"
-        }
-        switch (stateData.state) {
-          case "downloaded":
-            updateInfo = stateData.updateInfo
-            setUpdateState("ready")
-            break
-          case "downloading":
-            updateInfo = stateData.updateInfo
-            setUpdateState("downloading", updateInfo)
-            updateProgressBar.style.width = `${Math.round(stateData.progress || 0)}%`
-            break
-          case "manual-update":
-            setUpdateState("manual-update", stateData.updateInfo)
-            break
-          case "error":
-          case "unsupported":
-            setUpdateState(stateData.state, stateData.error)
-            break
-          default:
-            setUpdateState(stateData.state)
-            break
-        }
-      }
-      ipcRenderer.on("gd-update-state-changed", (_, stateData) =>
-        receiveUpdateState(stateData)
-      )
-      const currentState = await ipcRenderer.invoke("getUpdateState")
-      if (currentState?.state === "idle") await checkForUpdates()
-      else if (currentState) receiveUpdateState(currentState)
+          if (discordLinkInline) {
+            discordLinkInline.onclick = (e: Event) => {
+              e.preventDefault()
+              ipcRenderer.invoke(
+                "openExternalLink",
+                "https://discord.gdlauncher.com"
+              )
+            }
+          }
+        },
+        oneLine: true
+      })
     },
 
     async backwardsMigrationError() {
@@ -599,25 +422,42 @@ function useLoading() {
 
           <!-- Reassurance -->
           <div style="font-size: 1rem; color: rgb(var(--green-400)); font-weight: 500; margin-bottom: 40px;">
-            Your instance, world, addon and server directories on disk remain. Use a compatible launcher version before choosing a last-resort metadata reset.
+            Your instance, world, addon and server directories on disk remain.
           </div>
 
-          <!-- Button: it keeps the middle column, so it does not move when the confirming one appears beside it -->
-          <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: center; width: 100%;">
-            <button id="reset-db-confirm-btn" data-testid="recovery-reset-db-confirm-button" style="grid-column: 1; justify-self: end; padding: 14px 20px; background: rgb(var(--red-500)); color: white; border: 1px solid rgb(var(--red-500)); border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.2s; white-space: nowrap;">
-              Reset Database
+          <!-- Update: what gets this database opened again -->
+          <div id="update-step" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+            <button id="check-updates-btn" data-testid="recovery-check-updates-button" style="padding: 14px 32px; background: rgb(var(--primary-500)); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.2s; white-space: nowrap;">
+              Check for Updates
             </button>
-            <button id="reset-db-btn" data-testid="recovery-reset-db-button" style="grid-column: 2; padding: 14px 32px; background: rgb(var(--primary-500)); color: white; border: 1px solid rgb(var(--primary-500)); border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.2s; white-space: nowrap;">
-              Reset Database & Restart
-            </button>
+            <div id="update-status-text" data-testid="recovery-update-status" role="status" style="font-size: 0.85rem; color: rgb(var(--lightSlate-400)); margin-top: 14px; min-height: 1.3em;"></div>
+            <div id="update-progress-container" style="display: none; margin-top: 8px; width: 260px; max-width: 100%;">
+              <div style="background: rgb(var(--darkSlate-600)); border-radius: 3px; height: 4px; overflow: hidden;">
+                <div id="update-progress-bar" style="background: rgb(var(--primary-500)); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 24px; margin-top: 20px; flex-wrap: wrap; justify-content: center;">
+              <button id="discord-btn" style="background: none; border: none; padding: 0; color: rgb(var(--lightSlate-500)); font-size: 0.85rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-family: inherit;">Get help on Discord</button>
+              <button id="reset-db-btn" data-testid="recovery-reset-db-button" style="background: none; border: none; padding: 0; color: rgb(var(--lightSlate-500)); font-size: 0.85rem; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; font-family: inherit;">Reset database instead</button>
+            </div>
           </div>
 
-          <!-- Note -->
-          <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-500)); margin-top: 16px;">
-            ${RESET_WARNING}
+          <!-- Reset: shown in place of the update step once asked for -->
+          <div id="reset-db-panel" style="display: flex; flex-direction: column; align-items: center; width: 100%;">
+            <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-500)); margin-bottom: 20px;">
+              ${RESET_WARNING}
+            </div>
+            <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+              <button id="reset-db-confirm-btn" data-testid="recovery-reset-db-confirm-button" style="padding: 14px 32px; background: rgb(var(--red-500)); color: white; border: 1px solid rgb(var(--red-500)); border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.2s; white-space: nowrap;">
+                Reset Database
+              </button>
+              <button id="reset-db-cancel-btn" style="padding: 14px 32px; background: transparent; color: rgb(var(--lightSlate-300)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.2s; white-space: nowrap;">
+                Cancel
+              </button>
+            </div>
+            <div id="reset-db-error" role="alert" style="white-space: pre-wrap; margin-top: 12px;"></div>
           </div>
 
-          <div id="reset-db-error" role="alert" style="white-space: pre-wrap;"></div>
           <!-- Version -->
           <div style="font-size: 0.7rem; color: rgb(var(--lightSlate-600)); margin-top: auto; padding-top: 32px;">
             v${__APP_VERSION__}
@@ -625,26 +465,54 @@ function useLoading() {
         </div>
       </div>`
 
-      const resetDbBtn: HTMLButtonElement =
-        document.querySelector("#reset-db-btn")!
-      const resetDbConfirmBtn: HTMLButtonElement = document.querySelector(
-        "#reset-db-confirm-btn"
-      )!
+      const button = (id: string) =>
+        document.querySelector<HTMLButtonElement>(`#${id}`)!
+      const checkUpdatesBtn = button("check-updates-btn")
+      const resetDbConfirmBtn = button("reset-db-confirm-btn")
+      const resetDbCancelBtn = button("reset-db-cancel-btn")
+      const discordBtn = button("discord-btn")
 
-      for (const button of [resetDbBtn, resetDbConfirmBtn]) {
-        button.addEventListener("mouseenter", () => {
-          button.style.filter = "brightness(0.85)"
+      for (const hovered of [
+        checkUpdatesBtn,
+        resetDbConfirmBtn,
+        resetDbCancelBtn
+      ]) {
+        hovered.addEventListener("mouseenter", () => {
+          if (!hovered.disabled) hovered.style.filter = "brightness(0.85)"
         })
-        button.addEventListener("mouseleave", () => {
-          button.style.filter = "brightness(1)"
+        hovered.addEventListener("mouseleave", () => {
+          hovered.style.filter = "brightness(1)"
         })
       }
 
-      confirmedResetClick({
-        button: resetDbBtn,
+      discordBtn.addEventListener("click", () => {
+        ipcRenderer.invoke("openExternalLink", "https://discord.gdlauncher.com")
+      })
+
+      revealedResetClick({
+        open: button("reset-db-btn"),
+        panel: document.querySelector<HTMLElement>("#reset-db-panel")!,
         confirm: resetDbConfirmBtn,
+        cancel: resetDbCancelBtn,
         error: document.querySelector<HTMLElement>("#reset-db-error")!,
-        invoke: () => ipcRenderer.invoke("deleteDbAndRestart")
+        invoke: () => ipcRenderer.invoke("deleteDbAndRestart"),
+        hide: [document.querySelector<HTMLElement>("#update-step")!]
+      })
+
+      await recoveryUpdateCheck({
+        ipc: ipcRenderer,
+        button: checkUpdatesBtn,
+        status: document.querySelector<HTMLElement>("#update-status-text")!,
+        progress: document.querySelector<HTMLElement>(
+          "#update-progress-container"
+        )!,
+        bar: document.querySelector<HTMLElement>("#update-progress-bar")!,
+        idle: "",
+        noUpdate: (status) => {
+          status.textContent =
+            "No newer version found. Install the version you used before."
+        },
+        oneLine: false
       })
     }
   }

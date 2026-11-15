@@ -5,6 +5,7 @@ import vm from "node:vm"
 import { EventEmitter } from "node:events"
 import ts from "typescript"
 import { createCoreOutput } from "./coreOutput"
+import { recoveryUpdateScreen } from "../../preload/recoveryUpdate.fixture"
 import { createCoreExitNotice, type CoreExit } from "./coreExitNotice"
 import { AccountIdentityReceiver } from "./accountIdentity"
 import {
@@ -378,55 +379,44 @@ it("Task23 actual main-window update consumer clears busy/manual state and Copy 
   expect(clipboard).toBe("https://active.invalid/GDLauncher__2__linux__x64.zip")
 })
 it("Task23 actual recovery broadcast/hydration reducer resets unsupported button and manual clipboard action", async () => {
-  const text = source("apps/desktop/packages/preload/loading.ts"),
-    button = { textContent: "Checking...", disabled: true, style: {} },
-    status = { textContent: "", style: {}, innerHTML: "" }
   let copied = ""
-  const context: Record<string, any> = {
-    lastUpdateRevision: -1,
-    readyDownloadId: undefined,
-    updateState: "checking",
-    updateInfo: null,
-    updateStatusText: status,
-    updateProgressContainer: { style: {} },
-    updateProgressBar: { style: {} },
-    checkUpdatesBtn: button,
-    navigator: {
-      clipboard: {
-        writeText: async (s: string) => {
-          copied = s
-        }
+  vi.stubGlobal("navigator", {
+    clipboard: {
+      writeText: async (s: string) => {
+        copied = s
       }
     }
+  })
+  try {
+    const screen = recoveryUpdateScreen(async (name) =>
+      name === "getUpdateState" ? { state: "checking", revision: 0 } : undefined
+    )
+    await screen.ready
+    expect(screen.button.disabled).toBe(true)
+    screen.receive({
+      state: "unsupported",
+      revision: 2,
+      error: { message: "Manual update unavailable; retry" }
+    })
+    expect(screen.button.disabled).toBe(false)
+    expect(screen.button.textContent).toBe("Retry")
+    expect(screen.status.textContent).toContain("retry")
+    screen.receive({ state: "checking", revision: 1 })
+    expect(screen.button.disabled).toBe(false)
+    expect(screen.button.textContent).toBe("Retry")
+    screen.receive({
+      state: "manual-update",
+      revision: 3,
+      updateInfo: {
+        version: "2",
+        downloadUrl: "https://active.invalid/fixture.zip"
+      }
+    })
+    await screen.click()
+    expect(copied).toBe("https://active.invalid/fixture.zip")
+  } finally {
+    vi.unstubAllGlobals()
   }
-  const set = evaluate(initializer(text, "setUpdateState"), context)
-  context.setUpdateState = set
-  const receive = evaluate(initializer(text, "receiveUpdateState"), context)
-  receive({
-    state: "unsupported",
-    revision: 2,
-    error: { message: "Manual update unavailable; retry" }
-  })
-  expect(button.disabled).toBe(false)
-  expect(button.textContent).toBe("Retry")
-  expect(status.textContent).toContain("retry")
-  receive({ state: "checking", revision: 1 })
-  expect(button.disabled).toBe(false)
-  expect(context.updateInfo).toBeNull()
-  receive({
-    state: "manual-update",
-    revision: 3,
-    updateInfo: {
-      version: "2",
-      downloadUrl: "https://active.invalid/fixture.zip"
-    }
-  })
-  const click = evaluate(
-    callArgument(text, "checkUpdatesBtn.addEventListener", "click"),
-    context
-  )
-  await click()
-  expect(copied).toBe("https://active.invalid/fixture.zip")
 })
 it("Task23 actual updater wrapper null branch hydrates a packaged-provider manual artifact without ambient feed env", async () => {
   const handlers: Record<string, (...args: any[]) => any> = {},
@@ -528,42 +518,26 @@ it("Task23 actual updater wrapper null branch hydrates a packaged-provider manua
   expect(broadcast.at(-1)).toBe(result.currentState)
 })
 it("Task36 actual fatal consumer keeps positive token beside an error and Retry invokes the displayed artifact", async () => {
-  const text = source("apps/desktop/packages/preload/loading.ts"),
-    button = { textContent: "Install", disabled: false, style: {} },
-    status = { textContent: "", style: {}, innerHTML: "" }
-  let installToken: number | undefined
-  const context: Record<string, any> = {
-    lastUpdateRevision: -1,
-    readyDownloadId: undefined,
-    updateState: "ready",
-    updateInfo: null,
-    updateStatusText: status,
-    updateProgressContainer: { style: {} },
-    updateProgressBar: { style: {} },
-    checkUpdatesBtn: button,
-    installReady: async () => {
-      installToken = context.readyDownloadId
-    }
-  }
-  context.setUpdateState = evaluate(
-    initializer(text, "setUpdateState"),
-    context
-  )
-  const receive = evaluate(initializer(text, "receiveUpdateState"), context)
-  receive({
+  const installs: number[] = []
+  let checks = 0
+  const screen = recoveryUpdateScreen(async (name, id) => {
+    if (name === "getUpdateState") return { state: "checking", revision: 0 }
+    if (name === "installUpdate") installs.push(id)
+    if (name === "checkForUpdatesFromRecovery") checks++
+    return undefined
+  })
+  await screen.ready
+  screen.receive({
     state: "error",
     revision: 5,
     readyUpdate: { id: 3, version: "2.0.0" },
     error: { message: "Installer rejected; retry" }
   })
-  expect(status.textContent).toContain("Installer rejected")
-  expect(button.textContent).toBe("Retry")
-  expect(context.readyDownloadId).toBe(3)
-  await evaluate(
-    callArgument(text, "checkUpdatesBtn.addEventListener", "click"),
-    context
-  )()
-  expect(installToken).toBe(3)
+  expect(screen.status.textContent).toContain("Installer rejected")
+  expect(screen.button.textContent).toBe("Retry")
+  await screen.click()
+  expect(installs).toEqual([3])
+  expect(checks).toBe(0)
 })
 it("Task36 actual main wrapper owns a queued install callback through error before a successor completion", async () => {
   const handlers: Record<string, (...args: any[]) => any> = {},

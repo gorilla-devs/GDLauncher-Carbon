@@ -10,7 +10,7 @@ import { createUpdaterController } from "../../../main/utils/updaterController"
 import { ownsDownloadedUpdate } from "../../../main/utils/downloadedUpdate"
 import { createOwnedInstallDispatch } from "../../../main/utils/ownedInstallDispatch"
 import { createOwnedNativePreparation } from "../../../main/utils/ownedNativePreparation"
-import { installReadyUpdateAction } from "../../../preload/installReadyUpdate"
+import { recoveryUpdateScreen } from "../../../preload/recoveryUpdate.fixture"
 vi.mock("@gd/ui", async () => ({
   toast: (await import("somoto")).toast,
   Progress: () => <span />
@@ -76,45 +76,6 @@ findFinish(
   )!
 )
 if (!finishBody) throw Error("Actual Mac response finish callback absent")
-function extract(text: string, name: string, call = false) {
-  const parsed = ts.createSourceFile(
-    "fixture.ts",
-    text,
-    ts.ScriptTarget.Latest,
-    true
-  )
-  let body: string | undefined
-  function find(node: ts.Node) {
-    if (
-      !call &&
-      ts.isVariableDeclaration(node) &&
-      node.name.getText(parsed) === name
-    )
-      body = node.initializer?.getText(parsed)
-    if (
-      call &&
-      ts.isCallExpression(node) &&
-      node.expression.getText(parsed) === "checkUpdatesBtn.addEventListener" &&
-      node.arguments[0].getText(parsed) === '"click"'
-    )
-      body = node.arguments[1].getText(parsed)
-    ts.forEachChild(node, find)
-  }
-  find(parsed)
-  if (!body) throw Error("Actual consumer source absent: " + name)
-  return body
-}
-function evaluate(body: string, context: Record<string, unknown>) {
-  return vm.runInNewContext(
-    ts.transpileModule("(" + body + ")", {
-      compilerOptions: {
-        target: ts.ScriptTarget.ES2022,
-        module: ts.ModuleKind.CommonJS
-      }
-    }).outputText,
-    context
-  )
-}
 function deferred() {
   let resolve!: (value: any) => void, reject!: (error: Error) => void
   const promise = new Promise<any>((yes, no) => {
@@ -484,36 +445,19 @@ it.each([false, true])(
     await f.check("stable")
     await flush()
     expect(f.updater.autoInstallOnAppQuit).toBe(true)
-    const text = fs.readFileSync(
-      path.join(root, "apps/desktop/packages/preload/loading.ts"),
-      "utf8"
-    )
-    const button = { textContent: "", disabled: false, style: {} },
-      status = { textContent: "", style: {} },
-      context: Record<string, any> = {
-        lastUpdateRevision: -1,
-        readyDownloadId: undefined,
-        updateState: "idle",
-        updateInfo: null,
-        updateStatusText: status,
-        updateProgressContainer: { style: {} },
-        updateProgressBar: { style: {} },
-        checkUpdatesBtn: button,
-        // The loading screen's own install action, as loading.ts builds it.
-        installReady: installReadyUpdateAction(
-          () => context.readyDownloadId,
-          (id) => f.install(id),
-          (message) => context.setUpdateState("error", { message })
-        ),
-        checkForUpdates: async () => {
-          await f.check("stable")
-          receive(f.getState())
-        }
+    // The recovery screens' own update check, against this main.
+    const screen = recoveryUpdateScreen(async (name, id) => {
+      if (name === "getUpdateState") return f.getState()
+      if (name === "installUpdate") return f.install(id)
+      if (name === "checkForUpdatesFromRecovery") {
+        await f.check("stable")
+        return { status: "checking", currentState: f.getState() }
       }
-    context.setUpdateState = evaluate(extract(text, "setUpdateState"), context)
-    const receive = evaluate(extract(text, "receiveUpdateState"), context),
-      click = evaluate(extract(text, "click", true), context)
-    receive(f.getState())
+      return undefined
+    })
+    await screen.ready
+    const { button, click } = screen
+    const receive = screen.receive
     const clicked = click()
     await flush()
     if (postServing) await f.transferFinished()
@@ -521,7 +465,6 @@ it.each([false, true])(
     await flush()
     await clicked
     receive(f.getState())
-    expect(context.readyDownloadId).toBeUndefined()
     expect(button).toMatchObject({ textContent: "Retry", disabled: false })
     // The failed preparation was waited for before the core was stopped.
     expect(f.shutdown).not.toHaveBeenCalled()

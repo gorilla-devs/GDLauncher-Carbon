@@ -85,3 +85,49 @@ export function confirmedResetClick(io: {
     void reset()
   })
 }
+
+/**
+ * The reset of a screen whose first choice is something else: `open` shows
+ * `panel`, which holds the warning, `confirm` and `cancel`, in place of the
+ * `hide` elements. Only `confirm` resets, and it stays for a retry when the
+ * reset fails.
+ */
+export function revealedResetClick(io: {
+  open: HTMLButtonElement
+  panel: HTMLElement
+  confirm: HTMLButtonElement
+  cancel: HTMLButtonElement
+  error: Pick<HTMLElement, "textContent">
+  invoke: () => Promise<RestoreOutcome>
+  hide: HTMLElement[]
+  now?: () => number
+}) {
+  const now = io.now ?? (() => Date.now())
+  const reset = resetDatabaseClick(io.confirm, io.error, io.invoke)
+  let shownAt: number | undefined
+  const displays = io.hide.map((element) => element.style.display)
+  const show = (shown: boolean) => {
+    shownAt = shown ? now() : undefined
+    io.panel.style.display = shown ? "flex" : "none"
+    io.hide.forEach((element, index) => {
+      element.style.display = shown ? "none" : displays[index]
+    })
+  }
+
+  io.panel.style.display = "none"
+  io.open.addEventListener("click", () => show(true))
+  io.cancel.addEventListener("click", () => {
+    show(false)
+  })
+  io.confirm.addEventListener("click", async () => {
+    if (shownAt === undefined || now() - shownAt < RESET_CONFIRM_GUARD_MS)
+      return
+    io.cancel.disabled = true
+    io.cancel.style.opacity = "0.6"
+    await reset()
+    // A reset that worked leaves both busy until the restart.
+    if (io.confirm.disabled) return
+    io.cancel.disabled = false
+    io.cancel.style.opacity = "1"
+  })
+}
