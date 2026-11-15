@@ -20,6 +20,18 @@ interface DownloadOperation {
   info: UpdateInfo
   preparation?: Promise<void>
   native?: OwnedNativePreparation
+  /** The ready update's id, when this download is that same update again. */
+  repeats?: number
+}
+
+/** Whether two checks found one and the same update: its version and files. */
+function sameUpdate(a: UpdateInfo, b: UpdateInfo) {
+  const files = (info: UpdateInfo) =>
+    info.files
+      .map((file) => `${file.url}\n${file.sha512}`)
+      .sort()
+      .join("\n")
+  return a.version === b.version && files(a) === files(b)
 }
 
 /** English reasons, for logs and the untranslated loading screen, why an
@@ -74,6 +86,8 @@ export function createUpdaterController(io: {
     id: number
     info: UpdateInfo
     operation: DownloadOperation
+    /** An install of it failed. A later download of it is announced anew. */
+    spent?: true
   } | null = null
   let revision = 0
   // Set once an install stopped the core. Nothing starts it again in this
@@ -100,6 +114,21 @@ export function createUpdaterController(io: {
   }
   const nativeInstallPending = () =>
     installing?.stage === "dispatching" || installing?.stage === "pending"
+  /**
+   * A repeat that fails may have replaced the cached file it started from.
+   * The ready update goes with it then, instead of offering an install that
+   * can only be refused.
+   */
+  function dropLostRepeat(operation: DownloadOperation | null) {
+    if (
+      !downloaded ||
+      operation?.repeats !== downloaded.id ||
+      io.isDownloaded(downloaded.info)
+    )
+      return
+    downloaded.operation.native?.dispose()
+    downloaded = null
+  }
   function failPreparation(operation: DownloadOperation, error: unknown) {
     if (downloaded?.operation !== operation && activeDownload !== operation)
       return
@@ -107,6 +136,7 @@ export function createUpdaterController(io: {
     operation.native?.dispose()
     if (downloaded?.operation === operation) downloaded = null
     if (activeDownload === operation) activeDownload = null
+    dropLostRepeat(operation)
     revision++
     locked = false
     const attempt = installing
@@ -178,11 +208,21 @@ export function createUpdaterController(io: {
   }
   io.updater.on("update-available", (info: UpdateInfo) => {
     if (nativeInstallPending()) return
-    downloaded?.operation.native?.dispose()
+    // A later check finds the update that is already downloaded and downloads
+    // it again, from its cached file. It stays ready under its id meanwhile,
+    // so the window neither loses it nor announces it a second time.
+    const repeats =
+      downloaded && !downloaded.spent && sameUpdate(downloaded.info, info)
+        ? downloaded.id
+        : undefined
+    if (repeats === undefined) {
+      downloaded?.operation.native?.dispose()
+      downloaded = null
+    }
     activeDownload?.native?.dispose()
-    downloaded = null
     activeDownload = {
-      info: { ...info, files: info.files.map((file) => ({ ...file })) }
+      info: { ...info, files: info.files.map((file) => ({ ...file })) },
+      repeats
     }
     downloadOperations.set(info, activeDownload)
     locked = true
@@ -213,6 +253,7 @@ export function createUpdaterController(io: {
     if (nativeInstallPending()) return
     locked = false
     if (!activeDownload || !io.isDownloaded(activeDownload.info)) {
+      downloaded?.operation.native?.dispose()
       downloaded = null
       set({
         state: "error",
@@ -226,20 +267,35 @@ export function createUpdaterController(io: {
       return
     }
     const operation = activeDownload
+    // A repeat hands its download to the update that is already ready, which
+    // keeps its id and stays the one an install in progress was started for.
+    // Anything else is a new update with a new id.
+    const ready =
+      downloaded && downloaded.id === operation.repeats ? downloaded : null
+    downloaded?.operation.native?.dispose()
     operation.native = nativePreparation.watch((error) =>
       failPreparation(operation, error)
     )
-    downloaded = { id: state.revision + 1, info: operation.info, operation }
+    if (ready) {
+      ready.info = operation.info
+      ready.operation = operation
+    } else
+      downloaded = { id: state.revision + 1, info: operation.info, operation }
     activeDownload = null
     set({ state: "downloaded", progress: 100 })
   })
   io.updater.on("error", (error: unknown) => {
     if (nativePreparation.ownsError(error)) return
     const attempt = installing
-    if (attempt) attempt.failed = true
+    if (attempt) {
+      attempt.failed = true
+      if (downloaded) downloaded.spent = true
+    }
     revision++
     locked = false
+    const failed = activeDownload
     activeDownload = null
+    dropLostRepeat(failed)
     set({
       state: "error",
       updateInfo: null,
@@ -452,6 +508,7 @@ export function createUpdaterController(io: {
         // until a real error permits recovery or the application exits.
         if (attempt.failed) releaseFailedDispatch(attempt)
       } catch (error) {
+        captured.spent = true
         if (attempt.stage === "dispatching" || attempt.stage === "pending") {
           attempt.failed = true
           releaseFailedDispatch(attempt)

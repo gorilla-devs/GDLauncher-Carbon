@@ -493,3 +493,208 @@ it("manual ready reopen preserves a pending install presentation and real error 
   await flush()
   expect(f.installer).toHaveBeenCalledTimes(2)
 })
+
+/** The 30-minute check finding `version` again, served from its cached file. */
+async function repeatCheck(
+  f: Awaited<ReturnType<typeof fixture>>,
+  version: string
+) {
+  f.checks.mockImplementationOnce(async () => {
+    await f.complete(f.available(version))
+    return {}
+  })
+  await f.controller.check("stable")
+  await flush()
+}
+/** Every state the window is sent from here on. */
+function sentStates() {
+  const sent: any[] = [],
+    inner = listener!
+  listener = (event, state) => {
+    sent.push(state)
+    inner(event, state)
+  }
+  return sent
+}
+it("Later stays closed when a later check finds the same update: no download notice, the badge stays and Install still works", async () => {
+  const f = await fixture(),
+    token = f.controller.getState().readyUpdate!.id
+  expect(f.presentation().type).toBe("success")
+  toast.dismiss("updater-downloading")
+  await flush()
+  expect(f.presentation()).toBeUndefined()
+  const sent = sentStates()
+  await repeatCheck(f, "2.0.0")
+  await repeatCheck(f, "2.0.0")
+  expect(sent.map((state) => state.state)).toEqual([
+    "checking",
+    "downloading",
+    "downloaded",
+    "checking",
+    "downloading",
+    "downloaded"
+  ])
+  // The update stayed ready under its id through both repeats.
+  expect(sent.map((state) => state.readyUpdate?.id)).toEqual(
+    Array(6).fill(token)
+  )
+  expect(f.presentation()).toBeUndefined()
+  expect(renderer!.hasPendingUpdate()).toBe(true)
+  expect(renderer!.pendingUpdateVersion()).toBe("2.0.0")
+  // A check the player asks for brings the notice back, and it installs.
+  await renderer!.manualCheckForUpdates("stable")
+  await flush()
+  expect(f.presentation().type).toBe("success")
+  await f.presentation().action.onClick()
+  await flush()
+  expect(f.installer).toHaveBeenCalledTimes(1)
+})
+it("a newer update found by a later check replaces the closed one and is announced", async () => {
+  const f = await fixture(),
+    token = f.controller.getState().readyUpdate!.id
+  toast.dismiss("updater-downloading")
+  await flush()
+  await repeatCheck(f, "2.1.0")
+  const ready = f.controller.getState().readyUpdate!
+  expect(ready.version).toBe("2.1.0")
+  expect(ready.id).not.toBe(token)
+  expect(f.presentation().type).toBe("success")
+  await expect(f.controller.install(token)).rejects.toThrow(
+    "No automatic update is ready to install"
+  )
+})
+it("an Install clicked while a later check repeats the same update goes through with it", async () => {
+  const f = await fixture(),
+    token = f.controller.getState().readyUpdate!.id,
+    repeat = deferred()
+  f.checks.mockImplementationOnce(async () => {
+    const value = f.available("2.0.0")
+    await repeat.promise
+    await f.complete(value)
+    return {}
+  })
+  const checking = f.controller.check("stable")
+  await flush()
+  const installing = f.controller.install(token)
+  await flush()
+  expect(f.shutdown).not.toHaveBeenCalled()
+  repeat.resolve(undefined)
+  await checking
+  await installing
+  expect(f.shutdown).toHaveBeenCalledTimes(1)
+  expect(f.installer).toHaveBeenCalledTimes(1)
+})
+it("a repeat that fails after replacing the cached file takes the ready update with it", async () => {
+  const f = await fixture()
+  f.checks.mockImplementationOnce(async () => {
+    f.available("2.0.0")
+    // electron-updater found the cached file unusable and cleared it.
+    Object.assign(f.helper, {
+      file: null,
+      versionInfo: null,
+      fileInfo: null,
+      downloadedFileInfo: null
+    })
+    f.events.error(Error("Download failed"))
+    return {}
+  })
+  await f.controller.check("stable")
+  await flush()
+  expect(f.controller.getState()).toMatchObject({
+    state: "error",
+    readyUpdate: null
+  })
+  expect(renderer!.hasPendingUpdate()).toBe(false)
+})
+it("a failed check leaves a ready update whose file is still there", async () => {
+  const f = await fixture(),
+    token = f.controller.getState().readyUpdate!.id
+  f.checks.mockImplementationOnce(async () => {
+    f.available("2.0.0")
+    f.events.error(Error("Feed went away"))
+    return {}
+  })
+  await f.controller.check("stable")
+  await flush()
+  expect(f.controller.getState().readyUpdate?.id).toBe(token)
+  expect(renderer!.hasPendingUpdate()).toBe(true)
+})
+it("the same version published again with another file is a new update, not a repeat", async () => {
+  const f = await fixture(),
+    token = f.controller.getState().readyUpdate!.id
+  toast.dismiss("updater-downloading")
+  await flush()
+  const rebuilt: UpdateInfo = {
+    ...info("2.0.0"),
+    sha512: "rebuilt",
+    files: [{ url: "fixture.zip", sha512: "rebuilt" }]
+  }
+  f.checks.mockImplementationOnce(async () => {
+    f.events["update-available"](rebuilt)
+    await f.complete(rebuilt)
+    return {}
+  })
+  const sent = sentStates()
+  await f.controller.check("stable")
+  await flush()
+  expect(
+    sent.find((state) => state.state === "downloading").readyUpdate
+  ).toBeNull()
+  expect(f.controller.getState().readyUpdate!.id).not.toBe(token)
+  expect(f.presentation().type).toBe("success")
+})
+it("a repeat on macOS waits on a fresh native preparation and leaves no old watcher behind", async () => {
+  const native = new EventEmitter(),
+    f = await fixture(undefined, native),
+    token = f.controller.getState().readyUpdate!.id
+  // What MacUpdater carries, and what makes its preparation watched.
+  Object.assign(f.updater, {
+    autoInstallOnAppQuit: true,
+    squirrelDownloadedUpdate: false
+  })
+  const settled = {
+    error: native.listenerCount("error"),
+    completed: native.listenerCount("update-downloaded")
+  }
+  const counts = () => ({
+    error: native.listenerCount("error"),
+    completed: native.listenerCount("update-downloaded")
+  })
+  await repeatCheck(f, "2.0.0")
+  // Squirrel is fed again: one watcher, for the repeat.
+  expect(counts()).toEqual({
+    error: settled.error + 1,
+    completed: settled.completed + 1
+  })
+  expect(f.controller.getState().readyUpdate!.id).toBe(token)
+  native.emit("update-downloaded")
+  await flush()
+  expect(counts()).toEqual(settled)
+  await repeatCheck(f, "2.0.0")
+  // The repeat's own native failure is the one that counts.
+  native.emit("error", Error("Squirrel failed"))
+  await flush()
+  expect(f.controller.getState()).toMatchObject({
+    state: "error",
+    readyUpdate: null,
+    error: { code: "prepare-failed" }
+  })
+  expect(counts()).toEqual(settled)
+})
+it("an update whose install failed is announced again when a later check downloads it", async () => {
+  const f = await fixture(),
+    token = f.controller.getState().readyUpdate!.id
+  await f.presentation().action.onClick()
+  await flush()
+  expect(f.installer).toHaveBeenCalledTimes(1)
+  f.events.error(Error("Asynchronous install failed"))
+  await flush()
+  expect(f.controller.getState().readyUpdate!.id).toBe(token)
+  toast.dismiss("updater-downloading")
+  await flush()
+  await repeatCheck(f, "2.0.0")
+  const ready = f.controller.getState().readyUpdate!
+  expect(ready.version).toBe("2.0.0")
+  expect(ready.id).not.toBe(token)
+  expect(f.presentation().type).toBe("success")
+})

@@ -412,7 +412,10 @@ const receiveUpdateState = (stateData: UpdateStateData) => {
         const ver = pendingReady!.version
         setHasPendingUpdate(true)
         setPendingUpdateVersion(ver)
-        showPendingUpdateToast()
+        // A later check downloads the update that is already ready again,
+        // under the same id. Its notice was shown, and perhaps closed with
+        // Later; the badge and a check the player asks for bring it back.
+        if (previousReadyId !== pendingReady!.id) showPendingUpdateToast()
       }
       break
 
