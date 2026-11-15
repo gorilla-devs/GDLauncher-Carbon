@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { it, expect, vi, beforeEach } from "vitest"
 import path from "node:path"
+import { RESET_CONFIRM_GUARD_MS } from "./resetButton"
 const bridge = vi.hoisted(() => ({
   api: {} as Record<string, any>,
   invoke: vi.fn(),
@@ -15,7 +16,19 @@ vi.mock("electron", () => ({
   ipcRenderer: { invoke: bridge.invoke, on: bridge.on }
 }))
 vi.mock("./utils", () => ({ domReady: async () => true }))
+let clock = 0
+/** Clicks the reset button, waits past the double-click guard and confirms. */
+function confirmReset() {
+  document.querySelector<HTMLButtonElement>("#reset-db-btn")!.click()
+  clock += RESET_CONFIRM_GUARD_MS
+  document.querySelector<HTMLButtonElement>("#reset-db-confirm-btn")!.click()
+}
+const resets = () =>
+  bridge.invoke.mock.calls.filter((call) => call[0] === "deleteDbAndRestart")
+    .length
 async function ready() {
+  clock = 0
+  vi.spyOn(Date, "now").mockImplementation(() => clock)
   document.body.innerHTML = '<div id="appFatalCrash"></div>'
   vi.stubGlobal("__APP_VERSION__", "synthetic")
   bridge.invoke.mockReset()
@@ -45,6 +58,12 @@ it("fatal recovery removes universal reset advice and describes locked database 
   )
   expect(document.body.textContent).not.toContain("Most common fix")
   expect(document.body.textContent).toContain("lock")
+  await bridge.api.fatalError(
+    "synthetic failure",
+    "CoreModule",
+    undefined,
+    "corruption"
+  )
   expect(document.body.textContent).toContain(
     "come back from their folders with their settings"
   )
@@ -61,7 +80,7 @@ it.each(["fatal", "backwards"])(
       message: "Retained <foreign> bytes; retry",
       recoveryPath: "/synthetic/backup"
     }))
-    document.querySelector<HTMLButtonElement>("#reset-db-btn")!.click()
+    confirmReset()
     await new Promise((resolve) => setTimeout(resolve, 0))
     const button = document.querySelector<HTMLButtonElement>("#reset-db-btn")!
     expect(button.disabled).toBe(false)
@@ -121,16 +140,23 @@ it.each(["fatal", "backwards"])(
       : bridge.api.backwardsMigrationError())
     bridge.invoke.mockRejectedValue(Error("controlled refusal"))
     const button = document.querySelector<HTMLButtonElement>("#reset-db-btn")!
-    button.click()
+    confirmReset()
     await new Promise((resolve) => setTimeout(resolve, 0))
     expect(button.disabled).toBe(false)
     expect(button.textContent).toBe("Retry Reset")
+    bridge.invoke.mockReset()
     bridge.invoke.mockResolvedValue({
       ok: true,
       recoveryPath: "/synthetic/retained"
     })
+    // A retry is confirmed again: one click on it resets nothing.
     button.click()
+    expect(resets()).toBe(0)
+    button.click()
+    expect(button.textContent).toBe("Retry Reset")
+    confirmReset()
     await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(resets()).toBe(1)
     expect(button.disabled).toBe(true)
   }
 )
@@ -193,4 +219,96 @@ it("the fatal screen leaves the update channel to main, which never downgrades f
   expect(bridge.invoke).toHaveBeenCalledWith("checkForUpdatesFromRecovery")
   expect(calls).not.toContain("checkForUpdates")
   expect(calls).not.toContain("getSettings")
+})
+
+const screens = {
+  fatal: () => bridge.api.fatalError("failure", "CoreModule"),
+  window: () => bridge.api.fatalError("failure", "Window"),
+  backwards: () => bridge.api.backwardsMigrationError()
+}
+const resetButtons = () => ({
+  button: document.querySelector<HTMLButtonElement>("#reset-db-btn")!,
+  confirm: document.querySelector<HTMLButtonElement>("#reset-db-confirm-btn")!
+})
+it.each(Object.keys(screens) as (keyof typeof screens)[])(
+  "one click on the %s screen's reset button resets nothing, and Cancel puts the button back",
+  async (screen) => {
+    await screens[screen]()
+    const { button, confirm } = resetButtons()
+    const label = button.textContent
+    const background = button.style.background
+    expect(confirm.style.display).toBe("none")
+    button.click()
+    expect(resets()).toBe(0)
+    expect(confirm.style.display).toBe("")
+    expect(confirm.textContent.trim()).toBe("Reset Database")
+    expect(button.textContent).toBe("Cancel")
+    button.click()
+    expect(resets()).toBe(0)
+    expect(confirm.style.display).toBe("none")
+    expect(button.textContent).toBe(label)
+    expect(button.style.background).toBe(background)
+    // Hidden again, the confirming button resets nothing either.
+    clock += RESET_CONFIRM_GUARD_MS
+    confirm.click()
+    expect(resets()).toBe(0)
+  }
+)
+it.each(Object.keys(screens) as (keyof typeof screens)[])(
+  "the second click of a double click on the %s screen's reset button cannot confirm",
+  async (screen) => {
+    await screens[screen]()
+    const { button, confirm } = resetButtons()
+    button.click()
+    clock += RESET_CONFIRM_GUARD_MS - 1
+    confirm.click()
+    expect(resets()).toBe(0)
+    expect(button.textContent).toBe("Cancel")
+    clock += 1
+    confirm.click()
+    expect(resets()).toBe(1)
+    expect(confirm.style.display).toBe("none")
+    expect(button.textContent).toBe("Resetting...")
+    expect(button.disabled).toBe(true)
+  }
+)
+it("Open Folder gives its place to the confirming button and comes back on Cancel", async () => {
+  await screens.fatal()
+  const { button } = resetButtons()
+  const open = document.querySelector<HTMLElement>("#open-db-folder-btn")!
+  button.click()
+  expect(open.style.display).toBe("none")
+  button.click()
+  expect(open.style.display).toBe("")
+})
+it.each(["locked", "access", "storage"])(
+  "a %s database gets no reset, only where the database is",
+  async (category) => {
+    await bridge.api.fatalError("failure", "CoreModule", undefined, category)
+    expect(document.querySelector("#reset-db-btn")).toBeNull()
+    expect(document.querySelector("#reset-db-confirm-btn")).toBeNull()
+    expect(document.body.textContent).not.toMatch(/reset/i)
+    expect(document.body.textContent).toContain(
+      `/synthetic/runtime${path.sep}gdl_conf.db`
+    )
+    document.querySelector<HTMLButtonElement>("#open-db-folder-btn")!.click()
+    expect(bridge.invoke).toHaveBeenCalledWith(
+      "openFolder",
+      `/synthetic/runtime${path.sep}gdl_conf.db`
+    )
+    // The rest of the screen still works without the reset step.
+    document.querySelector<HTMLButtonElement>("#restart-btn")!.click()
+    expect(bridge.invoke).toHaveBeenCalledWith("relaunch")
+  }
+)
+it.each([
+  "corruption",
+  "version",
+  "downgrade",
+  "interrupted_restore",
+  "unknown",
+  undefined
+])("a %s failure still offers the reset", async (category) => {
+  await bridge.api.fatalError("failure", "CoreModule", undefined, category)
+  expect(document.querySelector("#reset-db-btn")).not.toBeNull()
 })

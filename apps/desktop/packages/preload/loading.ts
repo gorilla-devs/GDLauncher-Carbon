@@ -1,10 +1,11 @@
 import { contextBridge, ipcRenderer } from "electron"
 import {
   dbRecoveryAdvice,
+  dbResetOffered,
   RESET_WARNING,
   type DbRecoveryCategory
 } from "../main/utils/dbRecovery"
-import { resetDatabaseClick } from "./resetButton"
+import { confirmedResetClick } from "./resetButton"
 import { restartClick } from "./restartButton"
 import { recoverRestoreClick, restoreSnapshotClick } from "./restoreButton"
 import { installReadyUpdateAction } from "./installReadyUpdate"
@@ -90,6 +91,47 @@ function useLoading() {
           </div>`
           : ""
 
+      const openFolderButton = `<button id="open-db-folder-btn" style="padding: 8px 12px; background: transparent; color: rgb(var(--lightSlate-300)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 500; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
+                Open Folder
+              </button>`
+      const databasePath = `<code style="flex: 1; min-width: 180px; background: rgb(var(--darkSlate-800)); padding: 8px 10px; border-radius: 6px; font-size: 0.7rem; font-family: 'Ubuntu Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-400)); text-align: left;">
+                ${dbPath}
+              </code>`
+      // A reset cannot help a locked or unreachable database or a failing
+      // drive, so those causes get the database's place alone.
+      const resetStepHtml = dbResetOffered(dbRecovery)
+        ? `
+          <!-- Step 3: Last-resort metadata reset -->
+          <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--amber-600)); text-align: left;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
+              <span style="font-size: 0.7rem; font-weight: 700; color: rgb(var(--lightSlate-500)); text-transform: uppercase; letter-spacing: 0.5px;">Step 3</span>
+              <span style="font-size: 0.65rem; font-weight: 600; color: rgb(var(--amber-400)); background: rgba(251, 191, 36, 0.15); padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;">Last resort</span>
+            </div>
+            <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 4px;">Reset Database</div>
+            <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400)); margin-bottom: 12px;">${RESET_WARNING}</div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              ${databasePath}
+              ${openFolderButton}
+              <button id="reset-db-confirm-btn" data-testid="recovery-reset-db-confirm-button" style="padding: 8px 14px; background: rgb(var(--red-500)); color: white; border: 1px solid rgb(var(--red-500)); border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
+                Reset Database
+              </button>
+              <button id="reset-db-btn" data-testid="recovery-reset-db-button" style="padding: 8px 14px; background: rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-50)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
+                Reset & Restart
+              </button>
+            </div>
+          </div>
+
+          <div id="reset-db-error" role="alert" style="white-space: pre-wrap;"></div>`
+        : `
+          <!-- Database location -->
+          <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--darkSlate-600)); text-align: left;">
+            <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 8px;">Database File</div>
+            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+              ${databasePath}
+              ${openFolderButton}
+            </div>
+          </div>`
+
       oDiv.innerHTML = `
       <div data-testid="recovery-fatal-screen" style="height: 100vh; overflow-y: auto; padding: 16px 20px; text-align: left;">
         <div style="max-width: 600px; margin: 0 auto; display: flex; flex-direction: column; gap: 16px;">
@@ -158,28 +200,7 @@ function useLoading() {
           ${restoreStepHtml}
           ${recoverStepHtml}
 
-          <!-- Step 3: Last-resort metadata reset -->
-          <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--amber-600)); text-align: left;">
-            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 8px;">
-              <span style="font-size: 0.7rem; font-weight: 700; color: rgb(var(--lightSlate-500)); text-transform: uppercase; letter-spacing: 0.5px;">Step 3</span>
-              <span style="font-size: 0.65rem; font-weight: 600; color: rgb(var(--amber-400)); background: rgba(251, 191, 36, 0.15); padding: 2px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.3px;">Last resort</span>
-            </div>
-            <div style="font-size: 0.95rem; font-weight: 600; color: rgb(var(--lightSlate-50)); margin-bottom: 4px;">Reset Database</div>
-            <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-400)); margin-bottom: 12px;">${RESET_WARNING}</div>
-            <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
-              <code style="flex: 1; min-width: 180px; background: rgb(var(--darkSlate-800)); padding: 8px 10px; border-radius: 6px; font-size: 0.7rem; font-family: 'Ubuntu Mono', monospace; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border: 1px solid rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-400)); text-align: left;">
-                ${dbPath}
-              </code>
-              <button id="open-db-folder-btn" style="padding: 8px 12px; background: transparent; color: rgb(var(--lightSlate-300)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 500; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
-                Open Folder
-              </button>
-              <button id="reset-db-btn" data-testid="recovery-reset-db-button" style="padding: 8px 14px; background: rgb(var(--darkSlate-600)); color: rgb(var(--lightSlate-50)); border: 1px solid rgb(var(--darkSlate-500)); border-radius: 6px; font-weight: 600; cursor: pointer; font-size: 0.75rem; transition: all 0.2s; white-space: nowrap;">
-                Reset & Restart
-              </button>
-            </div>
-          </div>
-
-          <div id="reset-db-error" role="alert" style="white-space: pre-wrap;"></div>
+          ${resetStepHtml}
           <!-- Discord Help -->
           <div style="background: rgb(var(--darkSlate-700)); border-radius: 10px; padding: 14px; border: 1px solid rgb(var(--brands-discord)); text-align: left;">
             <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px;">
@@ -215,8 +236,10 @@ function useLoading() {
       const openDbFolderBtn: HTMLButtonElement = document.querySelector(
         "#open-db-folder-btn"
       )!
-      const resetDbBtn: HTMLButtonElement =
-        document.querySelector("#reset-db-btn")!
+      const resetDbBtn: HTMLButtonElement | null =
+        document.querySelector("#reset-db-btn")
+      const resetDbConfirmBtn: HTMLButtonElement | null =
+        document.querySelector("#reset-db-confirm-btn")
       const copyErrorDetailBtn: HTMLButtonElement = document.querySelector(
         "#copy-error-detail-btn"
       )!
@@ -364,7 +387,6 @@ function useLoading() {
         restartBtn,
         discordBtn,
         openDbFolderBtn,
-        resetDbBtn,
         copyErrorDetailBtn,
         updateActionBtn
       ].forEach(addHoverEffect)
@@ -432,14 +454,17 @@ function useLoading() {
         }, 2000)
       })
 
-      resetDbBtn.addEventListener(
-        "click",
-        resetDatabaseClick(
-          resetDbBtn,
-          document.querySelector<HTMLElement>("#reset-db-error")!,
-          () => ipcRenderer.invoke("deleteDbAndRestart")
-        )
-      )
+      if (resetDbBtn && resetDbConfirmBtn) {
+        addHoverEffect(resetDbBtn)
+        addHoverEffect(resetDbConfirmBtn)
+        confirmedResetClick({
+          button: resetDbBtn,
+          confirm: resetDbConfirmBtn,
+          error: document.querySelector<HTMLElement>("#reset-db-error")!,
+          invoke: () => ipcRenderer.invoke("deleteDbAndRestart"),
+          hide: [openDbFolderBtn]
+        })
+      }
 
       if (snapshotPath) {
         const restoreSnapshotBtn: HTMLButtonElement | null =
@@ -577,10 +602,15 @@ function useLoading() {
             Your instance, world, addon and server directories on disk remain. Use a compatible launcher version before choosing a last-resort metadata reset.
           </div>
 
-          <!-- Button -->
-          <button id="reset-db-btn" data-testid="recovery-reset-db-button" style="padding: 14px 32px; background: rgb(var(--primary-500)); color: white; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.2s;">
-            Reset Database & Restart
-          </button>
+          <!-- Button: it keeps the middle column, so it does not move when the confirming one appears beside it -->
+          <div style="display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 12px; align-items: center; width: 100%;">
+            <button id="reset-db-confirm-btn" data-testid="recovery-reset-db-confirm-button" style="grid-column: 1; justify-self: end; padding: 14px 20px; background: rgb(var(--red-500)); color: white; border: 1px solid rgb(var(--red-500)); border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.2s; white-space: nowrap;">
+              Reset Database
+            </button>
+            <button id="reset-db-btn" data-testid="recovery-reset-db-button" style="grid-column: 2; padding: 14px 32px; background: rgb(var(--primary-500)); color: white; border: 1px solid rgb(var(--primary-500)); border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 1rem; transition: all 0.2s; white-space: nowrap;">
+              Reset Database & Restart
+            </button>
+          </div>
 
           <!-- Note -->
           <div style="font-size: 0.8rem; color: rgb(var(--lightSlate-500)); margin-top: 16px;">
@@ -597,22 +627,25 @@ function useLoading() {
 
       const resetDbBtn: HTMLButtonElement =
         document.querySelector("#reset-db-btn")!
+      const resetDbConfirmBtn: HTMLButtonElement = document.querySelector(
+        "#reset-db-confirm-btn"
+      )!
 
-      resetDbBtn.addEventListener("mouseenter", () => {
-        resetDbBtn.style.filter = "brightness(0.85)"
-      })
-      resetDbBtn.addEventListener("mouseleave", () => {
-        resetDbBtn.style.filter = "brightness(1)"
-      })
+      for (const button of [resetDbBtn, resetDbConfirmBtn]) {
+        button.addEventListener("mouseenter", () => {
+          button.style.filter = "brightness(0.85)"
+        })
+        button.addEventListener("mouseleave", () => {
+          button.style.filter = "brightness(1)"
+        })
+      }
 
-      resetDbBtn.addEventListener(
-        "click",
-        resetDatabaseClick(
-          resetDbBtn,
-          document.querySelector<HTMLElement>("#reset-db-error")!,
-          () => ipcRenderer.invoke("deleteDbAndRestart")
-        )
-      )
+      confirmedResetClick({
+        button: resetDbBtn,
+        confirm: resetDbConfirmBtn,
+        error: document.querySelector<HTMLElement>("#reset-db-error")!,
+        invoke: () => ipcRenderer.invoke("deleteDbAndRestart")
+      })
     }
   }
 }

@@ -22,14 +22,24 @@ export function dbRecoveryCategory(
     ? payload
     : "unknown"
 }
+/**
+ * Whether the startup error screen offers the database reset. A reset cannot
+ * clear a lock, an access restriction or a storage fault, and it would cost
+ * the sign-ins and settings of a database that is still whole.
+ */
+export function dbResetOffered(category?: DbRecoveryCategory): boolean {
+  return (
+    category !== "locked" && category !== "access" && category !== "storage"
+  )
+}
 export function dbRecoveryAdvice(category?: DbRecoveryCategory): string {
   switch (category) {
     case "locked":
-      return "Another operation may hold a database lock. Wait for it to finish, then Restart. Reset does not resolve a continuing lock."
+      return "Another operation may hold a database lock. Wait for it to finish, then Restart."
     case "access":
-      return "The database cannot be accessed. Check path availability, permissions and read-only storage, then Restart. Reset does not fix an access restriction."
+      return "The database cannot be accessed. Check path availability, permissions and read-only storage, then Restart."
     case "storage":
-      return "SQLite reported a storage or I/O failure. Check free space and storage availability, then Restart. Reset does not repair the storage device."
+      return "SQLite reported a storage or I/O failure. Check free space and storage availability, then Restart."
     case "corruption":
       return "SQLite reported corrupt or non-database bytes. Preserve the recovery files and contact support; a last-resort reset creates a fresh database."
     case "version":

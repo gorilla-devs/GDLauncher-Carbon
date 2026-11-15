@@ -228,6 +228,9 @@ export const TEST_IDS = Object.freeze({
   // a visibility one.
   recoveryRestoreSnapshotButton: "recovery-restore-snapshot-button",
   recoveryResetDbButton: "recovery-reset-db-button",
+  // Hidden until `recoveryResetDbButton` is clicked, which then reads Cancel;
+  // only this one resets, and not within the first moment after it appears.
+  recoveryResetDbConfirmButton: "recovery-reset-db-confirm-button",
   // The fatal screen's log text box — the core's own log lines plus the
   // `Database error: <EVENT>` line `main/index.ts` appends, rendered via
   // `textContent` (never interpolated as HTML; see `loading.ts`'s own

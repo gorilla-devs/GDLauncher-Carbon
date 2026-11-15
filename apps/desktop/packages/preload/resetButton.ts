@@ -26,3 +26,62 @@ export function resetDatabaseClick(
     button.style.opacity = "1"
   }
 }
+
+/**
+ * How long the confirming button ignores clicks after it appears, so the
+ * second click of a double click on the first button cannot land on it.
+ */
+export const RESET_CONFIRM_GUARD_MS = 600
+
+/**
+ * A reset takes two clicks on both reset screens. The first turns `button`
+ * into Cancel, in the same place and at least as wide, and shows `confirm`;
+ * only `confirm` resets. A failed reset has to be confirmed again.
+ */
+export function confirmedResetClick(io: {
+  button: HTMLButtonElement
+  confirm: HTMLButtonElement
+  error: Pick<HTMLElement, "textContent">
+  invoke: () => Promise<RestoreOutcome>
+  /** Controls beside the button that give their room to `confirm`. */
+  hide?: HTMLElement[]
+  now?: () => number
+}) {
+  const now = io.now ?? (() => Date.now())
+  const reset = resetDatabaseClick(io.button, io.error, io.invoke)
+  let armed:
+    | { at: number; label: string | null; style: Record<string, string> }
+    | undefined
+
+  const disarm = () => {
+    if (!armed) return
+    io.button.textContent = armed.label
+    Object.assign(io.button.style, armed.style)
+    io.confirm.style.display = "none"
+    for (const element of io.hide ?? []) element.style.display = ""
+    armed = undefined
+  }
+
+  io.confirm.style.display = "none"
+  io.button.addEventListener("click", () => {
+    if (armed) return disarm()
+    const { background, color, border } = io.button.style
+    armed = {
+      at: now(),
+      label: io.button.textContent,
+      style: { background, color, border }
+    }
+    io.button.style.minWidth = `${io.button.offsetWidth}px`
+    io.button.textContent = "Cancel"
+    io.button.style.background = "transparent"
+    io.button.style.color = "rgb(var(--lightSlate-300))"
+    io.button.style.border = "1px solid rgb(var(--darkSlate-500))"
+    for (const element of io.hide ?? []) element.style.display = "none"
+    io.confirm.style.display = ""
+  })
+  io.confirm.addEventListener("click", () => {
+    if (!armed || now() - armed.at < RESET_CONFIRM_GUARD_MS) return
+    disarm()
+    void reset()
+  })
+}

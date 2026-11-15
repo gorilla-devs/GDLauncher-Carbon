@@ -882,7 +882,19 @@ test('"Reset Database & Restart" deletes the database file for real, on its own 
     const seeded = fs.readFileSync(dbPath)
     await stubResetDialog(launched.app)
 
+    // The first click only asks: nothing is reset until the confirming
+    // button is pressed, and that one ignores a click that follows at once.
+    const confirmButton = page.locator(
+      byTestId(TEST_IDS.recoveryResetDbConfirmButton)
+    )
+    await expect(confirmButton).toBeHidden()
     await resetButton.click()
+    await expect(confirmButton).toBeVisible()
+    await expect(resetButton).toHaveText("Cancel")
+    expect(await resetDialogs(launched.app)).toEqual([])
+    expect(fs.readFileSync(dbPath).equals(seeded)).toBe(true)
+    await page.waitForTimeout(700)
+    await confirmButton.click()
 
     // `deleteDbAndRestart` (`main/index.ts`, via `utils/databaseReset.ts`)
     // stops the core (already exited here after `_STATUS_:DB_CORRUPT`),
