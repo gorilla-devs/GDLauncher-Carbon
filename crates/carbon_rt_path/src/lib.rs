@@ -434,21 +434,39 @@ impl<T: tempentry::TempEntryType> TempEntry<T> {
             None => anyhow::bail!("destination path has no file name: {}", dest.display()),
         };
 
-        tokio::fs::copy(&*self, &staging).await.with_context(|| {
-            format!(
-                "failed to copy {} to {}",
-                (&*self).display(),
-                staging.display(),
-            )
-        })?;
-        tokio::fs::rename(&staging, dest).await.with_context(|| {
-            format!("failed to move {} to {}", staging.display(), dest.display())
-        })?;
+        let published = async {
+            tokio::fs::copy(&*self, &staging).await.with_context(|| {
+                format!(
+                    "failed to copy {} to {}",
+                    (&*self).display(),
+                    staging.display(),
+                )
+            })?;
+            tokio::fs::rename(&staging, dest).await.with_context(|| {
+                format!("failed to move {} to {}", staging.display(), dest.display())
+            })
+        }
+        .await;
+        if let Err(error) = published {
+            // The staging file sits in a folder the user chose, where nothing else of ours
+            // ever looks, so one left behind here would stay for good.
+            let _ = tokio::fs::remove_file(&staging).await;
+            return Err(error);
+        }
 
-        if self.is_dir() {
-            tokio::fs::remove_dir_all(&*self).await?;
+        // `dest` is complete and in place, and dropping `self` removes the temp source again,
+        // so failing to remove it here is not a failed publish.
+        let removed = if self.is_dir() {
+            tokio::fs::remove_dir_all(&*self).await
         } else {
-            tokio::fs::remove_file(&*self).await?;
+            tokio::fs::remove_file(&*self).await
+        };
+        if let Err(error) = removed {
+            tracing::warn!(
+                "Could not remove the temporary {} after publishing it as {}: {error}",
+                (&*self).display(),
+                dest.display(),
+            );
         }
 
         Ok(())
@@ -1233,5 +1251,87 @@ mod copy_and_temp_tests {
         assert_ne!(&*first, &*second);
         let file = temp.maketmpfile().await.unwrap();
         assert!(file.parent().unwrap().is_dir());
+    }
+}
+
+#[cfg(test)]
+mod publish_across_drives_tests {
+    use super::*;
+
+    const CONTENT: &[u8] = b"an exported instance";
+
+    fn fixture(name: &str) -> PathBuf {
+        let path = std::env::temp_dir().join(format!("publish-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&path);
+        std::fs::create_dir_all(&path).unwrap();
+        path
+    }
+
+    fn staging_of(dest: &Path) -> PathBuf {
+        let mut name = dest.file_name().unwrap().to_os_string();
+        name.push(".__gdl_xdev~");
+        dest.with_file_name(name)
+    }
+
+    async fn temp_file(root: &Path) -> TempEntry<tempentry::File> {
+        let temp = TempPath::new(root.join("temp"));
+        std::fs::create_dir_all(temp.to_path()).unwrap();
+        let file = temp.maketmpfile().await.unwrap();
+        std::fs::write(&*file, CONTENT).unwrap();
+        file
+    }
+
+    /// The last step failing is what a zip of the same name held open by another program
+    /// does on Windows. A folder in the way fails the same two renames on every system.
+    #[tokio::test]
+    async fn a_publish_that_fails_at_the_last_step_leaves_no_staging_file() {
+        let root = fixture("last-step");
+        let dest = root.join("chosen/export.zip");
+        std::fs::create_dir_all(&dest).unwrap();
+        std::fs::write(dest.join("kept.txt"), b"kept").unwrap();
+
+        let result = temp_file(&root).await.try_rename_or_move(&dest).await;
+
+        assert!(result.is_err(), "a folder in the way can't be replaced");
+        let left: Vec<_> = std::fs::read_dir(root.join("chosen"))
+            .unwrap()
+            .map(|entry| entry.unwrap().file_name())
+            .collect();
+        assert_eq!(left, ["export.zip"], "only what was there before stays");
+        assert_eq!(std::fs::read(dest.join("kept.txt")).unwrap(), b"kept");
+    }
+
+    /// A read-only temp folder refuses the rename the way another drive does, and then
+    /// refuses the removal of the temp source once the copy is in place.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_publish_that_is_in_place_is_done_even_when_its_temp_source_stays() {
+        use std::os::unix::fs::PermissionsExt;
+        let root = fixture("source-stays");
+        let dest = root.join("chosen/export.zip");
+        std::fs::create_dir_all(dest.parent().unwrap()).unwrap();
+        let file = temp_file(&root).await;
+        let source = file.to_path_buf();
+
+        struct Restore(PathBuf);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                let _ = std::fs::set_permissions(&self.0, std::fs::Permissions::from_mode(0o700));
+            }
+        }
+        let temp = root.join("temp");
+        std::fs::set_permissions(&temp, std::fs::Permissions::from_mode(0o500)).unwrap();
+        let _restore = Restore(temp.clone());
+        if std::fs::write(temp.join("probe"), b"").is_ok() {
+            // Running as root: no folder refuses anything, so there is nothing to test.
+            return;
+        }
+
+        let result = file.try_rename_or_move(&dest).await;
+
+        assert!(source.exists(), "the temp source could not be removed");
+        assert_eq!(std::fs::read(&dest).unwrap(), CONTENT);
+        assert!(!staging_of(&dest).exists());
+        result.expect("the file is complete and in place");
     }
 }
