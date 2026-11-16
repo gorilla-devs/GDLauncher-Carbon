@@ -15,8 +15,6 @@ use uuid::Uuid;
 pub enum DatabaseError {
     #[error("error while ensuring java profiles in db")]
     EnsureProfiles(anyhow::Error),
-    #[error("error while fetching latest terms and privacy checksum")]
-    TermsAndPrivacy(anyhow::Error),
     #[error("database version is newer than app version (backwards migration)")]
     BackwardsMigration,
     #[error("database history diverged from this build at migration {0}")]
@@ -222,6 +220,18 @@ fn cleanup_stale_snapshot(db_path: &Path, session_start: SystemTime) {
 /// The rusqlite-backed executor, opened against the migrated on-disk database.
 pub(super) struct LoadedDb {
     pub db: std::sync::Arc<carbon_repos::db_exec::Db>,
+}
+
+/// The database of `runtime_path`, created when it is not there yet, for a
+/// test that needs rows in place before the app starts on that folder.
+#[cfg(test)]
+pub(crate) async fn open_for_test(
+    runtime_path: PathBuf,
+) -> std::sync::Arc<carbon_repos::db_exec::Db> {
+    load_and_migrate(runtime_path, None)
+        .await
+        .expect("the test database did not open")
+        .db
 }
 
 #[instrument]

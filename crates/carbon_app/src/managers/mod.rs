@@ -106,29 +106,14 @@ mod app {
             runtime_path: PathBuf,
             gdl_base_api: String,
         ) -> App {
-            // Bounds the pre-DB-load terms/privacy fetch so a stalled connection can't
-            // block startup forever. Generous enough for the HTTP client's own timeout
-            // and a couple of retries to play out; still finite. A timeout here is not
-            // fatal: it's handled exactly like any other fetch failure below, which
-            // just seeds the DB without a known checksum.
-            const TERMS_CONSENT_FETCH_TIMEOUT: std::time::Duration =
-                std::time::Duration::from_secs(90);
-
-            let latest_tos_privacy_checksum = match tokio::time::timeout(
-                TERMS_CONSENT_FETCH_TIMEOUT,
-                TermsAndPrivacy::get_latest_consent_sha(&gdl_base_api),
+            // Asked before the database opens, because a changed checksum
+            // resets the stored acceptance there. No answer is not fatal: the
+            // database then opens without a known checksum.
+            let latest_tos_privacy_checksum = TermsAndPrivacy::latest_consent_sha_within(
+                &gdl_base_api,
+                crate::managers::settings::terms_and_privacy::STARTUP_CONSENT_CHECK_BUDGET,
             )
-            .await
-            {
-                Ok(result) => result.map_err(DatabaseError::TermsAndPrivacy).ok(),
-                Err(_) => {
-                    error!(
-                        "Timed out after {:?} fetching latest terms and privacy checksum",
-                        TERMS_CONSENT_FETCH_TIMEOUT
-                    );
-                    None
-                }
-            };
+            .await;
 
             let loaded_db = match db_bootstrap::load_and_migrate(
                 runtime_path.clone(),

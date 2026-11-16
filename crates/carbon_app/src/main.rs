@@ -249,6 +249,26 @@ fn generate_api_token() -> String {
     format!("{a}{b}")
 }
 
+/// Re-exchanges the GDL tokens on every startup to ensure they're valid
+/// (handles backend target changes where JWT signing keys differ).
+///
+/// In the background, so the launcher does not wait on the API to open: every
+/// request that needs a GDL token checks the stored one first and exchanges it
+/// on demand (`ensure_gdl_auth_token`), with or without this pass.
+fn refresh_gdl_tokens_in_background(app: &App) -> tokio::task::JoinHandle<()> {
+    let app = app.clone();
+    tokio::spawn(async move {
+        let t = std::time::Instant::now();
+        if let Err(e) = app.account_manager().refresh_all_gdl_tokens().await {
+            tracing::warn!("Failed to refresh GDL tokens on startup: {}", e);
+        }
+        debug!(
+            "[startup-timing] refresh_all_gdl_tokens completed in {:.2}s",
+            t.elapsed().as_secs_f64()
+        );
+    })
+}
+
 async fn start_router(
     runtime_path: PathBuf,
     base_api_override: String,
@@ -298,34 +318,7 @@ async fn start_router(
         async move { app.start_background_tasks().await }
     });
 
-    // Re-exchange GDL tokens on every startup to ensure they're valid
-    // (handles backend target changes where JWT signing keys differ)
-    //
-    // Bounded so a stalled connection can't block `axum::serve` forever: generous
-    // enough for the HTTP client's own timeout/retries to get through a handful of
-    // accounts, but finite. Any account left un-refreshed when this times out is
-    // simply refreshed later, on demand, by `ensure_gdl_auth_token`, so a timeout
-    // here is handled exactly like the existing error path: log and move on.
-    const REFRESH_GDL_TOKENS_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
-
-    let t = std::time::Instant::now();
-    match tokio::time::timeout(
-        REFRESH_GDL_TOKENS_TIMEOUT,
-        app.account_manager().refresh_all_gdl_tokens(),
-    )
-    .await
-    {
-        Ok(Err(e)) => tracing::warn!("Failed to refresh GDL tokens on startup: {}", e),
-        Err(_) => tracing::warn!(
-            "Timed out after {:?} refreshing GDL tokens on startup",
-            REFRESH_GDL_TOKENS_TIMEOUT
-        ),
-        Ok(Ok(())) => {}
-    }
-    debug!(
-        "[startup-timing] refresh_all_gdl_tokens completed in {:.2}s",
-        t.elapsed().as_secs_f64()
-    );
+    refresh_gdl_tokens_in_background(&app);
 
     let t = std::time::Instant::now();
     let auto_manage_java_system_profiles = app
@@ -687,37 +680,116 @@ mod stop_request_tests {
 }
 
 #[cfg(test)]
-mod test {
+mod startup_wait_tests {
     use crate::get_available_port;
+    use base64::Engine;
+    use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+    use carbon_repos::dbtypes::DbDateTime;
+    use carbon_repos::repos::account as account_repo;
+    use chrono::Utc;
+    use std::time::{Duration, Instant};
 
-    #[tokio::test]
-    async fn test_router() {
-        let tcp_listener = get_available_port().await;
-        let port = &tcp_listener.local_addr().unwrap().port();
-        let temp_dir = tempfile::tempdir().unwrap();
-        let server = tokio::spawn(async move {
-            super::start_router(
-                temp_dir.into_path(),
-                crate::util::base_api::get_base_api_env!(),
-                tcp_listener,
-                crate::launcher::Watch::off(),
+    /// The GDLauncher API of this test: it knows the terms in force, and
+    /// never answers a token exchange. Reports every exchange it is asked.
+    async fn api_that_never_exchanges_a_token() -> (String, tokio::sync::mpsc::UnboundedReceiver<()>)
+    {
+        let (asked, was_asked) = tokio::sync::mpsc::unbounded_channel();
+        let api = axum::Router::new()
+            .route(
+                "/v1/latest_consent_checksum",
+                axum::routing::get(|| async { "checksum" }),
             )
-            .await;
-        });
-        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+            .route(
+                "/v1/auth/token",
+                axum::routing::post(move || {
+                    let asked = asked.clone();
+                    async move {
+                        let _ = asked.send(());
+                        std::future::pending::<&'static str>().await
+                    }
+                }),
+            );
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = format!("http://{}", listener.local_addr().unwrap());
+        tokio::spawn(async move { axum::serve(listener, api).await });
+        (url, was_asked)
+    }
+
+    /// A data folder with one Microsoft account whose id token is still
+    /// good, which is the account the start-up pass exchanges a token for.
+    /// It has no refresh token, so nothing else has a request to make for it.
+    async fn data_folder_with_a_signed_in_account() -> std::path::PathBuf {
+        let folder = dunce::canonicalize(tempfile::tempdir().unwrap().into_path()).unwrap();
+        let header = URL_SAFE_NO_PAD.encode(r#"{"alg":"RS256"}"#);
+        let claims =
+            URL_SAFE_NO_PAD.encode(format!(r#"{{"exp":{}}}"#, Utc::now().timestamp() + 3600));
+        let id_token = format!("{header}.{claims}.c2ln");
+        let next_day = Utc::now() + chrono::Duration::days(1);
+
+        let db = crate::managers::db_bootstrap::open_for_test(folder.clone()).await;
+        account_repo::insert_account_microsoft(
+            &db,
+            "11111111-2222-3333-4444-555555555555",
+            "Alex",
+            DbDateTime(Utc::now().into()),
+            "minecraft-access-token",
+            Some(DbDateTime(next_day.into())),
+            None,
+            Some(&id_token),
+            None,
+            None,
+        )
+        .await
+        .unwrap();
+        folder
+    }
+
+    /// The loading screen stays until the core answers. It used to wait for
+    /// the token exchange of every signed-in account first, for up to two
+    /// minutes on a network that drops packets.
+    ///
+    /// The one test that starts the router: its API token is set once per
+    /// process, so a second start in this test binary panics.
+    #[tokio::test]
+    async fn the_launcher_opens_while_a_token_exchange_is_still_waiting_on_the_api() {
+        let (api, mut was_asked) = api_that_never_exchanges_a_token().await;
+        let folder = data_folder_with_a_signed_in_account().await;
+        let listener = get_available_port().await;
+        let port = listener.local_addr().unwrap().port();
+        let core = tokio::spawn(super::start_router(
+            folder,
+            api,
+            listener,
+            crate::launcher::Watch::off(),
+        ));
 
         let client = reqwest::Client::builder().no_proxy().build().unwrap();
-        let resp = client
-            .get(format!("http://127.0.0.1:{port}",))
-            .send()
+        let started = Instant::now();
+        let greeting = loop {
+            let answer = client
+                .get(format!("http://127.0.0.1:{port}"))
+                .timeout(Duration::from_millis(500))
+                .send()
+                .await;
+            if let Ok(answer) = answer {
+                assert_eq!(answer.status(), 200);
+                break answer.text().await.unwrap();
+            }
+            assert!(
+                started.elapsed() < Duration::from_secs(20),
+                "the core was not answering after {:?}",
+                started.elapsed()
+            );
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        };
+        assert_eq!(greeting, "Hello 'rspc'!");
+
+        // The pass still runs: the exchange was asked, and is never answered.
+        tokio::time::timeout(Duration::from_secs(20), was_asked.recv())
             .await
+            .expect("no token exchange was asked for the signed-in account")
             .unwrap();
-        let resp_code = resp.status();
-        let resp_body = resp.text().await.unwrap();
-
-        assert_eq!(resp_code, 200);
-        assert_eq!(resp_body, "Hello 'rspc'!");
-
-        server.abort();
+        assert!(!core.is_finished());
+        core.abort();
     }
 }

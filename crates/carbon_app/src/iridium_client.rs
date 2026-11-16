@@ -26,6 +26,17 @@ fn shared_client_builder(
         .read_timeout(read)
 }
 
+/// The shared transport with none of [`get_client`]'s retries, for a request
+/// something waits on and would sooner go without than wait longer for.
+pub fn single_attempt_client() -> reqwest::Client {
+    shared_client_builder(
+        std::time::Duration::from_secs(30),
+        std::time::Duration::from_secs(60),
+    )
+    .build()
+    .expect("Failed to build HTTP client")
+}
+
 pub fn get_client(gdl_base_api: String) -> reqwest_middleware::ClientBuilder {
     use reqwest::{Request, Response};
     use reqwest_middleware::{Middleware, Next};
