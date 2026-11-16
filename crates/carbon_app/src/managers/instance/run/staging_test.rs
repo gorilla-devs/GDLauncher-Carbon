@@ -382,6 +382,7 @@ async fn reenable_without_a_staged_copy_keeps_a_changed_twin_disabled() {
         &mut notes,
         None,
         &Default::default(),
+        &Default::default(),
     )
     .await
     .unwrap();
@@ -3041,6 +3042,7 @@ async fn round1_apply(
         &mut report.notes,
         None,
         &Default::default(),
+        &Default::default(),
     )
     .await?;
     Ok(super::render_cleanup_audit(&actual, &report))
@@ -4082,6 +4084,7 @@ async fn apply_checks_setup_ownership_once_whatever_the_pack_size() {
             &mut notes,
             Some(&owner),
             &Default::default(),
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -4155,6 +4158,7 @@ async fn apply_stops_before_the_next_change_when_another_setup_replaces_the_reco
             None,
             &mut Vec::new(),
             Some(&owner),
+            &Default::default(),
             &Default::default(),
         )
         .await;
@@ -4315,6 +4319,7 @@ async fn apply_of_a_5000_file_update_finishes_quickly() {
         None,
         &mut Vec::new(),
         Some(&owner),
+        &Default::default(),
         &Default::default(),
     )
     .await
@@ -4902,6 +4907,7 @@ async fn a_replacement_whose_linked_source_was_edited_in_place_keeps_the_edit() 
             &mut notes,
             None,
             &Default::default(),
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -4982,7 +4988,15 @@ async fn changed_staged_sources_are_never_published() {
 
     let mut notes = Vec::new();
     let outcomes = super::execute_bound_plan(
-        &entries, &root, &staging, &target, None, &mut notes, None, &sources,
+        &entries,
+        &root,
+        &staging,
+        &target,
+        None,
+        &mut notes,
+        None,
+        &sources,
+        &Default::default(),
     )
     .await
     .unwrap();
@@ -5065,6 +5079,7 @@ async fn a_representation_change_from_a_changed_source_is_preserved() {
             &mut notes,
             None,
             &Default::default(),
+            &Default::default(),
         )
         .await
         .unwrap();
@@ -5119,6 +5134,7 @@ async fn folders_an_earlier_attempt_linked_into_are_synced_before_applied() {
         &mut Vec::new(),
         None,
         &sources,
+        &Default::default(),
     )
     .await
     .unwrap();
@@ -5490,4 +5506,250 @@ async fn shadowed_disabled_twins_are_dropped_from_the_preparation() {
     assert!(!staged.join("mods/skipped.jar.disabled").exists());
     assert!(staged.join("mods/only.jar.disabled").is_file());
     assert!(staged.join("mods/odd.jar.disabled.disabled").is_file());
+}
+
+// --- the same mod under a new file name (`same_mod`) ------------------------
+
+/// A version change planned and applied the way `process_modpack_staging`
+/// does it: scan, plan, carry the player's choices over, apply, audit. `old`
+/// is the installed pack record, and the target is what is staged.
+async fn update_carrying_choices(
+    root: &std::path::Path,
+    staging: &std::path::Path,
+    old: &PackInfo,
+) -> (Vec<PlanEntry>, String) {
+    let data = root.join("instance");
+    let target = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let universe: BTreeSet<String> = old
+        .files
+        .keys()
+        .chain(target.files.keys())
+        .cloned()
+        .collect();
+    let scan = disk_scan::scan_disk_state(&data, &universe).await.unwrap();
+    let mut entries = apply_plan::plan(PlanInputs {
+        old: Some(old),
+        target: &target,
+        staged: &target.files.keys().cloned().collect(),
+        disk: &scan.states,
+        mode: ApplyMode::VersionChange,
+        fs_case_insensitive: false,
+        coexisting_disabled_twin_md5: &scan.coexisting_disabled_twin_md5,
+    })
+    .unwrap();
+    let carried = super::same_mod::carry(
+        &mut entries,
+        old,
+        &target,
+        &data,
+        &staging.join("instance"),
+        false,
+    )
+    .await;
+    let mut notes = Vec::new();
+    let outcomes = super::execute_bound_plan(
+        &entries,
+        root,
+        staging,
+        &target,
+        None,
+        &mut notes,
+        None,
+        &Default::default(),
+        &carried,
+    )
+    .await
+    .unwrap();
+    notes.extend(carried.notes(&outcomes));
+    let report = super::CleanupReport {
+        removed: Vec::new(),
+        notes,
+    };
+    let audit = super::render_cleanup_audit(&outcomes, &report);
+    (outcomes, audit)
+}
+
+/// Installs `files` as the pack's current version and returns its record.
+async fn installed_pack(root: &std::path::Path, files: &[(&str, &[u8])]) -> PackInfo {
+    for (path, bytes) in files {
+        write_live(root, path, bytes).await;
+    }
+    super::packinfo::scan_dir(&root.join("instance"), None)
+        .await
+        .unwrap()
+}
+
+fn switch_off(root: &std::path::Path, path: &str) {
+    std::fs::rename(live_path(root, path), disabled_path(root, path)).unwrap();
+}
+
+#[tokio::test]
+async fn a_mod_the_player_switched_off_stays_off_under_its_next_file_name() {
+    use super::same_mod::test_jar;
+    let (_tmp, root, staging) = scaffold();
+    let (map_old, map_new) = (test_jar("map", "1.0"), test_jar("map", "1.1"));
+    let (lib_old, lib_new) = (test_jar("lib", "1.0"), test_jar("lib", "1.1"));
+    let old = installed_pack(
+        &root,
+        &[
+            ("/mods/map-1.0.jar", &map_old),
+            ("/mods/lib-1.0.jar", &lib_old),
+        ],
+    )
+    .await;
+    switch_off(&root, "/mods/map-1.0.jar");
+    write_staged(&staging, "/mods/map-1.1.jar", &map_new).await;
+    write_staged(&staging, "/mods/lib-1.1.jar", &lib_new).await;
+
+    let (_, audit) = update_carrying_choices(&root, &staging, &old).await;
+
+    assert_eq!(
+        names(root.join("instance/mods")),
+        ["lib-1.1.jar", "map-1.1.jar.disabled"]
+    );
+    assert_eq!(
+        std::fs::read(disabled_path(&root, "/mods/map-1.1.jar")).unwrap(),
+        map_new
+    );
+    assert_eq!(
+        std::fs::read(live_path(&root, "/mods/lib-1.1.jar")).unwrap(),
+        lib_new
+    );
+    assert!(
+        audit.contains("\nFiles created:\n - /mods/lib-1.1.jar\n - /mods/map-1.1.jar\n"),
+        "{audit}"
+    );
+    assert!(
+        audit.contains("\nFiles deleted:\n - /mods/lib-1.0.jar\n - /mods/map-1.0.jar\n"),
+        "{audit}"
+    );
+    assert!(
+        audit.contains(
+            "\n/mods/map-1.1.jar was installed switched off: it is the same mod as \
+             /mods/map-1.0.jar, which was switched off.\n"
+        ),
+        "{audit}"
+    );
+
+    // The next update finds the mod as the player left it: switched off.
+    let installed = super::packinfo::scan_dir(&staging.join("instance"), None)
+        .await
+        .unwrap();
+    let (outcomes, _) = update_carrying_choices(&root, &staging, &installed).await;
+    let map = outcomes
+        .iter()
+        .find(|entry| entry.path == "/mods/map-1.1.jar")
+        .unwrap();
+    assert_eq!(
+        (&map.action, &map.reason),
+        (&PlanAction::Keep, &PlanReason::DisabledByUser)
+    );
+}
+
+/// An attempt that stopped once the new file was in place, before the old
+/// one was removed, left both. The next attempt finishes it.
+#[tokio::test]
+async fn an_interrupted_update_still_removes_the_file_its_successor_replaced() {
+    use super::same_mod::test_jar;
+    let (_tmp, root, staging) = scaffold();
+    let (map_old, map_new) = (test_jar("map", "1.0"), test_jar("map", "1.1"));
+    let old = installed_pack(&root, &[("/mods/map-1.0.jar", &map_old)]).await;
+    switch_off(&root, "/mods/map-1.0.jar");
+    write_staged(&staging, "/mods/map-1.1.jar", &map_new).await;
+    write_disabled(&root, "/mods/map-1.1.jar", &map_new).await;
+
+    let (_, audit) = update_carrying_choices(&root, &staging, &old).await;
+
+    assert_eq!(names(root.join("instance/mods")), ["map-1.1.jar.disabled"]);
+    assert!(
+        audit.contains("\nFiles deleted:\n - /mods/map-1.0.jar\n"),
+        "{audit}"
+    );
+}
+
+#[tokio::test]
+async fn a_switched_off_file_the_player_changed_stays_beside_its_successor() {
+    use super::same_mod::test_jar;
+    let (_tmp, root, staging) = scaffold();
+    let edited = test_jar("map", "edited");
+    let old = installed_pack(&root, &[("/mods/map-1.0.jar", &test_jar("map", "1.0"))]).await;
+    switch_off(&root, "/mods/map-1.0.jar");
+    std::fs::write(disabled_path(&root, "/mods/map-1.0.jar"), &edited).unwrap();
+    write_staged(&staging, "/mods/map-1.1.jar", &test_jar("map", "1.1")).await;
+
+    let (_, audit) = update_carrying_choices(&root, &staging, &old).await;
+
+    assert_eq!(
+        names(root.join("instance/mods")),
+        ["map-1.0.jar.disabled", "map-1.1.jar.disabled"]
+    );
+    assert_eq!(
+        std::fs::read(disabled_path(&root, "/mods/map-1.0.jar")).unwrap(),
+        edited
+    );
+    assert!(
+        audit.contains(" - /mods/map-1.0.jar: disabled by user\n"),
+        "{audit}"
+    );
+    assert!(audit.contains("\nFiles deleted:\n\n"), "{audit}");
+}
+
+#[tokio::test]
+async fn the_players_own_copy_of_a_mod_keeps_the_packs_copy_out() {
+    use super::same_mod::test_jar;
+    let (_tmp, root, staging) = scaffold();
+    let own = test_jar("jei", "1.2");
+    let old = installed_pack(&root, &[("/mods/jei-1.0.jar", &test_jar("jei", "1.0"))]).await;
+    // The player replaced the pack's file with a newer one of their own.
+    std::fs::remove_file(live_path(&root, "/mods/jei-1.0.jar")).unwrap();
+    write_live(&root, "/mods/jei-1.2.jar", &own).await;
+    write_staged(&staging, "/mods/jei-1.1.jar", &test_jar("jei", "1.1")).await;
+    write_staged(&staging, "/mods/new-1.0.jar", &test_jar("new", "1.0")).await;
+
+    let (_, audit) = update_carrying_choices(&root, &staging, &old).await;
+
+    assert_eq!(
+        names(root.join("instance/mods")),
+        ["jei-1.2.jar", "new-1.0.jar"]
+    );
+    assert_eq!(
+        std::fs::read(live_path(&root, "/mods/jei-1.2.jar")).unwrap(),
+        own
+    );
+    assert!(
+        audit.contains(" - /mods/jei-1.1.jar: already present\n"),
+        "{audit}"
+    );
+    assert!(
+        audit.contains("\nFiles created:\n - /mods/new-1.0.jar\n\n"),
+        "{audit}"
+    );
+    assert!(
+        audit.contains(
+            "\n/mods/jei-1.1.jar was not installed: /mods/jei-1.2.jar is the same mod and was \
+             kept.\n"
+        ),
+        "{audit}"
+    );
+}
+
+/// The successor's enabled name is taken by a file of the player's, so the
+/// update installs nothing there. Nothing replaced the old file: it stays.
+#[tokio::test]
+async fn a_switched_off_file_stays_when_its_successor_was_not_installed() {
+    use super::same_mod::test_jar;
+    let (_tmp, root, staging) = scaffold();
+    let old = installed_pack(&root, &[("/mods/map-1.0.jar", &test_jar("map", "1.0"))]).await;
+    switch_off(&root, "/mods/map-1.0.jar");
+    write_live(&root, "/mods/map-1.1.jar", &test_jar("map", "theirs")).await;
+    write_staged(&staging, "/mods/map-1.1.jar", &test_jar("map", "1.1")).await;
+
+    update_carrying_choices(&root, &staging, &old).await;
+
+    assert_eq!(
+        names(root.join("instance/mods")),
+        ["map-1.0.jar.disabled", "map-1.1.jar"]
+    );
 }

@@ -14,6 +14,10 @@
 //! the user modified, disabled, or deleted is always preserved as-is, and a
 //! target file we have no staged source for is a hard error rather than a
 //! silent no-op (see [`PlanError`]).
+//!
+//! A file is known here by its path alone. What a player did with a mod is
+//! carried over to the file an update ships that mod in next by
+//! [`super::same_mod`], which runs on this module's plan.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 
@@ -472,7 +476,8 @@ fn decide_dropped(old_hashes: &FileHashes, disk_state: DiskState) -> (PlanAction
         DiskState::Missing => (PlanAction::Keep, PlanReason::DeletedByUser),
         // The stale disabled twin (e.g. `foo.jar.disabled` when the
         // pack drops `foo.jar`) is surfaced by the untracked-file
-        // walk, not by this planner.
+        // walk, not by this planner. `same_mod` removes it when the update
+        // ships that mod's next file.
         DiskState::Disabled { .. } => (PlanAction::Keep, PlanReason::DisabledByUser),
     }
 }

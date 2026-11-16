@@ -14,7 +14,7 @@ use crate::managers::instance::log::{
 use crate::managers::instance::modpack::session::{self, Kind, Owner, Phase, Producer, Session};
 use crate::managers::instance::modpack::{
     PackVersionFile, RepairMarkerFile, apply_plan, disk_scan, normalize_cleanup_path, packinfo,
-    walk_untracked_files,
+    same_mod, walk_untracked_files,
 };
 use crate::managers::java::java_checker::{JavaChecker, RealJavaChecker};
 use crate::managers::java::managed::Step;
@@ -1461,6 +1461,23 @@ pub async fn process_modpack_staging(
             old_packinfo.as_ref(),
         );
 
+        // A player's choice about a mod follows it to the file this update
+        // ships it in next (see `same_mod`).
+        let carried = match &old_packinfo {
+            Some(old) => {
+                same_mod::carry(
+                    &mut entries,
+                    old,
+                    &target_packinfo,
+                    &instance_root.join("instance"),
+                    &staging_dir.join("instance"),
+                    fs_case_insensitive,
+                )
+                .await
+            }
+            None => same_mod::Carried::default(),
+        };
+
         session.phase = Phase::Applying;
         session.save(&instance_root, owner).await?;
 
@@ -1485,8 +1502,10 @@ pub async fn process_modpack_staging(
             &mut representation_notes,
             Some(owner),
             &sources,
+            &carried,
         )
         .await?;
+        representation_notes.extend(carried.notes(&entries));
 
         // Repair-only: paths the user explicitly ticked for removal in the
         // preview, applied after the plan so a cleanup can never race the
@@ -3190,6 +3209,7 @@ pub(in crate::managers::instance) async fn execute_plan(
         &mut Vec::new(),
         None,
         &Default::default(),
+        &Default::default(),
     )
     .await
 }
@@ -3199,7 +3219,8 @@ pub(in crate::managers::instance) async fn execute_plan(
 /// publication collisions and preserved conflicts become actual audit outcomes.
 /// `sources` is what the pre-apply source check found: files an interrupted
 /// earlier attempt already linked, and staged sources that must not be
-/// published because they changed since.
+/// published because they changed since. `carried` is what [`same_mod::carry`]
+/// decided for this plan.
 #[allow(clippy::too_many_arguments)]
 async fn execute_bound_plan(
     entries: &[apply_plan::PlanEntry],
@@ -3210,6 +3231,7 @@ async fn execute_bound_plan(
     notes: &mut Vec<String>,
     owner: Option<&Owner>,
     sources: &session::SourceCheck,
+    carried: &same_mod::Carried,
 ) -> anyhow::Result<Vec<apply_plan::PlanEntry>> {
     #[cfg(not(test))]
     if owner.is_none() {
@@ -3335,7 +3357,9 @@ async fn execute_bound_plan(
                 let (source, is_disabled) =
                     resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
                 // A pack-shipped-disabled path must land disabled, not
-                // enabled — the pack's own default is preserved.
+                // enabled — the pack's own default is preserved. So must the
+                // next file of a mod the player switched off.
+                let is_disabled = is_disabled || carried.lands_switched_off(&entry.path);
                 let dest = if is_disabled { &twin } else { &live };
                 tokio::fs::create_dir_all(dest.parent().unwrap()).await?;
                 // Preserve observed representation intent as well as the
@@ -3387,6 +3411,21 @@ async fn execute_bound_plan(
         }
     }
     publications.finish().await?;
+    // Only now that their successors are durable. One that can't be removed
+    // stays as the switched-off file it is, and the audit says so.
+    for (path, file) in carried.replaced(&data_path).await {
+        if let Some(ownership) = &mut ownership {
+            ownership.check().await?;
+        }
+        if let Err(error) = tokio::fs::remove_file(&file).await {
+            tracing::warn!("Could not remove {}: {error}", file.display());
+            continue;
+        }
+        if let Some(entry) = outcomes.iter_mut().find(|entry| entry.path == path) {
+            entry.action = PlanAction::Delete;
+            entry.reason = PlanReason::PackDropped;
+        }
+    }
     Ok(outcomes)
 }
 

@@ -1552,6 +1552,101 @@ async fn task08_legacy_disabled_archive_recovers_with_owned_retained_original() 
     Ok(())
 }
 
+/// A pack update ships most mods under a new file name, as the name carries
+/// the version. What the player did with a mod follows it there, through the
+/// real preparation and apply: a mod they switched off stays off and its old
+/// file goes, and a mod they replaced with their own copy gets no second one.
+#[tokio::test]
+async fn an_update_that_renames_mods_keeps_what_the_player_did_with_them() -> anyhow::Result<()> {
+    use super::modpack::{
+        packinfo,
+        same_mod::test_jar,
+        session::{Phase, Session},
+    };
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "renamed-mods").await?;
+    let mods = root.join("instance/mods");
+    let (map_new, lib_new) = (test_jar("map", "1.1"), test_jar("lib", "1.1"));
+    let jei_own = test_jar("jei", "1.2");
+    task08_archive(
+        &root,
+        &[
+            ("mods/map-1.1.jar", &map_new),
+            ("mods/jei-1.1.jar", &test_jar("jei", "1.1")),
+            ("mods/lib-1.1.jar", &lib_new),
+        ],
+    )?;
+    tokio::fs::create_dir(&mods).await?;
+    for (name, id) in [("map", "map"), ("jei", "jei"), ("lib", "lib")] {
+        tokio::fs::write(mods.join(format!("{name}-1.0.jar")), test_jar(id, "1.0")).await?;
+    }
+    let old = packinfo::scan_dir(&root.join("instance"), None).await?;
+    tokio::fs::write(root.join("packinfo.json"), packinfo::make_packinfo(old)?).await?;
+    // Since then the player switched the map off, and replaced jei with a
+    // newer one of their own.
+    tokio::fs::rename(mods.join("map-1.0.jar"), mods.join("map-1.0.jar.disabled")).await?;
+    tokio::fs::remove_file(mods.join("jei-1.0.jar")).await?;
+    tokio::fs::write(mods.join("jei-1.2.jar"), &jei_own).await?;
+
+    let (shortpath, config) = app.instance_manager().current_config(id).await?;
+    let task = crate::managers::vtask::VisualTask::new(
+        crate::api::translation::Translation::InstanceTaskPrepare {
+            name: "fixture".into(),
+        },
+    );
+    let mut owner = None;
+    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+        app.clone(),
+        id,
+        true,
+        config,
+        shortpath.clone(),
+        &task,
+        false,
+        &mut owner,
+    )
+    .await?;
+    run::modpack::process_modpack_staging(
+        app.clone(),
+        id,
+        shortpath,
+        &subtasks,
+        options,
+        oracle,
+        owner.as_ref(),
+    )
+    .await?;
+
+    assert_eq!(Session::load(&root).await?.unwrap().phase, Phase::Committed);
+    let mut names = Vec::new();
+    let mut files = tokio::fs::read_dir(&mods).await?;
+    while let Some(file) = files.next_entry().await? {
+        names.push(file.file_name().to_string_lossy().into_owned());
+    }
+    names.sort();
+    assert_eq!(
+        names,
+        ["jei-1.2.jar", "lib-1.1.jar", "map-1.1.jar.disabled"]
+    );
+    assert_eq!(tokio::fs::read(mods.join("jei-1.2.jar")).await?, jei_own);
+    assert_eq!(tokio::fs::read(mods.join("lib-1.1.jar")).await?, lib_new);
+    assert_eq!(
+        tokio::fs::read(mods.join("map-1.1.jar.disabled")).await?,
+        map_new
+    );
+    let audit = tokio::fs::read_to_string(root.join(".install_audit/audit.txt")).await?;
+    for line in [
+        "/mods/map-1.1.jar was installed switched off: it is the same mod as /mods/map-1.0.jar, which was switched off.\n",
+        "/mods/jei-1.1.jar was not installed: /mods/jei-1.2.jar is the same mod and was kept.\n",
+        " - /mods/jei-1.1.jar: already present\n",
+        "\nFiles deleted:\n - /mods/lib-1.0.jar\n - /mods/map-1.0.jar\n",
+        "\nFiles created:\n - /mods/lib-1.1.jar\n - /mods/map-1.1.jar\n",
+    ] {
+        assert!(audit.contains(line), "{line:?} is missing from:\n{audit}");
+    }
+    Ok(())
+}
+
 /// A long instance folder name ('Vault Hunters 3rd Edition' under a short
 /// Windows user name is already 89 characters) puts the representation
 /// record, its recovery manifest and deep pack files past 260 characters.

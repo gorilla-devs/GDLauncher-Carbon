@@ -35,6 +35,7 @@ pub use imported_baseline::ChangeVersionRefusal;
 pub(crate) use imported_baseline::inventory_fixture;
 pub mod origin_check;
 pub mod packinfo;
+pub(crate) mod same_mod;
 pub(crate) mod session;
 
 /// The version changes each instance is checking: usually one, but a request
