@@ -403,11 +403,7 @@ fn no_replace_unsupported(error: &io::Error) -> bool {
         .is_some_and(|code| CODES.contains(&code))
 }
 
-/// EXDEV on unix, ERROR_NOT_SAME_DEVICE on Windows.
-pub(crate) fn crosses_devices(error: &io::Error) -> bool {
-    const CODE: i32 = if cfg!(windows) { 17 } else { 18 };
-    error.kind() == io::ErrorKind::CrossesDevices || error.raw_os_error() == Some(CODE)
-}
+pub(crate) use carbon_rt_path::crosses_devices;
 
 /// No-replace publication on a volume that cannot rename without replacing.
 /// Callers hold the instance gate (natives their cache mutex), so only

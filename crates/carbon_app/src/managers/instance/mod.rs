@@ -2279,7 +2279,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .app
             .settings_manager()
             .runtime_path
-            .get_temp()
+            .staging_for(carbon_rt_path::PublishInto::Instances)
+            .await
             .maketmpdir()
             .await?;
 
@@ -3228,7 +3229,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .app
             .settings_manager()
             .runtime_path
-            .get_temp()
+            .staging_for(carbon_rt_path::PublishInto::Instances)
+            .await
             .maketmpdir()
             .await?;
 
@@ -5282,6 +5284,81 @@ mod test {
             Some((4242, Some(1_700_000_000))),
             "duplicating an instance must not disturb the source's own pidfile"
         );
+
+        Ok(())
+    }
+
+    /// People keep their instances on another drive by replacing `instances`
+    /// with a link or a mount. A new instance is renamed into place, which
+    /// no rename out of the data folder's `temp` can do then, so it is built
+    /// where `staging_for` says: on that drive.
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn instances_kept_on_another_drive_are_created_and_duplicated() -> anyhow::Result<()> {
+        use std::os::unix::fs::MetadataExt;
+
+        let app = crate::setup_managers_for_test().await;
+        // Start-up's own scan, as in the scan tests below.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let runtime = app.settings_manager().runtime_path.clone();
+        let instances = runtime.get_instances().to_path();
+
+        let shm = std::path::Path::new("/dev/shm");
+        let other_filesystem = match (std::fs::metadata(shm), std::fs::metadata(&*runtime)) {
+            (Ok(shm), Ok(data)) => shm.dev() != data.dev(),
+            _ => false,
+        };
+        if !other_filesystem {
+            eprintln!("skipped: /dev/shm is not another filesystem here");
+            return Ok(());
+        }
+        let drive = shm.join(format!("gdl-instances-{}", uuid::Uuid::new_v4()));
+        std::fs::create_dir_all(&drive)?;
+        struct Remove(std::path::PathBuf);
+        impl Drop for Remove {
+            fn drop(&mut self) {
+                let _ = std::fs::remove_dir_all(&self.0);
+            }
+        }
+        let _remove = Remove(drive.clone());
+        let _ = std::fs::remove_dir(&instances);
+        std::os::unix::fs::symlink(&drive, &instances)?;
+
+        let manager = app.instance_manager();
+        let group = manager.get_default_group().await?;
+        let source = manager
+            .create_instance(
+                group,
+                "source".to_string(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Standard(
+                    info::StandardVersion {
+                        release: String::from("1.7.10"),
+                        modloaders: HashSet::new(),
+                    },
+                )),
+                String::new(),
+            )
+            .await?;
+        std::fs::write(drive.join("source/instance/options.txt"), b"fov:90")?;
+        let duplicate = manager
+            .duplicate_instance(source, "duplicate".to_string())
+            .await?;
+
+        let shortpath = manager.instances.read().await[&duplicate].shortpath.clone();
+        let copy = drive.join(&shortpath);
+        assert!(drive.join("source/instance.json").is_file());
+        assert_eq!(std::fs::read(copy.join("instance/options.txt"))?, b"fov:90");
+        assert!(std::fs::read_to_string(copy.join("instance.json"))?.contains("\"duplicate\""));
+
+        // What was built is gone from the staging folder, and what a session
+        // that ended mid-way left there is no instance to the scan.
+        let staging = drive.join(carbon_rt_path::STAGING_FOLDER);
+        assert_eq!(std::fs::read_dir(&staging)?.count(), 0);
+        write_test_instance_json(&staging.join("left-mid-way"), "left-mid-way").await;
+        manager.scan_instances().await?;
+        assert_eq!(manager.instances.read().await.len(), 2);
+        assert!(staging.join("left-mid-way/instance.json").is_file());
 
         Ok(())
     }

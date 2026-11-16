@@ -8,6 +8,9 @@ use std::{
 
 use anyhow::Context;
 
+mod staging;
+pub use staging::{PublishInto, STAGING_FOLDER, crosses_devices};
+
 #[derive(Clone)]
 pub struct RuntimePath(PathBuf);
 
@@ -414,6 +417,10 @@ impl<T: tempentry::TempEntryType> TempEntry<T> {
         path
     }
 
+    /// Publishes this entry as `path`. A file that a rename cannot bring
+    /// there (another drive) is copied next to `path` and renamed. A folder
+    /// is only ever renamed, so folders are built where
+    /// [`RuntimePath::staging_for`] says, which a rename can leave for `path`.
     pub async fn try_rename_or_move(self, path: impl AsRef<Path>) -> anyhow::Result<()> {
         let dest = path.as_ref();
 
@@ -532,6 +539,10 @@ impl RuntimePath {
         LoggingConfigsPath(self.0.join("logging_configs"))
     }
 
+    /// Scratch space, emptied at every start: for what is read or copied
+    /// from. What a rename will publish is built where
+    /// [`RuntimePath::staging_for`] says instead, as a rename cannot leave
+    /// its drive.
     pub fn get_temp(&self) -> TempPath {
         TempPath(self.0.join("temp"))
     }

@@ -125,9 +125,11 @@ pub fn main() {
             // no subscriber installed yet, `tracing::warn!` is a silent no-op.
             managers::account::endpoints::init_from_args();
 
-            // Clean up leftover temp files/folders from previous sessions
-            let temp_path = carbon_rt_path::TempPath::new(runtime_path.join("temp"));
-            temp_path.cleanup_all().await;
+            // Clean up leftover temp files/folders from previous sessions,
+            // wherever they were built (see carbon_rt_path's staging module).
+            carbon_rt_path::RuntimePath::new(runtime_path.clone())
+                .cleanup_staging()
+                .await;
             // And addon install staging an earlier session left in the data
             // folder (quit or crashed mid-install, or kept by an older build).
             managers::instance::installer::publication::sweep_stale_staging(&runtime_path).await;
