@@ -17,7 +17,7 @@ impl ManagerRef<'_, RichPresenceManager> {
             .await?
             .discord_integration
         {
-            println!("_DRPC_:INIT");
+            crate::launcher::tell("_DRPC_:INIT");
         }
 
         Ok(())
@@ -31,7 +31,7 @@ impl ManagerRef<'_, RichPresenceManager> {
             .await?
             .discord_integration
         {
-            println!("_DRPC_:SHUTDOWN");
+            crate::launcher::tell("_DRPC_:SHUTDOWN");
         }
 
         Ok(())
@@ -45,7 +45,7 @@ impl ManagerRef<'_, RichPresenceManager> {
             .await?
             .discord_integration
         {
-            println!("_DRPC_:UPDATE_ACTIVITY|{state}");
+            crate::launcher::tell(format_args!("_DRPC_:UPDATE_ACTIVITY|{state}"));
         }
 
         Ok(())
@@ -59,7 +59,7 @@ impl ManagerRef<'_, RichPresenceManager> {
             .await?
             .discord_integration
         {
-            println!("_DRPC_:STOP_ACTIVITY");
+            crate::launcher::tell("_DRPC_:STOP_ACTIVITY");
         }
 
         Ok(())

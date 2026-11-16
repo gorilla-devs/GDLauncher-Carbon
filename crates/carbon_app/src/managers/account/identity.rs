@@ -72,10 +72,10 @@ impl Identity {
 }
 pub(super) fn stdout(event: Event) {
     // A single JSON value, redacted as a whole by the Electron log boundary.
-    println!(
+    crate::launcher::tell(format_args!(
         "_GDL_ACCOUNT_EMAIL_:{}",
         serde_json::to_string(&event).expect("identity event serializes")
-    );
+    ));
 }
 #[cfg(test)]
 mod task19_identity_tests {

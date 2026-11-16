@@ -236,7 +236,7 @@ pub async fn export_modrinth(
             super::verify_linked_export_files(&app, instance_id, &linked_files).await?;
             tmpfile.try_rename_or_move(save_path).await?;
 
-            println!("Completed items");
+            crate::launcher::tell("Completed items");
             t_create_bundle.complete_items();
 
             Ok(())

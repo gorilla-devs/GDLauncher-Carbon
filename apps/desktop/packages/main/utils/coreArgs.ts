@@ -5,6 +5,9 @@ export interface CoreArgsOptions {
   e2eEntitlementKey?: string | null
 }
 
+/** Same as `EXIT_WITH_LAUNCHER_ARG` in crates/carbon_app/src/launcher.rs. */
+export const EXIT_WITH_LAUNCHER_ARG = "--exit_with_launcher"
+
 /**
  * The argv handed to the core module.
  *
@@ -26,6 +29,12 @@ export function buildCoreModuleArgs(opts: CoreArgsOptions): string[] {
   if (opts.e2eEntitlementKey) {
     args.push("--e2e_entitlement_key", opts.e2eEntitlementKey)
   }
+
+  // The core watches the pipe this process holds to its standard input, and
+  // shuts down when this process is gone (a crash or a kill included): on
+  // unix nothing else would end it. Last, so it is never taken for the value
+  // of an argument before it.
+  args.push(EXIT_WITH_LAUNCHER_ARG)
 
   return args
 }

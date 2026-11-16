@@ -187,7 +187,7 @@ impl State {
                 "installs": stops.installs,
             })
         );
-        println!("{row}");
+        crate::launcher::tell(&row);
         #[cfg(test)]
         self.stops_rows.push(row);
     }

@@ -217,10 +217,10 @@ impl ManagerRef<'_, SettingsManager> {
             self.app.invalidate(GET_SETTINGS, None);
 
             if let Some(show_app_close_warning) = incoming_settings.show_app_close_warning {
-                println!(
+                crate::launcher::tell(format_args!(
                     "_SHOW_APP_CLOSE_WARNING_:{}",
                     show_app_close_warning.inner()
-                );
+                ));
             }
         }
 

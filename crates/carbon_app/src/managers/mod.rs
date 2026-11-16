@@ -229,9 +229,15 @@ mod app {
                     Ok(settings) => {
                         let show_app_close_warning = settings.show_app_close_warning;
                         info!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
-                        println!("_SHOW_APP_CLOSE_WARNING_:{}", show_app_close_warning);
+                        crate::launcher::tell(format_args!(
+                            "_SHOW_APP_CLOSE_WARNING_:{}",
+                            show_app_close_warning
+                        ));
                         info!("_POTATO_PC_MODE_:{}", settings.reduced_motion);
-                        println!("_POTATO_PC_MODE_:{}", settings.reduced_motion);
+                        crate::launcher::tell(format_args!(
+                            "_POTATO_PC_MODE_:{}",
+                            settings.reduced_motion
+                        ));
                     }
                     Err(e) => {
                         error!("Error getting settings: {e}");

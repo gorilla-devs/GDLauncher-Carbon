@@ -143,7 +143,7 @@ impl DbStatus {
 /// The single stdout funnel point: every DB status line passes
 /// through here so no fatal path can bypass emission.
 fn emit_status(status: &DbStatus) {
-    println!("{}", status.status_line());
+    crate::launcher::tell(status.status_line());
 }
 
 /// Maps the runner outcome to the funnel. `Ok(None)` proceeds silently;
@@ -495,7 +495,7 @@ async fn seed_init_db(
     }
 
     // Emit status for frontend progress tracking
-    println!("_STATUS_:VerifyingTermsAndPrivacy");
+    crate::launcher::tell("_STATUS_:VerifyingTermsAndPrivacy");
 
     if latest_consent_sha.is_some() {
         let mut should_empty_tos_privacy = false;

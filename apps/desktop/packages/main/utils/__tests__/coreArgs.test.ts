@@ -1,18 +1,27 @@
 import { describe, expect, it } from "vitest"
-import { buildCoreModuleArgs } from "../coreArgs.js"
+import fs from "node:fs"
+import path from "node:path"
+import { buildCoreModuleArgs, EXIT_WITH_LAUNCHER_ARG } from "../coreArgs.js"
 
 describe("buildCoreModuleArgs", () => {
   it("always passes the runtime path first", () => {
     expect(buildCoreModuleArgs({ runtimePath: "/data" })).toEqual([
       "--runtime_path",
-      "/data"
+      "/data",
+      "--exit_with_launcher"
     ])
   })
 
   it("appends the base api override when present", () => {
     expect(
       buildCoreModuleArgs({ runtimePath: "/data", baseApi: "http://api" })
-    ).toEqual(["--runtime_path", "/data", "--base_api", "http://api"])
+    ).toEqual([
+      "--runtime_path",
+      "/data",
+      "--base_api",
+      "http://api",
+      "--exit_with_launcher"
+    ])
   })
 
   it("appends both e2e overrides when present", () => {
@@ -28,7 +37,8 @@ describe("buildCoreModuleArgs", () => {
       "--e2e_auth_base",
       "http://127.0.0.1:1234",
       "--e2e_entitlement_key",
-      "/tmp/key.pem"
+      "/tmp/key.pem",
+      "--exit_with_launcher"
     ])
   })
 
@@ -43,6 +53,21 @@ describe("buildCoreModuleArgs", () => {
         e2eAuthBase: null,
         e2eEntitlementKey: null
       })
-    ).toEqual(["--runtime_path", "/data"])
+    ).toEqual(["--runtime_path", "/data", "--exit_with_launcher"])
+  })
+
+  it("asks the core to end with the launcher, by the name the core reads", () => {
+    const core = fs.readFileSync(
+      path.resolve("../../crates/carbon_app/src/launcher.rs"),
+      "utf8"
+    )
+    expect(core).toContain(
+      `pub const EXIT_WITH_LAUNCHER_ARG: &str = "${EXIT_WITH_LAUNCHER_ARG}";`
+    )
+    // The launcher starts the core with a pipe to its standard input and
+    // never closes it: the core takes its end for the launcher's.
+    const main = fs.readFileSync(path.resolve("packages/main/index.ts"), "utf8")
+    expect(main).toMatch(/detached: false,\s+stdio: "pipe"/)
+    expect(main).not.toMatch(/\.stdin\b/)
   })
 })

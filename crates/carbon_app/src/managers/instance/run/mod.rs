@@ -1566,7 +1566,7 @@ impl ManagerRef<'_, InstanceManager> {
             expected_task,
             state,
             &action_to_take.to_string(),
-            &mut |record| println!("{record}"),
+            &mut |record| crate::launcher::tell(record),
         )?;
         drop(instances);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -1674,7 +1674,7 @@ impl ManagerRef<'_, InstanceManager> {
             data.state = LaunchState::Inactive { failed_task: None };
             let shortpath = instance.shortpath.clone();
             self.running_publication
-                .publish(&instances, &mut |record| println!("{record}"));
+                .publish(&instances, &mut |record| crate::launcher::tell(record));
             shortpath
         };
 

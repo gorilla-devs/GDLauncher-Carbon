@@ -74,7 +74,7 @@ impl std::fmt::Display for CoreModuleStatus {
 }
 
 pub fn update_core_module_status(status: CoreModuleStatus) {
-    println!("_STATUS_:{status}");
+    crate::launcher::tell(format_args!("_STATUS_:{status}"));
 }
 
 #[derive(Deserialize, Serialize, Type)]

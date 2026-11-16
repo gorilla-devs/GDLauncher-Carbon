@@ -17,22 +17,21 @@ use tracing::{debug, info};
 
 pub mod api;
 mod app_version;
+mod base_api_override;
 pub mod cache_middleware;
 pub mod domain;
 mod error;
 pub mod iridium_client;
+mod launcher;
 mod livenesstracker;
-pub mod managers;
-mod platform;
-// mod pprocess_keepalive;
-mod base_api_override;
 mod logger;
+pub mod managers;
 mod once_send;
+mod platform;
 mod runtime_path_override;
 mod util;
 
 pub fn main() {
-    // pprocess_keepalive::init();
     #[cfg(debug_assertions)]
     {
         let mut args = std::env::args();
@@ -107,6 +106,21 @@ pub fn main() {
             // static `WorkerGuard` needs this at all.
             logger::install_panic_hook();
 
+            // Until the shutdown loop in `start_router` takes over, nothing
+            // of the user's runs here yet, and a launcher that is gone ends
+            // this core at once, as SIGTERM does before that loop.
+            let launcher = launcher::Watch::from_args();
+            tokio::spawn({
+                let launcher = launcher.clone();
+                async move {
+                    launcher.gone().await;
+                    if !SHUTDOWN_LOOP_STARTED.load(std::sync::atomic::Ordering::SeqCst) {
+                        info!("The launcher is gone; exiting");
+                        logger::flush_and_exit(0);
+                    }
+                }
+            });
+
             // After the logger so its `E2E MODE` warnings land somewhere: with
             // no subscriber installed yet, `tracing::warn!` is a silent no-op.
             managers::account::endpoints::init_from_args();
@@ -142,9 +156,37 @@ pub fn main() {
                 init_time.elapsed()
             );
 
-            start_router(runtime_path, base_api_override, listener).await;
+            start_router(runtime_path, base_api_override, listener, launcher).await;
         });
 }
+
+/// Set once the loop in `start_router` answers termination requests with an
+/// orderly shutdown. Before that a launcher that is gone ends the core at once.
+static SHUTDOWN_LOOP_STARTED: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
+/// Waits for the next reason to shut down: a termination `signal`, the end
+/// of the launcher, or, once the launcher is gone, `retry` having passed
+/// since the last attempt.
+async fn next_stop_request(
+    signal: impl std::future::Future<Output = ()>,
+    launcher: &launcher::Watch,
+    launcher_gone: &mut bool,
+    retry: std::time::Duration,
+) {
+    tokio::select! {
+        _ = signal => {}
+        _ = launcher.gone(), if !*launcher_gone => {
+            *launcher_gone = true;
+            tracing::warn!("The launcher is gone; shutting down");
+        }
+        _ = tokio::time::sleep(retry), if *launcher_gone => {}
+    }
+}
+
+/// How long the core waits before it tries again to shut down after the
+/// launcher is gone and an attempt ended unresolved: nobody is left to ask.
+const LAUNCHER_GONE_RETRY: std::time::Duration = std::time::Duration::from_secs(30);
 
 /// Waits for a request to terminate this process: SIGTERM or SIGINT on
 /// unix (an external `kill`, Ctrl+C, or a service manager's stop signal),
@@ -207,7 +249,12 @@ fn generate_api_token() -> String {
     format!("{a}{b}")
 }
 
-async fn start_router(runtime_path: PathBuf, base_api_override: String, listener: TcpListener) {
+async fn start_router(
+    runtime_path: PathBuf,
+    base_api_override: String,
+    listener: TcpListener,
+    launcher: launcher::Watch,
+) {
     info!("Starting router");
     let startup_total = std::time::Instant::now();
     let (invalidation_sender, _) = tokio::sync::broadcast::channel(1000);
@@ -339,9 +386,22 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     // Each signal is its own request, so a later signal takes the place of an
     // attempt that ended unresolved, as the launcher's 'Quit now' does
     // before it escalates to SIGKILL.
+    //
+    // A launcher that crashed or was killed can send none of this: on unix
+    // the core would stay behind, unseen, with its servers. Its end counts as
+    // a request too, and with nobody left to ask again the core tries again
+    // by itself for as long as an attempt ends unresolved.
+    SHUTDOWN_LOOP_STARTED.store(true, std::sync::atomic::Ordering::SeqCst);
     tokio::spawn(async move {
+        let mut launcher_gone = false;
         loop {
-            wait_for_termination_signal().await;
+            next_stop_request(
+                wait_for_termination_signal(),
+                &launcher,
+                &mut launcher_gone,
+                LAUNCHER_GONE_RETRY,
+            )
+            .await;
             if app2.runtime_lifecycle.shutdown_committed() {
                 logger::flush_and_exit(0);
             }
@@ -402,7 +462,7 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
                     startup_total.elapsed().as_secs_f64()
                 );
                 info!("_STATUS_:READY|{port}|<token redacted>");
-                println!("_STATUS_:READY|{port}|{api_token}");
+                launcher::tell(format_args!("_STATUS_:READY|{port}|{api_token}"));
                 break;
             }
         }
@@ -540,6 +600,93 @@ macro_rules! mirror_into {
 }
 
 #[cfg(test)]
+mod stop_request_tests {
+    use super::{launcher, next_stop_request};
+    use std::time::Duration;
+
+    const RETRY: Duration = Duration::from_secs(30);
+    async fn within(time: Duration, wait: impl std::future::Future<Output = ()>) -> bool {
+        tokio::time::timeout(time, wait).await.is_ok()
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn only_a_signal_stops_a_core_whose_launcher_is_there() {
+        let (launcher_end, watch) = launcher::Watch::over_pipe();
+        let mut gone = false;
+        let never = std::future::pending::<()>();
+        assert!(
+            !within(
+                RETRY * 10,
+                next_stop_request(never, &watch, &mut gone, RETRY)
+            )
+            .await
+        );
+        assert!(!gone);
+        assert!(within(RETRY, next_stop_request(async {}, &watch, &mut gone, RETRY)).await);
+        assert!(!gone);
+        drop(launcher_end);
+    }
+
+    #[tokio::test]
+    async fn the_end_of_the_launcher_is_one_request_and_then_one_more_at_every_retry() {
+        let (launcher_end, watch) = launcher::Watch::over_pipe();
+        let mut gone = false;
+        let retry = Duration::from_millis(400);
+        drop(launcher_end);
+        let never = std::future::pending::<()>;
+        assert!(
+            within(
+                Duration::from_millis(300),
+                next_stop_request(never(), &watch, &mut gone, retry)
+            )
+            .await
+        );
+        assert!(gone);
+        // Not again at once, although the launcher stays gone: an attempt
+        // that ended unresolved is not repeated in a tight loop.
+        assert!(
+            !within(
+                Duration::from_millis(200),
+                next_stop_request(never(), &watch, &mut gone, retry)
+            )
+            .await
+        );
+        let started = std::time::Instant::now();
+        assert!(
+            within(
+                Duration::from_secs(10),
+                next_stop_request(never(), &watch, &mut gone, retry)
+            )
+            .await
+        );
+        assert!(started.elapsed() >= Duration::from_millis(350));
+        // A signal is still answered at once meanwhile.
+        assert!(
+            within(
+                Duration::from_millis(100),
+                next_stop_request(async {}, &watch, &mut gone, retry)
+            )
+            .await
+        );
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_core_nobody_watches_is_never_stopped_by_a_retry() {
+        let watch = launcher::Watch::off();
+        let mut gone = false;
+        let never = std::future::pending::<()>();
+        assert!(
+            !within(
+                RETRY * 100,
+                next_stop_request(never, &watch, &mut gone, RETRY)
+            )
+            .await
+        );
+        assert!(!gone);
+    }
+}
+
+#[cfg(test)]
 mod test {
     use crate::get_available_port;
 
@@ -553,6 +700,7 @@ mod test {
                 temp_dir.into_path(),
                 crate::util::base_api::get_base_api_env!(),
                 tcp_listener,
+                crate::launcher::Watch::off(),
             )
             .await;
         });

@@ -501,7 +501,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             self.app.runtime_lifecycle.reconciliation_finished(Err(e));
             let instances = self.instances.read().await;
             self.running_publication
-                .publish(&instances, &mut |record| println!("{record}"));
+                .publish(&instances, &mut |record| crate::launcher::tell(record));
         }
         self.import_manager().launch_background_tasks();
     }
@@ -730,7 +730,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
                 instances.insert(instance_id, instance);
                 self.running_publication
-                    .publish(&instances, &mut |record| println!("{record}"));
+                    .publish(&instances, &mut |record| crate::launcher::tell(record));
                 drop(instances);
                 drop(path_admission);
                 drop(_operation);
@@ -795,7 +795,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         {
             let instances = self.instances.read().await;
             self.running_publication
-                .publish(&instances, &mut |record| println!("{record}"));
+                .publish(&instances, &mut |record| crate::launcher::tell(record));
         }
         if !adopted_ids.is_empty() {
             self.watch_adopted_instances(adopted_ids);
