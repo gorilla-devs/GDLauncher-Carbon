@@ -49,6 +49,7 @@ import {
   forgetUnavailableRuntimePath,
   leftInOldFolder,
   leftPartialCopy,
+  notEnoughSpace,
   relocateRuntime,
   describeRuntimePathChange,
   removedPartialCopy,
@@ -1254,7 +1255,9 @@ ipcMain.handle(
     newPath: string,
     switchOnly = false,
     // Only an explicit choice in the dialog moves what is not the launcher's.
-    moveUnfamiliar = false
+    moveUnfamiliar = false,
+    // Only "Move anyway", after the move was refused for lack of space.
+    ignoreSpace = false
   ): Promise<import("./utils/runtimeRelocation").RuntimeRelocationResult> => {
     return withRuntimeOperation(async () => {
       let recovery: "none" | "restart" | "shutdown_unresolved" = "none"
@@ -1275,6 +1278,7 @@ ipcMain.handle(
           target: newPath,
           switchOnly,
           leaveUnfamiliar: moveUnfamiliar !== true,
+          ignoreSpace: ignoreSpace === true,
           pointer: path.join(
             app.getPath("userData"),
             RUNTIME_PATH_OVERRIDE_NAME
@@ -1362,6 +1366,7 @@ ipcMain.handle(
           // Decided from what failed, never by probing the renderer-supplied path.
           incompleteTarget: leftPartialCopy(error),
           unsupported: unsupportedRuntimeEntries(error),
+          noSpace: notEnoughSpace(error),
           ...(removedPartialCopy(error) && { copyRemoved: true }),
           ...(refused && { refused })
         }

@@ -13,7 +13,11 @@ import {
 import { Portal } from "solid-js/web"
 import { RTprogress, RTsetProgress } from "@/utils/runtimePathProgress"
 import type { RuntimeBlocker } from "../../../../../../main/utils/coreShutdown"
-import type { UnsupportedRuntimeEntries } from "../../../../../../main/utils/runtimeRelocation"
+import type {
+  RuntimeSpaceShortage,
+  UnsupportedRuntimeEntries
+} from "../../../../../../main/utils/runtimeRelocation"
+import { formatBytes } from "@/utils/formatBytes"
 import { DeletionNoteBox, DeletionNoteLine } from "../DeletionNote"
 import {
   isChangingRuntimePath,
@@ -163,6 +167,11 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
     createSignal<UnsupportedRuntimeEntries>()
   // An earlier unresolved attempt keeps its recovery view, whatever this one found.
   const notMoved = () => stoppedBeforeMove() && !runtimeRecoveryRequired()
+  // The drive of the new folder is too small; found before anything was stopped.
+  const [noSpace, setNoSpace] = createSignal<RuntimeSpaceShortage>()
+  const tooSmall = () => (notMoved() ? noSpace() : undefined)
+  // "Move anyway" holds for every later attempt from this dialog.
+  let ignoreSpace = false
 
   const [migrationError, setMigrationError] = createSignal<string | undefined>(
     undefined
@@ -205,11 +214,13 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
     setRestartFailed(false)
     setStoppedBeforeMove(false)
     setUnsupported(undefined)
+    setNoSpace(undefined)
     try {
       const result = await window.changeRuntimePath(
         submitted.target,
         submitted.switchOnly,
-        !submitted.switchOnly && moveUnfamiliar()
+        !submitted.switchOnly && moveUnfamiliar(),
+        ignoreSpace
       )
       if (result.type === "failed") {
         if (result.refused) {
@@ -229,6 +240,7 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
           result.recovery === "none" && !result.incompleteTarget
         )
         setUnsupported(result.unsupported)
+        setNoSpace(result.noSpace)
         setCopyRemoved(!!result.copyRemoved)
         setMigrationError(result.message)
       } else modalsContext?.closeModal()
@@ -631,6 +643,53 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                         </Button>
                       </Show>
                     </div>
+                  </div>
+                )}
+              </Match>
+              <Match when={migrationError() ? tooSmall() : undefined}>
+                {(space) => (
+                  <div
+                    class="flex max-w-2xl flex-col items-center text-center"
+                    data-testid="relocation-no-space"
+                  >
+                    <div class="text-2xl">
+                      <Trans key="java:_trn_runtime_no_space.title" />
+                    </div>
+                    <p class="mt-4 text-base">
+                      <Trans
+                        key="java:_trn_runtime_no_space.body"
+                        options={{
+                          needed: formatBytes(space().needed, "up"),
+                          free: formatBytes(space().free, "down")
+                        }}
+                      />
+                    </p>
+                    <div class="mt-6 flex justify-center gap-4">
+                      <Button
+                        type="secondary"
+                        onClick={() => {
+                          setMigrationError(undefined)
+                          setNoSpace(undefined)
+                          modalsContext?.closeModal()
+                        }}
+                      >
+                        <Trans key="general:_trn_dismiss" />
+                      </Button>
+                      <Button onClick={() => attemptRelocation(false)}>
+                        <Trans key="java:_trn_runtime_relocation_busy.try_again" />
+                      </Button>
+                    </div>
+                    <button
+                      type="button"
+                      class="text-lightSlate-600 hover:text-lightSlate-300 mt-4 cursor-pointer border-none bg-transparent text-sm underline underline-offset-4"
+                      data-testid="relocation-move-anyway"
+                      onClick={() => {
+                        ignoreSpace = true
+                        void attemptRelocation(false)
+                      }}
+                    >
+                      <Trans key="java:_trn_runtime_no_space.move_anyway" />
+                    </button>
                   </div>
                 )}
               </Match>

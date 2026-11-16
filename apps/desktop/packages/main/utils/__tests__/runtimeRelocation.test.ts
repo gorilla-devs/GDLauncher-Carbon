@@ -16,6 +16,7 @@ import {
   selectRuntimePath,
   removableMountFor,
   leftPartialCopy,
+  notEnoughSpace,
   unsupportedRuntimeEntries,
   UnsupportedRuntimeEntriesError,
   removedPartialCopy,
@@ -120,6 +121,7 @@ async function fixture() {
     relocateRuntime,
     validateRuntimeDestination,
     leftPartialCopy,
+    notEnoughSpace,
     unsupportedRuntimeEntries,
     removedPartialCopy,
     runtimeTargetRefusal,
@@ -1723,7 +1725,7 @@ describe("a data folder in use that still holds an old move's marker", () => {
     )
     expect(
       await inventoryRuntimeTree(f.target, undefined, { liveSource: true })
-    ).toEqual([{ relative: "gdl_conf.db", directory: false }])
+    ).toEqual([{ relative: "gdl_conf.db", directory: false, size: 8 }])
   })
   it("a marker that is not a plain file still refuses the move", async () => {
     const f = await fixture()
@@ -3802,5 +3804,136 @@ describe("a folder that is not only the launcher's", () => {
     })
     expect(await fs.readdir(f.source)).toContain("Steam")
     expect(await fs.readdir(f.target)).not.toContain("Steam")
+  })
+})
+
+/**
+ * Every drive answers with `free` bytes free, the rest as it is. Returns the
+ * folders asked.
+ */
+function driveReports(free: number, more: Record<string, unknown> = {}) {
+  const asked: string[] = [],
+    statfs = fs.statfs.bind(fs)
+  vi.spyOn(fs, "statfs").mockImplementation((async (
+    folder: any,
+    ...args: any[]
+  ) => {
+    asked.push(String(folder))
+    return {
+      ...(await (statfs as any)(folder, ...args)),
+      bsize: 1,
+      bavail: free,
+      ...more
+    }
+  }) as any)
+  return asked
+}
+describe("a move to a drive without room for the data", () => {
+  // "save" of the fixture is 8 bytes.
+  async function withPack(bytes: number) {
+    const f = await fixture()
+    await fs.mkdir(path.join(f.source, "instances", "pack"), {
+      recursive: true
+    })
+    await fs.writeFile(
+      path.join(f.source, "instances", "pack", "big"),
+      Buffer.alloc(bytes)
+    )
+    return f
+  }
+  it("is refused with both sizes before the core is stopped, and moves once there is room", async () => {
+    const f = await withPack(1000)
+    driveReports(1007)
+    const result = await f.rawMove(null, f.target)
+    expect(result).toMatchObject({
+      type: "failed",
+      recovery: "none",
+      incompleteTarget: false,
+      noSpace: { needed: 1008, free: 1007 }
+    })
+    expect(result.copyRemoved).toBeUndefined()
+    expect(result.refused).toBeUndefined()
+    // The core was asked whether it would refuse, and nothing more.
+    expect(f.check).toHaveBeenCalledTimes(1)
+    expect(f.stop).not.toHaveBeenCalled()
+    expect(await fs.readdir(f.target)).toEqual([])
+    expect(selectRuntimePath(null, f.root)).toBe(f.source)
+    vi.mocked(fs.statfs).mockRestore()
+    driveReports(1008)
+    await f.move(null, f.target)
+    expect(selectRuntimePath(null, f.root)).toBe(f.target)
+    expect(
+      (await fs.stat(path.join(f.target, "instances", "pack", "big"))).size
+    ).toBe(1000)
+  })
+  it("goes ahead when the user chose to move anyway", async () => {
+    const f = await withPack(1000)
+    driveReports(0)
+    const change = callback("changeRuntimePath", f.globals)
+    expect(await change(null, f.target, false, true, true)).toEqual({
+      type: "relaunching"
+    })
+    expect(selectRuntimePath(null, f.root)).toBe(f.target)
+    // Only the literal choice counts, as with what is not the launcher's.
+    const g = await withPack(1000)
+    expect(
+      await callback("changeRuntimePath", g.globals)(
+        null,
+        g.target,
+        false,
+        true,
+        "yes"
+      )
+    ).toMatchObject({ type: "failed", noSpace: { needed: 1008, free: 0 } })
+  })
+  it("is left to the copy when the drive cannot tell its free space", async () => {
+    const f = await withPack(1000)
+    vi.spyOn(fs, "statfs").mockRejectedValue(
+      Object.assign(Error("ENOSYS: statfs"), { code: "ENOSYS" })
+    )
+    await f.move(null, f.target)
+    expect(selectRuntimePath(null, f.root)).toBe(f.target)
+    vi.mocked(fs.statfs).mockRestore()
+    // A drive that reports no blocks at all reports no free ones either.
+    const g = await withPack(1000)
+    driveReports(0, { blocks: 0 })
+    await g.move(null, g.target)
+    expect(selectRuntimePath(null, g.root)).toBe(g.target)
+  })
+  it("asks the drive of the nearest folder that exists when the new folder does not yet", async () => {
+    const f = await withPack(1000)
+    const target = path.join(f.target, "deep", "new")
+    const asked = driveReports(10)
+    expect(await f.rawMove(null, target)).toMatchObject({
+      type: "failed",
+      recovery: "none",
+      noSpace: { needed: 1008, free: 10 }
+    })
+    expect(asked).toEqual([f.target])
+    // Nothing was made on the way to the new folder.
+    expect(await fs.readdir(f.target)).toEqual([])
+  })
+  it("counts only what the move takes along", async () => {
+    const f = await withPack(1000)
+    await fs.mkdir(path.join(f.source, "Steam"))
+    await fs.writeFile(path.join(f.source, "Steam", "game"), Buffer.alloc(5000))
+    // "save" and "Steam" are not the launcher's and stay where they are.
+    driveReports(999)
+    expect(await f.leaving(f.target)).toMatchObject({
+      type: "failed",
+      noSpace: { needed: 1000, free: 999 }
+    })
+    vi.mocked(fs.statfs).mockRestore()
+    driveReports(1000)
+    expect(await f.leaving(f.target)).toEqual({ type: "relaunching" })
+    expect(await fs.readdir(f.target)).toEqual(["instances"])
+  })
+  it("is no business of a switch, which copies nothing", async () => {
+    const f = await withPack(1000)
+    await fs.writeFile(path.join(f.target, "gdl_conf.db"), "complete")
+    const asked = driveReports(0)
+    await f.move(null, f.target, true)
+    expect(asked).toEqual([])
+    expect(selectRuntimePath(null, f.root)).toBe(f.target)
   })
 })

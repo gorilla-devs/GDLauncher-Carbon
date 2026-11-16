@@ -102,7 +102,7 @@ it("says what a switch opens, and that nothing is moved", async () => {
   expect(byTestId("runtime-unfamiliar")).toBeNull()
   confirm(true).click()
   await flush()
-  expect(f.changeRuntimePath).toHaveBeenCalledWith("/new", true, false)
+  expect(f.changeRuntimePath).toHaveBeenCalledWith("/new", true, false, false)
 })
 
 it("says what a data folder without its database brings back and what it does not", async () => {
@@ -128,7 +128,7 @@ it("keeps the move dialog as it is when the old folder holds only the launcher's
   expect(byTestId("runtime-switch-notes")).toBeNull()
   confirm(false).click()
   await flush()
-  expect(f.changeRuntimePath).toHaveBeenCalledWith("/new", false, false)
+  expect(f.changeRuntimePath).toHaveBeenCalledWith("/new", false, false, false)
 })
 
 it("lists what is not the launcher's and leaves it unless the user chooses to move it", async () => {
@@ -148,20 +148,35 @@ it("lists what is not the launcher's and leaves it unless the user chooses to mo
   expect(radios.map((radio) => radio.checked)).toEqual([true, false])
   confirm(false).click()
   await flush()
-  expect(f.changeRuntimePath).toHaveBeenLastCalledWith("/new", false, false)
+  expect(f.changeRuntimePath).toHaveBeenLastCalledWith(
+    "/new",
+    false,
+    false,
+    false
+  )
 
   radios[1].click()
   await flush()
   expect(radios.map((radio) => radio.checked)).toEqual([false, true])
   confirm(false).click()
   await flush()
-  expect(f.changeRuntimePath).toHaveBeenLastCalledWith("/new", false, true)
+  expect(f.changeRuntimePath).toHaveBeenLastCalledWith(
+    "/new",
+    false,
+    true,
+    false
+  )
 
   radios[0].click()
   await flush()
   confirm(false).click()
   await flush()
-  expect(f.changeRuntimePath).toHaveBeenLastCalledWith("/new", false, false)
+  expect(f.changeRuntimePath).toHaveBeenLastCalledWith(
+    "/new",
+    false,
+    false,
+    false
+  )
 })
 
 it("says one item without a plural and counts the ones it does not list", async () => {
@@ -207,7 +222,7 @@ it("still moves, leaving everything unfamiliar, when the folders cannot be descr
   expect(confirm(false).disabled).toBe(false)
   confirm(false).click()
   await flush()
-  expect(f.changeRuntimePath).toHaveBeenCalledWith("/new", false, false)
+  expect(f.changeRuntimePath).toHaveBeenCalledWith("/new", false, false, false)
 })
 
 it("has every new string in every shipped language", () => {

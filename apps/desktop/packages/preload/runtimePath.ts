@@ -19,9 +19,16 @@ contextBridge.exposeInMainWorld(
   async (
     newPath: string | null,
     switchOnly?: boolean,
-    moveUnfamiliar?: boolean
+    moveUnfamiliar?: boolean,
+    ignoreSpace?: boolean
   ): Promise<RuntimeRelocationResult> =>
-    ipcRenderer.invoke("changeRuntimePath", newPath, switchOnly, moveUnfamiliar)
+    ipcRenderer.invoke(
+      "changeRuntimePath",
+      newPath,
+      switchOnly,
+      moveUnfamiliar,
+      ignoreSpace
+    )
 )
 
 contextBridge.exposeInMainWorld(

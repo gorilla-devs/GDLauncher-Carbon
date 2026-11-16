@@ -83,7 +83,9 @@ declare global {
       newPath: string | null,
       switchOnly?: boolean,
       // Also move what is in the old folder and is not the launcher's.
-      moveUnfamiliar?: boolean
+      moveUnfamiliar?: boolean,
+      // Move although the drive of the new folder reports too little free space.
+      ignoreSpace?: boolean
     ) => Promise<RuntimeRelocationResult>
     // What a switch to this folder would open, and what a move would leave.
     describeRuntimePathChange: (newPath: string) => Promise<RuntimePathChange>

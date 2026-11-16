@@ -34,3 +34,19 @@ it("existing numeric cache size formatting stays compatible", () => {
   expect(formatBytes(1048576)).toBe("1.0 MB")
   expect(formatBytes(1073741824)).toBe("1.00 GB")
 })
+it("what is needed rounds up and what is there rounds down, so the two never read alike", () => {
+  const gb = 1073741824
+  // 12.004 GB needed, 12.001 GB free: both read 12.00 GB when rounded to the nearest.
+  const needed = Math.round(12.004 * gb),
+    free = Math.round(12.001 * gb)
+  expect(formatBytes(needed)).toBe(formatBytes(free))
+  expect(formatBytes(needed, "up")).toBe("12.01 GB")
+  expect(formatBytes(free, "down")).toBe("12.00 GB")
+  expect(formatBytes(1048576 * 3 + 1, "up")).toBe("3.1 MB")
+  expect(formatBytes(1048576 * 4 - 1, "down")).toBe("3.9 MB")
+  expect(formatBytes(1048576 * 3, "up")).toBe("3.0 MB")
+  expect(formatBytes(2049, "up")).toBe("2.1 KB")
+  expect(formatBytes(1023, "up")).toBe("1023 B")
+  expect(formatByteUnit(5, 2n, 0, "up")).toBe("3")
+  expect(formatByteUnit(5, 2n, 0, "down")).toBe("2")
+})

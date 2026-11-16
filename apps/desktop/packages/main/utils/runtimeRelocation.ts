@@ -41,6 +41,8 @@ export type RuntimeRelocationResult =
       refused?: { blockers: RuntimeBlocker[] }
       // Links or special files inside the data folder that a move would not carry over.
       unsupported?: UnsupportedRuntimeEntries
+      // The drive of the new folder is too small for the data (see notEnoughSpace).
+      noSpace?: RuntimeSpaceShortage
     }
 
 export interface RuntimeRelocationOutcome {
@@ -174,6 +176,35 @@ export function unsupportedRuntimeEntries(
     entries: error.entries.slice(0, LEFT_BEHIND_SHOWN),
     count: error.entries.length
   }
+}
+
+/** Bytes the data folder holds, and bytes free on the drive of the new folder. */
+export interface RuntimeSpaceShortage {
+  needed: number
+  free: number
+}
+
+/**
+ * The drive of the new folder has less free space than the data takes. Found
+ * by the scan before the core is stopped, so nothing was stopped or copied.
+ */
+export class NotEnoughSpaceError extends Error {
+  constructor(
+    readonly target: string,
+    readonly shortage: RuntimeSpaceShortage
+  ) {
+    super(
+      `Not enough free space for the move: the data takes ${shortage.needed} bytes and the drive of ${target} has ${shortage.free} bytes free`
+    )
+    this.name = "NotEnoughSpaceError"
+  }
+}
+
+/** What a move that was refused for lack of space needs and what the drive has. */
+export function notEnoughSpace(
+  error: unknown
+): RuntimeSpaceShortage | undefined {
+  return error instanceof NotEnoughSpaceError ? error.shortage : undefined
 }
 
 /** Whether a failed move left the chosen folder holding only a partial copy of the data folder in use. */
@@ -515,6 +546,8 @@ async function markedSource(marker: string): Promise<string | null> {
 interface Entry {
   relative: string
   directory: boolean
+  // Bytes of a file; 0 for a folder.
+  size: number
 }
 export async function inventoryRuntimeTree(
   root: string,
@@ -552,7 +585,12 @@ export async function inventoryRuntimeTree(
       unsupported.push(relative)
       return
     }
-    if (relative) result.push({ relative, directory: st.isDirectory() })
+    if (relative)
+      result.push({
+        relative,
+        directory: st.isDirectory(),
+        size: st.isDirectory() ? 0 : st.size
+      })
     if (st.isDirectory())
       for (const name of await fs.readdir(full)) {
         if (!relative) {
@@ -1055,6 +1093,12 @@ export interface RuntimeRelocationOptions {
    * launcher's where it is, instead of moving it along.
    */
   leaveUnfamiliar?: boolean
+  /**
+   * The user moves although the drive of the new folder reports too little
+   * free space: some network drives and compressing filesystems report less
+   * than they can take.
+   */
+  ignoreSpace?: boolean
   context?: RuntimeDestinationContext
   /**
    * Asks the core, without stopping or freezing anything, whether something
@@ -1086,6 +1130,29 @@ export interface RuntimeRelocationOptions {
   }) => void
 }
 
+/**
+ * Refuses a move whose files do not fit on the drive of `target`, before
+ * anything is stopped or copied. A drive that cannot tell (statfs fails, or
+ * reports no blocks) is left to the copy, which still fails safely.
+ */
+async function assertRoomForMove(target: string, entries: Entry[]) {
+  let free: number
+  try {
+    let folder = target
+    while (!(await statOrMissing(folder))) {
+      if (path.dirname(folder) === folder) return
+      folder = path.dirname(folder)
+    }
+    const stats = await fs.statfs(folder)
+    if (!stats.blocks) return
+    free = stats.bavail * stats.bsize
+  } catch {
+    return
+  }
+  const needed = entries.reduce((sum, entry) => sum + entry.size, 0)
+  if (free < needed) throw new NotEnoughSpaceError(target, { needed, free })
+}
+
 export async function relocateRuntime(
   options: RuntimeRelocationOptions
 ): Promise<RuntimeRelocationOutcome> {
@@ -1114,11 +1181,13 @@ export async function relocateRuntime(
   progress?.({ action: "check", currentName: "", current: 0, total: 0 })
   // A switch copies nothing and never touches the old folder, so what either
   // folder holds does not matter: `check` already refused an unfinished move.
-  if (!options.switchOnly)
-    await inventoryRuntimeTree(source, signal, {
+  if (!options.switchOnly) {
+    const found = await inventoryRuntimeTree(source, signal, {
       liveSource: true,
       leaveUnfamiliar: options.leaveUnfamiliar
     })
+    if (!options.ignoreSpace) await assertRoomForMove(target, found)
+  }
   // Last point where closing the app leaves everything as it was.
   options.interruptible?.commit()
   progress?.({ action: "scan", currentName: "", current: 0, total: 0 })

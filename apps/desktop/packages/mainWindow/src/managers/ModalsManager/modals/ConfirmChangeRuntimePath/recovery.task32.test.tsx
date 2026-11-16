@@ -11,6 +11,7 @@ import {
   forgetUnavailableRuntimePath,
   leftInOldFolder,
   leftPartialCopy,
+  notEnoughSpace,
   unsupportedRuntimeEntries,
   removedPartialCopy,
   relocateRuntime,
@@ -71,7 +72,7 @@ vi.mock("@gd/i18n", () => ({
   useTransContext: () => [(key: string) => key],
   Trans: (p: any) => (
     <span>
-      {/runtime_recovery\.|runtime_relocation_busy\.|_trn_copying_file|_trn_removing_file|_trn_removing_partial_copy|_trn_saving_copy/.test(
+      {/runtime_recovery\.|runtime_no_space\.|runtime_relocation_busy\.|_trn_copying_file|_trn_removing_file|_trn_removing_partial_copy|_trn_saving_copy/.test(
         p.key
       )
         ? translate(p.key, p.options)
@@ -189,6 +190,7 @@ async function fixture(relocate: typeof relocateRuntime = relocateRuntime) {
     leftInOldFolder,
     recordRuntimeMoveNotice,
     leftPartialCopy,
+    notEnoughSpace,
     unsupportedRuntimeEntries,
     removedPartialCopy,
     CURRENT_RUNTIME_PATH: source,
@@ -211,8 +213,8 @@ async function fixture(relocate: typeof relocateRuntime = relocateRuntime) {
   window.getRuntimePath = async () => source
   window.openFolder = vi.fn()
   // These moves take everything in the old folder, as the user may choose to.
-  window.changeRuntimePath = (target, switchOnly) =>
-    move(null, target, switchOnly, true)
+  window.changeRuntimePath = (target, switchOnly, _unfamiliar, ignoreSpace) =>
+    move(null, target, switchOnly, true, ignoreSpace)
   window.describeRuntimePathChange = async () => ({
     found: null,
     unfamiliar: [],
@@ -1296,4 +1298,128 @@ it("does not warn against closing the app while it only checks before the move",
     "java:_trn_checking_runtime_path"
   )
   RTsetProgress(undefined)
+})
+
+/** Every drive answers with `free` bytes free; the fixture's data takes 23. */
+function driveReports(free: number) {
+  const statfs = fs.statfs.bind(fs)
+  vi.spyOn(fs, "statfs").mockImplementation((async (...args: any[]) => ({
+    ...(await (statfs as any)(...args)),
+    bsize: 1,
+    bavail: free
+  })) as any)
+}
+const noSpaceView = () =>
+  document.querySelector<HTMLElement>('[data-testid="relocation-no-space"]')
+const moveAnyway = () =>
+  document.querySelector<HTMLElement>('[data-testid="relocation-move-anyway"]')!
+it("a move that does not fit says what the data needs and what the drive has, with nothing stopped", async () => {
+  const f = await fixture()
+  driveReports(22)
+  await submit(f)
+  expect(noSpaceView()!.textContent).toBe(
+    [
+      "Not enough free space for the move",
+      "Your data needs 23 B. The drive of the new folder has 22 B free.",
+      "general:_trn_dismiss",
+      "Try again",
+      "Move anyway"
+    ].join("")
+  )
+  // Neither the error as main worded it nor the red failure view.
+  expect(document.body.textContent).not.toContain("bytes")
+  expect(document.body.textContent).not.toContain("java:_trn_migration")
+  expect(document.querySelector(".bg-red-900")).toBeNull()
+  expect(f.stop).not.toHaveBeenCalled()
+  expect(runtimeRecoveryRequired()).toBe(false)
+  expect(await fs.readdir(f.target)).toEqual([])
+  button(document.body, "general:_trn_dismiss").click()
+  await settle()
+  expect(c.manager.hasOpenModals()).toBe(false)
+  expect(f.restart).not.toHaveBeenCalled()
+  expect(selectRuntimePath(null, f.root)).toBe(f.source)
+})
+it("Try again checks the space again: refused while it is short, moved once there is room", async () => {
+  const f = await fixture()
+  driveReports(22)
+  await submit(f)
+  button(noSpaceView()!, "Try again").click()
+  await vi.waitFor(() => expect(f.check).toHaveBeenCalledTimes(2))
+  await vi.waitFor(() => expect(isChangingRuntimePath()).toBe(false))
+  await settle()
+  expect(noSpaceView()).not.toBeNull()
+  expect(f.stop).not.toHaveBeenCalled()
+  vi.mocked(fs.statfs).mockRestore()
+  driveReports(23)
+  button(noSpaceView()!, "Try again").click()
+  await vi.waitFor(() => expect(f.restart).toHaveBeenCalledTimes(1))
+  expect(selectRuntimePath(null, f.root)).toBe(f.target)
+})
+it("Move anyway moves although the drive reports too little", async () => {
+  const f = await fixture()
+  driveReports(0)
+  await submit(f)
+  moveAnyway().click()
+  await vi.waitFor(() => expect(f.restart).toHaveBeenCalledTimes(1))
+  expect(selectRuntimePath(null, f.root)).toBe(f.target)
+  expect(await fs.readFile(path.join(f.target, "a"), "utf8")).toBe(
+    "first bytes"
+  )
+})
+it("Move anyway still holds after the move was refused for a running game", async () => {
+  const f = await fixture()
+  driveReports(0)
+  await submit(f)
+  f.stop.mockRejectedValueOnce(
+    new ShutdownRefusedError("Core relocation refused", [...busy])
+  )
+  moveAnyway().click()
+  await vi.waitFor(() => expect(f.stop).toHaveBeenCalledTimes(1))
+  await vi.waitFor(() => expect(isChangingRuntimePath()).toBe(false))
+  await settle()
+  expect(noSpaceView()).toBeNull()
+  expect(document.body.textContent).toContain(
+    javaText["_trn_runtime_relocation_busy.body"]
+  )
+  button(
+    document.body,
+    javaText["_trn_runtime_relocation_busy.try_again"]
+  ).click()
+  await vi.waitFor(() => expect(f.restart).toHaveBeenCalledTimes(1))
+  expect(selectRuntimePath(null, f.root)).toBe(f.target)
+})
+it("an unresolved shutdown keeps its recovery view when the retry finds too little space", async () => {
+  const f = await fixture()
+  f.stop.mockRejectedValue(
+    Error("Shutdown unresolved, live core ownership retained")
+  )
+  await submit(f)
+  expect(c.protection()).toBe(true)
+  driveReports(0)
+  button(document.body, "Retry relocation").click()
+  await vi.waitFor(() => expect(f.check).toHaveBeenCalledTimes(2))
+  await vi.waitFor(() => expect(isChangingRuntimePath()).toBe(false))
+  await settle()
+  expect(noSpaceView()).toBeNull()
+  expect(c.protection()).toBe(true)
+  expect(hasButton("general:_trn_dismiss")).toBe(false)
+  expect(hasButton("Retry relocation")).toBe(true)
+})
+it("sizes that would read alike are rounded apart: up for what is needed, down for what is free", async () => {
+  await fixture()
+  const gb = 1073741824
+  window.changeRuntimePath = async () => ({
+    type: "failed",
+    recovery: "none",
+    message: "worded by main",
+    noSpace: {
+      needed: Math.round(12.004 * gb),
+      free: Math.round(12.001 * gb)
+    }
+  })
+  button(document.body, "confirm_change_confirm_button").click()
+  await vi.waitFor(() => expect(noSpaceView()).not.toBeNull())
+  expect(noSpaceView()!.textContent).toContain(
+    "Your data needs 12.01 GB. The drive of the new folder has 12.00 GB free."
+  )
 })
