@@ -20,6 +20,10 @@ vi.mock("@gd/i18n", () => ({
   )
 }))
 vi.mock("../..", () => ({ useModal: () => ({ closeModal: c.close }) }))
+vi.mock("@/utils/adhelper", () => ({
+  default: { width: 0 },
+  adLayoutMounted: () => false
+}))
 vi.mock("../../ModalLayout", () => ({
   default: (p: any) => (
     <div>

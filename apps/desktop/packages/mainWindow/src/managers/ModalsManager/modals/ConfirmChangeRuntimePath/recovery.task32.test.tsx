@@ -51,7 +51,10 @@ const c = vi.hoisted(() => {
     close: vi.fn(),
     protection: () => false,
     manager: undefined as any,
-    params: new URLSearchParams()
+    params: new URLSearchParams(),
+    // The ad column beside the page, as adhelper reports it.
+    ad: { width: 0 },
+    adLayout: false
   }
 })
 vi.mock("@gd/ui", async () => import("@/task32.fixture"))
@@ -99,7 +102,10 @@ vi.mock("@solidjs/router", () => ({
 vi.mock("@/managers/NavigationManager", () => ({
   useGDNavigate: () => ({ navigate: vi.fn() })
 }))
-vi.mock("@/utils/adhelper", () => ({ default: { width: 0 } }))
+vi.mock("@/utils/adhelper", () => ({
+  default: c.ad,
+  adLayoutMounted: () => c.adLayout
+}))
 vi.mock("@/utils/memoryWarningBridge", () => ({
   listenMemoryWarning: () => () => {}
 }))
@@ -132,6 +138,8 @@ afterEach(async () => {
   dispose = undefined
   setIsChangingRuntimePath(false)
   setRuntimeRecoveryRequired(false)
+  c.ad.width = 0
+  c.adLayout = false
   document.body.textContent = ""
   vi.restoreAllMocks()
   for (const root of roots.splice(0))
@@ -1422,4 +1430,27 @@ it("sizes that would read alike are rounded apart: up for what is needed, down f
   expect(noSpaceView()!.textContent).toContain(
     "Your data needs 12.01 GB. The drive of the new folder has 12.00 GB free."
   )
+})
+it("centres what it says beside the ad column, and in the whole window where there is none", async () => {
+  const overlay = () =>
+    document.querySelector<HTMLElement>('[data-testid="relocation-overlay"]')!
+  c.ad.width = 400
+  c.adLayout = true
+  const f = await fixture()
+  driveReports(0)
+  await submit(f)
+  expect(overlay().contains(noSpaceView())).toBe(true)
+  expect(overlay().style.paddingRight).toBe("432px")
+  button(document.body, "general:_trn_dismiss").click()
+  await settle()
+  dispose?.()
+  document.body.textContent = ""
+  const again = document.createElement("div")
+  again.id = "overlay"
+  document.body.append(again)
+  // A page without the ad column, as the login page is.
+  c.adLayout = false
+  const g = await fixture()
+  await submit(g)
+  expect(overlay().style.paddingRight).toBe("")
 })

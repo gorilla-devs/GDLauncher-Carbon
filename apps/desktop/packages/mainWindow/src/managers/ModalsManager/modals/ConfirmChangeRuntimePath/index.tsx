@@ -18,6 +18,7 @@ import type {
   UnsupportedRuntimeEntries
 } from "../../../../../../main/utils/runtimeRelocation"
 import { formatBytes } from "@/utils/formatBytes"
+import adSize, { adLayoutMounted } from "@/utils/adhelper"
 import { DeletionNoteBox, DeletionNoteLine } from "../DeletionNote"
 import {
   isChangingRuntimePath,
@@ -460,6 +461,13 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
         <Portal mount={document.getElementById("overlay")!}>
           <div
             class="z-9999 fixed inset-0 flex flex-col items-center justify-center bg-opacity-65 p-8 backdrop-blur-sm"
+            // The ad column stays on top at the right: centre in what is left.
+            style={{
+              "padding-right": adLayoutMounted()
+                ? `${adSize.width + 32}px`
+                : undefined
+            }}
+            data-testid="relocation-overlay"
             classList={{
               "bg-black": !migrationError() || !!busy() || notMoved(),
               "bg-red-900": !!migrationError() && !busy() && !notMoved()
