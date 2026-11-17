@@ -559,6 +559,18 @@ impl VisualTask {
             })
     }
 
+    /// Where the step with this name got to, complete or not.
+    #[cfg(test)]
+    pub fn subtask_progress(&self, name: &Translation) -> Option<Progress> {
+        self.subtasks
+            .lock()
+            .expect("this mutex can never witness a panic")
+            .iter()
+            .map(|subtask| subtask.borrow())
+            .find(|subtask| &subtask.name == name)
+            .map(|subtask| subtask.progress)
+    }
+
     pub async fn make_domain_task(&self, id: VisualTaskId) -> domain::Task {
         let (name, state) = {
             let data = self.data.read().await;

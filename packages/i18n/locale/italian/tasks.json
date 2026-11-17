@@ -15,6 +15,7 @@
   "_trn_instance_task_launch_request_addon_metadata": "Recupero metadati componente aggiuntivo",
   "_trn_instance_task_launch_extract_modpack_files": "Estrazione file modpack",
   "_trn_instance_task_launch_download_modpack_files": "Download file modpack",
+  "_trn_instance_task_launch_checking_modpack_files": "Verifica file modpack",
   "_trn_instance_task_launch_request_modpack": "Recupero dettagli modpack",
   "_trn_instance_task_launch_download_modpack": "Download modpack",
   "_trn_instance_task_launch_download_java": "Download Java",

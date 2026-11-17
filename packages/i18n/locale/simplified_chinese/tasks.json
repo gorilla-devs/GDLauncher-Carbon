@@ -15,6 +15,7 @@
   "_trn_instance_task_launch_request_addon_metadata": "正在获取附加组件元数据",
   "_trn_instance_task_launch_extract_modpack_files": "正在解压整合包文件",
   "_trn_instance_task_launch_download_modpack_files": "正在下载整合包文件",
+  "_trn_instance_task_launch_checking_modpack_files": "正在检查整合包文件",
   "_trn_instance_task_launch_request_modpack": "正在获取整合包详情",
   "_trn_instance_task_launch_download_modpack": "正在下载整合包",
   "_trn_instance_task_launch_download_java": "正在下载 Java",

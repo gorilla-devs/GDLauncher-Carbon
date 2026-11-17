@@ -29,6 +29,7 @@ pub enum Translation {
     InstanceTaskRequestModloaderInfo,
     InstanceTaskRequestMinecraftFiles,
     InstanceTaskLaunchCheckingFiles,
+    InstanceTaskLaunchCheckingModpackFiles,
     InstanceTaskLaunchDownloadFiles,
     InstanceTaskGeneratingPackInfo,
     InstanceTaskFillCache,

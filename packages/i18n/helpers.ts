@@ -203,6 +203,7 @@ export function getTaskTranslationKey(taskType: string): NamespacedTranslationKe
     'InstanceTaskRequestModloaderInfo': 'tasks:_trn_instance_task_request_modloader_info',
     'InstanceTaskRequestMinecraftFiles': 'tasks:_trn_instance_task_request_minecraft_files',
     'InstanceTaskLaunchCheckingFiles': 'tasks:_trn_instance_task_launch_checking_files',
+    'InstanceTaskLaunchCheckingModpackFiles': 'tasks:_trn_instance_task_launch_checking_modpack_files',
     'InstanceTaskLaunchDownloadFiles': 'tasks:_trn_instance_task_launch_download_files',
     'InstanceTaskGeneratingPackInfo': 'tasks:_trn_instance_task_generating_pack_info',
     'InstanceTaskFillCache': 'tasks:_trn_instance_task_fill_cache',

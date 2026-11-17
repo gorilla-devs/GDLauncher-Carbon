@@ -15,6 +15,7 @@
   "_trn_instance_task_launch_request_addon_metadata": "Запрос метаданных дополнений...",
   "_trn_instance_task_launch_extract_modpack_files": "Распаковка файлов модпака...",
   "_trn_instance_task_launch_download_modpack_files": "Загрузка файлов модпака...",
+  "_trn_instance_task_launch_checking_modpack_files": "Проверка файлов модпака...",
   "_trn_instance_task_launch_request_modpack": "Запрос информации о модпаке...",
   "_trn_instance_task_launch_download_modpack": "Загрузка модпака...",
   "_trn_instance_task_launch_download_java": "Загрузка Java...",

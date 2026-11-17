@@ -1,14 +1,15 @@
 //! Produces [`apply_plan::DiskState`] from the real filesystem for a given
-//! universe of packinfo-style paths, and takes a full disk snapshot of an
-//! instance's data directory as a [`PackInfo`] for the repair skip-oracle.
+//! universe of packinfo-style paths, and reads the hashes of an installed
+//! pack's files as a [`PackInfo`] for the repair skip-oracle.
 //!
-//! Neither function consults any pack metadata — they only look at what is
-//! actually on disk right now. Callers combine their output with `old`/
-//! `target` packinfos in [`apply_plan::plan`](super::apply_plan::plan).
+//! Both are given the paths to look at and report what is actually on disk
+//! right now; neither reads anything else in the instance folder. Callers
+//! combine their output with `old`/`target` packinfos in
+//! [`apply_plan::plan`](super::apply_plan::plan).
 
 use anyhow::Context;
 use futures::{StreamExt, TryStreamExt};
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
 #[cfg(test)]
 use std::time::SystemTime;
@@ -40,31 +41,7 @@ pub async fn scan_disk_state(
     let mut futures = Vec::with_capacity(universe.len());
 
     for path in universe {
-        // `strip_prefix` rather than `[1..]`: char-boundary-safe (an empty
-        // key or one starting with a multibyte character would panic on a
-        // byte-index slice), and it gives `None` instead of a garbage
-        // substring for a key that doesn't actually start with '/'.
-        let rel = path
-            .strip_prefix('/')
-            .ok_or_else(|| anyhow::anyhow!("packinfo key '{path}' must start with '/'"))?;
-        // Re-checked here rather than trusted from `parse_packinfo`: a `..`
-        // segment survives `Path::join` as a literal component, and
-        // `Path::starts_with` below compares components lexically without
-        // ever resolving `..` — so `data_path.join("mods/../../evil")`
-        // would otherwise pass the containment check below even though the
-        // real, OS-resolved path escapes `data_path` entirely.
-        if super::packinfo::has_dotdot_segment(path) {
-            anyhow::bail!("packinfo key '{path}' contains a '..' path segment");
-        }
-        let disk_path = data_path.join(rel);
-        // Belt-and-braces even though `parse_packinfo` already rejects a
-        // doubled leading '/': `Path::join` with an absolute argument
-        // REPLACES the base entirely, so a key like "//tmp/esc" (whose tail
-        // after stripping one '/' is itself still absolute) would otherwise
-        // resolve to a path outside `data_path` — never trust a join alone.
-        if !disk_path.starts_with(data_path) {
-            anyhow::bail!("packinfo key '{path}' escapes the instance data dir");
-        }
+        let disk_path = tracked_path(data_path, path)?;
         let key = path.clone();
 
         futures.push(async move {
@@ -101,6 +78,37 @@ pub async fn scan_disk_state(
         states,
         coexisting_disabled_twin_md5,
     })
+}
+
+/// Where the file of a pack record key is in the instance, refusing a key
+/// that leads outside it. The record is a file anyone can edit.
+fn tracked_path(data_path: &Path, key: &str) -> anyhow::Result<PathBuf> {
+    // `strip_prefix` rather than `[1..]`: char-boundary-safe (an empty
+    // key or one starting with a multibyte character would panic on a
+    // byte-index slice), and it gives `None` instead of a garbage
+    // substring for a key that doesn't actually start with '/'.
+    let rel = key
+        .strip_prefix('/')
+        .ok_or_else(|| anyhow::anyhow!("packinfo key '{key}' must start with '/'"))?;
+    // Re-checked here rather than trusted from `parse_packinfo`: a `..`
+    // segment survives `Path::join` as a literal component, and
+    // `Path::starts_with` below compares components lexically without
+    // ever resolving `..` — so `data_path.join("mods/../../evil")`
+    // would otherwise pass the containment check below even though the
+    // real, OS-resolved path escapes `data_path` entirely.
+    if super::packinfo::has_dotdot_segment(key) {
+        anyhow::bail!("packinfo key '{key}' contains a '..' path segment");
+    }
+    let disk_path = data_path.join(rel);
+    // Belt-and-braces even though `parse_packinfo` already rejects a
+    // doubled leading '/': `Path::join` with an absolute argument
+    // REPLACES the base entirely, so a key like "//tmp/esc" (whose tail
+    // after stripping one '/' is itself still absolute) would otherwise
+    // resolve to a path outside `data_path` — never trust a join alone.
+    if !disk_path.starts_with(data_path) {
+        anyhow::bail!("packinfo key '{key}' escapes the instance data dir");
+    }
+    Ok(disk_path)
 }
 
 /// Probe the data directory itself (case policy can be per-directory).
@@ -194,11 +202,19 @@ fn disabled_sibling(path: &Path) -> PathBuf {
 const UNAVAILABLE_LINK: &str = "is a link to a file or folder that cannot be found. Reconnect \
      the drive or folder it points to, or remove the link, then try again.";
 
-/// Opens `path` and md5-hashes it, or `Ok(None)` if it doesn't exist —
+/// Opens the file at a tracked path, or `Ok(None)` if it doesn't exist —
 /// including when an intermediate directory component is missing.
-pub(crate) async fn probe_md5(path: &Path) -> anyhow::Result<Option<[u8; 16]>> {
-    let mut file = match tokio::fs::File::open(path).await {
-        Ok(file) => file,
+async fn open_tracked(path: &Path) -> anyhow::Result<Option<tokio::fs::File>> {
+    // Asked before opening: opening a pipe waits for its other end.
+    if let Ok(metadata) = tokio::fs::metadata(path).await {
+        anyhow::ensure!(
+            metadata.is_file(),
+            "Could not read {}: it is not a regular file",
+            path.display()
+        );
+    }
+    match tokio::fs::File::open(path).await {
+        Ok(file) => Ok(Some(file)),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             // A dangling entry (including an ancestor link) is not verified
             // absence. Keep required-path failures visible to the fresh scan.
@@ -226,13 +242,17 @@ pub(crate) async fn probe_md5(path: &Path) -> anyhow::Result<Option<[u8; 16]>> {
                     }
                 }
             }
-            return Ok(None);
+            Ok(None)
         }
-        Err(e) => {
-            return Err(anyhow::Error::new(e).context(format!("Could not open {}", path.display())));
-        }
-    };
+        Err(e) => Err(anyhow::Error::new(e).context(format!("Could not open {}", path.display()))),
+    }
+}
 
+/// The md5 of the file at a tracked path, or `Ok(None)` if it doesn't exist.
+pub(crate) async fn probe_md5(path: &Path) -> anyhow::Result<Option<[u8; 16]>> {
+    let Some(mut file) = open_tracked(path).await? else {
+        return Ok(None);
+    };
     let mut md5 = Md5::new();
     carbon_scheduler::buffered_digest(&mut file, |chunk| {
         md5.update(&chunk);
@@ -243,357 +263,80 @@ pub(crate) async fn probe_md5(path: &Path) -> anyhow::Result<Option<[u8; 16]>> {
     Ok(Some(md5.finalize().into()))
 }
 
-/// Repair skip-oracle: full scan of the instance data dir, producing both a
-/// [`PackInfo`] (md5+sha512, keyed under enabled names with `.disabled`
-/// stripped, skipping `/saves` and `.install_audit` — same as
-/// [`scan_dir`](super::packinfo::scan_dir)) for the skip-optimising prep
-/// functions, and a [`DiskScan`] with Present/Disabled/twin semantics
-/// identical to [`scan_disk_state`] over that same directory. Both are
-/// derived from one walk so a repair's
-/// [`super::super::run::modpack::process_modpack_staging`] can reuse the
-/// `DiskScan` half instead of paying for a second full-tree hash of the
-/// instance data dir. When both `X` and `X.disabled` exist the ENABLED
-/// file's hashes win in both outputs (deterministic, unlike scan_dir's racy
-/// insert).
+/// [`probe_md5`] with both hashes a pack record keeps.
+async fn probe_hashes(path: &Path) -> anyhow::Result<Option<FileHashes>> {
+    let Some(mut file) = open_tracked(path).await? else {
+        return Ok(None);
+    };
+    let mut sha512 = Sha512::new();
+    let mut md5 = Md5::new();
+    carbon_scheduler::buffered_digest(&mut file, |chunk| {
+        sha512.update(&chunk);
+        md5.update(&chunk);
+    })
+    .await
+    .with_context(|| format!("Could not read {}", path.display()))?;
+
+    Ok(Some(FileHashes {
+        sha512: sha512.finalize().into(),
+        md5: md5.finalize().into(),
+    }))
+}
+
+/// What a Repair can skip downloading: the hashes, read now, of the files
+/// the installed pack record lists (`recorded`, packinfo-style keys). A file
+/// is keyed under its enabled name whether it is switched off (`.disabled`)
+/// or not, and the enabled file's hashes win when both exist. A listed file
+/// that is gone has no entry, so it is downloaded. One that is there but
+/// cannot be read fails the Repair, as it fails the apply's own scan
+/// ([`scan_disk_state`]).
 ///
-/// `/saves` and `.install_audit` are never hashed and never appear in the
-/// returned `PackInfo`, exactly as before — but a file under either that the
-/// walk finds still needs to land in `DiskScan`: a modpack override can
-/// legitimately ship a file under `/saves` (see [`apply_plan::plan`]'s own
-/// doc), so its planner needs to know whether such a path exists on disk at
-/// all. That branch of the planner only ever inspects the `DiskState`
-/// variant for a `/saves` path (`Present`/`Disabled`/`Missing`), never the
-/// md5 carried by the first two, so a placeholder stands in for the real
-/// hash here — recording existence, which the walk already observed for
-/// free, without opening and hashing a save that can be many gigabytes,
-/// which would defeat the entire point of this function producing a
-/// `DiskScan` a repair can reuse in the first place.
-/// A failed optional oracle observation. UTF-8 paths remain attributable until
-/// the full old/target universe is known; invalid names cannot match a manifest.
-#[derive(Debug)]
-pub struct OracleDiagnostic {
-    pub path: Option<String>,
-    pub message: String,
-}
-
-pub fn validate_oracle_diagnostics(
-    diagnostics: &[OracleDiagnostic],
-    universe: &BTreeSet<String>,
-    insensitive: bool,
-) -> anyhow::Result<()> {
-    for diagnostic in diagnostics {
-        let Some(path) = &diagnostic.path else {
-            continue;
-        };
-        let normalize = |p: &str| {
-            let p = if insensitive {
-                p.to_lowercase()
-            } else {
-                p.to_owned()
-            };
-            p.strip_suffix(".disabled")
-                .unwrap_or(&p)
-                .trim_end_matches('/')
-                .to_owned()
-        };
-        let path = normalize(path);
-        if path.is_empty()
-            || universe.iter().any(|key| {
-                let key = normalize(key);
-                key == path
-                    || key.starts_with(&(path.clone() + "/"))
-                    || path.starts_with(&(key + "/"))
-            })
-        {
-            anyhow::bail!(
-                "Could not read {} in the instance folder: {}",
-                diagnostic.path.as_deref().unwrap_or("/"),
-                diagnostic.message
-            );
-        }
-    }
-    Ok(())
-}
-
-pub async fn scan_instance_as_packinfo(data_path: &Path) -> anyhow::Result<(PackInfo, DiskScan)> {
-    let (info, scan, _) = scan_repair_oracle(data_path).await?;
-    Ok((info, scan))
-}
-
-/// A folder the repair walk is inside, to spot a folder link that leads back
-/// into it.
-#[derive(Clone)]
-struct WalkedFolder {
-    path: PathBuf,
-    /// Where it really is. None on a volume that cannot report final paths
-    /// (some Windows RAM disks and virtual drives); such a folder is compared
-    /// by file identity instead.
-    resolved: Option<PathBuf>,
-}
-
-impl WalkedFolder {
-    fn new(path: &Path) -> Self {
-        let resolved = match resolve_folder(path) {
-            Ok(resolved) => Some(resolved),
-            Err(error) => {
-                tracing::debug!(path = %path.display(), "repair oracle: folder path not resolved: {error}");
-                None
-            }
-        };
-        Self {
-            path: path.to_owned(),
-            resolved,
-        }
-    }
-
-    fn is(&self, other: &Self) -> bool {
-        match (&self.resolved, &other.resolved) {
-            (Some(resolved), Some(other)) => resolved == other,
-            _ => same_file::is_same_file(&self.path, &other.path).unwrap_or(false),
-        }
-    }
-}
-
-fn resolve_folder(path: &Path) -> std::io::Result<PathBuf> {
-    #[cfg(test)]
-    if unresolvable::contains(path) {
-        return Err(std::io::ErrorKind::Unsupported.into());
-    }
-    std::fs::canonicalize(path)
-}
-
-/// Folders whose final path the test volume "cannot report".
-#[cfg(test)]
-mod unresolvable {
-    use std::collections::HashSet;
-    use std::path::{Path, PathBuf};
-    use std::sync::{LazyLock, Mutex};
-
-    static PATHS: LazyLock<Mutex<HashSet<PathBuf>>> = LazyLock::new(Default::default);
-
-    pub(super) fn add(path: &Path) {
-        PATHS.lock().unwrap().insert(path.to_owned());
-    }
-
-    pub(super) fn contains(path: &Path) -> bool {
-        PATHS.lock().unwrap().contains(path)
-    }
-}
-
+/// Nothing outside the record is read. Only pack paths are ever looked up in
+/// the result, and the rest of an instance folder (backups, map caches,
+/// screenshots, linked folders) can be tens of GB. Saves are never hashed.
+///
+/// `checked` gets the number of files done so far and the number to do.
 pub async fn scan_repair_oracle(
     data_path: &Path,
-) -> anyhow::Result<(PackInfo, DiskScan, Vec<OracleDiagnostic>)> {
-    let mut diagnostics = Vec::new();
-    let mut futures = Vec::new();
-    let mut unhashed_presence: Vec<(String, bool)> = Vec::new();
-    let mut pending = vec![(
-        data_path.to_owned(),
-        std::fs::read_dir(data_path)?,
-        vec![WalkedFolder::new(data_path)],
-    )];
-    while let Some((directory, reader, ancestors)) = pending.pop() {
-        for entry in reader {
-            let entry = match entry {
-                Ok(entry) => entry,
-                Err(error) => {
-                    let relative = directory.strip_prefix(data_path)?;
-                    diagnostics.push(OracleDiagnostic {
-                        path: relative
-                            .to_str()
-                            .map(|p| format!("/{}", p.replace('\\', "/"))),
-                        message: error.to_string(),
-                    });
-                    continue;
-                }
-            };
-            let path = entry.path();
-            let relative = path.strip_prefix(data_path)?;
-            let Some(relative) = relative.to_str() else {
-                diagnostics.push(OracleDiagnostic {
-                    path: None,
-                    message: format!("non UTF-8 path: {relative:?}"),
-                });
-                continue;
-            };
-            let relative_path = format!("/{}", relative.replace('\\', "/"));
-            let metadata = match std::fs::metadata(&path) {
-                Ok(metadata) => metadata,
-                Err(error) => {
-                    let link = error.kind() == std::io::ErrorKind::NotFound
-                        && std::fs::symlink_metadata(&path)
-                            .is_ok_and(|metadata| metadata.file_type().is_symlink());
-                    diagnostics.push(OracleDiagnostic {
-                        path: Some(relative_path),
-                        message: if link {
-                            format!("it {UNAVAILABLE_LINK}")
-                        } else {
-                            error.to_string()
-                        },
-                    });
-                    continue;
-                }
-            };
-            if metadata.is_dir() {
-                let folder = WalkedFolder::new(&path);
-                let result = if ancestors.iter().any(|ancestor| ancestor.is(&folder)) {
-                    Err(std::io::Error::other("directory link cycle"))
-                } else {
-                    std::fs::read_dir(&path).map(|reader| {
-                        let mut next = ancestors.clone();
-                        next.push(folder);
-                        (path.clone(), reader, next)
-                    })
-                };
-                match result {
-                    Ok(next) => pending.push(next),
-                    Err(error) => diagnostics.push(OracleDiagnostic {
-                        path: Some(relative_path),
-                        message: error.to_string(),
-                    }),
-                }
-                continue;
-            }
-            if !metadata.is_file() {
-                diagnostics.push(OracleDiagnostic {
-                    path: Some(relative_path),
-                    message: "not a regular file".into(),
-                });
-                continue;
-            }
-            let from_disabled = relative_path.ends_with(".disabled");
-            let key = relative_path
-                .strip_suffix(".disabled")
-                .unwrap_or(&relative_path)
-                .to_owned();
-            if apply_plan::is_saves_path(&relative_path)
-                || resolves_into_saves(data_path, &path)
-                || relative_path.starts_with("/.install_audit")
-            {
-                unhashed_presence.push((key, from_disabled));
-                continue;
-            }
-            futures.push(async move {
-                let result = async {
-                    let mut file = tokio::fs::File::open(path).await?;
-                    let mut sha512 = Sha512::new();
-                    let mut md5 = Md5::new();
-                    carbon_scheduler::buffered_digest(&mut file, |chunk| {
-                        sha512.update(&chunk);
-                        md5.update(&chunk);
-                    })
-                    .await?;
-                    Ok::<_, anyhow::Error>((
-                        key,
-                        FileHashes {
-                            sha512: sha512.finalize().into(),
-                            md5: md5.finalize().into(),
-                        },
-                        from_disabled,
-                    ))
-                }
-                .await;
-                (relative_path, result)
-            });
-        }
-    }
-    let mut results = Vec::new();
-    for (path, result) in futures::stream::iter(futures)
-        .buffer_unordered(8)
-        .collect::<Vec<_>>()
-        .await
-    {
-        match result {
-            Ok(value) => results.push(value),
-            Err(error) => diagnostics.push(OracleDiagnostic {
-                path: Some(path),
-                message: error.to_string(),
-            }),
-        }
-    }
-    for diagnostic in &diagnostics {
-        tracing::warn!(path = ?diagnostic.path, "repair oracle: {}", diagnostic.message);
-    }
-
-    // Enabled-wins, order-independent: a `.disabled`-sourced insertion never
-    // overwrites an already-present entry unless that entry itself came from
-    // a `.disabled` twin (tracked in `disabled_backed`); an enabled-sourced
-    // insertion always overwrites, regardless of what (if anything) preceded
-    // it. This is deterministic regardless of the walker's/readdir's
-    // discovery order, unlike `scan_dir`'s plain `collect()`.
-    let mut files: HashMap<String, FileHashes> = HashMap::new();
-    let mut disabled_backed: HashSet<String> = HashSet::new();
-
-    for (key, hashes, from_disabled) in &results {
-        if *from_disabled {
-            if !files.contains_key(key) || disabled_backed.contains(key) {
-                files.insert(key.clone(), hashes.clone());
-                disabled_backed.insert(key.clone());
-            }
-        } else {
-            files.insert(key.clone(), hashes.clone());
-            disabled_backed.remove(key);
-        }
-    }
-
-    // `DiskScan` companion to `files` above, built from the same walk.
-    // Tracked via separate enabled/disabled md5 maps rather than reusing
-    // `files`/`disabled_backed`: a coexisting `.disabled` twin's md5 is
-    // exactly what `disabled_backed`'s bookkeeping discards once an enabled
-    // copy wins the key above, but `DiskScan::coexisting_disabled_twin_md5`
-    // needs that value regardless. Placeholder md5s from `unhashed_presence`
-    // (see this function's own doc) are folded in via `or_insert` only,
-    // never able to clobber a real hashed value — a path is either under
-    // `/saves`/`.install_audit` or hashed, never both, so this can't happen
-    // in practice, but `or_insert` keeps that an explicit ordering rather
-    // than an assumed invariant.
-    const UNHASHED_PRESENCE_PLACEHOLDER: [u8; 16] = [0xEE; 16];
-
-    let mut enabled_md5: HashMap<String, [u8; 16]> = HashMap::new();
-    let mut disabled_md5: HashMap<String, [u8; 16]> = HashMap::new();
-    for (key, hashes, from_disabled) in &results {
-        if *from_disabled {
-            disabled_md5.entry(key.clone()).or_insert(hashes.md5);
-        } else {
-            enabled_md5.entry(key.clone()).or_insert(hashes.md5);
-        }
-    }
-    for (key, from_disabled) in &unhashed_presence {
-        if *from_disabled {
-            disabled_md5
-                .entry(key.clone())
-                .or_insert(UNHASHED_PRESENCE_PLACEHOLDER);
-        } else {
-            enabled_md5
-                .entry(key.clone())
-                .or_insert(UNHASHED_PRESENCE_PLACEHOLDER);
-        }
-    }
-
-    let mut states = HashMap::with_capacity(enabled_md5.len() + disabled_md5.len());
-    let mut coexisting_disabled_twin_md5 = HashMap::new();
-    for (key, &md5) in &enabled_md5 {
-        states.insert(key.clone(), apply_plan::DiskState::Present { md5 });
-        if let Some(&twin_md5) = disabled_md5.get(key) {
-            coexisting_disabled_twin_md5.insert(key.clone(), twin_md5);
-        }
-    }
-    for (key, &md5) in &disabled_md5 {
-        if enabled_md5.contains_key(key) {
-            // Already recorded as `Present` above; its own md5 is in
-            // `coexisting_disabled_twin_md5`, not a second `states` entry.
+    recorded: &BTreeSet<String>,
+    checked: impl Fn(u32, u32),
+) -> anyhow::Result<PackInfo> {
+    let saves = std::fs::canonicalize(data_path.join("saves")).ok();
+    let mut paths = Vec::with_capacity(recorded.len());
+    for key in recorded {
+        let path = tracked_path(data_path, key)?;
+        // Saves, under their own name or through a link, are never hashed.
+        if key.starts_with("/.install_audit")
+            || saves
+                .as_deref()
+                .is_some_and(|saves| resolves_into(saves, &path))
+        {
             continue;
         }
-        states.insert(key.clone(), apply_plan::DiskState::Disabled { md5 });
+        paths.push((key.clone(), path));
     }
 
-    Ok((
-        PackInfo { files },
-        DiskScan {
-            states,
-            coexisting_disabled_twin_md5,
-        },
-        diagnostics,
-    ))
+    let total = paths.len() as u32;
+    checked(0, total);
+    let mut probes = futures::stream::iter(paths.into_iter().map(|(key, path)| async move {
+        let hashes = match probe_hashes(&path).await? {
+            Some(hashes) => Some(hashes),
+            None => probe_hashes(&disabled_sibling(&path)).await?,
+        };
+        Ok::<_, anyhow::Error>((key, hashes))
+    }))
+    .buffer_unordered(8);
+
+    let mut files = HashMap::new();
+    let mut done = 0;
+    while let Some((key, hashes)) = probes.try_next().await? {
+        done += 1;
+        checked(done, total);
+        if let Some(hashes) = hashes {
+            files.insert(key, hashes);
+        }
+    }
+    Ok(PackInfo { files })
 }
 
 #[cfg(test)]
@@ -606,92 +349,6 @@ mod tests {
 
     fn md5_of(bytes: &[u8]) -> [u8; 16] {
         Md5::digest(bytes).into()
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn task08_oracle_continues_after_unrelated_dangling_link() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("logs")).unwrap();
-        std::fs::create_dir_all(dir.path().join("mods")).unwrap();
-        std::fs::write(dir.path().join("mods/required.jar"), b"tracked").unwrap();
-        std::os::unix::fs::symlink("absent", dir.path().join("logs/old-output")).unwrap();
-        let (info, _) = scan_instance_as_packinfo(dir.path()).await.unwrap();
-        assert_eq!(info.files["/mods/required.jar"].md5, md5_of(b"tracked"));
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn task08_oracle_continues_after_unrelated_non_utf8_name() {
-        use std::os::unix::ffi::OsStringExt;
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("logs")).unwrap();
-        std::fs::write(dir.path().join("tracked"), b"tracked").unwrap();
-        match std::fs::write(
-            dir.path()
-                .join("logs")
-                .join(std::ffi::OsString::from_vec(vec![255])),
-            b"log",
-        ) {
-            Ok(()) => {}
-            // APFS and HFS+ store names as UTF-8 and refuse other bytes with
-            // EILSEQ, so such a name cannot exist there to be skipped.
-            #[cfg(target_vendor = "apple")]
-            Err(error) if error.raw_os_error() == Some(libc::EILSEQ) => return,
-            Err(error) => panic!("creating the non-UTF-8 name failed: {error}"),
-        }
-        let (info, _) = scan_instance_as_packinfo(dir.path()).await.unwrap();
-        assert_eq!(info.files["/tracked"].md5, md5_of(b"tracked"));
-    }
-
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn task08_required_oracle_faults_and_normal_links_remain_visible() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir(dir.path().join("mods")).unwrap();
-        std::fs::create_dir(dir.path().join("logs")).unwrap();
-        std::fs::write(dir.path().join("mods/good.jar"), b"good").unwrap();
-        std::os::unix::fs::symlink("good.jar", dir.path().join("mods/alias.jar")).unwrap();
-        std::os::unix::fs::symlink("absent", dir.path().join("mods/required.jar.disabled"))
-            .unwrap();
-        std::os::unix::fs::symlink("absent", dir.path().join("logs/unrelated")).unwrap();
-        let (info, _, diagnostics) = scan_repair_oracle(dir.path()).await.unwrap();
-        assert_eq!(info.files["/mods/alias.jar"].md5, md5_of(b"good"));
-        assert_eq!(diagnostics.len(), 2);
-        assert!(
-            validate_oracle_diagnostics(&diagnostics, &universe(&["/mods/good.jar"]), false)
-                .is_ok()
-        );
-        assert!(
-            validate_oracle_diagnostics(&diagnostics, &universe(&["/mods/required.jar"]), false)
-                .is_err()
-        );
-        assert!(
-            validate_oracle_diagnostics(&diagnostics, &universe(&["/MODS/REQUIRED.JAR"]), true)
-                .is_err()
-        );
-        assert!(
-            scan_repair_oracle(&dir.path().join("missing-root"))
-                .await
-                .is_err()
-        );
-    }
-
-    #[test]
-    fn task08_oracle_ancestor_and_unattributable_root_faults_refuse() {
-        let fault = |path: &str| OracleDiagnostic {
-            path: Some(path.into()),
-            message: "permission denied".into(),
-        };
-        assert!(
-            validate_oracle_diagnostics(&[fault("/mods")], &universe(&["/mods/a.jar"]), false)
-                .is_err()
-        );
-        assert!(validate_oracle_diagnostics(&[fault("/")], &universe(&[]), false).is_err());
-        assert!(
-            validate_oracle_diagnostics(&[fault("/logs")], &universe(&["/mods/a.jar"]), false)
-                .is_ok()
-        );
     }
 
     #[cfg(unix)]
@@ -731,44 +388,13 @@ mod tests {
         assert!(message.contains("Reconnect the drive"), "{error:#}");
         assert!(message.contains("remove the link"), "{error:#}");
 
-        let (_, _, diagnostics) = scan_repair_oracle(dir.path()).await.unwrap();
-        let message = validate_oracle_diagnostics(&diagnostics, &tracked, false)
+        let message = scan_repair_oracle(dir.path(), &tracked, |_, _| {})
+            .await
             .unwrap_err()
             .to_string();
-        assert!(message.contains("/resourcepacks"), "{message}");
+        assert!(message.contains(&link.display().to_string()), "{message}");
         assert!(message.contains("Reconnect the drive"), "{message}");
         assert!(message.contains("remove the link"), "{message}");
-    }
-
-    /// Some Windows volumes (RAM disks, drives the Mount Manager does not
-    /// map) cannot report a folder's final path. The repair scan still reads
-    /// every file there, and still stops at a folder link that leads back
-    /// into a folder it is in.
-    #[cfg(unix)]
-    #[tokio::test]
-    async fn the_repair_scan_works_where_folder_paths_cannot_be_resolved() {
-        for root_resolves in [false, true] {
-            let dir = tempfile::tempdir().unwrap();
-            let data = dir.path().join("instance");
-            std::fs::create_dir_all(data.join("mods/nested")).unwrap();
-            std::fs::write(data.join("mods/a.jar"), b"a").unwrap();
-            std::fs::write(data.join("mods/nested/b.jar"), b"b").unwrap();
-            std::os::unix::fs::symlink(&data, data.join("mods/loop")).unwrap();
-            if !root_resolves {
-                unresolvable::add(&data);
-            }
-            for folder in ["mods", "mods/nested", "mods/loop"] {
-                unresolvable::add(&data.join(folder));
-            }
-            let (info, scan, diagnostics) = scan_repair_oracle(&data).await.unwrap();
-            assert_eq!(info.files.len(), 2, "{root_resolves}");
-            assert_eq!(info.files["/mods/a.jar"].md5, md5_of(b"a"));
-            assert_eq!(info.files["/mods/nested/b.jar"].md5, md5_of(b"b"));
-            assert_eq!(scan.states.len(), 2, "{root_resolves}");
-            assert_eq!(diagnostics.len(), 1, "{root_resolves}");
-            assert_eq!(diagnostics[0].path.as_deref(), Some("/mods/loop"));
-            assert_eq!(diagnostics[0].message, "directory link cycle");
-        }
     }
 
     // --- scan_disk_state --------------------------------------------------
@@ -941,213 +567,152 @@ mod tests {
         );
     }
 
-    // --- scan_instance_as_packinfo -----------------------------------------
+    // --- scan_repair_oracle -------------------------------------------------
 
-    #[tokio::test]
-    async fn keys_carry_a_leading_slash() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("a.jar"), b"hi").unwrap();
-
-        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
-
-        assert!(
-            packinfo.files.contains_key("/a.jar"),
-            "got keys: {:?}",
-            packinfo.files.keys().collect::<Vec<_>>()
-        );
+    fn sha512_of(bytes: &[u8]) -> [u8; 64] {
+        Sha512::digest(bytes).into()
     }
 
-    #[tokio::test]
-    async fn disabled_suffix_is_stripped_from_the_key() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("a.jar.disabled"), b"hi").unwrap();
-
-        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
-
-        assert!(packinfo.files.contains_key("/a.jar"));
-        assert!(!packinfo.files.contains_key("/a.jar.disabled"));
+    async fn oracle(data: &Path, recorded: &[&str]) -> anyhow::Result<PackInfo> {
+        scan_repair_oracle(data, &universe(recorded), |_, _| {}).await
     }
 
+    /// A long-played instance holds tens of GB the pack never shipped. A
+    /// Repair reads the pack's files and leaves the rest alone.
     #[tokio::test]
-    async fn both_present_prefers_enabled_hashes() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::write(dir.path().join("a.jar"), b"enabled-bytes").unwrap();
-        std::fs::write(dir.path().join("a.jar.disabled"), b"disabled-bytes").unwrap();
-
-        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
-
-        let hashes = packinfo
-            .files
-            .get("/a.jar")
-            .expect("enabled file must be present under its own key");
-        assert_eq!(hashes.md5, md5_of(b"enabled-bytes"));
-    }
-
-    #[tokio::test]
-    async fn saves_are_excluded() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("saves/world")).unwrap();
-        std::fs::write(dir.path().join("saves/world/level.dat"), b"save").unwrap();
-        std::fs::write(dir.path().join("a.jar"), b"kept").unwrap();
-
-        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
-
-        assert!(packinfo.files.contains_key("/a.jar"));
-        assert!(
-            !packinfo.files.keys().any(|k| k.starts_with("/saves")),
-            "got keys: {:?}",
-            packinfo.files.keys().collect::<Vec<_>>()
-        );
-    }
-
-    #[tokio::test]
-    async fn install_audit_is_excluded() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join(".install_audit")).unwrap();
-        std::fs::write(dir.path().join(".install_audit/log.json"), b"audit").unwrap();
-        std::fs::write(dir.path().join("a.jar"), b"kept").unwrap();
-
-        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
-
-        assert!(packinfo.files.contains_key("/a.jar"));
-        assert!(
-            !packinfo
-                .files
-                .keys()
-                .any(|k| k.starts_with("/.install_audit")),
-            "got keys: {:?}",
-            packinfo.files.keys().collect::<Vec<_>>()
-        );
-    }
-
-    #[tokio::test]
-    async fn nested_directories_are_walked() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("mods/sub")).unwrap();
-        std::fs::write(dir.path().join("mods/sub/nested.jar"), b"nested-bytes").unwrap();
-
-        let (packinfo, _disk_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
-
-        let hashes = packinfo
-            .files
-            .get("/mods/sub/nested.jar")
-            .expect("nested file must be found by the walk");
-        assert_eq!(hashes.md5, md5_of(b"nested-bytes"));
-    }
-
-    // --- scan_instance_as_packinfo's paired DiskScan -----------------------
-
-    #[tokio::test]
-    async fn oracle_disk_scan_matches_a_direct_scan_disk_state_over_the_same_universe() {
+    async fn the_repair_check_reads_the_files_the_record_lists_and_nothing_else() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(dir.path().join("mods")).unwrap();
-        // Plain enabled-only file.
-        std::fs::write(dir.path().join("mods/enabled.jar"), b"enabled-bytes").unwrap();
-        // Plain disabled-only file (sole on-disk representation).
-        std::fs::write(
-            dir.path().join("mods/disabled.jar.disabled"),
-            b"disabled-only-bytes",
-        )
-        .unwrap();
-        // Coexisting enabled file + disabled twin.
-        std::fs::write(dir.path().join("mods/twin.jar"), b"twin-enabled-bytes").unwrap();
-        std::fs::write(
-            dir.path().join("mods/twin.jar.disabled"),
-            b"twin-disabled-bytes",
-        )
-        .unwrap();
+        std::fs::create_dir_all(dir.path().join("backups")).unwrap();
+        std::fs::write(dir.path().join("mods/pack.jar"), b"pack").unwrap();
+        std::fs::write(dir.path().join("mods/own.jar"), b"own").unwrap();
+        std::fs::write(dir.path().join("backups/world.zip"), b"backup").unwrap();
+        #[cfg(unix)]
+        std::os::unix::fs::symlink("absent", dir.path().join("backups/unplugged")).unwrap();
 
-        let (packinfo, oracle_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
-
-        let file_universe: BTreeSet<String> = packinfo.files.keys().cloned().collect();
-        assert_eq!(
-            file_universe,
-            universe(&["/mods/enabled.jar", "/mods/disabled.jar", "/mods/twin.jar"])
-        );
-
-        // The oracle (`scan_instance_as_packinfo`'s own `DiskScan`) only ever
-        // inserts a `states` entry for a path its walk actually found on
-        // disk, in either spelling — a universe drawn solely from
-        // `packinfo.files.keys()`, like `file_universe` above, can therefore
-        // never contain a path absent from disk, since the oracle would
-        // never have produced a key for one anyway. `absent` is added
-        // directly to the universe passed to `scan_disk_state` below, which
-        // — unlike the oracle — always inserts an explicit
-        // `DiskState::Missing` entry for every universe path it's given.
-        // The two maps are consequently never literally equal over this
-        // wider universe; what both must actually agree on is the effective
-        // lookup `apply_plan::plan` itself performs
-        // (`disk.get(path).copied().unwrap_or(DiskState::Missing)`), so
-        // that's what's compared below instead of raw map equality.
-        const ABSENT: &str = "/mods/absent.jar";
-        let mut universe_with_absent = file_universe.clone();
-        universe_with_absent.insert(ABSENT.to_string());
-
-        let direct_scan = scan_disk_state(dir.path(), &universe_with_absent)
+        let info = oracle(dir.path(), &["/mods/pack.jar", "/mods/gone.jar"])
             .await
             .unwrap();
 
-        assert!(
-            !oracle_scan.states.contains_key(ABSENT),
-            "the oracle must report no states entry at all for a path absent from disk, got {:?}",
-            oracle_scan.states.get(ABSENT)
-        );
-        assert_eq!(
-            direct_scan.states.get(ABSENT).copied(),
-            Some(apply_plan::DiskState::Missing),
-            "scan_disk_state must report an explicit Missing for a universe path absent from disk"
-        );
+        assert_eq!(info.files.keys().collect::<Vec<_>>(), ["/mods/pack.jar"]);
+        assert_eq!(info.files["/mods/pack.jar"].md5, md5_of(b"pack"));
+        assert_eq!(info.files["/mods/pack.jar"].sha512, sha512_of(b"pack"));
+    }
 
-        for path in &universe_with_absent {
-            let oracle_effective = oracle_scan
-                .states
-                .get(path)
-                .copied()
-                .unwrap_or(apply_plan::DiskState::Missing);
-            let direct_effective = direct_scan
-                .states
-                .get(path)
-                .copied()
-                .unwrap_or(apply_plan::DiskState::Missing);
-            assert_eq!(
-                oracle_effective, direct_effective,
-                "effective disk state (the oracle's `.get(path).copied().unwrap_or(Missing)`, \
-                 matching apply_plan::plan's own lookup) must match a direct scan_disk_state \
-                 for {path}"
-            );
+    #[tokio::test]
+    async fn a_switched_off_file_counts_under_its_enabled_name_and_the_enabled_file_wins() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("mods/sub")).unwrap();
+        std::fs::write(dir.path().join("mods/sub/off.jar.disabled"), b"off").unwrap();
+        std::fs::write(dir.path().join("mods/both.jar"), b"enabled").unwrap();
+        std::fs::write(dir.path().join("mods/both.jar.disabled"), b"disabled").unwrap();
+
+        let info = oracle(dir.path(), &["/mods/sub/off.jar", "/mods/both.jar"])
+            .await
+            .unwrap();
+
+        assert_eq!(info.files.len(), 2);
+        assert_eq!(info.files["/mods/sub/off.jar"].md5, md5_of(b"off"));
+        assert_eq!(info.files["/mods/both.jar"].md5, md5_of(b"enabled"));
+    }
+
+    #[tokio::test]
+    async fn the_repair_check_never_hashes_saves_or_the_install_audit() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("saves/world")).unwrap();
+        std::fs::create_dir_all(dir.path().join(".install_audit")).unwrap();
+        std::fs::create_dir_all(dir.path().join("config")).unwrap();
+        std::fs::write(dir.path().join("saves/world/level.dat"), b"save").unwrap();
+        std::fs::write(dir.path().join(".install_audit/log.json"), b"audit").unwrap();
+        std::fs::write(dir.path().join("a.jar"), b"kept").unwrap();
+        let mut recorded = vec![
+            "/a.jar",
+            "/saves/world/level.dat",
+            "/.install_audit/log.json",
+        ];
+        // A folder that is a link into saves is saves too.
+        #[cfg(unix)]
+        {
+            std::os::unix::fs::symlink(
+                dir.path().join("saves/world"),
+                dir.path().join("config/linked"),
+            )
+            .unwrap();
+            recorded.push("/config/linked/level.dat");
         }
-        assert_eq!(
-            oracle_scan.coexisting_disabled_twin_md5, direct_scan.coexisting_disabled_twin_md5,
-            "the oracle-derived coexisting-twin md5s must exactly match a direct scan_disk_state"
+
+        let counts = std::cell::RefCell::new(Vec::new());
+        let info = scan_repair_oracle(dir.path(), &universe(&recorded), |done, total| {
+            counts.borrow_mut().push((done, total))
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(info.files.keys().collect::<Vec<_>>(), ["/a.jar"]);
+        assert_eq!(counts.into_inner(), [(0, 1), (1, 1)]);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_recorded_file_that_cannot_be_read_fails_the_repair_check() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(dir.path().join("mods")).unwrap();
+        std::fs::create_dir_all(dir.path().join("config/folder.toml")).unwrap();
+        std::fs::write(dir.path().join("mods/good.jar"), b"good").unwrap();
+        std::os::unix::fs::symlink("good.jar", dir.path().join("mods/alias.jar")).unwrap();
+        std::os::unix::fs::symlink("absent", dir.path().join("mods/required.jar.disabled"))
+            .unwrap();
+
+        // A link to a file that is there is read through.
+        let info = oracle(dir.path(), &["/mods/good.jar", "/mods/alias.jar"])
+            .await
+            .unwrap();
+        assert_eq!(info.files["/mods/alias.jar"].md5, md5_of(b"good"));
+
+        assert!(oracle(dir.path(), &["/mods/required.jar"]).await.is_err());
+        let error = oracle(dir.path(), &["/config/folder.toml"])
+            .await
+            .unwrap_err();
+        assert!(
+            error.to_string().contains("not a regular file"),
+            "{error:#}"
         );
     }
 
     #[tokio::test]
-    async fn oracle_disk_scan_reports_a_saves_file_present_without_hashing_it() {
-        // `/saves` is excluded from the returned `PackInfo` (never hashed —
-        // see this function's own doc), but its DiskScan companion still
-        // needs to know a save exists at all, since `apply_plan::plan`'s
-        // `/saves` branch can fall through to normal reconciliation for a
-        // path `old` never tracked (see that function's own doc).
+    async fn a_record_path_that_leads_outside_the_instance_is_refused() {
         let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir_all(dir.path().join("saves/world")).unwrap();
-        std::fs::write(dir.path().join("saves/world/level.dat"), b"save-bytes").unwrap();
+        let data = dir.path().join("instance");
+        std::fs::create_dir_all(data.join("mods")).unwrap();
+        std::fs::write(dir.path().join("outside.jar"), b"outside").unwrap();
 
-        let (packinfo, oracle_scan) = scan_instance_as_packinfo(dir.path()).await.unwrap();
+        assert!(oracle(&data, &["/mods/../../outside.jar"]).await.is_err());
+        assert!(oracle(&data, &["//tmp/esc"]).await.is_err());
+        assert!(oracle(&data, &["mods/a.jar"]).await.is_err());
+    }
 
-        assert!(
-            !packinfo.files.contains_key("/saves/world/level.dat"),
-            "a /saves file must never be hashed into the returned PackInfo"
-        );
-        assert!(
-            matches!(
-                oracle_scan.states.get("/saves/world/level.dat"),
-                Some(apply_plan::DiskState::Present { .. })
-            ),
-            "a /saves file's mere existence must still surface as Present in the paired \
-             DiskScan, got {:?}",
-            oracle_scan.states.get("/saves/world/level.dat")
-        );
+    #[tokio::test]
+    async fn the_repair_check_counts_every_recorded_file_it_has_done() {
+        let dir = tempfile::tempdir().unwrap();
+        std::fs::create_dir(dir.path().join("mods")).unwrap();
+        let recorded: Vec<String> = (0..512).map(|n| format!("/mods/{n}.jar")).collect();
+        // The last one is gone: it is counted, and has no entry.
+        for path in &recorded[..511] {
+            std::fs::write(dir.path().join(&path[1..]), vec![42; 32768]).unwrap();
+        }
+
+        let counts = std::cell::RefCell::new(Vec::new());
+        let info = scan_repair_oracle(
+            dir.path(),
+            &recorded.iter().cloned().collect(),
+            |done, total| counts.borrow_mut().push((done, total)),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(info.files.len(), 511);
+        let expected: Vec<(u32, u32)> = (0..=512).map(|done| (done, 512)).collect();
+        assert_eq!(counts.into_inner(), expected);
     }
 
     // --- probe_case_insensitive ---------------------------------------
@@ -1230,16 +795,5 @@ mod tests {
             .unwrap();
         probe_case_insensitive(dir.path()).await;
         assert_eq!(std::fs::read(path).unwrap(), b"my notes");
-    }
-
-    #[tokio::test]
-    async fn task03_oracle_many_files() {
-        let dir = tempfile::tempdir().unwrap();
-        std::fs::create_dir(dir.path().join("mods")).unwrap();
-        for n in 0..512 {
-            std::fs::write(dir.path().join(format!("mods/{n}.jar")), vec![42; 32768]).unwrap();
-        }
-        let (info, _) = scan_instance_as_packinfo(dir.path()).await.unwrap();
-        assert_eq!(info.files.len(), 512);
     }
 }

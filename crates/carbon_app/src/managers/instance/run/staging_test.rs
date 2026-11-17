@@ -2134,17 +2134,34 @@ async fn task03_disabled_replace_failure_retains_source_for_retry() {
     );
 }
 
+/// A Repair is how a damaged install is put right, and its record can be
+/// part of the damage: with none it can read, it has nothing to skip.
+#[tokio::test]
+async fn a_repair_without_a_readable_record_skips_no_download() {
+    let (_tmp, root, _staging) = scaffold();
+    write_live(&root, "/mods/foo.jar", b"mod").await;
+    use crate::api::translation::Translation;
+    let task = crate::managers::vtask::VisualTask::new(Translation::Test);
+    let step = task.subtask(Translation::Test);
+    for record in [None, Some("not json")] {
+        if let Some(text) = record {
+            std::fs::write(root.join("packinfo.json"), text).unwrap();
+        }
+        let oracle = super::repair_oracle(&root, &root.join("instance"), &step)
+            .await
+            .unwrap();
+        assert!(oracle.files.is_empty(), "{record:?}");
+    }
+}
+
 #[tokio::test]
 async fn task03_apply_refreshes_skip_oracle() {
     let (_tmp, root, staging) = scaffold();
     let path = "/mods/foo.jar";
-    let (_, oracle) = disk_scan::scan_instance_as_packinfo(&root.join("instance"))
-        .await
-        .unwrap();
     write_disabled(&root, path, b"disabled mod").await;
     write_staged(&staging, path, b"disabled mod").await;
     let universe = [path.to_owned()].into_iter().collect();
-    let scan = super::scan_for_apply(&root.join("instance"), &universe, Some(oracle))
+    let scan = disk_scan::scan_disk_state(&root.join("instance"), &universe)
         .await
         .unwrap();
     assert!(matches!(
@@ -2458,7 +2475,7 @@ async fn task03_permission_failure_resumes_original_disabled_repair_options() {
             let recorded: super::RepairMarkerFile =
                 serde_json::from_slice(&std::fs::read(root.join(".setup/repair")).unwrap())
                     .unwrap();
-            let scan = super::scan_for_apply(&root.join("instance"), &universe, None)
+            let scan = disk_scan::scan_disk_state(&root.join("instance"), &universe)
                 .await
                 .unwrap();
             let entries = apply_plan::plan(PlanInputs {
@@ -2621,10 +2638,9 @@ async fn task03_physical_save_alias_and_sensitive_distinct_name() {
     let target = super::packinfo::scan_dir(&staging.join("instance"), None)
         .await
         .unwrap();
-    let scan = super::scan_for_apply(
+    let scan = disk_scan::scan_disk_state(
         &root.join("instance"),
         &target.files.keys().cloned().collect(),
-        None,
     )
     .await
     .unwrap();
@@ -2692,7 +2708,7 @@ async fn task03_case_ownership_fresh_scan_actual_update_and_modified_control() {
             .chain(target.files.keys())
             .cloned()
             .collect();
-        let scan = super::scan_for_apply(&root.join("instance"), &universe, None)
+        let scan = disk_scan::scan_disk_state(&root.join("instance"), &universe)
             .await
             .unwrap();
         let entries = apply_plan::plan(PlanInputs {
@@ -3009,7 +3025,7 @@ async fn round1_apply(
     options: &super::RepairMarkerFile,
 ) -> anyhow::Result<String> {
     let universe = target.files.keys().cloned().collect();
-    let scan = super::scan_for_apply(&root.join("instance"), &universe, None).await?;
+    let scan = disk_scan::scan_disk_state(&root.join("instance"), &universe).await?;
     let staged = super::packinfo::scan_dir(&staging.join("instance"), None)
         .await?
         .files

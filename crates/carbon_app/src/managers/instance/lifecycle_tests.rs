@@ -1298,7 +1298,7 @@ async fn task08_legacy_archive_restores_consumed_complete_membership() -> anyhow
         },
     );
     let mut owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -1315,7 +1315,6 @@ async fn task08_legacy_archive_restores_consumed_complete_membership() -> anyhow
         shortpath,
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await?;
@@ -1346,7 +1345,7 @@ async fn task08_preparation_preserves_installed_version_until_apply() -> anyhow:
         },
     );
     let mut owner = None;
-    let (_, version, _, _) = run::modpack::process_modpack(
+    let (_, version, _) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -1507,7 +1506,7 @@ async fn task08_legacy_disabled_archive_recovers_with_owned_retained_original() 
         },
     );
     let mut owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -1524,7 +1523,6 @@ async fn task08_legacy_disabled_archive_recovers_with_owned_retained_original() 
         shortpath,
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await?;
@@ -1595,7 +1593,7 @@ async fn an_update_that_renames_mods_keeps_what_the_player_did_with_them() -> an
         },
     );
     let mut owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -1612,7 +1610,6 @@ async fn an_update_that_renames_mods_keeps_what_the_player_did_with_them() -> an
         shortpath,
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await?;
@@ -1682,7 +1679,7 @@ async fn long_instance_root_owned_update_with_disabled_replace_commits() -> anyh
         },
     );
     let mut owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -1699,7 +1696,6 @@ async fn long_instance_root_owned_update_with_disabled_replace_commits() -> anyh
         shortpath,
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await?;
@@ -1744,7 +1740,7 @@ async fn task08_promoted_restart_merges_current_edits_and_rejects_old_record() -
         },
     );
     let mut owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -1763,7 +1759,6 @@ async fn task08_promoted_restart_merges_current_edits_and_rejects_old_record() -
             shortpath.clone(),
             &subtasks,
             options.clone(),
-            oracle,
             owner.as_ref(),
         );
         tokio::pin!(apply);
@@ -1790,7 +1785,6 @@ async fn task08_promoted_restart_merges_current_edits_and_rejects_old_record() -
             shortpath.clone(),
             &subtasks,
             options.clone(),
-            None,
             owner.as_ref()
         )
         .await
@@ -1806,7 +1800,6 @@ async fn task08_promoted_restart_merges_current_edits_and_rejects_old_record() -
         shortpath,
         &subtasks,
         options,
-        None,
         owner.as_ref(),
     )
     .await?;
@@ -1873,7 +1866,7 @@ async fn task08_current_missing_source_refuses_without_deleting_live_twins() -> 
         },
     );
     let mut owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -1894,7 +1887,6 @@ async fn task08_current_missing_source_refuses_without_deleting_live_twins() -> 
             shortpath,
             &subtasks,
             options,
-            oracle,
             owner.as_ref()
         )
         .await
@@ -1948,7 +1940,7 @@ async fn task08_copied_pending_archive_is_reconstructed_for_new_identity() -> an
         original_owner.clone().unwrap()
     );
     let mut copy_owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         copy,
         true,
@@ -1967,7 +1959,6 @@ async fn task08_copied_pending_archive_is_reconstructed_for_new_identity() -> an
         shortpath,
         &subtasks,
         options,
-        oracle,
         copy_owner.as_ref(),
     )
     .await?;
@@ -2058,7 +2049,10 @@ async fn task08_repair_pipeline_filters_unrelated_but_refuses_required_fault() -
             },
         );
         let mut owner = None;
-        let result = run::modpack::process_modpack(
+        // Nothing is installed yet, so the Repair's own check of the pack's
+        // files has nothing to read. The apply reads every path of the
+        // target before it changes anything.
+        let (subtasks, _, options) = run::modpack::process_modpack(
             app.clone(),
             id,
             true,
@@ -2068,27 +2062,23 @@ async fn task08_repair_pipeline_filters_unrelated_but_refuses_required_fault() -
             false,
             &mut owner,
         )
+        .await?;
+        let applied = run::modpack::process_modpack_staging(
+            app.clone(),
+            id,
+            shortpath,
+            &subtasks,
+            options,
+            owner.as_ref(),
+        )
         .await;
         if required {
             // Names the link and the way out.
-            let message = result.err().expect("required scan must fail").to_string();
-            assert!(
-                message.contains("Could not read /mods/required.jar in the instance folder"),
-                "{message}"
-            );
+            let message = applied.err().expect("required scan must fail").to_string();
+            assert!(message.contains(&broken.display().to_string()), "{message}");
             assert!(message.contains("Reconnect the drive"), "{message}");
         } else {
-            let (subtasks, _, options, oracle) = result?;
-            run::modpack::process_modpack_staging(
-                app.clone(),
-                id,
-                shortpath,
-                &subtasks,
-                options,
-                oracle,
-                owner.as_ref(),
-            )
-            .await?;
+            applied?;
             assert_eq!(
                 tokio::fs::read(root.join("instance/mods/required.jar")).await?,
                 b"target"
@@ -2197,7 +2187,7 @@ async fn task08_private_and_imported_complete_shapes_qualify_without_pack_downlo
             },
         );
         let mut owner = None;
-        let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+        let (subtasks, _, options) = run::modpack::process_modpack(
             app.clone(),
             id,
             true,
@@ -2214,7 +2204,6 @@ async fn task08_private_and_imported_complete_shapes_qualify_without_pack_downlo
             shortpath,
             &subtasks,
             options,
-            oracle,
             owner.as_ref(),
         )
         .await?;
@@ -2288,7 +2277,7 @@ async fn task08_legacy_transition_adopts_both_records_and_preserves_payload() ->
         },
     );
     let mut owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -2305,7 +2294,6 @@ async fn task08_legacy_transition_adopts_both_records_and_preserves_payload() ->
         shortpath.clone(),
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await?;
@@ -2330,7 +2318,7 @@ async fn task08_legacy_transition_adopts_both_records_and_preserves_payload() ->
     tokio::fs::remove_file(root.join(".setup/setup-session.json")).await?;
     let (_, config) = app.instance_manager().current_config(id).await?;
     let mut new_owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -2347,7 +2335,6 @@ async fn task08_legacy_transition_adopts_both_records_and_preserves_payload() ->
         shortpath,
         &subtasks,
         options,
-        oracle,
         new_owner.as_ref(),
     )
     .await?;
@@ -2551,7 +2538,7 @@ async fn task08_round1_publication(
         }
         assert!(!root.join("instance/target.txt").exists());
         let (_, config) = app.instance_manager().current_config(id).await?;
-        let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+        let (subtasks, _, options) = run::modpack::process_modpack(
             app.clone(),
             id,
             true,
@@ -2568,7 +2555,6 @@ async fn task08_round1_publication(
             shortpath,
             &subtasks,
             options,
-            oracle,
             owner.as_ref(),
         )
         .await?;
@@ -2665,7 +2651,7 @@ async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow
         },
     );
     let mut owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -2695,7 +2681,6 @@ async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow
         shortpath.clone(),
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await?;
@@ -2846,7 +2831,7 @@ async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow
         acquired,
         "transition source must receive an independently verified original"
     );
-    let (subtasks, _, options, oracle) = match prepared {
+    let (subtasks, _, options) = match prepared {
         Some(result) => result?,
         None => {
             let before: serde_json::Value =
@@ -2894,7 +2879,6 @@ async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow
         shortpath,
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await?;
@@ -2971,7 +2955,7 @@ async fn task08_round1_publication_requires_original_owner_and_sources() -> anyh
         },
     );
     let mut owner = None;
-    let (subtasks, _, options, _) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -2996,7 +2980,6 @@ async fn task08_round1_publication_requires_original_owner_and_sources() -> anyh
             shortpath.clone(),
             &subtasks,
             options.clone(),
-            None,
             owner.as_ref()
         )
         .await
@@ -3020,7 +3003,6 @@ async fn task08_round1_publication_requires_original_owner_and_sources() -> anyh
             shortpath.clone(),
             &subtasks,
             options.clone(),
-            None,
             owner.as_ref()
         )
         .await
@@ -3039,7 +3021,6 @@ async fn task08_round1_publication_requires_original_owner_and_sources() -> anyh
         shortpath,
         &subtasks,
         options,
-        None,
         owner.as_ref(),
     )
     .await?;
@@ -3095,7 +3076,7 @@ async fn large_pack_applies_with_a_bounded_number_of_session_loads() -> anyhow::
     );
     let before = load_count::of(&root);
     let mut owner = None;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -3113,7 +3094,6 @@ async fn large_pack_applies_with_a_bounded_number_of_session_loads() -> anyhow::
         shortpath,
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await?;
@@ -3176,7 +3156,7 @@ async fn prepared_pack(
         },
     );
     let mut owner = None;
-    let (subtasks, _, options, _) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -3218,7 +3198,6 @@ async fn resumed_apply_keeps_an_in_place_edit_of_a_published_file() -> anyhow::R
             shortpath.clone(),
             &subtasks,
             options.clone(),
-            None,
             owner.as_ref(),
         )
         .await
@@ -3242,7 +3221,6 @@ async fn resumed_apply_keeps_an_in_place_edit_of_a_published_file() -> anyhow::R
         shortpath,
         &subtasks,
         options,
-        None,
         owner.as_ref(),
     )
     .await?;
@@ -3287,7 +3265,6 @@ async fn resumed_apply_finishes_after_a_published_file_is_edited_then_removed() 
             shortpath.clone(),
             &subtasks,
             options.clone(),
-            None,
             owner.as_ref(),
         )
         .await
@@ -3312,7 +3289,6 @@ async fn resumed_apply_finishes_after_a_published_file_is_edited_then_removed() 
         shortpath,
         &subtasks,
         options,
-        None,
         owner.as_ref(),
     )
     .await?;
@@ -3380,7 +3356,6 @@ async fn resumed_apply_finishes_after_its_first_attempt_moved_files() -> anyhow:
             shortpath.clone(),
             &subtasks,
             options.clone(),
-            None,
             owner.as_ref(),
         )
         .await
@@ -3407,7 +3382,6 @@ async fn resumed_apply_finishes_after_its_first_attempt_moved_files() -> anyhow:
         shortpath,
         &subtasks,
         options,
-        None,
         owner.as_ref(),
     )
     .await?;
@@ -3455,7 +3429,6 @@ async fn resumed_apply_syncs_the_folders_its_first_attempt_linked() -> anyhow::R
             shortpath.clone(),
             &subtasks,
             options.clone(),
-            None,
             owner.as_ref(),
         )
         .await
@@ -3470,7 +3443,6 @@ async fn resumed_apply_syncs_the_folders_its_first_attempt_linked() -> anyhow::R
         shortpath,
         &subtasks,
         options,
-        None,
         owner.as_ref(),
     )
     .await?;
@@ -3519,7 +3491,6 @@ async fn staged_sources_are_hashed_once_per_apply() -> anyhow::Result<()> {
         shortpath,
         &subtasks,
         options,
-        None,
         owner.as_ref(),
     )
     .await?;
@@ -3571,7 +3542,6 @@ async fn fresh_install_syncs_each_published_folder_once_before_applied() -> anyh
         shortpath,
         &subtasks,
         options,
-        None,
         owner.as_ref(),
     )
     .await?;
@@ -4496,7 +4466,7 @@ async fn legacy_prepare(
     let mut owner = legacy_play_owner(app, id).await?;
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
     let task = legacy_task();
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -4513,7 +4483,6 @@ async fn legacy_prepare(
         shortpath,
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await?;
@@ -5958,7 +5927,7 @@ async fn versiononly_prepare_after_a_replace_is_a_first_install() -> anyhow::Res
     let mut owner = Some(new.owner()?);
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
     let task = legacy_task();
-    let (subtasks, _, _, _) = run::modpack::process_modpack(
+    let (subtasks, _, _) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -7563,7 +7532,7 @@ async fn repairblocked_finish_repair(
     let mut owner = Some(owner);
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
     let task = legacy_task();
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -7580,7 +7549,6 @@ async fn repairblocked_finish_repair(
         shortpath,
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await
@@ -7656,7 +7624,7 @@ async fn repairblocked_failed_first_install_is_replaced_by_repair() -> anyhow::R
     let mut owner = Some(created.owner()?);
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
     let task = legacy_task();
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -7675,7 +7643,6 @@ async fn repairblocked_failed_first_install_is_replaced_by_repair() -> anyhow::R
         shortpath,
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await
@@ -7767,7 +7734,7 @@ async fn repairblocked_committed_update_is_previewed_and_repaired() -> anyhow::R
     let (id, root, owner) = repairblocked_resolved_change(&app, "repairblocked-committed").await?;
     let (shortpath, _) = app.instance_manager().current_config(id).await?;
     let subtasks_task = legacy_task();
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -7784,7 +7751,6 @@ async fn repairblocked_committed_update_is_previewed_and_repaired() -> anyhow::R
         shortpath,
         &subtasks,
         options,
-        oracle,
         Some(&owner),
     )
     .await?;
@@ -9407,7 +9373,7 @@ async fn a_repair_whose_skipped_file_vanished_is_prepared_again() -> anyhow::Res
     .await?;
     let mut owner = None;
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -9428,7 +9394,6 @@ async fn a_repair_whose_skipped_file_vanished_is_prepared_again() -> anyhow::Res
         shortpath.clone(),
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await
@@ -9449,7 +9414,7 @@ async fn a_repair_whose_skipped_file_vanished_is_prepared_again() -> anyhow::Res
     assert!(!root.join(".setup/apply-started").exists());
 
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
-    let (subtasks, _, options, oracle) = run::modpack::process_modpack(
+    let (subtasks, _, options) = run::modpack::process_modpack(
         app.clone(),
         id,
         true,
@@ -9467,12 +9432,138 @@ async fn a_repair_whose_skipped_file_vanished_is_prepared_again() -> anyhow::Res
         shortpath,
         &subtasks,
         options,
-        oracle,
         owner.as_ref(),
     )
     .await?;
     assert_eq!(tokio::fs::read(root.join("instance/mods/a.jar")).await?, A);
     assert_eq!(preparing_dirs(&root)?, Vec::<PathBuf>::new());
+    Ok(())
+}
+
+/// A Repair hashes the installed pack's files to know which it need not
+/// download again, and the tile shows that as a step counting those files.
+/// An intact file is not downloaded and a damaged one is. Nothing else in the
+/// instance is read for it: a file the record does not list is downloaded
+/// even when it is already there, and a link in a folder the pack never
+/// shipped, to a drive that is not plugged in, changes nothing.
+#[tokio::test]
+async fn a_repair_checks_the_packs_own_files_under_a_counted_step() -> anyhow::Result<()> {
+    use super::modpack::{RepairMarkerFile, packinfo, session::Session};
+    use crate::api::translation::Translation;
+    use crate::managers::vtask::Progress;
+    const STEP: Translation = Translation::InstanceTaskLaunchCheckingModpackFiles;
+    let app = crate::setup_managers_for_test().await;
+    let mut server = mockito::Server::new_async().await;
+    let mut downloaded = Vec::new();
+    for name in ["damaged", "unlisted"] {
+        downloaded.push(
+            server
+                .mock("GET", format!("/mods/{name}.jar").as_str())
+                .with_body(name)
+                .expect(1)
+                .create_async()
+                .await,
+        );
+    }
+    let (id, root) = fixture(&app, "repair-check").await?;
+    // An older producer's setup: no record, reconstructed from the archive.
+    tokio::fs::remove_file(root.join(".setup/setup-session.json")).await?;
+    resume_pack(
+        &root,
+        &server.url(),
+        &[
+            ("mods/intact.jar", b"intact"),
+            ("mods/damaged.jar", b"damaged"),
+            ("mods/unlisted.jar", b"unlisted"),
+        ],
+        &[],
+    )?;
+    let mods = root.join("instance/mods");
+    tokio::fs::create_dir_all(&mods).await?;
+    tokio::fs::write(mods.join("intact.jar"), b"intact").await?;
+    tokio::fs::write(mods.join("damaged.jar"), b"damaged").await?;
+    let installed = packinfo::scan_dir(&root.join("instance"), None).await?;
+    tokio::fs::write(
+        root.join("packinfo.json"),
+        packinfo::make_packinfo(installed)?,
+    )
+    .await?;
+    tokio::fs::write(mods.join("damaged.jar"), b"bit rot").await?;
+    tokio::fs::write(mods.join("unlisted.jar"), b"unlisted").await?;
+    tokio::fs::create_dir(root.join("instance/backups")).await?;
+    tokio::fs::write(root.join("instance/backups/world.zip"), b"backup").await?;
+    #[cfg(unix)]
+    std::os::unix::fs::symlink("absent", root.join("instance/backups/unplugged"))?;
+    tokio::fs::write(
+        root.join(".setup/repair"),
+        serde_json::to_vec(&RepairMarkerFile::default())?,
+    )
+    .await?;
+
+    let task = legacy_task();
+    let mut owner = None;
+    let (shortpath, config) = app.instance_manager().current_config(id).await?;
+    let (subtasks, _, options) = run::modpack::process_modpack(
+        app.clone(),
+        id,
+        true,
+        config,
+        shortpath.clone(),
+        &task,
+        false,
+        &mut owner,
+    )
+    .await?;
+    assert_eq!(
+        task.subtask_progress(&STEP),
+        Some(Progress::Item {
+            current: 2,
+            total: 2
+        })
+    );
+    let bound = Session::load(&root).await?.unwrap();
+    assert_eq!(bound.target.unwrap().skipped, vec!["/mods/intact.jar"]);
+    for mock in &downloaded {
+        mock.assert_async().await;
+    }
+    run::modpack::process_modpack_staging(
+        app.clone(),
+        id,
+        shortpath,
+        &subtasks,
+        options,
+        owner.as_ref(),
+    )
+    .await?;
+    for name in ["intact", "damaged", "unlisted"] {
+        assert_eq!(
+            tokio::fs::read(mods.join(format!("{name}.jar"))).await?,
+            name.as_bytes()
+        );
+    }
+    assert_eq!(
+        tokio::fs::read(root.join("instance/backups/world.zip")).await?,
+        b"backup"
+    );
+
+    // An install or update has no such step: it goes by the record.
+    let (id, root) = fixture(&app, "update-without-check").await?;
+    task08_archive(&root, &[("mods/pack.jar", b"pack")])?;
+    let task = legacy_task();
+    let mut owner = None;
+    let (shortpath, config) = app.instance_manager().current_config(id).await?;
+    run::modpack::process_modpack(
+        app.clone(),
+        id,
+        true,
+        config,
+        shortpath,
+        &task,
+        false,
+        &mut owner,
+    )
+    .await?;
+    assert_eq!(task.subtask_progress(&STEP), None);
     Ok(())
 }
 
@@ -9574,7 +9665,6 @@ async fn a_pack_shipping_a_file_enabled_and_disabled_installs_the_enabled_one() 
         shortpath,
         &subtasks,
         options,
-        None,
         owner.as_ref(),
     )
     .await?;

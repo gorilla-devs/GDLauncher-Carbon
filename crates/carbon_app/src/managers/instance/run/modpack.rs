@@ -164,12 +164,7 @@ pub async fn process_modpack(
     task: &VisualTask,
     has_callback_task: bool,
     session_owner: &mut Option<Owner>,
-) -> anyhow::Result<(
-    TSubtasks,
-    Option<StandardVersion>,
-    Option<RepairMarkerFile>,
-    Option<disk_scan::DiskScan>,
-)> {
+) -> anyhow::Result<(TSubtasks, Option<StandardVersion>, Option<RepairMarkerFile>)> {
     process_modpack_cancellable(
         app,
         instance_id,
@@ -194,12 +189,7 @@ pub async fn process_modpack_cancellable(
     has_callback_task: bool,
     session_owner: &mut Option<Owner>,
     cancel: &tokio_util::sync::CancellationToken,
-) -> anyhow::Result<(
-    TSubtasks,
-    Option<StandardVersion>,
-    Option<RepairMarkerFile>,
-    Option<disk_scan::DiskScan>,
-)> {
+) -> anyhow::Result<(TSubtasks, Option<StandardVersion>, Option<RepairMarkerFile>)> {
     // An attempt's preparation folder holds nothing worth keeping until its
     // downloads start (see `reuse_earlier_downloads`): only overrides, which
     // every attempt extracts again. Removing it when the attempt fails
@@ -242,12 +232,7 @@ async fn prepare_modpack(
     session_owner: &mut Option<Owner>,
     cancel: &tokio_util::sync::CancellationToken,
     unclaimed: &mut Option<PathBuf>,
-) -> anyhow::Result<(
-    TSubtasks,
-    Option<StandardVersion>,
-    Option<RepairMarkerFile>,
-    Option<disk_scan::DiskScan>,
-)> {
+) -> anyhow::Result<(TSubtasks, Option<StandardVersion>, Option<RepairMarkerFile>)> {
     anyhow::ensure!(!cancel.is_cancelled(), "Modpack preparation cancelled");
     let installed_snapshot = config.clone();
     let mut version: Option<StandardVersion> = None;
@@ -398,7 +383,6 @@ async fn prepare_modpack(
     };
 
     let packinfo_path = instance_root.join("packinfo.json");
-    let tmp_packinfo_path = instance_root.join("tmp-packinfo.json");
 
     // Absent marker (including a `.setup` left behind by an older build that
     // never wrote one) means an ordinary version change.
@@ -440,45 +424,34 @@ async fn prepare_modpack(
     // The download oracle avoids fetching already-verified bytes. Staging
     // always performs a fresh bounded old/target scan before planning;
     // the earlier oracle never authorizes a later live-file mutation.
-    let mut oracle_diagnostics = Vec::new();
-    let (skip_oracle, oracle_disk_scan) = match &repair_options {
-        Some(_) => {
-            let (packinfo, disk_scan, diagnostics) =
-                disk_scan::scan_repair_oracle(&instance_path.get_data_path()).await?;
-            oracle_diagnostics = diagnostics;
-            (Some(packinfo), Some(disk_scan))
-        }
-        None => (
-            match tokio::fs::read_to_string(&packinfo_path).await {
-                Ok(text) => {
-                    Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?)
-                }
-                Err(_) => None,
-            },
-            None,
-        ),
+    //
+    // A repair reads its own from the files once the preparation below
+    // starts, under a step of its own: that takes as long as hashing the
+    // installed pack does.
+    let mut skip_oracle = match &repair_options {
+        Some(_) => None,
+        None => match tokio::fs::read_to_string(&packinfo_path).await {
+            Ok(text) => {
+                Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?)
+            }
+            Err(_) => None,
+        },
     };
 
-    // Only transition members need independent pristine acquisition. Keep
-    // all unrelated descriptor skips and the complete original oracle intact.
-    let preparation_oracle = skip_oracle.as_ref().map(|oracle| {
-        let mut oracle = oracle.clone();
-        for path in &transition_sources {
-            oracle.files.remove(path);
-        }
-        oracle
-    });
-    let t_modpack =
-        match is_setup && (!is_modpack_complete || reconstruct || needs_originals) && !resolved {
-            true => Some((
-                task.subtask(Translation::InstanceTaskLaunchRequestModpack),
-                task.subtask(Translation::InstanceTaskLaunchDownloadModpack),
-                task.subtask(Translation::InstanceTaskLaunchDownloadModpackFiles),
-                task.subtask(Translation::InstanceTaskLaunchExtractModpackFiles),
-                task.subtask(Translation::InstanceTaskLaunchRequestAddonMetadata),
-            )),
-            false => None,
-        };
+    let prepares =
+        is_setup && (!is_modpack_complete || reconstruct || needs_originals) && !resolved;
+    let t_check_modpack_files = (prepares && repair_options.is_some())
+        .then(|| task.subtask(Translation::InstanceTaskLaunchCheckingModpackFiles));
+    let t_modpack = match prepares {
+        true => Some((
+            task.subtask(Translation::InstanceTaskLaunchRequestModpack),
+            task.subtask(Translation::InstanceTaskLaunchDownloadModpack),
+            task.subtask(Translation::InstanceTaskLaunchDownloadModpackFiles),
+            task.subtask(Translation::InstanceTaskLaunchExtractModpackFiles),
+            task.subtask(Translation::InstanceTaskLaunchRequestAddonMetadata),
+        )),
+        false => None,
+    };
 
     let t_apply_staging = task.subtask(Translation::InstanceTaskLaunchApplyStagedPatches);
 
@@ -547,6 +520,26 @@ async fn prepare_modpack(
         t_addon_metadata,
     )) = t_modpack
     {
+        if let Some(step) = &t_check_modpack_files {
+            // It writes nothing, so a quit drops it rather than wait for it.
+            skip_oracle = Some(
+                crate::managers::runtime_lifecycle::lookup_or_cancel(
+                    cancel,
+                    repair_oracle(&instance_root, &instance_path.get_data_path(), step),
+                )
+                .await?,
+            );
+        }
+        // Only transition members need independent pristine acquisition. Keep
+        // all unrelated descriptor skips and the complete original oracle intact.
+        let preparation_oracle = skip_oracle.as_ref().map(|oracle| {
+            let mut oracle = oracle.clone();
+            for path in &transition_sources {
+                oracle.files.remove(path);
+            }
+            oracle
+        });
+
         let mut modpack_downloads = Vec::new();
         if ["curseforge", "modrinth", "gdlpack"]
             .iter()
@@ -1213,22 +1206,6 @@ async fn prepare_modpack(
             t_generating_packinfo.complete_opaque();
         }
 
-        if !oracle_diagnostics.is_empty() {
-            let mut universe = BTreeSet::new();
-            // The oracle is not the old record: include declared paths even if
-            // this scan could not open them.
-            for record in [&packinfo_path, &tmp_packinfo_path] {
-                match tokio::fs::read_to_string(record).await {
-                    Ok(text) => universe.extend(packinfo::parse_packinfo(&text)?.files.into_keys()),
-                    Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
-                    Err(error) => return Err(error.into()),
-                }
-            }
-            let insensitive =
-                disk_scan::probe_case_insensitive(&instance_path.get_data_path()).await;
-            disk_scan::validate_oracle_diagnostics(&oracle_diagnostics, &universe, insensitive)?;
-        }
-
         trace!("marking modpack initialization as complete");
 
         tracing::info!("queueing metadata caching for running instance");
@@ -1266,12 +1243,36 @@ async fn prepare_modpack(
         t_finalize_import,
     };
 
-    Ok((
-        Arc::new(subtasks),
-        version,
-        repair_options,
-        oracle_disk_scan,
-    ))
+    Ok((Arc::new(subtasks), version, repair_options))
+}
+
+/// What a Repair may skip downloading: the hashes of the installed pack's
+/// files as they are on disk now (see [`disk_scan::scan_repair_oracle`]),
+/// counted on `step`. A record that is missing or cannot be read lists
+/// nothing, so every file is downloaded.
+async fn repair_oracle(
+    root: &Path,
+    data: &Path,
+    step: &Subtask,
+) -> anyhow::Result<packinfo::PackInfo> {
+    let record = tokio::fs::read_to_string(root.join("packinfo.json"))
+        .await
+        .map_err(anyhow::Error::from)
+        .and_then(|text| packinfo::parse_packinfo(&text));
+    let recorded = match record {
+        Ok(record) => record.files.into_keys().collect(),
+        Err(error) => {
+            tracing::warn!(
+                ?error,
+                "installed pack record not read; repair downloads every file"
+            );
+            BTreeSet::new()
+        }
+    };
+    disk_scan::scan_repair_oracle(data, &recorded, |done, total| {
+        step.update_items(done, total)
+    })
+    .await
 }
 
 /// Apply an admitted complete target, retain original sources through audit and
@@ -1285,7 +1286,6 @@ pub async fn process_modpack_staging(
     instance_shortpath: String,
     t_subtasks: &TSubtasks,
     repair_options: Option<RepairMarkerFile>,
-    oracle_disk_scan: Option<disk_scan::DiskScan>,
     session_owner: Option<&Owner>,
 ) -> anyhow::Result<()> {
     let runtime_path = app.settings_manager().runtime_path.clone();
@@ -1401,7 +1401,7 @@ pub async fn process_modpack_staging(
         let disk_scan::DiskScan {
             states: disk,
             coexisting_disabled_twin_md5,
-        } = scan_for_apply(&instance_root.join("instance"), &universe, oracle_disk_scan).await?;
+        } = disk_scan::scan_disk_state(&instance_root.join("instance"), &universe).await?;
 
         // Whether this instance's data dir lives on a filesystem that folds
         // path case together (Windows, default-configuration macOS) — see
@@ -1726,15 +1726,6 @@ async fn finish_session_commit(
     finish_promoted_staging(&root.join(".setup/staging"), &root.join(".setup")).await?;
     app.invalidate(GET_MODPACK_INFO, Some(owner.instance_id.into()));
     Ok(())
-}
-
-async fn scan_for_apply(
-    data: &Path,
-    universe: &BTreeSet<String>,
-    oracle: Option<disk_scan::DiskScan>,
-) -> anyhow::Result<disk_scan::DiskScan> {
-    drop(oracle);
-    disk_scan::scan_disk_state(data, universe).await
 }
 
 /// The apply's answer to a plan that needs a staged copy of a file the

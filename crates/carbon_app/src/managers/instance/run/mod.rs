@@ -800,7 +800,7 @@ impl ManagerRef<'_, InstanceManager> {
                         }
                         let mut downloads = Vec::new();
 
-                        let (t_subtasks, modpack_version, repair_options, oracle_disk_scan) =
+                        let (t_subtasks, modpack_version, repair_options) =
                             modpack::process_modpack_cancellable(
                                 Arc::clone(&app),
                                 instance_id.clone(),
@@ -823,7 +823,6 @@ impl ManagerRef<'_, InstanceManager> {
                             instance_shortpath.clone(),
                             &t_subtasks,
                             repair_options,
-                            oracle_disk_scan,
                             session_owner.as_ref(),
                         )
                         .await?;

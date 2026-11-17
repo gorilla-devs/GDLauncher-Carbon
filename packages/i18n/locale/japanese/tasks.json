@@ -15,6 +15,7 @@
   "_trn_instance_task_launch_request_addon_metadata": "アドオンのメタデータを取得中",
   "_trn_instance_task_launch_extract_modpack_files": "Modパックファイルを展開中",
   "_trn_instance_task_launch_download_modpack_files": "Modパックファイルをダウンロード中",
+  "_trn_instance_task_launch_checking_modpack_files": "Modパックファイルを確認中",
   "_trn_instance_task_launch_request_modpack": "Modパック情報を取得中",
   "_trn_instance_task_launch_download_modpack": "Modパックをダウンロード中",
   "_trn_instance_task_launch_download_java": "Javaをダウンロード中",

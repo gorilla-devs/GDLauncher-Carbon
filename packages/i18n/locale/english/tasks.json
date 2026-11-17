@@ -16,6 +16,7 @@
   "_trn_instance_task_launch_request_addon_metadata": "Getting addon metadata",
   "_trn_instance_task_launch_extract_modpack_files": "Extracting modpack files",
   "_trn_instance_task_launch_download_modpack_files": "Downloading modpack files",
+  "_trn_instance_task_launch_checking_modpack_files": "Checking modpack files",
   "_trn_instance_task_launch_request_modpack": "Getting modpack details",
   "_trn_instance_task_launch_download_modpack": "Downloading modpack",
   "_trn_instance_task_launch_download_java": "Downloading Java",
