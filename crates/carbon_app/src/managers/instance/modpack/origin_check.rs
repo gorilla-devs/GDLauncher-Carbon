@@ -705,23 +705,13 @@ async fn run_check_pack_origin(
     let instance_root = instance_path.get_root();
     let data_path = instance_path.get_data_path();
 
-    let packinfo = match tokio::fs::read_to_string(instance_root.join("packinfo.json")).await {
-        Ok(text) => {
-            match super::packinfo::parse_packinfo(&text).context("while parsing packinfo json") {
-                Ok(p) => p,
-                Err(e) => {
-                    store_and_invalidate(&app, instance_id, OriginResults::default()).await;
-                    task.fail(e).await;
-                    return;
-                }
-            }
-        }
-        // No recorded packinfo at all: nothing to compare against, so there
-        // is nothing untracked to prove — mirrors `repair_preview`'s own
-        // "no packinfo -> nothing to report" handling.
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => super::packinfo::PackInfo {
+    let packinfo = match super::packinfo::Installed::read(&instance_root).await {
+        // No recorded packinfo at all, or a damaged one: nothing to compare
+        // against, so there is nothing untracked to prove — mirrors
+        // `repair_preview`'s own "no packinfo -> nothing to report" handling.
+        Ok(installed) => installed.usable().unwrap_or(super::packinfo::PackInfo {
             files: HashMap::new(),
-        },
+        }),
         Err(e) => {
             store_and_invalidate(&app, instance_id, OriginResults::default()).await;
             task.fail(e.into()).await;

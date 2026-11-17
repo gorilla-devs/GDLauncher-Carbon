@@ -272,6 +272,7 @@
   "_trn_change_version_unreachable": "无法连接到 {{platform}} 来检查此整合包的已安装版本添加了哪些文件。请检查网络连接;如果网络正常,请过几分钟再试。",
   "_trn_change_version_unreachable_services": "无法连接到所需的在线服务来检查此整合包的已安装版本添加了哪些文件。请检查网络连接;如果网络正常,请过几分钟再试。",
   "_trn_change_version_gone": "此版本已不再提供。请选择其他版本。",
+  "_trn_change_version_record_damaged": "此整合包已安装文件的记录已损坏。请先对此实例执行“修复”，然后再更改版本。",
   "_trn_change_version_not_listed": "已安装的版本不在此列表中。请选择所需的版本。",
   "_trn_change_version_none_listed": "无法列出此整合包的版本。请检查网络连接，稍后再试。如果此整合包已从其平台移除，可在实例设置中使用“取消关联”，将其保留为普通实例。",
   "_trn_change_version_pick": "选择版本",

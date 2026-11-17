@@ -9440,6 +9440,110 @@ async fn a_repair_whose_skipped_file_vanished_is_prepared_again() -> anyhow::Res
     Ok(())
 }
 
+/// A pack record a sync tool emptied (or a partial copy cut short) no longer
+/// locks the instance. Play does not need the record. Repair, the way out,
+/// goes ahead as it does with no record and writes a new one. An update,
+/// which goes by the record to tell the pack's files from the player's,
+/// stops before changing anything and names Repair.
+#[tokio::test]
+async fn a_damaged_pack_record_is_repaired_by_repair_and_stops_only_an_update() -> anyhow::Result<()>
+{
+    use super::modpack::{RepairMarkerFile, packinfo};
+    let app = crate::setup_managers_for_test().await;
+
+    let (id, root) = fixture(&app, "damaged-record-play").await?;
+    tokio::fs::write(root.join("packinfo.json"), b"").await?;
+    let mut owner = None;
+    let (shortpath, config) = app.instance_manager().current_config(id).await?;
+    let (subtasks, _, options) = run::modpack::process_modpack(
+        app.clone(),
+        id,
+        true,
+        config,
+        shortpath.clone(),
+        &legacy_task(),
+        false,
+        &mut owner,
+    )
+    .await?;
+    run::modpack::process_modpack_staging(
+        app.clone(),
+        id,
+        shortpath,
+        &subtasks,
+        options,
+        owner.as_ref(),
+    )
+    .await?;
+
+    for repair in [true, false] {
+        let name = if repair {
+            "damaged-record-repair"
+        } else {
+            "damaged-record-update"
+        };
+        let (id, root) = fixture(&app, name).await?;
+        task08_archive(&root, &[("mods/pack.jar", b"pack")])?;
+        if repair {
+            tokio::fs::write(
+                root.join(".setup/repair"),
+                serde_json::to_vec(&RepairMarkerFile::default())?,
+            )
+            .await?;
+        }
+        let mods = root.join("instance/mods");
+        tokio::fs::create_dir_all(&mods).await?;
+        tokio::fs::write(mods.join("pack.jar"), b"bit rot").await?;
+        tokio::fs::write(mods.join("own.jar"), b"own").await?;
+        tokio::fs::write(root.join("packinfo.json"), b"{\"_version\":").await?;
+
+        let mut owner = None;
+        let (shortpath, config) = app.instance_manager().current_config(id).await?;
+        let (subtasks, _, options) = run::modpack::process_modpack(
+            app.clone(),
+            id,
+            true,
+            config,
+            shortpath.clone(),
+            &legacy_task(),
+            false,
+            &mut owner,
+        )
+        .await?;
+        let applied = run::modpack::process_modpack_staging(
+            app.clone(),
+            id,
+            shortpath,
+            &subtasks,
+            options,
+            owner.as_ref(),
+        )
+        .await;
+        assert_eq!(tokio::fs::read(mods.join("own.jar")).await?, b"own");
+        if repair {
+            applied?;
+            assert_eq!(tokio::fs::read(mods.join("pack.jar")).await?, b"pack");
+            let packinfo::Installed::Recorded(record) = packinfo::Installed::read(&root).await?
+            else {
+                panic!("Repair writes a new record");
+            };
+            assert_eq!(record.files.keys().collect::<Vec<_>>(), ["/mods/pack.jar"]);
+        } else {
+            let error = applied.err().expect("an update needs the record");
+            assert!(
+                format!("{error:#}").contains("Run Repair on this instance"),
+                "{error:#}"
+            );
+            assert_eq!(tokio::fs::read(mods.join("pack.jar")).await?, b"bit rot");
+            assert_eq!(
+                tokio::fs::read(root.join("packinfo.json")).await?,
+                b"{\"_version\":"
+            );
+        }
+    }
+    Ok(())
+}
+
 /// A Repair hashes the installed pack's files to know which it need not
 /// download again, and the tile shows that as a step counting those files.
 /// An intact file is not downloaded and a damaged one is. Nothing else in the

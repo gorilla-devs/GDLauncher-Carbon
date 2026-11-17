@@ -272,6 +272,7 @@
   "_trn_change_version_unreachable": "Could not reach {{platform}} to check which files the installed version of this modpack added. Check your connection, or try again in a few minutes if it is working.",
   "_trn_change_version_unreachable_services": "Could not reach the online services needed to check which files the installed version of this modpack added. Check your connection, or try again in a few minutes if it is working.",
   "_trn_change_version_gone": "This version is no longer available. Pick another version.",
+  "_trn_change_version_record_damaged": "GDLauncher's record of the files this modpack installed is damaged. Run Repair on this instance, then change the version.",
   "_trn_change_version_not_listed": "The installed version is not in this list. Pick the version you want.",
   "_trn_change_version_none_listed": "No versions of this modpack could be listed. Check your connection and try again later. If the modpack was removed from its platform, use Unpair in the instance settings to keep this as a regular instance.",
   "_trn_change_version_pick": "Pick a version",

@@ -103,6 +103,16 @@ pub enum ChangeVersionRefusal {
     /// Nothing changed, so there is nothing to tell the player.
     #[error("The version change was cancelled")]
     Cancelled,
+    /// The record of what the installed version put in place cannot be read
+    /// (see [`packinfo::Installed::Damaged`]), so the change can't tell the
+    /// pack's files from the player's. Repair writes a new record.
+    #[error(
+        "GDLauncher's record of the files this modpack installed is damaged. Run Repair on this instance, then change the version."
+    )]
+    RecordDamaged {
+        #[source]
+        cause: anyhow::Error,
+    },
 }
 
 impl crate::error::FeErrorCode for ChangeVersionRefusal {
@@ -111,6 +121,7 @@ impl crate::error::FeErrorCode for ChangeVersionRefusal {
             Self::Unreachable { .. } => "MODPACK_CHECK_UNREACHABLE",
             Self::VersionGone => "MODPACK_VERSION_GONE",
             Self::Cancelled => "MODPACK_CHECK_CANCELLED",
+            Self::RecordDamaged { .. } => "MODPACK_RECORD_DAMAGED",
         }
     }
 
@@ -161,8 +172,8 @@ pub(super) async fn ensure_cancellable(
     resolve: impl Future<Output = anyhow::Result<Resolved>>,
 ) -> anyhow::Result<Baseline> {
     let record = root.join("packinfo.json");
-    match tokio::fs::read_to_string(&record).await {
-        Ok(text) => return existing_record(&text),
+    match tokio::fs::read(&record).await {
+        Ok(record) => return existing_record(&record),
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
         Err(e) => return Err(e.into()),
     }
@@ -221,9 +232,11 @@ pub(super) async fn ensure(
 }
 
 /// What a `packinfo.json` already in place tells the change.
-fn existing_record(text: &str) -> anyhow::Result<Baseline> {
-    packinfo::parse_packinfo(text)?;
-    Ok(if left_files_unchecked(text) {
+fn existing_record(record: &[u8]) -> anyhow::Result<Baseline> {
+    if let packinfo::Installed::Damaged(cause) = packinfo::Installed::from_bytes(record) {
+        return Err(ChangeVersionRefusal::RecordDamaged { cause }.into());
+    }
+    Ok(if left_files_unchecked(record) {
         Baseline::Partial
     } else {
         Baseline::Recorded
@@ -234,8 +247,8 @@ fn existing_record(text: &str) -> anyhow::Result<Baseline> {
 /// files unchecked. A version change that finishes replaces it with a record
 /// of its own, so this holds until the first change goes through, however many
 /// attempts that takes.
-fn left_files_unchecked(record: &str) -> bool {
-    serde_json::from_str::<serde_json::Value>(record)
+fn left_files_unchecked(record: &[u8]) -> bool {
+    serde_json::from_slice::<serde_json::Value>(record)
         .ok()
         .and_then(|record| record["verified_import_inventory"]["unchecked_files"].as_u64())
         .is_some_and(|unchecked| unchecked > 0)
@@ -296,8 +309,8 @@ fn record_baseline(
     if let Err(error) = publish_record(root, text.as_bytes()) {
         // Another writer published one first: that is the record the change
         // reads, so it is what the change can rely on.
-        if let Ok(text) = std::fs::read_to_string(root.join("packinfo.json")) {
-            return existing_record(&text);
+        if let Ok(record) = std::fs::read(root.join("packinfo.json")) {
+            return existing_record(&record);
         }
         tracing::warn!(
             ?error,
@@ -1824,6 +1837,31 @@ mod task13_controls {
             );
             assert!(!info.files.contains_key("/mods/both.jar.disabled"));
             assert!(info.files.contains_key("/mods/odd.jar.disabled"));
+        }
+    }
+
+    /// A record that cannot be read refuses the change with its way out, in
+    /// words the version dialog translates, and is left as it is for Repair.
+    #[tokio::test]
+    async fn a_damaged_record_refuses_the_change_and_names_repair() {
+        use crate::error::FeErrorCode;
+        let t = tempfile::tempdir().unwrap();
+        for damaged in [&b""[..], &b"{\"_version\":"[..], &[0xff, 0xfe][..]] {
+            std::fs::write(t.path().join("packinfo.json"), damaged).unwrap();
+            let error = ensure(t.path(), MODRINTH, async {
+                panic!("a damaged record must not fetch a provider")
+            })
+            .await
+            .unwrap_err();
+            let refusal = error
+                .downcast_ref::<ChangeVersionRefusal>()
+                .expect("a refusal the dialog can word");
+            assert_eq!(refusal.error_code(), "MODPACK_RECORD_DAMAGED");
+            assert!(refusal.to_string().contains("Run Repair"), "{refusal}");
+            assert_eq!(
+                std::fs::read(t.path().join("packinfo.json")).unwrap(),
+                damaged
+            );
         }
     }
 

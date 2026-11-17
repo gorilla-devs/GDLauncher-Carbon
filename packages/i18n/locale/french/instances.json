@@ -272,6 +272,7 @@
   "_trn_change_version_unreachable": "Impossible de joindre {{platform}} pour vérifier quels fichiers la version installée de ce modpack a ajoutés. Vérifiez votre connexion, ou réessayez dans quelques minutes si elle fonctionne.",
   "_trn_change_version_unreachable_services": "Impossible de joindre les services en ligne nécessaires pour vérifier quels fichiers la version installée de ce modpack a ajoutés. Vérifiez votre connexion, ou réessayez dans quelques minutes si elle fonctionne.",
   "_trn_change_version_gone": "Cette version n’est plus disponible. Choisissez une autre version.",
+  "_trn_change_version_record_damaged": "Le registre des fichiers installés par ce modpack est endommagé. Lancez Réparer sur cette instance, puis changez de version.",
   "_trn_change_version_not_listed": "La version installée ne figure pas dans cette liste. Choisissez la version souhaitée.",
   "_trn_change_version_none_listed": "Aucune version de ce modpack n’a pu être listée. Vérifiez votre connexion et réessayez plus tard. Si le modpack a été retiré de sa plateforme, utilisez Dissocier dans les paramètres de l’instance pour la garder comme instance normale.",
   "_trn_change_version_pick": "Choisissez une version",

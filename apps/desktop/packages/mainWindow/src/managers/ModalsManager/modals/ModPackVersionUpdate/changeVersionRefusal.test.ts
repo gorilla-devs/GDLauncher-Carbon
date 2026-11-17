@@ -45,6 +45,16 @@ describe("changeVersionRefusalText", () => {
     })
   })
 
+  it("points at Repair when the installed pack record is damaged", () => {
+    const error = rspcError([
+      { display: "Damaged", code: "MODPACK_RECORD_DAMAGED" },
+      { display: "EOF while parsing a value at line 1 column 0" }
+    ])
+    expect(changeVersionRefusalText(error)).toEqual({
+      key: "instances:_trn_change_version_record_damaged"
+    })
+  })
+
   it("leaves any other error to the core's wording", () => {
     expect(
       changeVersionRefusalText(rspcError([{ display: "Something else" }]))

@@ -847,14 +847,8 @@ impl ManagerRef<'_, InstanceManager> {
         let instance_root = instance_path.get_root();
         let data_path = instance_path.get_data_path();
 
-        let packinfo_path = instance_root.join("packinfo.json");
-        let recorded = match tokio::fs::read_to_string(&packinfo_path).await {
-            Ok(text) => {
-                Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?)
-            }
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-            Err(e) => return Err(e.into()),
-        };
+        // A damaged record previews as no record does: Repair replaces it.
+        let recorded = packinfo::Installed::read(&instance_root).await?.usable();
 
         // Computed regardless of packinfo presence — a duplicate mod isn't a
         // packinfo concept, it's purely a fact about what's currently
@@ -2410,8 +2404,10 @@ mod tests {
         assert_eq!(bytes_after, b"corrupted-on-disk-bytes");
     }
 
+    /// A damaged record previews as no record does, so Repair can be
+    /// confirmed: it is the way out of one.
     #[tokio::test]
-    async fn repair_preview_with_no_packinfo_reports_has_packinfo_false() {
+    async fn repair_preview_with_no_or_a_damaged_packinfo_reports_has_packinfo_false() {
         use crate::domain::instance::info;
         use crate::managers::instance::InstanceVersionSource;
 
@@ -2442,19 +2438,30 @@ mod tests {
             .unwrap();
         assert!(status.pending && !status.preview_withheld);
 
-        let preview = app
-            .instance_manager()
-            .repair_preview(instance_id)
-            .await
-            .unwrap();
+        let root = app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path("test-no-packinfo")
+            .get_root();
+        for damaged in [None, Some(&b"{\"_version\":"[..])] {
+            if let Some(damaged) = damaged {
+                std::fs::write(root.join("packinfo.json"), damaged).unwrap();
+            }
+            let preview = app
+                .instance_manager()
+                .repair_preview(instance_id)
+                .await
+                .unwrap();
 
-        assert!(!preview.has_packinfo);
-        assert!(preview.with_re_enable.entries.is_empty());
-        assert_eq!(preview.with_re_enable.counts, RepairCounts::default());
-        assert!(preview.without_re_enable.entries.is_empty());
-        assert_eq!(preview.without_re_enable.counts, RepairCounts::default());
-        assert!(preview.untracked.is_empty());
-        assert!(preview.duplicates.is_empty());
+            assert!(!preview.has_packinfo);
+            assert!(preview.with_re_enable.entries.is_empty());
+            assert_eq!(preview.with_re_enable.counts, RepairCounts::default());
+            assert!(preview.without_re_enable.entries.is_empty());
+            assert_eq!(preview.without_re_enable.counts, RepairCounts::default());
+            assert!(preview.untracked.is_empty());
+            assert!(preview.duplicates.is_empty());
+        }
     }
     #[tokio::test]
     async fn task03_preview_rejects_origin_for_edited_content() {

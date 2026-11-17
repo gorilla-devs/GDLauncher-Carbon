@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::path::Path;
 
 use anyhow::bail;
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,67 @@ pub struct FileHashes {
 enum PackInfoWrapper {
     #[serde(rename = "1")]
     V1(v1::PackInfo),
+}
+
+/// An instance's record of the files its modpack installed (`packinfo.json`
+/// in the instance folder), as it reads now.
+#[derive(Debug)]
+pub enum Installed {
+    Recorded(PackInfo),
+    /// No record: not a pack, an import, or a copy made by 2.0.40.
+    Missing,
+    /// A record that cannot be read as one: emptied or cut short by a sync or
+    /// backup tool, a partial copy between PCs, a disk error or a hand edit.
+    /// Repair writes a new one.
+    Damaged(anyhow::Error),
+}
+
+impl Installed {
+    pub async fn read(root: &Path) -> std::io::Result<Self> {
+        match tokio::fs::read(root.join("packinfo.json")).await {
+            Ok(bytes) => Ok(Self::from_bytes(&bytes)),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(Self::Missing),
+            Err(error) => Err(error),
+        }
+    }
+
+    pub fn from_bytes(bytes: &[u8]) -> Self {
+        let record = std::str::from_utf8(bytes)
+            .map_err(anyhow::Error::from)
+            .and_then(parse_packinfo);
+        match record {
+            Ok(record) => Self::Recorded(record),
+            Err(error) => Self::Damaged(error),
+        }
+    }
+
+    /// The record, where a damaged one is as good as none: for a reader that
+    /// only saves work with it, and for Repair, which replaces it.
+    pub fn usable(self) -> Option<PackInfo> {
+        match self {
+            Self::Recorded(record) => Some(record),
+            Self::Missing => None,
+            Self::Damaged(error) => {
+                tracing::warn!(
+                    ?error,
+                    "the installed pack record is damaged and is not used"
+                );
+                None
+            }
+        }
+    }
+
+    /// The record, where a damaged one stops the change: an update goes by
+    /// it to tell the pack's files from the player's.
+    pub fn required(self) -> anyhow::Result<Option<PackInfo>> {
+        match self {
+            Self::Recorded(record) => Ok(Some(record)),
+            Self::Missing => Ok(None),
+            Self::Damaged(error) => Err(error.context(
+                "GDLauncher's record of the files this modpack installed is damaged. Run Repair on this instance.",
+            )),
+        }
+    }
 }
 
 pub fn parse_packinfo(packinfo_str: &str) -> anyhow::Result<PackInfo> {
@@ -120,6 +182,65 @@ mod tests {
     /// literal that might not match the wire format.
     fn serialize(key: &str) -> String {
         make_packinfo(packinfo_with_key(key)).unwrap()
+    }
+
+    /// What a sync tool, a partial copy or a disk error leaves of a record
+    /// reads as damaged, which each reader has an answer to, not as an error
+    /// none of them can do anything with.
+    #[tokio::test]
+    async fn a_record_that_cannot_be_read_as_one_is_damaged_and_none_is_missing() {
+        let dir = tempfile::tempdir().unwrap();
+        let record = dir.path().join("packinfo.json");
+        assert!(matches!(
+            Installed::read(dir.path()).await.unwrap(),
+            Installed::Missing
+        ));
+
+        let good = serialize("/mods/a.jar");
+        let outside = serialize("/mods/../evil.jar");
+        for damaged in [
+            &b""[..],
+            &good.as_bytes()[..good.len() / 2],
+            &[0xff, 0xfe, 0x00],
+            b"null",
+            outside.as_bytes(),
+        ] {
+            std::fs::write(&record, damaged).unwrap();
+            assert!(
+                matches!(
+                    Installed::read(dir.path()).await.unwrap(),
+                    Installed::Damaged(_)
+                ),
+                "{damaged:?}"
+            );
+        }
+
+        std::fs::write(&record, &good).unwrap();
+        let Installed::Recorded(read) = Installed::read(dir.path()).await.unwrap() else {
+            panic!("a whole record is read");
+        };
+        assert!(read.files.contains_key("/mods/a.jar"));
+    }
+
+    #[test]
+    fn a_damaged_record_is_no_record_to_repair_and_stops_an_update() {
+        let good = serialize("/mods/a.jar");
+        assert!(Installed::from_bytes(b"").usable().is_none());
+        assert!(Installed::Missing.usable().is_none());
+        assert!(Installed::from_bytes(good.as_bytes()).usable().is_some());
+
+        let error = Installed::from_bytes(b"").required().unwrap_err();
+        assert!(
+            error.to_string().contains("Run Repair on this instance"),
+            "{error:#}"
+        );
+        assert!(Installed::Missing.required().unwrap().is_none());
+        assert!(
+            Installed::from_bytes(good.as_bytes())
+                .required()
+                .unwrap()
+                .is_some()
+        );
     }
 
     #[test]

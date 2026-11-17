@@ -382,8 +382,6 @@ async fn prepare_modpack(
         setup_path.join("staging")
     };
 
-    let packinfo_path = instance_root.join("packinfo.json");
-
     // Absent marker (including a `.setup` left behind by an older build that
     // never wrote one) means an ordinary version change.
     let repair_marker_path = setup_path.join("repair");
@@ -430,12 +428,10 @@ async fn prepare_modpack(
     // installed pack does.
     let mut skip_oracle = match &repair_options {
         Some(_) => None,
-        None => match tokio::fs::read_to_string(&packinfo_path).await {
-            Ok(text) => {
-                Some(packinfo::parse_packinfo(&text).context("while parsing packinfo json")?)
-            }
-            Err(_) => None,
-        },
+        None => packinfo::Installed::read(&instance_root)
+            .await
+            .ok()
+            .and_then(packinfo::Installed::usable),
     };
 
     let prepares =
@@ -1255,20 +1251,16 @@ async fn repair_oracle(
     data: &Path,
     step: &Subtask,
 ) -> anyhow::Result<packinfo::PackInfo> {
-    let record = tokio::fs::read_to_string(root.join("packinfo.json"))
-        .await
-        .map_err(anyhow::Error::from)
-        .and_then(|text| packinfo::parse_packinfo(&text));
-    let recorded = match record {
-        Ok(record) => record.files.into_keys().collect(),
+    let record = match packinfo::Installed::read(root).await {
+        Ok(installed) => installed.usable(),
         Err(error) => {
-            tracing::warn!(
-                ?error,
-                "installed pack record not read; repair downloads every file"
-            );
-            BTreeSet::new()
+            tracing::warn!(?error, "the installed pack record could not be read");
+            None
         }
     };
+    let recorded = record
+        .map(|record| record.files.into_keys().collect())
+        .unwrap_or_default();
     disk_scan::scan_repair_oracle(data, &recorded, |done, total| {
         step.update_items(done, total)
     })
@@ -1357,10 +1349,12 @@ pub async fn process_modpack_staging(
             .await?;
         }
 
-        let old_packinfo = match tokio::fs::read_to_string(&packinfo_path).await {
-            Ok(s) => Some(packinfo::parse_packinfo(&s)?),
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => None,
-            Err(e) => return Err(e.into()),
+        // Repair is the way out of a damaged record, so it goes ahead as it
+        // does without one.
+        let installed = packinfo::Installed::read(&instance_root).await?;
+        let old_packinfo = match &repair_options {
+            Some(_) => installed.usable(),
+            None => installed.required()?,
         };
         let target_packinfo =
             packinfo::parse_packinfo(&tokio::fs::read_to_string(&tmp_packinfo_path).await?)?;

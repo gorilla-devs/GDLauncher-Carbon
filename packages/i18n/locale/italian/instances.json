@@ -272,6 +272,7 @@
   "_trn_change_version_unreachable": "Impossibile raggiungere {{platform}} per controllare quali file ha aggiunto la versione installata di questo modpack. Controlla la connessione, oppure riprova tra qualche minuto se funziona.",
   "_trn_change_version_unreachable_services": "Impossibile raggiungere i servizi online necessari per controllare quali file ha aggiunto la versione installata di questo modpack. Controlla la connessione, oppure riprova tra qualche minuto se funziona.",
   "_trn_change_version_gone": "Questa versione non è più disponibile. Scegline un’altra.",
+  "_trn_change_version_record_damaged": "Il registro dei file installati da questo modpack è danneggiato. Usa Ripara su questa istanza, poi cambia versione.",
   "_trn_change_version_not_listed": "La versione installata non è in questo elenco. Scegli la versione che vuoi.",
   "_trn_change_version_none_listed": "Non è stato possibile elencare le versioni di questo modpack. Controlla la connessione e riprova più tardi. Se il modpack è stato rimosso dalla sua piattaforma, usa Scollega nelle impostazioni dell'istanza per tenerla come istanza normale.",
   "_trn_change_version_pick": "Scegli una versione",

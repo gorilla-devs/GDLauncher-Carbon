@@ -13,6 +13,7 @@ export type ChangeVersionRefusalText =
     }
   | { key: "instances:_trn_change_version_unreachable_services" }
   | { key: "instances:_trn_change_version_gone" }
+  | { key: "instances:_trn_change_version_record_damaged" }
 
 /** The translated wording of a refusal the core sends with a code (see
  *  `ChangeVersionRefusal` in imported_baseline.rs), or undefined for any other
@@ -34,6 +35,8 @@ export function changeVersionRefusalText(
     }
     case "MODPACK_VERSION_GONE":
       return { key: "instances:_trn_change_version_gone" }
+    case "MODPACK_RECORD_DAMAGED":
+      return { key: "instances:_trn_change_version_record_damaged" }
     default:
       return undefined
   }
