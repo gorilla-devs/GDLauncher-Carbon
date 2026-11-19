@@ -40,6 +40,8 @@ pub struct ModpackInfo {
     pub manifest: curseforge::manifest::Manifest,
     // (downloadable, existing path from packinfo)
     pub downloadables: Vec<(Downloadable, Option<String>)>,
+    /// The override files this preparation wrote into the instance path.
+    pub extracted: Vec<std::path::PathBuf>,
 }
 
 #[tracing::instrument(skip(app, progress_percentage_sender))]
@@ -353,7 +355,7 @@ pub async fn prepare_modpack_from_zip_cancellable(
 
     t_addon_metadata.complete_opaque();
 
-    if !skip_overrides {
+    let extracted = if !skip_overrides {
         let override_folder_name = manifest.overrides.clone();
         let override_full_path = instance_path.get_data_path();
         crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async {
@@ -368,6 +370,7 @@ pub async fn prepare_modpack_from_zip_cancellable(
                 // entries each just under a per-entry cap could still add up to an
                 // unbounded amount written to disk.
                 let mut extracted_bytes: u64 = 0;
+                let mut written = Vec::new();
                 for i in 0..archive.len() {
                     let mut file = archive.by_index(i)?;
 
@@ -407,6 +410,7 @@ pub async fn prepare_modpack_from_zip_cancellable(
                         let remaining_budget =
                             MAX_EXTRACTED_OVERRIDE_BYTES.saturating_sub(extracted_bytes);
                         extracted_bytes += copy_bounded(&mut file, &mut outfile, remaining_budget)?;
+                        written.push(outpath);
                     }
 
                     progress_percentage_sender.send_modify(|progress| {
@@ -416,16 +420,19 @@ pub async fn prepare_modpack_from_zip_cancellable(
                     });
                 }
 
-                Ok::<(), anyhow::Error>(())
+                Ok::<_, anyhow::Error>(written)
             })
             .await?
         })
-        .await?;
-    }
+        .await?
+    } else {
+        Vec::new()
+    };
 
     Ok(ModpackInfo {
         manifest,
         downloadables,
+        extracted,
     })
 }
 

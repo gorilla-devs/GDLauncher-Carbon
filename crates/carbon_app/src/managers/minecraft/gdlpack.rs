@@ -34,6 +34,8 @@ pub struct ModpackInfo {
     pub manifest: Manifest,
     pub version: StandardVersion,
     pub downloadables: Vec<(Downloadable, Option<String>)>,
+    /// The override files this preparation wrote into the instance path.
+    pub extracted: Vec<PathBuf>,
 }
 
 /// Resolved file info from platform lookup
@@ -386,7 +388,7 @@ where
     }
 
     // Extract overrides
-    if !skip_overrides {
+    let extracted_files = if !skip_overrides {
         tokio::task::spawn_blocking({
             let admitted = admitted.clone();
             let instance_data_path = instance_path.get_data_path().to_path_buf();
@@ -394,9 +396,10 @@ where
             let client_overrides = manifest.client_overrides.clone();
             let progress_sender = progress_sender.clone();
 
-            move || -> anyhow::Result<()> {
+            move || -> anyhow::Result<Vec<PathBuf>> {
                 let file = std::fs::File::open(admitted.path())?;
                 let mut archive = zip::ZipArchive::new(file)?;
+                let mut written = Vec::new();
 
                 // Count override files
                 let override_prefix = format!("{}/", overrides_dir);
@@ -481,6 +484,7 @@ where
                             MAX_EXTRACTED_OVERRIDE_BYTES.saturating_sub(extracted_bytes);
                         extracted_bytes +=
                             copy_bounded(&mut entry, &mut outfile, remaining_budget)?;
+                        written.push(target);
 
                         extracted += 1;
                         progress_sender.send_modify(|state| {
@@ -489,11 +493,13 @@ where
                     }
                 }
 
-                Ok(())
+                Ok(written)
             }
         })
-        .await??;
-    }
+        .await??
+    } else {
+        Vec::new()
+    };
 
     // Build StandardVersion from manifest
     let modloaders: HashSet<ModLoader> = manifest
@@ -520,6 +526,7 @@ where
         manifest,
         version,
         downloadables,
+        extracted: extracted_files,
     })
 }
 

@@ -10206,3 +10206,456 @@ async fn past_logs_loaded_while_an_instance_is_deleted_are_not_kept() -> anyhow:
     assert!(!manager.log_history.contains_key(&id));
     Ok(())
 }
+
+/// Starts a version change of `id` to pack B, whose archive is the one
+/// [`resume_pack`] writes, and stops it once its files are downloaded and
+/// unpacked, as antivirus software gets to them. Returns the change's task
+/// and its preparation folder.
+async fn lost_files_change_downloaded(
+    app: &crate::App,
+    id: InstanceId,
+    root: &Path,
+    server: &str,
+) -> anyhow::Result<(crate::domain::vtask::VisualTaskId, PathBuf, Arc<Pause>)> {
+    let permit = app
+        .instance_manager
+        .persistence_manager
+        .instance_download_lock
+        .acquire()
+        .await?;
+    let pause = app
+        .instance_manager
+        .test_hooks
+        .arm("setup_downloads_done", id);
+    let task = app
+        .instance_manager()
+        .change_modpack(id, legacy_pack("B"))
+        .await?;
+    resume_pack(
+        root,
+        server,
+        &[("mods/pack.jar", b"B"), ("mods/new.jar", b"new in B")],
+        &[("config/pack.cfg", b"cfg"), ("config/kept.cfg", b"kept")],
+    )?;
+    drop(permit);
+    tokio::time::timeout(Duration::from_secs(30), pause.entered.notified()).await?;
+    let folders = preparing_dirs(root)?;
+    assert_eq!(folders.len(), 1);
+    Ok((task, folders[0].join("instance"), pause))
+}
+
+async fn lost_files_server() -> mockito::ServerGuard {
+    let mut server = mockito::Server::new_async().await;
+    for (path, body) in [
+        ("/mods/pack.jar", "B"),
+        ("/mods/new.jar", "new in B"),
+        ("/mods/lib-2.jar", "new lib"),
+        ("/mods/fresh.jar", "fresh"),
+        ("/mods/other.jar", "other"),
+    ] {
+        server
+            .mock("GET", path)
+            .with_body(body)
+            .create_async()
+            .await;
+    }
+    server
+}
+
+/// The warnings of the one task that has finished with any.
+async fn lost_files_reported(
+    app: &crate::App,
+) -> anyhow::Result<crate::domain::vtask::TaskWarnings> {
+    Ok(tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            let mut pending = app.task_manager().get_task_warnings().await;
+            if let Some(reported) = pending.pop() {
+                assert!(pending.is_empty());
+                return reported;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await?)
+}
+
+/// R05-run-modpack#2: a pack file removed between its download and the
+/// record of what to install (antivirus software taking a mod it has just
+/// seen written) used to leave the update one file short with no word of
+/// it: the old version's file deleted, the new one never installed. The
+/// update is given up before it changes anything, the installed version
+/// stays as it was, and the task ends saying which files went missing.
+/// Asking for the same version again then installs it.
+#[tokio::test]
+async fn an_update_that_loses_pack_files_is_given_up_for_the_installed_version()
+-> anyhow::Result<()> {
+    use crate::domain::vtask::TaskWarning;
+    let app = crate::setup_managers_for_test().await;
+    let server = lost_files_server().await;
+    let (id, root) = repairblocked_installed(&app, "lost-update", "A").await?;
+    let instance_before = legacy_tree(&root.join("instance"));
+    let record_before = tokio::fs::read(root.join("packinfo.json")).await?;
+    let config_before = tokio::fs::read(root.join("instance.json")).await?;
+
+    let (task, prepared, pause) =
+        lost_files_change_downloaded(&app, id, &root, &server.url()).await?;
+    tokio::fs::remove_file(prepared.join("mods/new.jar")).await?;
+    tokio::fs::remove_file(prepared.join("config/pack.cfg")).await?;
+    pause.release.notify_one();
+
+    let reported = lost_files_reported(&app).await?;
+    assert_eq!(reported.id, task);
+    assert_eq!(
+        reported.warnings,
+        vec![TaskWarning::PackUpdateAbandoned {
+            instance_id: id.0,
+            files: vec!["config/pack.cfg".into(), "mods/new.jar".into()],
+            total: 2,
+            pack: legacy_pack("B"),
+        }]
+    );
+    // Not a failure: the instance is as it was, with nothing pending.
+    assert!(matches!(
+        app.instance_manager.instances.read().await[&id]
+            .data()?
+            .state,
+        run::LaunchState::Inactive { failed_task: None }
+    ));
+    assert_eq!(legacy_tree(&root.join("instance")), instance_before);
+    assert_eq!(
+        tokio::fs::read(root.join("packinfo.json")).await?,
+        record_before
+    );
+    assert_eq!(
+        tokio::fs::read(root.join("instance.json")).await?,
+        config_before
+    );
+    assert!(!root.join(".setup").exists());
+    assert!(!root.join("tmp-packinfo.json").exists());
+    let status = app.instance_manager().pending_setup(id).await?;
+    assert!(!status.pending);
+    // Retired like a cancelled update: its record stays, its downloads go.
+    let retired = legacy_retired(&root)?;
+    assert_eq!(retired.len(), 1);
+    assert!(retired[0].join(super::modpack::session::RECORD).is_file());
+    assert!(!retired[0].join("modrinth").exists());
+    assert!(std::fs::read_dir(&retired[0])?.all(|entry| {
+        !entry
+            .unwrap()
+            .file_name()
+            .to_string_lossy()
+            .starts_with("preparing-")
+    }));
+
+    // The same request again, with nothing removed this time.
+    let staged = app.instance_manager().test_hooks.arm("setup_staged", id);
+    let (_, _, pause) = lost_files_change_downloaded(&app, id, &root, &server.url()).await?;
+    pause.release.notify_one();
+    tokio::time::timeout(Duration::from_secs(30), staged.entered.notified()).await?;
+    let installed = root.join("instance");
+    assert_eq!(
+        tokio::fs::read(installed.join("mods/pack.jar")).await?,
+        b"B"
+    );
+    assert_eq!(
+        tokio::fs::read(installed.join("mods/new.jar")).await?,
+        b"new in B"
+    );
+    assert_eq!(
+        tokio::fs::read(installed.join("config/pack.cfg")).await?,
+        b"cfg"
+    );
+    assert!(!installed.join("mods/old.jar").exists());
+    assert_eq!(
+        tokio::fs::read(installed.join("mods/user.jar")).await?,
+        b"user"
+    );
+    Ok(())
+}
+
+/// What the given-up update would have warned of had it finished (here,
+/// that the replaced version's files could not be checked) is not said of
+/// an update that never happened.
+#[tokio::test]
+async fn a_given_up_update_reports_only_that_it_was_given_up() -> anyhow::Result<()> {
+    use super::modpack::inventory_fixture;
+    use crate::domain::vtask::TaskWarning;
+    let app = crate::setup_managers_for_test().await;
+    let server = lost_files_server().await;
+    let (id, root, inventory) = task08_round2_change_fixture(&app, "lost-update-warned").await?;
+    drop(inventory);
+    let _gone = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Gone);
+    let (task, prepared, pause) =
+        lost_files_change_downloaded(&app, id, &root, &server.url()).await?;
+    assert!(matches!(
+        app.task_manager()
+            .running_task_warnings(task)
+            .await
+            .as_deref(),
+        Some([TaskWarning::PreviousPackFilesKept { .. }])
+    ));
+    tokio::fs::remove_file(prepared.join("mods/pack.jar")).await?;
+    pause.release.notify_one();
+    assert_eq!(
+        lost_files_reported(&app).await?.warnings,
+        vec![TaskWarning::PackUpdateAbandoned {
+            instance_id: id.0,
+            files: vec!["mods/pack.jar".into()],
+            total: 1,
+            pack: legacy_pack("B"),
+        }]
+    );
+    assert!(!root.join(".setup").exists());
+    Ok(())
+}
+
+/// A first install has no installed version to stay on, and neither has a
+/// version change of a pack that never finished installing: both go on as
+/// they always did, and their setup records which files it is missing, for
+/// the task that finishes it to say. The record of what was installed
+/// leaves those files out, so a Repair downloads them.
+#[tokio::test]
+async fn an_install_that_loses_pack_files_finishes_and_records_which() -> anyhow::Result<()> {
+    use super::modpack::{
+        packinfo,
+        session::{Kind, Producer, Session},
+    };
+    use crate::domain::vtask::TaskWarning;
+    let app = crate::setup_managers_for_test().await;
+    let server = lost_files_server().await;
+    for first_install in [true, false] {
+        let name = if first_install {
+            "lost-install"
+        } else {
+            "lost-unfinished"
+        };
+        let (id, root) = fixture(&app, name).await?;
+        tokio::fs::remove_dir_all(root.join(".setup")).await?;
+        tokio::fs::create_dir(root.join(".setup")).await?;
+        let (shortpath, config) = app.instance_manager().current_config(id).await?;
+        let mut session = if first_install {
+            Session::new(&config, Producer::Create, Kind::Pack, None)?
+        } else {
+            // Its pack never finished installing, so it has no game version.
+            let mut unfinished = config.clone();
+            unfinished.game_configuration.version = None;
+            let mut session = Session::new(&unfinished, Producer::Change, Kind::Pack, None)?;
+            let request = repairblocked_request("B")?;
+            tokio::fs::write(root.join(".setup/change-pack-version.json"), &request).await?;
+            session.requested_pack = Some(request);
+            session
+        };
+        session.instance_id = Some(id.0);
+        session.create(&root).await?;
+        resume_pack(
+            &root,
+            &server.url(),
+            &[
+                ("mods/lib-2.jar", b"new lib"),
+                ("mods/other.jar", b"other"),
+                ("mods/fresh.jar", b"fresh"),
+            ],
+            &[("config/pack.cfg", b"cfg"), ("config/kept.cfg", b"kept")],
+        )?;
+        let pause = app
+            .instance_manager
+            .test_hooks
+            .arm("setup_downloads_done", id);
+        let task = legacy_task();
+        let mut owner = None;
+        let prepared = {
+            let prepare = run::modpack::process_modpack(
+                app.clone(),
+                id,
+                true,
+                config,
+                shortpath.clone(),
+                &task,
+                false,
+                &mut owner,
+            );
+            tokio::pin!(prepare);
+            tokio::select! {
+                _ = pause.entered.notified() => {}
+                result = &mut prepare => {
+                    anyhow::bail!("settled before its downloads: {:?}", result.err());
+                }
+            }
+            let folders = preparing_dirs(&root)?;
+            assert_eq!(folders.len(), 1);
+            for lost in ["mods/lib-2.jar", "mods/fresh.jar", "config/pack.cfg"] {
+                tokio::fs::remove_file(folders[0].join("instance").join(lost)).await?;
+            }
+            pause.release.notify_one();
+            prepare.await
+        };
+        let (subtasks, _, options) = prepared?;
+        let missing = vec![TaskWarning::PackFilesMissing {
+            instance_id: id.0,
+            // The first two by path; the log names them all.
+            files: vec!["config/pack.cfg".into(), "mods/fresh.jar".into()],
+            total: 3,
+            repairable: !first_install,
+        }];
+        assert_eq!(Session::load(&root).await?.unwrap().warnings, missing);
+        run::modpack::process_modpack_staging(
+            app.clone(),
+            id,
+            shortpath,
+            &subtasks,
+            options,
+            owner.as_ref(),
+        )
+        .await?;
+        let installed = root.join("instance");
+        assert_eq!(
+            tokio::fs::read(installed.join("mods/other.jar")).await?,
+            b"other"
+        );
+        assert_eq!(
+            tokio::fs::read(installed.join("config/kept.cfg")).await?,
+            b"kept"
+        );
+        for lost in ["mods/lib-2.jar", "mods/fresh.jar", "config/pack.cfg"] {
+            assert!(!installed.join(lost).exists());
+        }
+        let record = packinfo::Installed::read(&root).await?.usable().unwrap();
+        let mut recorded: Vec<_> = record.files.keys().cloned().collect();
+        recorded.sort();
+        assert_eq!(recorded, ["/config/kept.cfg", "/mods/other.jar"]);
+        assert_eq!(Session::load(&root).await?.unwrap().warnings, missing);
+    }
+    Ok(())
+}
+
+/// A Repair is not given up either: what it could repair is repaired, and
+/// its task says which file is still missing, with Repair as the way to
+/// get it.
+#[tokio::test]
+async fn a_repair_that_loses_a_pack_file_finishes_and_says_which() -> anyhow::Result<()> {
+    use super::modpack::session::Session;
+    use crate::domain::vtask::TaskWarning;
+    let app = crate::setup_managers_for_test().await;
+    let mut server = mockito::Server::new_async().await;
+    server
+        .mock("GET", "/mods/pack.jar")
+        .with_body("A")
+        .create_async()
+        .await;
+    server
+        .mock("GET", "/mods/old.jar")
+        .with_body("only A")
+        .create_async()
+        .await;
+    let (id, root) = repairblocked_installed(&app, "lost-repair", "A").await?;
+    // Both are damaged, so the repair downloads both.
+    tokio::fs::write(root.join("instance/mods/pack.jar"), b"damaged").await?;
+    tokio::fs::remove_file(root.join("instance/mods/old.jar")).await?;
+    let permit = app
+        .instance_manager
+        .persistence_manager
+        .instance_download_lock
+        .acquire()
+        .await?;
+    let pause = app
+        .instance_manager
+        .test_hooks
+        .arm("setup_downloads_done", id);
+    let staged = app.instance_manager().test_hooks.arm("setup_staged", id);
+    let task = app
+        .instance_manager()
+        .repair_modpack(id, super::modpack::RepairMarkerFile::default(), None)
+        .await?;
+    resume_pack(
+        &root,
+        &server.url(),
+        &[("mods/pack.jar", b"A"), ("mods/old.jar", b"only A")],
+        &[],
+    )?;
+    drop(permit);
+    tokio::time::timeout(Duration::from_secs(30), pause.entered.notified()).await?;
+    let folders = preparing_dirs(&root)?;
+    assert_eq!(folders.len(), 1);
+    tokio::fs::remove_file(folders[0].join("instance/mods/pack.jar")).await?;
+    pause.release.notify_one();
+    tokio::time::timeout(Duration::from_secs(30), staged.entered.notified()).await?;
+
+    let missing = vec![TaskWarning::PackFilesMissing {
+        instance_id: id.0,
+        files: vec!["mods/pack.jar".into()],
+        total: 1,
+        repairable: true,
+    }];
+    assert_eq!(
+        app.task_manager().running_task_warnings(task).await,
+        Some(missing.clone())
+    );
+    assert_eq!(Session::load(&root).await?.unwrap().warnings, missing);
+    assert!(legacy_retired(&root)?.is_empty());
+    assert_eq!(
+        tokio::fs::read(root.join("instance/mods/old.jar")).await?,
+        b"only A"
+    );
+    assert_eq!(
+        tokio::fs::read(root.join("instance/mods/user.jar")).await?,
+        b"user"
+    );
+    Ok(())
+}
+
+/// Only this instance's own version change, and only while it has applied
+/// nothing, is given up for the installed version.
+#[tokio::test]
+async fn only_an_unapplied_version_change_is_given_up() -> anyhow::Result<()> {
+    use super::modpack::session::{Kind, Owner, Producer, Session};
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = repairblocked_installed(&app, "give-up-rules", "A").await?;
+    let owner = repairblocked_pending_change(&app, id, &root, "B")
+        .await?
+        .owner()?;
+    let before = legacy_tree(&root);
+
+    tokio::fs::write(root.join(".setup/apply-started"), b"").await?;
+    let error = app
+        .instance_manager()
+        .abandon_version_change(id, &owner)
+        .await
+        .expect_err("an apply that may have started is never given up");
+    assert!(
+        error.to_string().contains("Apply may have started"),
+        "{error}"
+    );
+    tokio::fs::remove_file(root.join(".setup/apply-started")).await?;
+    let stranger = Owner {
+        instance_id: id.0,
+        operation: uuid::Uuid::new_v4().to_string(),
+    };
+    app.instance_manager()
+        .abandon_version_change(id, &stranger)
+        .await
+        .expect_err("another setup's owner gives nothing up");
+    assert_eq!(legacy_tree(&root), before);
+
+    app.instance_manager()
+        .abandon_version_change(id, &owner)
+        .await?;
+    assert!(!root.join(".setup").exists());
+    assert_eq!(legacy_retired(&root)?.len(), 1);
+
+    let (_, config) = app.instance_manager().current_config(id).await?;
+    tokio::fs::create_dir(root.join(".setup")).await?;
+    let mut repair = Session::new(&config, Producer::Repair, Kind::Pack, None)?;
+    repair.instance_id = Some(id.0);
+    repair.create(&root).await?;
+    let error = app
+        .instance_manager()
+        .abandon_version_change(id, &repair.owner()?)
+        .await
+        .expect_err("a repair is never given up");
+    assert!(
+        error.to_string().contains("only a version change"),
+        "{error}"
+    );
+    assert!(root.join(".setup").is_dir());
+    Ok(())
+}

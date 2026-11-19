@@ -34,7 +34,7 @@ pub struct ModpackInfo {
     pub locked: bool,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum Modpack {
     Curseforge(CurseforgeModpack),
     Modrinth(ModrinthModpack),
@@ -49,13 +49,13 @@ impl ToString for Modpack {
     }
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct CurseforgeModpack {
     pub project_id: u32,
     pub file_id: u32,
 }
 
-#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+#[derive(Debug, Clone, Hash, Eq, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct ModrinthModpack {
     pub project_id: String,
     pub version_id: String,

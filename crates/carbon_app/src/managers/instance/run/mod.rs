@@ -1034,8 +1034,45 @@ impl ManagerRef<'_, InstanceManager> {
                     // and launched concurrently instead of queuing behind an already-running game.
                     drop(download_guard);
 
-                    match try_result {
-                        Err(e) => {
+                    // A version change that lost pack files before it changed
+                    // anything is given up for the installed version, which
+                    // still works, rather than failed and left pending.
+                    let kept_installed = match &try_result {
+                        Err(error) => match (
+                            error.downcast_ref::<modpack::UpdateLostFiles>(),
+                            session_owner.as_ref(),
+                        ) {
+                            (Some(lost), Some(owner)) => match app
+                                .instance_manager()
+                                .abandon_version_change(instance_id, owner)
+                                .await
+                            {
+                                Ok(()) => Some(lost.warning()),
+                                Err(error) => {
+                                    tracing::warn!(?error, "the version change stays pending");
+                                    None
+                                }
+                            },
+                            _ => None,
+                        },
+                        Ok(_) => None,
+                    };
+
+                    match (try_result, kept_installed) {
+                        (Err(_), Some(warning)) => {
+                            // The task ends as one that succeeded with this to
+                            // say, not with what the version change would have.
+                            task.warn_instead(warning);
+                            let _ = app
+                                .instance_manager()
+                                .change_launch_state(
+                                    instance_id,
+                                    id,
+                                    LaunchState::Inactive { failed_task: None },
+                                )
+                                .await;
+                        }
+                        (Err(e), None) => {
                             task.fail(e).await;
 
                             let _ = app
@@ -1049,8 +1086,8 @@ impl ManagerRef<'_, InstanceManager> {
                                 )
                                 .await;
                         }
-                        Ok(None) => {}
-                        Ok(Some(mut child)) => {
+                        (Ok(None), _) => {}
+                        (Ok(Some(mut child)), _) => {
                             drop(task);
 
                             let _liveness_watch =

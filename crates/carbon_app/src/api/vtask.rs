@@ -8,6 +8,7 @@ use crate::error::FeError;
 use crate::domain::vtask as domain;
 use crate::managers::App;
 
+use super::instance::{FEInstanceId, Modpack};
 use super::router::router;
 use super::translation::Translation;
 
@@ -108,6 +109,25 @@ pub enum FETaskWarning {
     PreviousPackFilesKept {
         platform: FEDependencyPlatform,
         reason: FEPreviousPackFilesReason,
+    },
+    /// A modpack install or Repair finished without `total` of the pack's
+    /// files, which were gone before the launcher could install them.
+    /// `files` names the first few, `/`-separated, inside the game folder;
+    /// `repairable` is whether Repair can download the modpack again.
+    PackFilesMissing {
+        instance: FEInstanceId,
+        files: Vec<String>,
+        total: u32,
+        repairable: bool,
+    },
+    /// A modpack version change lost files the same way before it changed
+    /// anything, so the installed version was kept; `modpack` is the version
+    /// that was asked for.
+    PackUpdateAbandoned {
+        instance: FEInstanceId,
+        files: Vec<String>,
+        total: u32,
+        modpack: Modpack,
     },
 }
 
@@ -235,6 +255,28 @@ impl From<domain::TaskWarning> for FETaskWarning {
                     },
                 }
             }
+            domain::TaskWarning::PackFilesMissing {
+                instance_id,
+                files,
+                total,
+                repairable,
+            } => Self::PackFilesMissing {
+                instance: crate::domain::instance::InstanceId(instance_id).into(),
+                files,
+                total,
+                repairable,
+            },
+            domain::TaskWarning::PackUpdateAbandoned {
+                instance_id,
+                files,
+                total,
+                pack,
+            } => Self::PackUpdateAbandoned {
+                instance: crate::domain::instance::InstanceId(instance_id).into(),
+                files,
+                total,
+                modpack: pack.into(),
+            },
         }
     }
 }

@@ -1768,13 +1768,13 @@ struct ModpackInfo {
 #[derive(Type, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 #[serde(tag = "type", content = "value")]
-enum Modpack {
+pub enum Modpack {
     Curseforge(CurseforgeModpack),
     Modrinth(ModrinthModpack),
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
-struct CurseforgeModpack {
+pub struct CurseforgeModpack {
     project_id: u32,
     file_id: u32,
 }

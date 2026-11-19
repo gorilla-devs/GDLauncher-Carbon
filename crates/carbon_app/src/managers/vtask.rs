@@ -412,6 +412,15 @@ impl VisualTask {
             .push(warning);
     }
 
+    /// Reports `warning` alone: what the task warned of so far describes an
+    /// outcome it no longer has.
+    pub fn warn_instead(&self, warning: domain::TaskWarning) {
+        *self
+            .warnings
+            .lock()
+            .expect("this mutex can never witness a panic") = vec![warning];
+    }
+
     /// Names what the warnings are about, when the task name does not.
     pub fn set_warning_subject(&self, subject: String) {
         *self
@@ -1173,6 +1182,27 @@ mod task_warning_tests {
         );
         app.task_manager().acknowledge_task_warnings(id).await;
         assert!(app.task_manager().get_task_warnings().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_warning_given_instead_replaces_the_earlier_ones() {
+        let app = crate::setup_managers_for_test().await;
+        let task = VisualTask::new(Translation::Test);
+        task.require_explicit_completion();
+        let id = app.task_manager().spawn_task(&task).await;
+        task.warn(skipped());
+        let instead = domain::TaskWarning::WorldNameTaken {
+            name: "World".into(),
+            saved_as: "World (copy 1)".into(),
+        };
+        task.warn_instead(instead.clone());
+        task.complete();
+        drop(task);
+        assert!(matches!(settled(&app, id).await, TaskOutcome::Succeeded));
+        assert_eq!(
+            app.task_manager().get_task_warnings().await[0].warnings,
+            vec![instead]
+        );
     }
 
     #[tokio::test]

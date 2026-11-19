@@ -6,7 +6,7 @@ use crate::domain::instance::info::{
 use crate::domain::instance::{self as domain, GameLogId, InstanceId};
 use crate::domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName};
 use crate::domain::metrics::GDLMetricsEvent;
-use crate::domain::vtask::VisualTaskId;
+use crate::domain::vtask::{TaskWarning, VisualTaskId};
 use crate::managers::AppInner;
 use crate::managers::instance::log::{
     GameLog, LogEntry, LogEntrySourceKind, format_message_as_log4j_event,
@@ -765,6 +765,7 @@ async fn prepare_modpack(
         let instance_prep_path = InstancePath::new(staging_dir.clone());
 
         let mut skipped_mods = Vec::new();
+        let mut extracted: Vec<PathBuf> = Vec::new();
 
         // Prepaers the list of modpack downloadable files and the manifest, as
         // well as extract the overrides in it
@@ -813,7 +814,8 @@ async fn prepare_modpack(
                 });
 
                 completion.await?;
-                let modpack_info = modpack_info?;
+                let mut modpack_info = modpack_info?;
+                extracted.append(&mut modpack_info.extracted);
 
                 tokio::fs::create_dir_all(skip_overrides_path).await?;
 
@@ -878,7 +880,8 @@ async fn prepare_modpack(
                 .await;
 
                 completion.await?;
-                let modpack_info = modpack_info?;
+                let mut modpack_info = modpack_info?;
+                extracted.append(&mut modpack_info.extracted);
 
                 tokio::fs::create_dir_all(skip_overrides_path).await?;
 
@@ -950,7 +953,8 @@ async fn prepare_modpack(
                 .await;
 
                 completion.await?;
-                let modpack_info = modpack_info?;
+                let mut modpack_info = modpack_info?;
+                extracted.append(&mut modpack_info.extracted);
 
                 tokio::fs::create_dir_all(skip_overrides_path).await?;
 
@@ -1022,6 +1026,11 @@ async fn prepare_modpack(
         });
         completion.await?;
         download_result?;
+        #[cfg(test)]
+        app.instance_manager
+            .test_hooks
+            .pause("setup_downloads_done", instance_id)
+            .await;
 
         if let Some(v) = v {
             tracing::info!("Modpack version: {v:?}");
@@ -1056,6 +1065,61 @@ async fn prepare_modpack(
                     continue;
                 }
                 files.push(entry.relative_path.to_string());
+            }
+            // Before the twin of a file shipped both enabled and disabled is
+            // removed below, so nothing the preparation removed itself counts.
+            let lost = lost_pack_files(
+                &instance_prep_path.get_data_path(),
+                modpack_downloads
+                    .iter()
+                    .map(|download| download.path.clone())
+                    .chain(extracted)
+                    .collect(),
+            )
+            .await?;
+            let mut lost_warning = None;
+            if !lost.is_empty() {
+                for path in &lost {
+                    tracing::warn!(path, "a pack file was gone before it could be installed");
+                }
+                let files: Vec<String> = lost
+                    .iter()
+                    .take(crate::domain::vtask::LOST_PACK_FILES_NAMED)
+                    .cloned()
+                    .collect();
+                let total = lost.len() as u32;
+                // A version change that has changed nothing yet is given up
+                // for the installed version, which works. Every other setup
+                // has no such version to stay on, so it goes on as it always
+                // did and says what it is missing.
+                let gives_up = match &setup_session {
+                    Some(session) => {
+                        session.producer == Producer::Change
+                            && session
+                                .cancel_refusal(&instance_root, &installed_snapshot, false)?
+                                .is_none()
+                    }
+                    None => false,
+                };
+                match &config.modpack {
+                    Some(pack) if gives_up => {
+                        return Err(UpdateLostFiles {
+                            instance_id,
+                            files,
+                            total,
+                            pack: pack.modpack.clone(),
+                        }
+                        .into());
+                    }
+                    pack => {
+                        lost_warning = Some(TaskWarning::PackFilesMissing {
+                            instance_id: instance_id.0,
+                            files,
+                            total,
+                            repairable: pack.is_some(),
+                        });
+                    }
+                }
             }
             drop_shadowed_disabled_twins(&staging_dir.join("instance"), &mut files).await?;
 
@@ -1103,6 +1167,12 @@ async fn prepare_modpack(
                     session
                 }
             };
+            if let Some(warning) = lost_warning {
+                // Told once the setup finishes, by this task or by the one
+                // that resumes it.
+                task.warn(warning.clone());
+                session.warnings.push(warning);
+            }
             if let Some(proof) = &archive_proof {
                 // The proof was hashed earlier in this same preparation. An
                 // archive nothing wrote since still holds those bytes; any
@@ -1767,6 +1837,92 @@ async fn unstaged_plan_error(
 async fn file_stamp(path: &Path) -> Option<(u64, std::time::SystemTime)> {
     let metadata = tokio::fs::symlink_metadata(path).await.ok()?;
     Some((metadata.len(), metadata.modified().ok()?))
+}
+
+/// A version change that lost pack files before it had changed anything (see
+/// [`lost_pack_files`]). `prepare_game` gives the change up and keeps the
+/// installed version, reporting [`warning`](Self::warning); this is the
+/// failure shown when it can't, and the setup then stays pending for Play to
+/// resume.
+#[derive(Debug)]
+pub struct UpdateLostFiles {
+    instance_id: InstanceId,
+    /// The first few of the `total` lost, never empty.
+    files: Vec<String>,
+    total: u32,
+    /// The version that was asked for.
+    pack: Modpack,
+}
+
+impl UpdateLostFiles {
+    pub fn warning(&self) -> TaskWarning {
+        TaskWarning::PackUpdateAbandoned {
+            instance_id: self.instance_id.0,
+            files: self.files.clone(),
+            total: self.total,
+            pack: self.pack.clone(),
+        }
+    }
+}
+
+impl std::fmt::Display for UpdateLostFiles {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "A file downloaded for this modpack ({}) went missing before it could be installed, often because antivirus software removed it. Press Play to try again.",
+            self.files.first().map_or("unknown", String::as_str)
+        )
+    }
+}
+
+impl std::error::Error for UpdateLostFiles {}
+
+/// Which of the files this preparation itself put under `data` (each
+/// download it finished and each override it unpacked) are no longer there,
+/// as sorted `/`-separated paths inside `data`. Antivirus software removing a
+/// mod it has just seen written is the usual cause.
+///
+/// Each path is asked of the disk, never compared with a listing of the
+/// folder as text: a file system that folds case or normalises names lists
+/// a file under another spelling than it was written with. A file present
+/// under its `.disabled` twin's name, or under its own name without
+/// `.disabled`, is the same target file (see
+/// [`drop_shadowed_disabled_twins`]) and is not lost.
+async fn lost_pack_files(data: &Path, written: Vec<PathBuf>) -> anyhow::Result<Vec<String>> {
+    let data = data.to_owned();
+    Ok(tokio::task::spawn_blocking(move || {
+        // Only a file the disk says is not there is lost: one that can't be
+        // looked at (held by a scanner, say) is still in place.
+        let there = |path: &Path| {
+            !matches!(
+                std::fs::symlink_metadata(path),
+                Err(error) if error.kind() == io::ErrorKind::NotFound
+            )
+        };
+        written
+            .into_iter()
+            .filter(|path| {
+                let mut twin = path.clone().into_os_string();
+                twin.push(".disabled");
+                let bare = path
+                    .to_str()
+                    .and_then(|text| text.strip_suffix(".disabled"))
+                    .map(PathBuf::from);
+                !(there(path) || there(Path::new(&twin)) || bare.is_some_and(|bare| there(&bare)))
+            })
+            .map(|path| {
+                path.strip_prefix(&data)
+                    .unwrap_or(&path)
+                    .components()
+                    .map(|part| part.as_os_str().to_string_lossy())
+                    .collect::<Vec<_>>()
+                    .join("/")
+            })
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    })
+    .await?)
 }
 
 /// A pack can ship a file both enabled and as its `.disabled` twin, say a

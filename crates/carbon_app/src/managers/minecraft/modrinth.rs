@@ -151,6 +151,8 @@ pub struct ModpackInfo {
     pub index: ModpackIndex,
     // (downloadable, existing path)
     pub downloadables: Vec<(Downloadable, Option<String>)>,
+    /// The override files this preparation wrote into the instance path.
+    pub extracted: Vec<std::path::PathBuf>,
 }
 
 pub async fn download_mrpack(
@@ -382,7 +384,7 @@ async fn prepare_mrpack_cancellable(
             .collect::<Result<Vec<_>, _>>()?
     };
 
-    if !skip_overlays {
+    let extracted = if !skip_overlays {
         let data_path = instance_path.get_data_path();
 
         crate::managers::runtime_lifecycle::run_owned_phase(cancel, || async move {
@@ -409,6 +411,7 @@ async fn prepare_mrpack_cancellable(
                 // entries each just under a per-entry cap could still add up to an
                 // unbounded amount written to disk.
                 let mut extracted_bytes: u64 = 0;
+                let mut written = Vec::new();
                 for (pass, overrides_folder_name) in
                     ["overrides", "client-overrides"].into_iter().enumerate()
                 {
@@ -451,6 +454,7 @@ async fn prepare_mrpack_cancellable(
                                 extraction_budget.saturating_sub(extracted_bytes);
                             extracted_bytes +=
                                 copy_bounded(&mut file, &mut out_file, remaining_budget)?;
+                            written.push(out_path);
                         }
 
                         report_progress(pass as u64 * entries_per_pass + i as u64 + 1)?;
@@ -459,16 +463,19 @@ async fn prepare_mrpack_cancellable(
                 // Account for an ignored tail or an archive with no eligible files.
                 // Errors above never reach this successful completion update.
                 report_progress(total_extraction_work)?;
-                Ok::<(), anyhow::Error>(())
+                Ok::<_, anyhow::Error>(written)
             })
             .await?
         })
-        .await?;
-    }
+        .await?
+    } else {
+        Vec::new()
+    };
 
     Ok(ModpackInfo {
         index,
         downloadables,
+        extracted,
     })
 }
 

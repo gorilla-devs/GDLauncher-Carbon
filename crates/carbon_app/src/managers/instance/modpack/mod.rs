@@ -673,11 +673,7 @@ impl ManagerRef<'_, InstanceManager> {
                 } else if let Ok(text) = tokio::fs::read_to_string(root.join(".setup/change-pack-version.json")).await {
                     if let Ok(pack) = serde_json::from_str::<PackVersionFile>(&text) { status.pending_version = Some(PackProofContext::from(&Modpack::from(pack)).version_id); }
                 }
-                status.reason = session.cancel_reason(&current);
-                if !inactive { status.reason = Some("Wait for the current operation to finish before cancelling.".into()); }
-                if root.join(".setup/apply-started").try_exists()? || root.join(".setup/representation-transitions").try_exists()? {
-                    status.reason = Some("Apply may have started. Resume the pending setup to finish safely.".into());
-                }
+                status.reason = session.cancel_refusal(&root, &current, !inactive)?;
                 status.can_cancel = status.reason.is_none();
             }
             Ok(None) if !inactive => status.reason = Some("Wait for the current operation to finish before cancelling.".into()),
@@ -744,7 +740,51 @@ impl ManagerRef<'_, InstanceManager> {
             instance_id: instance_id.0,
             operation: expected_operation,
         };
-        let session = session::Session::require(&root, &owner).await?;
+        self.retire_unapplied_setup(instance_id, &root, &owner)
+            .await
+    }
+
+    /// Gives up the version change this instance's own preparation was
+    /// making, when it has changed nothing yet, so the instance stays on its
+    /// installed version: what [`cancel_pending_setup`](Self::cancel_pending_setup)
+    /// does for the user, done by the preparation that found it can't
+    /// install the version whole (see `run::modpack::UpdateLostFiles`). The
+    /// instance is still preparing, which is the caller itself.
+    pub(super) async fn abandon_version_change(
+        self,
+        instance_id: InstanceId,
+        owner: &session::Owner,
+    ) -> anyhow::Result<()> {
+        let _operation = self.lock_instance(instance_id).await;
+        let (shortpath, current) = self.current_config(instance_id).await?;
+        let root = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath)
+            .get_root();
+        let session = session::Session::require(&root, owner).await?;
+        if session.producer != session::Producer::Change {
+            bail!("only a version change can be given up for the installed version");
+        }
+        if let Some(reason) = session.cancel_refusal(&root, &current, false)? {
+            bail!("{reason}");
+        }
+        self.retire_unapplied_setup(instance_id, &root, owner).await
+    }
+
+    /// Retires `owner`'s pending setup, which changed no installed content,
+    /// so the instance is back on its installed version. Requires the
+    /// instance gate, and a setup that can be cancelled (see
+    /// [`session::Session::cancel_refusal`]).
+    async fn retire_unapplied_setup(
+        self,
+        instance_id: InstanceId,
+        root: &Path,
+        owner: &session::Owner,
+    ) -> anyhow::Result<()> {
+        let session = session::Session::require(root, owner).await?;
         let temporary = root.join("tmp-packinfo.json");
         if temporary.try_exists()? {
             let target = session
@@ -759,7 +799,7 @@ impl ManagerRef<'_, InstanceManager> {
         }
         // Rename retains evidence and atomically restores the ordinary no-setup
         // installed-version launch path, without downloading or rewriting config.
-        let retained = session::retire(&root, &owner.operation).await?;
+        let retained = session::retire(root, &owner.operation).await?;
         // A cancellable setup never changed installed content, so its
         // downloads are evidence of nothing; its records stay.
         if let Err(error) = session::trim_retired(&retained).await {

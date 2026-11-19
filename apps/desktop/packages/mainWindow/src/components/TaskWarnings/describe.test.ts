@@ -449,4 +449,116 @@ describe("describeTaskWarnings", () => {
       "The modpack was updated, but files from its previous version were kept"
     )
   })
+
+  it("says an update was given up, which files went missing, and offers to try it again", async () => {
+    const i18n = i18next.createInstance()
+    await i18n.init({
+      lng: "en",
+      ns: ["notifications"],
+      resources: { en: { notifications: english } }
+    })
+    const translate: Translate = (key, options) =>
+      i18n.t(key as string, options)
+    const modpack = {
+      type: "modrinth",
+      value: { project_id: "atm10", version_id: "4.2" }
+    } as const
+    const entry: FETaskWarnings = {
+      id: 21,
+      name: {
+        translation: "InstanceTaskPrepare",
+        args: { name: "Steve's Pack" }
+      },
+      subject: null,
+      warnings: [
+        {
+          type: "PackUpdateAbandoned",
+          value: {
+            instance: 4,
+            files: ["mods/example-lib-2.4.jar"],
+            total: 1,
+            modpack
+          }
+        }
+      ]
+    }
+    expect(describeTaskWarnings(entry, translate)).toEqual({
+      title: "Steve's Pack wasn't updated",
+      lines: ["Antivirus may have removed mods/example-lib-2.4.jar."],
+      action: { kind: "retryUpdate", instance: 4, modpack }
+    })
+    // What the update would have said had it finished is not said of it.
+    expect(
+      describeTaskWarnings(
+        {
+          ...entry,
+          name: { translation: "InstanceTaskLaunch", args: { name: "" } },
+          warnings: [
+            {
+              type: "PreviousPackFilesKept",
+              value: { platform: "Modrinth", reason: "VersionUnavailable" }
+            },
+            ...entry.warnings
+          ]
+        },
+        translate
+      )
+    ).toEqual({
+      title: "The modpack wasn't updated",
+      lines: ["Antivirus may have removed mods/example-lib-2.4.jar."],
+      action: { kind: "retryUpdate", instance: 4, modpack }
+    })
+  })
+
+  it("says how many files an install is missing, names the first two, and offers Repair when it can download them", async () => {
+    const i18n = i18next.createInstance()
+    await i18n.init({
+      lng: "en",
+      ns: ["notifications"],
+      resources: { en: { notifications: english } }
+    })
+    const translate: Translate = (key, options) =>
+      i18n.t(key as string, options)
+    const missing = (files: string[], total: number, repairable = true) =>
+      describeTaskWarnings(
+        {
+          id: 22,
+          name: {
+            translation: "InstanceTaskLaunch",
+            args: { name: "Steve's Pack" }
+          },
+          subject: null,
+          warnings: [
+            {
+              type: "PackFilesMissing",
+              value: { instance: 9, files, total, repairable }
+            }
+          ]
+        },
+        translate
+      )
+    const repair = { kind: "repair", instance: 9, name: "Steve's Pack" }
+    expect(missing(["mods/a.jar"], 1)).toEqual({
+      title: "Steve's Pack is missing 1 file",
+      lines: ["Antivirus may have removed mods/a.jar."],
+      action: repair
+    })
+    expect(missing(["config/b.toml", "mods/a.jar"], 2)).toEqual({
+      title: "Steve's Pack is missing 2 files",
+      lines: ["Antivirus may have removed config/b.toml and mods/a.jar."],
+      action: repair
+    })
+    expect(missing(["config/b.toml", "mods/a.jar"], 14)).toEqual({
+      title: "Steve's Pack is missing 14 files",
+      lines: [
+        "Antivirus may have removed config/b.toml, mods/a.jar and 12 more."
+      ],
+      action: repair
+    })
+    // Installed from a file alone: Repair has nothing to download it from.
+    expect(missing(["mods/a.jar"], 1, false)).toEqual({
+      title: "Steve's Pack is missing 1 file",
+      lines: ["Antivirus may have removed mods/a.jar."]
+    })
+  })
 })

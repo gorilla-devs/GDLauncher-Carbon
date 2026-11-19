@@ -1023,6 +1023,34 @@ impl Session {
         Ok(self.binds_to(instance) && self.pack_installed(root).await?)
     }
 
+    /// Why this pending setup can't be given up for the installed version,
+    /// or `None` when it can: nothing it prepared was applied, and the
+    /// installed version is still what it started from (see
+    /// [`cancel_reason`](Self::cancel_reason)). `busy` is whether another
+    /// operation is running on the instance; the preparation that gives up
+    /// its own setup passes `false`.
+    pub fn cancel_refusal(
+        &self,
+        root: &Path,
+        current: &info::Instance,
+        busy: bool,
+    ) -> std::io::Result<Option<String>> {
+        let setup = root.join(".setup");
+        if setup.join("apply-started").try_exists()?
+            || setup.join("representation-transitions").try_exists()?
+        {
+            return Ok(Some(
+                "Apply may have started. Resume the pending setup to finish safely.".into(),
+            ));
+        }
+        if busy {
+            return Ok(Some(
+                "Wait for the current operation to finish before cancelling.".into(),
+            ));
+        }
+        Ok(self.cancel_reason(current))
+    }
+
     pub fn cancel_reason(&self, current: &info::Instance) -> Option<String> {
         const FIRST_INSTALL: &str = "This is the instance's first install, so there is no earlier version to go back to. Press Play to finish installing it.";
         match (self.producer, self.kind) {

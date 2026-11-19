@@ -105,7 +105,36 @@ pub enum TaskWarning {
         platform: DependencyPlatform,
         reason: PreviousPackFilesReason,
     },
+    /// A modpack install or Repair finished without some of the pack's
+    /// files: the launcher downloaded or unpacked them, and they were gone
+    /// before it could install them (most often antivirus software removing
+    /// a mod it has just seen written). The installed record leaves them
+    /// out, so a Repair downloads them again.
+    PackFilesMissing {
+        instance_id: i32,
+        /// The first [`LOST_PACK_FILES_NAMED`], as `/`-separated paths inside
+        /// the game folder.
+        files: Vec<String>,
+        /// How many went missing in all.
+        total: u32,
+        /// Whether the instance is linked to a modpack Repair can download
+        /// again; one installed from a file alone is not.
+        repairable: bool,
+    },
+    /// A modpack version change lost files the same way before it had
+    /// changed anything, so it was given up and the installed version kept.
+    PackUpdateAbandoned {
+        instance_id: i32,
+        /// As in [`TaskWarning::PackFilesMissing`].
+        files: Vec<String>,
+        total: u32,
+        /// The version that was asked for, to ask for again.
+        pack: crate::domain::instance::info::Modpack,
+    },
 }
+
+/// How many lost pack files a warning names; the launcher log lists them all.
+pub const LOST_PACK_FILES_NAMED: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum DependencyPlatform {

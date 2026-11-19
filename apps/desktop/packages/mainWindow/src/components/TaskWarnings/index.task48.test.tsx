@@ -7,7 +7,9 @@ const io = vi.hoisted(() => ({
   data: (() => undefined) as () => FETaskWarnings[] | undefined,
   queryKey: null as unknown,
   acknowledge: vi.fn(),
-  warning: vi.fn()
+  warning: vi.fn(),
+  error: vi.fn(),
+  openModal: vi.fn()
 }))
 vi.mock("@/utils/rspcClient", () => ({
   rspc: {
@@ -22,7 +24,12 @@ vi.mock("@/utils/rspcClient", () => ({
     }
   }
 }))
-vi.mock("@gd/ui", () => ({ toast: { warning: io.warning } }))
+vi.mock("@gd/ui", () => ({
+  toast: { warning: io.warning, error: io.error }
+}))
+vi.mock("@/managers/ModalsManager", () => ({
+  useModal: () => ({ openModal: io.openModal })
+}))
 vi.mock("@gd/i18n", () => ({
   useTransContext: () => [
     (key: string, options?: Record<string, unknown>) => {
@@ -132,4 +139,85 @@ it("does not toast again when the acknowledgement fails", async () => {
   await flush()
   expect(io.warning).toHaveBeenCalledTimes(1)
   error.mockRestore()
+})
+
+const lostFiles = (
+  id: number,
+  warning: FETaskWarnings["warnings"][number]
+): FETaskWarnings => ({
+  id,
+  name: { translation: "InstanceTaskPrepare", args: { name: "ATM 10" } },
+  subject: null,
+  warnings: [warning]
+})
+
+it("offers Repair on an install that is missing files, and opens it for that instance", async () => {
+  setData([
+    lostFiles(11, {
+      type: "PackFilesMissing",
+      value: { instance: 5, files: ["mods/a.jar"], total: 1, repairable: true }
+    })
+  ])
+  await flush()
+  const [title, options] = io.warning.mock.calls[0]
+  expect(title).toBe(
+    'notifications:_trn_pack_files_missing_in_instance {"instance":"ATM 10","count":1}'
+  )
+  expect((options.description as HTMLElement).textContent).toBe(
+    'notifications:_trn_pack_files_lost_single {"file":"mods/a.jar"}'
+  )
+  expect(options.action.label).toBe("instances:_trn_instance_settings.repair")
+  options.action.onClick()
+  expect(io.openModal).toHaveBeenCalledWith(
+    { name: "repairModpack" },
+    { id: 5, name: "ATM 10", isServer: false }
+  )
+  // Only the acknowledgement was sent to the core.
+  expect(io.acknowledge).toHaveBeenCalledTimes(1)
+})
+
+it("shows no button when Repair cannot download the modpack again", async () => {
+  setData([
+    lostFiles(12, {
+      type: "PackFilesMissing",
+      value: { instance: 5, files: ["mods/a.jar"], total: 1, repairable: false }
+    })
+  ])
+  await flush()
+  expect(io.warning.mock.calls[0][1].action).toBeUndefined()
+})
+
+it("asks for the same version again from an update that was given up, and says why when that is refused", async () => {
+  const modpack = {
+    type: "curseforge",
+    value: { project_id: 925200, file_id: 6000001 }
+  } as const
+  setData([
+    lostFiles(13, {
+      type: "PackUpdateAbandoned",
+      value: { instance: 5, files: ["mods/a.jar"], total: 1, modpack }
+    })
+  ])
+  await flush()
+  const [title, options] = io.warning.mock.calls[0]
+  expect(title).toBe(
+    'notifications:_trn_pack_update_abandoned_in_instance {"instance":"ATM 10"}'
+  )
+  expect(options.action.label).toBe("notifications:_trn_pack_update_try_again")
+  options.action.onClick()
+  await flush()
+  expect(io.acknowledge).toHaveBeenLastCalledWith([
+    "instance.changeModpack",
+    { instance: 5, modpack }
+  ])
+  expect(io.error).not.toHaveBeenCalled()
+
+  io.acknowledge.mockRejectedValueOnce(new Error("the instance is running"))
+  options.action.onClick()
+  await flush()
+  expect(io.error).toHaveBeenCalledTimes(1)
+  expect(io.error.mock.calls[0][0]).toBe("instances:_trn_change_version_failed")
+  expect(io.error.mock.calls[0][1].description).toContain(
+    "the instance is running"
+  )
 })

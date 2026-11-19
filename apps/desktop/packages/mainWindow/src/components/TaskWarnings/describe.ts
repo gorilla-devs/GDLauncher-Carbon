@@ -3,7 +3,8 @@ import type {
   FEPreviousPackFilesReason,
   FESkippedDependencyReason,
   FETaskWarning,
-  FETaskWarnings
+  FETaskWarnings,
+  Modpack
 } from "@gd/core_module/bindings"
 import type { NamespacedTranslationKey } from "@gd/i18n"
 
@@ -12,11 +13,22 @@ export type Translate = (
   options?: Record<string, unknown>
 ) => string
 
+/** The one thing the toast's button does. */
+export type WarningAction =
+  | { kind: "repair"; instance: number; name: string }
+  | { kind: "retryUpdate"; instance: number; modpack: Modpack }
+
 export interface WarningToast {
   title: string
   lines: string[]
-  hint: string
+  hint?: string
+  action?: WarningAction
 }
+
+type WarningOf<T extends FETaskWarning["type"]> = Extract<
+  FETaskWarning,
+  { type: T }
+>
 
 const SKIP_REASON: Record<FESkippedDependencyReason, NamespacedTranslationKey> =
   {
@@ -92,6 +104,32 @@ export function dependencyLabel(
   })
 }
 
+/** Which pack files went missing: the first two by name, then how many more. */
+function lostFiles(
+  value: { files: string[]; total: number },
+  t: Translate
+): string {
+  const [first, second] = value.files
+  if (second === undefined) {
+    return t("notifications:_trn_pack_files_lost_single", {
+      file: first,
+      interpolation: noEscape
+    })
+  }
+  return value.total > 2
+    ? t("notifications:_trn_pack_files_lost_more", {
+        first,
+        second,
+        more: value.total - 2,
+        interpolation: noEscape
+      })
+    : t("notifications:_trn_pack_files_lost_pair", {
+        first,
+        second,
+        interpolation: noEscape
+      })
+}
+
 function describeWarning(warning: FETaskWarning, t: Translate): string {
   switch (warning.type) {
     case "SkippedDependency":
@@ -131,6 +169,9 @@ function describeWarning(warning: FETaskWarning, t: Translate): string {
       return t(PREVIOUS_PACK_FILES[warning.value.reason], {
         platform: PLATFORM_NAME[warning.value.platform]
       })
+    case "PackFilesMissing":
+    case "PackUpdateAbandoned":
+      return lostFiles(warning.value, t)
   }
 }
 
@@ -141,9 +182,9 @@ function nonEmpty(value: unknown): string | null {
 /** Toast content for a succeeded task's warnings: which required
  * dependencies were left out, are installed but disabled, or were installed
  * at another version than asked,
- * which of a modpack's files were not installed, which files a modpack
- * version change kept, or under which name a world was saved because its
- * own was taken, why, and what the user can do about it. */
+ * which of a modpack's files were not installed or went missing, which files
+ * a modpack version change kept, or under which name a world was saved
+ * because its own was taken, why, and what the user can do about it. */
 export function describeTaskWarnings(
   entry: FETaskWarnings,
   t: Translate
@@ -151,6 +192,64 @@ export function describeTaskWarnings(
   const lines = entry.warnings.map((warning) => describeWarning(warning, t))
   if (lines.length === 0) return null
   const args = taskArgs(entry)
+  // Both run as the instance's preparation task, whose name carries the
+  // instance's name. A version change that was given up says nothing else.
+  const abandoned = entry.warnings.find(
+    (warning): warning is WarningOf<"PackUpdateAbandoned"> =>
+      warning.type === "PackUpdateAbandoned"
+  )
+  if (abandoned) {
+    const instance = nonEmpty(args.name)
+    return {
+      title:
+        instance !== null
+          ? t("notifications:_trn_pack_update_abandoned_in_instance", {
+              instance,
+              interpolation: noEscape
+            })
+          : t("notifications:_trn_pack_update_abandoned"),
+      lines: [describeWarning(abandoned, t)],
+      action: {
+        kind: "retryUpdate",
+        instance: abandoned.value.instance,
+        modpack: abandoned.value.modpack
+      }
+    }
+  }
+  const missing = entry.warnings.find(
+    (warning): warning is WarningOf<"PackFilesMissing"> =>
+      warning.type === "PackFilesMissing"
+  )
+  if (missing) {
+    const instance = nonEmpty(args.name)
+    const count = missing.value.total
+    return {
+      title:
+        instance !== null
+          ? t("notifications:_trn_pack_files_missing_in_instance", {
+              instance,
+              count,
+              interpolation: noEscape
+            })
+          : t("notifications:_trn_pack_files_missing", { count }),
+      lines: [
+        describeWarning(missing, t),
+        ...entry.warnings
+          .filter((warning) => warning !== missing)
+          .map((warning) => describeWarning(warning, t))
+      ],
+      // A pack installed from a file alone has nothing for Repair to download.
+      ...(missing.value.repairable && instance !== null
+        ? {
+            action: {
+              kind: "repair",
+              instance: missing.value.instance,
+              name: instance
+            }
+          }
+        : {})
+    }
+  }
   // A modpack version change runs as the instance's preparation task, whose
   // name carries the instance's name.
   if (

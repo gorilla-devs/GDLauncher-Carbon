@@ -5769,3 +5769,69 @@ async fn a_switched_off_file_stays_when_its_successor_was_not_installed() {
         ["map-1.0.jar.disabled", "map-1.1.jar"]
     );
 }
+
+/// A file the preparation wrote counts as lost only when the disk has it
+/// under none of the names it can be installed from: its own, its
+/// `.disabled` twin's, or its own without `.disabled`.
+#[tokio::test]
+async fn lost_pack_files_are_the_written_files_the_disk_no_longer_has() {
+    let tmp = tempfile::tempdir().unwrap();
+    let data = tmp.path().join("instance");
+    std::fs::create_dir_all(data.join("mods/nested")).unwrap();
+    std::fs::create_dir_all(data.join("config")).unwrap();
+    for present in [
+        "mods/there.jar",
+        "mods/switched-off.jar.disabled",
+        "mods/switched-on.jar",
+        "config/there.cfg",
+    ] {
+        std::fs::write(data.join(present), b"x").unwrap();
+    }
+    let written = [
+        "mods/there.jar",
+        "mods/switched-off.jar",
+        "mods/switched-on.jar.disabled",
+        "config/there.cfg",
+        "mods/nested/gone.jar",
+        "config/gone.cfg",
+        "mods/gone.jar.disabled",
+        // Written twice, by a download and an override: named once.
+        "config/gone.cfg",
+    ]
+    .map(|path| data.join(path))
+    .to_vec();
+    assert_eq!(
+        super::lost_pack_files(&data, written).await.unwrap(),
+        [
+            "config/gone.cfg",
+            "mods/gone.jar.disabled",
+            "mods/nested/gone.jar"
+        ]
+    );
+    assert!(
+        super::lost_pack_files(&data, vec![data.join("mods/there.jar")])
+            .await
+            .unwrap()
+            .is_empty()
+    );
+}
+
+/// What the task fails with when the version change can't be given up: it
+/// names the file and the way to go on.
+#[test]
+fn a_version_change_that_cannot_be_given_up_names_the_lost_file() {
+    use crate::domain::instance::info::{Modpack, ModrinthModpack};
+    let error = super::UpdateLostFiles {
+        instance_id: crate::domain::instance::InstanceId(1),
+        files: vec!["mods/example.jar".into()],
+        total: 1,
+        pack: Modpack::Modrinth(ModrinthModpack {
+            project_id: "project".into(),
+            version_id: "version".into(),
+        }),
+    };
+    assert_eq!(
+        error.to_string(),
+        "A file downloaded for this modpack (mods/example.jar) went missing before it could be installed, often because antivirus software removed it. Press Play to try again."
+    );
+}
