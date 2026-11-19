@@ -123,7 +123,7 @@ export default function HookTest(props: {
   }
 
   return (
-    <div class="flex w-full flex-col gap-2" data-testid="hook-test">
+    <div class="flex w-full flex-col gap-2 pb-3" data-testid="hook-test">
       <div class="flex w-full items-center gap-2">
         <div class="min-w-0 flex-1">{props.children}</div>
         {props.beside}

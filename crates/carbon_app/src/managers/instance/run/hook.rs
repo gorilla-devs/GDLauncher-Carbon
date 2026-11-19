@@ -38,7 +38,11 @@ pub enum HookFailure {
     TimedOut(Duration),
     /// The launcher's own shutdown stopped it.
     Stopped(std::io::Error),
-    NotStarted(std::io::Error),
+    /// `program`, the command's first word, could not be started.
+    NotStarted {
+        program: String,
+        error: std::io::Error,
+    },
     /// It ended with an error, having printed `stdout` and `stderr`.
     Failed {
         status: std::process::ExitStatus,
@@ -66,7 +70,14 @@ impl HookFailure {
                 format!("It did not finish within {} minutes.", limit.as_secs() / 60)
             }
             Self::Stopped(_) => "GDLauncher stopped it while closing.".into(),
-            Self::NotStarted(error) => error.to_string(),
+            // The usual reason by far: a tool that is not installed, or
+            // not where the launcher looks for programs.
+            Self::NotStarted { program, error } if error.kind() == std::io::ErrorKind::NotFound => {
+                format!("{program} was not found. Check that it is installed.")
+            }
+            Self::NotStarted { program, error } => {
+                format!("{program} could not be started: {error}")
+            }
             Self::Failed {
                 status,
                 stdout,
@@ -98,7 +109,9 @@ impl std::fmt::Display for HookError {
             HookFailure::Stopped(error) => {
                 write!(f, "{hook} was stopped before it finished: {error:?}")
             }
-            HookFailure::NotStarted(error) => write!(f, "{hook} failed to start: {error:?}"),
+            HookFailure::NotStarted { error, .. } => {
+                write!(f, "{hook} failed to start: {error:?}")
+            }
             HookFailure::Failed { status, stderr, .. } => {
                 write!(f, "{hook} failed with status: {status:?} \n{stderr}")
             }
@@ -127,7 +140,7 @@ pub async fn run(
         limit,
         crate::managers::runtime_lifecycle::tracked_output_reserved(
             &app.runtime_lifecycle,
-            tokio::process::Command::new(program)
+            tokio::process::Command::new(&program)
                 .args(words)
                 .current_dir(folder)
                 .kill_on_drop(true),
@@ -141,7 +154,7 @@ pub async fn run(
         failed(if error.kind() == std::io::ErrorKind::Interrupted {
             HookFailure::Stopped(error)
         } else {
-            HookFailure::NotStarted(error)
+            HookFailure::NotStarted { program, error }
         })
     })?;
     if !output.status.success() {
@@ -453,7 +466,7 @@ mod tests {
 
         let error = failure(HookKind::PostExit, "/no/such/program --flag", LIMIT).await;
         assert!(
-            matches!(error.failure, HookFailure::NotStarted(_)),
+            matches!(&error.failure, HookFailure::NotStarted { program, .. } if program == "/no/such/program"),
             "{error}"
         );
         assert!(
@@ -502,10 +515,16 @@ mod tests {
             summary("sleep 30", Duration::from_millis(200)).await,
             "It did not finish within 0 minutes."
         );
+        assert_eq!(
+            summary("rclone-is-not-installed sync saves remote:x", LIMIT).await,
+            "rclone-is-not-installed was not found. Check that it is installed."
+        );
+        // There, but not something that can be run.
+        std::fs::write(folder.path().join("not-a-program"), b"text").unwrap();
         assert!(
-            summary("/no/such/program", LIMIT)
+            summary("./not-a-program", LIMIT)
                 .await
-                .contains("No such file"),
+                .starts_with("./not-a-program could not be started: "),
         );
     }
 
@@ -651,10 +670,11 @@ mod tests {
             .test_hook(id, HookKind::PreLaunch, "/no/such/program".into())
             .await
             .unwrap();
-        assert!(
-            matches!(&test.outcome, HookTestOutcome::NotRun { summary } if summary.contains("No such file")),
-            "{:?}",
-            test.outcome
+        assert_eq!(
+            test.outcome,
+            HookTestOutcome::NotRun {
+                summary: "/no/such/program was not found. Check that it is installed.".into()
+            }
         );
         let test = manager
             .test_hook(id, HookKind::PreLaunch, "  ".into())
