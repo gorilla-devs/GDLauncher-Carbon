@@ -1949,6 +1949,46 @@ async fn lost_pack_files(data: &Path, written: Vec<PathBuf>) -> anyhow::Result<V
     .await?)
 }
 
+/// Whether the system refused a file because another program holds it open
+/// or because it, or its folder, can't be written: access denied anywhere,
+/// and on Windows a sharing or lock violation. Windows reports a file that
+/// is open elsewhere as either, so the two are told as one.
+fn held_or_read_only(error: &anyhow::Error) -> bool {
+    error
+        .chain()
+        .filter_map(|cause| cause.downcast_ref::<io::Error>())
+        .any(|error| {
+            error.kind() == io::ErrorKind::PermissionDenied
+                || cfg!(windows) && matches!(error.raw_os_error(), Some(32 | 33))
+        })
+}
+
+/// What the apply fails with when its step for one pack file fails: which
+/// file, what was being done to it, and the way on. The apply saved that it
+/// had started before its first step, so Play resumes it. The failure itself
+/// stays in the chain for the log.
+fn entry_failure(entry: &apply_plan::PlanEntry, error: anyhow::Error) -> anyhow::Error {
+    use apply_plan::PlanAction;
+    let file = entry.path.trim_start_matches('/');
+    let done = match entry.action {
+        PlanAction::Delete => "removed",
+        PlanAction::Create => "installed",
+        PlanAction::ReEnable => "switched back on",
+        PlanAction::Replace | PlanAction::ReplaceDisabled | PlanAction::Keep => "replaced",
+    };
+    let message = if held_or_read_only(&error) {
+        format!(
+            "{file} could not be {done} because another program has it open or it is read-only. Close that program, then press Play to finish."
+        )
+    } else {
+        format!(
+            "{file} could not be {done}: {}. Press Play to try again.",
+            error.root_cause()
+        )
+    };
+    error.context(message)
+}
+
 /// A pack can ship a file both enabled and as its `.disabled` twin, say a
 /// mod it downloads plus an override of the same name that is disabled. Both
 /// stand for one target path. The bare file is the one installed, as before
@@ -3466,114 +3506,121 @@ async fn execute_bound_plan(
         {
             ownership.check().await?;
         }
-        if entry.action != PlanAction::Keep
-            && (transition_path(instance_root, &entry.path).try_exists()?
-                || entry.action == PlanAction::ReEnable
-                || entry.action == PlanAction::Replace
-                    && resolve_staged(&staged).is_some_and(|(_, disabled)| disabled))
-        {
-            execute_representation(
-                entry,
-                instance_root,
-                &staged,
-                target,
-                &binding,
-                notes,
-                owner,
-            )
-            .await?;
-            continue;
-        }
-        let pack = target.files.get(&entry.path);
-        let expected = pack.map(|h| h.sha512);
-        let pack_md5 = pack.map(|h| h.md5).unwrap_or_default();
-        // A staged source that changed since the apply started is never
-        // published, whichever action needs it.
-        let changed = sources.changed.contains(&entry.path);
-        match entry.action {
-            PlanAction::Keep => {}
-            PlanAction::Delete => {
-                tokio::fs::remove_file(&live).await?;
+        // Everything this entry's own step does to its file. A failure
+        // names the file and the way on (see `entry_failure`).
+        let step: anyhow::Result<()> = async {
+            if entry.action != PlanAction::Keep
+                && (transition_path(instance_root, &entry.path).try_exists()?
+                    || entry.action == PlanAction::ReEnable
+                    || entry.action == PlanAction::Replace
+                        && resolve_staged(&staged).is_some_and(|(_, disabled)| disabled))
+            {
+                execute_representation(
+                    entry,
+                    instance_root,
+                    &staged,
+                    target,
+                    &binding,
+                    notes,
+                    owner,
+                )
+                .await?;
+                return Ok(());
             }
-            PlanAction::Replace => {
-                let (source, is_disabled) =
-                    resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
-                debug_assert!(
-                    !is_disabled,
-                    "disabled Replace uses durable representation intent"
-                );
-                let publication = if changed {
-                    Publication::SourceChanged
-                } else {
-                    publish_staged(
-                        &source,
-                        &live,
-                        expected.context("missing target hash for staged publication")?,
-                        false,
-                        &mut publications.routes,
-                    )
-                    .await?
-                };
-                publications
-                    .record(entry, publication, &live, pack_md5, notes)
-                    .await?;
-            }
-            PlanAction::Create => {
-                let (source, is_disabled) =
-                    resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
-                // A pack-shipped-disabled path must land disabled, not
-                // enabled — the pack's own default is preserved. So must the
-                // next file of a mod the player switched off.
-                let is_disabled = is_disabled || carried.lands_switched_off(&entry.path);
-                let dest = if is_disabled { &twin } else { &live };
-                tokio::fs::create_dir_all(dest.parent().unwrap()).await?;
-                // Preserve observed representation intent as well as the
-                // destination itself. No-clobber publication closes the
-                // destination race after this twin check.
-                let other = if is_disabled { &live } else { &twin };
-                let publication = if other.try_exists()? {
-                    Publication::Kept
-                } else if changed {
-                    Publication::SourceChanged
-                } else {
-                    publish_staged(
-                        &source,
-                        dest,
-                        expected.context("missing target hash for staged publication")?,
-                        true,
-                        &mut publications.routes,
-                    )
-                    .await?
-                };
-                let kept = publication == Publication::Kept;
-                publications
-                    .record(entry, publication, dest, pack_md5, notes)
-                    .await?;
-                if kept && other == &twin && twin.exists() {
-                    entry.reason = PlanReason::DisabledByUser;
+            let pack = target.files.get(&entry.path);
+            let expected = pack.map(|h| h.sha512);
+            let pack_md5 = pack.map(|h| h.md5).unwrap_or_default();
+            // A staged source that changed since the apply started is never
+            // published, whichever action needs it.
+            let changed = sources.changed.contains(&entry.path);
+            match entry.action {
+                PlanAction::Keep => {}
+                PlanAction::Delete => {
+                    tokio::fs::remove_file(&live).await?;
                 }
+                PlanAction::Replace => {
+                    let (source, is_disabled) =
+                        resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
+                    debug_assert!(
+                        !is_disabled,
+                        "disabled Replace uses durable representation intent"
+                    );
+                    let publication = if changed {
+                        Publication::SourceChanged
+                    } else {
+                        publish_staged(
+                            &source,
+                            &live,
+                            expected.context("missing target hash for staged publication")?,
+                            false,
+                            &mut publications.routes,
+                        )
+                        .await?
+                    };
+                    publications
+                        .record(entry, publication, &live, pack_md5, notes)
+                        .await?;
+                }
+                PlanAction::Create => {
+                    let (source, is_disabled) =
+                        resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
+                    // A pack-shipped-disabled path must land disabled, not
+                    // enabled — the pack's own default is preserved. So must the
+                    // next file of a mod the player switched off.
+                    let is_disabled = is_disabled || carried.lands_switched_off(&entry.path);
+                    let dest = if is_disabled { &twin } else { &live };
+                    tokio::fs::create_dir_all(dest.parent().unwrap()).await?;
+                    // Preserve observed representation intent as well as the
+                    // destination itself. No-clobber publication closes the
+                    // destination race after this twin check.
+                    let other = if is_disabled { &live } else { &twin };
+                    let publication = if other.try_exists()? {
+                        Publication::Kept
+                    } else if changed {
+                        Publication::SourceChanged
+                    } else {
+                        publish_staged(
+                            &source,
+                            dest,
+                            expected.context("missing target hash for staged publication")?,
+                            true,
+                            &mut publications.routes,
+                        )
+                        .await?
+                    };
+                    let kept = publication == Publication::Kept;
+                    publications
+                        .record(entry, publication, dest, pack_md5, notes)
+                        .await?;
+                    if kept && other == &twin && twin.exists() {
+                        entry.reason = PlanReason::DisabledByUser;
+                    }
+                }
+                PlanAction::ReplaceDisabled => {
+                    let (source, _) =
+                        resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
+                    let publication = if changed {
+                        Publication::SourceChanged
+                    } else {
+                        publish_staged(
+                            &source,
+                            &twin,
+                            expected.context("missing target hash for staged publication")?,
+                            false,
+                            &mut publications.routes,
+                        )
+                        .await?
+                    };
+                    publications
+                        .record(entry, publication, &twin, pack_md5, notes)
+                        .await?;
+                }
+                PlanAction::ReEnable => unreachable!("ReEnable uses durable representation intent"),
             }
-            PlanAction::ReplaceDisabled => {
-                let (source, _) =
-                    resolve_staged(&staged).ok_or_else(|| missing_staged_error(&entry.path))?;
-                let publication = if changed {
-                    Publication::SourceChanged
-                } else {
-                    publish_staged(
-                        &source,
-                        &twin,
-                        expected.context("missing target hash for staged publication")?,
-                        false,
-                        &mut publications.routes,
-                    )
-                    .await?
-                };
-                publications
-                    .record(entry, publication, &twin, pack_md5, notes)
-                    .await?;
-            }
-            PlanAction::ReEnable => unreachable!("ReEnable uses durable representation intent"),
+            Ok(())
         }
+        .await;
+        step.map_err(|error| entry_failure(entry, error))?;
     }
     publications.finish().await?;
     // Only now that their successors are durable. One that can't be removed

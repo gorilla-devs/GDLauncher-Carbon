@@ -5835,3 +5835,82 @@ fn a_version_change_that_cannot_be_given_up_names_the_lost_file() {
         "A file downloaded for this modpack (mods/example.jar) went missing before it could be installed, often because antivirus software removed it. Press Play to try again."
     );
 }
+
+/// R05-run-modpack#5: a pack file the apply could not remove, replace or
+/// install failed the update with the system's bare error, which names no
+/// file. The failure now says which file, and how to go on. The system's own
+/// error stays behind it for the log.
+#[cfg(unix)]
+#[tokio::test]
+async fn a_file_the_apply_cannot_change_is_named_with_the_way_on() {
+    use std::os::unix::fs::PermissionsExt;
+    const PATH: &str = "/config/held.toml";
+    for (action, reason, done) in [
+        (PlanAction::Delete, PlanReason::PackDropped, "removed"),
+        (PlanAction::Replace, PlanReason::PackUpdate, "replaced"),
+        (PlanAction::Create, PlanReason::PackUpdate, "installed"),
+    ] {
+        let (_tmp, instance_root, staging_dir) = scaffold();
+        let folder = live_path(&instance_root, PATH).parent().unwrap().to_owned();
+        std::fs::create_dir_all(&folder).unwrap();
+        if action != PlanAction::Create {
+            write_live(&instance_root, PATH, b"installed").await;
+        }
+        write_staged(&staging_dir, PATH, b"the new version's").await;
+        let target = match action {
+            PlanAction::Delete => packinfo(&[]),
+            _ => packinfo(&[(PATH, 2)]),
+        };
+        let entry = PlanEntry {
+            path: PATH.into(),
+            action: action.clone(),
+            reason,
+        };
+        // A folder nothing can be changed in, as a file held open or marked
+        // read-only refuses on Windows.
+        std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o555)).unwrap();
+        if std::fs::write(folder.join("probe"), b"").is_ok() {
+            // Running as a user permissions don't bind.
+            return;
+        }
+        let failed = super::execute_plan(&[entry], &instance_root, &staging_dir, &target).await;
+        std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let error = failed.expect_err("the folder refuses every change");
+        assert_eq!(
+            error.to_string(),
+            format!(
+                "config/held.toml could not be {done} because another program has it open or it is read-only. Close that program, then press Play to finish."
+            )
+        );
+        assert!(
+            format!("{error:#}").contains("Permission denied"),
+            "{error:#}"
+        );
+    }
+}
+
+/// A failure that is not a held or read-only file says what the system
+/// said, again with the file.
+#[tokio::test]
+async fn another_failure_of_the_apply_names_the_file_and_what_the_system_said() {
+    const PATH: &str = "/mods/old.jar";
+    let (_tmp, instance_root, staging_dir) = scaffold();
+    // A folder where the file to remove should be.
+    std::fs::create_dir_all(live_path(&instance_root, PATH)).unwrap();
+    let entry = PlanEntry {
+        path: PATH.into(),
+        action: PlanAction::Delete,
+        reason: PlanReason::PackDropped,
+    };
+    let error = super::execute_plan(&[entry], &instance_root, &staging_dir, &packinfo(&[]))
+        .await
+        .expect_err("a folder is not removed as a file");
+    let text = error.to_string();
+    assert!(
+        text.starts_with("mods/old.jar could not be removed: "),
+        "{text}"
+    );
+    assert!(text.ends_with(". Press Play to try again."), "{text}");
+    assert!(!text.contains("another program"), "{text}");
+    assert!(live_path(&instance_root, PATH).is_dir());
+}
