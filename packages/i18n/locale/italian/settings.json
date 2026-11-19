@@ -71,7 +71,6 @@
   "_trn_hook_test_failed_code": "Non riuscito, codice di uscita {{code}}",
   "_trn_hook_test_failed": "Non riuscito",
   "_trn_hook_test_timed_out": "Fermato dopo cinque minuti",
-  "_trn_hook_test_stopped": "Fermato",
   "_trn_hook_test_instance": "Istanza in cui provare",
   "_trn_wrapper_command_title": "Comando Wrapper",
   "_trn_wrapper_command_text": "Comando per eseguire il gioco. Questo può essere utile per il modding o altri scopi.",

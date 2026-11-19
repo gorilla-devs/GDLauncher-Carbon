@@ -8,10 +8,16 @@ const io = vi.hoisted(() => ({
   stop: vi.fn(),
   loading: vi.fn(),
   success: vi.fn(),
-  error: vi.fn()
+  error: vi.fn(),
+  dismiss: vi.fn()
 }))
 vi.mock("@gd/ui", () => ({
-  toast: { loading: io.loading, success: io.success, error: io.error },
+  toast: {
+    loading: io.loading,
+    success: io.success,
+    error: io.error,
+    dismiss: io.dismiss
+  },
   Button: (p: any) => (
     <button
       data-testid={p["data-testid"]}
@@ -55,6 +61,8 @@ const result = (outcome: FEHookTest["outcome"], more = {}): FEHookTest => ({
   stderr: "",
   ...more
 })
+/** The id of the notice the last test started. */
+const notice = (): string => io.loading.mock.calls.at(-1)![1].id
 /** What a notice says under its title. */
 const told = (call: unknown[]) => {
   const options = call[1] as { description: HTMLElement }
@@ -108,7 +116,7 @@ it("runs what the box holds now and tells it in one notice, without moving the p
   expect(io.loading).toHaveBeenCalledWith(
     "settings:_trn_hook_test_title_post",
     {
-      id: "hook-test-PostExit",
+      id: expect.stringMatching(/^hook-test-PostExit-\d+$/),
       duration: Infinity
     }
   )
@@ -132,7 +140,7 @@ it("runs what the box holds now and tells it in one notice, without moving the p
   // something to read.
   const [title, options] = io.success.mock.calls[0]
   expect(title).toBe("settings:_trn_hook_test_title_post")
-  expect(options.id).toBe("hook-test-PostExit")
+  expect(options.id).toBe(notice())
   expect(options.duration).toBe(Infinity)
   expect(told(io.success.mock.calls[0])).toEqual({
     verdict: 'settings:_trn_hook_test_finished {"seconds":"6.2"}',
@@ -155,7 +163,7 @@ it("lets a test that printed nothing go by itself, and keeps every failure", asy
     part("hook-test-run")!.click()
     await flush()
     expect(io.error.mock.calls[0][1].duration).toBe(Infinity)
-    expect(io.error.mock.calls[0][1].id).toBe("hook-test-PostExit")
+    expect(io.error.mock.calls[0][1].id).toBe(notice())
     return told(io.error.mock.calls[0])
   }
   expect(
@@ -181,9 +189,6 @@ it("lets a test that printed nothing go by itself, and keeps every failure", asy
   expect((await failure({ type: "TimedOut" })).verdict).toBe(
     "settings:_trn_hook_test_timed_out"
   )
-  expect((await failure({ type: "Stopped" })).verdict).toBe(
-    "settings:_trn_hook_test_stopped"
-  )
   // The core refusing the test at all is told the same way.
   io.error.mockClear()
   io.test.mockRejectedValueOnce(
@@ -194,6 +199,36 @@ it("lets a test that printed nothing go by itself, and keeps every failure", asy
   expect(told(io.error.mock.calls[0]).verdict).toContain(
     "A test of this hook is already running."
   )
+})
+
+it("gives each test a notice of its own and puts the last one away", async () => {
+  // A notice reused would keep the last result under the spinner, and stay
+  // behind any notice shown since.
+  io.test.mockResolvedValueOnce(
+    result({ type: "Failed", value: { code: 1 } }, { stderr: "no\n" })
+  )
+  part("hook-test-run")!.click()
+  await flush()
+  const first = notice()
+  io.test.mockResolvedValueOnce(result({ type: "Finished" }))
+  part("hook-test-run")!.click()
+  await flush()
+  expect(notice()).not.toBe(first)
+  expect(io.dismiss).toHaveBeenCalledWith(first)
+  expect(io.dismiss.mock.invocationCallOrder.at(-1)).toBeLessThan(
+    io.loading.mock.invocationCallOrder.at(-1)!
+  )
+  expect(io.success.mock.calls[0][1].id).toBe(notice())
+})
+
+it("only takes the notice away for a test the player stopped", async () => {
+  io.test.mockResolvedValueOnce(result({ type: "Stopped" }))
+  part("hook-test-run")!.click()
+  await flush()
+  expect(io.dismiss).toHaveBeenLastCalledWith(notice())
+  expect(io.success).not.toHaveBeenCalled()
+  expect(io.error).not.toHaveBeenCalled()
+  expect(part("hook-test-run")).not.toBeNull()
 })
 
 it("cannot test an empty command or without an instance to run in", () => {

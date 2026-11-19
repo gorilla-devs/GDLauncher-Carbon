@@ -71,7 +71,6 @@
   "_trn_hook_test_failed_code": "失败，退出代码 {{code}}",
   "_trn_hook_test_failed": "失败",
   "_trn_hook_test_timed_out": "五分钟后已停止",
-  "_trn_hook_test_stopped": "已停止",
   "_trn_hook_test_instance": "用于测试的实例",
   "_trn_wrapper_command_title": "包装命令",
   "_trn_wrapper_command_text": "运行游戏的命令。这可用于模组或其他目的。",

@@ -71,7 +71,6 @@
   "_trn_hook_test_failed_code": "Échec avec le code de sortie {{code}}",
   "_trn_hook_test_failed": "Échec",
   "_trn_hook_test_timed_out": "Arrêté après cinq minutes",
-  "_trn_hook_test_stopped": "Arrêté",
   "_trn_hook_test_instance": "Instance où tester",
   "_trn_wrapper_command_title": "Commande Wrapper",
   "_trn_wrapper_command_text": "Commande pour lancer le jeu. Cela peut être utile pour le modding ou à d'autres fins.",

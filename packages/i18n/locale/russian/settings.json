@@ -71,7 +71,6 @@
   "_trn_hook_test_failed_code": "Ошибка, код выхода {{code}}",
   "_trn_hook_test_failed": "Ошибка",
   "_trn_hook_test_timed_out": "Остановлено через пять минут",
-  "_trn_hook_test_stopped": "Остановлено",
   "_trn_hook_test_instance": "Экземпляр для проверки",
   "_trn_wrapper_command_title": "Команда-обёртка",
   "_trn_wrapper_command_text": "Команда для запуска игры. Это может быть полезно для модификации или других целей.",

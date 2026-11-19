@@ -29,6 +29,14 @@ const TITLE: Record<FEHookKind, NamespacedTranslationKey> = {
   PostExit: "settings:_trn_hook_test_title_post"
 }
 
+/**
+ * The notice each hook's last test left, by its id. A new test puts it away
+ * and tells itself in a notice of its own: one reused would keep the last
+ * result under the spinner, and would stay behind any notice shown since.
+ */
+const shown = new Map<FEHookKind, string>()
+let tests = 0
+
 const Outcome = (props: { verdict: string; test: FEHookTest | null }) => (
   <div class="flex flex-col gap-2">
     <span data-testid="hook-test-verdict">{props.verdict}</span>
@@ -64,6 +72,7 @@ const Word = (props: { shown: string; other: string }) => (
  * runs, the button stops it. How it went is a notice, as for a hook that
  * runs around a game, so nothing on the page moves: it shows while the test
  * runs and turns into how it ended, with the last lines the script printed.
+ * A test that was stopped only takes its notice away.
  *
  * `children` is the command box; `beside` goes between it and the button
  * (the launcher-wide settings put the instance to test in there).
@@ -77,8 +86,6 @@ export default function HookTest(props: {
 }) {
   const [t] = useTransContext()
   const [running, setRunning] = createSignal<number | null>(null)
-  // One notice per hook: a new test replaces the last one's.
-  const notice = () => `hook-test-${props.kind}`
 
   const testMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.testHook"],
@@ -96,7 +103,8 @@ export default function HookTest(props: {
     }
   })
 
-  const verdict = (done: FEHookTest): { ok: boolean; text: string } => {
+  /** What to tell of a test, or nothing for one the player stopped. */
+  const verdict = (done: FEHookTest): { ok: boolean; text: string } | null => {
     switch (done.outcome.type) {
       case "Finished":
         return {
@@ -120,7 +128,7 @@ export default function HookTest(props: {
       case "TimedOut":
         return { ok: false, text: t("settings:_trn_hook_test_timed_out") }
       case "Stopped":
-        return { ok: false, text: t("settings:_trn_hook_test_stopped") }
+        return null
     }
   }
 
@@ -129,7 +137,11 @@ export default function HookTest(props: {
     if (instance === undefined || running() !== null) return
     const title = t(TITLE[props.kind])
     setRunning(instance)
-    toast.loading(title, { id: notice(), duration: Infinity })
+    const last = shown.get(props.kind)
+    if (last !== undefined) toast.dismiss(last)
+    const id = `hook-test-${props.kind}-${++tests}`
+    shown.set(props.kind, id)
+    toast.loading(title, { id, duration: Infinity })
     try {
       const done = await testMutation.mutateAsync({
         instance,
@@ -137,21 +149,25 @@ export default function HookTest(props: {
         command: props.command()
       })
       const told = verdict(done)
+      if (told === null) {
+        toast.dismiss(id)
+        return
+      }
       const printed = done.stdout !== "" || done.stderr !== ""
       const description = <Outcome verdict={told.text} test={done} />
       if (told.ok) {
         toast.success(title, {
-          id: notice(),
+          id,
           description,
           // Something to read stays until closed.
           duration: printed ? Infinity : 6000
         })
       } else {
-        toast.error(title, { id: notice(), description, duration: Infinity })
+        toast.error(title, { id, description, duration: Infinity })
       }
     } catch (error) {
       toast.error(title, {
-        id: notice(),
+        id,
         description: (
           <Outcome verdict={extractErrorDisplay(error)} test={null} />
         ),

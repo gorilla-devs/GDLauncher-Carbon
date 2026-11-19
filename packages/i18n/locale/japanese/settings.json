@@ -71,7 +71,6 @@
   "_trn_hook_test_failed_code": "終了コード {{code}} で失敗しました",
   "_trn_hook_test_failed": "失敗しました",
   "_trn_hook_test_timed_out": "5 分経過したため停止しました",
-  "_trn_hook_test_stopped": "停止しました",
   "_trn_hook_test_instance": "テストに使うインスタンス",
   "_trn_wrapper_command_title": "ラッパーコマンド",
   "_trn_wrapper_command_text": "ゲームを実行するためのコマンドです。Modの導入などに利用できます。",

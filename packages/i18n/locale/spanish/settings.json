@@ -71,7 +71,6 @@
   "_trn_hook_test_failed_code": "Falló con el código de salida {{code}}",
   "_trn_hook_test_failed": "Falló",
   "_trn_hook_test_timed_out": "Detenido tras cinco minutos",
-  "_trn_hook_test_stopped": "Detenido",
   "_trn_hook_test_instance": "Instancia donde probar",
   "_trn_wrapper_command_title": "Comando envolvente",
   "_trn_wrapper_command_text": "Comando para ejecutar el juego. Esto puede ser útil para mods u otros propósitos.",
