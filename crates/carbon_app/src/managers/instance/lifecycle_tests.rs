@@ -7551,7 +7551,8 @@ async fn repairblocked_finish_repair(
         options,
         owner.as_ref(),
     )
-    .await
+    .await?;
+    Ok(())
 }
 
 /// The pack's files after a repair that installed B over A's record: what
@@ -10217,6 +10218,26 @@ async fn lost_files_change_downloaded(
     root: &Path,
     server: &str,
 ) -> anyhow::Result<(crate::domain::vtask::VisualTaskId, PathBuf, Arc<Pause>)> {
+    pack_change_downloaded(
+        app,
+        id,
+        root,
+        server,
+        &[("mods/pack.jar", b"B"), ("mods/new.jar", b"new in B")],
+        &[("config/pack.cfg", b"cfg"), ("config/kept.cfg", b"kept")],
+    )
+    .await
+}
+
+/// [`lost_files_change_downloaded`] for a pack B of these files.
+async fn pack_change_downloaded(
+    app: &crate::App,
+    id: InstanceId,
+    root: &Path,
+    server: &str,
+    downloads: &[(&str, &[u8])],
+    overrides: &[(&str, &[u8])],
+) -> anyhow::Result<(crate::domain::vtask::VisualTaskId, PathBuf, Arc<Pause>)> {
     let permit = app
         .instance_manager
         .persistence_manager
@@ -10231,12 +10252,7 @@ async fn lost_files_change_downloaded(
         .instance_manager()
         .change_modpack(id, legacy_pack("B"))
         .await?;
-    resume_pack(
-        root,
-        server,
-        &[("mods/pack.jar", b"B"), ("mods/new.jar", b"new in B")],
-        &[("config/pack.cfg", b"cfg"), ("config/kept.cfg", b"kept")],
-    )?;
+    resume_pack(root, server, downloads, overrides)?;
     drop(permit);
     tokio::time::timeout(Duration::from_secs(30), pause.entered.notified()).await?;
     let folders = preparing_dirs(root)?;
@@ -10657,5 +10673,322 @@ async fn only_an_unapplied_version_change_is_given_up() -> anyhow::Result<()> {
         "{error}"
     );
     assert!(root.join(".setup").is_dir());
+    Ok(())
+}
+
+/// An instance with pack A installed and recorded: a mod, three configs and
+/// the game's options. The player then edited two of the configs, the game
+/// saved its options again, and the player added a mod of their own.
+async fn kept_files_installed(
+    app: &crate::App,
+    name: &str,
+) -> anyhow::Result<(InstanceId, PathBuf)> {
+    use super::modpack::packinfo;
+    let (id, root) = fixture(app, name).await?;
+    tokio::fs::remove_dir_all(root.join(".setup")).await?;
+    let (shortpath, mut config) = app.instance_manager().current_config(id).await?;
+    config.modpack = Some(info::ModpackInfo {
+        modpack: legacy_pack("A"),
+        locked: false,
+    });
+    config.game_configuration.version = Some(GameVersion::Standard(info::StandardVersion {
+        release: "1.20.1".into(),
+        modloaders: HashSet::new(),
+    }));
+    app.instance_manager()
+        .persist_config(id, &shortpath, config)
+        .await?;
+    let data = root.join("instance");
+    tokio::fs::create_dir_all(data.join("mods")).await?;
+    tokio::fs::create_dir_all(data.join("config")).await?;
+    for (path, bytes) in [
+        ("mods/pack.jar", "A"),
+        ("config/changed.cfg", "v1"),
+        ("config/same.cfg", "same"),
+        ("config/untouched.cfg", "v1"),
+        ("options.txt", "pack keys v1"),
+    ] {
+        tokio::fs::write(data.join(path), bytes).await?;
+    }
+    let record = packinfo::scan_dir(&data, None).await?;
+    tokio::fs::write(root.join("packinfo.json"), packinfo::make_packinfo(record)?).await?;
+    tokio::fs::write(data.join("config/changed.cfg"), b"mine").await?;
+    tokio::fs::write(data.join("config/same.cfg"), b"mine too").await?;
+    tokio::fs::write(data.join("options.txt"), b"my keys").await?;
+    tokio::fs::write(data.join("mods/user.jar"), b"user").await?;
+    Ok((id, root))
+}
+
+/// R05-run-modpack#3: an update keeps every pack file whose bytes changed
+/// since install, and used to say nothing and throw the new version's copy
+/// away. Where the new version changed such a file too, the update now sets
+/// its copy aside and its task says which files those are. A kept file the
+/// new version left as it was is not named, and neither are the game's
+/// options, which are the player's own.
+#[tokio::test]
+async fn an_update_sets_aside_and_names_the_kept_files_it_changed() -> anyhow::Result<()> {
+    use super::modpack::{packinfo, session::Session};
+    use crate::domain::vtask::TaskWarning;
+    use sha2::Digest;
+    let app = crate::setup_managers_for_test().await;
+    let server = lost_files_server().await;
+    let (id, root) = kept_files_installed(&app, "kept-update").await?;
+    let staged = app.instance_manager().test_hooks.arm("setup_staged", id);
+    let (task, _, pause) = pack_change_downloaded(
+        &app,
+        id,
+        &root,
+        &server.url(),
+        &[("mods/pack.jar", b"B")],
+        &[
+            ("config/changed.cfg", b"v2"),
+            ("config/same.cfg", b"same"),
+            ("config/untouched.cfg", b"v2"),
+            ("options.txt", b"pack keys v2"),
+        ],
+    )
+    .await?;
+    pause.release.notify_one();
+    tokio::time::timeout(Duration::from_secs(30), staged.entered.notified()).await?;
+
+    // The update itself went as it always did.
+    let data = root.join("instance");
+    for (path, bytes) in [
+        ("mods/pack.jar", "B"),
+        ("config/changed.cfg", "mine"),
+        ("config/same.cfg", "mine too"),
+        ("config/untouched.cfg", "v2"),
+        ("options.txt", "my keys"),
+        ("mods/user.jar", "user"),
+    ] {
+        assert_eq!(tokio::fs::read(data.join(path)).await?, bytes.as_bytes());
+    }
+    // Only the kept file the new version changed has its copy set aside.
+    let aside = root.join(".install_audit/kept");
+    assert_eq!(
+        legacy_tree(&aside)
+            .into_iter()
+            .filter_map(|(path, bytes)| bytes.map(|bytes| (path, bytes)))
+            .collect::<Vec<_>>(),
+        vec![("config/changed.cfg".to_owned(), b"v2".to_vec())]
+    );
+    let kept = vec![TaskWarning::PackFilesKept {
+        instance_id: id.0,
+        files: vec!["config/changed.cfg".into()],
+    }];
+    assert_eq!(
+        app.task_manager().running_task_warnings(task).await,
+        Some(kept.clone())
+    );
+    assert_eq!(Session::load(&root).await?.unwrap().warnings, kept);
+    // The installed record names the pack's bytes for it, which is what
+    // taking the pack's version later checks the copy against.
+    let record = packinfo::Installed::read(&root).await?.usable().unwrap();
+    assert_eq!(
+        record.files["/config/changed.cfg"].sha512[..],
+        sha2::Sha512::digest(b"v2")[..]
+    );
+    Ok(())
+}
+
+/// The copies an update set aside, as it leaves them: the pack's version of
+/// each of `files`, which the installed record names.
+async fn kept_files_set_aside(root: &Path, files: &[(&str, &str)]) -> anyhow::Result<()> {
+    for (path, bytes) in files {
+        let copy = root.join(".install_audit/kept").join(path);
+        tokio::fs::create_dir_all(copy.parent().unwrap()).await?;
+        tokio::fs::write(copy, bytes).await?;
+    }
+    Ok(())
+}
+
+/// The player takes the modpack's version of the files they pick: each
+/// replaces the player's copy, which goes to the Recycle Bin, and nothing
+/// else in the instance changes. A file the launcher can't vouch for is
+/// refused by itself.
+#[tokio::test]
+async fn the_modpacks_version_replaces_only_the_kept_files_asked_for() -> anyhow::Result<()> {
+    use crate::util::recycle_bin::bin_under_test;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = kept_files_installed(&app, "kept-use").await?;
+    let data = root.join("instance");
+    kept_files_set_aside(
+        &root,
+        &[
+            ("config/changed.cfg", "v1"),
+            ("config/same.cfg", "same"),
+            // Not what the installed record names for it.
+            ("config/untouched.cfg", "tampered"),
+            ("mods/user.jar", "not a pack file"),
+        ],
+    )
+    .await?;
+    let before = legacy_tree(&data);
+
+    let results = app
+        .instance_manager()
+        .use_pack_versions(
+            id,
+            vec![
+                "config/changed.cfg".into(),
+                "config/untouched.cfg".into(),
+                "mods/user.jar".into(),
+                "../packinfo.json".into(),
+                "config/never-kept.cfg".into(),
+                "mods/pack.jar".into(),
+            ],
+        )
+        .await?;
+    let outcome: Vec<(String, Option<String>)> = results
+        .into_iter()
+        .map(|(path, replaced)| (path, replaced.err().map(|error| error.to_string())))
+        .collect();
+    let refused = |path: &str| {
+        outcome
+            .iter()
+            .find(|(asked, _)| asked == path)
+            .and_then(|(_, error)| error.clone())
+            .unwrap_or_else(|| panic!("{path} was not refused: {outcome:?}"))
+    };
+    assert_eq!(outcome.len(), 6);
+    assert!(outcome.contains(&("config/changed.cfg".into(), None)));
+    assert!(refused("config/untouched.cfg").contains("not the installed version's"));
+    assert!(refused("mods/user.jar").contains("not one of the modpack's files"));
+    refused("../packinfo.json");
+    assert!(refused("config/never-kept.cfg").contains("not one of the modpack's files"));
+    // A pack file with no copy set aside.
+    assert!(refused("mods/pack.jar").contains("no longer kept"));
+
+    // Only the one file changed, and the player's copy can be taken back.
+    let mut expected = before.clone();
+    expected.insert("config/changed.cfg".into(), Some(b"v1".to_vec()));
+    // Where tests find what went to the Recycle Bin.
+    let mut after = legacy_tree(&data);
+    after.retain(|path, _| !path.starts_with("recycle-bin-under-test"));
+    assert_eq!(after, expected);
+    assert_eq!(
+        tokio::fs::read(bin_under_test(&data.join("config/changed.cfg")).join("changed.cfg"))
+            .await?,
+        b"mine"
+    );
+    // Not offered twice; the one not asked for still is.
+    let aside = root.join(".install_audit/kept");
+    assert!(!aside.join("config/changed.cfg").exists());
+    assert!(aside.join("config/same.cfg").is_file());
+
+    // With the Recycle Bin off the player's copy is overwritten.
+    app.settings_manager()
+        .set(
+            carbon_repos::repos::app_configuration::AppConfigurationPatch {
+                deletion_through_recycle_bin: Some(false),
+                ..Default::default()
+            },
+        )
+        .await?;
+    let results = app
+        .instance_manager()
+        .use_pack_versions(id, vec!["config/same.cfg".into()])
+        .await?;
+    assert!(results[0].1.is_ok(), "{:?}", results[0].1);
+    assert_eq!(
+        tokio::fs::read(data.join("config/same.cfg")).await?,
+        b"same"
+    );
+    assert!(
+        !bin_under_test(&data.join("config/same.cfg"))
+            .join("same.cfg")
+            .exists()
+    );
+
+    assert_eq!(
+        app.instance_manager()
+            .kept_file_location(id, "config/same.cfg".into())
+            .await?,
+        data.join("config/same.cfg")
+    );
+    app.instance_manager()
+        .kept_file_location(id, "saves/world/level.dat".into())
+        .await
+        .expect_err("only the modpack's files are located");
+    Ok(())
+}
+
+/// Nothing is replaced under an install or update that didn't finish, in an
+/// instance that is running or being set up, through a folder that is a
+/// link, or for a mod the player has switched off since.
+#[tokio::test]
+async fn kept_files_are_left_alone_when_replacing_them_is_not_safe() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = kept_files_installed(&app, "kept-refused").await?;
+    let data = root.join("instance");
+    kept_files_set_aside(
+        &root,
+        &[("config/changed.cfg", "v1"), ("mods/pack.jar", "A")],
+    )
+    .await?;
+    let before = legacy_tree(&root);
+    let ask = || {
+        app.instance_manager()
+            .use_pack_versions(id, vec!["config/changed.cfg".into()])
+    };
+
+    tokio::fs::create_dir(root.join(".setup")).await?;
+    let error = ask().await.expect_err("a pending setup comes first");
+    assert!(error.to_string().contains("didn't finish"), "{error}");
+    tokio::fs::remove_dir(root.join(".setup")).await?;
+
+    app.instance_manager
+        .instances
+        .write()
+        .await
+        .get_mut(&id)
+        .unwrap()
+        .data_mut()?
+        .state = run::LaunchState::Queued(crate::domain::vtask::VisualTaskId(1));
+    let error = ask().await.expect_err("a busy instance is left alone");
+    assert!(
+        error.to_string().contains("running or being installed"),
+        "{error}"
+    );
+    app.instance_manager
+        .instances
+        .write()
+        .await
+        .get_mut(&id)
+        .unwrap()
+        .data_mut()?
+        .state = run::LaunchState::Inactive { failed_task: None };
+    assert_eq!(legacy_tree(&root), before);
+
+    // The mod was switched off after the update kept it.
+    tokio::fs::rename(
+        data.join("mods/pack.jar"),
+        data.join("mods/pack.jar.disabled"),
+    )
+    .await?;
+    let results = app
+        .instance_manager()
+        .use_pack_versions(id, vec!["mods/pack.jar".into()])
+        .await?;
+    let error = results[0]
+        .1
+        .as_ref()
+        .expect_err("a switched-off mod stays off");
+    assert!(error.to_string().contains("switched off"), "{error}");
+    assert!(!data.join("mods/pack.jar").exists());
+
+    #[cfg(unix)]
+    {
+        let elsewhere = root.join("elsewhere");
+        tokio::fs::rename(data.join("config"), &elsewhere).await?;
+        std::os::unix::fs::symlink(&elsewhere, data.join("config"))?;
+        let results = ask().await?;
+        let error = results[0].1.as_ref().expect_err("never through a link");
+        assert!(error.to_string().contains("link"), "{error}");
+        assert_eq!(
+            tokio::fs::read(elsewhere.join("changed.cfg")).await?,
+            b"mine"
+        );
+    }
     Ok(())
 }

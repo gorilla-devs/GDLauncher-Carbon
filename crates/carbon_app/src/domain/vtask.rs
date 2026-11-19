@@ -131,6 +131,17 @@ pub enum TaskWarning {
         /// The version that was asked for, to ask for again.
         pack: crate::domain::instance::info::Modpack,
     },
+    /// A modpack version change kept pack files as the player has them
+    /// although the new version ships them changed: their bytes changed
+    /// since install, by the player or by the game saving them again. The
+    /// pack's copies are set aside for the player to take (see
+    /// `managers::instance::modpack::kept_files`).
+    PackFilesKept {
+        instance_id: i32,
+        /// All of them, sorted, as `/`-separated paths inside the game
+        /// folder.
+        files: Vec<String>,
+    },
 }
 
 /// How many lost pack files a warning names; the launcher log lists them all.

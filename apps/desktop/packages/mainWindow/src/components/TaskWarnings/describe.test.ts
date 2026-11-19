@@ -561,4 +561,58 @@ describe("describeTaskWarnings", () => {
       lines: ["Antivirus may have removed mods/a.jar."]
     })
   })
+
+  it("says an update kept files the new version changed too, and offers to review them", async () => {
+    const i18n = i18next.createInstance()
+    await i18n.init({
+      lng: "en",
+      ns: ["notifications"],
+      resources: { en: { notifications: english } }
+    })
+    const translate: Translate = (key, options) =>
+      i18n.t(key as string, options)
+    const kept = (files: string[]) =>
+      ({ type: "PackFilesKept", value: { instance: 6, files } }) as const
+    const entry = (
+      warnings: FETaskWarnings["warnings"],
+      name = "Steve's Pack"
+    ): FETaskWarnings => ({
+      id: 23,
+      name: { translation: "InstanceTaskPrepare", args: { name } },
+      subject: null,
+      warnings
+    })
+    const files = ["config/example.toml", "kubejs/server_scripts/recipes.js"]
+    expect(describeTaskWarnings(entry([kept(files)]), translate)).toEqual({
+      title: "Steve's Pack was updated",
+      lines: ["2 files that changed since install were kept."],
+      action: { kind: "reviewKept", instance: 6, name: "Steve's Pack", files }
+    })
+    expect(
+      describeTaskWarnings(entry([kept(["options.cfg"])]), translate)?.lines
+    ).toEqual(["1 file that changed since install was kept."])
+    // Without the instance's name there is no dialog to open.
+    expect(describeTaskWarnings(entry([kept(files)], ""), translate)).toEqual({
+      title: "The modpack was updated",
+      lines: ["2 files that changed since install were kept."]
+    })
+    // What else the update kept is said under the same title.
+    const both = describeTaskWarnings(
+      entry([
+        {
+          type: "PreviousPackFilesKept",
+          value: { platform: "Modrinth", reason: "SomeFilesUnchecked" }
+        },
+        kept(files)
+      ]),
+      translate
+    )
+    expect(both?.title).toBe("Steve's Pack was updated")
+    expect(both?.lines).toEqual([
+      "2 files that changed since install were kept.",
+      "Some files of its previous version could not be checked, so they were kept."
+    ])
+    expect(both?.hint).toContain("open Repair in the instance settings")
+    expect(both?.action?.kind).toBe("reviewKept")
+  })
 })

@@ -150,6 +150,28 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.instance_manager().cancel_pending_setup(args.instance.into(), args.expected_operation).await
         }
 
+        // Replaces the player's copies of files the last modpack update
+        // kept with the installed version's. One result per file.
+        mutation USE_PACK_VERSIONS[app, args: KeptPackFiles] {
+            Ok(app.instance_manager()
+                .use_pack_versions(args.instance.into(), args.paths)
+                .await?
+                .into_iter()
+                .map(|(path, replaced)| KeptPackFileResult {
+                    path,
+                    error: replaced.err().map(|error| format!("{error:#}")),
+                })
+                .collect::<Vec<_>>())
+        }
+
+        // Where the player's copy of a kept file is, to show it in the file
+        // manager.
+        mutation KEPT_FILE_LOCATION[app, args: KeptPackFile] {
+            app.instance_manager()
+                .kept_file_location(args.instance.into(), args.path)
+                .await
+        }
+
         query GET_REPAIR_PREVIEW[app, args: RepairPreviewArgs] {
             app.instance_manager()
                 .repair_preview(args.instance.into())
@@ -3187,6 +3209,27 @@ impl From<RegenerateShareCodeResponse> for FERegenerateShareCodeResponse {
 pub struct CancelPendingSetup {
     pub instance: FEInstanceId,
     pub expected_operation: String,
+}
+
+/// Files a modpack update kept, as `PackFilesKept` named them.
+#[derive(specta::Type, serde::Deserialize, Debug)]
+pub struct KeptPackFiles {
+    pub instance: FEInstanceId,
+    pub paths: Vec<String>,
+}
+
+#[derive(specta::Type, serde::Deserialize, Debug)]
+pub struct KeptPackFile {
+    pub instance: FEInstanceId,
+    pub path: String,
+}
+
+/// `error` is why the file still is the player's; `None` once it is the
+/// modpack's.
+#[derive(specta::Type, serde::Serialize, Debug)]
+pub struct KeptPackFileResult {
+    pub path: String,
+    pub error: Option<String>,
 }
 
 /// A Delete found the addon twice, as `name` and `name.disabled` (one

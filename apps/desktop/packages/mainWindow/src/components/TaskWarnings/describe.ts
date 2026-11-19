@@ -17,6 +17,7 @@ export type Translate = (
 export type WarningAction =
   | { kind: "repair"; instance: number; name: string }
   | { kind: "retryUpdate"; instance: number; modpack: Modpack }
+  | { kind: "reviewKept"; instance: number; name: string; files: string[] }
 
 export interface WarningToast {
   title: string
@@ -172,6 +173,10 @@ function describeWarning(warning: FETaskWarning, t: Translate): string {
     case "PackFilesMissing":
     case "PackUpdateAbandoned":
       return lostFiles(warning.value, t)
+    case "PackFilesKept":
+      return t("notifications:_trn_pack_files_kept", {
+        count: warning.value.files.length
+      })
   }
 }
 
@@ -245,6 +250,43 @@ export function describeTaskWarnings(
               kind: "repair",
               instance: missing.value.instance,
               name: instance
+            }
+          }
+        : {})
+    }
+  }
+  // The update went through, and kept files the new version changed too.
+  // Whatever else it kept is said under the same title.
+  const kept = entry.warnings.find(
+    (warning): warning is WarningOf<"PackFilesKept"> =>
+      warning.type === "PackFilesKept"
+  )
+  if (kept) {
+    const instance = nonEmpty(args.name)
+    const others = entry.warnings.filter((warning) => warning !== kept)
+    return {
+      title:
+        instance !== null
+          ? t("notifications:_trn_modpack_updated_in_instance", {
+              instance,
+              interpolation: noEscape
+            })
+          : t("notifications:_trn_modpack_updated"),
+      lines: [
+        describeWarning(kept, t),
+        ...others.map((warning) => describeWarning(warning, t))
+      ],
+      ...(others.some((warning) => warning.type === "PreviousPackFilesKept")
+        ? { hint: t("notifications:_trn_modpack_update_kept_files_hint") }
+        : {}),
+      // The dialog names the instance, so it needs its name.
+      ...(instance !== null
+        ? {
+            action: {
+              kind: "reviewKept",
+              instance: kept.value.instance,
+              name: instance,
+              files: kept.value.files
             }
           }
         : {})

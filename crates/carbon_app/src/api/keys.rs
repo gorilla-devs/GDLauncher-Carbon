@@ -106,6 +106,8 @@ keys! {
         COPY_DATAPACK                             = "copyDatapack";
         GET_PENDING_SETUP                          = "getPendingSetup";
         CANCEL_PENDING_SETUP                       = "cancelPendingSetup";
+        USE_PACK_VERSIONS                          = "usePackVersions";
+        KEPT_FILE_LOCATION                         = "keptFileLocation";
         CHECK_PACK_ORIGIN                           = "checkPackOrigin";
         LOAD_ICON_URL                               = "loadIconUrl";
         DELETE_GROUP                                = "deleteGroup";

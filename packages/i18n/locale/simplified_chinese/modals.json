@@ -16,6 +16,7 @@
   "_trn_notification": "通知",
   "_trn_confirm_instance_deletion": "确认删除实例",
   "_trn_repair_modpack": "修复整合包",
+  "_trn_kept_files": "保留的文件",
   "_trn_confirm_reinstall": "重新安装整合包",
   "_trn_confirm_batch_instance_deletion": "删除实例",
   "_trn_confirm_batch_server_deletion": "删除服务器",

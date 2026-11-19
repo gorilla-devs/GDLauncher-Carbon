@@ -221,3 +221,24 @@ it("asks for the same version again from an update that was given up, and says w
     "the instance is running"
   )
 })
+
+it("opens the list of kept files from an update that kept some", async () => {
+  const files = ["config/a.toml", "config/b.toml"]
+  setData([
+    lostFiles(14, { type: "PackFilesKept", value: { instance: 5, files } })
+  ])
+  await flush()
+  const [title, options] = io.warning.mock.calls[0]
+  expect(title).toBe(
+    'notifications:_trn_modpack_updated_in_instance {"instance":"ATM 10"}'
+  )
+  expect((options.description as HTMLElement).textContent).toBe(
+    'notifications:_trn_pack_files_kept {"count":2}'
+  )
+  expect(options.action.label).toBe("notifications:_trn_pack_files_kept_review")
+  options.action.onClick()
+  expect(io.openModal).toHaveBeenCalledWith(
+    { name: "keptPackFiles" },
+    { id: 5, name: "ATM 10", files }
+  )
+})

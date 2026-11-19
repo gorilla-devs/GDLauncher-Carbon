@@ -817,7 +817,7 @@ impl ManagerRef<'_, InstanceManager> {
                             !cancel.is_cancelled(),
                             "Instance preparation cancelled before apply"
                         );
-                        modpack::process_modpack_staging(
+                        for warning in modpack::process_modpack_staging(
                             Arc::clone(&app),
                             instance_id,
                             instance_shortpath.clone(),
@@ -825,7 +825,10 @@ impl ManagerRef<'_, InstanceManager> {
                             repair_options,
                             session_owner.as_ref(),
                         )
-                        .await?;
+                        .await?
+                        {
+                            task.warn(warning);
+                        }
                         #[cfg(test)]
                         app.instance_manager()
                             .test_hooks

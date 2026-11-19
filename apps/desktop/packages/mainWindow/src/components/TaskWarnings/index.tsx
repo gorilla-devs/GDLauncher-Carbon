@@ -1,6 +1,6 @@
 import { createEffect, For, Show } from "solid-js"
 import { toast } from "@gd/ui"
-import { useTransContext } from "@gd/i18n"
+import { type NamespacedTranslationKey, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
 import { extractErrorDisplay } from "@/utils/rspcErrorText"
 import { useModal } from "@/managers/ModalsManager"
@@ -13,6 +13,12 @@ import {
   type WarningAction,
   type WarningToast
 } from "./describe"
+
+const ACTION_LABEL: Record<WarningAction["kind"], NamespacedTranslationKey> = {
+  repair: "instances:_trn_instance_settings.repair",
+  retryUpdate: "notifications:_trn_pack_update_try_again",
+  reviewKept: "notifications:_trn_pack_files_kept_review"
+}
 
 const WarningLines = (props: { content: WarningToast }) => (
   <div class="flex flex-col gap-1">
@@ -39,6 +45,13 @@ export default function TaskWarnings() {
       modals?.openModal(
         { name: "repairModpack" },
         { id: action.instance, name: action.name, isServer: false }
+      )
+      return
+    }
+    if (action.kind === "reviewKept") {
+      modals?.openModal(
+        { name: "keptPackFiles" },
+        { id: action.instance, name: action.name, files: action.files }
       )
       return
     }
@@ -75,10 +88,7 @@ export default function TaskWarnings() {
           ...(action
             ? {
                 action: {
-                  label:
-                    action.kind === "repair"
-                      ? t("instances:_trn_instance_settings.repair")
-                      : t("notifications:_trn_pack_update_try_again"),
+                  label: t(ACTION_LABEL[action.kind]),
                   onClick: () => run(action)
                 }
               }

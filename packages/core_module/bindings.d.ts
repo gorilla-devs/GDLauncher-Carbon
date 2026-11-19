@@ -133,6 +133,8 @@ export type Procedures = {
         { key: "instance.cancelImportScan", input: never, result: null } | 
         { key: "instance.cancelModpackChangeCheck", input: FEInstanceId, result: null } | 
         { key: "instance.cancelPendingSetup", input: CancelPendingSetup, result: null } | 
+        { key: "instance.keptFileLocation", input: KeptPackFile, result: string } | 
+        { key: "instance.usePackVersions", input: KeptPackFiles, result: KeptPackFileResult[] } | 
         { key: "instance.changeModpack", input: ChangeModpack, result: FETaskId } | 
         { key: "instance.checkPackOrigin", input: FEInstanceId, result: FETaskId } | 
         { key: "instance.copyDatapack", input: CopyDatapack, result: string } | 
@@ -591,6 +593,19 @@ export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "app
 
 export type CancelPendingSetup = { instance: FEInstanceId; expected_operation: string }
 
+/**
+ * Files a modpack update kept, as `PackFilesKept` named them.
+ */
+export type KeptPackFiles = { instance: FEInstanceId; paths: string[] }
+
+export type KeptPackFile = { instance: FEInstanceId; path: string }
+
+/**
+ * `error` is why the file still is the player's; `None` once it is the
+ * modpack's.
+ */
+export type KeptPackFileResult = { path: string; error: string | null }
+
 export type FERequestEmailChange = { email: string; uuid: string }
 
 export type RenameServerGroup = { group: FEServerGroupId; name: string }
@@ -807,7 +822,7 @@ export type FEMoveServerTarget = { beforeServer: FEServerId } | { endOfGroup: FE
 
 export type CFFEModFileParameters = { modId: number; fileId: number }
 
-export type FETaskWarning = { type: "SkippedDependency"; value: { name: string | null; platform: FEDependencyPlatform; project_id: string; reason: FESkippedDependencyReason } } | { type: "ReplacedPinnedVersion"; value: { name: string; project_id: string; pinned: string; installed: string } } | { type: "ConflictingVersions"; value: { name: string; platform: FEDependencyPlatform; project_id: string; installed: string } } | { type: "PackFilesSkippedAtLink"; value: { path: string } } | { type: "WorldNameTaken"; value: { name: string; saved_as: string } } | { type: "PreviousPackFilesKept"; value: { platform: FEDependencyPlatform; reason: FEPreviousPackFilesReason } } | { type: "PackFilesMissing"; value: { instance: FEInstanceId; files: string[]; total: number; repairable: boolean } } | { type: "PackUpdateAbandoned"; value: { instance: FEInstanceId; files: string[]; total: number; modpack: Modpack } }
+export type FETaskWarning = { type: "SkippedDependency"; value: { name: string | null; platform: FEDependencyPlatform; project_id: string; reason: FESkippedDependencyReason } } | { type: "ReplacedPinnedVersion"; value: { name: string; project_id: string; pinned: string; installed: string } } | { type: "ConflictingVersions"; value: { name: string; platform: FEDependencyPlatform; project_id: string; installed: string } } | { type: "PackFilesSkippedAtLink"; value: { path: string } } | { type: "WorldNameTaken"; value: { name: string; saved_as: string } } | { type: "PreviousPackFilesKept"; value: { platform: FEDependencyPlatform; reason: FEPreviousPackFilesReason } } | { type: "PackFilesMissing"; value: { instance: FEInstanceId; files: string[]; total: number; repairable: boolean } } | { type: "PackUpdateAbandoned"; value: { instance: FEInstanceId; files: string[]; total: number; modpack: Modpack } } | { type: "PackFilesKept"; value: { instance: FEInstanceId; files: string[] } }
 
 export type MRFESearchIndex = "relevance" | "downloads" | "follows" | "newest" | "updated"
 

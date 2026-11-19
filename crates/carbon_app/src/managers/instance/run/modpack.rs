@@ -13,8 +13,8 @@ use crate::managers::instance::log::{
 };
 use crate::managers::instance::modpack::session::{self, Kind, Owner, Phase, Producer, Session};
 use crate::managers::instance::modpack::{
-    PackVersionFile, RepairMarkerFile, apply_plan, disk_scan, normalize_cleanup_path, packinfo,
-    same_mod, walk_untracked_files,
+    PackVersionFile, RepairMarkerFile, apply_plan, disk_scan, kept_files, normalize_cleanup_path,
+    packinfo, same_mod, walk_untracked_files,
 };
 use crate::managers::java::java_checker::{JavaChecker, RealJavaChecker};
 use crate::managers::java::managed::Step;
@@ -1349,7 +1349,7 @@ pub async fn process_modpack_staging(
     t_subtasks: &TSubtasks,
     repair_options: Option<RepairMarkerFile>,
     session_owner: Option<&Owner>,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Vec<TaskWarning>> {
     let runtime_path = app.settings_manager().runtime_path.clone();
     let instance_path = runtime_path
         .get_instances()
@@ -1359,8 +1359,11 @@ pub async fn process_modpack_staging(
     let setup_path = instance_root.join(".setup");
     let is_first_run = setup_path.is_dir();
     if !is_first_run {
-        return Ok(());
+        return Ok(Vec::new());
     }
+    // What this apply found to tell the player. The setup records it as
+    // well, for the task that finishes it when this one fails later.
+    let mut told = Vec::new();
     let manager = app.instance_manager();
     let operation = manager.lock_instance(instance_id).await;
     let (current_shortpath, _) = manager.current_config(instance_id).await?;
@@ -1375,11 +1378,11 @@ pub async fn process_modpack_staging(
     if session.kind != Kind::Pack {
         session.phase = Phase::Committed;
         session.save(&instance_root, owner).await?;
-        return Ok(());
+        return Ok(told);
     }
     if matches!(session.phase, Phase::Applied | Phase::Committed) {
         finish_session_commit(&app, &operation, &instance_root, &mut session).await?;
-        return Ok(());
+        return Ok(told);
     }
     // The one full read of the staged pack per apply, before anything below
     // publishes or records it. It is the first step of applying, and can take
@@ -1618,6 +1621,27 @@ pub async fn process_modpack_staging(
         let mut audit_handle = File::create(&audit_file).await?;
         audit_handle.write_all(audit_txt.as_bytes()).await?;
         audit_handle.sync_all().await?;
+        // A version change kept every pack file whose bytes changed since
+        // install. Where the new version changed such a file too, its copy
+        // is set aside for the player to take, and they are told.
+        let kept = kept_files::set_aside(
+            &instance_root,
+            &staging_dir.join("instance"),
+            &entries,
+            &target_packinfo,
+        )
+        .await;
+        session
+            .warnings
+            .retain(|warning| !matches!(warning, TaskWarning::PackFilesKept { .. }));
+        if !kept.is_empty() {
+            let warning = TaskWarning::PackFilesKept {
+                instance_id: instance_id.0,
+                files: kept,
+            };
+            session.warnings.push(warning.clone());
+            told.push(warning);
+        }
         session::sync_dir(&audit_dir).await?;
         session::sync_dir(&instance_root).await?;
 
@@ -1638,7 +1662,7 @@ pub async fn process_modpack_staging(
             .await;
     }
 
-    Ok(())
+    Ok(told)
 }
 
 // Resolved itself owns the complete target and verified source inventory.

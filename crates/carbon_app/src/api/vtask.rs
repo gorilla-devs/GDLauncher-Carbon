@@ -129,6 +129,14 @@ pub enum FETaskWarning {
         total: u32,
         modpack: Modpack,
     },
+    /// A modpack version change kept these pack files as the player has
+    /// them although the new version ships them changed; `files` are
+    /// `/`-separated paths inside the game folder, which
+    /// `instance.usePackVersions` takes.
+    PackFilesKept {
+        instance: FEInstanceId,
+        files: Vec<String>,
+    },
 }
 
 #[derive(Type, Serialize)]
@@ -276,6 +284,10 @@ impl From<domain::TaskWarning> for FETaskWarning {
                 files,
                 total,
                 modpack: pack.into(),
+            },
+            domain::TaskWarning::PackFilesKept { instance_id, files } => Self::PackFilesKept {
+                instance: crate::domain::instance::InstanceId(instance_id).into(),
+                files,
             },
         }
     }

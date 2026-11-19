@@ -108,6 +108,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/RepairModpack")),
     title: t("modals:_trn_repair_modpack")
   },
+  keptPackFiles: {
+    component: lazy(() => import("./modals/KeptPackFiles")),
+    title: t("modals:_trn_kept_files")
+  },
   confirmBatchInstanceDeletion: {
     component: lazy(() => import("./modals/ConfirmBatchInstanceDeletion")),
     title: t("modals:_trn_confirm_batch_instance_deletion")
