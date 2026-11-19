@@ -5,11 +5,13 @@ import type { FEHookTest } from "@gd/core_module/bindings"
 
 const io = vi.hoisted(() => ({
   test: vi.fn(),
-  stop: vi.fn()
+  stop: vi.fn(),
+  loading: vi.fn(),
+  success: vi.fn(),
+  error: vi.fn()
 }))
 vi.mock("@gd/ui", () => ({
-  toast: { error: vi.fn() },
-  Spinner: () => <span data-testid="spinner" />,
+  toast: { loading: io.loading, success: io.success, error: io.error },
   Button: (p: any) => (
     <button
       data-testid={p["data-testid"]}
@@ -35,7 +37,7 @@ vi.mock("@/utils/rspcClient", () => ({
   }
 }))
 
-import HookTest, { seconds } from "./index"
+import HookTest, { lastLines, seconds } from "./index"
 
 let dispose: (() => void) | undefined
 let root: HTMLElement
@@ -53,10 +55,21 @@ const result = (outcome: FEHookTest["outcome"], more = {}): FEHookTest => ({
   stderr: "",
   ...more
 })
+/** What a notice says under its title. */
+const told = (call: unknown[]) => {
+  const options = call[1] as { description: HTMLElement }
+  return {
+    verdict: options.description.querySelector(
+      '[data-testid="hook-test-verdict"]'
+    )?.textContent,
+    output:
+      options.description.querySelector('[data-testid="hook-test-output"]')
+        ?.textContent ?? null
+  }
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
-  vi.useFakeTimers()
   const [command, changeCommand] = createSignal("rclone sync saves remote:x")
   const [instance, changeInstance] = createSignal<number | undefined>(7)
   setCommand = changeCommand
@@ -76,12 +89,12 @@ afterEach(() => {
   dispose?.()
   dispose = undefined
   document.body.textContent = ""
-  vi.useRealTimers()
 })
 
-it("runs what the box holds now, shows that it runs, and then how it ended", async () => {
+it("runs what the box holds now and tells it in one notice, without moving the page", async () => {
   let finish!: (value: FEHookTest) => void
   io.test.mockReturnValue(new Promise((resolve) => (finish = resolve)))
+  const before = root.innerHTML
   setCommand("backup.sh --now")
   part("hook-test-run")!.click()
   await flush()
@@ -90,11 +103,21 @@ it("runs what the box holds now, shows that it runs, and then how it ended", asy
     kind: "PostExit",
     command: "backup.sh --now"
   })
-  // While it runs: the time so far, and Stop in place of Test.
+  // While it runs: a notice, and Stop in place of Test. Nothing else is
+  // added to the page.
+  expect(io.loading).toHaveBeenCalledWith(
+    "settings:_trn_hook_test_title_post",
+    {
+      id: "hook-test-PostExit",
+      duration: Infinity
+    }
+  )
   expect(part("hook-test-run")).toBeNull()
-  expect(part("hook-test-running")?.textContent).toContain('{"seconds":0}')
-  vi.advanceTimersByTime(4000)
-  expect(part("hook-test-running")?.textContent).toContain('{"seconds":4}')
+  expect(root.querySelectorAll("div, pre, span").length).toBe(
+    new DOMParser()
+      .parseFromString(before, "text/html")
+      .querySelectorAll("div, pre, span").length
+  )
   part("hook-test-stop")!.click()
   expect(io.stop).toHaveBeenCalledWith({ instance: 7, kind: "PostExit" })
 
@@ -105,56 +128,70 @@ it("runs what the box holds now, shows that it runs, and then how it ended", asy
     )
   )
   await flush()
-  expect(part("hook-test-running")).toBeNull()
-  expect(part("hook-test-verdict")?.textContent).toBe(
-    'settings:_trn_hook_test_finished {"seconds":"6.2"}'
-  )
-  expect(part("hook-test-output")?.textContent).toBe(
-    "Transferred: 3 / 3\nnote\n"
-  )
+  // The same notice turns into the outcome, and stays while there is
+  // something to read.
+  const [title, options] = io.success.mock.calls[0]
+  expect(title).toBe("settings:_trn_hook_test_title_post")
+  expect(options.id).toBe("hook-test-PostExit")
+  expect(options.duration).toBe(Infinity)
+  expect(told(io.success.mock.calls[0])).toEqual({
+    verdict: 'settings:_trn_hook_test_finished {"seconds":"6.2"}',
+    output: "Transferred: 3 / 3\nnote"
+  })
   expect(part("hook-test-run")).not.toBeNull()
+  expect(root.innerHTML).toBe(before)
 })
 
-it("says each way a test did not work", async () => {
-  const verdictOf = async (outcome: FEHookTest["outcome"], more = {}) => {
+it("lets a test that printed nothing go by itself, and keeps every failure", async () => {
+  io.test.mockResolvedValueOnce(result({ type: "Finished" }))
+  part("hook-test-run")!.click()
+  await flush()
+  expect(io.success.mock.calls[0][1].duration).toBe(6000)
+  expect(told(io.success.mock.calls[0]).output).toBeNull()
+
+  const failure = async (outcome: FEHookTest["outcome"], more = {}) => {
+    io.error.mockClear()
     io.test.mockResolvedValueOnce(result(outcome, more))
     part("hook-test-run")!.click()
     await flush()
-    return part("hook-test-verdict")?.textContent
+    expect(io.error.mock.calls[0][1].duration).toBe(Infinity)
+    expect(io.error.mock.calls[0][1].id).toBe("hook-test-PostExit")
+    return told(io.error.mock.calls[0])
   }
   expect(
-    await verdictOf(
+    await failure(
       { type: "Failed", value: { code: 127 } },
       { stderr: "sh: rclone: command not found\n" }
     )
-  ).toBe('settings:_trn_hook_test_failed_code {"code":127}')
-  expect(part("hook-test-output")?.textContent).toBe(
-    "sh: rclone: command not found\n"
-  )
-  expect(await verdictOf({ type: "Failed", value: { code: null } })).toBe(
-    "settings:_trn_hook_test_failed"
-  )
-  // Nothing printed: no empty box.
-  expect(part("hook-test-output")).toBeNull()
+  ).toEqual({
+    verdict: 'settings:_trn_hook_test_failed_code {"code":127}',
+    output: "sh: rclone: command not found"
+  })
   expect(
-    await verdictOf({
-      type: "NotRun",
-      value: { summary: "No such file or directory (os error 2)" }
-    })
-  ).toBe("No such file or directory (os error 2)")
-  expect(await verdictOf({ type: "TimedOut" })).toBe(
+    (await failure({ type: "Failed", value: { code: null } })).verdict
+  ).toBe("settings:_trn_hook_test_failed")
+  expect(
+    (
+      await failure({
+        type: "NotRun",
+        value: { summary: "rclone was not found. Check that it is installed." }
+      })
+    ).verdict
+  ).toBe("rclone was not found. Check that it is installed.")
+  expect((await failure({ type: "TimedOut" })).verdict).toBe(
     "settings:_trn_hook_test_timed_out"
   )
-  expect(await verdictOf({ type: "Stopped" })).toBe(
+  expect((await failure({ type: "Stopped" })).verdict).toBe(
     "settings:_trn_hook_test_stopped"
   )
-  // The core refusing the test at all is shown in the same place.
+  // The core refusing the test at all is told the same way.
+  io.error.mockClear()
   io.test.mockRejectedValueOnce(
     new Error("A test of this hook is already running.")
   )
   part("hook-test-run")!.click()
   await flush()
-  expect(part("hook-test-verdict")?.textContent).toContain(
+  expect(told(io.error.mock.calls[0]).verdict).toContain(
     "A test of this hook is already running."
   )
 })
@@ -179,7 +216,13 @@ it("stops a test that is still running when its page goes away", async () => {
   expect(io.stop).toHaveBeenCalledWith({ instance: 7, kind: "PostExit" })
 })
 
-it("shows a test's time in seconds with one decimal", () => {
+it("shows a test's time with one decimal, and only the end of a long output", () => {
   expect(seconds(6234)).toBe("6.2")
   expect(seconds(40)).toBe("0.0")
+  expect(lastLines("one\ntwo\n")).toBe("one\ntwo")
+  const long = Array.from({ length: 30 }, (_, n) => `line ${n}`).join("\n")
+  expect(lastLines(`${long}\n`).split("\n")).toEqual(
+    Array.from({ length: 8 }, (_, n) => `line ${n + 22}`)
+  )
+  expect(lastLines("")).toBe("")
 })

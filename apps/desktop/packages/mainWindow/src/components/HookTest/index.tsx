@@ -5,8 +5,8 @@ import {
   type Accessor,
   type JSX
 } from "solid-js"
-import { Button, Spinner } from "@gd/ui"
-import { useTransContext } from "@gd/i18n"
+import { Button, toast } from "@gd/ui"
+import { type NamespacedTranslationKey, useTransContext } from "@gd/i18n"
 import type { FEHookKind, FEHookTest } from "@gd/core_module/bindings"
 import { rspc } from "@/utils/rspcClient"
 import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
@@ -15,11 +15,55 @@ import { extractErrorDisplay } from "@/utils/rspcErrorText"
 /** Seconds with one decimal, as "6.2". */
 export const seconds = (millis: number) => (millis / 1000).toFixed(1)
 
+/** How many lines of what a test printed its notice shows: the last ones. */
+const SHOWN_LINES = 8
+
+/** The last lines of `text`, without the empty line a final newline leaves. */
+export function lastLines(text: string, count = SHOWN_LINES): string {
+  const lines = text.replace(/\n+$/, "").split("\n")
+  return lines.slice(-count).join("\n")
+}
+
+const TITLE: Record<FEHookKind, NamespacedTranslationKey> = {
+  PreLaunch: "settings:_trn_hook_test_title_pre",
+  PostExit: "settings:_trn_hook_test_title_post"
+}
+
+const Outcome = (props: { verdict: string; test: FEHookTest | null }) => (
+  <div class="flex flex-col gap-2">
+    <span data-testid="hook-test-verdict">{props.verdict}</span>
+    <Show when={props.test?.stdout || props.test?.stderr}>
+      <pre
+        class="bg-darkSlate-900 m-0 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md p-2 font-mono text-xs opacity-100"
+        data-testid="hook-test-output"
+      >
+        {lastLines(props.test?.stdout ?? "")}
+        <Show when={props.test?.stdout && props.test?.stderr}>{"\n"}</Show>
+        <span class="text-red-300">{lastLines(props.test?.stderr ?? "")}</span>
+      </pre>
+    </Show>
+  </div>
+)
+
+/**
+ * The button's word, as wide as the wider of its two words, so the row keeps
+ * its widths when Test turns into Stop.
+ */
+const Word = (props: { shown: string; other: string }) => (
+  <span class="grid">
+    <span class="col-start-1 row-start-1">{props.shown}</span>
+    <span class="invisible col-start-1 row-start-1" aria-hidden="true">
+      {props.other}
+    </span>
+  </span>
+)
+
 /**
  * A hook's command box with a way to try it: Test runs what the box holds
- * now, in the game folder of `instance`, without starting the game, and
- * shows how it ended and what it printed. While it runs, the button stops
- * it.
+ * now, in the game folder of `instance`, without starting the game. While it
+ * runs, the button stops it. How it went is a notice, as for a hook that
+ * runs around a game, so nothing on the page moves: it shows while the test
+ * runs and turns into how it ended, with the last lines the script printed.
  *
  * `children` is the command box; `beside` goes between it and the button
  * (the launcher-wide settings put the instance to test in there).
@@ -33,9 +77,8 @@ export default function HookTest(props: {
 }) {
   const [t] = useTransContext()
   const [running, setRunning] = createSignal<number | null>(null)
-  const [elapsed, setElapsed] = createSignal(0)
-  const [result, setResult] = createSignal<FEHookTest | null>(null)
-  const [refusal, setRefusal] = createSignal<string | null>(null)
+  // One notice per hook: a new test replaces the last one's.
+  const notice = () => `hook-test-${props.kind}`
 
   const testMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.testHook"],
@@ -45,13 +88,7 @@ export default function HookTest(props: {
     mutationKey: ["instance.stopHookTest"]
   }))
 
-  let ticking: ReturnType<typeof setInterval> | undefined
-  const stopTicking = () => {
-    clearInterval(ticking)
-    ticking = undefined
-  }
   onCleanup(() => {
-    stopTicking()
     // A test left running would outlive the page that shows it.
     const instance = running()
     if (instance !== null) {
@@ -59,42 +96,7 @@ export default function HookTest(props: {
     }
   })
 
-  const test = async () => {
-    const instance = props.instance()
-    if (instance === undefined || running() !== null) return
-    setResult(null)
-    setRefusal(null)
-    setElapsed(0)
-    setRunning(instance)
-    const startedAt = Date.now()
-    ticking = setInterval(
-      () => setElapsed(Math.floor((Date.now() - startedAt) / 1000)),
-      1000
-    )
-    try {
-      setResult(
-        await testMutation.mutateAsync({
-          instance,
-          kind: props.kind,
-          command: props.command()
-        })
-      )
-    } catch (error) {
-      setRefusal(extractErrorDisplay(error))
-    } finally {
-      stopTicking()
-      setRunning(null)
-    }
-  }
-
-  const stop = () => {
-    const instance = running()
-    if (instance !== null) stopMutation.mutate({ instance, kind: props.kind })
-  }
-
-  const verdict = (): { ok: boolean; text: string } | null => {
-    const done = result()
-    if (!done) return null
+  const verdict = (done: FEHookTest): { ok: boolean; text: string } => {
     switch (done.outcome.type) {
       case "Finished":
         return {
@@ -122,88 +124,85 @@ export default function HookTest(props: {
     }
   }
 
+  const test = async () => {
+    const instance = props.instance()
+    if (instance === undefined || running() !== null) return
+    const title = t(TITLE[props.kind])
+    setRunning(instance)
+    toast.loading(title, { id: notice(), duration: Infinity })
+    try {
+      const done = await testMutation.mutateAsync({
+        instance,
+        kind: props.kind,
+        command: props.command()
+      })
+      const told = verdict(done)
+      const printed = done.stdout !== "" || done.stderr !== ""
+      const description = <Outcome verdict={told.text} test={done} />
+      if (told.ok) {
+        toast.success(title, {
+          id: notice(),
+          description,
+          // Something to read stays until closed.
+          duration: printed ? Infinity : 6000
+        })
+      } else {
+        toast.error(title, { id: notice(), description, duration: Infinity })
+      }
+    } catch (error) {
+      toast.error(title, {
+        id: notice(),
+        description: (
+          <Outcome verdict={extractErrorDisplay(error)} test={null} />
+        ),
+        duration: Infinity
+      })
+    } finally {
+      setRunning(null)
+    }
+  }
+
+  const stop = () => {
+    const instance = running()
+    if (instance !== null) stopMutation.mutate({ instance, kind: props.kind })
+  }
+
   return (
-    <div class="flex w-full flex-col gap-2 pb-3" data-testid="hook-test">
-      <div class="flex w-full items-center gap-2">
-        <div class="min-w-0 flex-1">{props.children}</div>
-        {props.beside}
-        <Show
-          when={running() === null}
-          fallback={
-            <Button
-              type="secondary"
-              size="medium"
-              data-testid="hook-test-stop"
-              onClick={stop}
-            >
-              <div class="i-hugeicons:stop h-4 w-4" />
-              {t("settings:_trn_hook_test_stop")}
-            </Button>
-          }
-        >
+    <div class="flex w-full items-center gap-2" data-testid="hook-test">
+      <div class="min-w-0 flex-1">{props.children}</div>
+      {props.beside}
+      <Show
+        when={running() === null}
+        fallback={
           <Button
             type="secondary"
             size="medium"
-            data-testid="hook-test-run"
-            disabled={
-              props.instance() === undefined || props.command().trim() === ""
-            }
-            onClick={test}
+            data-testid="hook-test-stop"
+            onClick={stop}
           >
-            <div class="i-hugeicons:play h-4 w-4" />
-            {t("settings:_trn_hook_test")}
-          </Button>
-        </Show>
-      </div>
-
-      <Show when={running() !== null}>
-        <div
-          class="text-lightSlate-300 flex items-center gap-2 text-sm"
-          data-testid="hook-test-running"
-        >
-          <Spinner class="h-4 w-4" />
-          {t("settings:_trn_hook_test_running", { seconds: elapsed() })}
-        </div>
-      </Show>
-
-      <Show when={refusal()}>
-        {(message) => (
-          <div class="text-sm text-red-400" data-testid="hook-test-verdict">
-            {message()}
-          </div>
-        )}
-      </Show>
-
-      <Show when={verdict()}>
-        {(told) => (
-          <div
-            class="flex items-center gap-2 text-sm"
-            classList={{
-              "text-green-400": told().ok,
-              "text-red-400": !told().ok
-            }}
-            data-testid="hook-test-verdict"
-          >
-            <div
-              class="h-4 w-4 shrink-0"
-              classList={{
-                "i-hugeicons:checkmark-circle-02": told().ok,
-                "i-hugeicons:alert-circle": !told().ok
-              }}
+            <div class="i-hugeicons:stop h-4 w-4" />
+            <Word
+              shown={t("settings:_trn_hook_test_stop")}
+              other={t("settings:_trn_hook_test")}
             />
-            {told().text}
-          </div>
-        )}
-      </Show>
-
-      <Show when={result()?.stdout || result()?.stderr}>
-        <pre
-          class="bg-darkSlate-900 text-lightSlate-300 m-0 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-md p-3 font-mono text-xs"
-          data-testid="hook-test-output"
+          </Button>
+        }
+      >
+        <Button
+          type="secondary"
+          size="medium"
+          data-testid="hook-test-run"
+          disabled={
+            props.instance() === undefined || props.command().trim() === ""
+          }
+          onClick={test}
         >
-          {result()?.stdout}
-          <span class="text-red-300">{result()?.stderr}</span>
-        </pre>
+          <div class="i-hugeicons:play h-4 w-4" />
+          <Word
+            shown={t("settings:_trn_hook_test")}
+            other={t("settings:_trn_hook_test_stop")}
+          />
+        </Button>
       </Show>
     </div>
   )
