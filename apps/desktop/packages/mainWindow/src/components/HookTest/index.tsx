@@ -1,11 +1,20 @@
 import {
   createSignal,
+  For,
   onCleanup,
   Show,
   type Accessor,
   type JSX
 } from "solid-js"
-import { Button, toast } from "@gd/ui"
+import {
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuTrigger,
+  toast
+} from "@gd/ui"
 import { type NamespacedTranslationKey, useTransContext } from "@gd/i18n"
 import type { FEHookKind, FEHookTest } from "@gd/core_module/bindings"
 import { rspc } from "@/utils/rspcClient"
@@ -66,6 +75,18 @@ const Word = (props: { shown: string; other: string }) => (
   </span>
 )
 
+/** Test as the button that opens the list of instances to test in. */
+const MenuButton = (trigger: { children?: JSX.Element }) => (
+  <Button
+    {...trigger}
+    type="secondary"
+    size="medium"
+    data-testid="hook-test-run"
+  >
+    {trigger.children}
+  </Button>
+)
+
 /**
  * A hook's command box with a way to try it: Test runs what the box holds
  * now, in the game folder of `instance`, without starting the game. While it
@@ -74,15 +95,17 @@ const Word = (props: { shown: string; other: string }) => (
  * runs and turns into how it ended, with the last lines the script printed.
  * A test that was stopped only takes its notice away.
  *
- * `children` is the command box; `beside` goes between it and the button
- * (the launcher-wide settings put the instance to test in there).
+ * `children` is the command box. A hook of one instance is tested in it
+ * (`instance`). A launcher-wide hook has none of its own, so it gives the
+ * instances it can be tried in (`choices`), and Test asks which one only
+ * when it is pressed: nothing about testing shows before that.
  */
 export default function HookTest(props: {
-  instance: Accessor<number | undefined>
+  instance?: Accessor<number | undefined>
+  choices?: Accessor<readonly { id: number; name: string }[]>
   kind: FEHookKind
   command: Accessor<string>
   children: JSX.Element
-  beside?: JSX.Element
 }) {
   const [t] = useTransContext()
   const [running, setRunning] = createSignal<number | null>(null)
@@ -132,8 +155,7 @@ export default function HookTest(props: {
     }
   }
 
-  const test = async () => {
-    const instance = props.instance()
+  const test = async (instance: number | undefined) => {
     if (instance === undefined || running() !== null) return
     const title = t(TITLE[props.kind])
     setRunning(instance)
@@ -183,10 +205,23 @@ export default function HookTest(props: {
     if (instance !== null) stopMutation.mutate({ instance, kind: props.kind })
   }
 
+  /** Where Test runs without asking: the instance, or the only choice. */
+  const only = () =>
+    props.instance ? props.instance() : props.choices?.()[0]?.id
+  const empty = () => props.command().trim() === ""
+  const word = () => (
+    <>
+      <div class="i-hugeicons:play h-4 w-4" />
+      <Word
+        shown={t("settings:_trn_hook_test")}
+        other={t("settings:_trn_hook_test_stop")}
+      />
+    </>
+  )
+
   return (
     <div class="flex w-full items-center gap-2" data-testid="hook-test">
       <div class="min-w-0 flex-1">{props.children}</div>
-      {props.beside}
       <Show
         when={running() === null}
         fallback={
@@ -204,21 +239,41 @@ export default function HookTest(props: {
           </Button>
         }
       >
-        <Button
-          type="secondary"
-          size="medium"
-          data-testid="hook-test-run"
-          disabled={
-            props.instance() === undefined || props.command().trim() === ""
+        <Show
+          when={(props.choices?.().length ?? 0) > 1}
+          fallback={
+            <Button
+              type="secondary"
+              size="medium"
+              data-testid="hook-test-run"
+              disabled={only() === undefined || empty()}
+              onClick={() => test(only())}
+            >
+              {word()}
+            </Button>
           }
-          onClick={test}
         >
-          <div class="i-hugeicons:play h-4 w-4" />
-          <Word
-            shown={t("settings:_trn_hook_test")}
-            other={t("settings:_trn_hook_test_stop")}
-          />
-        </Button>
+          <DropdownMenu placement="bottom-end">
+            <DropdownMenuTrigger as={MenuButton} disabled={empty()}>
+              {word()}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent class="max-h-72 max-w-72 overflow-y-auto">
+              <DropdownMenuLabel>
+                {t("settings:_trn_hook_test_instance")}
+              </DropdownMenuLabel>
+              <For each={props.choices!()}>
+                {(choice) => (
+                  <DropdownMenuItem
+                    data-testid="hook-test-choice"
+                    onSelect={() => test(choice.id)}
+                  >
+                    <span class="truncate">{choice.name}</span>
+                  </DropdownMenuItem>
+                )}
+              </For>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </Show>
       </Show>
     </div>
   )

@@ -71,7 +71,7 @@
   "_trn_hook_test_failed_code": "Failed with exit code {{code}}",
   "_trn_hook_test_failed": "Failed",
   "_trn_hook_test_timed_out": "Stopped after five minutes",
-  "_trn_hook_test_instance": "Instance to test in",
+  "_trn_hook_test_instance": "Test in",
   "_trn_wrapper_command_title": "Wrapper Command",
   "_trn_wrapper_command_text": "Command to run the game. This can be useful for modding or other purposes.",
   "_trn_privacy": "Privacy",

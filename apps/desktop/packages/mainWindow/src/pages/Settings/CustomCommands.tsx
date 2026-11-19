@@ -1,13 +1,6 @@
 import { createMemo, createSignal } from "solid-js"
-import { Trans, useTransContext } from "@gd/i18n"
-import {
-  Input,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue
-} from "@gd/ui"
+import { Trans } from "@gd/i18n"
+import { Input } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import HookTest from "@/components/HookTest"
@@ -16,19 +9,21 @@ import Row from "./components/Row"
 import Title from "./components/Title"
 import RowsContainer from "./components/RowsContainer"
 
-/** The instance a launcher-wide hook is tested in unless another is picked:
- * the one played last, or else the first. */
-export function defaultTestInstance(
-  instances: readonly { id: number; last_played: string | null }[]
-): number | undefined {
+/** The instances a launcher-wide hook can be tested in, in the order Test
+ * offers them: the ones played, latest first, then the rest as they come. */
+export function testOrder<T extends { last_played: string | null }>(
+  instances: readonly T[]
+): T[] {
   const played = instances
     .filter((instance) => instance.last_played !== null)
     .sort((a, b) => (a.last_played! < b.last_played! ? 1 : -1))
-  return (played[0] ?? instances[0])?.id
+  return [
+    ...played,
+    ...instances.filter((instance) => instance.last_played === null)
+  ]
 }
 
 const CustomCommands = () => {
-  const [t] = useTransContext()
   const globalStore = useGlobalStore()
   const settings = rspc.createQuery(() => ({
     queryKey: ["settings.getSettings"]
@@ -39,46 +34,12 @@ const CustomCommands = () => {
   }))
 
   // A hook set here runs for every instance, so a test needs one to run in.
-  const instances = createMemo(() =>
-    (globalStore.instances.data ?? []).filter(
-      (instance) => instance.status.status === "valid"
-    )
-  )
-  const [picked, setPicked] = createSignal<number>()
-  const testInstance = () => {
-    const chosen = picked()
-    return chosen !== undefined &&
-      instances().some((instance) => instance.id === chosen)
-      ? chosen
-      : defaultTestInstance(instances())
-  }
-  const nameOf = (id: string | undefined) =>
-    instances().find((instance) => String(instance.id) === id)?.name ?? ""
-
-  const TestInstance = () => (
-    <Select
-      value={testInstance() === undefined ? undefined : String(testInstance())}
-      onChange={(value) => {
-        if (value) setPicked(Number(value))
-      }}
-      options={instances().map((instance) => String(instance.id))}
-      disabled={instances().length === 0}
-      itemComponent={(props) => (
-        <SelectItem item={props.item}>{nameOf(props.item.rawValue)}</SelectItem>
-      )}
-    >
-      <SelectTrigger
-        class="max-w-48"
-        aria-label={t("settings:_trn_hook_test_instance")}
-      >
-        <SelectValue<string>>
-          {(state) => (
-            <span class="truncate">{nameOf(state.selectedOption())}</span>
-          )}
-        </SelectValue>
-      </SelectTrigger>
-      <SelectContent />
-    </Select>
+  const testIn = createMemo(() =>
+    testOrder(
+      (globalStore.instances.data ?? []).filter(
+        (instance) => instance.status.status === "valid"
+      )
+    ).map((instance) => ({ id: instance.id, name: instance.name }))
   )
 
   const [preLaunchDraft, setPreLaunchDraft] = createSignal<string>()
@@ -97,12 +58,11 @@ const CustomCommands = () => {
             <Trans key="settings:_trn_pre_launch_hook_title" />
           </Title>
           <HookTest
-            instance={testInstance}
+            choices={testIn}
             kind="PreLaunch"
             command={() =>
               preLaunchDraft() ?? settings.data?.preLaunchHook ?? ""
             }
-            beside={<TestInstance />}
           >
             <Input
               value={settings.data?.preLaunchHook || ""}
@@ -124,10 +84,9 @@ const CustomCommands = () => {
             <Trans key="settings:_trn_post_exit_hook_title" />
           </Title>
           <HookTest
-            instance={testInstance}
+            choices={testIn}
             kind="PostExit"
             command={() => postExitDraft() ?? settings.data?.postExitHook ?? ""}
-            beside={<TestInstance />}
           >
             <Input
               value={settings.data?.postExitHook || ""}

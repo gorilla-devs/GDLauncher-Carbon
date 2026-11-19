@@ -12,21 +12,24 @@ vi.mock("./components/Row", () => ({ default: () => null }))
 vi.mock("./components/Title", () => ({ default: () => null }))
 vi.mock("./components/RowsContainer", () => ({ default: () => null }))
 
-import { defaultTestInstance } from "./CustomCommands"
+import { testOrder } from "./CustomCommands"
 
-it("tests a launcher-wide hook in the instance played last, or else the first", () => {
-  expect(defaultTestInstance([])).toBeUndefined()
+it("offers the instances to test a launcher-wide hook in with the one played last first", () => {
+  expect(testOrder([])).toEqual([])
+  const order = (instances: { id: number; last_played: string | null }[]) =>
+    testOrder(instances).map((instance) => instance.id)
   expect(
-    defaultTestInstance([
+    order([
       { id: 1, last_played: null },
       { id: 2, last_played: null }
     ])
-  ).toBe(1)
+  ).toEqual([1, 2])
   expect(
-    defaultTestInstance([
+    order([
       { id: 1, last_played: "2026-11-01T10:00:00Z" },
       { id: 2, last_played: null },
-      { id: 3, last_played: "2026-11-18T09:30:00Z" }
+      { id: 3, last_played: "2026-11-18T09:30:00Z" },
+      { id: 4, last_played: null }
     ])
-  ).toBe(3)
+  ).toEqual([3, 1, 2, 4])
 })

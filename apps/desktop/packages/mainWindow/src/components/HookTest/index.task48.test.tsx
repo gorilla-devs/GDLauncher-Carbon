@@ -26,6 +26,20 @@ vi.mock("@gd/ui", () => ({
     >
       {p.children}
     </button>
+  ),
+  // A menu that is always open: its trigger is the Test button.
+  DropdownMenu: (p: any) => <>{p.children}</>,
+  DropdownMenuTrigger: (p: any) => (
+    <button data-testid="hook-test-run" data-menu disabled={p.disabled}>
+      {p.children}
+    </button>
+  ),
+  DropdownMenuContent: (p: any) => <ul>{p.children}</ul>,
+  DropdownMenuLabel: (p: any) => <li>{p.children}</li>,
+  DropdownMenuItem: (p: any) => (
+    <li data-testid={p["data-testid"]} onClick={p.onSelect}>
+      {p.children}
+    </li>
   )
 }))
 vi.mock("@gd/i18n", () => ({
@@ -229,6 +243,59 @@ it("only takes the notice away for a test the player stopped", async () => {
   expect(io.success).not.toHaveBeenCalled()
   expect(io.error).not.toHaveBeenCalled()
   expect(part("hook-test-run")).not.toBeNull()
+})
+
+it("asks which instance to test a launcher-wide hook in only when Test is pressed", async () => {
+  dispose?.()
+  const [choices, setChoices] = createSignal([
+    { id: 3, name: "Vanilla 1.21" },
+    { id: 9, name: "All the Mods 10" }
+  ])
+  const [command, changeCommand] = createSignal("backup.sh")
+  dispose = render(
+    () => (
+      <HookTest choices={choices} kind="PreLaunch" command={command}>
+        <input />
+      </HookTest>
+    ),
+    root
+  )
+  // Test is the menu; no picker stands beside the box.
+  expect(part("hook-test-run")!.hasAttribute("data-menu")).toBe(true)
+  expect(root.querySelector("select")).toBeNull()
+  const offered = [
+    ...root.querySelectorAll<HTMLElement>('[data-testid="hook-test-choice"]')
+  ]
+  expect(offered.map((choice) => choice.textContent)).toEqual([
+    "Vanilla 1.21",
+    "All the Mods 10"
+  ])
+  io.test.mockResolvedValueOnce(result({ type: "Finished" }))
+  offered[1].click()
+  await flush()
+  expect(io.test).toHaveBeenCalledWith({
+    instance: 9,
+    kind: "PreLaunch",
+    command: "backup.sh"
+  })
+  changeCommand("  ")
+  expect(part("hook-test-run")!.hasAttribute("disabled")).toBe(true)
+  changeCommand("backup.sh")
+
+  // With one instance there is nothing to ask.
+  setChoices([{ id: 3, name: "Vanilla 1.21" }])
+  expect(part("hook-test-run")!.hasAttribute("data-menu")).toBe(false)
+  io.test.mockResolvedValueOnce(result({ type: "Finished" }))
+  part("hook-test-run")!.click()
+  await flush()
+  expect(io.test).toHaveBeenLastCalledWith({
+    instance: 3,
+    kind: "PreLaunch",
+    command: "backup.sh"
+  })
+  // With none there is nowhere to run it.
+  setChoices([])
+  expect(part("hook-test-run")!.hasAttribute("disabled")).toBe(true)
 })
 
 it("cannot test an empty command or without an instance to run in", () => {
