@@ -226,6 +226,79 @@ it("a Button with holdToConfirm acts when held, and a click on it only shows the
   expect(click).not.toHaveBeenCalled()
 })
 
+it("the click that ends a confirmed hold is claimed once, and a later click is not", () => {
+  const h = hold({ onConfirm: () => {}, duration: 300 })
+  const mouseUp = () =>
+    window.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }))
+  expect(h.claimsClick()).toBe(false)
+  press(h)
+  vi.advanceTimersByTime(300)
+  // The control changing under the press (it loses focus, say) is not the
+  // press ending: the mouse is still down.
+  h.handlers.onBlur()
+  vi.advanceTimersByTime(800)
+  // Letting go now is the click to claim.
+  mouseUp()
+  expect(h.claimsClick()).toBe(true)
+  expect(h.claimsClick()).toBe(false)
+
+  // Let go where no click follows: the next click is the player's own.
+  press(h)
+  vi.advanceTimersByTime(300)
+  mouseUp()
+  vi.advanceTimersByTime(1)
+  expect(h.claimsClick()).toBe(false)
+
+  // Held with a key: its release is claimed the same way.
+  press(h)
+  vi.advanceTimersByTime(300)
+  window.dispatchEvent(new KeyboardEvent("keyup", { key: " " }))
+  expect(h.claimsClick()).toBe(true)
+
+  // A press that did not confirm claims nothing.
+  press(h)
+  vi.advanceTimersByTime(100)
+  h.handlers.onPointerUp()
+  mouseUp()
+  expect(h.claimsClick()).toBe(false)
+})
+
+it("a Button that stops being held when it confirms does not click on release", () => {
+  // Stop turns into Play the moment the hold confirms, as on the instance page.
+  const [running, setRunning] = createSignal(true)
+  const play = vi.fn()
+  const root = document.createElement("div")
+  document.body.append(root)
+  dispose = render(
+    () => (
+      <Button
+        holdToConfirm={
+          running() ? { onConfirm: () => setRunning(false) } : undefined
+        }
+        onClick={play}
+      >
+        {running() ? "Stop" : "Play"}
+      </Button>
+    ),
+    root
+  )
+  const button = root.querySelector("button")!
+  pointer(button, "pointerdown")
+  vi.advanceTimersByTime(HOLD_TO_CONFIRM_MS)
+  expect(button.textContent).toBe("Play")
+  // Turning into Play can cost the button its focus while the mouse is
+  // still down; it comes up later, on what is now Play.
+  button.dispatchEvent(new FocusEvent("blur"))
+  vi.advanceTimersByTime(700)
+  pointer(button, "pointerup")
+  button.click()
+  expect(play).not.toHaveBeenCalled()
+  // A click of its own, later, plays.
+  vi.advanceTimersByTime(1)
+  button.click()
+  expect(play).toHaveBeenCalledTimes(1)
+})
+
 it("a Button without it clicks as before, whichever way its handler is given", () => {
   const click = vi.fn()
   const plain = mountButton({ onClick: click })

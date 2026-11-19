@@ -23,6 +23,13 @@ export interface HoldToConfirm {
   hinted: Accessor<boolean>
   /** The duration of the press now held, or of the next one. */
   duration: Accessor<number>
+  /**
+   * True, once, for the click that ends a press which confirmed. Letting go
+   * of the mouse or the key is still a click on the control, and by then the
+   * control may be something else (Stop became Play): its own click handler
+   * asks this first and does nothing when it is true.
+   */
+  claimsClick: () => boolean
   /** Spread on the element that is pressed. A click alone does nothing. */
   handlers: {
     onPointerDown: (event: PointerEvent) => void
@@ -61,6 +68,23 @@ export function createHoldToConfirm(
   let confirmTimer: ReturnType<typeof setTimeout> | undefined
   let hintTimer: ReturnType<typeof setTimeout> | undefined
   let startedAt = 0
+  // The press that is still down has confirmed.
+  let confirmed = false
+  // Until the mouse button or the key really comes up, wherever that is:
+  // the control may have changed under it, lost focus, or been left. The
+  // click of that release comes right after it, in the same turn; any later
+  // click is a new one.
+  const pressEnded = () => {
+    window.removeEventListener("pointerup", pressEnded, true)
+    window.removeEventListener("keyup", pressEnded, true)
+    setTimeout(() => (confirmed = false), 0)
+  }
+  const confirm = () => {
+    confirmed = true
+    window.addEventListener("pointerup", pressEnded, true)
+    window.addEventListener("keyup", pressEnded, true)
+    options.onConfirm()
+  }
 
   const start = () => {
     if (holding() || options.disabled?.()) return
@@ -72,7 +96,7 @@ export function createHoldToConfirm(
     confirmTimer = setTimeout(() => {
       confirmTimer = undefined
       setHolding(false)
-      options.onConfirm()
+      confirm()
     }, duration())
   }
 
@@ -91,12 +115,19 @@ export function createHoldToConfirm(
   onCleanup(() => {
     clearTimeout(confirmTimer)
     clearTimeout(hintTimer)
+    window.removeEventListener("pointerup", pressEnded, true)
+    window.removeEventListener("keyup", pressEnded, true)
   })
 
   return {
     holding,
     hinted,
     duration,
+    claimsClick: () => {
+      const claimed = confirmed
+      confirmed = false
+      return claimed
+    },
     handlers: {
       onPointerDown: (event) => {
         // The main button only; and never a drag or a click on what is
@@ -126,6 +157,7 @@ export function createHoldToConfirm(
       },
       onBlur: release,
       onClick: (event) => {
+        confirmed = false
         event.preventDefault()
         event.stopPropagation()
       }

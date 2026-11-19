@@ -284,7 +284,16 @@ function Button(props: Props) {
       // re-fires its click handler on Enter/Space while a mutation is in
       // flight, letting keyboard users double-submit.
       disabled={local.loading || local.disabled}
-      onClick={handle(local.onClick, hold.handlers.onClick)}
+      onClick={(event: MouseEvent) => {
+        // The click that ends a hold which confirmed is not a click on
+        // what the button has become.
+        if (hold.claimsClick()) {
+          event.preventDefault()
+          event.stopPropagation()
+          return
+        }
+        handle(local.onClick, hold.handlers.onClick)(event)
+      }}
       onPointerDown={handle(local.onPointerDown, hold.handlers.onPointerDown)}
       onPointerUp={handle(local.onPointerUp, hold.handlers.onPointerUp)}
       onPointerCancel={handle(

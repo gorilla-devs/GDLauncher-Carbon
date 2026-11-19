@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
+import { createSignal } from "solid-js"
 import { render } from "solid-js/web"
 import { BaseTile } from "./index"
 
@@ -23,8 +24,12 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const mount = (props: { isRunning: boolean; hint?: string }) => {
-  const play = vi.fn()
+const mount = (props: {
+  isRunning: boolean | (() => boolean)
+  hint?: string
+  onPlay?: () => void
+}) => {
+  const play = vi.fn(props.onPlay)
   const open = vi.fn()
   const drag = vi.fn()
   const root = document.createElement("div")
@@ -36,7 +41,11 @@ const mount = (props: { isRunning: boolean; hint?: string }) => {
         size={2}
         isLoading={false}
         isWaiting={false}
-        isRunning={props.isRunning}
+        isRunning={
+          typeof props.isRunning === "function"
+            ? props.isRunning()
+            : props.isRunning
+        }
         isBusy={false}
         isDeleting={false}
         isMultiSelected={false}
@@ -49,7 +58,15 @@ const mount = (props: { isRunning: boolean; hint?: string }) => {
         onDragStart={drag}
         shouldSetViewTransition={false}
         viewTransitionPrefix="synthetic"
-        playButtonContent={props.isRunning ? "STOP" : "PLAY"}
+        playButtonContent={
+          (
+            typeof props.isRunning === "function"
+              ? props.isRunning()
+              : props.isRunning
+          )
+            ? "STOP"
+            : "PLAY"
+        }
         holdToStopHint={props.hint}
         infoContent="Info"
       />
@@ -86,6 +103,30 @@ it("the Stop of a running tile acts only when held, and a click on it shows the 
   // Neither opens the instance nor starts dragging the tile.
   expect(tile.open).not.toHaveBeenCalled()
   expect(tile.drag).not.toHaveBeenCalled()
+})
+
+it("letting go after holding Stop does not press the Play it has become", () => {
+  const [running, setRunning] = createSignal(true)
+  const tile = mount({
+    isRunning: running,
+    hint: "Hold to stop",
+    // The game stops: the control is Play from here on.
+    onPlay: () => setRunning(false)
+  })
+  tile.pointer("pointerdown")
+  vi.advanceTimersByTime(1200)
+  expect(tile.play).toHaveBeenCalledTimes(1)
+  expect(tile.control.textContent).toBe("PLAY")
+  // It stops being a focusable Stop while the mouse is still down.
+  tile.control.dispatchEvent(new FocusEvent("blur"))
+  vi.advanceTimersByTime(700)
+  tile.pointer("pointerup")
+  tile.control.click()
+  expect(tile.play).toHaveBeenCalledTimes(1)
+  // A click of its own, later, plays.
+  vi.advanceTimersByTime(1)
+  tile.control.click()
+  expect(tile.play).toHaveBeenCalledTimes(2)
 })
 
 it("Play is still one click", () => {

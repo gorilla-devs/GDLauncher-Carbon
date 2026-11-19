@@ -942,7 +942,9 @@ function DockAvatar(props: DockAvatarProps) {
                         !isServerRecoveredUnverified()
                     }}
                     onClick={(e) => {
-                      if (stopIsHeld()) {
+                      // Letting go after holding Stop is a click too, on
+                      // what is Play by then.
+                      if (stopHold.claimsClick() || stopIsHeld()) {
                         e.stopPropagation()
                         return
                       }

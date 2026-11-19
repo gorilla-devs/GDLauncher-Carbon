@@ -492,7 +492,10 @@ const BaseTile = (props: BaseTileProps) => {
                   }
                   onClick={(e) => {
                     e.stopPropagation()
-                    if (!stopIsHeld()) props.onPlay?.(e)
+                    // Letting go after holding Stop is a click too, on what
+                    // is Play by then: it must not start the game again.
+                    if (stopHold.claimsClick() || stopIsHeld()) return
+                    props.onPlay?.(e)
                   }}
                   onPointerDown={(e) => {
                     if (stopIsHeld()) stopHold.handlers.onPointerDown(e)
