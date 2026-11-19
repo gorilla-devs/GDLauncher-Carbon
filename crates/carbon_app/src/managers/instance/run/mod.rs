@@ -57,6 +57,7 @@ use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, info, trace, warn};
 
 mod download_failure;
+pub(crate) mod game_crash;
 mod java;
 mod minecraft;
 pub(super) mod modpack;
@@ -1275,6 +1276,11 @@ impl ManagerRef<'_, InstanceManager> {
                                 }
                             };
                             time_at_start = Some(Utc::now());
+                            // For telling a crash from a Stop, and a report
+                            // of this session from an older one.
+                            let stop_requested = std::sync::atomic::AtomicBool::new(false);
+                            let (game_started, game_started_at) =
+                                (std::time::Instant::now(), std::time::SystemTime::now());
                             let (stop_reads, stop_rx) = watch::channel(false);
                             let detach_reads = stop_reads.clone();
                             let (exit_result, incomplete_drain) = supervise_logs(
@@ -1289,6 +1295,7 @@ impl ManagerRef<'_, InstanceManager> {
                                     },
                                     result = child.wait() => result.map(Some),
                                     Some(()) = kill_rx.recv() => {
+                                        stop_requested.store(true, std::sync::atomic::Ordering::Relaxed);
                                         if let Err(error) = child.start_kill() { tracing::warn!("Failed to request game stop: {error}"); }
                                         child.wait().await.map(Some)
                                     },
@@ -1371,6 +1378,38 @@ impl ManagerRef<'_, InstanceManager> {
                             if let Ok(Some(exitcode)) = exit_result {
                                 if let Some(ownership) = game_activity.take() {
                                     ownership.finish();
+                                }
+                                // A game that crashed or never got going is
+                                // told to the player. One that only ended
+                                // with an error is not: that is also how a
+                                // game ended from outside looks.
+                                let ended = game_crash::GameExit {
+                                    success: exitcode.success(),
+                                    code: exitcode.code(),
+                                    faulted: game_crash::faulted(&exitcode),
+                                    stopped: stop_requested
+                                        .load(std::sync::atomic::Ordering::Relaxed),
+                                    said_crashed: log
+                                        .as_ref()
+                                        .is_some_and(|log| log.borrow().said_crashed()),
+                                    wrote_report: !exitcode.success()
+                                        && game_crash::wrote_report(
+                                            &instance_path.get_data_path(),
+                                            &instance_path.get_crash_reports_path(),
+                                            game_started_at,
+                                        )
+                                        .await,
+                                    ran_for: game_started.elapsed(),
+                                };
+                                if let Some(kind) = game_crash::classify(&ended) {
+                                    let manager = app.instance_manager();
+                                    let name = manager
+                                        .current_config(instance_id)
+                                        .await
+                                        .map(|(_, config)| config.name)
+                                        .unwrap_or_default();
+                                    manager.game_crashes.push(instance_id, name, kind);
+                                    app.invalidate(GET_GAME_CRASHES, None);
                                 }
                                 let msg = format!("{exitcode}");
 

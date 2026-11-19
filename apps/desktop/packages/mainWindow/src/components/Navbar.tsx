@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import AddonFailures from "./AddonFailures"
 import TaskWarnings from "./TaskWarnings"
+import GameCrashes from "./GameCrashes"
 import RestoredServers from "./RestoredServers"
 import { AccountsDropdown } from "./AccountsDropdown"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
@@ -112,6 +113,7 @@ const AppNavbar = () => {
         <div class="text-lightSlate-50 flex h-full list-none items-center gap-6">
           <AddonFailures />
           <TaskWarnings />
+          <GameCrashes />
           <RestoredServers />
           <Show when={hasPendingUpdate()}>
             <div

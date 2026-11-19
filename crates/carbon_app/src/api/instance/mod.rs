@@ -163,6 +163,19 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 }))
         }
 
+        // Games that crashed or did not start, which the app has not shown
+        // yet.
+        query GET_GAME_CRASHES[app, args: ()] {
+            Ok(app.instance_manager().game_crashes.pending().into_iter()
+                .map(FEGameCrash::from)
+                .collect::<Vec<_>>())
+        }
+
+        mutation ACKNOWLEDGE_GAME_CRASH[app, id: u32] {
+            app.instance_manager().game_crashes.acknowledge(id);
+            Ok(())
+        }
+
         // Takes a queued Play, install, update or repair out of the queue.
         mutation LEAVE_QUEUE[app, id: FEInstanceId] {
             app.instance_manager().leave_queue(id.into())
@@ -3227,6 +3240,43 @@ impl From<RegenerateShareCodeResponse> for FERegenerateShareCodeResponse {
 pub struct CancelPendingSetup {
     pub instance: FEInstanceId,
     pub expected_operation: String,
+}
+
+/// A game that crashed or did not start, told once.
+#[derive(specta::Type, serde::Serialize, Debug)]
+pub struct FEGameCrash {
+    pub id: u32,
+    pub instance: FEInstanceId,
+    /// The instance's name when it crashed.
+    pub name: String,
+    pub kind: FECrashKind,
+}
+
+#[derive(specta::Type, serde::Serialize, Debug)]
+#[serde(tag = "type", content = "value")]
+pub enum FECrashKind {
+    /// It failed while running; `report` is whether it left a crash report.
+    Crashed { report: bool },
+    /// It ended with an error `seconds` after starting, with exit code
+    /// `code` when it has one.
+    DidNotStart { seconds: u32, code: Option<i32> },
+}
+
+impl From<crate::managers::instance::run::game_crash::GameCrash> for FEGameCrash {
+    fn from(crash: crate::managers::instance::run::game_crash::GameCrash) -> Self {
+        use crate::managers::instance::run::game_crash::CrashKind;
+        Self {
+            id: crash.id,
+            instance: crash.instance_id.into(),
+            name: crash.name,
+            kind: match crash.kind {
+                CrashKind::Crashed { report } => FECrashKind::Crashed { report },
+                CrashKind::DidNotStart { seconds, code } => {
+                    FECrashKind::DidNotStart { seconds, code }
+                }
+            },
+        }
+    }
 }
 
 /// The instance whose install, update, repair or launch the queued ones

@@ -42,6 +42,8 @@ pub struct GameLog {
     entries: Vec<LogEntry>,
     message_bytes: usize,
     truncated: bool,
+    /// The game printed that it crashed, whether or not that line was kept.
+    said_crashed: bool,
 }
 
 impl GameLog {
@@ -310,6 +312,11 @@ impl GameLog {
     /// Inserts a new entry into the log, returning whether the log was modified.
     /// Returns `false` once the entry or byte cap has been reached.
     pub fn try_add_entry(&mut self, entry: LogEntry) -> bool {
+        // Before the cap: a long session's last lines are the ones that say
+        // how it ended.
+        if !self.said_crashed && super::run::game_crash::says_crashed(&entry.message) {
+            self.said_crashed = true;
+        }
         if self.truncated {
             return false;
         }
@@ -325,6 +332,11 @@ impl GameLog {
         self.message_bytes += entry.message.len();
         self.entries.push(entry);
         true
+    }
+
+    /// Whether the game printed that it crashed.
+    pub fn said_crashed(&self) -> bool {
+        self.said_crashed
     }
 
     /// Retrieves the requested entry from the log.

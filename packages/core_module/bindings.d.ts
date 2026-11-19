@@ -27,6 +27,7 @@ export type Procedures = {
         { key: "instance.getLogs", input: FEInstanceId, result: GameLogEntry[] } | 
         { key: "instance.getModSources", input: FEInstanceId, result: ModSources } | 
         { key: "instance.getModpackInfo", input: FEInstanceId | null, result: FEInstanceModpackInfo | null } | 
+        { key: "instance.getGameCrashes", input: never, result: FEGameCrash[] } | 
         { key: "instance.getInstallTurn", input: never, result: InstallTurnHolder | null } | 
         { key: "instance.getPendingSetup", input: FEInstanceId, result: PendingSetupStatus } | 
         { key: "instance.getRepairPreview", input: RepairPreviewArgs, result: FERepairPreview } | 
@@ -133,6 +134,7 @@ export type Procedures = {
         { key: "instance.arrangeLibrary", input: LibrarySortCriteria, result: null } | 
         { key: "instance.cancelImportScan", input: never, result: null } | 
         { key: "instance.cancelModpackChangeCheck", input: FEInstanceId, result: null } | 
+        { key: "instance.acknowledgeGameCrash", input: number, result: null } | 
         { key: "instance.cancelPendingSetup", input: CancelPendingSetup, result: null } | 
         { key: "instance.keptFileLocation", input: KeptPackFile, result: string } | 
         { key: "instance.leaveQueue", input: FEInstanceId, result: null } | 
@@ -594,6 +596,13 @@ export type ExportEntry = { entries: { [key: string]: ExportEntry | null } }
 export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
 
 export type CancelPendingSetup = { instance: FEInstanceId; expected_operation: string }
+
+/**
+ * A game that crashed or did not start, told once.
+ */
+export type FEGameCrash = { id: number; instance: FEInstanceId; name: string; kind: FECrashKind }
+
+export type FECrashKind = { type: "Crashed"; value: { report: boolean } } | { type: "DidNotStart"; value: { seconds: number; code: number | null } }
 
 /**
  * The instance whose install, update, repair or launch the queued ones

@@ -108,6 +108,8 @@ keys! {
         CANCEL_PENDING_SETUP                       = "cancelPendingSetup";
         USE_PACK_VERSIONS                          = "usePackVersions";
         INSTALL_TURN                               = "getInstallTurn";
+        GET_GAME_CRASHES                           = "getGameCrashes";
+        ACKNOWLEDGE_GAME_CRASH                     = "acknowledgeGameCrash";
         LEAVE_QUEUE                                = "leaveQueue";
         KEPT_FILE_LOCATION                         = "keptFileLocation";
         CHECK_PACK_ORIGIN                           = "checkPackOrigin";
