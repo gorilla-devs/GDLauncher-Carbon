@@ -62,7 +62,7 @@
   "_trn_pre_launch_hook_title": "起動前フック (Pre-Launch Hook)",
   "_trn_pre_launch_hook_text": "ゲーム起動前にスクリプトを実行します。Modの導入などに利用できます。",
   "_trn_post_exit_hook_title": "終了後フック (Post-Exit Hook)",
-  "_trn_post_exit_hook_text": "ゲーム終了後にスクリプトを実行します。Modの導入などに利用できます。",
+  "_trn_post_exit_hook_text": "ゲーム終了後にスクリプトを実行します。その時点でGDLauncherが起動している場合にのみ実行されます。",
   "_trn_wrapper_command_title": "ラッパーコマンド",
   "_trn_wrapper_command_text": "ゲームを実行するためのコマンドです。Modの導入などに利用できます。",
   "_trn_privacy": "プライバシー",

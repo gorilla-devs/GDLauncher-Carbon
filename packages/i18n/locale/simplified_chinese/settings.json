@@ -62,7 +62,7 @@
   "_trn_pre_launch_hook_title": "启动前钩子",
   "_trn_pre_launch_hook_text": "在启动游戏前运行脚本。这可用于模组或其他目的。",
   "_trn_post_exit_hook_title": "退出后钩子",
-  "_trn_post_exit_hook_text": "在游戏退出后运行脚本。这可用于模组或其他目的。",
+  "_trn_post_exit_hook_text": "在游戏退出后运行脚本。仅当此时 GDLauncher 处于打开状态时才会运行。",
   "_trn_wrapper_command_title": "包装命令",
   "_trn_wrapper_command_text": "运行游戏的命令。这可用于模组或其他目的。",
   "_trn_privacy": "隐私",

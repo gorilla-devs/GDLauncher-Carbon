@@ -58,6 +58,7 @@ use tracing::{debug, info, trace, warn};
 
 mod download_failure;
 pub(crate) mod game_crash;
+pub(crate) mod hook;
 mod java;
 mod minecraft;
 pub(super) mod modpack;
@@ -379,13 +380,7 @@ impl ManagerRef<'_, InstanceManager> {
             }
         };
 
-        let post_exit_hook = match config.post_exit_hook.as_ref() {
-            Some(hook) => Some(hook.clone()),
-            None => {
-                let settings = self.app.settings_manager().get_settings().await?;
-                settings.post_exit_hook.clone()
-            }
-        };
+        let post_exit_hook = self.post_exit_hook(&config).await?;
 
         let wrapper_command = match config.wrapper_command.as_ref() {
             Some(cmd) => Some(cmd.clone()),
@@ -939,54 +934,16 @@ impl ManagerRef<'_, InstanceManager> {
                                 if let Some(pre_launch_hook) =
                                     pre_launch_hook.filter(|v| !v.is_empty())
                                 {
-                                    let mut split = split_hook_command(&pre_launch_hook)
-                                        .ok_or_else(|| {
-                                            anyhow::anyhow!("Failed to parse pre-launch hook")
-                                        })?
-                                        .into_iter();
-
-                                    let main_command = split.next().ok_or_else(|| {
-                                        anyhow::anyhow!("Pre-launch hook is empty")
-                                    })?;
-
-                                    let pre_launch_command = tokio::time::timeout(
-                                HOOK_TIMEOUT,
-                                crate::managers::runtime_lifecycle::tracked_output_reserved(
-                                    &app.runtime_lifecycle,
-                                    tokio::process::Command::new(main_command)
-                                        .args(split)
-                                        .current_dir(instance_path.get_data_path())
-                                        .kill_on_drop(true),
-                                    crate::managers::runtime_lifecycle::ActivityPolicy::Hook, None,
-                                ),
-                            )
-                            .await
-                            .map_err(|_| {
-                                anyhow::anyhow!(
-                                    "Pre-launch hook did not finish within {HOOK_TIMEOUT:?}"
-                                )
-                            })?
-                            .map_err(|e| {
-                                if e.kind() == std::io::ErrorKind::Interrupted {
-                                    anyhow::anyhow!("Pre-launch hook was stopped before it finished: {:?}", e)
-                                } else {
-                                    anyhow::anyhow!("Pre-launch hook failed to start: {:?}", e)
-                                }
-                            })?;
-
-                                    if !pre_launch_command.status.success() {
-                                        return Err(anyhow::anyhow!(
-                                            "Pre-launch hook failed with status: {:?} \n{}",
-                                            pre_launch_command.status,
-                                            String::from_utf8(pre_launch_command.stderr)
-                                                .unwrap_or_default()
-                                        ));
-                                    }
-
+                                    let printed = hook::run(
+                                        &app,
+                                        hook::HookKind::PreLaunch,
+                                        &pre_launch_hook,
+                                        &instance_path.get_data_path(),
+                                        HOOK_TIMEOUT,
+                                    )
+                                    .await?;
                                     tracing::info!(
-                                        "Pre-launch hook completed successfully {}",
-                                        String::from_utf8(pre_launch_command.stdout)
-                                            .unwrap_or_default()
+                                        "Pre-launch hook completed successfully {printed}"
                                     );
                                     // A quit lets the hook finish but not the
                                     // launch it was preparing.
@@ -1453,78 +1410,12 @@ impl ManagerRef<'_, InstanceManager> {
                             if let Some(post_exit_hook) =
                                 post_exit_hook.filter(|v| !v.is_empty() && !cancel.is_cancelled())
                             {
-                                match split_hook_command(&post_exit_hook)
-                                    .ok_or_else(|| {
-                                        anyhow::anyhow!("Failed to parse post-exit hook")
-                                    })
-                                    .map(|v| v.into_iter())
-                                {
-                                    Ok(mut split) => match split.next() {
-                                        Some(main_command) => {
-                                            let post_exit_command = tokio::time::timeout(
-                                        HOOK_TIMEOUT,
-                                        crate::managers::runtime_lifecycle::tracked_output_reserved(
-                                            &app.runtime_lifecycle,
-                                            tokio::process::Command::new(main_command)
-                                                .args(split)
-                                                .current_dir(instance_path.get_data_path())
-                                                .kill_on_drop(true),
-                                            crate::managers::runtime_lifecycle::ActivityPolicy::Hook, None,
-                                        ),
+                                app.instance_manager()
+                                    .run_post_exit_hook(
+                                        &post_exit_hook,
+                                        &instance_path.get_data_path(),
                                     )
                                     .await;
-
-                                            match post_exit_command {
-                                                Err(_) => {
-                                                    tracing::warn!(
-                                                        "Post-exit hook did not finish within {HOOK_TIMEOUT:?}; cleanup requested and supervision retained"
-                                                    );
-                                                }
-                                                Ok(Ok(post_exit_command)) => {
-                                                    if !post_exit_command.status.success() {
-                                                        tracing::error!(
-                                                            "Post-exit hook failed with status: {:?} \n{}",
-                                                            post_exit_command.status,
-                                                            String::from_utf8(
-                                                                post_exit_command.stderr
-                                                            )
-                                                            .unwrap_or_default()
-                                                        );
-                                                    } else {
-                                                        tracing::info!(
-                                                            "Post-exit hook completed successfully {}",
-                                                            String::from_utf8(
-                                                                post_exit_command.stdout
-                                                            )
-                                                            .unwrap_or_default()
-                                                        );
-                                                    }
-                                                }
-                                                Ok(Err(e))
-                                                    if e.kind()
-                                                        == std::io::ErrorKind::Interrupted =>
-                                                {
-                                                    tracing::error!(
-                                                        "Post-exit hook was stopped before it finished: {:?}",
-                                                        e
-                                                    );
-                                                }
-                                                Ok(Err(e)) => {
-                                                    tracing::error!(
-                                                        "Post-exit hook failed to start: {:?}",
-                                                        e
-                                                    );
-                                                }
-                                            }
-                                        }
-                                        None => {
-                                            tracing::error!("Post-exit hook is empty");
-                                        }
-                                    },
-                                    Err(e) => {
-                                        tracing::error!("Post-exit hook failed to parse: {:?}", e);
-                                    }
-                                }
                             }
 
                             let _ = app
@@ -1729,7 +1620,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .await;
                 }
                 orphan_pid::IdentityStatus::GoneOrReused => {
-                    self.release_adopted_instance(instance_id, record).await
+                    self.adopted_game_ended(instance_id, record).await
                 }
                 orphan_pid::IdentityStatus::Unknown => {
                     bail!("Adopted game identity is unconfirmed; ownership retained, retry Stop")
@@ -1759,27 +1650,30 @@ impl ManagerRef<'_, InstanceManager> {
     /// or closing the window they just opened) for a game they launched
     /// earlier — so it must not print the close either, or the two go out of
     /// step.
+    ///
+    /// Returns whether it was released: `false` when the instance is no
+    /// longer following `expected`.
     pub async fn release_adopted_instance(
         self,
         instance_id: InstanceId,
         expected: orphan_pid::ProcessRecord,
-    ) {
+    ) -> bool {
         // Same gate as launch/rename/delete. Hold it through conditional marker
         // cleanup; release the global map before IO and never admit fresh work.
         let _ownership = self.lock_instance(instance_id).await;
         let shortpath = {
             let mut instances = self.instances.write().await;
             let Some(instance) = instances.get_mut(&instance_id) else {
-                return;
+                return false;
             };
             let Ok(data) = instance.data_mut() else {
-                return;
+                return false;
             };
             let LaunchState::Running(running) = &data.state else {
-                return;
+                return false;
             };
             if !running.is_adopted() || running.process_record() != expected {
-                return;
+                return false;
             }
 
             data.state = LaunchState::Inactive { failed_task: None };
@@ -1801,6 +1695,83 @@ impl ManagerRef<'_, InstanceManager> {
         self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
+        true
+    }
+
+    /// The post-exit hook of an instance with this configuration: its own,
+    /// or the one in the settings.
+    async fn post_exit_hook(self, config: &info::Instance) -> anyhow::Result<Option<String>> {
+        Ok(match config.post_exit_hook.as_ref() {
+            Some(hook) => Some(hook.clone()),
+            None => {
+                self.app
+                    .settings_manager()
+                    .get_settings()
+                    .await?
+                    .post_exit_hook
+            }
+        })
+    }
+
+    /// Runs a post-exit hook in the instance's game folder. A hook that
+    /// fails is the player's script failing, not the game: it is logged.
+    async fn run_post_exit_hook(self, command: &str, folder: &Path) {
+        match hook::run(
+            self.app,
+            hook::HookKind::PostExit,
+            command,
+            folder,
+            HOOK_TIMEOUT,
+        )
+        .await
+        {
+            Ok(printed) => tracing::info!("Post-exit hook completed successfully {printed}"),
+            Err(error) => match error.failure {
+                hook::HookFailure::TimedOut(_) => {
+                    tracing::warn!("{error}; cleanup requested and supervision retained")
+                }
+                _ => tracing::error!("{error}"),
+            },
+        }
+    }
+
+    /// A game followed from an earlier session of the launcher has ended:
+    /// the instance is released, and its post-exit hook runs as it does for
+    /// a game this session started. The hook is the instance's as it is set
+    /// now. It runs by itself, so that neither the instance nor the other
+    /// games followed wait for a long script.
+    pub async fn adopted_game_ended(
+        self,
+        instance_id: InstanceId,
+        expected: orphan_pid::ProcessRecord,
+    ) {
+        if !self.release_adopted_instance(instance_id, expected).await {
+            return;
+        }
+        let Ok((shortpath, config)) = self.current_config(instance_id).await else {
+            return;
+        };
+        let command = match self.post_exit_hook(&config).await {
+            Ok(Some(command)) if !command.is_empty() => command,
+            Ok(_) => return,
+            Err(error) => {
+                tracing::error!("Post-exit hook not run: {error:#}");
+                return;
+            }
+        };
+        let folder = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath)
+            .get_data_path();
+        let app = self.app.clone();
+        tokio::spawn(async move {
+            app.instance_manager()
+                .run_post_exit_hook(&command, &folder)
+                .await;
+        });
     }
 
     /// Record that an adopted instance's process was seen alive at `now`, and
@@ -2014,7 +1985,7 @@ impl ManagerRef<'_, InstanceManager> {
                                     .bank_adopted_playtime_session(instance_id, Some(record))
                                     .await;
                                 app.instance_manager()
-                                    .release_adopted_instance(instance_id, record)
+                                    .adopted_game_ended(instance_id, record)
                                     .await;
                             }
                             orphan_pid::IdentityStatus::Same => {
@@ -3281,6 +3252,99 @@ mod tests {
             Some((4242, Some(1_700_000_000))),
             "the pidfile must be left in place when the release is a no-op"
         );
+    }
+
+    /// R06-launch#6: a game followed from an earlier session of the launcher
+    /// ended without its post-exit hook ever running. It now runs when that
+    /// game ends, in the instance's game folder. A release that does not
+    /// happen (the instance has moved on) runs nothing.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_followed_game_that_ends_runs_the_instances_post_exit_hook() {
+        let app = crate::setup_managers_for_test().await;
+        let instance_id = InstanceId(1);
+        let shortpath = "hooked-instance".to_string();
+        let path = app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .get_instance_path(&shortpath);
+        let data_path = path.get_data_path();
+        tokio::fs::create_dir_all(&data_path).await.unwrap();
+
+        let follow = |app: &crate::managers::App| {
+            let running = RunningInstance::adopted(4242, 1_700_000_000, Utc::now(), Utc::now());
+            let record = running.process_record();
+            let mut data = instance_data_with_state(LaunchState::Running(running));
+            data.config.post_exit_hook = Some("touch hook-ran".into());
+            let (app, shortpath) = (app.clone(), shortpath.clone());
+            async move {
+                app.instance_manager().instances.write().await.insert(
+                    instance_id,
+                    Instance {
+                        shortpath,
+                        type_: InstanceType::Valid(data),
+                    },
+                );
+                record
+            }
+        };
+
+        // Another process than the one followed: nothing is released or run.
+        let record = follow(&app).await;
+        let mut other = record;
+        other.pid += 1;
+        app.instance_manager()
+            .adopted_game_ended(instance_id, other)
+            .await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(!data_path.join("hook-ran").exists());
+        assert!(matches!(
+            app.instance_manager().instances.read().await[&instance_id]
+                .data()
+                .unwrap()
+                .state,
+            LaunchState::Running(_)
+        ));
+
+        app.instance_manager()
+            .adopted_game_ended(instance_id, record)
+            .await;
+        tokio::time::timeout(Duration::from_secs(10), async {
+            while !data_path.join("hook-ran").exists() {
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        })
+        .await
+        .expect("the hook ran in the game folder");
+        assert!(matches!(
+            app.instance_manager().instances.read().await[&instance_id]
+                .data()
+                .unwrap()
+                .state,
+            LaunchState::Inactive { failed_task: None }
+        ));
+
+        // No hook set: the game is released and nothing runs.
+        tokio::fs::remove_file(data_path.join("hook-ran"))
+            .await
+            .unwrap();
+        let record = follow(&app).await;
+        app.instance_manager()
+            .instances
+            .write()
+            .await
+            .get_mut(&instance_id)
+            .unwrap()
+            .data_mut()
+            .unwrap()
+            .config
+            .post_exit_hook = Some(String::new());
+        app.instance_manager()
+            .adopted_game_ended(instance_id, record)
+            .await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        assert!(!data_path.join("hook-ran").exists());
     }
 
     // --- adopted playtime -------------------------------------------------

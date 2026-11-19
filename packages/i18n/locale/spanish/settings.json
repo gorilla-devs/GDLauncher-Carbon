@@ -62,7 +62,7 @@
   "_trn_pre_launch_hook_title": "Gancho previo al lanzamiento",
   "_trn_pre_launch_hook_text": "Ejecuta un script antes de iniciar el juego. Esto puede ser útil para mods u otros propósitos.",
   "_trn_post_exit_hook_title": "Gancho posterior a la salida",
-  "_trn_post_exit_hook_text": "Ejecuta un script después de que el juego haya salido. Esto puede ser útil para mods u otros propósitos.",
+  "_trn_post_exit_hook_text": "Ejecuta un script después de que el juego haya salido. Solo se ejecuta si GDLauncher está abierto en ese momento.",
   "_trn_wrapper_command_title": "Comando envolvente",
   "_trn_wrapper_command_text": "Comando para ejecutar el juego. Esto puede ser útil para mods u otros propósitos.",
   "_trn_privacy": "Privacidad",

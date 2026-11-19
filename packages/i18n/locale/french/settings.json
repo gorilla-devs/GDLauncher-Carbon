@@ -62,7 +62,7 @@
   "_trn_pre_launch_hook_title": "Script avant lancement",
   "_trn_pre_launch_hook_text": "Exécuter un script avant de lancer le jeu. Cela peut être utile pour le modding ou à d'autres fins.",
   "_trn_post_exit_hook_title": "Script après fermeture",
-  "_trn_post_exit_hook_text": "Exécuter un script après la fermeture du jeu. Cela peut être utile pour le modding ou à d'autres fins.",
+  "_trn_post_exit_hook_text": "Exécuter un script après la fermeture du jeu. Il ne s’exécute que si GDLauncher est ouvert à ce moment-là.",
   "_trn_wrapper_command_title": "Commande Wrapper",
   "_trn_wrapper_command_text": "Commande pour lancer le jeu. Cela peut être utile pour le modding ou à d'autres fins.",
   "_trn_privacy": "Confidentialité",

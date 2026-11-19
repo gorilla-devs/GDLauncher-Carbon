@@ -62,7 +62,7 @@
   "_trn_pre_launch_hook_title": "Hook Pre-Avvio",
   "_trn_pre_launch_hook_text": "Esegui uno script prima di avviare il gioco. Questo può essere utile per il modding o altri scopi.",
   "_trn_post_exit_hook_title": "Hook Post-Uscita",
-  "_trn_post_exit_hook_text": "Esegui uno script dopo che il gioco è uscito. Questo può essere utile per il modding o altri scopi.",
+  "_trn_post_exit_hook_text": "Esegui uno script dopo che il gioco è uscito. Viene eseguito solo se GDLauncher è aperto in quel momento.",
   "_trn_wrapper_command_title": "Comando Wrapper",
   "_trn_wrapper_command_text": "Comando per eseguire il gioco. Questo può essere utile per il modding o altri scopi.",
   "_trn_privacy": "Privacy",
