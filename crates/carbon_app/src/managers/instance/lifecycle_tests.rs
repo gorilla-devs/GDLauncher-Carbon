@@ -11427,3 +11427,120 @@ async fn play_cancels_the_update_left_waiting_on_an_unpaired_instance_and_says_s
     );
     Ok(())
 }
+
+async fn folder_of(app: &crate::App, id: InstanceId) -> anyhow::Result<String> {
+    Ok(instance_repo::get_instance(&app.db, id.0)
+        .await?
+        .unwrap()
+        .shortpath)
+}
+
+/// R07-instance-manager.2#10: the copy used to be made under the lock that
+/// hands out folder names, so for the minutes a large instance takes,
+/// creating, importing and renaming any other instance, and the last step of
+/// deleting one, waited. The lock is now held to choose the copy's name and
+/// to publish it; the name is kept for it in between.
+#[tokio::test]
+async fn duplicating_an_instance_holds_up_no_other_instance_while_it_copies() -> anyhow::Result<()>
+{
+    let app = crate::setup_managers_for_test().await;
+    without_recycle_bin(&app).await?;
+    let (id, root) = fixture(&app, "big").await?;
+    tokio::fs::write(root.join("instance/world.dat"), b"world").await?;
+    let (deleted, deleted_root) = fixture(&app, "deleted-meanwhile").await?;
+    let manager = app.instance_manager();
+    let pause = manager.test_hooks.arm("duplicate_copy", id);
+    let duplicate = manager.duplicate_instance(id, "big".into());
+    tokio::pin!(duplicate);
+    reach(&pause, duplicate.as_mut()).await;
+
+    // Create, rename and delete of other instances finish during the copy.
+    let (other, _) = tokio::time::timeout(PROMPTLY, fixture(&app, "other"))
+        .await
+        .expect("creating an instance waited for the copy")?;
+    let mut edit = update(other);
+    edit.name = Some("other renamed".into());
+    tokio::time::timeout(PROMPTLY, manager.update_instance(edit))
+        .await
+        .expect("renaming an instance waited for the copy")?;
+    assert_eq!(folder_of(&app, other).await?, "other renamed");
+    tokio::time::timeout(PROMPTLY, manager._delete_instance(deleted))
+        .await
+        .expect("deleting an instance waited for the copy")?;
+    assert!(!deleted_root.exists());
+
+    // The name chosen for the copy is given to nobody else meanwhile: not to
+    // a new instance of the same name, a rename to it, or a second copy.
+    assert!(!root.with_file_name("big1").exists());
+    let (same_name, _) = fixture(&app, "big").await?;
+    assert_eq!(folder_of(&app, same_name).await?, "big2");
+    let mut edit = update(other);
+    edit.name = Some("big1".into());
+    manager.update_instance(edit).await?;
+    assert_ne!(folder_of(&app, other).await?, "big1");
+    let second = tokio::time::timeout(PROMPTLY, manager.duplicate_instance(id, "big".into()))
+        .await
+        .expect("a second copy waited for the first")?;
+    let second_folder = folder_of(&app, second).await?;
+    assert!(!["big", "big1", "big2"].contains(&second_folder.as_str()));
+
+    pause.release.notify_one();
+    let copy = duplicate.await?;
+    assert_eq!(folder_of(&app, copy).await?, "big1");
+    assert_eq!(
+        tokio::fs::read(root.with_file_name("big1").join("instance/world.dat")).await?,
+        b"world"
+    );
+    assert!(manager.reserved_folders.lock().unwrap().is_empty());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_copy_that_fails_gives_its_folder_name_back() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "source").await?;
+    let manager = app.instance_manager();
+
+    // A folder made by hand under the copy's name while it copied is never
+    // replaced by the copy.
+    let pause = manager.test_hooks.arm("duplicate_copy", id);
+    let duplicate = manager.duplicate_instance(id, "source".into());
+    tokio::pin!(duplicate);
+    reach(&pause, duplicate.as_mut()).await;
+    let by_hand = root.with_file_name("source1");
+    tokio::fs::create_dir(&by_hand).await?;
+    tokio::fs::write(by_hand.join("mine.txt"), b"mine").await?;
+    pause.release.notify_one();
+    let error = duplicate.await.expect_err("the copy replaced a folder");
+    assert!(
+        error
+            .to_string()
+            .contains("appeared in the instances folder while the copy was made"),
+        "{error:#}"
+    );
+    assert_eq!(tokio::fs::read(by_hand.join("mine.txt")).await?, b"mine");
+    assert!(manager.reserved_folders.lock().unwrap().is_empty());
+    assert_eq!(instance_repo::get_all_instances(&app.db).await?.len(), 1);
+    tokio::fs::remove_dir_all(&by_hand).await?;
+
+    // The copy itself failing: the name is free for the next one.
+    let pause = manager.test_hooks.arm("duplicate_copy", id);
+    let duplicate = manager.duplicate_instance(id, "source".into());
+    tokio::pin!(duplicate);
+    reach(&pause, duplicate.as_mut()).await;
+    assert_eq!(
+        *manager.reserved_folders.lock().unwrap(),
+        HashSet::from(["source1".to_owned()])
+    );
+    let hidden = root.with_file_name("source-hidden");
+    tokio::fs::rename(&root, &hidden).await?;
+    pause.release.notify_one();
+    duplicate
+        .await
+        .expect_err("a copy of a folder that is gone failed");
+    assert!(manager.reserved_folders.lock().unwrap().is_empty());
+    tokio::fs::rename(&hidden, &root).await?;
+    let copy = manager.duplicate_instance(id, "source".into()).await?;
+    assert_eq!(folder_of(&app, copy).await?, "source1");
+    Ok(())
+}

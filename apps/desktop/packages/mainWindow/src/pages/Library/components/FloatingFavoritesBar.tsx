@@ -48,6 +48,7 @@ import { recoveredServerAction } from "@/utils/recoveredServer"
 import { useRecoveredServerAction } from "@/pages/Library/Server/useRecoveredServerAction"
 import { useDragContext } from "../DragContext"
 import { LibraryMode } from "../types"
+import { isDuplicating, useDuplicateInstance } from "@/utils/duplicateInstance"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import type {
   FEServerState,
@@ -487,9 +488,7 @@ function DockAvatar(props: DockAvatarProps) {
     mutationKey: ["instance.openInstanceFolder"]
   }))
 
-  const duplicateInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.duplicateInstance"]
-  }))
+  const duplicateInstance = useDuplicateInstance()
 
   const instanceSetFavoriteMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.setFavorite"]
@@ -647,10 +646,7 @@ function DockAvatar(props: DockAvatarProps) {
 
   const handleDuplicate = () => {
     if (instance()?.status.status !== "invalid") {
-      duplicateInstanceMutation.mutate({
-        instance: props.instanceId,
-        new_name: instance()?.name || ""
-      })
+      duplicateInstance(props.instanceId, instance()?.name || "")
     }
   }
 
@@ -841,7 +837,11 @@ function DockAvatar(props: DockAvatarProps) {
                         <ContextMenuItem
                           class="flex items-center gap-2"
                           onClick={handleDuplicate}
-                          disabled={isLoading() || isDeleting()}
+                          disabled={
+                            isLoading() ||
+                            isDeleting() ||
+                            isDuplicating(props.instanceId)
+                          }
                         >
                           <div class="i-hugeicons:copy-01 h-4 w-4" />
                           {t("instances:_trn_action_duplicate")}

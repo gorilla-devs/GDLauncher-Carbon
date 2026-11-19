@@ -89,6 +89,9 @@ pub struct InstanceManager {
     index_lock: Mutex<()>,
     // seperate lock to prevent a deadlock with the index lock
     path_lock: Mutex<()>,
+    // Folder names promised to a copy that is still being made (see
+    // `reserve_folder`): no folder or row holds them yet.
+    reserved_folders: Arc<std::sync::Mutex<HashSet<String>>>,
     // Shared ownership gate for existing-instance config writers and root lifecycle.
     // Always acquire before a map guard; never wait for this gate holding the map.
     instance_op_locks: Arc<DashMap<InstanceId, Arc<Mutex<()>>>>,
@@ -287,6 +290,7 @@ impl InstanceManager {
             instances: RwLock::new(HashMap::new()),
             index_lock: Mutex::new(()),
             path_lock: Mutex::new(()),
+            reserved_folders: Default::default(),
             instance_op_locks: Arc::new(DashMap::new()),
             instance_root_locks: Arc::new(DashMap::new()),
             unsaved_playtime: DashMap::new(),
@@ -336,6 +340,22 @@ const ILLEGAL_NAMES: &[&str] = &[
 /// dies with the process that held it, so without the pidfile a game that
 /// outlived the launcher would be invisible to the instance it belongs to.
 pub(crate) const PID_FILE_NAME: &str = ".gdl_instance.pid";
+
+/// A folder name kept for a copy in the making; see
+/// `reserve_folder`. Dropping it frees the name.
+struct FolderReservation {
+    reserved: Arc<std::sync::Mutex<HashSet<String>>>,
+    shortpath: String,
+}
+
+impl Drop for FolderReservation {
+    fn drop(&mut self) {
+        self.reserved
+            .lock()
+            .expect("this mutex can never witness a panic")
+            .remove(&self.shortpath);
+    }
+}
 
 /// The name of an entry of the instances folder as an instance is known by
 /// (its shortpath), or `None` when the name is not valid UTF-8 and so cannot
@@ -2093,6 +2113,24 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.next_folder_excluding(name, &reserved)
     }
 
+    /// Keeps `shortpath`, just chosen under path_lock, for the caller until
+    /// the returned guard is dropped, so path_lock need not be held while
+    /// what will carry the name is made: every choice of a folder name
+    /// passes it over (see `next_folder_excluding`). Nothing is created for
+    /// it, so no scan meets a half-made folder, and dropping the guard on
+    /// failure is all the cleanup there is. The caller publishes under
+    /// path_lock again, and the row then holds the name.
+    fn reserve_folder(&self, shortpath: String) -> FolderReservation {
+        self.reserved_folders
+            .lock()
+            .expect("this mutex can never witness a panic")
+            .insert(shortpath.clone());
+        FolderReservation {
+            reserved: self.reserved_folders.clone(),
+            shortpath,
+        }
+    }
+
     fn next_folder(&self, name: &str) -> anyhow::Result<(String, PathBuf)> {
         self.next_folder_excluding(name, &HashSet::new())
     }
@@ -2131,7 +2169,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             };
 
             let full_path = instance_path.join(&current_name);
-            if !full_path.exists() && !reserved.contains(&current_name) {
+            if !full_path.exists()
+                && !reserved.contains(&current_name)
+                && !self
+                    .reserved_folders
+                    .lock()
+                    .expect("this mutex can never witness a panic")
+                    .contains(&current_name)
+            {
                 return Ok((current_name, full_path));
             }
         }
@@ -3236,8 +3281,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // never holds up Play, settings, logs or the game's exit on the
         // original: only the snapshot above needs its gate.
         drop(operation);
-        #[cfg(test)]
-        self.test_hooks.pause("duplicate_copy", instance_id).await;
 
         let id = *instance_id;
         let group_id = instance_repo::get_instance(&self.app.db, id)
@@ -3249,9 +3292,19 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             })?
             .group_id;
 
-        let _path_guard = self.path_lock.lock().await;
-        let (new_shortpath, new_path) = self.next_available_folder(&src_shortpath).await?;
+        // path_lock is held to choose the copy's folder name and again to
+        // publish the copy, not while it is made: a large instance takes
+        // minutes, and creating, importing and renaming any other instance,
+        // and the last step of deleting one, all wait for this lock.
+        let (new_shortpath, new_path, _reservation) = {
+            let _path_guard = self.path_lock.lock().await;
+            let (shortpath, path) = self.next_available_folder(&src_shortpath).await?;
+            let reservation = self.reserve_folder(shortpath.clone());
+            (shortpath, path, reservation)
+        };
         new_info.name = name;
+        #[cfg(test)]
+        self.test_hooks.pause("duplicate_copy", instance_id).await;
 
         let path = self
             .app
@@ -3320,6 +3373,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // as if it were running the source's game, or Stop on the duplicate
         // could signal the source's real, unrelated game process.
         orphan_pid::remove_pid_file_strict(&tmppath, PID_FILE_NAME).await?;
+
+        // Published under path_lock, held until the row and the map know the
+        // copy, as for a new instance.
+        let _path_guard = self.path_lock.lock().await;
+        // The name was kept from the launcher's own choices, not from a
+        // folder made by hand meanwhile, which a rename could replace.
+        if new_path.try_exists()? {
+            bail!(
+                "A folder named {new_shortpath} appeared in the instances folder while the copy was made. Duplicate the instance again."
+            );
+        }
         tokio::fs::rename(&tmppath, &new_path).await?;
 
         let id = self

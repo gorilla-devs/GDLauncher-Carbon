@@ -159,6 +159,8 @@
   "_trn_action_edit": "Modifier",
   "_trn_select_image": "Sélectionner une image",
   "_trn_action_duplicate": "Dupliquer",
+  "_trn_duplicating": "Duplication de {{name}}",
+  "_trn_duplicate_failed": "Impossible de dupliquer {{name}}",
   "_trn_toggle_favorite": "Ajouter/Retirer des favoris",
   "_trn_view_logs": "Voir les journaux",
   "_trn_more_options": "Plus d'options",

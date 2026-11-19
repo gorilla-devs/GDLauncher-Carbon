@@ -159,6 +159,8 @@
   "_trn_action_edit": "编辑",
   "_trn_select_image": "选择图片",
   "_trn_action_duplicate": "复制",
+  "_trn_duplicating": "正在复制 {{name}}",
+  "_trn_duplicate_failed": "无法复制 {{name}}",
   "_trn_toggle_favorite": "切换收藏",
   "_trn_view_logs": "查看日志",
   "_trn_more_options": "更多选项",

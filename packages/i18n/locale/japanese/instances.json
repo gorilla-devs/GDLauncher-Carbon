@@ -159,6 +159,8 @@
   "_trn_action_edit": "編集",
   "_trn_select_image": "画像を選択",
   "_trn_action_duplicate": "複製",
+  "_trn_duplicating": "{{name}} を複製中",
+  "_trn_duplicate_failed": "{{name}} を複製できませんでした",
   "_trn_toggle_favorite": "お気に入りを切り替え",
   "_trn_view_logs": "ログを表示",
   "_trn_more_options": "その他のオプション",

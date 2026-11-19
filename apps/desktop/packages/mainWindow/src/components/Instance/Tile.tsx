@@ -34,6 +34,7 @@ import { useGlobalStore } from "../GlobalStoreContext"
 import useSearchContext from "../SearchInputContext"
 import GdlFeatureContextMenuItem from "../GdlFeatureContextMenuItem"
 import { BaseTile } from "../BaseTile"
+import { isDuplicating, useDuplicateInstance } from "@/utils/duplicateInstance"
 
 interface Props {
   modloader: CFFEModLoaderType | null | undefined
@@ -94,9 +95,7 @@ const Tile = (props: Props) => {
     mutationKey: ["instance.openInstanceFolder"]
   }))
 
-  const duplicateInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.duplicateInstance"]
-  }))
+  const duplicateInstance = useDuplicateInstance()
 
   const setFavoriteMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.setFavorite"]
@@ -171,10 +170,7 @@ const Tile = (props: Props) => {
 
   const handleDuplicate = () => {
     if (!props.isInvalid) {
-      duplicateInstanceMutation.mutate({
-        instance: props.instance.id,
-        new_name: props.instance.name
-      })
+      duplicateInstance(props.instance.id, props.instance.name)
     }
   }
 
@@ -339,8 +335,12 @@ const Tile = (props: Props) => {
                       <ContextMenuItem
                         class="flex items-center gap-2"
                         onClick={handleDuplicate}
+                        data-testid="tile-duplicate"
                         disabled={
-                          isLoading() || isInQueue() || props.isDeleting
+                          isLoading() ||
+                          isInQueue() ||
+                          props.isDeleting ||
+                          isDuplicating(props.instance.id)
                         }
                       >
                         <div class="i-hugeicons:copy-01 h-4 w-4" />
