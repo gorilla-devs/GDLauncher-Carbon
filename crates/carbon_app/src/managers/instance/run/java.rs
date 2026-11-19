@@ -108,6 +108,11 @@ pub async fn check_and_install(
         effective_java_system_profile
     );
 
+    // The built-in profile the launcher looks after for this launch: it uses
+    // that profile's Java, or installs one. It is the one the instance needs
+    // unless the instance is set to another built-in profile.
+    let mut managed_java_system_profile = effective_java_system_profile;
+
     let java_component_override = match java_override {
         Some(path) => match path {
             JavaOverride::Path(value) => {
@@ -126,64 +131,42 @@ pub async fn check_and_install(
                 }
             }
             JavaOverride::Profile(value) => {
-                if let Some(value) = value {
-                    if let Ok(all_profiles) = app.java_manager().get_java_profiles().await {
-                        if let Ok(all_javas) = app.java_manager().get_available_javas().await {
-                            let mut result = None;
-                            for profile in all_profiles.iter() {
-                                if profile.name == value {
-                                    if auto_manage_java_system_profiles
-                                        && profile.is_system
-                                        && value == required_java_system_profile.to_string()
-                                    {
-                                        // !! THIS IS USED TO EFFECTIVELY TREAT IT AS A NON-OVERRIDE, SO THAT THE LAUNCHER MANAGES THE PROFILE NORMALLY !!
-                                        trace!(
-                                            "Java profile override BUT ignoring: {:?}",
-                                            profile.name
-                                        );
-                                        result = None;
-                                    } else {
-                                        if let Some(java_id) = profile.java_id.as_ref() {
-                                            let java_component =
-                                                all_javas.iter().find_map(|javas| {
-                                                    javas.1.iter().find_map(|java| {
-                                                        if &java.id == java_id {
-                                                            Some(java.component.clone())
-                                                        } else {
-                                                            None
-                                                        }
-                                                    })
-                                                });
-
-                                            if let Some(java_component) = java_component {
-                                                trace!(
-                                                    "Java profile override: {:?}",
-                                                    java_component
-                                                );
-                                                result = Some(Ok(java_component));
-                                            } else {
-                                                result = Some(anyhow::bail!(
-                                                    "Java profile has associated java id that does not exist"
-                                                ));
-                                            }
-                                        } else {
-                                            result = Some(anyhow::bail!(
-                                                "Java profile has no associated java id"
-                                            ));
-                                        }
-                                    }
-                                }
-                            }
-
-                            result
-                        } else {
-                            Some(anyhow::bail!("Could not get available javas"))
-                        }
-                    } else {
-                        Some(anyhow::bail!("Could not get java profiles"))
+                let Some(value) = value else {
+                    anyhow::bail!("Java profile is not set");
+                };
+                let Ok(all_profiles) = app.java_manager().get_java_profiles().await else {
+                    anyhow::bail!("Could not get java profiles");
+                };
+                match profile_choice(
+                    &all_profiles,
+                    &value,
+                    required_java_system_profile,
+                    effective_java_system_profile,
+                    auto_manage_java_system_profiles,
+                )? {
+                    ProfileChoice::Managed(profile) => {
+                        trace!("Java profile override, managed: {profile:?}");
+                        managed_java_system_profile = profile;
+                        None
                     }
-                } else {
-                    Some(anyhow::bail!("Java profile is not set"))
+                    ProfileChoice::Unknown => None,
+                    ProfileChoice::Linked(java_id) => {
+                        let Ok(all_javas) = app.java_manager().get_available_javas().await else {
+                            anyhow::bail!("Could not get available javas");
+                        };
+                        let java_component = all_javas.iter().find_map(|javas| {
+                            javas
+                                .1
+                                .iter()
+                                .find(|java| java.id == java_id)
+                                .map(|java| java.component.clone())
+                        });
+                        let Some(java_component) = java_component else {
+                            anyhow::bail!(java_removed(&value));
+                        };
+                        trace!("Java profile override: {:?}", java_component);
+                        Some(Ok(java_component))
+                    }
                 }
             }
         },
@@ -204,7 +187,7 @@ pub async fn check_and_install(
 
                 let usable_java = app
                     .java_manager()
-                    .get_usable_java_for_profile_name(effective_java_system_profile)
+                    .get_usable_java_for_profile_name(managed_java_system_profile)
                     .await?;
 
                 tracing::debug!("Usable java: {:?}", usable_java);
@@ -274,7 +257,7 @@ pub async fn check_and_install(
                     let path = app
                         .java_manager()
                         .require_java_install(
-                            effective_java_system_profile,
+                            managed_java_system_profile,
                             true,
                             Some(progress_watch_tx),
                         )
@@ -332,6 +315,65 @@ pub async fn check_and_install(
     Ok(java)
 }
 
+/// What a Java profile chosen for an instance means when the game starts.
+#[derive(Debug, PartialEq, Eq)]
+enum ProfileChoice {
+    /// A built-in profile the launcher looks after: it uses the profile's
+    /// Java when that works, and installs one when it does not.
+    Managed(SystemJavaProfileName),
+    /// The Java, by id, that the profile was given by hand.
+    Linked(String),
+    /// No profile has that name. The instance starts as if none was chosen.
+    Unknown,
+}
+
+/// Reads the profile named `chosen` for an instance that needs `required`
+/// (`effective` is what is installed for it, which differs for Forge 1.16.5).
+///
+/// While the launcher manages the built-in profiles, choosing one means
+/// "this Java version, kept by the launcher", whichever it is: the one the
+/// instance needs or another. Only the first used to be honoured; any other
+/// that had no Java yet failed the launch instead of getting one installed.
+/// A profile the user looks after is used as it is set, and refused in words
+/// that say where to set it when it has no Java.
+fn profile_choice(
+    profiles: &[crate::domain::java::JavaProfile],
+    chosen: &str,
+    required: SystemJavaProfileName,
+    effective: SystemJavaProfileName,
+    auto_manage: bool,
+) -> anyhow::Result<ProfileChoice> {
+    let Some(profile) = profiles.iter().find(|profile| profile.name == chosen) else {
+        return Ok(ProfileChoice::Unknown);
+    };
+    if auto_manage && profile.is_system {
+        if chosen == required.to_string() {
+            return Ok(ProfileChoice::Managed(effective));
+        }
+        if let Ok(built_in) = SystemJavaProfileName::try_from(chosen) {
+            return Ok(ProfileChoice::Managed(built_in));
+        }
+    }
+    match &profile.java_id {
+        Some(java_id) => Ok(ProfileChoice::Linked(java_id.clone())),
+        None if profile.is_system => bail!(
+            "The Java profile \"{chosen}\" has no Java set. Choose one for it in Settings > \
+             Java, or turn on automatic Java management there."
+        ),
+        None => bail!(
+            "The Java profile \"{chosen}\" has no Java set. Choose one for it in Settings > Java."
+        ),
+    }
+}
+
+/// Why a launch stops when the Java a profile points at is gone.
+fn java_removed(profile: &str) -> String {
+    format!(
+        "The Java set for the profile \"{profile}\" is no longer installed. Choose another for \
+         it in Settings > Java."
+    )
+}
+
 fn forward_java_download(task: &Subtask, step: &Step) {
     if let Step::Downloading(current, total) = step {
         task.update_download(*current, *total, true);
@@ -352,5 +394,135 @@ mod task21_java_progress_tests {
         assert!((task.progress_float().await - 0.8).abs() < 0.00001);
         forward_java_download(&subtask, &Step::Downloading(5_368_709_120, 5_368_709_120));
         assert_eq!(task.progress_float().await, 1.0);
+    }
+}
+
+#[cfg(test)]
+mod profile_choice_tests {
+    use super::*;
+    use crate::domain::java::JavaProfile;
+    use SystemJavaProfileName::{Delta, Gamma, Legacy, LegacyFixed1};
+
+    fn built_in(name: SystemJavaProfileName, java_id: Option<&str>) -> JavaProfile {
+        JavaProfile {
+            name: name.to_string(),
+            java_id: java_id.map(str::to_owned),
+            is_system: true,
+        }
+    }
+
+    fn own(name: &str, java_id: Option<&str>) -> JavaProfile {
+        JavaProfile {
+            name: name.to_owned(),
+            java_id: java_id.map(str::to_owned),
+            is_system: false,
+        }
+    }
+
+    fn profiles() -> Vec<JavaProfile> {
+        vec![
+            built_in(Legacy, None),
+            built_in(Gamma, Some("zulu17")),
+            built_in(Delta, None),
+            own("My Java 21", Some("temurin21")),
+            own("Empty", None),
+        ]
+    }
+
+    fn choice(chosen: &str, auto_manage: bool) -> anyhow::Result<ProfileChoice> {
+        profile_choice(&profiles(), chosen, Gamma, Gamma, auto_manage)
+    }
+
+    #[test]
+    fn a_built_in_profile_without_java_gets_one_installed_instead_of_failing_the_launch() {
+        // The instance needs Gamma (Java 17) and is set to Delta (Java 21),
+        // which nothing was ever installed for. This used to end the launch
+        // with "Java profile has no associated java id" on every Play.
+        assert_eq!(
+            choice(&Delta.to_string(), true).unwrap(),
+            ProfileChoice::Managed(Delta)
+        );
+        assert_eq!(
+            choice(&Legacy.to_string(), true).unwrap(),
+            ProfileChoice::Managed(Legacy)
+        );
+    }
+
+    #[test]
+    fn a_built_in_profile_with_java_is_looked_after_too_so_a_broken_one_is_replaced() {
+        // Managed, not Linked: the managed path checks the Java before using
+        // it, where a linked one is taken as recorded.
+        let mut all = profiles();
+        all[2].java_id = Some("zulu21".into());
+        assert_eq!(
+            profile_choice(&all, &Delta.to_string(), Gamma, Gamma, true).unwrap(),
+            ProfileChoice::Managed(Delta)
+        );
+    }
+
+    #[test]
+    fn the_profile_the_instance_needs_stays_the_one_installed_for_it() {
+        assert_eq!(
+            choice(&Gamma.to_string(), true).unwrap(),
+            ProfileChoice::Managed(Gamma)
+        );
+        // Forge 1.16.5: the instance needs Legacy, and an older Java 8 is
+        // what gets installed for it. Choosing Legacy must not lose that.
+        assert_eq!(
+            profile_choice(&profiles(), &Legacy.to_string(), Legacy, LegacyFixed1, true).unwrap(),
+            ProfileChoice::Managed(LegacyFixed1)
+        );
+    }
+
+    #[test]
+    fn a_profile_of_ones_own_is_used_as_it_is_set_whatever_the_launcher_manages() {
+        for auto_manage in [true, false] {
+            assert_eq!(
+                choice("My Java 21", auto_manage).unwrap(),
+                ProfileChoice::Linked("temurin21".into())
+            );
+            assert_eq!(
+                choice("Empty", auto_manage).unwrap_err().to_string(),
+                "The Java profile \"Empty\" has no Java set. Choose one for it in Settings > Java."
+            );
+        }
+    }
+
+    #[test]
+    fn with_automatic_java_off_a_built_in_profile_is_used_as_set_and_never_installed() {
+        assert_eq!(
+            choice(&Gamma.to_string(), false).unwrap(),
+            ProfileChoice::Linked("zulu17".into())
+        );
+        let refused = choice(&Delta.to_string(), false).unwrap_err().to_string();
+        assert_eq!(
+            refused,
+            format!(
+                "The Java profile \"{}\" has no Java set. Choose one for it in Settings > Java, \
+                 or turn on automatic Java management there.",
+                Delta.to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn a_name_no_profile_has_starts_the_instance_as_without_a_choice() {
+        assert_eq!(
+            choice("Deleted profile", true).unwrap(),
+            ProfileChoice::Unknown
+        );
+        assert_eq!(
+            choice("Deleted profile", false).unwrap(),
+            ProfileChoice::Unknown
+        );
+    }
+
+    #[test]
+    fn a_profile_whose_java_is_gone_says_where_to_choose_another() {
+        assert_eq!(
+            java_removed("My Java 21"),
+            "The Java set for the profile \"My Java 21\" is no longer installed. Choose another \
+             for it in Settings > Java."
+        );
     }
 }
