@@ -4,6 +4,7 @@ import { Input } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import HookTest from "@/components/HookTest"
+import { pickable } from "@/components/InstancePicker"
 import PageTitle from "./components/PageTitle"
 import Row from "./components/Row"
 import Title from "./components/Title"
@@ -39,7 +40,7 @@ const CustomCommands = () => {
       (globalStore.instances.data ?? []).filter(
         (instance) => instance.status.status === "valid"
       )
-    ).map((instance) => ({ id: instance.id, name: instance.name }))
+    ).map(pickable)
   )
 
   const [preLaunchDraft, setPreLaunchDraft] = createSignal<string>()

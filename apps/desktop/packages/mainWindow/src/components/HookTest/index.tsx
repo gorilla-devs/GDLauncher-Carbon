@@ -1,23 +1,17 @@
 import {
   createSignal,
-  For,
   onCleanup,
   Show,
   type Accessor,
   type JSX
 } from "solid-js"
-import {
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-  toast
-} from "@gd/ui"
+import { Button, toast } from "@gd/ui"
 import { type NamespacedTranslationKey, useTransContext } from "@gd/i18n"
 import type { FEHookKind, FEHookTest } from "@gd/core_module/bindings"
 import { rspc } from "@/utils/rspcClient"
+import InstancePicker, {
+  type PickableInstance
+} from "@/components/InstancePicker"
 import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
 import { extractErrorDisplay } from "@/utils/rspcErrorText"
 
@@ -102,7 +96,7 @@ const MenuButton = (trigger: { children?: JSX.Element }) => (
  */
 export default function HookTest(props: {
   instance?: Accessor<number | undefined>
-  choices?: Accessor<readonly { id: number; name: string }[]>
+  choices?: Accessor<readonly PickableInstance[]>
   kind: FEHookKind
   command: Accessor<string>
   children: JSX.Element
@@ -253,26 +247,15 @@ export default function HookTest(props: {
             </Button>
           }
         >
-          <DropdownMenu placement="bottom-end">
-            <DropdownMenuTrigger as={MenuButton} disabled={empty()}>
-              {word()}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent class="max-h-72 max-w-72 overflow-y-auto">
-              <DropdownMenuLabel>
-                {t("settings:_trn_hook_test_instance")}
-              </DropdownMenuLabel>
-              <For each={props.choices!()}>
-                {(choice) => (
-                  <DropdownMenuItem
-                    data-testid="hook-test-choice"
-                    onSelect={() => test(choice.id)}
-                  >
-                    <span class="truncate">{choice.name}</span>
-                  </DropdownMenuItem>
-                )}
-              </For>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <InstancePicker
+            instances={props.choices!}
+            onPick={test}
+            trigger={MenuButton}
+            label={t("settings:_trn_hook_test_instance")}
+            disabled={empty()}
+          >
+            {word()}
+          </InstancePicker>
         </Show>
       </Show>
     </div>

@@ -7,6 +7,7 @@ vi.mock("@/components/GlobalStoreContext", () => ({
   useGlobalStore: () => ({})
 }))
 vi.mock("@/components/HookTest", () => ({ default: () => null }))
+vi.mock("@/components/InstancePicker", () => ({ pickable: () => null }))
 vi.mock("./components/PageTitle", () => ({ default: () => null }))
 vi.mock("./components/Row", () => ({ default: () => null }))
 vi.mock("./components/Title", () => ({ default: () => null }))

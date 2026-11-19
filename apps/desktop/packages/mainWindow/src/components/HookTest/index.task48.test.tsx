@@ -26,20 +26,26 @@ vi.mock("@gd/ui", () => ({
     >
       {p.children}
     </button>
-  ),
-  // A menu that is always open: its trigger is the Test button.
-  DropdownMenu: (p: any) => <>{p.children}</>,
-  DropdownMenuTrigger: (p: any) => (
-    <button data-testid="hook-test-run" data-menu disabled={p.disabled}>
-      {p.children}
-    </button>
-  ),
-  DropdownMenuContent: (p: any) => <ul>{p.children}</ul>,
-  DropdownMenuLabel: (p: any) => <li>{p.children}</li>,
-  DropdownMenuItem: (p: any) => (
-    <li data-testid={p["data-testid"]} onClick={p.onSelect}>
-      {p.children}
-    </li>
+  )
+}))
+// A picker that is always open: its trigger is the Test button.
+vi.mock("@/components/InstancePicker", () => ({
+  default: (p: any) => (
+    <>
+      <button data-testid="hook-test-run" data-menu disabled={p.disabled}>
+        {p.children}
+      </button>
+      <ul aria-label={p.label}>
+        {p.instances().map((instance: { id: number; name: string }) => (
+          <li
+            data-testid="hook-test-choice"
+            onClick={() => p.onPick(instance.id)}
+          >
+            {instance.name}
+          </li>
+        ))}
+      </ul>
+    </>
   )
 }))
 vi.mock("@gd/i18n", () => ({
@@ -247,9 +253,16 @@ it("only takes the notice away for a test the player stopped", async () => {
 
 it("asks which instance to test a launcher-wide hook in only when Test is pressed", async () => {
   dispose?.()
+  const row = (id: number, name: string) => ({
+    id,
+    name,
+    gameVersion: "1.21",
+    modloader: "vanilla",
+    iconUrl: null
+  })
   const [choices, setChoices] = createSignal([
-    { id: 3, name: "Vanilla 1.21" },
-    { id: 9, name: "All the Mods 10" }
+    row(3, "Vanilla 1.21"),
+    row(9, "All the Mods 10")
   ])
   const [command, changeCommand] = createSignal("backup.sh")
   dispose = render(
@@ -283,7 +296,7 @@ it("asks which instance to test a launcher-wide hook in only when Test is presse
   changeCommand("backup.sh")
 
   // With one instance there is nothing to ask.
-  setChoices([{ id: 3, name: "Vanilla 1.21" }])
+  setChoices([row(3, "Vanilla 1.21")])
   expect(part("hook-test-run")!.hasAttribute("data-menu")).toBe(false)
   io.test.mockResolvedValueOnce(result({ type: "Finished" }))
   part("hook-test-run")!.click()
