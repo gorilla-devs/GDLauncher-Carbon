@@ -81,6 +81,11 @@ export interface BaseTileProps {
 
   // Waiting/deleting spinner text
   waitingText?: JSX.Element
+  /** What it waits for, under the waiting text. */
+  waitingDetail?: JSX.Element
+  /** Takes the tile out of the queue it waits in; shown where Play sits. */
+  onLeaveWaiting?: () => void
+  leaveWaitingLabel?: string
   deletingText?: JSX.Element
 
   // Context menu state (managed by parent ContextMenu)
@@ -379,12 +384,46 @@ const BaseTile = (props: BaseTileProps) => {
 
               {/* Waiting spinner (queue / indeterminate installing) */}
               <Show when={props.isWaiting && !props.isLoading}>
-                <div class="z-3 absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2">
+                <div class="z-3 absolute left-1/2 top-1/2 box-border flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2 px-2">
                   <Spinner />
                   <span class="text-sm font-bold text-white">
                     {props.waitingText}
                   </span>
+                  <Show when={props.waitingDetail}>
+                    <span
+                      class="text-lightSlate-300 -mt-1.5 max-w-full truncate text-xs"
+                      data-testid="tile-waiting-detail"
+                    >
+                      {props.waitingDetail}
+                    </span>
+                  </Show>
                 </div>
+                <Show when={props.onLeaveWaiting}>
+                  <div
+                    role="button"
+                    tabIndex={0}
+                    aria-label={props.leaveWaitingLabel}
+                    title={props.leaveWaitingLabel}
+                    data-testid="tile-leave-waiting"
+                    class="z-5 bg-darkSlate-600 hover:bg-darkSlate-500 ease-spring absolute right-3 top-3 flex h-10 translate-x-3 items-center justify-center rounded-xl px-3 opacity-0 transition-all duration-200 focus-visible:translate-x-0 focus-visible:opacity-100"
+                    classList={{
+                      "group-hover:translate-x-0 group-hover:opacity-100":
+                        !props.isDragActive,
+                      "!translate-x-0 !opacity-100": isMenuOpen()
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      props.onLeaveWaiting?.()
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key !== "Enter") return
+                      e.stopPropagation()
+                      props.onLeaveWaiting?.()
+                    }}
+                  >
+                    <div class="i-hugeicons:cancel-01 text-lightSlate-50 h-5 w-5 shrink-0" />
+                  </div>
+                </Show>
               </Show>
 
               {/* Deleting spinner */}

@@ -107,6 +107,8 @@ keys! {
         GET_PENDING_SETUP                          = "getPendingSetup";
         CANCEL_PENDING_SETUP                       = "cancelPendingSetup";
         USE_PACK_VERSIONS                          = "usePackVersions";
+        INSTALL_TURN                               = "getInstallTurn";
+        LEAVE_QUEUE                                = "leaveQueue";
         KEPT_FILE_LOCATION                         = "keptFileLocation";
         CHECK_PACK_ORIGIN                           = "checkPackOrigin";
         LOAD_ICON_URL                               = "loadIconUrl";

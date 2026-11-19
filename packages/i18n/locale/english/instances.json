@@ -204,6 +204,8 @@
   "_trn_server_eula_agree": "I have read and agree to the Minecraft EULA",
   "_trn_server_eula_accept_and_start": "Accept and start",
   "_trn_isInQueue": "In queue",
+  "_trn_queue_after": "after {{name}}",
+  "_trn_leave_queue": "Leave queue",
   "_trn_isDeleting": "Deleting...",
   "_trn_instance_mc_version": "Minecraft version",
   "_trn_include_snapshot_versions": "Include snapshot versions",

@@ -59,6 +59,7 @@ use tracing::{debug, info, trace, warn};
 mod java;
 mod minecraft;
 pub(super) mod modpack;
+pub(crate) mod turn;
 
 struct ShaderRecovery {
     session: super::modpack::session::Session,
@@ -94,15 +95,32 @@ impl crate::error::FeErrorCode for InsufficientMemoryError {
 
 #[derive(Debug)]
 pub struct PersistenceManager {
-    pub(super) instance_download_lock: Semaphore,
+    /// The one turn for work that writes what instances share (see
+    /// [`turn`]).
+    pub(super) instance_download_lock: Arc<Semaphore>,
+    /// The instance whose run has the turn.
+    turn_holder: std::sync::Mutex<Option<InstanceId>>,
+    /// The runs waiting for the turn, each with what takes it out of the
+    /// queue.
+    turn_waiters: std::sync::Mutex<
+        std::collections::HashMap<InstanceId, tokio_util::sync::CancellationToken>,
+    >,
     loader_install_lock: Arc<Semaphore>,
     java_check_lock: Mutex<()>,
 }
 
 impl PersistenceManager {
+    /// The instances whose runs wait for the turn.
+    #[cfg(test)]
+    pub(super) fn turn_waiters_for_test(&self) -> Vec<InstanceId> {
+        self.turn_waiters.lock().unwrap().keys().copied().collect()
+    }
+
     pub fn new() -> Self {
         Self {
-            instance_download_lock: Semaphore::new(1),
+            instance_download_lock: Arc::new(Semaphore::new(1)),
+            turn_holder: Default::default(),
+            turn_waiters: Default::default(),
             loader_install_lock: Arc::new(Semaphore::new(1)),
             java_check_lock: Mutex::new(()),
         }
@@ -776,25 +794,20 @@ impl ManagerRef<'_, InstanceManager> {
                     let setup_path = instance_root.join(".setup");
                     let is_setup = setup_path.is_dir();
 
-                    // Acquire semaphore FIRST - this is where queuing happens
-                    // Instance stays in Queued state until we get the lock
-                    let instance_manager = app.instance_manager();
-                    let mut download_guard = None;
+                    // An install, update, repair or import waits for its
+                    // turn before anything else, and its instance stays
+                    // queued until then. A Play of an installed instance
+                    // verifies its files first and takes the turn only at a
+                    // step that has something to download or install.
+                    let mut turn =
+                        turn::InstallTurn::new(Arc::clone(&app), instance_id, id, cancel.clone());
                     let try_result: anyhow::Result<_> = async {
-                        download_guard = Some(
-                            crate::managers::runtime_lifecycle::wait_or_cancel(
-                                &cancel,
-                                instance_manager
-                                    .persistence_manager
-                                    .instance_download_lock
-                                    .acquire(),
-                            )
-                            .await??,
-                        );
+                        if is_setup || deep_check || launch_account.is_none() {
+                            turn.take().await?;
+                        } else {
+                            turn.start_without().await?;
+                        }
                         anyhow::ensure!(!cancel.is_cancelled(), "Instance preparation cancelled");
-                        app.instance_manager()
-                            .change_launch_state(instance_id, id, LaunchState::Preparing(id))
-                            .await?;
                         if let Some(owner) = &session_owner {
                             Session::require(&instance_root, owner).await?;
                         }
@@ -878,6 +891,7 @@ impl ManagerRef<'_, InstanceManager> {
                             log.as_ref(),
                             file.as_mut(),
                             &cancel,
+                            &mut turn,
                         )
                         .await?;
 
@@ -894,6 +908,7 @@ impl ManagerRef<'_, InstanceManager> {
                             file.as_mut(),
                             &mut downloads,
                             &cancel,
+                            &mut turn,
                         )
                         .await?;
 
@@ -909,6 +924,10 @@ impl ManagerRef<'_, InstanceManager> {
                             super::modpack::session::dispose(&instance_root, owner).await?;
                         }
 
+                        // Everything shared is in place. The pre-launch hook
+                        // and the game's start write none of it, so they do
+                        // not keep other instances waiting.
+                        turn.release();
                         anyhow::ensure!(
                             !cancel.is_cancelled(),
                             "Instance preparation cancelled before launch"
@@ -1035,7 +1054,7 @@ impl ManagerRef<'_, InstanceManager> {
                     // Downloading, installing and spawning the process are done; release the global
                     // download permit before the game-session wait so other instances can be prepared
                     // and launched concurrently instead of queuing behind an already-running game.
-                    drop(download_guard);
+                    drop(turn);
 
                     // A version change that lost pack files before it changed
                     // anything is given up for the installed version, which
@@ -1062,6 +1081,19 @@ impl ManagerRef<'_, InstanceManager> {
                     };
 
                     match (try_result, kept_installed) {
+                        // Taken out of the queue before anything started:
+                        // the task goes, and the instance is as it was.
+                        (Err(error), _) if error.is::<turn::LeftQueue>() => {
+                            app.task_manager().withdraw_task(id).await;
+                            let _ = app
+                                .instance_manager()
+                                .change_launch_state(
+                                    instance_id,
+                                    id,
+                                    LaunchState::Inactive { failed_task: None },
+                                )
+                                .await;
+                        }
                         (Err(_), Some(warning)) => {
                             // The task ends as one that succeeded with this to
                             // say, not with what the version change would have.

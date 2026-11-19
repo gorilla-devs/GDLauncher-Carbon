@@ -24,6 +24,7 @@ import {
 } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { queryClient, rspc } from "@/utils/rspcClient"
+import { useInstallQueue } from "@/utils/installQueue"
 import useInstanceData from "./instance.data"
 import { detectDuplicatedMods } from "@/utils/duplicateMods"
 import { InstanceDetails, ListInstance } from "@gd/core_module/bindings"
@@ -263,6 +264,8 @@ const Instance = (props: { children?: any }) => {
   const isQueued = () =>
     routeData.instanceDetails.data?.state &&
     getQueuedState(routeData.instanceDetails.data?.state)
+
+  const queue = useInstallQueue(instanceId, () => isQueued() !== undefined)
 
   const curseforgeProjectId = () => {
     const modpack = routeData.instanceDetails.data?.modpack
@@ -610,28 +613,62 @@ const Instance = (props: { children?: any }) => {
         </>
       }
       headerActions={
-        <Button
-          uppercase
-          size="large"
-          variant={isRunning() && "red"}
-          loading={isPreparing() !== undefined || isQueued() !== undefined}
-          style={{
-            "view-transition-name": `instance-tile-play-button`,
-            contain: "layout"
-          }}
-          onClick={handlePlay}
+        <Show
+          when={isQueued() !== undefined}
+          fallback={
+            <Button
+              uppercase
+              size="large"
+              variant={isRunning() && "red"}
+              loading={isPreparing() !== undefined}
+              style={{
+                "view-transition-name": `instance-tile-play-button`,
+                contain: "layout"
+              }}
+              onClick={handlePlay}
+            >
+              <Switch>
+                <Match when={!isRunning()}>
+                  <div class="i-hugeicons:play text-xl" />
+                  <Trans key="instances:_trn_play" />
+                </Match>
+                <Match when={isRunning()}>
+                  <div class="i-hugeicons:stop text-xl" />
+                  <Trans key="instances:_trn_stop" />
+                </Match>
+              </Switch>
+            </Button>
+          }
         >
-          <Switch>
-            <Match when={!isRunning()}>
-              <div class="i-hugeicons:play text-xl" />
-              <Trans key="instances:_trn_play" />
-            </Match>
-            <Match when={isRunning()}>
-              <div class="i-hugeicons:stop text-xl" />
-              <Trans key="instances:_trn_stop" />
-            </Match>
-          </Switch>
-        </Button>
+          <div class="flex items-center gap-3" data-testid="instance-queued">
+            <div class="flex min-w-0 flex-col items-end text-sm">
+              <span class="text-lightSlate-300">
+                <Trans key="instances:_trn_isInQueue" />
+              </span>
+              <Show when={queue.behind()}>
+                <span class="text-lightSlate-500 max-w-48 truncate text-xs">
+                  <Trans
+                    key="instances:_trn_queue_after"
+                    options={{
+                      name: queue.behind(),
+                      interpolation: { escapeValue: false }
+                    }}
+                  />
+                </span>
+              </Show>
+            </div>
+            <Button
+              uppercase
+              size="large"
+              type="secondary"
+              data-testid="instance-leave-queue"
+              onClick={queue.leave}
+            >
+              <div class="i-hugeicons:cancel-01 text-xl" />
+              <Trans key="instances:_trn_leave_queue" />
+            </Button>
+          </div>
+        </Show>
       }
       headerTopRight={
         <>
@@ -732,25 +769,40 @@ const Instance = (props: { children?: any }) => {
       stickyRightButton={
         <Tooltip placement="bottom">
           <TooltipTrigger as="div">
-            <Button
-              size="small"
-              variant={isRunning() && "red"}
-              loading={isPreparing() !== undefined || isQueued() !== undefined}
-              onClick={handlePlay}
+            <Show
+              when={isQueued() !== undefined}
+              fallback={
+                <Button
+                  size="small"
+                  variant={isRunning() && "red"}
+                  loading={isPreparing() !== undefined}
+                  onClick={handlePlay}
+                >
+                  <Switch>
+                    <Match when={!isRunning()}>
+                      <div class="i-hugeicons:play text-xl" />
+                    </Match>
+                    <Match when={isRunning()}>
+                      <div class="i-hugeicons:stop text-xl" />
+                    </Match>
+                  </Switch>
+                </Button>
+              }
             >
-              <Switch>
-                <Match when={!isRunning()}>
-                  <div class="i-hugeicons:play text-xl" />
-                </Match>
-                <Match when={isRunning()}>
-                  <div class="i-hugeicons:stop text-xl" />
-                </Match>
-              </Switch>
-            </Button>
+              <Button size="small" type="secondary" onClick={queue.leave}>
+                <div class="i-hugeicons:cancel-01 text-xl" />
+              </Button>
+            </Show>
           </TooltipTrigger>
           <TooltipContent>
             <Trans
-              key={isRunning() ? "instances:_trn_stop" : "instances:_trn_play"}
+              key={
+                isQueued() !== undefined
+                  ? "instances:_trn_leave_queue"
+                  : isRunning()
+                    ? "instances:_trn_stop"
+                    : "instances:_trn_play"
+              }
             />
           </TooltipContent>
         </Tooltip>

@@ -62,6 +62,7 @@ pub async fn process_minecraft(
     file: Option<&mut File>,
     downloads: &mut Vec<Downloadable>,
     cancel: &tokio_util::sync::CancellationToken,
+    turn: &mut super::turn::InstallTurn,
 ) -> anyhow::Result<(LibraryGroup, AssetsDir, VersionInfo)> {
     let runtime_path = app.settings_manager().runtime_path.clone();
     let instance_path = runtime_path
@@ -223,6 +224,8 @@ pub async fn process_minecraft(
     let download_required = download_required?;
 
     if download_required {
+        // Only now does a launch that began without the turn need it.
+        turn.take().await?;
         let (progress_watch_tx, mut progress_watch_rx) =
             tokio::sync::watch::channel(carbon_net::Progress::new());
 
@@ -340,6 +343,9 @@ pub async fn process_minecraft(
                     } else {
                         t_forge_processors.start_opaque();
 
+                        // The turn before the loader's own lock, as a run
+                        // that began with the turn takes them.
+                        turn.take().await?;
                         let instance_manager = app.instance_manager();
                         let reservation = Arc::new(
                             crate::managers::runtime_lifecycle::wait_or_cancel(
@@ -444,6 +450,9 @@ pub async fn process_minecraft(
                     } else {
                         t_neoforge_processors.start_opaque();
 
+                        // The turn before the loader's own lock, as a run
+                        // that began with the turn takes them.
+                        turn.take().await?;
                         let instance_manager = app.instance_manager();
                         let reservation = Arc::new(
                             crate::managers::runtime_lifecycle::wait_or_cancel(

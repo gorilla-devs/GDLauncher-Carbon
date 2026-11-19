@@ -180,6 +180,20 @@ impl ManagerRef<'_, VisualTaskManager> {
         }
     }
 
+    /// Takes a task its own producer gives up without failing off the list,
+    /// with the outcome a dismissed one has: it did not succeed, and there
+    /// is no failure to show. The producer's later drop changes nothing.
+    pub async fn withdraw_task(self, task_id: VisualTaskId) {
+        if self.tasks.write().await.remove(&task_id).is_some() {
+            self.record_terminal(task_id, TerminalOutcome::Dismissed)
+                .await;
+        }
+        self.app.invalidate(GET_TASKS, None);
+        self.app.invalidate(GET_TASK, Some(task_id.0.into()));
+        self.app
+            .invalidate(GET_TASK_OUTCOME, Some(task_id.0.into()));
+    }
+
     pub async fn dismiss_task(self, task_id: VisualTaskId) -> anyhow::Result<()> {
         let mut tasklist = self.tasks.write().await;
         let task = tasklist.get(&task_id).ok_or(InvalidTaskIdError)?;
@@ -1203,6 +1217,29 @@ mod task_warning_tests {
             app.task_manager().get_task_warnings().await[0].warnings,
             vec![instead]
         );
+    }
+
+    /// A task its producer withdraws neither succeeded nor failed: it is off
+    /// the list with a dismissed outcome, its warnings are not reported, and
+    /// the producer's later drop changes none of that.
+    #[tokio::test]
+    async fn a_withdrawn_task_is_dismissed_and_stays_so() {
+        let app = crate::setup_managers_for_test().await;
+        let task = VisualTask::new(Translation::Test);
+        let id = app.task_manager().spawn_task(&task).await;
+        task.warn(skipped());
+        app.task_manager().withdraw_task(id).await;
+        assert!(matches!(
+            app.task_manager().get_task_outcome(id).await,
+            TaskOutcome::Dismissed
+        ));
+        drop(task);
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        assert!(matches!(
+            app.task_manager().get_task_outcome(id).await,
+            TaskOutcome::Dismissed
+        ));
+        assert!(app.task_manager().get_task_warnings().await.is_empty());
     }
 
     #[tokio::test]

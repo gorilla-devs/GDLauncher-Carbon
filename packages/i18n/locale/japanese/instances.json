@@ -204,6 +204,8 @@
   "_trn_server_eula_agree": "MinecraftのEULAを読み、同意します",
   "_trn_server_eula_accept_and_start": "同意して起動",
   "_trn_isInQueue": "待機中",
+  "_trn_queue_after": "{{name}} の後",
+  "_trn_leave_queue": "順番待ちをやめる",
   "_trn_isDeleting": "削除中...",
   "_trn_instance_mc_version": "Minecraftバージョン",
   "_trn_include_snapshot_versions": "スナップショット版を含める",

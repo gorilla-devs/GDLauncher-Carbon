@@ -27,6 +27,7 @@ export type Procedures = {
         { key: "instance.getLogs", input: FEInstanceId, result: GameLogEntry[] } | 
         { key: "instance.getModSources", input: FEInstanceId, result: ModSources } | 
         { key: "instance.getModpackInfo", input: FEInstanceId | null, result: FEInstanceModpackInfo | null } | 
+        { key: "instance.getInstallTurn", input: never, result: InstallTurnHolder | null } | 
         { key: "instance.getPendingSetup", input: FEInstanceId, result: PendingSetupStatus } | 
         { key: "instance.getRepairPreview", input: RepairPreviewArgs, result: FERepairPreview } | 
         { key: "instance.getShareEntries", input: FEInstanceId, result: FEShareEntry[] } | 
@@ -134,6 +135,7 @@ export type Procedures = {
         { key: "instance.cancelModpackChangeCheck", input: FEInstanceId, result: null } | 
         { key: "instance.cancelPendingSetup", input: CancelPendingSetup, result: null } | 
         { key: "instance.keptFileLocation", input: KeptPackFile, result: string } | 
+        { key: "instance.leaveQueue", input: FEInstanceId, result: null } | 
         { key: "instance.usePackVersions", input: KeptPackFiles, result: KeptPackFileResult[] } | 
         { key: "instance.changeModpack", input: ChangeModpack, result: FETaskId } | 
         { key: "instance.checkPackOrigin", input: FEInstanceId, result: FETaskId } | 
@@ -592,6 +594,12 @@ export type ExportEntry = { entries: { [key: string]: ExportEntry | null } }
 export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
 
 export type CancelPendingSetup = { instance: FEInstanceId; expected_operation: string }
+
+/**
+ * The instance whose install, update, repair or launch the queued ones
+ * wait for.
+ */
+export type InstallTurnHolder = { instance: FEInstanceId; name: string }
 
 /**
  * Files a modpack update kept, as `PackFilesKept` named them.

@@ -204,6 +204,8 @@
   "_trn_server_eula_agree": "我已阅读并同意 Minecraft EULA",
   "_trn_server_eula_accept_and_start": "接受并启动",
   "_trn_isInQueue": "排队中",
+  "_trn_queue_after": "排在 {{name}} 之后",
+  "_trn_leave_queue": "退出队列",
   "_trn_isDeleting": "删除中...",
   "_trn_instance_mc_version": "Minecraft 版本",
   "_trn_include_snapshot_versions": "包含快照版本",

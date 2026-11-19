@@ -28,6 +28,7 @@ import {
   TooltipTrigger
 } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
+import { useInstallQueue } from "@/utils/installQueue"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useModal } from "@/managers/ModalsManager"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
@@ -516,6 +517,7 @@ function DockAvatar(props: DockAvatarProps) {
       ? serverStatus() === "deleting"
       : instanceState() === "deleting"
   const isLoading = () => isQueued() || isPreparing()
+  const queue = useInstallQueue(() => props.instanceId, isQueued)
   // instance.json missing or broken: it can't run or be edited, only opened,
   // unfavorited or deleted.
   const isInvalid = () =>
@@ -689,8 +691,18 @@ function DockAvatar(props: DockAvatarProps) {
             <ContextMenuGroup>
               <ContextMenuGroupLabel>{itemName()}</ContextMenuGroupLabel>
               <ContextMenuSeparator />
+              <Show when={isQueued()}>
+                <ContextMenuItem
+                  class="flex items-center gap-2"
+                  onClick={queue.leave}
+                >
+                  <div class="i-hugeicons:cancel-01 h-4 w-4" />
+                  {t("instances:_trn_leave_queue")}
+                </ContextMenuItem>
+              </Show>
               <ContextMenuItem
                 class="flex items-center gap-2"
+                classList={{ hidden: isQueued() }}
                 onClick={() => handlePlay()}
                 disabled={isBusy() || isDeleting() || isInvalid()}
               >

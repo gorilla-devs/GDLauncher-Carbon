@@ -10992,3 +10992,139 @@ async fn kept_files_are_left_alone_when_replacing_them_is_not_safe() -> anyhow::
     }
     Ok(())
 }
+
+async fn queue_state(app: &crate::App, id: InstanceId) -> anyhow::Result<&'static str> {
+    Ok(
+        match app.instance_manager.instances.read().await[&id]
+            .data()?
+            .state
+        {
+            run::LaunchState::Queued(_) => "queued",
+            run::LaunchState::Preparing(_) => "preparing",
+            run::LaunchState::Inactive { failed_task: None } => "inactive",
+            run::LaunchState::Inactive {
+                failed_task: Some(_),
+            } => "failed",
+            _ => "other",
+        },
+    )
+}
+
+/// R06-launch#1: Play on an instance that is already installed used to wait
+/// in the queue for as long as another instance's install had the turn. It
+/// now starts checking its own files at once. An install still waits.
+#[tokio::test]
+async fn play_on_an_installed_instance_does_not_wait_for_another_install() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    // Installed: no setup pending.
+    let (installed, _) = repairblocked_installed(&app, "queue-installed", "A").await?;
+    // Never installed: its first install is pending.
+    let (pending, _) = fixture(&app, "queue-pending").await?;
+    // Another instance's install has the turn for the whole test.
+    let _turn = app
+        .instance_manager
+        .persistence_manager
+        .instance_download_lock
+        .acquire()
+        .await?;
+    let account = || crate::managers::account::FullAccount {
+        username: "Steve".into(),
+        uuid: "00000000-0000-0000-0000-000000000000".into(),
+        type_: crate::managers::account::FullAccountType::Offline,
+        last_used: chrono::Utc::now().fixed_offset(),
+    };
+
+    app.instance_manager()
+        .prepare_game(installed, Some(account()), None, false)
+        .await?;
+    app.instance_manager()
+        .prepare_game(pending, Some(account()), None, false)
+        .await?;
+    // The launch moves on (here, as far as a test without the game's files
+    // gets), while the install stays where it was.
+    tokio::time::timeout(Duration::from_secs(10), async {
+        while queue_state(&app, installed).await? == "queued" {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        Ok::<_, anyhow::Error>(())
+    })
+    .await??;
+    assert_eq!(queue_state(&app, pending).await?, "queued");
+    assert!(
+        app.instance_manager()
+            .persistence_manager
+            .turn_waiters_for_test()
+            .contains(&pending)
+    );
+    assert!(
+        !app.instance_manager()
+            .persistence_manager
+            .turn_waiters_for_test()
+            .contains(&installed)
+    );
+    Ok(())
+}
+
+/// A queued update is taken out of the queue: its task is withdrawn, not
+/// failed, the instance is idle with nothing changed, and the update stays
+/// pending for the next Play, which queues it again.
+#[tokio::test]
+async fn a_queued_update_leaves_the_queue_and_stays_pending() -> anyhow::Result<()> {
+    use super::modpack::session::Session;
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = repairblocked_installed(&app, "queue-left", "A").await?;
+    let instance_before = legacy_tree(&root.join("instance"));
+    let permit = app
+        .instance_manager
+        .persistence_manager
+        .instance_download_lock
+        .acquire()
+        .await?;
+    let task = app
+        .instance_manager()
+        .change_modpack(id, legacy_pack("B"))
+        .await?;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while !app
+            .instance_manager()
+            .persistence_manager
+            .turn_waiters_for_test()
+            .contains(&id)
+        {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await?;
+    assert_eq!(queue_state(&app, id).await?, "queued");
+
+    app.instance_manager().leave_queue(id)?;
+    tokio::time::timeout(Duration::from_secs(5), async {
+        while queue_state(&app, id).await? != "inactive" {
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+        Ok::<_, anyhow::Error>(())
+    })
+    .await??;
+    assert!(matches!(
+        app.task_manager().get_task_outcome(task).await,
+        crate::managers::vtask::TaskOutcome::Dismissed
+    ));
+    assert_eq!(legacy_tree(&root.join("instance")), instance_before);
+    let pending = Session::load(&root)
+        .await?
+        .expect("the update stays pending");
+    assert_eq!(repairblocked_requested(&pending)?, "B");
+    app.instance_manager()
+        .leave_queue(id)
+        .expect_err("it left already");
+
+    // Play takes it up again, and it waits its turn as before.
+    let (_, resumed) = app
+        .instance_manager()
+        .prepare_game(id, None, None, false)
+        .await?;
+    assert_ne!(resumed, task);
+    assert_eq!(queue_state(&app, id).await?, "queued");
+    drop(permit);
+    Ok(())
+}

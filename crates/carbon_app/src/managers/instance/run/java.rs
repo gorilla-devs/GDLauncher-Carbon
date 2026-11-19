@@ -63,6 +63,7 @@ pub async fn check_and_install(
     log: Option<&watch::Sender<GameLog>>,
     mut file: Option<&mut File>,
     cancel: &tokio_util::sync::CancellationToken,
+    turn: &mut super::turn::InstallTurn,
 ) -> anyhow::Result<JavaComponent> {
     let java_profile = daedalus::minecraft::MinecraftJavaProfile::try_from(
         version_info
@@ -194,18 +195,31 @@ pub async fn check_and_install(
             java_component_override?
         } else {
             let instance_manager = app.instance_manager();
-            let _guard = tokio::select! {
-                biased;
-                _ = cancel.cancelled() => anyhow::bail!("Java preparation cancelled while queued"),
-                guard = instance_manager.persistence_manager.java_check_lock.lock() => guard,
+            let (usable_java, _guard) = loop {
+                let guard = tokio::select! {
+                    biased;
+                    _ = cancel.cancelled() => anyhow::bail!("Java preparation cancelled while queued"),
+                    guard = instance_manager.persistence_manager.java_check_lock.lock() => guard,
+                };
+
+                let usable_java = app
+                    .java_manager()
+                    .get_usable_java_for_profile_name(effective_java_system_profile)
+                    .await?;
+
+                tracing::debug!("Usable java: {:?}", usable_java);
+
+                // Installing Java needs the turn. A run that has it waits
+                // for this lock, so the turn is never waited for under it:
+                // the lock is given back first, and Java looked for again
+                // once the turn is this run's.
+                if usable_java.is_none() && auto_manage_java_system_profiles && !turn.is_held() {
+                    drop(guard);
+                    turn.take().await?;
+                    continue;
+                }
+                break (usable_java, guard);
             };
-
-            let usable_java = app
-                .java_manager()
-                .get_usable_java_for_profile_name(effective_java_system_profile)
-                .await?;
-
-            tracing::debug!("Usable java: {:?}", usable_java);
 
             match usable_java {
                 Some(path) => path,

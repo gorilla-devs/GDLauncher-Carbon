@@ -204,6 +204,8 @@
   "_trn_server_eula_agree": "He leído y acepto el EULA de Minecraft",
   "_trn_server_eula_accept_and_start": "Aceptar e iniciar",
   "_trn_isInQueue": "En cola",
+  "_trn_queue_after": "después de {{name}}",
+  "_trn_leave_queue": "Salir de la cola",
   "_trn_isDeleting": "Eliminando...",
   "_trn_instance_mc_version": "Versión de Minecraft",
   "_trn_include_snapshot_versions": "Incluir versiones de instantánea",

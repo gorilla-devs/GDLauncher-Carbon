@@ -204,6 +204,8 @@
   "_trn_server_eula_agree": "J'ai lu et j'accepte le CLUF de Minecraft",
   "_trn_server_eula_accept_and_start": "Accepter et démarrer",
   "_trn_isInQueue": "Dans la file d'attente",
+  "_trn_queue_after": "après {{name}}",
+  "_trn_leave_queue": "Quitter la file",
   "_trn_isDeleting": "Suppression...",
   "_trn_instance_mc_version": "Version de Minecraft",
   "_trn_include_snapshot_versions": "Inclure les versions snapshot",

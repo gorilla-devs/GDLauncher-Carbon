@@ -7,6 +7,7 @@ import {
 import { Show, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
+import { useInstallQueue } from "@/utils/installQueue"
 import {
   ContextMenu,
   ContextMenuContent,
@@ -103,6 +104,10 @@ const Tile = (props: Props) => {
 
   const isLoading = () => props.isLoading
   const isInQueue = () => props.isQueued
+  const queue = useInstallQueue(
+    () => props.instance.id,
+    () => !!props.isQueued
+  )
 
   const validInstance = () =>
     props.instance.status.status === "valid"
@@ -198,18 +203,32 @@ const Tile = (props: Props) => {
                 {props.instance.name}
               </ContextMenuGroupLabel>
               <ContextMenuSeparator />
-              <ContextMenuItem
-                class="flex items-center gap-2"
-                onClick={handlePlay}
-                disabled={unavailable()}
+              <Show
+                when={isInQueue()}
+                fallback={
+                  <ContextMenuItem
+                    class="flex items-center gap-2"
+                    onClick={handlePlay}
+                    disabled={unavailable()}
+                  >
+                    <div
+                      class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} h-4 w-4`}
+                    />
+                    {props.isRunning
+                      ? t("instances:_trn_stop")
+                      : t("instances:_trn_action_play")}
+                  </ContextMenuItem>
+                }
               >
-                <div
-                  class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} h-4 w-4`}
-                />
-                {props.isRunning
-                  ? t("instances:_trn_stop")
-                  : t("instances:_trn_action_play")}
-              </ContextMenuItem>
+                <ContextMenuItem
+                  class="flex items-center gap-2"
+                  data-testid="instance-context-leave-queue"
+                  onClick={queue.leave}
+                >
+                  <div class="i-hugeicons:cancel-01 h-4 w-4" />
+                  {t("instances:_trn_leave_queue")}
+                </ContextMenuItem>
+              </Show>
               <ContextMenuItem
                 class="flex items-center gap-2"
                 onClick={handleEdit}
@@ -437,6 +456,15 @@ const Tile = (props: Props) => {
             </>
           }
           waitingText={<Trans key="instances:_trn_isInQueue" />}
+          waitingDetail={
+            queue.behind() &&
+            t("instances:_trn_queue_after", {
+              name: queue.behind(),
+              interpolation: { escapeValue: false }
+            })
+          }
+          onLeaveWaiting={queue.leave}
+          leaveWaitingLabel={t("instances:_trn_leave_queue")}
           infoContent={
             <>
               <h4

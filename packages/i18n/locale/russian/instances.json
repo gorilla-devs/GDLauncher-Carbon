@@ -204,6 +204,8 @@
   "_trn_server_eula_agree": "Я прочитал(а) Minecraft EULA и согласен(а) с ним",
   "_trn_server_eula_accept_and_start": "Принять EULA и запустить сервер",
   "_trn_isInQueue": "В очереди",
+  "_trn_queue_after": "после {{name}}",
+  "_trn_leave_queue": "Выйти из очереди",
   "_trn_isDeleting": "Удаление...",
   "_trn_instance_mc_version": "Версия Minecraft",
   "_trn_include_snapshot_versions": "Включать снимки разработки (snapshots)",

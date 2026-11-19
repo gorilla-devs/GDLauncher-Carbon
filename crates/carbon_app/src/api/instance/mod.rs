@@ -150,6 +150,24 @@ pub(super) fn mount() -> RouterBuilder<App> {
             app.instance_manager().cancel_pending_setup(args.instance.into(), args.expected_operation).await
         }
 
+        // The instance whose install, update, repair or launch the queued
+        // ones wait for.
+        query INSTALL_TURN[app, args: ()] {
+            Ok(app
+                .instance_manager()
+                .install_turn_holder_named()
+                .await
+                .map(|(id, name)| InstallTurnHolder {
+                    instance: id.into(),
+                    name,
+                }))
+        }
+
+        // Takes a queued Play, install, update or repair out of the queue.
+        mutation LEAVE_QUEUE[app, id: FEInstanceId] {
+            app.instance_manager().leave_queue(id.into())
+        }
+
         // Replaces the player's copies of files the last modpack update
         // kept with the installed version's. One result per file.
         mutation USE_PACK_VERSIONS[app, args: KeptPackFiles] {
@@ -3209,6 +3227,14 @@ impl From<RegenerateShareCodeResponse> for FERegenerateShareCodeResponse {
 pub struct CancelPendingSetup {
     pub instance: FEInstanceId,
     pub expected_operation: String,
+}
+
+/// The instance whose install, update, repair or launch the queued ones
+/// wait for.
+#[derive(specta::Type, serde::Serialize, Debug)]
+pub struct InstallTurnHolder {
+    pub instance: FEInstanceId,
+    pub name: String,
 }
 
 /// Files a modpack update kept, as `PackFilesKept` named them.
