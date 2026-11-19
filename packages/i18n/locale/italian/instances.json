@@ -161,6 +161,7 @@
   "_trn_action_duplicate": "Duplica",
   "_trn_duplicating": "Duplicazione di {{name}}",
   "_trn_duplicate_failed": "Impossibile duplicare {{name}}",
+  "_trn_rename_failed": "Impossibile rinominare {{name}}",
   "_trn_toggle_favorite": "Attiva/Disattiva Preferito",
   "_trn_view_logs": "Visualizza Log",
   "_trn_more_options": "Altre Opzioni",

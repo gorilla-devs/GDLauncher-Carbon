@@ -9,6 +9,7 @@ pub(super) struct Hooks {
     pauses: StdMutex<HashMap<(&'static str, InstanceId), Arc<Pause>>>,
     path_pauses: StdMutex<HashMap<(&'static str, String), Arc<Pause>>>,
     drop_barriers: StdMutex<HashMap<InstanceId, Arc<std::sync::Barrier>>>,
+    failures: StdMutex<HashSet<(&'static str, InstanceId)>>,
 }
 
 #[derive(Debug, Default)]
@@ -18,6 +19,19 @@ pub(super) struct Pause {
 }
 
 impl Hooks {
+    /// Makes the step named `name` fail once for `id`, as its real failure
+    /// would: nothing of the step is done.
+    pub(super) fn arm_failure(&self, name: &'static str, id: InstanceId) {
+        self.failures.lock().unwrap().insert((name, id));
+    }
+
+    pub(super) fn fail(&self, name: &'static str, id: InstanceId) -> anyhow::Result<()> {
+        if self.failures.lock().unwrap().remove(&(name, id)) {
+            bail!("{name} failed (test)");
+        }
+        Ok(())
+    }
+
     pub(super) fn arm_path(&self, name: &'static str, path: &str) -> Arc<Pause> {
         let pause = Arc::new(Pause::default());
         self.path_pauses
@@ -11542,5 +11556,217 @@ async fn a_copy_that_fails_gives_its_folder_name_back() -> anyhow::Result<()> {
     tokio::fs::rename(&hidden, &root).await?;
     let copy = manager.duplicate_instance(id, "source".into()).await?;
     assert_eq!(folder_of(&app, copy).await?, "source1");
+    Ok(())
+}
+
+async fn library_name(app: &crate::App, id: InstanceId) -> anyhow::Result<String> {
+    Ok(instance_repo::get_instance(&app.db, id.0)
+        .await?
+        .unwrap()
+        .name)
+}
+
+fn rename(id: InstanceId, name: &str) -> domain::InstanceSettingsUpdate {
+    let mut edit = update(id);
+    edit.name = Some(name.into());
+    edit
+}
+
+/// Everything that names the instance: the folder, the library row, the
+/// instance's own file and what is in memory.
+async fn names(
+    app: &crate::App,
+    id: InstanceId,
+) -> anyhow::Result<(String, String, String, String)> {
+    let folder = folder_of(app, id).await?;
+    let root = app
+        .settings_manager()
+        .runtime_path
+        .get_instances()
+        .to_path()
+        .join(&folder);
+    let (shortpath, config) = app.instance_manager().current_config(id).await?;
+    assert_eq!(shortpath, folder);
+    Ok((
+        folder,
+        library_name(app, id).await?,
+        disk_config(&root).await?.name,
+        config.name,
+    ))
+}
+
+fn all(name: &str) -> (String, String, String, String) {
+    (name.into(), name.into(), name.into(), name.into())
+}
+
+/// R07-instance-manager.2#2: a rename wrote the new name to instance.json,
+/// then moved the folder, then updated the library. A failure after the
+/// first step left them apart: after a restart the tile showed the old name
+/// and the instance page the new one, and renaming again did nothing.
+#[tokio::test]
+async fn a_rename_that_fails_at_any_step_leaves_the_instance_as_it_was() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "Skyblock").await?;
+    tokio::fs::write(root.join("instance/world.dat"), b"world").await?;
+    let manager = app.instance_manager();
+
+    // The folder can't be moved: something took the name it was moving to
+    // (the same refusal as a folder held by another program).
+    let pause = manager.test_hooks.arm("rename_move", id);
+    let renaming = manager.update_instance(rename(id, "Skyblock 2"));
+    tokio::pin!(renaming);
+    reach(&pause, renaming.as_mut()).await;
+    let taken = root.with_file_name("Skyblock 2");
+    tokio::fs::create_dir(&taken).await?;
+    tokio::fs::write(taken.join("in-the-way"), b"x").await?;
+    pause.release.notify_one();
+    let error = renaming.await.expect_err("the folder moved over another");
+    assert!(
+        error
+            .to_string()
+            .starts_with("This instance's folder could not be moved to its new name ("),
+        "{error:#}"
+    );
+    assert_eq!(names(&app, id).await?, all("Skyblock"));
+    tokio::fs::remove_dir_all(&taken).await?;
+
+    // instance.json can't be written, then the library can't be updated:
+    // the folder goes back, and so does the file.
+    for step in ["rename_config", "rename_row"] {
+        manager.test_hooks.arm_failure(step, id);
+        manager
+            .update_instance(rename(id, "Skyblock 2"))
+            .await
+            .expect_err(step);
+        assert_eq!(names(&app, id).await?, all("Skyblock"), "{step}");
+        assert!(!root.with_file_name("Skyblock 2").exists(), "{step}");
+        assert_eq!(
+            tokio::fs::read(root.join("instance/world.dat")).await?,
+            b"world",
+            "{step}"
+        );
+    }
+
+    // And the rename still works afterwards: nothing was left half done.
+    manager.update_instance(rename(id, "Skyblock 2")).await?;
+    assert_eq!(names(&app, id).await?, all("Skyblock 2"));
+    assert!(!root.exists());
+    assert_eq!(
+        tokio::fs::read(root.with_file_name("Skyblock 2").join("instance/world.dat")).await?,
+        b"world"
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_blank_name_is_refused_before_anything_is_written_and_spaces_around_one_go()
+-> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "Named").await?;
+    let before = tokio::fs::read(root.join("instance.json")).await?;
+    for blank in ["", "   ", "\t \n"] {
+        let mut edit = rename(id, blank);
+        // What a save that also changes something else must not write.
+        edit.notes = Some("written with a blank name".into());
+        let error = app
+            .instance_manager()
+            .update_instance(edit)
+            .await
+            .expect_err("a blank name was accepted");
+        assert_eq!(error.to_string(), "An instance needs a name.");
+        assert_eq!(tokio::fs::read(root.join("instance.json")).await?, before);
+        assert_eq!(names(&app, id).await?, all("Named"));
+    }
+    app.instance_manager()
+        .update_instance(rename(id, "  Spaced out  "))
+        .await?;
+    assert_eq!(names(&app, id).await?, all("Spaced out"));
+    // The same name with spaces around it is no rename.
+    app.instance_manager()
+        .update_instance(rename(id, " Spaced out "))
+        .await?;
+    assert_eq!(names(&app, id).await?, all("Spaced out"));
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_rename_keeps_the_replaced_icon_until_the_save_is_whole() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "Icons").await?;
+    let manager = app.instance_manager();
+    let set_icon = |name: &'static str, rename_to: Option<&'static str>| {
+        let manager = app.instance_manager();
+        async move {
+            *manager.loaded_icon.lock().await = Some((name.into(), name.as_bytes().to_vec()));
+            let mut edit = update(id);
+            edit.use_loaded_icon = Some(true);
+            edit.name = rename_to.map(Into::into);
+            manager.update_instance(edit).await
+        }
+    };
+    set_icon("first.png", None).await?;
+    assert!(root.join("first.png").exists());
+
+    // The save fails after the new icon is written: the old one, which
+    // instance.json still names, is still there.
+    manager.test_hooks.arm_failure("rename_row", id);
+    set_icon("second.png", Some("Icons renamed"))
+        .await
+        .expect_err("the library update was made to fail");
+    assert_eq!(names(&app, id).await?, all("Icons"));
+    assert!(root.join("first.png").exists());
+    assert!(matches!(
+        disk_config(&root).await?.icon,
+        info::InstanceIcon::RelativePath(icon) if icon == "first.png"
+    ));
+
+    // A save that goes through removes it.
+    set_icon("second.png", Some("Icons renamed")).await?;
+    let root = root.with_file_name("Icons renamed");
+    assert!(root.join("second.png").exists());
+    assert!(!root.join("first.png").exists());
+    Ok(())
+}
+
+/// An instance a failed rename of an earlier version left split: the
+/// library still has the old name, instance.json the new one.
+#[tokio::test]
+async fn start_up_brings_the_library_name_in_line_with_the_instances_own_file() -> anyhow::Result<()>
+{
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "Old name").await?;
+    let (untouched, _) = fixture(&app, "Untouched").await?;
+    let mut config = disk_config(&root).await?;
+    config.name = "New name".into();
+    tokio::fs::write(
+        root.join("instance.json"),
+        schema::make_instance_config(config)?,
+    )
+    .await?;
+    assert_eq!(library_name(&app, id).await?, "Old name");
+
+    app.instance_manager().scan_instances().await?;
+
+    // The tile (the library's name) now says what the instance page says.
+    assert_eq!(library_name(&app, id).await?, "New name");
+    let (shortpath, config) = app.instance_manager().current_config(id).await?;
+    assert_eq!(config.name, "New name");
+    // The folder is not what names an instance, and stays.
+    assert_eq!(shortpath, "Old name");
+    assert!(root.exists());
+    assert_eq!(library_name(&app, untouched).await?, "Untouched");
+    let groups = app.instance_manager().list_groups().await?;
+    let listed = groups
+        .iter()
+        .flat_map(|group| &group.instances)
+        .find(|instance| instance.id == id)
+        .unwrap();
+    assert_eq!(listed.name, "New name");
+
+    // Renaming it now works, where it used to be taken for no change.
+    app.instance_manager()
+        .update_instance(rename(id, "Old name"))
+        .await?;
+    assert_eq!(names(&app, id).await?, all("Old name"));
     Ok(())
 }

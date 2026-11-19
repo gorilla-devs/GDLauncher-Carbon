@@ -25,6 +25,7 @@ import {
   Switch
 } from "solid-js"
 import { apiFetch, extractErrorDisplay, rspc } from "@/utils/rspcClient"
+import { renameTo } from "@/utils/instanceName"
 import {
   CFFEModLoaderType,
   FEModdedManifestLoaderVersion,
@@ -311,7 +312,8 @@ const Custom = (
     }
   }
 
-  const isNameDiff = () => title() && title() !== instanceData()?.title
+  const isNameDiff = () =>
+    renameTo(title() ?? "", instanceData()?.title) !== null
   const isMcVersionDiff = () =>
     mcVersion() && mcVersion() !== instanceData()?.mcVersion
   const isModloaderDiff = () => loader() !== instanceData()?.modloader
@@ -433,7 +435,7 @@ const Custom = (
     const instance = editId()
     const pair = readPair()
     if (instance === undefined || !pairIsValid(pair)) return
-    if (!title()) {
+    if (!title()?.trim()) {
       setError("Fields must be filled in!")
       return
     }
@@ -451,7 +453,7 @@ const Custom = (
         await updateInstanceMutation.mutateAsync({
           instance,
           useLoadedIcon: isIconDiff() ? { Set: Boolean(bgPreview()) } : null,
-          name: isNameDiff() ? { Set: title()! } : null,
+          name: isNameDiff() ? { Set: title()!.trim() } : null,
           version:
             pair.release !== instanceData()?.mcVersion
               ? {

@@ -341,6 +341,54 @@ const ILLEGAL_NAMES: &[&str] = &[
 /// outlived the launcher would be invisible to the instance it belongs to.
 pub(crate) const PID_FILE_NAME: &str = ".gdl_instance.pid";
 
+/// An instance folder a rename has moved, until the rename is whole: dropped
+/// before [`keep`](Self::keep), it moves the folder back, so every way out of
+/// a rename that failed later leaves the folder under the name the library
+/// and instance.json still have.
+#[derive(Default)]
+struct MovedRoot(Option<(PathBuf, PathBuf)>);
+
+impl MovedRoot {
+    fn arm(from: &Path, to: &Path) -> Self {
+        Self(Some((from.to_owned(), to.to_owned())))
+    }
+
+    fn keep(mut self) {
+        self.0 = None;
+    }
+}
+
+impl Drop for MovedRoot {
+    fn drop(&mut self) {
+        if let Some((from, to)) = self.0.take() {
+            // One rename inside a folder; the same call just went the other way.
+            if let Err(error) = std::fs::rename(&to, &from) {
+                tracing::error!(
+                    ?error,
+                    from = %to.display(),
+                    to = %from.display(),
+                    "an instance folder could not be moved back after its rename failed"
+                );
+            }
+        }
+    }
+}
+
+/// Why an instance's folder could not be given its new name, in words: most
+/// often another program holds a file in it (on Windows, an Explorer window,
+/// an editor or antivirus software), which the system reports as access
+/// denied or as a sharing violation.
+fn folder_not_renamed(error: std::io::Error) -> anyhow::Error {
+    let held = error.kind() == std::io::ErrorKind::PermissionDenied
+        || cfg!(windows) && matches!(error.raw_os_error(), Some(32 | 33));
+    let message = if held {
+        "Another program is using this instance's folder, or the folder can't be changed. Close that program and try again.".to_owned()
+    } else {
+        format!("This instance's folder could not be moved to its new name ({error}).")
+    };
+    anyhow::Error::new(error).context(message)
+}
+
 /// A folder name kept for a copy in the making; see
 /// `reserve_folder`. Dropping it frees the name.
 struct FolderReservation {
@@ -720,6 +768,33 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                         .await?
                     }
                 };
+
+                // The library row keeps a copy of the name, which the tiles
+                // show; the instance page shows instance.json's. A rename
+                // that failed halfway in an earlier version left the two
+                // apart, and nothing brought them together again. The file
+                // is the instance's own, so its name wins.
+                if let (Some(row), InstanceType::Valid(data)) = (&cached, &instance.type_) {
+                    let name = &data.config.name;
+                    if *name != row.name && !name.trim().is_empty() {
+                        match instance_repo::set_instance_name_and_shortpath(
+                            &self.app.db,
+                            row.id,
+                            name,
+                            &shortpath,
+                        )
+                        .await
+                        {
+                            Ok(_) => tracing::info!(
+                                instance = row.id,
+                                "library name brought in line with instance.json"
+                            ),
+                            Err(error) => {
+                                tracing::warn!(?error, "library name left apart from instance.json")
+                            }
+                        }
+                    }
+                }
 
                 let mut instances = self.instances.write().await;
                 // Invalid startup entries need recovery tiles, but an invalid
@@ -2531,6 +2606,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         update: domain::InstanceSettingsUpdate,
         runtime_activity: &mut Option<crate::managers::runtime_lifecycle::RuntimeActivity>,
     ) -> anyhow::Result<Option<VisualTaskId>> {
+        // The name as it is kept: without the spaces around it, and never
+        // blank. Refused here, before anything is written: a blank name
+        // used to be written to instance.json and only then fail, at the
+        // folder step.
+        let mut update = update;
+        if let Some(name) = &mut update.name {
+            *name = name.trim().to_owned();
+            if name.is_empty() {
+                bail!("An instance needs a name.");
+            }
+        }
         let _instance_guard = self.lock_instance(update.instance_id).await;
 
         // Snapshot only after taking ownership; disk writes never hold the map.
@@ -2694,6 +2780,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         // Phase 2: Apply all updates WITHOUT holding global lock
         let old_name = config.name.clone();
+        // What instance.json holds now, to put back if a rename fails after
+        // it was written.
+        let original_json = schema::make_instance_config(config.clone())?;
         let mut info = config;
 
         // Check what changed before consuming values (for conditional invalidation)
@@ -2701,6 +2790,35 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let modpack_lock_changed = update.modpack_locked.is_some();
 
         let mut new_icon_revision = icon_revision;
+
+        // A rename moves the folder first, so one that can't be moved (on
+        // Windows, while another program holds a file in it) changes
+        // nothing. It used to be the last step but one, after instance.json
+        // already carried the new name: the library kept the old name, the
+        // instance page showed the new one after a restart, and renaming
+        // again did nothing. Whatever fails from here on moves it back.
+        // Root ownership is kept through DB and map publication.
+        let mut rename_path_guard = None;
+        let mut moved = MovedRoot::default();
+        let renamed = update.name.as_ref().is_some_and(|name| *name != old_name);
+        if let Some(name) = update.name.as_ref().filter(|_| renamed) {
+            rename_path_guard = Some(self.path_lock.lock().await);
+            if shortpath != *name {
+                let (new_shortpath, new_path) = self.next_available_folder(name).await?;
+                #[cfg(test)]
+                self.test_hooks
+                    .pause("rename_move", update.instance_id)
+                    .await;
+                tokio::fs::rename(&path, &new_path)
+                    .await
+                    .map_err(folder_not_renamed)?;
+                moved = MovedRoot::arm(&path, &new_path);
+                shortpath = new_shortpath;
+                path = new_path;
+            }
+        }
+        // The icon this save replaces, removed once the save is whole.
+        let mut replaced_icon = None;
 
         if let Some(use_loaded_icon) = update.use_loaded_icon {
             let icon = match (use_loaded_icon, self.loaded_icon.lock().await.take()) {
@@ -2711,9 +2829,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
                     if let InstanceIcon::RelativePath(oldpath) = &info.icon {
                         if *oldpath != ipath {
-                            tokio::fs::remove_file(path.join(oldpath))
-                                .await
-                                .context("removing old instance icon")?;
+                            replaced_icon = Some(oldpath.clone());
                         }
                     }
 
@@ -2823,6 +2939,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let json = schema::make_instance_config(info.clone())?;
 
+        #[cfg(test)]
+        self.test_hooks.fail("rename_config", update.instance_id)?;
         crate::util::durable::write_file_atomic(
             &self.app.settings_manager().runtime_path.get_temp(),
             path.join("instance.json"),
@@ -2831,25 +2949,45 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         .await?;
 
         // A display-name edit always updates the library row, even when
-        // its existing folder already has the requested name. Retain root
-        // ownership through both DB and map publication.
-        let mut rename_path_guard = None;
-        if let Some(name) = update.name {
-            if name != old_name {
-                rename_path_guard = Some(self.path_lock.lock().await);
-                if shortpath != name {
-                    let (new_shortpath, new_path) = self.next_available_folder(&name).await?;
-                    tokio::fs::rename(&path, &new_path).await?;
-                    shortpath = new_shortpath;
-                    path = new_path;
-                }
+        // its existing folder already has the requested name.
+        if renamed {
+            let instance_id = update.instance_id;
+            let published: anyhow::Result<()> = async {
+                #[cfg(test)]
+                self.test_hooks.fail("rename_row", instance_id)?;
                 instance_repo::set_instance_name_and_shortpath(
                     &self.app.db,
-                    *update.instance_id,
-                    &name,
+                    *instance_id,
+                    &info.name,
                     &shortpath,
                 )
                 .await?;
+                Ok(())
+            }
+            .await;
+            if let Err(error) = published {
+                // The library keeps the old name, so instance.json goes back
+                // to it too, and `moved` puts the folder back.
+                if let Err(error) = crate::util::durable::write_file_atomic(
+                    &self.app.settings_manager().runtime_path.get_temp(),
+                    path.join("instance.json"),
+                    original_json,
+                )
+                .await
+                {
+                    tracing::warn!(?error, "instance.json keeps the name of a failed rename");
+                }
+                return Err(error);
+            }
+        }
+        moved.keep();
+        if let Some(icon) = replaced_icon {
+            if let Err(error) = tokio::fs::remove_file(path.join(&icon)).await {
+                tracing::warn!(
+                    ?error,
+                    icon,
+                    "the replaced instance icon was left in the folder"
+                );
             }
         }
 

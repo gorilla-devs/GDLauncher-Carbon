@@ -161,6 +161,7 @@
   "_trn_action_duplicate": "Дублировать",
   "_trn_duplicating": "Дублирование: {{name}}",
   "_trn_duplicate_failed": "Не удалось дублировать {{name}}",
+  "_trn_rename_failed": "Не удалось переименовать {{name}}",
   "_trn_toggle_favorite": "Добавить в избранное или убрать из него",
   "_trn_view_logs": "Посмотреть логи",
   "_trn_more_options": "Дополнительно",

@@ -24,6 +24,11 @@ import {
 } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { queryClient, rspc } from "@/utils/rspcClient"
+import {
+  LOCAL_ERROR_TOAST,
+  toastMutationError
+} from "@/utils/mutationErrorToast"
+import { renameTo } from "@/utils/instanceName"
 import { useInstallQueue } from "@/utils/installQueue"
 import useInstanceData from "./instance.data"
 import { detectDuplicatedMods } from "@/utils/duplicateMods"
@@ -204,8 +209,10 @@ const Instance = (props: { children?: any }) => {
     mutationKey: ["instance.launchInstance"]
   }))
 
-  const updateInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.updateInstance"]
+  // Its failure is told by a notice of its own, which names the instance.
+  const renameMutation = rspc.createMutation(() => ({
+    mutationKey: ["instance.updateInstance"],
+    meta: LOCAL_ERROR_TOAST
   }))
 
   const killInstanceMutation = rspc.createMutation(() => ({
@@ -311,15 +318,44 @@ const Instance = (props: { children?: any }) => {
     return undefined
   }
 
+  // The heading shows what was typed until the launcher answers. When
+  // nothing is renamed, or the rename is refused, it shows the instance's
+  // name again: left as typed, it would name an instance that is not called
+  // that.
+  const showCurrentName = () => {
+    const current = routeData.instanceDetails.data?.name
+    if (current === undefined || !nameRef) return
+    setNewName(current)
+    nameRef.textContent = current
+  }
+
   const handleNameChange = () => {
-    if (newName()) {
-      updateInstanceMutation.mutate({
-        name: { Set: newName() },
-        useLoadedIcon: null,
-        memory: null,
-        notes: null,
-        instance: instanceId()
-      })
+    const current = routeData.instanceDetails.data?.name
+    const name = renameTo(newName(), current)
+    if (name === null) {
+      showCurrentName()
+    } else {
+      renameMutation.mutate(
+        {
+          name: { Set: name },
+          useLoadedIcon: null,
+          memory: null,
+          notes: null,
+          instance: instanceId()
+        },
+        {
+          onError: (error) => {
+            showCurrentName()
+            toastMutationError(
+              t("instances:_trn_rename_failed", {
+                name: current ?? name,
+                interpolation: { escapeValue: false }
+              }),
+              error
+            )
+          }
+        }
+      )
     }
     setEditableName(false)
   }
@@ -561,10 +597,7 @@ const Instance = (props: { children?: any }) => {
                   hidden: !editableName()
                 }}
                 onClick={() => {
-                  if (routeData.instanceDetails.data?.name && nameRef) {
-                    setNewName(routeData.instanceDetails.data?.name)
-                    nameRef.textContent = routeData.instanceDetails.data?.name
-                  }
+                  showCurrentName()
                   setEditableName(false)
                 }}
               />
