@@ -337,6 +337,13 @@ const ILLEGAL_NAMES: &[&str] = &[
 /// outlived the launcher would be invisible to the instance it belongs to.
 pub(crate) const PID_FILE_NAME: &str = ".gdl_instance.pid";
 
+/// The name of an entry of the instances folder as an instance is known by
+/// (its shortpath), or `None` when the name is not valid UTF-8 and so cannot
+/// be one.
+fn scanned_name(path: &Path) -> Option<String> {
+    path.file_name()?.to_str().map(str::to_owned)
+}
+
 fn sanitize_name(name: &str) -> String {
     let mut sanitized = name.trim().to_string();
 
@@ -595,12 +602,19 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
             let path = dir.path();
 
-            let shortpath = path
-                .file_name()
-                .expect("path given to scan_instance should never have a null filename")
-                .to_str()
-                .expect("current GDL versions only support UTF8 paths")
-                .to_string();
+            // A name that is not valid text (Linux allows any bytes; an old
+            // zip unpacked here leaves one) can't be an instance: neither the
+            // database nor instance.json can hold it. It is passed over.
+            // Stopping on it took down the task this scan runs in, and with
+            // it every instance not yet read, the servers, and the import
+            // and mod scans that start after this one.
+            let Some(shortpath) = scanned_name(&path) else {
+                tracing::warn!(
+                    entry = %path.display(),
+                    "skipping an entry of the instances folder whose name is not valid UTF-8"
+                );
+                continue;
+            };
 
             // One directory's failure (an add_instance/get_default_group
             // error — scan_instance itself never fails, converting a bad
@@ -5390,6 +5404,66 @@ mod test {
     /// Write a minimal, valid `instance.json` directly to `dir` — the same
     /// on-disk shape `scan_instances` reads, without going through
     /// `create_instance` (which needs a resolvable game version) or the DB.
+    /// R07-instance-manager.2#1: one entry with such a name used to panic
+    /// the scan, so nothing after it loaded, on every start.
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn scan_instances_passes_over_names_that_are_not_text_and_reads_the_rest()
+    -> anyhow::Result<()> {
+        use std::os::unix::ffi::OsStrExt;
+
+        assert_eq!(
+            super::scanned_name(std::path::Path::new("/data/instances/My pack")),
+            Some("My pack".to_owned())
+        );
+        assert_eq!(
+            super::scanned_name(std::path::Path::new("/data/instances/Ünïcode 包")),
+            Some("Ünïcode 包".to_owned())
+        );
+        let not_text = std::ffi::OsStr::from_bytes(b"M\xffds");
+        assert_eq!(
+            super::scanned_name(&std::path::Path::new("/data/instances").join(not_text)),
+            None
+        );
+        assert_eq!(super::scanned_name(std::path::Path::new("/")), None);
+
+        let app = crate::setup_managers_for_test().await;
+        // See `scan_instances_isolates_one_bad_entry_from_the_rest_of_the_scan`.
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        let instances_dir = app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .to_path();
+        // A folder and a file with such names, among instances that sort
+        // before, between and after them, whatever order the system lists
+        // them in.
+        for name in ["aaa-first", "N-between", "zzz-last"] {
+            write_test_instance_json(&instances_dir.join(name), name).await;
+        }
+        tokio::fs::create_dir(instances_dir.join(not_text)).await?;
+        tokio::fs::write(
+            instances_dir.join(std::ffi::OsStr::from_bytes(b"\xfe\xff.zip")),
+            b"zip",
+        )
+        .await?;
+
+        app.instance_manager().scan_instances().await?;
+
+        let manager = app.instance_manager();
+        let instances = manager.instances.read().await;
+        let mut read = instances
+            .values()
+            .map(|instance| instance.shortpath.clone())
+            .collect::<Vec<_>>();
+        read.sort();
+        assert_eq!(read, ["N-between", "aaa-first", "zzz-last"]);
+        drop(instances);
+        // Left where they are, untouched.
+        assert!(instances_dir.join(not_text).is_dir());
+        Ok(())
+    }
+
     async fn write_test_instance_json(dir: &std::path::Path, name: &str) {
         tokio::fs::create_dir_all(dir).await.unwrap();
         let config = info::Instance {
