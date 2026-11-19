@@ -16,6 +16,12 @@ const Confirmation = (props: ModalProps) => {
   const updateInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.updateInstance"]
   }))
+  // Unpairing cancels an update of the pack that waits and has changed
+  // nothing: said before it is confirmed, and only then.
+  const pendingSetup = rspc.createQuery(() => ({
+    queryKey: ["instance.getPendingSetup", data().instanceId],
+    enabled: data().instanceState === "unpair"
+  }))
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props.title} noPadding={true}>
@@ -25,6 +31,13 @@ const Confirmation = (props: ModalProps) => {
         </Show>
         <Show when={data().instanceState === "unpair"}>
           <p>{t("general:_trn_instance_unpair_confirmation")}</p>
+          <Show
+            when={pendingSetup.data?.pending && pendingSetup.data.can_cancel}
+          >
+            <p data-testid="unpair-cancels-update">
+              {t("general:_trn_instance_unpair_cancels_update")}
+            </p>
+          </Show>
         </Show>
         <p>{t("instances:_trn_instance_confirm_continue")}</p>
         <div class="mt-8 flex justify-between">

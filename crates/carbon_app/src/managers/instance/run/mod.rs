@@ -625,6 +625,19 @@ impl ManagerRef<'_, InstanceManager> {
                 let pending = if let Some(recovery) = &shader_recovery {
                     Some(Session::require_preparation(&root, &recovery.session).await?)
                 } else {
+                    // Unpaired while a pack update or repair waited, before
+                    // Unpair cancelled it itself: nothing offers to cancel it
+                    // without the link, so one that changed nothing goes here
+                    // and the game starts with what is installed.
+                    if config.modpack.is_none() {
+                        match self.settle_unlinked_setup(instance_id, &root, &config, false).await {
+                            Ok(super::modpack::UnlinkedSetup::Cancelled) => task.warn(
+                                crate::domain::vtask::TaskWarning::UnlinkedUpdateCancelled,
+                            ),
+                            Ok(_) => {}
+                            Err(error) => tracing::warn!(?error, "pending setup of an unpaired pack left as is"),
+                        }
+                    }
                     Session::load(&root).await.with_context(|| {
                         super::mods::unreadable_setup_refusal(&config, super::mods::PendingChange::Play)
                     })?

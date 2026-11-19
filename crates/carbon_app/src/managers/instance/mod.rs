@@ -2475,7 +2475,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let _instance_guard = self.lock_instance(update.instance_id).await;
 
         // Snapshot only after taking ownership; disk writes never hold the map.
-        let (mut shortpath, config, mut path, icon_revision) = {
+        let (mut shortpath, config, mut path, icon_revision, inactive) = {
             let instances = self.instances.read().await;
             let instance = instances
                 .get(&update.instance_id)
@@ -2485,6 +2485,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             if matches!(data.state, LaunchState::Deleting) {
                 bail!("cannot update an instance that is being deleted");
             }
+            let inactive = matches!(data.state, LaunchState::Inactive { .. });
 
             let changes_root_or_version = update
                 .name
@@ -2510,6 +2511,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 data.config.clone(),
                 path,
                 data.icon_revision,
+                inactive,
             )
             // Read guard released here - other instances can now operate
         };
@@ -2612,6 +2614,18 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     tracing::warn!(?error, "pending setup cannot be described");
                     WAITS_FOR_SETUP.into()
                 });
+                bail!("{refusal}");
+            }
+        }
+
+        // Unpairing takes the pack's unfinished update or repair with it:
+        // without the link nothing would offer to cancel it. Before
+        // instance.json is written, so a refusal changes nothing.
+        if update.modpack_locked == Some(None) && config.modpack.is_some() {
+            if let modpack::UnlinkedSetup::MustFinish(refusal) = self
+                .settle_unlinked_setup(update.instance_id, &path, &config, !inactive)
+                .await?
+            {
                 bail!("{refusal}");
             }
         }

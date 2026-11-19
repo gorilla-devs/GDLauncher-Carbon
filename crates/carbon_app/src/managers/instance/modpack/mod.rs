@@ -775,6 +775,68 @@ impl ManagerRef<'_, InstanceManager> {
         self.retire_unapplied_setup(instance_id, &root, owner).await
     }
 
+    /// Settles the pending update or repair of a pack for an instance that
+    /// leaves the pack: one being unpaired, or one that was unpaired while
+    /// it waited. Without the link nothing offers to cancel it (Repair, and
+    /// its Cancel, need a pack), so every Play would try it again.
+    ///
+    /// One that has changed nothing is cancelled as Repair's Cancel does,
+    /// and the instance stays on what is installed. One that may have
+    /// changed files is left to finish: half of each version is no instance
+    /// to keep. Any other pending setup (a first install, a game version
+    /// that still has to install, a record that is not this instance's own
+    /// or can't be read) is none of this, and stays as it is.
+    ///
+    /// `busy` is whether another operation is running on the instance; the
+    /// preparation that settles its own passes `false`. Requires the
+    /// instance gate.
+    pub(super) async fn settle_unlinked_setup(
+        self,
+        instance_id: InstanceId,
+        root: &Path,
+        current: &info::Instance,
+        busy: bool,
+    ) -> anyhow::Result<UnlinkedSetup> {
+        if !root.join(".setup").try_exists()? {
+            return Ok(UnlinkedSetup::Nothing);
+        }
+        let session = match session::Session::load(root).await {
+            Ok(Some(session)) => session,
+            Ok(None) => return Ok(UnlinkedSetup::Nothing),
+            Err(error) => {
+                tracing::warn!(?error, "pending setup left as is: its record can't be read");
+                return Ok(UnlinkedSetup::Nothing);
+            }
+        };
+        let repair = match session.producer {
+            session::Producer::Change => false,
+            session::Producer::Repair => true,
+            _ => return Ok(UnlinkedSetup::Nothing),
+        };
+        if session.kind != session::Kind::Pack
+            || !session.owned_by(instance_id)
+            // Its pack is installed and recorded; only the game is left.
+            || session.phase == session::Phase::Committed
+        {
+            return Ok(UnlinkedSetup::Nothing);
+        }
+        if session.cancel_refusal(root, current, busy)?.is_none() {
+            self.retire_unapplied_setup(instance_id, root, &session.owner()?)
+                .await?;
+            return Ok(UnlinkedSetup::Cancelled);
+        }
+        let what = if repair { "repair" } else { "update" };
+        Ok(UnlinkedSetup::MustFinish(if busy {
+            format!("This modpack's {what} is still running. Wait for it to finish, then unpair.")
+        } else if session.interrupted(root) {
+            format!("This modpack's {what} is half applied. Press Play to finish it, then unpair.")
+        } else {
+            format!(
+                "This modpack's {what} has to finish first. Press Play to finish it, then unpair."
+            )
+        }))
+    }
+
     /// Retires `owner`'s pending setup, which changed no installed content,
     /// so the instance is back on its installed version. Requires the
     /// instance gate, and a setup that can be cancelled (see
@@ -971,6 +1033,18 @@ impl ManagerRef<'_, InstanceManager> {
             duplicates,
         })
     }
+}
+
+/// What [`settle_unlinked_setup`](ManagerRef::settle_unlinked_setup) found
+/// and did.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum UnlinkedSetup {
+    /// No update or repair of the pack is pending.
+    Nothing,
+    /// One that had changed nothing was cancelled; what is installed stays.
+    Cancelled,
+    /// One that only finishing is safe for. Says so, for an Unpair it stops.
+    MustFinish(String),
 }
 
 #[derive(specta::Type, Serialize, Debug, Clone)]

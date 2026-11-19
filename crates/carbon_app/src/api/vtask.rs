@@ -120,6 +120,10 @@ pub enum FETaskWarning {
         total: u32,
         repairable: bool,
     },
+    /// An update or repair that waited on an instance since unpaired from
+    /// its modpack was cancelled when the game was started; the installed
+    /// version runs.
+    UnlinkedUpdateCancelled,
     /// A modpack version change lost files the same way before it changed
     /// anything, so the installed version was kept; `modpack` is the version
     /// that was asked for.
@@ -274,6 +278,7 @@ impl From<domain::TaskWarning> for FETaskWarning {
                 total,
                 repairable,
             },
+            domain::TaskWarning::UnlinkedUpdateCancelled => Self::UnlinkedUpdateCancelled,
             domain::TaskWarning::PackUpdateAbandoned {
                 instance_id,
                 files,

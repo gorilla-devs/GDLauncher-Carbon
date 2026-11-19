@@ -615,4 +615,39 @@ describe("describeTaskWarnings", () => {
     expect(both?.hint).toContain("open Repair in the instance settings")
     expect(both?.action?.kind).toBe("reviewKept")
   })
+
+  it("says that an update left waiting on an unpaired instance was cancelled", async () => {
+    const i18n = i18next.createInstance()
+    await i18n.init({
+      lng: "en",
+      ns: ["notifications"],
+      resources: { en: { notifications: english } }
+    })
+    const translate: Translate = (key, options) =>
+      i18n.t(key as string, options)
+    const entry: FETaskWarnings = {
+      id: 31,
+      name: {
+        translation: "InstanceTaskLaunch",
+        args: { name: "Steve's Pack" }
+      },
+      subject: null,
+      warnings: [{ type: "UnlinkedUpdateCancelled" }]
+    }
+    expect(describeTaskWarnings(entry, translate)).toEqual({
+      title: "Steve's Pack: unfinished modpack update cancelled",
+      lines: [
+        "This instance is no longer linked to the modpack. What was installed is unchanged."
+      ]
+    })
+    expect(
+      describeTaskWarnings(
+        {
+          ...entry,
+          name: { translation: "InstanceTaskLaunch", args: { name: "" } }
+        },
+        translate
+      )?.title
+    ).toBe("An unfinished modpack update was cancelled")
+  })
 })

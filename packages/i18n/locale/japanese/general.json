@@ -37,6 +37,7 @@
   "_trn_assigned_java_path": "割り当てられたJavaパス",
   "_trn_instance_unlock_confirmation": "ロックを解除すると、このインスタンスに追加コンテンツをインストールできるようになります。正しく行わないとインスタンスが起動しなくなる可能性があります。この操作は取り消せません。",
   "_trn_instance_unpair_confirmation": "ペアリングを解除すると、インスタンスとModパックのリンクが削除されます。以降、Modパックのバージョンを変更できなくなります。この操作は取り消せません。",
+  "_trn_instance_unpair_cancels_update": "リンクを解除すると、この Modpack の未完了の更新もキャンセルされます。",
   "_trn_select_image": "画像を選択",
   "_trn_delete": "削除",
   "_trn_edit": "編集",

@@ -121,6 +121,11 @@ pub enum TaskWarning {
         /// again; one installed from a file alone is not.
         repairable: bool,
     },
+    /// The game was started for an instance that was unpaired while an
+    /// update or repair of its modpack waited. Nothing offers to cancel one
+    /// without the link, and it had changed nothing, so it was cancelled and
+    /// the installed version started.
+    UnlinkedUpdateCancelled,
     /// A modpack version change lost files the same way before it had
     /// changed anything, so it was given up and the installed version kept.
     PackUpdateAbandoned {

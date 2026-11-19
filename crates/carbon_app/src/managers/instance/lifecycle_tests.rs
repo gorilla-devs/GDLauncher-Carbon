@@ -11171,3 +11171,259 @@ async fn a_refused_pack_file_fails_the_install_with_its_name_and_the_answer() ->
     );
     Ok(())
 }
+
+fn unpair(id: InstanceId) -> domain::InstanceSettingsUpdate {
+    let mut edit = update(id);
+    edit.modpack_locked = Some(None);
+    edit
+}
+
+/// R07-instance-manager.1#4: an update of the pack that waits when the
+/// instance is unpaired used to stay queued, with nothing left to cancel it:
+/// Repair, and its Cancel, need the link. Unpair now cancels one that has
+/// changed nothing, as Repair's Cancel does.
+#[tokio::test]
+async fn unpair_cancels_the_packs_update_that_waits_and_has_changed_nothing() -> anyhow::Result<()>
+{
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = repairblocked_installed(&app, "unpair-cancels", "A").await?;
+    repairblocked_pending_change(&app, id, &root, "B").await?;
+    let installed = legacy_tree(&root)
+        .into_iter()
+        .filter(|(path, _)| !path.starts_with(".setup") && path != "instance.json")
+        .collect::<Vec<_>>();
+    assert!(app.instance_manager().pending_setup(id).await?.can_cancel);
+
+    app.instance_manager().update_instance(unpair(id)).await?;
+
+    assert!(disk_config(&root).await?.modpack.is_none());
+    assert!(!root.join(".setup").exists());
+    let status = app.instance_manager().pending_setup(id).await?;
+    assert!(!status.pending, "{status:?}");
+    // What is installed is as it was.
+    let after = legacy_tree(&root)
+        .into_iter()
+        .filter(|(path, _)| {
+            !path.starts_with(".setup") && path != "instance.json" && !path.starts_with(".retired")
+        })
+        .collect::<Vec<_>>();
+    for kept in &installed {
+        assert!(after.contains(kept), "{kept:?} changed");
+    }
+    Ok(())
+}
+
+#[tokio::test]
+async fn unpair_is_refused_while_the_packs_update_is_half_applied_or_running() -> anyhow::Result<()>
+{
+    use super::modpack::session::{Phase, Producer, Session};
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = repairblocked_installed(&app, "unpair-refused", "A").await?;
+    let mut session = repairblocked_pending_change(&app, id, &root, "B").await?;
+    let owner = session.owner()?;
+
+    // Still running: only waiting is safe.
+    app.instance_manager()
+        .instances
+        .write()
+        .await
+        .get_mut(&id)
+        .unwrap()
+        .data_mut()?
+        .state = run::LaunchState::Queued(crate::domain::vtask::VisualTaskId(1));
+    let busy = app
+        .instance_manager()
+        .update_instance(unpair(id))
+        .await
+        .expect_err("an update that is running is not cancelled under it");
+    assert_eq!(
+        busy.to_string(),
+        "This modpack's update is still running. Wait for it to finish, then unpair."
+    );
+    app.instance_manager()
+        .instances
+        .write()
+        .await
+        .get_mut(&id)
+        .unwrap()
+        .data_mut()?
+        .state = run::LaunchState::Inactive { failed_task: None };
+
+    // It replaced some files: half of each version is nothing to keep.
+    session.phase = Phase::Applying;
+    session.save(&root, &owner).await?;
+    let before = legacy_tree(&root);
+    let refused = app
+        .instance_manager()
+        .update_instance(unpair(id))
+        .await
+        .expect_err("a half applied update is finished, not cancelled");
+    assert_eq!(
+        refused.to_string(),
+        "This modpack's update is half applied. Press Play to finish it, then unpair."
+    );
+    // The refusal changed nothing: still paired, the setup as it was.
+    assert_eq!(legacy_tree(&root), before);
+    assert!(disk_config(&root).await?.modpack.is_some());
+    let (_, current) = app.instance_manager().current_config(id).await?;
+    assert!(current.modpack.is_some());
+
+    // A repair is named as one.
+    session.producer = Producer::Repair;
+    session.save(&root, &owner).await?;
+    let repair = app
+        .instance_manager()
+        .update_instance(unpair(id))
+        .await
+        .expect_err("a half applied repair is finished, not cancelled");
+    assert_eq!(
+        repair.to_string(),
+        "This modpack's repair is half applied. Press Play to finish it, then unpair."
+    );
+    assert!(Session::load(&root).await?.is_some());
+    Ok(())
+}
+
+#[tokio::test]
+async fn unpair_leaves_every_other_pending_setup_as_it_did() -> anyhow::Result<()> {
+    use super::modpack::session::{Kind, Phase, Producer, Session};
+    let app = crate::setup_managers_for_test().await;
+
+    // A first install that has not finished: nothing to go back to.
+    let (id, root) = repairblocked_installed(&app, "unpair-first-install", "A").await?;
+    let (_, config) = app.instance_manager().current_config(id).await?;
+    tokio::fs::create_dir(root.join(".setup")).await?;
+    let mut session = Session::new(&config, Producer::Create, Kind::Pack, None)?;
+    session.instance_id = Some(id.0);
+    session.create(&root).await?;
+    app.instance_manager().update_instance(unpair(id)).await?;
+    assert!(disk_config(&root).await?.modpack.is_none());
+    assert_eq!(
+        Session::load(&root).await?.unwrap().operation,
+        session.operation
+    );
+
+    // An update whose pack is installed and recorded, with only the game
+    // left to install.
+    let (id, root) = repairblocked_installed(&app, "unpair-committed", "A").await?;
+    let mut session = repairblocked_pending_change(&app, id, &root, "B").await?;
+    let owner = session.owner()?;
+    session.phase = Phase::Committed;
+    session.save(&root, &owner).await?;
+    app.instance_manager().update_instance(unpair(id)).await?;
+    assert!(disk_config(&root).await?.modpack.is_none());
+    assert!(Session::load(&root).await?.is_some());
+
+    // A record that is not this instance's own.
+    let (id, root) = repairblocked_installed(&app, "unpair-foreign", "A").await?;
+    let mut session = repairblocked_pending_change(&app, id, &root, "B").await?;
+    session.instance_id = Some(id.0 + 100);
+    super::modpack::session::atomic_json(&root.join(".setup/setup-session.json"), &session, false)
+        .await?;
+    app.instance_manager().update_instance(unpair(id)).await?;
+    assert!(disk_config(&root).await?.modpack.is_none());
+    assert!(root.join(".setup/setup-session.json").exists());
+
+    // Nothing pending at all.
+    let (id, root) = repairblocked_installed(&app, "unpair-plain", "A").await?;
+    app.instance_manager().update_instance(unpair(id)).await?;
+    assert!(disk_config(&root).await?.modpack.is_none());
+    Ok(())
+}
+
+/// An instance unpaired before Unpair cancelled the update itself still has
+/// it queued. Starting the game settles it the same way.
+#[tokio::test]
+async fn an_update_left_waiting_on_an_unpaired_instance_is_settled_when_the_game_starts()
+-> anyhow::Result<()> {
+    use super::modpack::UnlinkedSetup;
+    use super::modpack::session::{Phase, Session};
+    let app = crate::setup_managers_for_test().await;
+    let stuck = |name: &'static str| {
+        let app = &app;
+        async move {
+            let (id, root) = repairblocked_installed(app, name, "A").await?;
+            let session = repairblocked_pending_change(app, id, &root, "B").await?;
+            // As the old Unpair left it: the link gone, the update queued.
+            {
+                let manager = app.instance_manager();
+                let mut instances = manager.instances.write().await;
+                let data = instances.get_mut(&id).unwrap().data_mut()?;
+                data.config.modpack = None;
+                tokio::fs::write(
+                    root.join("instance.json"),
+                    schema::make_instance_config(data.config.clone())?,
+                )
+                .await?;
+            }
+            anyhow::Ok((id, root, session))
+        }
+    };
+
+    let (id, root, _) = stuck("stuck-untouched").await?;
+    let (_, current) = app.instance_manager().current_config(id).await?;
+    assert!(current.modpack.is_none());
+    assert_eq!(
+        app.instance_manager()
+            .settle_unlinked_setup(id, &root, &current, false)
+            .await?,
+        UnlinkedSetup::Cancelled
+    );
+    assert!(!root.join(".setup").exists());
+    assert_eq!(
+        app.instance_manager()
+            .settle_unlinked_setup(id, &root, &current, false)
+            .await?,
+        UnlinkedSetup::Nothing
+    );
+
+    // One that replaced files is left for Play to finish.
+    let (id, root, mut session) = stuck("stuck-applying").await?;
+    let owner = session.owner()?;
+    session.phase = Phase::Applying;
+    session.save(&root, &owner).await?;
+    let (_, current) = app.instance_manager().current_config(id).await?;
+    assert!(matches!(
+        app.instance_manager()
+            .settle_unlinked_setup(id, &root, &current, false)
+            .await?,
+        UnlinkedSetup::MustFinish(_)
+    ));
+    assert_eq!(Session::load(&root).await?.unwrap().phase, Phase::Applying);
+    Ok(())
+}
+
+/// The same through Play itself: the game's preparation cancels the update
+/// that waited, says so in its task, and goes on with what is installed.
+#[tokio::test]
+async fn play_cancels_the_update_left_waiting_on_an_unpaired_instance_and_says_so()
+-> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = repairblocked_installed(&app, "stuck-play", "A").await?;
+    repairblocked_pending_change(&app, id, &root, "B").await?;
+    {
+        let manager = app.instance_manager();
+        let mut instances = manager.instances.write().await;
+        let data = instances.get_mut(&id).unwrap().data_mut()?;
+        data.config.modpack = None;
+        tokio::fs::write(
+            root.join("instance.json"),
+            schema::make_instance_config(data.config.clone())?,
+        )
+        .await?;
+    }
+    let staged = app.instance_manager().test_hooks.arm("setup_staged", id);
+    let (_, task) = app
+        .instance_manager()
+        .prepare_game(id, None, None, false)
+        .await?;
+    tokio::time::timeout(Duration::from_secs(30), staged.entered.notified()).await?;
+    assert!(!root.join(".setup").exists());
+    assert_eq!(
+        app.task_manager().running_task_warnings(task).await,
+        Some(vec![
+            crate::domain::vtask::TaskWarning::UnlinkedUpdateCancelled
+        ])
+    );
+    Ok(())
+}

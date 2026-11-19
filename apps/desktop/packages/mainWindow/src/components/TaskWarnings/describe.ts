@@ -173,6 +173,8 @@ function describeWarning(warning: FETaskWarning, t: Translate): string {
     case "PackFilesMissing":
     case "PackUpdateAbandoned":
       return lostFiles(warning.value, t)
+    case "UnlinkedUpdateCancelled":
+      return t("notifications:_trn_unlinked_update_cancelled")
     case "PackFilesKept":
       return t("notifications:_trn_pack_files_kept", {
         count: warning.value.files.length
@@ -219,6 +221,23 @@ export function describeTaskWarnings(
         instance: abandoned.value.instance,
         modpack: abandoned.value.modpack
       }
+    }
+  }
+  // Raised alone, by the start of a game that settled it.
+  const unlinked = entry.warnings.find(
+    (warning) => warning.type === "UnlinkedUpdateCancelled"
+  )
+  if (unlinked) {
+    const instance = nonEmpty(args.name)
+    return {
+      title:
+        instance !== null
+          ? t("notifications:_trn_unlinked_update_cancelled_in_instance", {
+              instance,
+              interpolation: noEscape
+            })
+          : t("notifications:_trn_unlinked_update_cancelled_title"),
+      lines
     }
   }
   const missing = entry.warnings.find(

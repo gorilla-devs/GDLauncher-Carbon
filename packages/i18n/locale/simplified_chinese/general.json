@@ -37,6 +37,7 @@
   "_trn_assigned_java_path": "分配的 Java 路径",
   "_trn_instance_unlock_confirmation": "解锁允许您在此实例上安装额外内容。如果操作不当，可能导致实例无法再启动。此操作无法撤销。",
   "_trn_instance_unpair_confirmation": "取消关联会移除实例和整合包之间的链接。这意味着您将无法再更改整合包版本。此操作无法撤销。",
+  "_trn_instance_unpair_cancels_update": "取消关联也会取消此整合包未完成的更新。",
   "_trn_select_image": "选择图片",
   "_trn_delete": "删除",
   "_trn_edit": "编辑",
