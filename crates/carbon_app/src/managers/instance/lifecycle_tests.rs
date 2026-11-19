@@ -11128,3 +11128,46 @@ async fn a_queued_update_leaves_the_queue_and_stays_pending() -> anyhow::Result<
     drop(permit);
     Ok(())
 }
+
+/// R06-launch#15, at the modpack's own downloads: a file the server refuses
+/// fails the install with the file and the server's answer, not with the
+/// instance's database id.
+#[tokio::test]
+async fn a_refused_pack_file_fails_the_install_with_its_name_and_the_answer() -> anyhow::Result<()>
+{
+    let app = crate::setup_managers_for_test().await;
+    let mut server = mockito::Server::new_async().await;
+    server
+        .mock("GET", "/mods/gone.jar")
+        .with_status(404)
+        .create_async()
+        .await;
+    let (id, _root) = resume_first_install(
+        &app,
+        "refused-pack-file",
+        &server.url(),
+        &[("mods/gone.jar", b"gone")],
+    )
+    .await?;
+    let (shortpath, config) = app.instance_manager().current_config(id).await?;
+    let task = legacy_task();
+    let mut owner = None;
+    let error = run::modpack::process_modpack(
+        app.clone(),
+        id,
+        true,
+        config,
+        shortpath,
+        &task,
+        false,
+        &mut owner,
+    )
+    .await
+    .err()
+    .expect("the pack's file is refused");
+    assert_eq!(
+        error.to_string(),
+        "The modpack's files could not be downloaded: the server answered 404 for gone.jar. Press Play to try again."
+    );
+    Ok(())
+}

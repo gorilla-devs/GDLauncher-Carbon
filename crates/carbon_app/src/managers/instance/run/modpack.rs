@@ -1021,8 +1021,8 @@ async fn prepare_modpack(
                 .build(),
         )
         .await
-        .with_context(|| {
-            format!("Failed to download modpack instance files for instance {instance_id}")
+        .map_err(|error| {
+            super::download_failure::explain("The modpack's files could not be downloaded", error)
         });
         completion.await?;
         download_result?;

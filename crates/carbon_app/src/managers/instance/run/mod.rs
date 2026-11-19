@@ -56,6 +56,7 @@ use tokio::time::Instant;
 use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, info, trace, warn};
 
+mod download_failure;
 mod java;
 mod minecraft;
 pub(super) mod modpack;

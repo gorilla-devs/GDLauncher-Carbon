@@ -219,7 +219,9 @@ pub async fn process_minecraft(
             .build(),
     )
     .await
-    .with_context(|| format!("Failed to verify instance files for instance {instance_id}"));
+    .map_err(|error| {
+        super::download_failure::explain("The game's files could not be checked", error)
+    });
     completion.await?;
     let download_required = download_required?;
 
@@ -257,7 +259,9 @@ pub async fn process_minecraft(
                 .build(),
         )
         .await
-        .with_context(|| format!("Failed to download instance files for instance {instance_id}"));
+        .map_err(|error| {
+            super::download_failure::explain("The game's files could not be downloaded", error)
+        });
         completion.await?;
         download_result?;
     }
