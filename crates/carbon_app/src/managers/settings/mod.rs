@@ -19,6 +19,10 @@ use tracing::{error, info, warn};
 
 pub mod terms_and_privacy;
 
+/// The least the launcher-wide maximum memory (MB) can be: where its slider
+/// starts. A lower value never started a game, as it is below the start amount.
+pub(crate) const MIN_XMX_MB: i32 = 1024;
+
 pub(crate) struct SettingsManager {
     pub runtime_path: carbon_rt_path::RuntimePath,
     pub terms_and_privacy: TermsAndPrivacy,
@@ -134,7 +138,7 @@ impl ManagerRef<'_, SettingsManager> {
         }
 
         if let Some(xmx) = incoming_settings.xmx {
-            patch.xmx = Some(xmx.inner());
+            patch.xmx = Some(xmx.inner().max(MIN_XMX_MB));
         }
 
         if let Some(xms) = incoming_settings.xms {
@@ -1322,5 +1326,30 @@ mod task21_cleanup_tests {
             );
             assert_eq!(task.progress_float().await, 1.0);
         }
+    }
+}
+
+#[cfg(test)]
+mod memory_setting_tests {
+    use super::*;
+
+    async fn saved_xmx(app: &crate::TestEnv, typed: i32) -> i32 {
+        app.settings_manager()
+            .set_settings(serde_json::from_value(serde_json::json!({"xmx":{"Set":typed}})).unwrap())
+            .await
+            .unwrap();
+        app.settings_manager().get_settings().await.unwrap().xmx
+    }
+
+    #[tokio::test]
+    async fn a_maximum_memory_under_the_least_offered_is_saved_as_the_least() {
+        let app = crate::setup_managers_for_test().await;
+        // 8 typed for 8 GB, and a real but too small amount.
+        assert_eq!(saved_xmx(&app, 8).await, MIN_XMX_MB);
+        assert_eq!(saved_xmx(&app, 512).await, MIN_XMX_MB);
+        assert_eq!(saved_xmx(&app, -3).await, MIN_XMX_MB);
+        // What the slider offers is kept as given.
+        assert_eq!(saved_xmx(&app, 1024).await, 1024);
+        assert_eq!(saved_xmx(&app, 6144).await, 6144);
     }
 }

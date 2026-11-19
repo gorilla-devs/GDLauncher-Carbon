@@ -1,6 +1,7 @@
 use super::log::{CappedLogFile, LogProcessor};
 use super::modpack::PackVersionFile;
 use super::{Instance, InstanceId, InstanceManager, InstanceType, InvalidInstanceIdError};
+use crate::managers::settings::MIN_XMX_MB;
 use crate::{
     api::keys::instance::*,
     api::translation::Translation,
@@ -138,14 +139,27 @@ type InstanceCallback = Box<
     dyn FnOnce(&Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
 >;
 
-/// Clamp the stored i32 heap settings (MB) into the u16 the JVM args use, saturating instead of
-/// wrapping: a raw `as u16` cast would turn e.g. 66000 MB into 464 MB and silently hand the JVM
-/// a tiny heap.
-fn clamp_heap_mb(xms: i32, xmx: i32) -> (u16, u16) {
-    (
+/// The start and maximum memory (MB) a game on the launcher-wide setting is
+/// started with, from the stored i32 values. They are clamped into the u16
+/// the JVM args use, saturating instead of wrapping: a raw `as u16` cast would
+/// turn e.g. 66000 MB into 464 MB and silently hand the JVM a tiny heap.
+///
+/// The maximum is at least [`MIN_XMX_MB`], the least the setting offers. Its
+/// box used to take any number, so a stored 8 (typed for 8 GB) or 512 is out
+/// there, and with one no game started: see [`start_within_max`].
+fn global_heap_mb(xms: i32, xmx: i32) -> (u16, u16) {
+    start_within_max((
         xms.clamp(0, u16::MAX as i32) as u16,
-        xmx.clamp(0, u16::MAX as i32) as u16,
-    )
+        xmx.clamp(MIN_XMX_MB, u16::MAX as i32) as u16,
+    ))
+}
+
+/// The pair with its start amount brought down to the maximum when it is
+/// above it. Java refuses to run when told to start with more memory than it
+/// may ever use ("Initial heap size set to a larger value than the maximum
+/// heap size"), and the game then closed the moment it started.
+fn start_within_max((xms, xmx): (u16, u16)) -> (u16, u16) {
+    (xms.min(xmx), xmx)
 }
 
 /// Split a user-configured hook command line into program + arguments. shlex uses POSIX
@@ -174,13 +188,13 @@ impl ManagerRef<'_, InstanceManager> {
         };
 
         match data.config.game_configuration.memory {
-            Some(memory) => Ok(memory),
+            Some(memory) => Ok(start_within_max(memory)),
             None => self
                 .app
                 .settings_manager()
                 .get_settings()
                 .await
-                .map(|c| clamp_heap_mb(c.xms, c.xmx)),
+                .map(|c| global_heap_mb(c.xms, c.xmx)),
         }
     }
 
@@ -318,13 +332,13 @@ impl ManagerRef<'_, InstanceManager> {
             .auto_manage_java_system_profiles;
 
         let (xms_memory, xmx_memory) = match config.game_configuration.memory {
-            Some(memory) => memory,
+            Some(memory) => start_within_max(memory),
             None => self
                 .app
                 .settings_manager()
                 .get_settings()
                 .await
-                .map(|c| clamp_heap_mb(c.xms, c.xmx))?,
+                .map(|c| global_heap_mb(c.xms, c.xmx))?,
         };
 
         let global_java_args = match config.game_configuration.global_java_args {
@@ -3490,5 +3504,95 @@ mod task22_tests {
         assert_eq!(take_adopted_bank(&mut running, Some(stale)), 0);
         assert_eq!(take_adopted_bank(&mut running, Some(record)), 30);
         assert_eq!(take_adopted_bank(&mut running, Some(record)), 0);
+    }
+}
+
+#[cfg(test)]
+mod heap_tests {
+    use super::*;
+
+    #[test]
+    fn a_game_is_never_told_to_start_with_more_memory_than_its_maximum() {
+        // Java refuses the first pair as stored, and the game closed at once.
+        assert_eq!(start_within_max((1024, 512)), (512, 512));
+        assert_eq!(start_within_max((2000, 1000)), (1000, 1000));
+        assert_eq!(start_within_max((1024, 1024)), (1024, 1024));
+        assert_eq!(start_within_max((1024, 4096)), (1024, 4096));
+        assert_eq!(start_within_max((0, 2048)), (0, 2048));
+    }
+
+    #[test]
+    fn a_stored_launcher_wide_maximum_under_the_least_offered_starts_games_with_the_least() {
+        // The start amount is 1024 for everyone: nothing in the interface
+        // changes it. 8 was typed for 8 GB before the box said its unit.
+        assert_eq!(global_heap_mb(1024, 8), (1024, 1024));
+        assert_eq!(global_heap_mb(1024, 512), (1024, 1024));
+        assert_eq!(global_heap_mb(1024, 0), (1024, 1024));
+        assert_eq!(global_heap_mb(1024, -1), (1024, 1024));
+        assert_eq!(global_heap_mb(1024, MIN_XMX_MB), (1024, 1024));
+        // Above it, the pair is what is stored.
+        assert_eq!(global_heap_mb(1024, 4096), (1024, 4096));
+        assert_eq!(global_heap_mb(512, 4096), (512, 4096));
+        // A start amount stored above the maximum comes down to it.
+        assert_eq!(global_heap_mb(8192, 4096), (4096, 4096));
+        // Saturating, not wrapping, at what the JVM args hold.
+        assert_eq!(global_heap_mb(1024, 66_000), (1024, u16::MAX));
+        assert_eq!(global_heap_mb(-5, 2048), (0, 2048));
+    }
+
+    #[tokio::test]
+    async fn an_instance_gets_usable_memory_from_a_setting_that_never_started_a_game() {
+        let app = crate::setup_managers_for_test().await;
+        let (instance_id, _, _) = crate::managers::instance::mods::tests::addon_fixture(
+            &app,
+            "memory",
+            crate::domain::instance::AddonType::Mods,
+            "a.jar",
+            b"a",
+        )
+        .await;
+        // As saved by a launcher from before the box had a minimum.
+        app.db
+            .write(|conn| {
+                let patch = carbon_repos::repos::app_configuration::AppConfigurationPatch {
+                    xmx: Some(8),
+                    ..Default::default()
+                };
+                Ok(patch.build().map(|q| q.execute(&conn)).transpose()?)
+            })
+            .await
+            .unwrap();
+        assert_eq!(app.settings_manager().get_settings().await.unwrap().xmx, 8);
+        assert_eq!(
+            app.instance_manager()
+                .get_effective_memory(instance_id)
+                .await
+                .unwrap(),
+            (1024, 1024)
+        );
+
+        // Memory of its own is used as set, but for a start above the maximum.
+        let set = |memory| {
+            let app = &app;
+            async move {
+                app.instance_manager()
+                    .instances
+                    .write()
+                    .await
+                    .get_mut(&instance_id)
+                    .unwrap()
+                    .data_mut()
+                    .unwrap()
+                    .config
+                    .game_configuration
+                    .memory = Some(memory);
+                app.instance_manager()
+                    .get_effective_memory(instance_id)
+                    .await
+                    .unwrap()
+            }
+        };
+        assert_eq!(set((1000, 1000)).await, (1000, 1000));
+        assert_eq!(set((2000, 1000)).await, (1000, 1000));
     }
 }

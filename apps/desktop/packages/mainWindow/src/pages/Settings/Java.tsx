@@ -35,6 +35,7 @@ import Title from "./components/Title"
 import RowsContainer from "./components/RowsContainer"
 import RightHandSide from "./components/RightHandSide"
 import { generateSequence } from "@/utils/helpers"
+import { MIN_MEMORY_MB, shownMemoryMb, typedMemoryMb } from "./javaMemory"
 import Center from "./components/Center"
 import TruncatedPath from "@/components/TruncatePath"
 
@@ -167,11 +168,11 @@ const Java = () => {
           </Title>
           <Center>
             <Slider
-              min={1024}
+              min={MIN_MEMORY_MB}
               max={mbTotalRAM()}
               steps={1024}
               marks={generateSequence(1024, mbTotalRAM())}
-              value={settings.data?.xmx}
+              value={shownMemoryMb(settings.data?.xmx)}
               tooltipFormat={(val) =>
                 val >= 1024
                   ? `${(val / 1024).toFixed(1).replace(/\.0$/, "")} GB`
@@ -186,12 +187,21 @@ const Java = () => {
               }}
             />
             <Input
-              class="w-26"
-              value={settings.data?.xmx}
+              class="w-30"
+              data-testid="java-memory-box"
+              inputMode="numeric"
+              value={shownMemoryMb(settings.data?.xmx)}
+              icon={<span class="text-lightSlate-600 text-xs">MB</span>}
               onChange={(e) => {
+                const typed = typedMemoryMb(e.currentTarget.value)
+                const shown = shownMemoryMb(settings.data?.xmx)
+                // The box shows what is in force at once: the minimum for a
+                // lower number, and what it held for anything else.
+                e.currentTarget.value = String(typed ?? shown ?? "")
+                if (typed === null || typed === settings.data?.xmx) return
                 settingsMutation.mutate({
                   xmx: {
-                    Set: parseInt(e.currentTarget.value, 10)
+                    Set: typed
                   }
                 })
               }}
