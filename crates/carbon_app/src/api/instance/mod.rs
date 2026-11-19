@@ -176,6 +176,34 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(())
         }
 
+        // The pre-launch and post-exit hooks that are running, and those
+        // that ended and have not been shown yet.
+        query GET_HOOK_RUNS[app, args: ()] {
+            Ok(app.instance_manager().hook_runs.all().into_iter()
+                .map(FEHookRun::from)
+                .collect::<Vec<_>>())
+        }
+
+        mutation ACKNOWLEDGE_HOOK_RUN[app, id: u32] {
+            app.instance_manager().hook_runs.acknowledge(id);
+            Ok(())
+        }
+
+        // Runs a hook's command now, in the instance's game folder, to try
+        // it while writing it. Answers when it has ended or was stopped.
+        mutation TEST_HOOK[app, args: FETestHook] {
+            app.instance_manager()
+                .test_hook(args.instance.into(), args.kind.into(), args.command)
+                .await
+                .map(FEHookTest::from)
+        }
+
+        mutation STOP_HOOK_TEST[app, args: FEHookRef] {
+            app.instance_manager()
+                .stop_hook_test(args.instance.into(), args.kind.into());
+            Ok(())
+        }
+
         // Takes a queued Play, install, update or repair out of the queue.
         mutation LEAVE_QUEUE[app, id: FEInstanceId] {
             app.instance_manager().leave_queue(id.into())
@@ -3240,6 +3268,123 @@ impl From<RegenerateShareCodeResponse> for FERegenerateShareCodeResponse {
 pub struct CancelPendingSetup {
     pub instance: FEInstanceId,
     pub expected_operation: String,
+}
+
+#[derive(specta::Type, serde::Serialize, serde::Deserialize, Debug, Clone, Copy)]
+pub enum FEHookKind {
+    PreLaunch,
+    PostExit,
+}
+
+impl From<FEHookKind> for crate::managers::instance::run::hook::HookKind {
+    fn from(kind: FEHookKind) -> Self {
+        match kind {
+            FEHookKind::PreLaunch => Self::PreLaunch,
+            FEHookKind::PostExit => Self::PostExit,
+        }
+    }
+}
+
+/// One run of a hook around a game, from its start until the app has shown
+/// how it ended.
+#[derive(specta::Type, serde::Serialize, Debug)]
+pub struct FEHookRun {
+    pub id: u32,
+    pub instance: FEInstanceId,
+    /// The instance's name when the hook started.
+    pub name: String,
+    pub kind: FEHookKind,
+    pub state: FEHookRunState,
+}
+
+#[derive(specta::Type, serde::Serialize, Debug)]
+#[serde(tag = "type", content = "value")]
+pub enum FEHookRunState {
+    Running,
+    Finished,
+    /// `summary` is one line on why: the last thing the script printed, or
+    /// what kept it from running.
+    Failed {
+        summary: String,
+    },
+}
+
+impl From<crate::managers::instance::run::hook::HookRun> for FEHookRun {
+    fn from(run: crate::managers::instance::run::hook::HookRun) -> Self {
+        use crate::managers::instance::run::hook::{HookKind, HookRunState};
+        Self {
+            id: run.id,
+            instance: run.instance_id.into(),
+            name: run.name,
+            kind: match run.kind {
+                HookKind::PreLaunch => FEHookKind::PreLaunch,
+                HookKind::PostExit => FEHookKind::PostExit,
+            },
+            state: match run.state {
+                HookRunState::Running => FEHookRunState::Running,
+                HookRunState::Finished => FEHookRunState::Finished,
+                HookRunState::Failed { summary } => FEHookRunState::Failed { summary },
+            },
+        }
+    }
+}
+
+#[derive(specta::Type, serde::Deserialize, Debug)]
+pub struct FEHookRef {
+    pub instance: FEInstanceId,
+    pub kind: FEHookKind,
+}
+
+/// A hook's command to run now. It need not be the one that is saved.
+#[derive(specta::Type, serde::Deserialize, Debug)]
+pub struct FETestHook {
+    pub instance: FEInstanceId,
+    pub kind: FEHookKind,
+    pub command: String,
+}
+
+/// What a test of a hook did; `stdout` and `stderr` are the end of what it
+/// printed.
+#[derive(specta::Type, serde::Serialize, Debug)]
+pub struct FEHookTest {
+    pub outcome: FEHookTestOutcome,
+    pub millis: u32,
+    pub stdout: String,
+    pub stderr: String,
+}
+
+#[derive(specta::Type, serde::Serialize, Debug)]
+#[serde(tag = "type", content = "value")]
+pub enum FEHookTestOutcome {
+    Finished,
+    /// It ended with an error, with this exit code when it has one.
+    Failed {
+        code: Option<i32>,
+    },
+    /// It never ran; `summary` says why.
+    NotRun {
+        summary: String,
+    },
+    TimedOut,
+    Stopped,
+}
+
+impl From<crate::managers::instance::run::hook::HookTest> for FEHookTest {
+    fn from(test: crate::managers::instance::run::hook::HookTest) -> Self {
+        use crate::managers::instance::run::hook::HookTestOutcome;
+        Self {
+            outcome: match test.outcome {
+                HookTestOutcome::Finished => FEHookTestOutcome::Finished,
+                HookTestOutcome::Failed { code } => FEHookTestOutcome::Failed { code },
+                HookTestOutcome::NotRun { summary } => FEHookTestOutcome::NotRun { summary },
+                HookTestOutcome::TimedOut => FEHookTestOutcome::TimedOut,
+                HookTestOutcome::Stopped => FEHookTestOutcome::Stopped,
+            },
+            millis: test.millis.min(u32::MAX as u64) as u32,
+            stdout: test.stdout,
+            stderr: test.stderr,
+        }
+    }
 }
 
 /// A game that crashed or did not start, told once.

@@ -6,6 +6,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import AddonFailures from "./AddonFailures"
 import TaskWarnings from "./TaskWarnings"
 import GameCrashes from "./GameCrashes"
+import HookRuns from "./HookRuns"
 import RestoredServers from "./RestoredServers"
 import { AccountsDropdown } from "./AccountsDropdown"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
@@ -114,6 +115,7 @@ const AppNavbar = () => {
           <AddonFailures />
           <TaskWarnings />
           <GameCrashes />
+          <HookRuns />
           <RestoredServers />
           <Show when={hasPendingUpdate()}>
             <div

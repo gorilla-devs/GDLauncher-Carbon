@@ -372,6 +372,8 @@ impl ManagerRef<'_, InstanceManager> {
             }
         };
 
+        // For telling the player which instance a hook runs for.
+        let instance_name = config.name.clone();
         let pre_launch_hook = match config.pre_launch_hook.as_ref() {
             Some(hook) => Some(hook.clone()),
             None => {
@@ -934,14 +936,17 @@ impl ManagerRef<'_, InstanceManager> {
                                 if let Some(pre_launch_hook) =
                                     pre_launch_hook.filter(|v| !v.is_empty())
                                 {
-                                    let printed = hook::run(
-                                        &app,
-                                        hook::HookKind::PreLaunch,
-                                        &pre_launch_hook,
-                                        &instance_path.get_data_path(),
-                                        HOOK_TIMEOUT,
-                                    )
-                                    .await?;
+                                    let printed = app
+                                        .instance_manager()
+                                        .run_hook_told(
+                                            instance_id,
+                                            instance_name.clone(),
+                                            hook::HookKind::PreLaunch,
+                                            &pre_launch_hook,
+                                            &instance_path.get_data_path(),
+                                            HOOK_TIMEOUT,
+                                        )
+                                        .await?;
                                     tracing::info!(
                                         "Pre-launch hook completed successfully {printed}"
                                     );
@@ -1412,6 +1417,8 @@ impl ManagerRef<'_, InstanceManager> {
                             {
                                 app.instance_manager()
                                     .run_post_exit_hook(
+                                        instance_id,
+                                        instance_name,
                                         &post_exit_hook,
                                         &instance_path.get_data_path(),
                                     )
@@ -1713,17 +1720,26 @@ impl ManagerRef<'_, InstanceManager> {
         })
     }
 
-    /// Runs a post-exit hook in the instance's game folder. A hook that
-    /// fails is the player's script failing, not the game: it is logged.
-    async fn run_post_exit_hook(self, command: &str, folder: &Path) {
-        match hook::run(
-            self.app,
-            hook::HookKind::PostExit,
-            command,
-            folder,
-            HOOK_TIMEOUT,
-        )
-        .await
+    /// Runs a post-exit hook in the instance's game folder and tells the
+    /// player of it. A hook that fails is the player's script failing, not
+    /// the game: it is told and logged, nothing more.
+    async fn run_post_exit_hook(
+        self,
+        instance_id: InstanceId,
+        name: String,
+        command: &str,
+        folder: &Path,
+    ) {
+        match self
+            .run_hook_told(
+                instance_id,
+                name,
+                hook::HookKind::PostExit,
+                command,
+                folder,
+                HOOK_TIMEOUT,
+            )
+            .await
         {
             Ok(printed) => tracing::info!("Post-exit hook completed successfully {printed}"),
             Err(error) => match error.failure {
@@ -1769,7 +1785,7 @@ impl ManagerRef<'_, InstanceManager> {
         let app = self.app.clone();
         tokio::spawn(async move {
             app.instance_manager()
-                .run_post_exit_hook(&command, &folder)
+                .run_post_exit_hook(instance_id, config.name, &command, &folder)
                 .await;
         });
     }

@@ -28,6 +28,7 @@ export type Procedures = {
         { key: "instance.getModSources", input: FEInstanceId, result: ModSources } | 
         { key: "instance.getModpackInfo", input: FEInstanceId | null, result: FEInstanceModpackInfo | null } | 
         { key: "instance.getGameCrashes", input: never, result: FEGameCrash[] } | 
+        { key: "instance.getHookRuns", input: never, result: FEHookRun[] } | 
         { key: "instance.getInstallTurn", input: never, result: InstallTurnHolder | null } | 
         { key: "instance.getPendingSetup", input: FEInstanceId, result: PendingSetupStatus } | 
         { key: "instance.getRepairPreview", input: RepairPreviewArgs, result: FERepairPreview } | 
@@ -135,9 +136,12 @@ export type Procedures = {
         { key: "instance.cancelImportScan", input: never, result: null } | 
         { key: "instance.cancelModpackChangeCheck", input: FEInstanceId, result: null } | 
         { key: "instance.acknowledgeGameCrash", input: number, result: null } | 
+        { key: "instance.acknowledgeHookRun", input: number, result: null } | 
         { key: "instance.cancelPendingSetup", input: CancelPendingSetup, result: null } | 
         { key: "instance.keptFileLocation", input: KeptPackFile, result: string } | 
         { key: "instance.leaveQueue", input: FEInstanceId, result: null } | 
+        { key: "instance.stopHookTest", input: FEHookRef, result: null } | 
+        { key: "instance.testHook", input: FETestHook, result: FEHookTest } | 
         { key: "instance.usePackVersions", input: KeptPackFiles, result: KeptPackFileResult[] } | 
         { key: "instance.changeModpack", input: ChangeModpack, result: FETaskId } | 
         { key: "instance.checkPackOrigin", input: FEInstanceId, result: FETaskId } | 
@@ -596,6 +600,31 @@ export type ExportEntry = { entries: { [key: string]: ExportEntry | null } }
 export type CFFEModStatus = "new" | "changesRequired" | "underSoftReview" | "approved" | "rejected" | "changesMade" | "inactive" | "abandoned" | "deleted" | "underReview"
 
 export type CancelPendingSetup = { instance: FEInstanceId; expected_operation: string }
+
+export type FEHookKind = "PreLaunch" | "PostExit"
+
+/**
+ * One run of a hook around a game, from its start until the app has shown
+ * how it ended.
+ */
+export type FEHookRun = { id: number; instance: FEInstanceId; name: string; kind: FEHookKind; state: FEHookRunState }
+
+export type FEHookRunState = { type: "Running" } | { type: "Finished" } | { type: "Failed"; value: { summary: string } }
+
+export type FEHookRef = { instance: FEInstanceId; kind: FEHookKind }
+
+/**
+ * A hook's command to run now. It need not be the one that is saved.
+ */
+export type FETestHook = { instance: FEInstanceId; kind: FEHookKind; command: string }
+
+/**
+ * What a test of a hook did; `stdout` and `stderr` are the end of what it
+ * printed.
+ */
+export type FEHookTest = { outcome: FEHookTestOutcome; millis: number; stdout: string; stderr: string }
+
+export type FEHookTestOutcome = { type: "Finished" } | { type: "Failed"; value: { code: number | null } } | { type: "NotRun"; value: { summary: string } } | { type: "TimedOut" } | { type: "Stopped" }
 
 /**
  * A game that crashed or did not start, told once.

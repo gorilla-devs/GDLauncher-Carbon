@@ -109,6 +109,10 @@ keys! {
         USE_PACK_VERSIONS                          = "usePackVersions";
         INSTALL_TURN                               = "getInstallTurn";
         GET_GAME_CRASHES                           = "getGameCrashes";
+        GET_HOOK_RUNS                              = "getHookRuns";
+        ACKNOWLEDGE_HOOK_RUN                       = "acknowledgeHookRun";
+        TEST_HOOK                                  = "testHook";
+        STOP_HOOK_TEST                             = "stopHookTest";
         ACKNOWLEDGE_GAME_CRASH                     = "acknowledgeGameCrash";
         LEAVE_QUEUE                                = "leaveQueue";
         KEPT_FILE_LOCATION                         = "keptFileLocation";

@@ -79,6 +79,9 @@ pub struct InstanceManager {
     running_publication: running_publication::RunningPublication,
     /// Crashed games the app has not shown yet (see `run::game_crash`).
     pub(crate) game_crashes: run::game_crash::GameCrashes,
+    /// Hook runs the app has not finished telling (see `run::hook`).
+    pub(crate) hook_runs: run::hook::HookRuns,
+    hook_tests: run::hook::HookTests,
     addon_retry_receipts: addon_retry::Receipts,
     /// Addon install graphs running on each instance (see
     /// `installer::LiveGraphs`).
@@ -302,6 +305,8 @@ impl InstanceManager {
             origin_checks: RwLock::new(HashMap::new()),
             running_publication: running_publication::RunningPublication::default(),
             game_crashes: Default::default(),
+            hook_runs: Default::default(),
+            hook_tests: Default::default(),
             addon_retry_receipts: Default::default(),
             addon_graphs: Default::default(),
         }

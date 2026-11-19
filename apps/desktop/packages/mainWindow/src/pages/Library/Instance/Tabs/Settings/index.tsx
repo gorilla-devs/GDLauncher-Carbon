@@ -15,7 +15,14 @@ import {
 } from "@gd/ui"
 import { useParams } from "@solidjs/router"
 import useInstanceData from "../../instance.data"
-import { Match, Show, createMemo, Switch as SolidSwitch } from "solid-js"
+import {
+  Match,
+  Show,
+  createMemo,
+  createSignal,
+  Switch as SolidSwitch
+} from "solid-js"
+import HookTest from "@/components/HookTest"
 import { InstanceDetails } from "@gd/core_module/bindings"
 import Title from "@/pages/Settings/components/Title"
 import Row from "@/pages/Settings/components/Row"
@@ -30,6 +37,10 @@ const Settings = () => {
   const modalsContext = useModal()
   const searchContext = useSearchContext()
   const params = useParams<{ id: string }>()
+  // What each hook's box holds while it is being written, which Test runs;
+  // the saved command until the box is typed in.
+  const [preLaunchDraft, setPreLaunchDraft] = createSignal<string>()
+  const [postExitDraft, setPostExitDraft] = createSignal<string>()
   const updateInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.updateInstance"],
     onMutate: async (variables) => {
@@ -795,17 +806,28 @@ const Settings = () => {
           typeof routeData?.instanceDetails?.data?.preLaunchHook === "string"
         }
       >
-        <Input
-          value={routeData?.instanceDetails?.data?.preLaunchHook || ""}
-          onChange={(e) => {
-            updateInstanceMutation.mutate({
-              preLaunchHook: {
-                Set: e.currentTarget.value.trim()
-              },
-              instance: parseInt(params.id, 10)
-            })
-          }}
-        />
+        <HookTest
+          instance={() => parseInt(params.id, 10)}
+          kind="PreLaunch"
+          command={() =>
+            preLaunchDraft() ??
+            routeData?.instanceDetails?.data?.preLaunchHook ??
+            ""
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.preLaunchHook || ""}
+            onInput={(e) => setPreLaunchDraft(e.currentTarget.value)}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                preLaunchHook: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              })
+            }}
+          />
+        </HookTest>
       </Show>
       <Row>
         <Title description={<Trans key="settings:_trn_post_exit_hook_text" />}>
@@ -832,17 +854,28 @@ const Settings = () => {
           typeof routeData?.instanceDetails?.data?.postExitHook === "string"
         }
       >
-        <Input
-          value={routeData?.instanceDetails?.data?.postExitHook || ""}
-          onChange={(e) => {
-            updateInstanceMutation.mutate({
-              postExitHook: {
-                Set: e.currentTarget.value.trim()
-              },
-              instance: parseInt(params.id, 10)
-            })
-          }}
-        />
+        <HookTest
+          instance={() => parseInt(params.id, 10)}
+          kind="PostExit"
+          command={() =>
+            postExitDraft() ??
+            routeData?.instanceDetails?.data?.postExitHook ??
+            ""
+          }
+        >
+          <Input
+            value={routeData?.instanceDetails?.data?.postExitHook || ""}
+            onInput={(e) => setPostExitDraft(e.currentTarget.value)}
+            onChange={(e) => {
+              updateInstanceMutation.mutate({
+                postExitHook: {
+                  Set: e.currentTarget.value.trim()
+                },
+                instance: parseInt(params.id, 10)
+              })
+            }}
+          />
+        </HookTest>
       </Show>
       <Row>
         <Title description={<Trans key="settings:_trn_wrapper_command_text" />}>
