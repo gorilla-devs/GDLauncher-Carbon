@@ -206,6 +206,7 @@
   "_trn_isInQueue": "В очереди",
   "_trn_queue_after": "после {{name}}",
   "_trn_leave_queue": "Выйти из очереди",
+  "_trn_hold_to_stop": "Удерживайте, чтобы остановить",
   "_trn_isDeleting": "Удаление...",
   "_trn_instance_mc_version": "Версия Minecraft",
   "_trn_include_snapshot_versions": "Включать снимки разработки (snapshots)",

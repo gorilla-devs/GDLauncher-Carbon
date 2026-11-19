@@ -1,6 +1,11 @@
 export * from "./task32.fixture"
 import { Button as ActualButton } from "../../../../../packages/ui/src/Button"
 export { Checkbox } from "../../../../../packages/ui/src/Checkbox"
+export {
+  createHoldToConfirm,
+  HoldFill,
+  HoldRing
+} from "../../../../../packages/ui/src/HoldToConfirm"
 export const Button = (p: any) => (
   <ActualButton
     {...p}

@@ -8,6 +8,14 @@ export * from "./Tooltip"
 export { Toaster, toast } from "./Sonner"
 
 export { Button } from "./Button"
+export {
+  createHoldToConfirm,
+  HoldFill,
+  HoldRing,
+  HOLD_TO_CONFIRM_MS,
+  type HoldToConfirm,
+  type HoldToConfirmOptions
+} from "./HoldToConfirm"
 export { Input } from "./Input"
 export { Slider } from "./Slider"
 export { Switch } from "./Switch"

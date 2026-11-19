@@ -204,7 +204,10 @@ test.describe("game launch", () => {
               // A later GAME_CLOSED means clicking it would start another game.
               if (before > closedBeforeLaunch) return
               const tile = current.page.locator(byInstanceName(INSTANCE_NAME))
-              await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+              // Stop acts only when held (1.2 s); a click just shows the hint.
+              await tile
+                .locator(byTestId(TEST_IDS.instancePlay))
+                .click({ delay: 1500 })
               await expect
                 .poll(() => closedCount(), {
                   timeout: STOP_TIMEOUT,

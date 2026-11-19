@@ -206,6 +206,7 @@
   "_trn_isInQueue": "In coda",
   "_trn_queue_after": "dopo {{name}}",
   "_trn_leave_queue": "Esci dalla coda",
+  "_trn_hold_to_stop": "Tieni premuto per fermare",
   "_trn_isDeleting": "Eliminazione...",
   "_trn_instance_mc_version": "Versione Minecraft",
   "_trn_include_snapshot_versions": "Includi versioni snapshot",

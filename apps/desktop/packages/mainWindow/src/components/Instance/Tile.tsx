@@ -440,6 +440,7 @@ const Tile = (props: Props) => {
           shouldSetViewTransition={props.shouldSetViewTransition}
           viewTransitionPrefix="instance-tile"
           onPlay={() => handlePlay()}
+          holdToStopHint={t("instances:_trn_hold_to_stop")}
           isMenuOpen={isMenuOpen()}
           glowExtraClass={props.isNew ? "instance-tile-new" : undefined}
           playButtonContent={

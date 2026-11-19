@@ -6,7 +6,9 @@ import { FESubtask } from "@gd/core_module/bindings"
 import { taskTranslationOptions } from "@/utils/taskTranslation"
 import {
   Checkbox,
+  HoldFill,
   Spinner,
+  createHoldToConfirm,
   Tooltip,
   TooltipContent,
   TooltipTrigger,
@@ -69,8 +71,13 @@ export interface BaseTileProps {
   viewTransitionPrefix: string // "instance-tile" or "server-tile"
 
   // Play button
-  onPlay?: (e: MouseEvent) => void
+  onPlay?: (e?: MouseEvent) => void
   playButtonContent: JSX.Element
+  /**
+   * When set, the Stop of a running tile must be held to act (see
+   * `createHoldToConfirm`); a click only shows this hint in its place.
+   */
+  holdToStopHint?: string
 
   // Glow border extra class (e.g., "instance-tile-new")
   glowExtraClass?: string
@@ -100,6 +107,13 @@ const BaseTile = (props: BaseTileProps) => {
   const isMenuOpen = () => props.isMenuOpen ?? false
 
   const isLoadingOrWaiting = () => props.isLoading || props.isWaiting
+
+  // Stop ends what is running at once, so it is held, not clicked.
+  const stopIsHeld = () => props.isRunning && !!props.holdToStopHint
+  const stopHold = createHoldToConfirm({
+    onConfirm: () => props.onPlay?.(),
+    disabled: () => !stopIsHeld()
+  })
 
   // Progress bar computation
   const computedProgressWidth = () => {
@@ -451,7 +465,10 @@ const BaseTile = (props: BaseTileProps) => {
                 }
               >
                 <div
-                  class="z-5 absolute right-3 top-3 h-10 items-center justify-center gap-2 rounded-xl px-4 transition-all duration-200 ease-spring translate-x-3 opacity-0"
+                  class="z-5 absolute right-3 top-3 h-10 items-center justify-center gap-2 overflow-hidden rounded-xl px-4 transition-all duration-200 ease-spring translate-x-3 opacity-0"
+                  role={stopIsHeld() ? "button" : undefined}
+                  tabIndex={stopIsHeld() ? 0 : undefined}
+                  data-testid="tile-play-control"
                   classList={{
                     "flex bg-primary-500 hover:bg-primary-400":
                       !props.isRunning && !props.isBusy,
@@ -475,10 +492,36 @@ const BaseTile = (props: BaseTileProps) => {
                   }
                   onClick={(e) => {
                     e.stopPropagation()
-                    props.onPlay?.(e)
+                    if (!stopIsHeld()) props.onPlay?.(e)
                   }}
+                  onPointerDown={(e) => {
+                    if (stopIsHeld()) stopHold.handlers.onPointerDown(e)
+                  }}
+                  onPointerUp={stopHold.handlers.onPointerUp}
+                  onPointerCancel={stopHold.handlers.onPointerCancel}
+                  onKeyDown={(e) => {
+                    if (stopIsHeld()) stopHold.handlers.onKeyDown(e)
+                  }}
+                  onKeyUp={stopHold.handlers.onKeyUp}
+                  onBlur={stopHold.handlers.onBlur}
                 >
-                  {props.playButtonContent}
+                  <Show when={stopIsHeld()}>
+                    <HoldFill hold={stopHold} />
+                  </Show>
+                  <Show
+                    when={
+                      stopIsHeld() && stopHold.hinted() && !stopHold.holding()
+                    }
+                    fallback={
+                      <div class="relative flex items-center gap-2">
+                        {props.playButtonContent}
+                      </div>
+                    }
+                  >
+                    <span class="text-lightSlate-50 relative whitespace-nowrap text-sm font-semibold">
+                      {props.holdToStopHint}
+                    </span>
+                  </Show>
                 </div>
               </Show>
 

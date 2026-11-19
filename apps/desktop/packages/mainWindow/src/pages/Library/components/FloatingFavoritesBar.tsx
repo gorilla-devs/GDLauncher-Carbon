@@ -22,7 +22,9 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
+  HoldRing,
   Spinner,
+  createHoldToConfirm,
   Tooltip,
   TooltipContent,
   TooltipTrigger
@@ -585,6 +587,14 @@ function DockAvatar(props: DockAvatarProps) {
     })
   }
 
+  // Stop closes a running game at once, so it is held, not clicked. A
+  // server's Stop asks the server to shut down, and stays a click.
+  const stopIsHeld = () => !isServerMode() && isRunning()
+  const stopHold = createHoldToConfirm({
+    onConfirm: () => handlePlay(),
+    disabled: () => !stopIsHeld()
+  })
+
   const handleDelete = () => {
     modalsContext?.openModal(
       {
@@ -931,8 +941,22 @@ function DockAvatar(props: DockAvatarProps) {
                         !isServerRecoveredRunning() &&
                         !isServerRecoveredUnverified()
                     }}
-                    onClick={(e) => handlePlay(e)}
+                    onClick={(e) => {
+                      if (stopIsHeld()) {
+                        e.stopPropagation()
+                        return
+                      }
+                      handlePlay(e)
+                    }}
+                    onPointerDown={(e) => {
+                      if (stopIsHeld()) stopHold.handlers.onPointerDown(e)
+                    }}
+                    onPointerUp={stopHold.handlers.onPointerUp}
+                    onPointerCancel={stopHold.handlers.onPointerCancel}
                   >
+                    <Show when={stopIsHeld()}>
+                      <HoldRing hold={stopHold} />
+                    </Show>
                     <div
                       class="text-white h-5 w-5"
                       classList={{
@@ -952,6 +976,11 @@ function DockAvatar(props: DockAvatarProps) {
                 <div class="text-sm font-bold text-white truncate max-w-48">
                   {itemName()}
                 </div>
+                <Show when={stopHold.hinted()}>
+                  <div class="mt-1 text-xs font-semibold text-red-400">
+                    {t("instances:_trn_hold_to_stop")}
+                  </div>
+                </Show>
                 <Show
                   when={!isServerMode()}
                   fallback={

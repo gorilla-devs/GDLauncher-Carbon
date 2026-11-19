@@ -267,6 +267,12 @@ const Instance = (props: { children?: any }) => {
 
   const queue = useInstallQueue(instanceId, () => isQueued() !== undefined)
 
+  // Stop closes the game at once, so it is held, not clicked.
+  const stopHold = () =>
+    isRunning()
+      ? { onConfirm: handlePlay, hint: t("instances:_trn_hold_to_stop") }
+      : undefined
+
   const curseforgeProjectId = () => {
     const modpack = routeData.instanceDetails.data?.modpack
     if (modpack?.modpack.type === "curseforge") {
@@ -625,6 +631,7 @@ const Instance = (props: { children?: any }) => {
                 "view-transition-name": `instance-tile-play-button`,
                 contain: "layout"
               }}
+              holdToConfirm={stopHold()}
               onClick={handlePlay}
             >
               <Switch>
@@ -776,6 +783,7 @@ const Instance = (props: { children?: any }) => {
                   size="small"
                   variant={isRunning() && "red"}
                   loading={isPreparing() !== undefined}
+                  holdToConfirm={stopHold()}
                   onClick={handlePlay}
                 >
                   <Switch>

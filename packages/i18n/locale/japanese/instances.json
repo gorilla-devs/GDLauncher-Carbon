@@ -206,6 +206,7 @@
   "_trn_isInQueue": "待機中",
   "_trn_queue_after": "{{name}} の後",
   "_trn_leave_queue": "順番待ちをやめる",
+  "_trn_hold_to_stop": "長押しで停止",
   "_trn_isDeleting": "削除中...",
   "_trn_instance_mc_version": "Minecraftバージョン",
   "_trn_include_snapshot_versions": "スナップショット版を含める",

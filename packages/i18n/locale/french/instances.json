@@ -206,6 +206,7 @@
   "_trn_isInQueue": "Dans la file d'attente",
   "_trn_queue_after": "après {{name}}",
   "_trn_leave_queue": "Quitter la file",
+  "_trn_hold_to_stop": "Maintenir pour arrêter",
   "_trn_isDeleting": "Suppression...",
   "_trn_instance_mc_version": "Version de Minecraft",
   "_trn_include_snapshot_versions": "Inclure les versions snapshot",

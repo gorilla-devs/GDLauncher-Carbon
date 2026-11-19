@@ -1,3 +1,9 @@
+// The hold-to-confirm primitive is logic, not markup: tests get the real one.
+export {
+  createHoldToConfirm,
+  HoldFill,
+  HoldRing
+} from "../../../../../../../packages/ui/src/HoldToConfirm"
 import { createContext, useContext, Show } from "solid-js"
 
 export const Wrapper = (props: any) => <div>{props.children}</div>

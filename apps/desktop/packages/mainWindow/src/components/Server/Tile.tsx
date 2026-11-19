@@ -186,8 +186,8 @@ const ServerTile = (props: Props) => {
     })
   }
 
-  const handlePlayStop = (e: MouseEvent) => {
-    e.stopPropagation()
+  const handlePlayStop = (e?: MouseEvent) => {
+    e?.stopPropagation()
     if (isBusy() || isDeleting() || isInstalling()) return
     if (recoveredAction()) {
       recovered.run(props.server)

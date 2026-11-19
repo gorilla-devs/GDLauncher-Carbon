@@ -10,6 +10,17 @@ import {
 import { Spinner } from "../Spinner"
 import { Dynamic } from "solid-js/web"
 import { getPressEffectClasses } from "../Clickable"
+import { createHoldToConfirm, HoldFill } from "../HoldToConfirm"
+
+/** Makes a button act only once it has been held (see `createHoldToConfirm`). */
+export interface ButtonHold {
+  /** Runs once the button has been held; `onClick` does not run. */
+  onConfirm: () => void
+  /** Shown in place of the label for a moment after a click, e.g. "Hold to stop". */
+  hint?: string
+  /** Milliseconds to hold; the shared default when left out. */
+  duration?: number
+}
 
 type Size = "small" | "medium" | "large"
 type Type = "primary" | "secondary" | "glow" | "transparent" | "glass" | "text"
@@ -35,6 +46,8 @@ interface Props extends Omit<
   variant?: string
   cursor?: string
   fullWidth?: boolean
+  /** When set, the button must be held to act, and a click only hints so. */
+  holdToConfirm?: ButtonHold
 }
 
 const getVariant = (
@@ -218,8 +231,36 @@ function Button(props: Props) {
     "loading",
     "size",
     "children",
-    "disabled"
+    "disabled",
+    "holdToConfirm",
+    "onClick",
+    "onPointerDown",
+    "onPointerUp",
+    "onPointerCancel",
+    "onKeyDown",
+    "onKeyUp",
+    "onBlur"
   ])
+
+  const hold = createHoldToConfirm({
+    onConfirm: () => local.holdToConfirm?.onConfirm(),
+    duration: () => local.holdToConfirm?.duration,
+    disabled: () => !local.holdToConfirm || !!local.disabled || !!local.loading
+  })
+  // The button's own handler for an event, or the hold's while it must be
+  // held. A handler given as a [function, data] pair is called as Solid
+  // calls it.
+  const handle =
+    <E extends Event>(own: unknown, held: (event: E) => void) =>
+    (event: Event) => {
+      if (local.holdToConfirm) {
+        held(event as E)
+      } else if (typeof own === "function") {
+        own(event)
+      } else if (Array.isArray(own)) {
+        own[0](own[1], event)
+      }
+    }
 
   const mergedProps = mergeProps(
     {
@@ -243,6 +284,16 @@ function Button(props: Props) {
       // re-fires its click handler on Enter/Space while a mutation is in
       // flight, letting keyboard users double-submit.
       disabled={local.loading || local.disabled}
+      onClick={handle(local.onClick, hold.handlers.onClick)}
+      onPointerDown={handle(local.onPointerDown, hold.handlers.onPointerDown)}
+      onPointerUp={handle(local.onPointerUp, hold.handlers.onPointerUp)}
+      onPointerCancel={handle(
+        local.onPointerCancel,
+        hold.handlers.onPointerCancel
+      )}
+      onKeyDown={handle(local.onKeyDown, hold.handlers.onKeyDown)}
+      onKeyUp={handle(local.onKeyUp, hold.handlers.onKeyUp)}
+      onBlur={handle(local.onBlur, hold.handlers.onBlur)}
       classList={{
         ...getVariant(
           props.type || "primary",
@@ -269,12 +320,26 @@ function Button(props: Props) {
         ...props.style
       }}
     >
+      <Show when={local.holdToConfirm}>
+        <HoldFill hold={hold} />
+      </Show>
       <Show when={props.icon}>{props.icon}</Show>
       <Show
         when={!props.loading}
         fallback={<Loading percentage={props.percentage}>{c()}</Loading>}
       >
-        {c()}
+        <Show
+          when={local.holdToConfirm?.hint && hold.hinted() && !hold.holding()}
+          fallback={
+            <Show when={local.holdToConfirm} fallback={c()}>
+              <span class="relative flex items-center gap-2">{c()}</span>
+            </Show>
+          }
+        >
+          <span class="relative" data-hold-hint="">
+            {local.holdToConfirm?.hint}
+          </span>
+        </Show>
       </Show>
     </Dynamic>
   )

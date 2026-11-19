@@ -206,6 +206,7 @@
   "_trn_isInQueue": "En cola",
   "_trn_queue_after": "después de {{name}}",
   "_trn_leave_queue": "Salir de la cola",
+  "_trn_hold_to_stop": "Mantén pulsado para detener",
   "_trn_isDeleting": "Eliminando...",
   "_trn_instance_mc_version": "Versión de Minecraft",
   "_trn_include_snapshot_versions": "Incluir versiones de instantánea",
