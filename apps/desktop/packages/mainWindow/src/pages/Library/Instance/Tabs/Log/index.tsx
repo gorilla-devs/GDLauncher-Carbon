@@ -167,8 +167,22 @@ const Logs = () => {
     if (activeLogId !== undefined) setSelectedLog(activeLogId)
   })
 
+  // A session that is no longer listed cannot be shown: its file was
+  // rotated away by a new game, or removed by hand and found gone when it
+  // was opened. The view goes back to having nothing selected.
   createEffect(() => {
-    if (selectedLog() === undefined) return
+    const listed = availableLogEntries.data
+    const selected = selectedLog()
+    if (!listed || selected === undefined) return
+    if (!listed.some((log) => log.id === selected)) setSelectedLog(undefined)
+  })
+
+  createEffect(() => {
+    if (selectedLog() === undefined) {
+      // Nothing is being loaded: the session shown before was given up.
+      setIsLoading(false)
+      return
+    }
 
     let current = true
 
@@ -193,10 +207,17 @@ const Logs = () => {
       }
     }
 
+    // The core closes the stream without a row when the session could not
+    // be opened; waiting on it would show the spinner for good.
+    wsConnection.onclose = () => {
+      if (current) setIsLoading(false)
+    }
+
     onCleanup(() => {
       // Revoke already-queued callbacks before transport cancellation.
       current = false
       wsConnection.onmessage = null
+      wsConnection.onclose = null
       setLogs([])
       setIsLoading(true)
 

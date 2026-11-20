@@ -106,16 +106,9 @@ pub struct InstanceManager {
     persistence_manager: PersistenceManager,
     import_manager: InstanceImportManager,
     export_manager: InstanceExportManager,
-    game_logs: RwLock<
-        HashMap<
-            GameLogId,
-            (
-                InstanceId,
-                chrono::DateTime<chrono::Local>,
-                watch::Receiver<GameLog>,
-            ),
-        >,
-    >,
+    game_logs: RwLock<HashMap<GameLogId, log::GameLogRecord>>,
+    // One past session's file is read at a time (see `open_log`).
+    log_reads: Mutex<()>,
     // One independent disk-history initialization per instance; never tied to live logs.
     log_history: DashMap<InstanceId, Arc<Mutex<bool>>>,
     /// Stops the installed-version check of a running version change (see
@@ -300,6 +293,7 @@ impl InstanceManager {
             import_manager: InstanceImportManager::new(),
             export_manager: InstanceExportManager::new(),
             game_logs: RwLock::new(HashMap::new()),
+            log_reads: Mutex::new(()),
             log_history: DashMap::new(),
             version_change_checks: DashMap::new(),
             modpack_info_semaphore: Mutex::new(()),
@@ -3393,7 +3387,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             self.game_logs
                 .write()
                 .await
-                .retain(|_, (id, _, _)| *id != instance_id);
+                .retain(|_, record| record.instance_id != instance_id);
             self.unsaved_playtime.remove(&instance_id);
         }
         self.app.meta_cache_manager().gc_mod_metadata().await;

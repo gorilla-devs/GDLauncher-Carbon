@@ -730,6 +730,16 @@ impl ManagerRef<'_, InstanceManager> {
                 crate::logger::cleanup_old_logs(&cleanup_path, 10);
             })
             .await;
+            // A session whose file was just rotated away can no longer be
+            // opened, so it leaves the list of sessions now rather than
+            // when it is clicked.
+            if app
+                .instance_manager()
+                .forget_logs_without_file(instance_id, &gdl_logs_path)
+                .await
+            {
+                app.invalidate(GET_LOGS, None);
+            }
 
             Some(gdl_logs_path.join(format!("{}.log", log_file_name)))
         } else {
@@ -1348,9 +1358,14 @@ impl ManagerRef<'_, InstanceManager> {
                                     "Core detached from surviving instance {}; running state and PID evidence retained",
                                     *instance_id
                                 );
-                                drop(log.take());
-                                if let Some(mut output) = file.take() {
-                                    let _ = output.flush().await;
+                                // The file first, so a log let go from
+                                // memory is whole when it is read back.
+                                let on_disk = match file.take() {
+                                    Some(mut output) => output.flush().await.is_ok(),
+                                    None => false,
+                                };
+                                if let (Some(log_id), Some(log)) = (log_id, log.take()) {
+                                    app.instance_manager().end_log(log_id, log, on_disk).await;
                                 }
                                 return;
                             }
@@ -1463,14 +1478,22 @@ impl ManagerRef<'_, InstanceManager> {
                         }
                     }
 
-                    // Drop the log sender so the receiver sees the channel as closed
-                    // This must happen BEFORE invalidation so the frontend sees active: false
-                    drop(log);
+                    // Flush and close the log file before invalidation so file size is
+                    // accurate, and before the log is ended, so one let go from
+                    // memory is whole when it is read back.
+                    let on_disk = match file.take() {
+                        Some(mut f) => f.flush().await.is_ok(),
+                        None => false,
+                    };
 
-                    // Flush and close the log file before invalidation so file size is accurate
-                    if let Some(mut f) = file.take() {
-                        let _ = f.flush().await;
-                        drop(f);
+                    // End the log (its sender is dropped) so the receiver sees the
+                    // channel as closed. This must happen BEFORE invalidation so the
+                    // frontend sees active: false
+                    match (log_id, log.take()) {
+                        (Some(log_id), Some(log)) => {
+                            app.instance_manager().end_log(log_id, log, on_disk).await
+                        }
+                        (_, log) => drop(log),
                     }
 
                     app.invalidate(GET_LOGS, Some(instance_id.0.into()));

@@ -237,6 +237,31 @@ test("the count says when the log holds more hits than were answered", async () 
   expect(root.textContent).toContain("1 of 1")
   expect(root.textContent).not.toContain("1 of 1+")
 })
+test("a session that leaves the list is deselected, without a spinner left behind", async () => {
+  setEntries(0, "active", false)
+  c.sidebar.setSelectedLog(2)
+  await flush()
+  Socket.sockets.at(-1)!.message("a past line")
+  expect(root.textContent).toContain("a past line")
+  const sockets = Socket.sockets.length
+  // Its file was rotated away: the core lists it no more.
+  setEntries([{ id: 1, active: false }])
+  await flush()
+  expect(c.sidebar.selectedLog).toBeUndefined()
+  expect(root.textContent).not.toContain("a past line")
+  expect(root.textContent).toContain("_trn_no_logs")
+  expect(Socket.sockets.length).toBe(sockets)
+})
+test("a session the core could not open stops loading when its stream closes", async () => {
+  setEntries(0, "active", false)
+  c.sidebar.setSelectedLog(2)
+  await flush()
+  const socket = Socket.sockets.at(-1)! as any
+  expect(root.textContent).not.toContain("_trn_no_logs")
+  socket.onclose?.()
+  await flush()
+  expect(root.textContent).toContain("_trn_no_logs")
+})
 test("matching live growth updates actual finder count and mounted highlight without changing query key", async () => {
   await search()
   await advance()

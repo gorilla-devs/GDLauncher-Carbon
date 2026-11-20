@@ -5,7 +5,7 @@ use serde::Serialize;
 use std::{
     borrow::Cow,
     ops::{Bound, RangeBounds},
-    path::Path,
+    path::{Path, PathBuf},
     sync::{
         Arc,
         atomic::{AtomicI32, Ordering},
@@ -453,6 +453,55 @@ pub struct SearchResult {
     pub len: usize,
 }
 
+/// How a session's log file is named after the time the session started.
+const LOG_FILE_STAMP: &str = "%Y-%m-%d_%H-%M-%S";
+
+fn log_file_name(datetime: &DateTime<Local>) -> String {
+    format!("{}.log", datetime.format(LOG_FILE_STAMP))
+}
+
+/// What the launcher holds of one game session's log.
+///
+/// Past sessions are known by their file and read when one is opened, so
+/// that listing them costs nothing and only what is looked at takes memory.
+#[derive(Debug)]
+pub struct GameLogRecord {
+    pub instance_id: InstanceId,
+    /// When the session started; its file is named after it.
+    pub datetime: DateTime<Local>,
+    /// The log in memory: a running game's, and a past session's from when
+    /// it is opened until another one is. `None` for a session known by its
+    /// file only.
+    pub log: Option<watch::Receiver<GameLog>>,
+    /// The whole log can be read back from its file, so the copy in memory
+    /// may be let go.
+    pub on_disk: bool,
+}
+
+impl GameLogRecord {
+    /// A game is still writing it.
+    pub fn is_active(&self) -> bool {
+        self.log
+            .as_ref()
+            .is_some_and(|log| log.has_changed().is_ok())
+    }
+
+    pub fn file_name(&self) -> String {
+        log_file_name(&self.datetime)
+    }
+}
+
+/// Why a session's log could not be opened.
+#[derive(Debug)]
+pub enum OpenLogError {
+    /// No session has this id (any more).
+    Unknown,
+    /// Its file is not in the folder that was looked in.
+    Missing,
+    /// Its file could not be read.
+    Unreadable(String),
+}
+
 static LOG_ID: AtomicI32 = AtomicI32::new(0);
 impl ManagerRef<'_, InstanceManager> {
     pub async fn create_log(
@@ -469,16 +518,11 @@ impl ManagerRef<'_, InstanceManager> {
         let mut logs = self.game_logs.write().await;
 
         match logs.get(&id) {
-            Some((_, _, rx)) => {
-                // sender dropped
-                match rx.has_changed() {
-                    Ok(_) => Err(anyhow::anyhow!("cannot delete active log")),
-                    Err(_) => {
-                        let _ = logs.remove(&id);
-                        self.app.invalidate(GET_LOGS, None);
-                        Ok(())
-                    }
-                }
+            Some(record) if record.is_active() => Err(anyhow::anyhow!("cannot delete active log")),
+            Some(_) => {
+                let _ = logs.remove(&id);
+                self.app.invalidate(GET_LOGS, None);
+                Ok(())
             }
             None => Err(anyhow::anyhow!(InvalidGameLogIdError)),
         }
@@ -491,10 +535,10 @@ impl ManagerRef<'_, InstanceManager> {
     ) -> anyhow::Result<String> {
         // Get the log entry to find the datetime
         let logs = self.game_logs.read().await;
-        let (_, datetime, _) = logs
+        let filename = logs
             .get(&log_id)
-            .ok_or_else(|| anyhow::anyhow!(InvalidGameLogIdError))?;
-        let datetime = datetime.clone();
+            .ok_or_else(|| anyhow::anyhow!(InvalidGameLogIdError))?
+            .file_name();
         drop(logs);
 
         // Get the instance shortpath
@@ -514,7 +558,6 @@ impl ManagerRef<'_, InstanceManager> {
             .get_instance_path(&shortpath)
             .get_gdl_logs_path();
 
-        let filename = format!("{}.log", datetime.format("%Y-%m-%d_%H-%M-%S"));
         let log_file_path = logs_path.join(&filename);
 
         // Return the file path if it exists, otherwise return the logs folder
@@ -525,14 +568,62 @@ impl ManagerRef<'_, InstanceManager> {
         }
     }
 
+    /// The log of a session. A past session's is read from its file first
+    /// (see [`InstanceManager::open_log`]).
+    ///
+    /// A session whose file is gone (deleted by hand, or rotated away between
+    /// the list and the click) cannot be opened: it leaves the list, and the
+    /// interface is told so.
     pub async fn get_log(
         self,
         id: GameLogId,
     ) -> Result<watch::Receiver<GameLog>, InvalidGameLogIdError> {
-        match self.game_logs.read().await.get(&id) {
-            Some((_, _, log)) => Ok(log.clone()),
-            None => Err(InvalidGameLogIdError),
+        let instance_id = match self.held_log(id).await {
+            Ok((Some(log), _)) => return Ok(log),
+            Ok((None, instance_id)) => instance_id,
+            Err(_) => return Err(InvalidGameLogIdError),
+        };
+
+        let mut looked_in: Option<PathBuf> = None;
+        loop {
+            // Looked up for every try: a rename moves the folder, and a file
+            // that is not where the folder was is not a file that is gone.
+            let Some(logs_dir) = self.logs_dir(instance_id).await else {
+                return Err(InvalidGameLogIdError);
+            };
+            #[cfg(test)]
+            self.test_hooks.pause("log_open", instance_id).await;
+            match self.open_log(id, &logs_dir).await {
+                Ok(log) => return Ok(log),
+                Err(OpenLogError::Unknown) => return Err(InvalidGameLogIdError),
+                Err(OpenLogError::Unreadable(error)) => {
+                    tracing::warn!(%error, "Failed to read a past session's log");
+                    return Err(InvalidGameLogIdError);
+                }
+                Err(OpenLogError::Missing) if looked_in.as_ref() == Some(&logs_dir) => {
+                    if self.forget_log_on_disk(id).await {
+                        self.app.invalidate(GET_LOGS, None);
+                    }
+                    return Err(InvalidGameLogIdError);
+                }
+                Err(OpenLogError::Missing) => looked_in = Some(logs_dir),
+            }
         }
+    }
+
+    /// Where the instance's session logs are kept, by its folder as it is
+    /// named now.
+    async fn logs_dir(self, instance_id: InstanceId) -> Option<PathBuf> {
+        let instances = self.instances.read().await;
+        let instance = instances.get(&instance_id)?;
+        Some(
+            self.app
+                .settings_manager()
+                .runtime_path
+                .get_instances()
+                .get_instance_path(&instance.shortpath)
+                .get_gdl_logs_path(),
+        )
     }
 
     pub async fn get_logs(self, instance_id: InstanceId) -> Vec<GameLogEntry> {
@@ -546,24 +637,23 @@ impl ManagerRef<'_, InstanceManager> {
                 .read()
                 .await
                 .iter()
-                .filter(|(_, (id, _, _))| *id == instance_id)
-                .map(|(id, (instance_id, datetime, rx))| {
-                    let active = rx.has_changed().is_ok();
+                .filter(|(_, record)| record.instance_id == instance_id)
+                .map(|(id, record)| {
+                    let active = record.is_active();
                     // For inactive logs, compute file size from the log file
                     let file_size = if active {
                         None
                     } else if let Some(ref logs_path) = logs_path {
-                        let filename = format!("{}.log", datetime.format("%Y-%m-%d_%H-%M-%S"));
-                        let file_path = logs_path.join(&filename);
+                        let file_path = logs_path.join(record.file_name());
                         std::fs::metadata(&file_path).ok().map(|m| m.len())
                     } else {
                         None
                     };
                     GameLogEntry {
                         id: *id,
-                        instance_id: *instance_id,
+                        instance_id: record.instance_id,
                         active,
-                        datetime: datetime.clone(),
+                        datetime: record.datetime,
                         file_size,
                     }
                 })
@@ -572,9 +662,8 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         // The gate is held only for this snapshot, taken against root
-        // rename/delete. Reading and parsing past logs can take seconds on a
-        // large pack, and must not hold up Play, settings or the game's state
-        // changes meanwhile. A delete retires this history registration
+        // rename/delete. Looking through the folder of past logs must not
+        // hold up Play, settings or the game's state changes meanwhile. A delete retires this history registration
         // under the gate, so a load it overtakes adds nothing back.
         let (logs_path, history) = {
             let _instance_guard = self.lock_instance(instance_id).await;
@@ -643,18 +732,198 @@ impl InstanceManager {
         let mut logs = self.game_logs.write().await;
         // If history won the IO race, promote that record to the new live receiver.
         // An already-live same-second launch retains the pre-existing filename limitation.
+        let file_name = log_file_name(&current_datetime);
         let existing = logs
             .iter()
-            .find(|(_, (owner, date, rx))| {
-                *owner == instance_id
-                    && rx.has_changed().is_err()
-                    && date.format("%Y-%m-%d_%H-%M-%S").to_string()
-                        == current_datetime.format("%Y-%m-%d_%H-%M-%S").to_string()
+            .find(|(_, record)| {
+                record.instance_id == instance_id
+                    && !record.is_active()
+                    && record.file_name() == file_name
             })
             .map(|(id, _)| *id);
         let id = existing.unwrap_or(id);
-        logs.insert(id, (instance_id, current_datetime, log_rx));
+        logs.insert(
+            id,
+            GameLogRecord {
+                instance_id,
+                datetime: current_datetime,
+                log: Some(log_rx),
+                // Not until the game has ended and its file is closed (see
+                // `end_log`).
+                on_disk: false,
+            },
+        );
         (id, log_tx)
+    }
+
+    /// The session's log if it is in memory, and the instance it belongs to.
+    /// Asking for a log is opening it, so the past sessions opened before
+    /// are let go (see `release_other_logs`).
+    pub(super) async fn held_log(
+        &self,
+        id: GameLogId,
+    ) -> Result<(Option<watch::Receiver<GameLog>>, InstanceId), OpenLogError> {
+        let (log, instance_id) = {
+            let logs = self.game_logs.read().await;
+            let record = logs.get(&id).ok_or(OpenLogError::Unknown)?;
+            (record.log.clone(), record.instance_id)
+        };
+        if log.is_some() {
+            self.release_other_logs(id).await;
+        }
+        Ok((log, instance_id))
+    }
+
+    /// The log of a session, read from its file in `logs_dir` when it is not
+    /// in memory. It then stays in memory until another session is opened.
+    pub(super) async fn open_log(
+        &self,
+        id: GameLogId,
+        logs_dir: &Path,
+    ) -> Result<watch::Receiver<GameLog>, OpenLogError> {
+        if let (Some(log), _) = self.held_log(id).await? {
+            return Ok(log);
+        }
+
+        // One file at a time: the stream and a search asking for the same
+        // session read it once, and the second finds it in memory.
+        let _reading = self.log_reads.lock().await;
+        let file_name = {
+            let logs = self.game_logs.read().await;
+            let record = logs.get(&id).ok_or(OpenLogError::Unknown)?;
+            if let Some(log) = &record.log {
+                return Ok(log.clone());
+            }
+            record.file_name()
+        };
+
+        let path = logs_dir.join(&file_name);
+        let bytes = match tokio::fs::read(&path).await {
+            Ok(bytes) => bytes,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                return Err(OpenLogError::Missing);
+            }
+            Err(error) => {
+                return Err(OpenLogError::Unreadable(format!(
+                    "{}: {error}",
+                    path.display()
+                )));
+            }
+        };
+        let (tx, rx) = watch::channel(GameLog::new());
+        if let Err(error) = LogProcessor::new(LogEntrySourceKind::StdOut, &tx)
+            .await
+            .process_data(&bytes, None)
+            .await
+        {
+            return Err(OpenLogError::Unreadable(format!(
+                "{}: {error}",
+                path.display()
+            )));
+        }
+        drop(tx);
+
+        {
+            let mut logs = self.game_logs.write().await;
+            // Deleted with its instance while the file was read.
+            let record = logs.get_mut(&id).ok_or(OpenLogError::Unknown)?;
+            match &record.log {
+                // A game started in the same second took the record over.
+                Some(log) => return Ok(log.clone()),
+                None => record.log = Some(rx.clone()),
+            }
+        }
+        self.release_other_logs(id).await;
+        Ok(rx)
+    }
+
+    /// Lets go of every ended session's log in memory but `opened`: one
+    /// past session is looked at at a time, and the others can be read from
+    /// their files again. A running game's log is never let go, nor one
+    /// that has no complete file.
+    async fn release_other_logs(&self, opened: GameLogId) {
+        let mut logs = self.game_logs.write().await;
+        for (id, record) in logs.iter_mut() {
+            if *id != opened && record.on_disk && record.log.is_some() && !record.is_active() {
+                record.log = None;
+            }
+        }
+    }
+
+    /// Ends a game's log: `sender` is what the game's output was written
+    /// through, and `on_disk` says whether all of it is in the session's
+    /// file as well, flushed and closed.
+    ///
+    /// A log that is on disk and that no Logs tab is following is let go
+    /// from memory here. One that is being followed stays until another
+    /// session is opened, so the rows on screen and a search of them keep
+    /// agreeing.
+    pub async fn end_log(&self, id: GameLogId, sender: watch::Sender<GameLog>, on_disk: bool) {
+        let mut logs = self.game_logs.write().await;
+        // This registry holds one receiver; any other is a Logs tab
+        // following the game, or a search under way.
+        let followed = sender.receiver_count() > 1;
+        drop(sender);
+        if let Some(record) = logs.get_mut(&id) {
+            record.on_disk = on_disk;
+            if on_disk && !followed {
+                record.log = None;
+            }
+        }
+    }
+
+    /// Forgets a session that is known by its file only, once that file
+    /// turned out to be gone. Says whether the list of sessions changed.
+    pub(super) async fn forget_log_on_disk(&self, id: GameLogId) -> bool {
+        let mut logs = self.game_logs.write().await;
+        if logs.get(&id).is_some_and(|record| record.log.is_none()) {
+            logs.remove(&id);
+            return true;
+        }
+        false
+    }
+
+    /// Forgets the ended sessions of an instance whose files are no longer
+    /// in `logs_dir`: starting a game rotates the oldest files away, and a
+    /// session without its file can no longer be opened. Says whether the
+    /// list of sessions changed.
+    pub async fn forget_logs_without_file(&self, instance_id: InstanceId, logs_dir: &Path) -> bool {
+        let ended: Vec<(GameLogId, String)> = self
+            .game_logs
+            .read()
+            .await
+            .iter()
+            .filter(|(_, record)| {
+                record.instance_id == instance_id && record.on_disk && !record.is_active()
+            })
+            .map(|(id, record)| (*id, record.file_name()))
+            .collect();
+
+        let mut gone = Vec::new();
+        for (id, file_name) in ended {
+            // Only a file known to be absent counts; one that could not be
+            // looked at stays listed.
+            if matches!(
+                tokio::fs::try_exists(logs_dir.join(&file_name)).await,
+                Ok(false)
+            ) {
+                gone.push((id, file_name));
+            }
+        }
+
+        let mut logs = self.game_logs.write().await;
+        let mut changed = false;
+        for (id, file_name) in gone {
+            // Not one a game started in the same second has taken over.
+            let still_ended = logs.get(&id).is_some_and(|record| {
+                record.on_disk && !record.is_active() && record.file_name() == file_name
+            });
+            if still_ended {
+                logs.remove(&id);
+                changed = true;
+            }
+        }
+        changed
     }
 
     /// This instance's history registration: one load at a time, and loaded
@@ -747,20 +1016,24 @@ impl InstanceManager {
             let Some(datetime) = Local.from_local_datetime(&naive).single() else {
                 continue;
             };
-            let matches = |id: &InstanceId, date: &DateTime<Local>| {
-                *id == instance_id && date.format("%Y-%m-%d_%H-%M-%S").to_string() == stem
+            let matches = |record: &GameLogRecord| {
+                record.instance_id == instance_id
+                    && record.datetime.format(LOG_FILE_STAMP).to_string() == stem
             };
-            if self
-                .game_logs
-                .read()
-                .await
-                .values()
-                .any(|(id, date, _)| matches(id, date))
-            {
+            if self.game_logs.read().await.values().any(matches) {
                 continue;
             }
-            let bytes = match tokio::fs::read(&path).await {
-                Ok(bytes) => bytes,
+            // The file is only looked at here; it is read when its session
+            // is opened (see `open_log`).
+            match tokio::fs::metadata(&path).await {
+                Ok(metadata) if metadata.is_file() => {}
+                Ok(_) => {
+                    record_failure(anyhow::anyhow!(
+                        "Failed to read retained log {}: not a file",
+                        path.display()
+                    ));
+                    continue;
+                }
                 Err(error) => {
                     record_failure(anyhow::anyhow!(
                         "Failed to read retained log {}: {error}",
@@ -768,20 +1041,7 @@ impl InstanceManager {
                     ));
                     continue;
                 }
-            };
-            let (tx, rx) = watch::channel(GameLog::new());
-            if let Err(error) = LogProcessor::new(LogEntrySourceKind::StdOut, &tx)
-                .await
-                .process_data(&bytes, None)
-                .await
-            {
-                record_failure(anyhow::anyhow!(
-                    "Failed to process retained log {}: {error}",
-                    path.display()
-                ));
-                continue;
             }
-            drop(tx);
             // create_log may have registered this same filename while IO was pending.
             let mut logs = self.game_logs.write().await;
             // A delete retired this registration while the file was read
@@ -793,9 +1053,17 @@ impl InstanceManager {
             if retired {
                 return Ok(changed);
             }
-            if !logs.values().any(|(id, date, _)| matches(id, date)) {
+            if !logs.values().any(matches) {
                 let id = GameLogId(LOG_ID.fetch_add(1, Ordering::Relaxed));
-                logs.insert(id, (instance_id, datetime, rx));
+                logs.insert(
+                    id,
+                    GameLogRecord {
+                        instance_id,
+                        datetime,
+                        log: None,
+                        on_disk: true,
+                    },
+                );
                 changed = true;
             }
         }
@@ -1314,17 +1582,25 @@ mod task17_tests {
         tx.send_modify(|log| log.add_entry(LogEntry::system_message("later")));
         assert_eq!(
             logs[&current]
-                .2
+                .log
+                .as_ref()
+                .unwrap()
                 .borrow()
                 .search("later", true, false, false)
                 .len(),
             1
         );
-        assert!(logs.values().any(|(_, _, rx)| {
-            !rx.borrow()
+        let retained = *logs.keys().find(|log| **log != current).unwrap();
+        drop(logs);
+        assert!(
+            !manager
+                .open_log(retained, dir.path())
+                .await
+                .unwrap()
+                .borrow()
                 .search("retained", true, false, false)
                 .is_empty()
-        }));
+        );
         assert!(std::fs::read(dir.path().join("2025-01-14_12-00-00.log")).is_ok());
     }
 
@@ -1377,7 +1653,15 @@ mod task17_tests {
         let (current, tx) = manager.register_log(id, Some(date)).await;
         assert_eq!(manager.game_logs.read().await.len(), 1);
         tx.send_modify(|log| log.add_entry(LogEntry::system_message("current")));
-        assert_eq!(manager.game_logs.read().await[&current].2.borrow().len(), 1);
+        assert_eq!(
+            manager.game_logs.read().await[&current]
+                .log
+                .as_ref()
+                .unwrap()
+                .borrow()
+                .len(),
+            1
+        );
         // An initialized registry does not resurrect a log removed from memory.
         drop(tx);
         manager.game_logs.write().await.clear();
@@ -1451,7 +1735,9 @@ mod task17_tests {
         tx.send_modify(|log| log.add_entry(LogEntry::system_message("still live")));
         assert_eq!(
             manager.game_logs.read().await[&live]
-                .2
+                .log
+                .as_ref()
+                .unwrap()
                 .borrow()
                 .search("still live", true, false, false)
                 .len(),
@@ -1466,12 +1752,20 @@ mod task17_tests {
         assert_eq!(logs.len(), 3);
         assert!(logs.contains_key(&healthy_id));
         assert!(logs.contains_key(&live));
-        assert!(logs.values().any(|(_, _, rx)| {
-            !rx.borrow()
+        let repaired = *logs
+            .keys()
+            .find(|log| **log != healthy_id && **log != live)
+            .unwrap();
+        drop(logs);
+        assert!(
+            !manager
+                .open_log(repaired, dir.path())
+                .await
+                .unwrap()
+                .borrow()
                 .search("repaired", true, false, false)
                 .is_empty()
-        }));
-        drop(logs);
+        );
         assert!(!manager.load_log_history(id, dir.path()).await.unwrap());
     }
 
@@ -1502,6 +1796,315 @@ mod task17_tests {
             manager.game_logs.read().await.len(),
             1,
             "enumeration errors must not hide later valid entries"
+        );
+    }
+}
+
+#[cfg(test)]
+mod session_registry_tests {
+    use super::*;
+
+    const INSTANCE: InstanceId = InstanceId(17);
+
+    fn at(day: u32) -> DateTime<Local> {
+        Local
+            .with_ymd_and_hms(2025, 1, day, 12, 0, 0)
+            .single()
+            .unwrap()
+    }
+
+    fn file_of(day: u32) -> String {
+        format!("2025-01-{day:02}_12-00-00.log")
+    }
+
+    /// A folder of past sessions, one for each day given, and a manager
+    /// that has listed them.
+    async fn listed(days: &[u32]) -> (tempfile::TempDir, InstanceManager) {
+        let dir = tempfile::tempdir().unwrap();
+        for day in days {
+            std::fs::write(dir.path().join(file_of(*day)), format!("session {day}\n")).unwrap();
+        }
+        let manager = InstanceManager::new();
+        manager
+            .load_log_history(INSTANCE, dir.path())
+            .await
+            .unwrap();
+        (dir, manager)
+    }
+
+    async fn id_of(manager: &InstanceManager, day: u32) -> GameLogId {
+        *manager
+            .game_logs
+            .read()
+            .await
+            .iter()
+            .find(|(_, record)| record.file_name() == file_of(day))
+            .unwrap()
+            .0
+    }
+
+    async fn in_memory(manager: &InstanceManager, id: GameLogId) -> bool {
+        manager.game_logs.read().await[&id].log.is_some()
+    }
+
+    fn text(log: &watch::Receiver<GameLog>) -> String {
+        let log = log.borrow();
+        (0..log.len())
+            .map(|index| log.get_entry(index).unwrap().message.clone())
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn listing_past_sessions_reads_none_of_them() {
+        let (_dir, manager) = listed(&[14, 15]).await;
+        let logs = manager.game_logs.read().await;
+        assert_eq!(logs.len(), 2);
+        for record in logs.values() {
+            assert!(record.log.is_none());
+            assert!(record.on_disk);
+            assert!(!record.is_active());
+        }
+    }
+
+    #[tokio::test]
+    async fn a_past_session_is_read_when_it_is_opened_and_stays_until_another_is() {
+        let (dir, manager) = listed(&[14, 15]).await;
+        let (first, second) = (id_of(&manager, 14).await, id_of(&manager, 15).await);
+
+        let log = manager.open_log(first, dir.path()).await.unwrap();
+        assert_eq!(text(&log), "session 14\n");
+        assert!(log.has_changed().is_err(), "a past session is not active");
+        assert!(in_memory(&manager, first).await);
+        assert!(!in_memory(&manager, second).await);
+
+        // Opened again (a search of it): the same log, not read again.
+        std::fs::write(dir.path().join(file_of(14)), "changed on disk\n").unwrap();
+        assert_eq!(
+            text(&manager.open_log(first, dir.path()).await.unwrap()),
+            "session 14\n"
+        );
+
+        let log = manager.open_log(second, dir.path()).await.unwrap();
+        assert_eq!(text(&log), "session 15\n");
+        assert!(in_memory(&manager, second).await);
+        assert!(
+            !in_memory(&manager, first).await,
+            "the one before is let go"
+        );
+
+        // And read from its file again when it is gone back to.
+        assert_eq!(
+            text(&manager.open_log(first, dir.path()).await.unwrap()),
+            "changed on disk\n"
+        );
+        assert!(!in_memory(&manager, second).await);
+    }
+
+    #[tokio::test]
+    async fn the_same_session_asked_for_twice_at_once_is_one_log() {
+        let (dir, manager) = listed(&[14]).await;
+        let id = id_of(&manager, 14).await;
+        let (stream, search) = tokio::join!(
+            manager.open_log(id, dir.path()),
+            manager.open_log(id, dir.path())
+        );
+        let (stream, search) = (stream.unwrap(), search.unwrap());
+        assert_eq!(text(&stream), "session 14\n");
+        assert!(stream.same_channel(&search));
+    }
+
+    #[tokio::test]
+    async fn opening_a_session_never_lets_go_of_a_log_that_cannot_be_read_back() {
+        let (dir, manager) = listed(&[14]).await;
+        let past = id_of(&manager, 14).await;
+
+        // A running game.
+        let (running, running_tx) = manager.register_log(INSTANCE, Some(at(20))).await;
+        running_tx.send_modify(|log| log.add_entry(LogEntry::system_message("running")));
+        // A game that ended without a complete file.
+        let (fileless, fileless_tx) = manager.register_log(InstanceId(18), Some(at(21))).await;
+        fileless_tx.send_modify(|log| log.add_entry(LogEntry::system_message("only in memory")));
+        let follower = manager.game_logs.read().await[&fileless]
+            .log
+            .clone()
+            .unwrap();
+        manager.end_log(fileless, fileless_tx, false).await;
+        drop(follower);
+
+        manager.open_log(past, dir.path()).await.unwrap();
+
+        let logs = manager.game_logs.read().await;
+        assert!(logs[&running].is_active());
+        assert_eq!(text(logs[&running].log.as_ref().unwrap()), "running");
+        assert_eq!(
+            text(logs[&fileless].log.as_ref().unwrap()),
+            "only in memory"
+        );
+        drop(logs);
+        drop(running_tx);
+    }
+
+    #[tokio::test]
+    async fn a_game_that_ends_unwatched_leaves_its_log_to_its_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let manager = InstanceManager::new();
+        let (id, tx) = manager.register_log(INSTANCE, Some(at(14))).await;
+        tx.send_modify(|log| log.add_entry(LogEntry::system_message("from memory")));
+        std::fs::write(dir.path().join(file_of(14)), "from the file\n").unwrap();
+
+        manager.end_log(id, tx, true).await;
+
+        assert!(!in_memory(&manager, id).await);
+        assert!(!manager.game_logs.read().await[&id].is_active());
+        // Still listed, and read from its file when opened.
+        assert_eq!(
+            text(&manager.open_log(id, dir.path()).await.unwrap()),
+            "from the file\n"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_game_that_ends_while_watched_keeps_its_log_until_another_session_is_opened() {
+        let (dir, manager) = listed(&[14]).await;
+        let past = id_of(&manager, 14).await;
+        let (id, tx) = manager.register_log(INSTANCE, Some(at(20))).await;
+        tx.send_modify(|log| log.add_entry(LogEntry::system_message("watched")));
+        // The Logs tab following the game.
+        let (stream, _) = manager.held_log(id).await.unwrap();
+        let stream = stream.unwrap();
+
+        manager.end_log(id, tx, true).await;
+
+        assert!(
+            stream.has_changed().is_err(),
+            "the stream sees the game end"
+        );
+        assert!(in_memory(&manager, id).await);
+        // A search of the rows on screen still finds them where they are.
+        let (searched, _) = manager.held_log(id).await.unwrap();
+        assert_eq!(text(&searched.unwrap()), "watched");
+
+        manager.open_log(past, dir.path()).await.unwrap();
+        assert!(!in_memory(&manager, id).await);
+    }
+
+    #[tokio::test]
+    async fn a_game_that_ends_without_a_complete_file_keeps_its_log() {
+        let (dir, manager) = listed(&[14]).await;
+        let past = id_of(&manager, 14).await;
+        let (id, tx) = manager.register_log(INSTANCE, Some(at(20))).await;
+        tx.send_modify(|log| log.add_entry(LogEntry::system_message("only in memory")));
+
+        manager.end_log(id, tx, false).await;
+        manager.open_log(past, dir.path()).await.unwrap();
+
+        let (log, _) = manager.held_log(id).await.unwrap();
+        assert_eq!(text(&log.unwrap()), "only in memory");
+    }
+
+    #[tokio::test]
+    async fn a_session_whose_file_is_gone_is_missing_and_can_be_forgotten() {
+        let (dir, manager) = listed(&[14, 15]).await;
+        let (gone, kept) = (id_of(&manager, 14).await, id_of(&manager, 15).await);
+        std::fs::remove_file(dir.path().join(file_of(14))).unwrap();
+
+        assert!(matches!(
+            manager.open_log(gone, dir.path()).await,
+            Err(OpenLogError::Missing)
+        ));
+        // Still listed until the caller has made sure of the folder.
+        assert!(manager.game_logs.read().await.contains_key(&gone));
+        assert!(manager.forget_log_on_disk(gone).await);
+        assert!(!manager.game_logs.read().await.contains_key(&gone));
+        assert!(matches!(
+            manager.open_log(gone, dir.path()).await,
+            Err(OpenLogError::Unknown)
+        ));
+
+        // One that is in memory is not forgotten for its file.
+        manager.open_log(kept, dir.path()).await.unwrap();
+        assert!(!manager.forget_log_on_disk(kept).await);
+        assert!(manager.game_logs.read().await.contains_key(&kept));
+    }
+
+    #[tokio::test]
+    async fn a_file_that_cannot_be_read_leaves_its_session_listed() {
+        let (dir, manager) = listed(&[14]).await;
+        let id = id_of(&manager, 14).await;
+        std::fs::remove_file(dir.path().join(file_of(14))).unwrap();
+        std::fs::create_dir(dir.path().join(file_of(14))).unwrap();
+
+        assert!(matches!(
+            manager.open_log(id, dir.path()).await,
+            Err(OpenLogError::Unreadable(_))
+        ));
+        assert!(manager.game_logs.read().await.contains_key(&id));
+        assert!(!in_memory(&manager, id).await);
+    }
+
+    #[tokio::test]
+    async fn sessions_rotated_away_leave_the_list_and_the_others_stay() {
+        let (dir, manager) = listed(&[10, 11, 12]).await;
+        let (rotated, opened, kept) = (
+            id_of(&manager, 10).await,
+            id_of(&manager, 11).await,
+            id_of(&manager, 12).await,
+        );
+        // Another instance's session of the same time, in another folder.
+        let other_dir = tempfile::tempdir().unwrap();
+        std::fs::write(other_dir.path().join(file_of(10)), "other\n").unwrap();
+        manager
+            .load_log_history(InstanceId(18), other_dir.path())
+            .await
+            .unwrap();
+        // The game being started, whose file is not written yet, and one
+        // that ended without a complete file.
+        let (starting, starting_tx) = manager.register_log(INSTANCE, Some(at(20))).await;
+        let (fileless, fileless_tx) = manager.register_log(INSTANCE, Some(at(19))).await;
+        manager.end_log(fileless, fileless_tx, false).await;
+
+        // Nothing is gone: nothing changes.
+        assert!(!manager.forget_logs_without_file(INSTANCE, dir.path()).await);
+        assert_eq!(manager.game_logs.read().await.len(), 6);
+
+        // The oldest is rotated away, and so is one that is being looked at.
+        manager.open_log(opened, dir.path()).await.unwrap();
+        std::fs::remove_file(dir.path().join(file_of(10))).unwrap();
+        std::fs::remove_file(dir.path().join(file_of(11))).unwrap();
+
+        assert!(manager.forget_logs_without_file(INSTANCE, dir.path()).await);
+        let logs = manager.game_logs.read().await;
+        assert!(!logs.contains_key(&rotated));
+        assert!(!logs.contains_key(&opened));
+        assert!(logs.contains_key(&kept));
+        assert!(logs.contains_key(&starting));
+        assert!(logs.contains_key(&fileless));
+        assert_eq!(
+            logs.values()
+                .filter(|record| record.instance_id == InstanceId(18))
+                .count(),
+            1
+        );
+        drop(logs);
+        drop(starting_tx);
+    }
+
+    #[tokio::test]
+    async fn a_game_started_in_the_second_of_a_listed_session_takes_its_record_over() {
+        let (dir, manager) = listed(&[14]).await;
+        let past = id_of(&manager, 14).await;
+
+        let (id, tx) = manager.register_log(INSTANCE, Some(at(14))).await;
+        assert_eq!(id, past);
+        assert_eq!(manager.game_logs.read().await.len(), 1);
+        let record_is_active = manager.game_logs.read().await[&id].is_active();
+        assert!(record_is_active);
+        assert!(!manager.game_logs.read().await[&id].on_disk);
+        // Opening it gives the running game's log, not the file's.
+        tx.send_modify(|log| log.add_entry(LogEntry::system_message("live")));
+        assert_eq!(
+            text(&manager.open_log(id, dir.path()).await.unwrap()),
+            "live"
         );
     }
 }

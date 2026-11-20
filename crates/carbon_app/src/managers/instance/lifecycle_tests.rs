@@ -10223,10 +10223,173 @@ async fn past_logs_loaded_while_an_instance_is_deleted_are_not_kept() -> anyhow:
             .read()
             .await
             .values()
-            .all(|(owner, _, _)| *owner != id),
+            .all(|record| record.instance_id != id),
         "a deleted instance's past logs were added back"
     );
     assert!(!manager.log_history.contains_key(&id));
+    Ok(())
+}
+
+/// A past session of `id`, written to its logs folder and listed.
+async fn past_session(
+    app: &crate::App,
+    id: InstanceId,
+    root: &Path,
+    name: &str,
+    text: &str,
+) -> anyhow::Result<GameLogId> {
+    tokio::fs::create_dir_all(root.join("logs")).await?;
+    tokio::fs::write(root.join("logs").join(name), text).await?;
+    let before: HashSet<GameLogId> = app
+        .instance_manager()
+        .game_logs
+        .read()
+        .await
+        .keys()
+        .copied()
+        .collect();
+    let listed = app.instance_manager().get_logs(id).await;
+    Ok(listed
+        .iter()
+        .map(|log| log.id)
+        .find(|log| !before.contains(log))
+        .expect("the session was listed"))
+}
+
+fn log_text(log: &tokio::sync::watch::Receiver<log::GameLog>) -> String {
+    let log = log.borrow();
+    (0..log.len())
+        .map(|index| log.get_entry(index).unwrap().message.clone())
+        .collect()
+}
+
+#[tokio::test]
+async fn opening_the_logs_tab_reads_no_past_session_and_opening_one_reads_that_one()
+-> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "lazy-logs").await?;
+    let manager = app.instance_manager();
+    let first = past_session(&app, id, &root, "2025-01-14_12-00-00.log", "first\n").await?;
+    // History is listed once per launcher run; the second file is one more
+    // session of the same listing.
+    manager.log_history.remove(&id);
+    let second = past_session(&app, id, &root, "2025-01-15_12-00-00.log", "second\n").await?;
+
+    let listed = manager.get_logs(id).await;
+    assert_eq!(listed.len(), 2);
+    assert!(listed.iter().all(|log| !log.active));
+    assert!(listed.iter().all(|log| log.file_size.is_some()));
+    assert!(
+        manager
+            .game_logs
+            .read()
+            .await
+            .values()
+            .all(|record| record.log.is_none()),
+        "listing read a past session"
+    );
+
+    assert_eq!(log_text(&manager.get_log(first).await.unwrap()), "first\n");
+    {
+        let logs = manager.game_logs.read().await;
+        assert!(logs[&first].log.is_some());
+        assert!(logs[&second].log.is_none());
+    }
+    assert_eq!(
+        log_text(&manager.get_log(second).await.unwrap()),
+        "second\n"
+    );
+    assert!(manager.game_logs.read().await[&first].log.is_none());
+    // Searching goes through the same door.
+    assert_eq!(
+        manager
+            .search_in_log(first, "first", true, false, false)
+            .await?
+            .results
+            .len(),
+        1
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_session_whose_file_is_gone_leaves_the_list_when_it_is_opened() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "rotated-logs").await?;
+    let manager = app.instance_manager();
+    let gone = past_session(&app, id, &root, "2025-01-14_12-00-00.log", "gone\n").await?;
+    manager.log_history.remove(&id);
+    let kept = past_session(&app, id, &root, "2025-01-15_12-00-00.log", "kept\n").await?;
+    tokio::fs::remove_file(root.join("logs/2025-01-14_12-00-00.log")).await?;
+
+    assert!(manager.get_log(gone).await.is_err());
+
+    let listed = manager.get_logs(id).await;
+    assert_eq!(listed.iter().map(|log| log.id).collect::<Vec<_>>(), [kept]);
+    assert_eq!(log_text(&manager.get_log(kept).await.unwrap()), "kept\n");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_past_session_opens_from_the_folder_its_instance_was_renamed_to() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "renamed-logs").await?;
+    let manager = app.instance_manager();
+    let session = past_session(&app, id, &root, "2025-01-14_12-00-00.log", "kept\n").await?;
+
+    // Renamed after the folder was looked up and before the file is read:
+    // the file is not where it was, and it is not gone.
+    let pause = manager.test_hooks.arm("log_open", id);
+    let open = manager.get_log(session);
+    tokio::pin!(open);
+    reach(&pause, open.as_mut()).await;
+    let mut edit = update(id);
+    edit.name = Some("renamed-logs-again".into());
+    tokio::time::timeout(PROMPTLY, manager.update_instance(edit))
+        .await
+        .expect("renaming waited for a past log being opened")?;
+    assert!(!root.exists(), "the rename did not move the folder");
+    pause.release.notify_one();
+
+    assert_eq!(log_text(&open.await.unwrap()), "kept\n");
+    assert_eq!(manager.get_logs(id).await.len(), 1);
+
+    // And once more after the rename, with nothing in memory.
+    let other = fixture(&app, "other-logs").await?;
+    let elsewhere = past_session(
+        &app,
+        other.0,
+        &other.1,
+        "2025-01-16_12-00-00.log",
+        "other\n",
+    )
+    .await?;
+    manager.get_log(elsewhere).await.unwrap();
+    assert!(manager.game_logs.read().await[&session].log.is_none());
+    assert_eq!(log_text(&manager.get_log(session).await.unwrap()), "kept\n");
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_past_session_being_opened_while_its_instance_is_deleted_is_not_kept()
+-> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    without_recycle_bin(&app).await?;
+    let (id, root) = fixture(&app, "deleted-open-logs").await?;
+    let manager = app.instance_manager();
+    let session = past_session(&app, id, &root, "2025-01-14_12-00-00.log", "kept\n").await?;
+
+    let pause = manager.test_hooks.arm("log_open", id);
+    let open = manager.get_log(session);
+    tokio::pin!(open);
+    reach(&pause, open.as_mut()).await;
+    tokio::time::timeout(PROMPTLY, manager._delete_instance(id))
+        .await
+        .expect("deleting waited for a past log being opened")?;
+    pause.release.notify_one();
+
+    assert!(open.await.is_err());
+    assert!(manager.game_logs.read().await.is_empty());
     Ok(())
 }
 

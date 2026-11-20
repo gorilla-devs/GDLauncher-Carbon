@@ -11,7 +11,15 @@ vi.mock("@/utils/rspcClient.js", () => ({
   apiWsUrl: (path: string) => `ws://injected.invalid${path}`,
   rspc: {
     createQuery: (options: any) => ({
-      data: options().queryKey[0] === "instance.getLogs" ? [] : undefined
+      // The two sessions the tests select; one that is not listed cannot
+      // be selected.
+      data:
+        options().queryKey[0] === "instance.getLogs"
+          ? [
+              { id: 1, active: false },
+              { id: 2, active: false }
+            ]
+          : undefined
     })
   }
 }))
