@@ -91,7 +91,7 @@ walkdir = "2.5.0"
 serde_plain = "1.0.2"
 tracing-subscriber = { version = "0.3.18", features = ["ansi", "env-filter"] }
 tracing-appender = "0.2.3"
-strip-ansi-escapes = "0.2.1"
+vte = { version = "0.14.1", default-features = false }
 # tracing-forest = { version = "0.1.5", features = [
 #   "smallvec",
 #   "chrono",

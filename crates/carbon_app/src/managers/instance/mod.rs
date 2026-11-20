@@ -58,6 +58,7 @@ mod addon_recycle_tests;
 mod lifecycle_tests;
 
 mod addon_retry;
+mod ansi;
 pub mod explore;
 pub mod export;
 pub mod importer;

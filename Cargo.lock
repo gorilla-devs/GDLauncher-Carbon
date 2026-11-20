@@ -487,7 +487,6 @@ dependencies = [
  "shlex",
  "specta",
  "static_vcruntime",
- "strip-ansi-escapes",
  "strum",
  "strum_macros",
  "sysinfo",
@@ -506,6 +505,7 @@ dependencies = [
  "unicode-segmentation",
  "url",
  "uuid",
+ "vte",
  "walkdir",
  "wayland-sys",
  "winreg",
@@ -4348,15 +4348,6 @@ name = "static_vcruntime"
 version = "2.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "954e3e877803def9dc46075bf4060147c55cd70db97873077232eae0269dc89b"
-
-[[package]]
-name = "strip-ansi-escapes"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a8f8038e7e7969abb3f1b7c2a811225e9296da208539e0f79c5251d6cac0025"
-dependencies = [
- "vte",
-]
 
 [[package]]
 name = "strum"

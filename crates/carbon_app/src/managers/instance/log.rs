@@ -28,6 +28,7 @@ use crate::{
 };
 
 use super::InstanceManager;
+use super::ansi::AnsiStripper;
 
 /// Hard caps on in-memory log entries per game session. A log-spamming game would
 /// otherwise grow this without bound; past either cap, entries are dropped after a
@@ -780,6 +781,8 @@ impl<'a> CappedLogFile<'a> {
 
 pub struct LogProcessor<'a> {
     pub parser: LogParser,
+    /// Takes the colour codes out of the output before it is parsed.
+    stripper: AnsiStripper,
     pub kind: LogEntrySourceKind,
     pub log: &'a watch::Sender<GameLog>,
 }
@@ -788,6 +791,7 @@ impl<'a> LogProcessor<'a> {
     pub async fn new(kind: LogEntrySourceKind, log: &'a watch::Sender<GameLog>) -> Self {
         Self {
             parser: LogParser::new(),
+            stripper: AnsiStripper::new(),
             kind,
             log,
         }
@@ -802,9 +806,9 @@ impl<'a> LogProcessor<'a> {
             file.write_all(data).await?;
         }
 
-        let data = &*strip_ansi_escapes::strip(data);
+        let text = self.stripper.strip(data);
 
-        self.parser.feed(data);
+        self.parser.feed(text.as_bytes());
 
         loop {
             let buffered_before = self.parser.buffered_len();
@@ -931,6 +935,39 @@ mod test {
                 ]
             );
             assert_eq!(log.search("Mod.java:151", true, false, false).len(), 1);
+        }
+    }
+
+    /// The rows of an output read in the given pieces.
+    async fn rows(pieces: &[&[u8]]) -> Vec<String> {
+        let (tx, rx) = watch::channel(GameLog::new());
+        let mut processor = LogProcessor::new(LogEntrySourceKind::StdOut, &tx).await;
+        for piece in pieces {
+            processor.process_data(piece, None).await.unwrap();
+        }
+        let log = rx.borrow();
+        (0..log.len())
+            .map(|index| log.get_entry(index).unwrap().message.clone())
+            .collect()
+    }
+
+    /// The game's output is read 1024 bytes at a time, so an event is cut
+    /// wherever a read stops: inside a character, inside a colour code.
+    #[tokio::test]
+    async fn process_data_gives_the_same_row_wherever_a_read_stops() {
+        let event = "<log4j:Event logger=\"Chat\" timestamp=\"1\" level=\"INFO\" thread=\"main\">\
+            <log4j:Message><![CDATA[\x1b[1;32mИгрок 张伟\x1b[0m joined\n\tat a.B.c(B.java:1)]]></log4j:Message>\
+            </log4j:Event>"
+            .as_bytes();
+        let expected = ["Игрок 张伟 joined\n\tat a.B.c(B.java:1)"];
+
+        assert_eq!(rows(&[event]).await, expected);
+        for at in 0..event.len() {
+            assert_eq!(
+                rows(&[&event[..at], &event[at..]]).await,
+                expected,
+                "read stopped after byte {at}"
+            );
         }
     }
 
