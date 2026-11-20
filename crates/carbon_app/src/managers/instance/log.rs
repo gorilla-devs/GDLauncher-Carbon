@@ -48,6 +48,8 @@ pub struct GameLog {
 }
 
 impl GameLog {
+    /// Every place the query is found in the log.
+    #[cfg(test)]
     pub fn search(
         &self,
         query: &str,
@@ -55,44 +57,93 @@ impl GameLog {
         match_whole_word: bool,
         use_regex: bool,
     ) -> Vec<SearchResult> {
-        let mut results = Vec::new();
+        self.search_up_to(query, match_case, match_whole_word, use_regex, usize::MAX)
+            .results
+    }
 
-        let regex = if use_regex {
-            match regex::RegexBuilder::new(query)
+    /// The first `limit` places the query is found in the log, and whether
+    /// there are more.
+    ///
+    /// A hit is never empty: a pattern that can match nothing (`error|`,
+    /// `x*`) matches at every character, and such a hit has nothing to
+    /// highlight or to step to.
+    pub fn search_up_to(
+        &self,
+        query: &str,
+        match_case: bool,
+        match_whole_word: bool,
+        use_regex: bool,
+        limit: usize,
+    ) -> SearchResults {
+        let mut found = SearchResults::default();
+        if query.is_empty() {
+            return found;
+        }
+
+        if use_regex {
+            let Ok(regex) = regex::RegexBuilder::new(query)
                 .case_insensitive(!match_case)
                 .build()
-            {
-                Ok(r) => Some(r),
-                Err(_) => return vec![],
+            else {
+                return found;
+            };
+
+            for (entry_index, entry) in self.entries.iter().enumerate() {
+                // Hits come in order, so the UTF-16 position of each is
+                // counted on from the one before, not from the start of the
+                // message again.
+                let mut counted_bytes = 0;
+                let mut counted_utf16 = 0;
+                let mut utf16_at = |byte: usize| {
+                    counted_utf16 += entry.message[counted_bytes..byte].encode_utf16().count();
+                    counted_bytes = byte;
+                    counted_utf16
+                };
+
+                for hit in regex.find_iter(&entry.message) {
+                    if hit.is_empty() {
+                        continue;
+                    }
+                    let pos = utf16_at(hit.start());
+                    let len = utf16_at(hit.end()) - pos;
+                    if !found.push(
+                        SearchResult {
+                            entry_index,
+                            pos,
+                            len,
+                        },
+                        limit,
+                    ) {
+                        return found;
+                    }
+                }
             }
+
+            return found;
+        }
+
+        let search_query = if match_case {
+            query.to_string()
         } else {
-            None
+            query.to_lowercase()
         };
+        let query_graphemes: Vec<&str> = search_query.graphemes(true).collect();
 
         for (entry_index, entry) in self.entries.iter().enumerate() {
-            if let Some(regex) = &regex {
-                for mat in regex.find_iter(&entry.message) {
-                    results.push(SearchResult {
-                        entry_index,
-                        pos: entry.message[..mat.start()].encode_utf16().count(),
-                        len: entry.message[mat.start()..mat.end()].encode_utf16().count(),
-                    });
-                }
-                continue;
-            }
             let message: Cow<str> = if match_case {
                 entry.message.as_str().into()
             } else {
                 entry.message.to_lowercase().into()
             };
-            let search_query = if match_case {
-                query.to_string()
-            } else {
-                query.to_lowercase()
-            };
+
+            // A hit is a run of whole graphemes that spells the query, so a
+            // message that does not hold the query's text cannot hold one.
+            // Most messages don't, and are spared the per-character work.
+            if !message.contains(&*search_query) {
+                continue;
+            }
 
             let message_graphemes: Vec<&str> = message.graphemes(true).collect();
-            let query_graphemes: Vec<&str> = search_query.graphemes(true).collect();
 
             // Literal matching keeps its grapheme/overlap/word rules on the folded
             // string. Only the returned spans are mapped back to the original text.
@@ -145,51 +196,45 @@ impl GameLog {
                 (begin, finish - begin)
             };
 
-            if match_whole_word {
-                let mut pos = 0;
-                while pos < message_graphemes.len() {
-                    if message_graphemes[pos..].starts_with(&query_graphemes) {
-                        // Check word boundaries
-                        let is_word_start = pos == 0
-                            || !message_graphemes[pos - 1]
-                                .chars()
-                                .next()
-                                .unwrap()
-                                .is_alphanumeric();
-                        let query_end = pos + query_graphemes.len();
-                        let is_word_end = query_end >= message_graphemes.len()
-                            || !message_graphemes[query_end]
-                                .chars()
-                                .next()
-                                .unwrap()
-                                .is_alphanumeric();
-
-                        if is_word_start && is_word_end {
-                            results.push(SearchResult {
-                                entry_index,
-                                pos: literal_span(pos, query_graphemes.len()).0,
-                                len: literal_span(pos, query_graphemes.len()).1,
-                            });
-                        }
-                    }
-                    pos += 1;
+            for pos in 0..message_graphemes.len() {
+                if !message_graphemes[pos..].starts_with(&query_graphemes) {
+                    continue;
                 }
-            } else {
-                let mut pos = 0;
-                while pos < message_graphemes.len() {
-                    if message_graphemes[pos..].starts_with(&query_graphemes) {
-                        results.push(SearchResult {
-                            entry_index,
-                            pos: literal_span(pos, query_graphemes.len()).0,
-                            len: literal_span(pos, query_graphemes.len()).1,
-                        });
+
+                if match_whole_word {
+                    let is_word_start = pos == 0
+                        || !message_graphemes[pos - 1]
+                            .chars()
+                            .next()
+                            .unwrap()
+                            .is_alphanumeric();
+                    let query_end = pos + query_graphemes.len();
+                    let is_word_end = query_end >= message_graphemes.len()
+                        || !message_graphemes[query_end]
+                            .chars()
+                            .next()
+                            .unwrap()
+                            .is_alphanumeric();
+                    if !(is_word_start && is_word_end) {
+                        continue;
                     }
-                    pos += 1;
+                }
+
+                let (pos, len) = literal_span(pos, query_graphemes.len());
+                if !found.push(
+                    SearchResult {
+                        entry_index,
+                        pos,
+                        len,
+                    },
+                    limit,
+                ) {
+                    return found;
                 }
             }
         }
 
-        results
+        found
     }
 }
 
@@ -373,6 +418,32 @@ impl GameLog {
     }
 }
 
+/// The most hits one search answers with. A single letter is found
+/// millions of times in a large log, far more than can be stepped through,
+/// and every hit is sent to the interface.
+pub const MAX_SEARCH_RESULTS: usize = 10_000;
+
+/// The hits of a search, in the order they stand in the log.
+#[derive(Debug, Default)]
+pub struct SearchResults {
+    pub results: Vec<SearchResult>,
+    /// There are more hits than the search was asked for.
+    pub truncated: bool,
+}
+
+impl SearchResults {
+    /// Takes the hit unless `limit` hits are held already. Says whether the
+    /// search goes on.
+    fn push(&mut self, result: SearchResult, limit: usize) -> bool {
+        if self.results.len() >= limit {
+            self.truncated = true;
+            return false;
+        }
+        self.results.push(result);
+        true
+    }
+}
+
 #[derive(Debug)]
 pub struct SearchResult {
     pub entry_index: usize,
@@ -544,11 +615,17 @@ impl ManagerRef<'_, InstanceManager> {
         match_case: bool,
         match_whole_word: bool,
         use_regex: bool,
-    ) -> anyhow::Result<Vec<SearchResult>> {
+    ) -> anyhow::Result<SearchResults> {
         let log = self.get_log(id).await?;
         let log = log.borrow();
 
-        Ok(log.search(query, match_case, match_whole_word, use_regex))
+        Ok(log.search_up_to(
+            query,
+            match_case,
+            match_whole_word,
+            use_regex,
+            MAX_SEARCH_RESULTS,
+        ))
     }
 }
 
@@ -968,6 +1045,95 @@ mod test {
                 expected,
                 "read stopped after byte {at}"
             );
+        }
+    }
+
+    fn log(message: &str) -> GameLog {
+        let mut log = GameLog::new();
+        log.add_entry(LogEntry::plaintext(message, LogEntrySourceKind::StdOut));
+        log
+    }
+
+    fn hits(results: &[SearchResult]) -> Vec<(usize, usize, usize)> {
+        results
+            .iter()
+            .map(|hit| (hit.entry_index, hit.pos, hit.len))
+            .collect()
+    }
+
+    #[test]
+    fn a_pattern_that_can_match_nothing_gives_no_empty_hits() {
+        // On the way to typing "error|warn".
+        assert_eq!(
+            hits(&log("an error here").search("error|", false, false, true)),
+            [(0, 3, 5)]
+        );
+        assert_eq!(
+            hits(&log("axxb xx").search("x*", false, false, true)),
+            [(0, 1, 2), (0, 5, 2)]
+        );
+        assert!(log("abc").search("x*", false, false, true).is_empty());
+        assert!(log("abc").search("", false, false, true).is_empty());
+        assert!(log("abc").search("", false, false, false).is_empty());
+        assert!(log("abc").search("", false, true, false).is_empty());
+    }
+
+    #[test]
+    fn several_regex_hits_in_a_row_keep_their_utf16_positions() {
+        assert_eq!(
+            hits(&log("😀 ab 😀 ab é ab").search("ab", true, false, true)),
+            [(0, 3, 2), (0, 9, 2), (0, 14, 2)]
+        );
+    }
+
+    #[test]
+    fn a_search_stops_at_its_limit_and_says_there_is_more() {
+        let mut log = GameLog::new();
+        for _ in 0..3 {
+            log.add_entry(LogEntry::plaintext("banana", LogEntrySourceKind::StdOut));
+        }
+
+        for regex in [false, true] {
+            // Nine hits in all: three letters in each of three rows.
+            let all = log.search_up_to("a", true, false, regex, 9);
+            assert_eq!(all.results.len(), 9);
+            assert!(!all.truncated, "regex: {regex}");
+
+            let some = log.search_up_to("a", true, false, regex, 4);
+            assert_eq!(
+                hits(&some.results),
+                [(0, 1, 1), (0, 3, 1), (0, 5, 1), (1, 1, 1)]
+            );
+            assert!(some.truncated, "regex: {regex}");
+        }
+    }
+
+    /// Before, "error|" on this log gave a hit at every one of its 1.8
+    /// million characters and found the position of each by reading its row
+    /// again from the start; the search did not finish in nine minutes.
+    #[tokio::test]
+    async fn a_search_of_the_sample_log_is_answered() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../carbon_parsing/fixtures/log_example.log"
+        );
+        let (tx, rx) = watch::channel(GameLog::new());
+        LogProcessor::new(LogEntrySourceKind::StdOut, &tx)
+            .await
+            .process_data(&std::fs::read(path).unwrap(), None)
+            .await
+            .unwrap();
+        let log = rx.borrow();
+
+        let plain = hits(&log.search("error", false, false, false));
+        assert!(!plain.is_empty());
+        assert_eq!(hits(&log.search("error|", false, false, true)), plain);
+        assert_eq!(hits(&log.search("error", false, false, true)), plain);
+
+        for regex in [false, true] {
+            let letter = log.search_up_to("e", false, false, regex, MAX_SEARCH_RESULTS);
+            assert_eq!(letter.results.len(), MAX_SEARCH_RESULTS);
+            assert!(letter.truncated);
         }
     }
 

@@ -11,6 +11,7 @@ const c = vi.hoisted(() => ({
   calls: [] as any[],
   deferred: [] as any[],
   defer: false,
+  truncated: false,
   aborted: 0
 }))
 vi.mock("@solidjs/router", () => ({ useParams: () => ({ id: "1" }) }))
@@ -42,11 +43,12 @@ vi.mock("@/utils/rspcClient.js", async () => {
                   : []
               }
             )
+            const answer = { results, truncated: c.truncated }
             if (c.defer)
               return new Promise((resolve) =>
-                c.deferred.push(() => resolve(results))
+                c.deferred.push(() => resolve(answer))
               )
-            return Promise.resolve(results)
+            return Promise.resolve(answer)
           }
         }))
       }
@@ -145,6 +147,7 @@ beforeEach(() => {
   c.calls = []
   c.deferred = []
   c.defer = false
+  c.truncated = false
   c.aborted = 0
   c.snapshots = { 1: [], 2: [] }
   Socket.sockets = []
@@ -188,6 +191,51 @@ afterEach(() => {
   root.remove()
   vi.unstubAllGlobals()
   vi.useRealTimers()
+})
+function type(text: string) {
+  const input = root.querySelector("input")!
+  input.value = text
+  input.dispatchEvent(new Event("input", { bubbles: true }))
+}
+test("typing a word searches once, after the typing has paused", async () => {
+  c.snapshots[1].push({ message: "an ERROR line" })
+  toggle()
+  for (const text of ["E", "ER", "ERR", "ERRO", "ERROR"]) {
+    type(text)
+    await advance(150)
+  }
+  expect(c.calls).toEqual([])
+  await advance(199 - 150)
+  expect(c.calls).toEqual([])
+  await advance(1)
+  expect(c.calls.map((call) => call.query)).toEqual(["ERROR"])
+  expect(root.textContent).toContain("1 of 1")
+})
+test("emptying the box clears the count at once, and a pending search with it", async () => {
+  c.snapshots[1].push({ message: "an ERROR line" })
+  await search()
+  await advance()
+  expect(root.textContent).toContain("1 of 1")
+  const before = c.calls.length
+  type("ERRORS")
+  await advance(100)
+  type("")
+  await flush()
+  expect(root.textContent).toContain("_trn_no_results")
+  await advance(1000)
+  expect(c.calls.length).toBe(before)
+})
+test("the count says when the log holds more hits than were answered", async () => {
+  c.snapshots[1].push({ message: "an ERROR line" }, { message: "ERROR two" })
+  c.truncated = true
+  await search()
+  await advance()
+  expect(root.textContent).toContain("1 of 2+")
+  c.truncated = false
+  type("ERROR two")
+  await advance()
+  expect(root.textContent).toContain("1 of 1")
+  expect(root.textContent).not.toContain("1 of 1+")
 })
 test("matching live growth updates actual finder count and mounted highlight without changing query key", async () => {
   await search()

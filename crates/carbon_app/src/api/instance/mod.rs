@@ -18,7 +18,7 @@ use crate::managers::instance::export::{
     InstanceTooLargeError, ShareEntry, ShareEntryKind, ShareInstanceProgress,
 };
 use crate::managers::instance::importer::ImportShareCodeProgress;
-use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
+use crate::managers::instance::log::{LogEntrySourceKind, SearchResult, SearchResults};
 use crate::managers::{App, AppInner, instance::importer};
 use anyhow::anyhow;
 use axum::Json;
@@ -506,12 +506,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     query.match_whole_word,
                     query.use_regex,
                 )
-                .await?
-                .into_iter()
-                .map(FESearchResult::from)
-                .collect::<Vec<_>>();
+                .await?;
 
-            Ok(res)
+            Ok(FESearchResults::from(res))
         }
 
         mutation DELETE_LOG[app, id: GameLogId] {
@@ -2926,6 +2923,22 @@ struct FESearchResult {
     pub entry_index: u32,
     pub pos: u32,
     pub len: u32,
+}
+
+/// The hits of a log search, and whether the log holds more than these.
+#[derive(Debug, Type, Serialize)]
+struct FESearchResults {
+    pub results: Vec<FESearchResult>,
+    pub truncated: bool,
+}
+
+impl From<SearchResults> for FESearchResults {
+    fn from(value: SearchResults) -> Self {
+        Self {
+            results: value.results.into_iter().map(Into::into).collect(),
+            truncated: value.truncated,
+        }
+    }
 }
 
 impl From<SearchResult> for FESearchResult {

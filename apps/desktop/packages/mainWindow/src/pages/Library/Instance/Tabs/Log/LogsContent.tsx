@@ -1,5 +1,6 @@
 import {
   createEffect,
+  createMemo,
   createSignal,
   For,
   Match,
@@ -19,6 +20,7 @@ import { VList } from "@/components/VirtuaWrapper"
 import { VirtualizerHandle } from "virtua/lib/solid"
 import { SetStoreFunction } from "solid-js/store"
 import LogsFinders from "./LogsFinders"
+import { groupHitsByRow } from "./searchHits"
 import { FESearchResult } from "@gd/core_module/bindings"
 import useKeyboardShortcut from "@/hooks/useKeyboardShortcut"
 import { ScrollToIndexOpts } from "virtua/lib/core"
@@ -28,6 +30,8 @@ interface Props {
   query: LogQuery
   setQuery: SetStoreFunction<LogQuery>
   logSearchResults: FESearchResult[] | undefined
+  /** The log holds more hits than `logSearchResults`. */
+  logSearchTruncated?: boolean
   onFinderVisibilityChange?: (open: boolean) => void
   isActive: boolean
   /** The instance is running a game a previous launcher session started, so
@@ -273,6 +277,7 @@ function ScrollBottomButton(props: {
 
 const LogsContent = (props: Props) => {
   const [open, setOpen] = createSignal(false)
+  const hitsByRow = createMemo(() => groupHitsByRow(props.logSearchResults))
   createEffect(() => props.onFinderVisibilityChange?.(open()))
   onCleanup(() => props.onFinderVisibilityChange?.(false))
   const [logsDensity, setLogsDensity] = createSignal<LogDensity>("low")
@@ -323,6 +328,7 @@ const LogsContent = (props: Props) => {
             query={props.query}
             setQuery={props.setQuery}
             logSearchResults={props.logSearchResults}
+            logSearchTruncated={props.logSearchTruncated}
             currentResultIndex={currentResultIndex()}
             setCurrentResultIndex={setCurrentResultIndex}
             scrollToIndex={props.scrollToIndex}
@@ -405,35 +411,20 @@ const LogsContent = (props: Props) => {
               bufferSize={10}
             >
               {(log, index) => {
+                const rowHits = () => hitsByRow().get(index())
+
                 const rowSearchResult = () =>
-                  open()
-                    ? props.logSearchResults?.filter(
-                        (result) => result.entry_index === index()
-                      )
-                    : undefined
+                  open() ? (rowHits()?.results ?? []) : undefined
 
-                const baseIndex = () =>
-                  props.logSearchResults?.findIndex(
-                    (result) => result.entry_index === index()
-                  )
+                const baseIndex = () => rowHits()?.first ?? -1
 
+                // Where the current hit stands among this row's own hits.
                 const relativeCurrentResultIndex = () => {
-                  const currResultIndex = currentResultIndex()
-                  if (
-                    currResultIndex !== null &&
-                    props.logSearchResults?.[currResultIndex]?.entry_index ===
-                      index()
-                  ) {
-                    // Match the current global result within this mounted row.
-                    const rowResultIndex = rowSearchResult()?.findIndex(
-                      (result) =>
-                        result === props.logSearchResults?.[currResultIndex]
-                    )
-                    if (rowResultIndex !== undefined && rowResultIndex !== -1) {
-                      return rowResultIndex
-                    }
-                  }
-                  return -1
+                  const current = currentResultIndex()
+                  const hits = rowHits()
+                  if (current === null || !hits) return -1
+                  const inRow = current - hits.first
+                  return inRow >= 0 && inRow < hits.results.length ? inRow : -1
                 }
 
                 return (

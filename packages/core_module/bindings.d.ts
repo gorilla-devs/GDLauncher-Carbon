@@ -36,7 +36,7 @@ export type Procedures = {
         { key: "instance.getSharePreview", input: string, result: FESharePreview } | 
         { key: "instance.getUserQuota", input: never, result: FEQuotaInfo } | 
         { key: "instance.getUserShares", input: FEGetUserSharesArgs, result: FEPaginatedShares } | 
-        { key: "instance.searchLogs", input: SearchLogsQuery, result: FESearchResult[] } | 
+        { key: "instance.searchLogs", input: SearchLogsQuery, result: FESearchResults } | 
         { key: "instance.validateShareCode", input: string, result: boolean } | 
         { key: "instance.verifyShaderLoader", input: ShaderLoaderVerification, result: boolean } | 
         { key: "instance.waitForShareInstance", input: FEWaitForShareInstanceArgs, result: FEWaitForInstanceShareResponse } | 
@@ -933,6 +933,11 @@ export type BanPlayerRequest = { serverId: FEServerId; username: string; reason:
  * Search offsets are UTF-16 code units in the original message, as used by JS slice.
  */
 export type FESearchResult = { entry_index: number; pos: number; len: number }
+
+/**
+ * The hits of a log search, and whether the log holds more than these.
+ */
+export type FESearchResults = { results: FESearchResult[]; truncated: boolean }
 
 /**
  * A selection of an instance's addons to delete in one step.

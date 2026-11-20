@@ -11,6 +11,8 @@ interface Props {
   query: LogQuery
   setQuery: SetStoreFunction<LogQuery>
   logSearchResults: FESearchResult[] | undefined
+  /** The log holds more hits than `logSearchResults`. */
+  logSearchTruncated?: boolean
   open: boolean
   setOpen: (open: boolean) => void
   currentResultIndex: number | null
@@ -147,9 +149,7 @@ const LogsFinders = (props: Props) => {
               </Match>
               <Match when={props.logSearchResults?.length !== 0}>
                 <div class="w-24">
-                  {props.currentResultIndex !== null
-                    ? `${props.currentResultIndex + 1} of ${props.logSearchResults?.length}`
-                    : `1 of ${props.logSearchResults?.length}`}
+                  {`${(props.currentResultIndex ?? 0) + 1} of ${props.logSearchResults?.length}${props.logSearchTruncated ? "+" : ""}`}
                 </div>
               </Match>
             </Switch>

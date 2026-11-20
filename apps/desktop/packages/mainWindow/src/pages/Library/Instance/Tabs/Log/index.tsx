@@ -5,10 +5,13 @@ import { createEffect, createSignal, onCleanup, untrack } from "solid-js"
 import LogsSidebar from "./LogsSidebar"
 import LogsContent from "./LogsContent"
 import { createStore } from "solid-js/store"
-import type { FESearchResult } from "@gd/core_module/bindings"
+import type { FESearchResults } from "@gd/core_module/bindings"
 import { VirtualizerHandle } from "virtua/lib/solid"
 
 export const [isFullScreen, setIsFullScreen] = createSignal(false)
+
+/** How long typing in the finder has to pause before the log is searched. */
+export const SEARCH_TYPING_PAUSE_MS = 200
 
 export interface LogQuery {
   query: string | null
@@ -31,7 +34,7 @@ const Logs = () => {
   const params = useParams<{ id: string }>()
   const [newLogsCount, setNewLogsCount] = createSignal(0)
   const [finderOpen, setFinderOpen] = createSignal(false)
-  const [searchResults, setSearchResults] = createSignal<FESearchResult[]>()
+  const [searchResults, setSearchResults] = createSignal<FESearchResults>()
   let markSearchDirty = () => {}
   const [query, setQuery] = createStore<LogQuery>({
     query: null,
@@ -40,12 +43,26 @@ const Logs = () => {
     useRegex: false
   })
 
+  // What is searched for: the text of the box once typing has paused. A
+  // search goes through the whole log, so one is not started for every
+  // letter on the way to a word. An emptied box counts at once.
+  const [searchText, setSearchText] = createSignal<string | null>(null)
+  createEffect(() => {
+    const typed = query.query
+    if (!typed) {
+      setSearchText(typed)
+      return
+    }
+    const timer = setTimeout(() => setSearchText(typed), SEARCH_TYPING_PAUSE_MS)
+    onCleanup(() => clearTimeout(timer))
+  })
+
   const logSearchResults = rspc.createQuery(() => ({
     queryKey: [
       "instance.searchLogs",
       {
         log_id: selectedLog()!,
-        query: query.query!,
+        query: searchText()!,
         match_case: query.matchCase,
         match_whole_word: query.matchWholeWord,
         use_regex: query.useRegex
@@ -53,7 +70,7 @@ const Logs = () => {
     ],
     enabled:
       finderOpen() &&
-      !!query.query &&
+      !!searchText() &&
       selectedLog() !== undefined &&
       selectedLog() !== null
   }))
@@ -81,7 +98,7 @@ const Logs = () => {
     const key = JSON.stringify([
       params.id,
       selectedLog(),
-      query.query,
+      searchText(),
       query.matchCase,
       query.matchWholeWord,
       query.useRegex,
@@ -90,7 +107,7 @@ const Logs = () => {
     const active = isActive()
     if (key !== previousKey) setSearchResults(undefined)
     markSearchDirty = () => {}
-    if (!finderOpen() || !query.query || selectedLog() == null) return key
+    if (!finderOpen() || !searchText() || selectedLog() == null) return key
 
     let current = true
     let dirty = false
@@ -284,7 +301,8 @@ const Logs = () => {
         logs={logs}
         query={query}
         setQuery={setQuery}
-        logSearchResults={searchResults()}
+        logSearchResults={searchResults()?.results}
+        logSearchTruncated={searchResults()?.truncated ?? false}
         onFinderVisibilityChange={setFinderOpen}
         isActive={isActive() || false}
         adopted={isAdoptedRunning()}
