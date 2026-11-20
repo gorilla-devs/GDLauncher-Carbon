@@ -22,6 +22,7 @@ import { FEPaginatedShares, FEShareInfo } from "@gd/core_module/bindings"
 import { Trans, useTransContext } from "@gd/i18n"
 import { createInfiniteQuery } from "@tanstack/solid-query"
 import { formatDownloadCount } from "@/utils/helpers"
+import { listedShare } from "@/utils/shareEdit"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import VerificationRequiredPlaceholder from "@/components/VerificationRequiredPlaceholder"
 
@@ -187,9 +188,9 @@ function MyShares(props: ModalProps) {
       { name: "editShare" },
       {
         share,
-        onUpdated: () => {
-          sharesQuery.refetch()
+        onUpdated: async () => {
           quotaQuery.refetch()
+          return listedShare(await sharesQuery.refetch(), share.shareCode)
         }
       }
     )

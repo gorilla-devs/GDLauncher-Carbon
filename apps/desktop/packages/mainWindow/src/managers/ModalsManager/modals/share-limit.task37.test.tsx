@@ -88,16 +88,23 @@ function button(root: HTMLElement, suffix: string) {
     b.textContent?.includes(suffix)
   )!
 }
-function edit(limit: any = 42, onUpdated = vi.fn()) {
+function edit(
+  limit: any = 42,
+  // The list read again after saving; by default the server stored what it
+  // was asked.
+  listed: (share: any, asked: any) => any = (share, asked) => ({
+    ...share,
+    ...asked
+  }),
+  title = " Title "
+) {
   io.update.mockResolvedValue(undefined)
+  const share = { shareCode: "fixture", title, maxDownloads: limit }
+  const onUpdated = vi.fn(async () =>
+    listed(share, io.update.mock.lastCall?.[0])
+  )
   const root = mount(() => (
-    <EditShare
-      title="Edit share"
-      data={{
-        share: { shareCode: "fixture", title: " Title ", maxDownloads: limit },
-        onUpdated
-      }}
-    />
+    <EditShare title="Edit share" data={{ share, onUpdated }} />
   ))
   return { root, onUpdated }
 }
@@ -166,7 +173,7 @@ it.each([
 ] as const)(
   "actual EditShare input %j displays %j and saves %s",
   async (text, display, value) => {
-    const f = edit()
+    const f = edit(7)
     const field = f.root.querySelector<HTMLInputElement>("input[type=number]")!
     input(field, text)
     expect(field.value).toBe(display)
@@ -204,6 +211,88 @@ it("EditShare failure retains callback/closure and shows only error feedback", a
   expect(io.success).not.toHaveBeenCalled()
   expect(f.onUpdated).not.toHaveBeenCalled()
   expect(io.close).not.toHaveBeenCalled()
+})
+it("EditShare leaves a limit that was not changed out of the request", async () => {
+  const f = edit(42)
+  button(f.root, "_trn_my_shares.save").click()
+  await flush()
+  expect(io.update).toHaveBeenCalledWith({
+    shareCode: "fixture",
+    title: "Title"
+  })
+  expect(io.success).toHaveBeenCalledTimes(1)
+})
+it("EditShare asks to remove an emptied title with empty text", async () => {
+  const f = edit(42)
+  input(f.root.querySelector<HTMLInputElement>("input:not([type=number])")!, "")
+  button(f.root, "_trn_my_shares.save").click()
+  await flush()
+  expect(io.update).toHaveBeenCalledWith({ shareCode: "fixture", title: "" })
+  expect(io.success).toHaveBeenCalledTimes(1)
+})
+it("EditShare with nothing changed closes without a request or a notice", async () => {
+  const f = edit(42, undefined, "Title")
+  button(f.root, "_trn_my_shares.save").click()
+  await flush()
+  expect(io.update).not.toHaveBeenCalled()
+  expect(f.onUpdated).not.toHaveBeenCalled()
+  expect(io.success).not.toHaveBeenCalled()
+  expect(io.error).not.toHaveBeenCalled()
+  expect(io.close).toHaveBeenCalledTimes(1)
+})
+it.each([
+  ["limit", "input[type=number]"],
+  ["title", "input:not([type=number])"]
+] as const)(
+  "EditShare says the update failed while the emptied %s is still listed",
+  async (_field, selector) => {
+    // The server answered, and still lists the share as it was.
+    const f = edit(42, (share) => share)
+    input(f.root.querySelector<HTMLInputElement>(selector)!, "")
+    button(f.root, "_trn_my_shares.save").click()
+    await flush()
+    expect(io.update).toHaveBeenCalledTimes(1)
+    expect(f.onUpdated).toHaveBeenCalledTimes(1)
+    expect(io.error).toHaveBeenCalledTimes(1)
+    expect(io.success).not.toHaveBeenCalled()
+    expect(io.close).not.toHaveBeenCalled()
+  }
+)
+it.each([
+  ["cannot be read", (): any => undefined],
+  [
+    "fails to be read",
+    (): any => {
+      throw new Error("injected list failure")
+    }
+  ]
+] as const)(
+  "EditShare shows no notice when the list %s after saving",
+  async (_case, listed) => {
+    const f = edit(42, listed)
+    input(f.root.querySelector<HTMLInputElement>("input[type=number]")!, "")
+    button(f.root, "_trn_my_shares.save").click()
+    await flush()
+    expect(io.update).toHaveBeenCalledTimes(1)
+    expect(io.success).not.toHaveBeenCalled()
+    expect(io.error).not.toHaveBeenCalled()
+    expect(io.close).toHaveBeenCalledTimes(1)
+  }
+)
+it("EditShare ignores a second Save while the first is being saved", async () => {
+  const f = edit(42)
+  let answer!: () => void
+  io.update.mockReturnValue(new Promise<void>((done) => (answer = done)))
+  const save = button(f.root, "_trn_my_shares.save")
+  save.click()
+  await flush()
+  save.click()
+  await flush()
+  expect(io.update).toHaveBeenCalledTimes(1)
+  answer()
+  await flush()
+  expect(io.success).toHaveBeenCalledTimes(1)
+  expect(io.close).toHaveBeenCalledTimes(1)
 })
 it("EditShare with its share removed after mount dispatches nothing", async () => {
   const [data, setData] = createSignal<any>({

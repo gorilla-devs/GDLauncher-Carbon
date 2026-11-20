@@ -3245,14 +3245,17 @@ impl From<QuotaInfo> for FEQuotaInfo {
     }
 }
 
-// Args for UPDATE_SHARE mutation
+// Args for UPDATE_SHARE mutation. A field that is left out stays as it is.
 #[derive(Debug, Deserialize, Type)]
 #[serde(rename_all = "camelCase")]
 struct FEUpdateShareArgs {
     share_code: String,
+    /// The new title; empty text removes it.
     #[specta(optional)]
     title: Option<String>,
+    /// The new download limit; an explicit `null` removes it.
     #[specta(optional)]
+    #[serde(default, deserialize_with = "crate::util::deserialize_double_option")]
     max_downloads: Option<Option<i32>>,
 }
 
@@ -3533,6 +3536,47 @@ mod task33_prepare_input_tests {
                 r#"{"instance":7,"expected_failed_task":11}"#
             )
             .is_err()
+        );
+    }
+}
+
+#[cfg(test)]
+mod update_share_wire_tests {
+    use super::*;
+    use crate::managers::account::gdl_account::UpdateShareBody;
+
+    /// What the server is sent for one request from the interface.
+    fn sent(request: &str) -> String {
+        let args: FEUpdateShareArgs = serde_json::from_str(request).unwrap();
+        serde_json::to_string(&UpdateShareBody {
+            title: args.title,
+            max_downloads: args.max_downloads,
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn an_emptied_limit_is_sent_as_a_removal() {
+        assert_eq!(
+            sent(r#"{"shareCode":"abc","maxDownloads":null}"#),
+            r#"{"max_downloads":null}"#
+        );
+    }
+
+    #[test]
+    fn a_field_left_out_is_not_sent() {
+        assert_eq!(sent(r#"{"shareCode":"abc"}"#), "{}");
+        assert_eq!(
+            sent(r#"{"shareCode":"abc","title":"New"}"#),
+            r#"{"title":"New"}"#
+        );
+    }
+
+    #[test]
+    fn a_new_limit_and_an_emptied_title_are_sent() {
+        assert_eq!(
+            sent(r#"{"shareCode":"abc","title":"","maxDownloads":25}"#),
+            r#"{"title":"","max_downloads":25}"#
         );
     }
 }

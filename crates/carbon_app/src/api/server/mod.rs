@@ -14,7 +14,7 @@ use axum::http::{HeaderMap, HeaderValue, StatusCode};
 use axum::response::IntoResponse;
 use chrono::{DateTime, Utc};
 use rspc::RouterBuilder;
-use serde::{Deserialize, Deserializer, Serialize};
+use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::sync::Arc;
 use tracing::error;
@@ -217,23 +217,6 @@ struct CreateServer {
     modloader_version: Option<String>,
 }
 
-/// Deserialize an `Option<Option<T>>` field where an absent key means "leave
-/// unchanged" and an explicit `null` means "clear it" (the "double option"
-/// pattern). Plain derive(Deserialize) can't tell those apart: both an absent
-/// key and an explicit `null` collapse to the outer `None`, so a value could
-/// never actually be cleared. This function only runs when the key IS
-/// present (paired with `#[serde(default)]`, which supplies the outer `None`
-/// when it's absent), so a present `null` parses through `Option::deserialize`
-/// (giving `None`) and gets wrapped in `Some`, and a present value becomes
-/// `Some(Some(value))`.
-fn deserialize_double_option<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
-where
-    D: Deserializer<'de>,
-    T: Deserialize<'de>,
-{
-    Deserialize::deserialize(deserializer).map(Some)
-}
-
 #[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct UpdateServer {
@@ -241,7 +224,7 @@ struct UpdateServer {
     name: Option<String>,
     xmx: Option<i32>,
     xms: Option<i32>,
-    #[serde(default, deserialize_with = "deserialize_double_option")]
+    #[serde(default, deserialize_with = "crate::util::deserialize_double_option")]
     extra_java_args: Option<Option<String>>,
     auto_restart: Option<bool>,
 }

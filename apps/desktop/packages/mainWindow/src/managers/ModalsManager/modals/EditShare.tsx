@@ -5,15 +5,16 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { createSignal } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { FEShareInfo } from "@gd/core_module/bindings"
-import {
-  MAX_DOWNLOADS_LIMIT,
-  parseMaxDownloads,
-  validateMaxDownloads
-} from "@/utils/validation"
+import { MAX_DOWNLOADS_LIMIT, validateMaxDownloads } from "@/utils/validation"
+import { shareChanges, shareChangesApplied } from "@/utils/shareEdit"
 
 interface Props {
   share: FEShareInfo
-  onUpdated: () => void
+  /**
+   * Reads the list again and answers with the share as it is listed now, or
+   * with nothing when that could not be read.
+   */
+  onUpdated: () => Promise<FEShareInfo | undefined>
 }
 
 const EditShare = (props: ModalProps) => {
@@ -30,25 +31,46 @@ const EditShare = (props: ModalProps) => {
     mutationKey: ["instance.updateShare"]
   }))
 
+  const [saving, setSaving] = createSignal(false)
+
   const handleSave = async () => {
     const share = data()?.share
-    if (!share) return
+    if (!share || saving()) return
 
-    const newTitle = editTitle().trim() || null
-    const newMaxDownloads = parseMaxDownloads(editMaxDownloads())
+    const changes = shareChanges(share, {
+      title: editTitle(),
+      maxDownloads: editMaxDownloads()
+    })
+    if (Object.keys(changes).length === 0) {
+      modalsContext?.closeModal()
+      return
+    }
 
+    setSaving(true)
     try {
       await updateMutation.mutateAsync({
         shareCode: share.shareCode,
-        title: newTitle,
-        maxDownloads: newMaxDownloads
+        ...changes
       })
-      toast.success(t("instances:_trn_my_shares.updated"))
-      data()?.onUpdated()
-      modalsContext?.closeModal()
     } catch {
       toast.error(t("instances:_trn_my_shares.update_failed"))
+      setSaving(false)
+      return
     }
+
+    // The server answers the same whether or not it took the change, so what
+    // it lists afterwards decides the notice. When that cannot be read, the
+    // list says so itself and no notice is shown.
+    const listed = await data()
+      ?.onUpdated()
+      ?.catch(() => undefined)
+    setSaving(false)
+    if (listed && !shareChangesApplied(listed, changes)) {
+      toast.error(t("instances:_trn_my_shares.update_failed"))
+      return
+    }
+    if (listed) toast.success(t("instances:_trn_my_shares.updated"))
+    modalsContext?.closeModal()
   }
 
   return (
@@ -93,11 +115,7 @@ const EditShare = (props: ModalProps) => {
           <Button type="secondary" onClick={() => modalsContext?.closeModal()}>
             <Trans key="instances:_trn_instance_share.cancel" />
           </Button>
-          <Button
-            type="primary"
-            onClick={handleSave}
-            loading={updateMutation.isPending}
-          >
+          <Button type="primary" onClick={handleSave} loading={saving()}>
             <Trans key="instances:_trn_my_shares.save" />
           </Button>
         </div>
