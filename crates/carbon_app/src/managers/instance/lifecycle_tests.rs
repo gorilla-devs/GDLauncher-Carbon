@@ -9989,8 +9989,16 @@ async fn deleting_or_renaming_an_original_waits_for_its_copy() -> anyhow::Result
         .await?,
         b"kept"
     );
-    assert!(manager.instance_op_locks.is_empty());
-    assert!(manager.instance_root_locks.is_empty());
+    // Every gate is given back. The copy's own is taken once more, briefly
+    // and in the background, by the mod scan a new instance gets, so this
+    // waits for that instead of racing it.
+    tokio::time::timeout(PROMPTLY, async {
+        while !manager.instance_op_locks.is_empty() || !manager.instance_root_locks.is_empty() {
+            tokio::time::sleep(Duration::from_millis(20)).await;
+        }
+    })
+    .await
+    .expect("an instance gate was never given back");
     Ok(())
 }
 
