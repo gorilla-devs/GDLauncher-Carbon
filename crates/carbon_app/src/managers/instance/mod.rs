@@ -389,6 +389,20 @@ fn folder_not_renamed(error: std::io::Error) -> anyhow::Error {
     anyhow::Error::new(error).context(message)
 }
 
+/// The entries of one library folder, by what the library shows for them.
+#[derive(Default)]
+struct GroupMembers {
+    /// Loaded instances: the tiles the folder shows.
+    shown: usize,
+    /// Entries of instances whose folder is gone from the instances folder,
+    /// removed or renamed by hand. The library lists them nowhere and keeps
+    /// them, so an instance that is put back finds its entry again.
+    gone: Vec<instance_repo::InstanceRow>,
+    /// Some entry is not loaded although its folder is there: the start-up
+    /// scan has not reached it yet.
+    loading: bool,
+}
+
 /// A folder name kept for a copy in the making; see
 /// `reserve_folder`. Dropping it frees the name.
 struct FolderReservation {
@@ -2120,6 +2134,38 @@ impl<'s> ManagerRef<'s, InstanceManager> {
     /// cannot repair, and `GDL_DISABLE_FK_ENFORCEMENT=1` selects the same
     /// state, so on those sessions the cascade never fires. Mirrors the
     /// equivalent server-delete fix.
+    /// Whether the instances folder holds an entry named `shortpath`.
+    fn instance_folder_exists(&self, shortpath: &str) -> bool {
+        let path = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_instances()
+            .to_path()
+            .join(shortpath);
+        // An entry that can't be looked at counts as there: nothing is
+        // dropped from the library on a guess.
+        !std::fs::symlink_metadata(path)
+            .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
+    }
+
+    /// Sorts a library folder's entries by what the library shows for them
+    /// (see [`GroupMembers`]).
+    async fn group_members(self, rows: &[instance_repo::InstanceRow]) -> GroupMembers {
+        let instances = self.instances.read().await;
+        let mut members = GroupMembers::default();
+        for row in rows {
+            if instances.contains_key(&InstanceId(row.id)) {
+                members.shown += 1;
+            } else if self.instance_folder_exists(&row.shortpath) {
+                members.loading = true;
+            } else {
+                members.gone.push(row.clone());
+            }
+        }
+        members
+    }
+
     async fn remove_instance(self, instance: InstanceId) -> anyhow::Result<()> {
         let instance_id = *instance;
         instance_repo::delete_instance_tx(&self.app.db, instance_id).await?;
@@ -3362,11 +3408,23 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             if group_id != default_group_id {
                 let gid = *group_id;
-                let remaining_count =
-                    instance_repo::count_instances_in_group(&self.app.db, gid).await?;
-
-                if remaining_count == 0 {
-                    instance_repo::delete_group(&self.app.db, gid).await?;
+                // What the folder still shows decides, not what the library
+                // remembers: the entry of an instance whose folder was
+                // removed by hand is listed nowhere, and counting it kept
+                // the emptied folder for good. Such entries move to the
+                // default folder, as when a folder alone is deleted, so an
+                // instance put back by hand still finds its entry.
+                let members = self
+                    .group_members(&instance_repo::get_instances_by_group(&self.app.db, gid).await?)
+                    .await;
+                if members.shown == 0 && !members.loading {
+                    let _index_lock = self.index_lock.lock().await;
+                    if members.gone.is_empty() {
+                        instance_repo::delete_group(&self.app.db, gid).await?;
+                    } else {
+                        instance_repo::delete_group_tx(&self.app.db, gid, *default_group_id)
+                            .await?;
+                    }
                     self.app.invalidate(GET_GROUPS, None);
                 }
             }
@@ -3677,12 +3735,19 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let instances_in_group =
             instance_repo::get_instances_by_group(&self.app.db, group_id).await?;
 
+        // An entry that is not loaded is either of an instance whose folder
+        // was removed by hand, which goes with the folder below, or of one
+        // the start-up scan has not reached yet. Nothing is deleted around
+        // the second: it would be left pointing at the folder being removed.
+        let members = self.group_members(&instances_in_group).await;
+        if members.loading {
+            bail!("The library is still loading. Try again in a moment.");
+        }
+
         // Refuse the whole operation if any contained instance is preparing or running, before
         // deleting anything. Otherwise the per-instance delete below returns an error for the
-        // running instance while the group row is removed
-        // anyway, orphaning that instance: it keeps running with a dangling group id and vanishes
-        // from list_groups (SQLite foreign keys are not enforced on this connection, so the group
-        // row deletes regardless of the referencing row). Mirror the single-instance guard.
+        // running instance after the others are already gone, and the group row, which that
+        // instance still points at, can't be removed. Mirror the single-instance guard.
         {
             let instances = self.instances.read().await;
             for instance in &instances_in_group {
@@ -3729,11 +3794,42 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
         }
 
+        // The entries of instances whose folder was removed by hand go too:
+        // the user asked for the folder with its instances. Left in place,
+        // they made the delete below fail on the database's foreign key,
+        // after the visible instances were already gone. (Deleting the last
+        // visible instance may have moved them to the default folder
+        // already; they are this folder's instances all the same.)
+        for gone in members.gone {
+            let _path_guard = self.path_lock.lock().await;
+            // Put back by hand meanwhile, or loaded by a scan: it stays.
+            if self.instance_folder_exists(&gone.shortpath)
+                || self
+                    .instances
+                    .read()
+                    .await
+                    .contains_key(&InstanceId(gone.id))
+            {
+                continue;
+            }
+            self.remove_instance(InstanceId(gone.id)).await?;
+        }
+
         // Delete the group record. _delete_instance auto-removes an emptied non-default group
         // after deleting its last instance, so the row may already be gone here; a plain DELETE
         // is idempotent (no error on zero rows), so a group already removed on the happy path
-        // does not surface a spurious error toast on a successful deletion.
-        instance_repo::delete_group(&self.app.db, group_id).await?;
+        // does not surface a spurious error toast on a successful deletion. An entry that came
+        // back above moves to the default folder, as when a folder alone is deleted.
+        let default_group = self.get_default_group().await?;
+        let _index_lock = self.index_lock.lock().await;
+        if group == default_group
+            || instance_repo::count_instances_in_group(&self.app.db, group_id).await? == 0
+        {
+            instance_repo::delete_group(&self.app.db, group_id).await?;
+        } else {
+            instance_repo::delete_group_tx(&self.app.db, group_id, *default_group).await?;
+        }
+        drop(_index_lock);
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);

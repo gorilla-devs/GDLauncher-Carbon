@@ -11770,3 +11770,168 @@ async fn start_up_brings_the_library_name_in_line_with_the_instances_own_file() 
     assert_eq!(names(&app, id).await?, all("Old name"));
     Ok(())
 }
+
+/// A library folder with instances named `names`, the last of which was
+/// then removed in the file manager: the library hides it and keeps its
+/// entry.
+async fn folder_with_a_hand_deleted_instance(
+    app: &crate::App,
+    folder: &str,
+    names: &[&str],
+) -> anyhow::Result<(GroupId, Vec<InstanceId>, PathBuf)> {
+    let manager = app.instance_manager();
+    let group = manager.create_group(folder.into()).await?;
+    let mut ids = Vec::new();
+    for name in names {
+        ids.push(
+            manager
+                .create_instance(
+                    group,
+                    (*name).into(),
+                    false,
+                    InstanceVersionSource::Version(GameVersion::Standard(info::StandardVersion {
+                        release: "1.7.10".into(),
+                        modloaders: HashSet::new(),
+                    })),
+                    String::new(),
+                )
+                .await?,
+        );
+    }
+    let instances_root = app
+        .settings_manager()
+        .runtime_path
+        .get_instances()
+        .to_path();
+    let gone = *ids.last().unwrap();
+    tokio::fs::remove_dir_all(instances_root.join(folder_of(app, gone).await?)).await?;
+    manager.instances.write().await.clear();
+    manager.scan_instances().await?;
+    // Hidden, and remembered.
+    assert!(!manager.instances.read().await.contains_key(&gone));
+    assert!(
+        instance_repo::get_instance(&app.db, gone.0)
+            .await?
+            .is_some()
+    );
+    Ok((group, ids, instances_root))
+}
+
+/// R07-instance-manager.2#8: the entry of an instance whose folder was
+/// removed by hand still pointed at its library folder, so "Delete folder
+/// and its instances" deleted the visible instances and then failed on the
+/// database's foreign key, leaving the emptied folder.
+#[tokio::test]
+async fn deleting_a_library_folder_with_its_instances_takes_a_hand_deleted_one_along()
+-> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    without_recycle_bin(&app).await?;
+    let (group, ids, instances_root) =
+        folder_with_a_hand_deleted_instance(&app, "Modded", &["one", "two", "gone"]).await?;
+    let manager = app.instance_manager();
+
+    manager._delete_group_with_instances(group).await?;
+
+    for id in &ids {
+        assert!(instance_repo::get_instance(&app.db, id.0).await?.is_none());
+    }
+    assert!(instance_repo::get_group(&app.db, group.0).await?.is_none());
+    assert!(!instances_root.join("one").exists());
+    // Its folder name is free again.
+    let (again, _) = fixture(&app, "gone").await?;
+    assert_eq!(folder_of(&app, again).await?, "gone");
+    Ok(())
+}
+
+#[tokio::test]
+async fn deleting_the_last_shown_instance_removes_the_folder_and_keeps_the_hidden_entry()
+-> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    without_recycle_bin(&app).await?;
+    let (group, ids, instances_root) =
+        folder_with_a_hand_deleted_instance(&app, "Modded", &["one", "gone"]).await?;
+    let manager = app.instance_manager();
+    let default = manager.get_default_group().await?;
+
+    manager._delete_instance(ids[0]).await?;
+
+    // The emptied folder is removed, where the hidden entry used to keep it.
+    assert!(instance_repo::get_group(&app.db, group.0).await?.is_none());
+    // The entry itself moved to the default folder, as when a folder alone
+    // is deleted, so the instance finds it again when put back by hand.
+    let row = instance_repo::get_instance(&app.db, ids[1].0)
+        .await?
+        .expect("the hidden entry was dropped");
+    assert_eq!(row.group_id, default.0);
+    let (_, donor) = fixture(&app, "donor").await?;
+    tokio::fs::create_dir(instances_root.join("gone")).await?;
+    tokio::fs::copy(
+        donor.join("instance.json"),
+        instances_root.join("gone/instance.json"),
+    )
+    .await?;
+    manager.scan_instances().await?;
+    assert_eq!(manager.instances.read().await[&ids[1]].shortpath, "gone");
+    Ok(())
+}
+
+#[tokio::test]
+async fn nothing_is_deleted_around_an_instance_the_library_has_not_loaded_yet() -> anyhow::Result<()>
+{
+    let app = crate::setup_managers_for_test().await;
+    without_recycle_bin(&app).await?;
+    let manager = app.instance_manager();
+    let group = manager.create_group("Loading".into()).await?;
+    let mut ids = Vec::new();
+    for name in ["loaded", "not-yet"] {
+        ids.push(
+            manager
+                .create_instance(
+                    group,
+                    name.into(),
+                    false,
+                    InstanceVersionSource::Version(GameVersion::Standard(info::StandardVersion {
+                        release: "1.7.10".into(),
+                        modloaders: HashSet::new(),
+                    })),
+                    String::new(),
+                )
+                .await?,
+        );
+    }
+    let instances_root = app
+        .settings_manager()
+        .runtime_path
+        .get_instances()
+        .to_path();
+    // As while the start-up scan is on its way: the folder is there, the
+    // instance is not loaded.
+    let waiting = manager.instances.write().await.remove(&ids[1]).unwrap();
+
+    let error = manager
+        ._delete_group_with_instances(group)
+        .await
+        .expect_err("deleted around an instance that was still loading");
+    assert_eq!(
+        error.to_string(),
+        "The library is still loading. Try again in a moment."
+    );
+    assert!(instances_root.join("loaded").exists());
+    assert!(instances_root.join("not-yet").exists());
+    assert!(instance_repo::get_group(&app.db, group.0).await?.is_some());
+
+    // Deleting the loaded one leaves the folder to the one still coming.
+    manager._delete_instance(ids[0]).await?;
+    let row = instance_repo::get_instance(&app.db, ids[1].0)
+        .await?
+        .unwrap();
+    assert_eq!(row.group_id, group.0);
+    assert!(instance_repo::get_group(&app.db, group.0).await?.is_some());
+
+    // Once loaded, the folder goes with it as before.
+    manager.instances.write().await.insert(ids[1], waiting);
+    manager._delete_group_with_instances(group).await?;
+    assert!(!instances_root.join("not-yet").exists());
+    assert!(instance_repo::get_group(&app.db, group.0).await?.is_none());
+    Ok(())
+}
