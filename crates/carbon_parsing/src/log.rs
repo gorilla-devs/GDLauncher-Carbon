@@ -63,7 +63,11 @@ pub enum ParsedItem {
 
 pub struct LogParser {
     buffer: Vec<u8>,
-    partial_data: Vec<u8>,
+    /// How much of the front of `buffer` is already resolved. Moving this on
+    /// costs nothing, where removing the bytes would move the whole rest of
+    /// the buffer once per item: a log fed in one piece then takes time that
+    /// grows with the square of its size.
+    consumed: usize,
 }
 
 impl LogParser {
@@ -71,7 +75,21 @@ impl LogParser {
     pub fn new() -> Self {
         Self {
             buffer: Vec::new(),
-            partial_data: Vec::new(),
+            consumed: 0,
+        }
+    }
+
+    /// The bytes not yet resolved into a [`ParsedItem`].
+    fn pending(&self) -> &[u8] {
+        &self.buffer[self.consumed..]
+    }
+
+    /// Marks the first `length` pending bytes as resolved.
+    fn consume(&mut self, length: usize) {
+        self.consumed += length;
+        if self.consumed == self.buffer.len() {
+            self.buffer.clear();
+            self.consumed = 0;
         }
     }
 
@@ -81,20 +99,18 @@ impl LogParser {
     /// before returning an error. Genuinely partial XML or UTF-8 is retained and
     /// reported as `Partial`. This length lets callers verify recovery progress.
     pub fn buffered_len(&self) -> usize {
-        self.buffer.len()
+        self.pending().len()
     }
 
     /// Feeds new data into the parser.
     pub fn feed(&mut self, data: &[u8]) {
-        if !self.partial_data.is_empty() {
-            // If we have partial data from a previous parse, prepend it
-            let mut new_buffer = self.partial_data.clone();
-            new_buffer.extend_from_slice(data);
-            self.buffer = new_buffer;
-            self.partial_data.clear();
-        } else {
-            self.buffer.extend_from_slice(data);
+        // The one place the resolved bytes are really removed: once per piece
+        // of data, however many items the piece before it held.
+        if self.consumed > 0 {
+            self.buffer.drain(..self.consumed);
+            self.consumed = 0;
         }
+        self.buffer.extend_from_slice(data);
     }
 
     /// Parses a log level string into the LogEntryLevel enum.
@@ -259,13 +275,13 @@ impl LogParser {
     /// Complete malformed events and definite invalid plaintext are consumed;
     /// incomplete event syntax and trailing UTF-8 code points remain buffered.
     pub fn parse_next(&mut self) -> Result<Option<ParsedItem>, ParserError> {
-        if self.buffer.is_empty() {
+        if self.pending().is_empty() {
             return Ok(None);
         }
 
         // Skip pure whitespace at the start
-        if self.buffer.iter().all(|&c| c.is_ascii_whitespace()) {
-            self.buffer.clear();
+        if self.pending().iter().all(|&c| c.is_ascii_whitespace()) {
+            self.consume(self.pending().len());
             return Ok(None);
         }
 
@@ -279,7 +295,7 @@ impl LogParser {
         // re-read and re-error on every future call: the live log freezes and
         // the buffer grows without bound for the rest of the session.
         let complete_event_len: Option<usize> = {
-            let mut reader = Reader::from_reader(&self.buffer[..]);
+            let mut reader = Reader::from_reader(self.pending());
             reader.config_mut().check_end_names = false;
             reader.config_mut().trim_text(false);
             let mut test_buf = Vec::new();
@@ -289,7 +305,7 @@ impl LogParser {
                     if e.as_ref().iter().all(u8::is_ascii_whitespace) {
                         let consumed = reader.buffer_position();
                         if consumed > 0 {
-                            self.buffer.drain(..consumed as usize);
+                            self.consume(consumed as usize);
                             return self.parse_next();
                         }
                         None
@@ -317,42 +333,36 @@ impl LogParser {
         };
 
         if let Some(event_len) = complete_event_len {
-            let result = Self::parse_complete_event(&self.buffer[..event_len]);
+            let result = Self::parse_complete_event(&self.pending()[..event_len]);
 
             // This event's bytes are fully consumed either way -- see the doc
             // comment on `parse_complete_event` for why an error must still drain.
-            self.buffer.drain(..event_len);
+            self.consume(event_len);
             // Skip any pure whitespace after the event
-            while !self.buffer.is_empty()
-                && self
-                    .buffer
-                    .iter()
-                    .take_while(|&&c| c.is_ascii_whitespace())
-                    .count()
-                    == self.buffer.len()
-            {
-                self.buffer.clear();
+            if self.pending().iter().all(|&c| c.is_ascii_whitespace()) {
+                self.consume(self.pending().len());
             }
 
             result.map(|entry| Some(ParsedItem::LogEntry(entry)))
         } else {
             // Check if what we have could be a start of a log4j event
-            if is_potential_log4j_start(&self.buffer) {
-                return Ok(Some(ParsedItem::Partial(self.buffer.clone())));
+            let pending = self.pending();
+            if is_potential_log4j_start(pending) {
+                return Ok(Some(ParsedItem::Partial(pending.to_vec())));
             }
 
             // Look for the next potential log4j start
             let mut start = 0;
-            while start < self.buffer.len() {
-                if let Some(pos) = self.buffer[start..].iter().position(|&c| c == b'<') {
+            while start < pending.len() {
+                if let Some(pos) = pending[start..].iter().position(|&c| c == b'<') {
                     let slice_start = start + pos;
-                    let slice = &self.buffer[slice_start..];
+                    let slice = &pending[slice_start..];
 
                     if is_potential_log4j_start(slice) {
                         if slice_start > 0 {
                             return self.take_plaintext(slice_start, false);
                         }
-                        return Ok(Some(ParsedItem::Partial(self.buffer.clone())));
+                        return Ok(Some(ParsedItem::Partial(pending.to_vec())));
                     }
                     start = slice_start + 1;
                 } else {
@@ -360,7 +370,7 @@ impl LogParser {
                 }
             }
 
-            self.take_plaintext(self.buffer.len(), true)
+            self.take_plaintext(pending.len(), true)
         }
     }
 
@@ -371,9 +381,9 @@ impl LogParser {
         length: usize,
         may_be_partial: bool,
     ) -> Result<Option<ParsedItem>, ParserError> {
-        match String::from_utf8(self.buffer[..length].to_vec()) {
+        match String::from_utf8(self.pending()[..length].to_vec()) {
             Ok(text) => {
-                self.buffer.drain(..length);
+                self.consume(length);
                 if text.chars().all(|c| c.is_ascii_whitespace()) {
                     self.parse_next()
                 } else {
@@ -385,11 +395,11 @@ impl LogParser {
                 if valid > 0 {
                     self.take_plaintext(valid, false)
                 } else {
-                    Ok(Some(ParsedItem::Partial(self.buffer.clone())))
+                    Ok(Some(ParsedItem::Partial(self.pending().to_vec())))
                 }
             }
             Err(error) => {
-                self.buffer.drain(..length);
+                self.consume(length);
                 Err(error.into())
             }
         }
@@ -409,17 +419,18 @@ impl LogParser {
 }
 
 /// Helper function to check if a buffer could be the start of a log4j event
+///
+/// True for the start tag in any letter case, and for a shorter buffer that
+/// is the beginning of one. Only the tag's own length is looked at: this runs
+/// at every `<` of plain text, with the whole rest of the log behind it.
 fn is_potential_log4j_start(buffer: &[u8]) -> bool {
     let target = b"<log4j:Event";
     if buffer.is_empty() || buffer[0] != b'<' {
         return false;
     }
 
-    let buffer_lower: Vec<u8> = buffer.iter().map(|&c| c.to_ascii_lowercase()).collect();
-
-    let target_lower: Vec<u8> = target.iter().map(|&c| c.to_ascii_lowercase()).collect();
-
-    target_lower.starts_with(&buffer_lower) || buffer_lower.starts_with(&target_lower)
+    let compared = buffer.len().min(target.len());
+    buffer[..compared].eq_ignore_ascii_case(&target[..compared])
 }
 
 #[cfg(test)]
@@ -589,5 +600,185 @@ mod throwable_tests {
             })
             .count();
         assert_eq!(with_trace, traces);
+    }
+}
+
+#[cfg(test)]
+mod read_position_tests {
+    use super::*;
+    use std::time::{Duration, Instant};
+
+    const SAMPLE: &[u8] = include_bytes!("../fixtures/log_example.log");
+    const EVENT: &[u8] = br#"<log4j:Event logger="test" timestamp="1" level="INFO" thread="main"><log4j:Message><![CDATA[hello]]></log4j:Message></log4j:Event>"#;
+
+    /// Everything the parser resolves from `pieces`, driven the way the
+    /// launcher drives it. Adjoining plain text is joined and its whitespace
+    /// left out: where a read stops decides where plain text is cut.
+    fn resolved<'a>(pieces: impl IntoIterator<Item = &'a [u8]>) -> Vec<ParsedItem> {
+        let mut parser = LogParser::new();
+        let mut items: Vec<ParsedItem> = Vec::new();
+        for piece in pieces {
+            parser.feed(piece);
+            loop {
+                let item = parser
+                    .parse_next()
+                    .expect("the sample log has no broken part");
+                match item {
+                    None | Some(ParsedItem::Partial(_)) => break,
+                    Some(ParsedItem::PlainText(text)) => {
+                        let text: String = text.split_ascii_whitespace().collect();
+                        match items.last_mut() {
+                            Some(ParsedItem::PlainText(last)) => last.push_str(&text),
+                            _ => items.push(ParsedItem::PlainText(text)),
+                        }
+                    }
+                    Some(entry) => items.push(entry),
+                }
+            }
+        }
+        assert_eq!(parser.buffered_len(), 0);
+        items
+    }
+
+    fn entries(items: &[ParsedItem]) -> usize {
+        items
+            .iter()
+            .filter(|item| matches!(item, ParsedItem::LogEntry(_)))
+            .count()
+    }
+
+    #[test]
+    fn the_sample_log_resolves_the_same_whatever_the_size_of_its_pieces() {
+        let whole = resolved([SAMPLE]);
+        assert_eq!(entries(&whole), 3196);
+        assert!(whole.len() > entries(&whole), "the sample has plain text");
+
+        for size in [13, 4096, 65_536, 1_000_003] {
+            assert!(
+                resolved(SAMPLE.chunks(size)) == whole,
+                "pieces of {size} bytes resolve differently from the whole log"
+            );
+        }
+    }
+
+    #[test]
+    fn resolving_an_item_leaves_the_rest_of_the_buffer_where_it_is() {
+        let mut log = Vec::new();
+        for _ in 0..100 {
+            log.extend_from_slice(EVENT);
+            log.push(b'\n');
+        }
+
+        let mut parser = LogParser::new();
+        parser.feed(&log);
+        let mut left = parser.buffered_len();
+        for resolved in 1..=100 {
+            assert!(matches!(
+                parser.parse_next().unwrap(),
+                Some(ParsedItem::LogEntry(_))
+            ));
+            assert!(parser.buffered_len() < left);
+            left = parser.buffered_len();
+            if resolved < 100 {
+                assert_eq!(parser.buffer.len(), log.len(), "after {resolved} items");
+            }
+        }
+
+        // With nothing left to resolve, nothing is held.
+        assert_eq!(parser.buffered_len(), 0);
+        assert!(parser.buffer.is_empty());
+        assert_eq!(parser.parse_next().unwrap(), None);
+    }
+
+    /// A running game's output, every read of it ending inside an event: the
+    /// resolved bytes have to leave the buffer although it never empties.
+    #[test]
+    fn the_buffer_does_not_grow_while_every_read_ends_inside_an_event() {
+        let (head, tail) = EVENT.split_at(20);
+        let mut parser = LogParser::new();
+        parser.feed(head);
+        assert!(matches!(
+            parser.parse_next().unwrap(),
+            Some(ParsedItem::Partial(_))
+        ));
+
+        for _ in 0..1000 {
+            let mut read = tail.to_vec();
+            read.extend_from_slice(b"\n");
+            read.extend_from_slice(head);
+            parser.feed(&read);
+
+            assert!(matches!(
+                parser.parse_next().unwrap(),
+                Some(ParsedItem::LogEntry(_))
+            ));
+            assert_eq!(
+                parser.parse_next().unwrap(),
+                Some(ParsedItem::Partial(head.to_vec()))
+            );
+            assert_eq!(parser.buffered_len(), head.len());
+            // One read and the start left over from the read before it.
+            assert_eq!(parser.buffer.len(), head.len() + read.len());
+        }
+    }
+
+    #[test]
+    fn an_event_start_is_known_in_any_case_and_when_cut_short() {
+        for start in [
+            "<log4j:Event",
+            "<log4j:Event logger=\"a\">",
+            "<LOG4J:EVENT>",
+            "<Log4J:event and a long tail",
+            "<",
+            "<l",
+            "<LOG4j:Ev",
+        ] {
+            assert!(is_potential_log4j_start(start.as_bytes()), "{start}");
+        }
+        for other in [
+            "",
+            "log4j:Event",
+            " <log4j:Event",
+            "<init>",
+            "<log4j:Message>",
+            "<log4j-Event>",
+            "<lo>",
+            "<log4j:Even>",
+        ] {
+            assert!(!is_potential_log4j_start(other.as_bytes()), "{other}");
+        }
+    }
+
+    fn resolve_whole(log: &[u8]) -> (usize, Duration) {
+        let started = Instant::now();
+        let mut parser = LogParser::new();
+        parser.feed(log);
+        let mut items = 0;
+        while let Ok(Some(item)) = parser.parse_next() {
+            if matches!(item, ParsedItem::Partial(_)) {
+                break;
+            }
+            items += 1;
+        }
+        (items, started.elapsed())
+    }
+
+    /// A past session's log is fed in one piece. The time it takes must grow
+    /// with its size, not with the square of it: these two take a second or
+    /// two here, and did not finish in minutes when every event moved the
+    /// rest of the log and every `<` copied it.
+    #[test]
+    fn a_log_fed_in_one_piece_is_resolved_in_time_in_proportion_to_its_size() {
+        let generous = Duration::from_secs(30);
+
+        let events = SAMPLE.repeat(16);
+        let (items, took) = resolve_whole(&events);
+        assert!(items >= 16 * 3196);
+        assert!(took < generous, "38 MB of events took {took:?}");
+
+        let plain_text = b"\tat a.B.<init>(B.java:1)\n".repeat(160_000);
+        let (items, took) = resolve_whole(&plain_text);
+        assert_eq!(items, 1);
+        assert!(took < generous, "4 MB of plain text took {took:?}");
     }
 }

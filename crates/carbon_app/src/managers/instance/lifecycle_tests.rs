@@ -10393,6 +10393,24 @@ async fn a_past_session_being_opened_while_its_instance_is_deleted_is_not_kept()
     Ok(())
 }
 
+/// Parsing a long session takes a while, and must not hold a thread that
+/// other requests are answered on. This runtime has one such thread: the
+/// test's own.
+#[tokio::test(flavor = "current_thread")]
+async fn a_past_session_is_read_off_the_thread_that_answers_requests() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "blocking-logs").await?;
+    let manager = app.instance_manager();
+    let session = past_session(&app, id, &root, "2025-01-14_12-00-00.log", "read\n").await?;
+
+    assert_eq!(log_text(&manager.get_log(session).await.unwrap()), "read\n");
+
+    let reader = log::read_thread::of(&root.join("logs").join("2025-01-14_12-00-00.log"))
+        .expect("the session's file was read");
+    assert_ne!(reader, std::thread::current().id());
+    Ok(())
+}
+
 /// Starts a version change of `id` to pack B, whose archive is the one
 /// [`resume_pack`] writes, and stops it once its files are downloaded and
 /// unpacked, as antivirus software gets to them. Returns the change's task

@@ -797,31 +797,13 @@ impl InstanceManager {
             record.file_name()
         };
 
+        // Off the async workers: a long session takes a while to parse, and
+        // the workers are what every other request is answered on.
         let path = logs_dir.join(&file_name);
-        let bytes = match tokio::fs::read(&path).await {
-            Ok(bytes) => bytes,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
-                return Err(OpenLogError::Missing);
-            }
-            Err(error) => {
-                return Err(OpenLogError::Unreadable(format!(
-                    "{}: {error}",
-                    path.display()
-                )));
-            }
+        let rx = match tokio::task::spawn_blocking(move || read_log_file(&path)).await {
+            Ok(read) => read?,
+            Err(error) => return Err(OpenLogError::Unreadable(error.to_string())),
         };
-        let (tx, rx) = watch::channel(GameLog::new());
-        if let Err(error) = LogProcessor::new(LogEntrySourceKind::StdOut, &tx)
-            .await
-            .process_data(&bytes, None)
-            .await
-        {
-            return Err(OpenLogError::Unreadable(format!(
-                "{}: {error}",
-                path.display()
-            )));
-        }
-        drop(tx);
 
         {
             let mut logs = self.game_logs.write().await;
@@ -1124,6 +1106,53 @@ impl<'a> CappedLogFile<'a> {
     }
 }
 
+/// A past session's log, read from its file and parsed. Blocks for as long
+/// as that takes.
+fn read_log_file(path: &Path) -> Result<watch::Receiver<GameLog>, OpenLogError> {
+    #[cfg(test)]
+    read_thread::note(path);
+
+    let bytes = match std::fs::read(path) {
+        Ok(bytes) => bytes,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+            return Err(OpenLogError::Missing);
+        }
+        Err(error) => {
+            return Err(OpenLogError::Unreadable(format!(
+                "{}: {error}",
+                path.display()
+            )));
+        }
+    };
+    let (tx, rx) = watch::channel(GameLog::new());
+    LogProcessor::for_stream(LogEntrySourceKind::StdOut, &tx).parse(&bytes);
+    Ok(rx)
+}
+
+/// Which thread read each log file, for the test that it is not one of the
+/// async workers.
+#[cfg(test)]
+pub(super) mod read_thread {
+    use std::collections::HashMap;
+    use std::path::{Path, PathBuf};
+    use std::sync::Mutex;
+    use std::thread::ThreadId;
+
+    static READERS: Mutex<Option<HashMap<PathBuf, ThreadId>>> = Mutex::new(None);
+
+    pub(super) fn note(path: &Path) {
+        READERS
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashMap::new)
+            .insert(path.to_owned(), std::thread::current().id());
+    }
+
+    pub fn of(path: &Path) -> Option<ThreadId> {
+        READERS.lock().unwrap().as_ref()?.get(path).copied()
+    }
+}
+
 pub struct LogProcessor<'a> {
     pub parser: LogParser,
     /// Takes the colour codes out of the output before it is parsed.
@@ -1134,6 +1163,10 @@ pub struct LogProcessor<'a> {
 
 impl<'a> LogProcessor<'a> {
     pub async fn new(kind: LogEntrySourceKind, log: &'a watch::Sender<GameLog>) -> Self {
+        Self::for_stream(kind, log)
+    }
+
+    fn for_stream(kind: LogEntrySourceKind, log: &'a watch::Sender<GameLog>) -> Self {
         Self {
             parser: LogParser::new(),
             stripper: AnsiStripper::new(),
@@ -1151,6 +1184,13 @@ impl<'a> LogProcessor<'a> {
             file.write_all(data).await?;
         }
 
+        self.parse(data);
+
+        Ok(())
+    }
+
+    /// Adds what `data` completes to the log. Nothing in here waits.
+    fn parse(&mut self, data: &[u8]) {
         let text = self.stripper.strip(data);
 
         self.parser.feed(text.as_bytes());
@@ -1192,8 +1232,6 @@ impl<'a> LogProcessor<'a> {
                 }
             }
         }
-
-        Ok(())
     }
 }
 
