@@ -1,5 +1,5 @@
 import { Button, Checkbox, PRESS_CLASSES, Progress } from "@gd/ui"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import {
   createEffect,
   createSignal,
@@ -13,12 +13,13 @@ import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import { formatBytes } from "@/utils/formatBytes"
+import { CancelLink, DialogFooter } from "../../DialogFooter"
 import { setCleanupRunning } from "./state"
 
-/** `checked` is rendered as `data-checked` purely so the state is readable
- *  from outside: the `Checkbox` this row wraps renders no queryable input,
- *  and it forwards no props of its own, so the row is the only place a
- *  scope's on/off state can be observed. */
+/** A press anywhere on the row toggles it; the keyboard toggles the
+ *  `Checkbox` inside. `checked` is also rendered as `data-checked`, the
+ *  scope's state as the e2e tests read it: the `Checkbox` forwards no
+ *  props of its own, so a test id can't go on it. */
 const ClickableRow = (props: {
   onToggle: () => void
   testId: string
@@ -45,6 +46,7 @@ const ClickableRow = (props: {
 type Phase = "select" | "running" | "done" | "failed"
 
 const CacheCleanup = (props: ModalProps) => {
+  const [t] = useTransContext()
   const modalsContext = useModal()
 
   const [phase, setPhase] = createSignal<Phase>("select")
@@ -138,8 +140,9 @@ const CacheCleanup = (props: ModalProps) => {
       title={props?.title}
       width="w-128"
       preventClose={phase() === "running"}
+      compact
     >
-      <div class="flex flex-col gap-4 p-4">
+      <div class="flex flex-col gap-4">
         <Switch>
           <Match when={phase() === "select"}>
             <div class="text-lightSlate-300 text-sm">
@@ -153,7 +156,11 @@ const CacheCleanup = (props: ModalProps) => {
                 onToggle={() => setGdlauncher((v) => !v)}
               >
                 <div class="pointer-events-none">
-                  <Checkbox checked={gdlauncher()} />
+                  <Checkbox
+                    checked={gdlauncher()}
+                    aria-label={t("modals:_trn_cache_cleanup.gdlauncher_title")}
+                    onChange={setGdlauncher}
+                  />
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div class="flex items-baseline justify-between gap-2">
@@ -178,7 +185,11 @@ const CacheCleanup = (props: ModalProps) => {
                 onToggle={() => setMinecraft((v) => !v)}
               >
                 <div class="pointer-events-none">
-                  <Checkbox checked={minecraft()} />
+                  <Checkbox
+                    checked={minecraft()}
+                    aria-label={t("modals:_trn_cache_cleanup.minecraft_title")}
+                    onChange={setMinecraft}
+                  />
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
                   <div class="flex items-baseline justify-between gap-2">
@@ -198,13 +209,8 @@ const CacheCleanup = (props: ModalProps) => {
               </ClickableRow>
             </div>
 
-            <div class="flex items-center justify-between gap-3 pt-2">
-              <Button
-                type="secondary"
-                onClick={() => modalsContext?.closeModal()}
-              >
-                <Trans key="modals:_trn_cache_cleanup.cancel" />
-              </Button>
+            <DialogFooter class="pt-2">
+              <CancelLink onClick={() => modalsContext?.closeModal()} />
               <Button
                 data-testid="cache-cleanup-start"
                 type="primary"
@@ -221,7 +227,7 @@ const CacheCleanup = (props: ModalProps) => {
                 <div class="i-hugeicons:delete-02 h-4 w-4" />
                 <Trans key="modals:_trn_cache_cleanup.start" />
               </Button>
-            </div>
+            </DialogFooter>
           </Match>
 
           <Match when={phase() === "running"}>
@@ -284,7 +290,7 @@ const CacheCleanup = (props: ModalProps) => {
                 {failedMessage()}
               </div>
               <Button
-                type="secondary"
+                type="primary"
                 onClick={() => modalsContext?.closeModal()}
               >
                 <Trans key="modals:_trn_cache_cleanup.close" />

@@ -13,7 +13,6 @@
   "_trn_shader_loader_body_vanilla": "Этому шейдерпаку для работы нужны Fabric и Iris. Carbon может установить все за вас.",
   "_trn_shader_loader_auto_setup": "Автоматическая установка",
   "_trn_shader_loader_continue_anyway": "Продолжить без установки",
-  "_trn_shader_loader_cancel": "Отмена",
   "_trn_shader_loader_installing_modloader": "Установка Fabric",
   "_trn_shader_loader_installing_loader": "Установка загрузчика шейдеров",
   "_trn_shader_loader_installing_shader": "Установка вашего шейдерпака",
@@ -200,5 +199,7 @@
   "_trn_table.status": "Статус",
   "_trn_table.actions": "Действия",
   "_trn_mods.search": "Поиск модов...",
-  "_trn_sort_by_asc": "По возрастанию"
+  "_trn_sort_by_asc": "По возрастанию",
+  "_trn_a11y_select_all": "Выбрать все",
+  "_trn_a11y_select_addon": "Выбрать {{name}}"
 }

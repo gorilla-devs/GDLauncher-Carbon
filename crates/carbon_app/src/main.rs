@@ -277,24 +277,44 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         t.elapsed().as_secs_f64()
     );
 
+    // Before the sync below relinks the system profiles, so the Javas picked
+    // by hand are read before anything replaces them.
     let t = std::time::Instant::now();
-    let auto_manage_java_system_profiles = app
-        .settings_manager()
-        .get_settings()
-        .await
-        .unwrap()
-        .auto_manage_java_system_profiles;
+    match app.settings_manager().get_settings().await {
+        Ok(settings) => {
+            match crate::managers::java::major_defaults::migrate_major_defaults(&app.db, &settings)
+                .await
+            {
+                Ok(true) => tracing::info!("Kept the chosen Javas as per-version defaults"),
+                Ok(false) => {}
+                Err(e) => tracing::warn!("Could not migrate the chosen Javas to defaults: {e:#}"),
+            }
+        }
+        Err(e) => tracing::warn!("Could not read settings to migrate Java defaults: {e:#}"),
+    }
     debug!(
-        "[startup-timing] settings.get_settings completed in {:.2}s",
+        "[startup-timing] migrate_major_defaults completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
 
+    // Relinking the profiles before the migration has read them would lose
+    // the Javas picked by hand; it runs again at the next start.
+    let link_profiles = crate::managers::java::major_defaults::major_defaults_migrated(&app.db)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!("Could not tell whether the Java defaults were migrated: {e:#}");
+            false
+        });
+    if !link_profiles {
+        tracing::warn!("Not linking the Java profiles until the Java defaults are migrated");
+    }
+
     let t = std::time::Instant::now();
     crate::managers::java::JavaManager::scan_and_sync(
-        auto_manage_java_system_profiles,
         &app.db,
         &RealDiscovery::new(app.settings_manager().runtime_path.clone()),
         &RealJavaChecker,
+        link_profiles,
     )
     .await
     .expect("Failed to scan and sync java system profiles");
@@ -302,6 +322,8 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         "[startup-timing] JavaManager::scan_and_sync completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
+
+    crate::managers::java::maintenance::spawn_java_maintenance(app.clone());
 
     let app1 = app.clone();
     let app2 = app.clone();

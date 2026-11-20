@@ -37,6 +37,7 @@ pub struct AppConfigurationRow {
     pub wrapper_command: Option<String>,
     pub post_exit_hook: Option<String>,
     pub auto_manage_java_system_profiles: bool,
+    pub auto_update_managed_java: bool,
     pub mod_platform_blacklist: String,
     pub mod_channels: String,
     pub terms_and_privacy_accepted: bool,
@@ -55,7 +56,7 @@ pub struct AppConfigurationRow {
 
 queries! {
     fn get_app_configuration() -> Option<AppConfigurationRow> =
-        "SELECT id, theme, reducedMotion, language, discordIntegration, releaseChannel, activeAccountUuid, concurrentDownloads, downloadDependencies, instancesTileSize, instancesGroupBy, instancesGroupByAsc, instancesSortBy, instancesSortByAsc, instancesDuplicateFavorites, showFeatured, deletionThroughRecycleBin, gameResolution, launcherActionOnGameLaunch, showAppCloseWarning, javaCustomArgs, xmx, xms, defaultInstanceGroup, preLaunchHook, wrapperCommand, postExitHook, autoManageJavaSystemProfiles, modPlatformBlacklist, modChannels, termsAndPrivacyAccepted, termsAndPrivacyAcceptedChecksum, gdlAccountUuid, gdlAccountStatus, installationId, serversTileSize, serversGroupBy, serversGroupByAsc, serversSortBy, serversSortByAsc, serversDuplicateFavorites, defaultServerGroup FROM AppConfiguration WHERE id = 0";
+        "SELECT id, theme, reducedMotion, language, discordIntegration, releaseChannel, activeAccountUuid, concurrentDownloads, downloadDependencies, instancesTileSize, instancesGroupBy, instancesGroupByAsc, instancesSortBy, instancesSortByAsc, instancesDuplicateFavorites, showFeatured, deletionThroughRecycleBin, gameResolution, launcherActionOnGameLaunch, showAppCloseWarning, javaCustomArgs, xmx, xms, defaultInstanceGroup, preLaunchHook, wrapperCommand, postExitHook, autoManageJavaSystemProfiles, autoUpdateManagedJava, modPlatformBlacklist, modChannels, termsAndPrivacyAccepted, termsAndPrivacyAcceptedChecksum, gdlAccountUuid, gdlAccountStatus, installationId, serversTileSize, serversGroupBy, serversGroupByAsc, serversSortBy, serversSortByAsc, serversDuplicateFavorites, defaultServerGroup FROM AppConfiguration WHERE id = 0";
     fn count_app_configuration() -> i64 =
         "SELECT COUNT(*) FROM AppConfiguration";
 }
@@ -151,6 +152,7 @@ pub struct AppConfigurationPatch {
     pub post_exit_hook: Option<Option<String>>,
     pub wrapper_command: Option<Option<String>>,
     pub auto_manage_java_system_profiles: Option<bool>,
+    pub auto_update_managed_java: Option<bool>,
     pub mod_platform_blacklist: Option<String>,
     pub mod_channels: Option<String>,
     pub terms_and_privacy_accepted: Option<bool>,
@@ -286,6 +288,11 @@ impl AppConfigurationPatch {
             self.auto_manage_java_system_profiles,
             "autoManageJavaSystemProfiles = :autoManageJavaSystemProfiles",
             ":autoManageJavaSystemProfiles"
+        );
+        push!(
+            self.auto_update_managed_java,
+            "autoUpdateManagedJava = :autoUpdateManagedJava",
+            ":autoUpdateManagedJava"
         );
         push!(
             self.mod_platform_blacklist,

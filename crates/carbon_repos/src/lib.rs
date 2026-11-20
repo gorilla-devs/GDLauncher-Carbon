@@ -72,6 +72,19 @@ pub fn get_migrations() -> (MigrationSet, i32) {
         historical_migration!("20260325000000_add_server_icon_revision"),
         historical_migration!("20260328000000_add_server_modloader_and_addons"),
         historical_migration!("20260410000000_add_server_modpack_info"),
+        MigrationDef {
+            name: "20261118172601_add_auto_update_managed_java",
+            up_sql: include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/prisma/migrations/20261118172601_add_auto_update_managed_java/migration.sql"
+            )),
+            down_sql: Some(include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/prisma/migrations/20261118172601_add_auto_update_managed_java/down.sql"
+            ))),
+            kind: MigrationKind::Breaking,
+            data_down: "full",
+        },
         // new-migration:anchor — the tool inserts new MigrationDef entries directly above this line
     ];
     let count = migrations.len() as i32;

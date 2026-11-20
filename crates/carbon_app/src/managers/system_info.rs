@@ -5,12 +5,17 @@ use tokio::sync::Mutex;
 
 pub(crate) struct SystemInfoManager {
     system: Arc<Mutex<System>>,
+    /// For tests: the free memory, in bytes, `get_available_ram` reports.
+    #[cfg(test)]
+    pub available_ram_for_test: std::sync::Mutex<Option<u64>>,
 }
 
 impl SystemInfoManager {
     pub fn new() -> Self {
         Self {
             system: Arc::new(Mutex::new(System::new_all())),
+            #[cfg(test)]
+            available_ram_for_test: Default::default(),
         }
     }
 
@@ -26,6 +31,15 @@ impl SystemInfoManager {
     }
 
     pub async fn get_available_ram(&self) -> u64 {
+        #[cfg(test)]
+        if let Some(available) = *self
+            .available_ram_for_test
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+        {
+            return available;
+        }
+
         let mut lock = self.system.lock().await;
         lock.refresh_memory();
         lock.available_memory()

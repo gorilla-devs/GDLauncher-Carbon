@@ -13,7 +13,6 @@
   "_trn_shader_loader_body_vanilla": "このシェーダーパックの実行にはFabricとIrisが必要です。Carbonが必要なものをすべてインストールできます。",
   "_trn_shader_loader_auto_setup": "自動セットアップ",
   "_trn_shader_loader_continue_anyway": "そのまま続行",
-  "_trn_shader_loader_cancel": "キャンセル",
   "_trn_shader_loader_installing_modloader": "Fabricをインストール中",
   "_trn_shader_loader_installing_loader": "シェーダーローダーをインストール中",
   "_trn_shader_loader_installing_shader": "シェーダーパックをインストール中",
@@ -200,5 +199,7 @@
   "_trn_table.status": "ステータス",
   "_trn_table.actions": "操作",
   "_trn_mods.search": "MODを検索...",
-  "_trn_sort_by_asc": "昇順"
+  "_trn_sort_by_asc": "昇順",
+  "_trn_a11y_select_all": "すべて選択",
+  "_trn_a11y_select_addon": "{{name}}を選択"
 }

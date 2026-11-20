@@ -1,5 +1,6 @@
 import { useModal } from ".."
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import { Button, Input } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { createSignal } from "solid-js"
@@ -52,15 +53,8 @@ const ChangeGDLAccountRecoveryEmail = () => {
           </Show>
         </div>
 
-        <div class="flex w-full justify-between">
-          <Button
-            onClick={() => {
-              modalsContext?.closeModal()
-            }}
-            type="secondary"
-          >
-            <Trans key="accounts:_trn_cancel" />
-          </Button>
+        <DialogFooter>
+          <CancelLink onClick={() => modalsContext?.closeModal()} />
           <Button
             type="primary"
             disabled={isLoading() || !!cooldown()}
@@ -110,7 +104,7 @@ const ChangeGDLAccountRecoveryEmail = () => {
           >
             <Trans key="accounts:_trn_confirm" />
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

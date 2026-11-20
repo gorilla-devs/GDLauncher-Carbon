@@ -13,6 +13,8 @@ import { useModal } from "./managers/ModalsManager"
 import { useGDNavigate } from "./managers/NavigationManager"
 import { parseSearchQuery } from "./utils/searchQueryParser"
 import { checkForUpdates } from "./utils/updater"
+import JavaAdvisoryNotifier from "./components/JavaAdvisoryNotifier"
+import JavaIssueNotifier from "./components/JavaIssueNotifier"
 import { windowCloseWarningAcquireLock } from "./managers/ModalsManager/modals/WindowCloseWarning"
 import { ACCOUNT_BANNED_EVENT } from "./utils/bannedEventBridge"
 
@@ -115,6 +117,8 @@ const App = (props: Props) => {
 
   return (
     <div class="relative w-screen">
+      <JavaAdvisoryNotifier />
+      <JavaIssueNotifier />
       <div class="z-10 flex h-auto w-screen">
         <main class="max-w-screen relative grow">{props.children}</main>
       </div>

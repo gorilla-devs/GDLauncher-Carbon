@@ -188,6 +188,11 @@ pub struct GameConfig {
     #[serde(default)]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub java_override: Option<JavaOverride>,
+    /// See `info::GameConfig::java_floor`. Configs from before it read as
+    /// none.
+    #[serde(default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub java_floor: Option<u8>,
 }
 
 fn default_global_java_args() -> bool {
@@ -400,6 +405,7 @@ impl From<GameConfig> for info::GameConfig {
             memory: value.memory.map(Into::into),
             game_resolution: value.game_resolution.map(Into::into),
             java_override: value.java_override.map(Into::into),
+            java_floor: value.java_floor,
         }
     }
 }
@@ -413,6 +419,7 @@ impl From<info::GameConfig> for GameConfig {
             memory: value.memory.map(Into::into),
             game_resolution: value.game_resolution.map(Into::into),
             java_override: value.java_override.map(Into::into),
+            java_floor: value.java_floor,
         }
     }
 }

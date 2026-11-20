@@ -3,7 +3,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { PRESS_CLASSES } from "../Clickable"
 
 const switchStyles = cva(
-  "absolute top-0 left-0 right-0 bottom-0 transition-colors duration-100 ease-spring rounded-md",
+  "absolute top-0 left-0 right-0 bottom-0 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary-500 transition-colors duration-100 ease-spring rounded-md",
   {
     variants: {
       state: {

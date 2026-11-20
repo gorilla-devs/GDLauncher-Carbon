@@ -15,6 +15,9 @@ pub struct LogEntry {
     pub thread_name: String,
     /// The log message.
     pub message: String,
+    /// The exception logged with the message (`<log4j:Throwable>`): its type,
+    /// message and stack trace.
+    pub throwable: Option<String>,
 }
 
 /// The log level of the log entry.
@@ -125,6 +128,7 @@ impl LogParser {
             timestamp: 0,
             thread_name: String::new(),
             message: String::new(),
+            throwable: None,
         };
 
         for attr in element.attributes() {
@@ -196,28 +200,12 @@ impl LogParser {
                 Ok(Event::Start(ref e)) => {
                     depth += 1;
                     if e.name().as_ref() == b"log4j:Message" {
-                        let mut message_buf = Vec::new();
-                        let mut message_complete = false;
-
-                        while !message_complete {
-                            match reader.read_event_into(&mut buf) {
-                                Ok(Event::Text(e)) => {
-                                    message_buf.extend_from_slice(&e.into_inner());
-                                }
-                                Ok(Event::CData(e)) => {
-                                    message_buf.extend_from_slice(&e.into_inner());
-                                }
-                                Ok(Event::End(ref e)) if e.name().as_ref() == b"log4j:Message" => {
-                                    message_complete = true;
-                                }
-                                Ok(Event::Eof) => return Err(ParserError::UnexpectedEventEnd),
-                                Err(e) => return Err(e.into()),
-                                _ => {}
-                            }
-                        }
-
-                        entry.message = String::from_utf8(message_buf)?;
+                        entry.message = Self::read_text(&mut reader, &mut buf, b"log4j:Message")?;
                         found_message = true;
+                        depth -= 1;
+                    } else if e.name().as_ref() == b"log4j:Throwable" {
+                        entry.throwable =
+                            Some(Self::read_text(&mut reader, &mut buf, b"log4j:Throwable")?);
                         depth -= 1;
                     }
                 }
@@ -235,6 +223,28 @@ impl LogParser {
                 _ => {}
             }
         }
+    }
+
+    /// The text and CDATA up to the end tag `end`, which it consumes.
+    fn read_text(
+        reader: &mut Reader<&[u8]>,
+        buf: &mut Vec<u8>,
+        end: &[u8],
+    ) -> Result<String, ParserError> {
+        let mut text = Vec::new();
+
+        loop {
+            match reader.read_event_into(buf) {
+                Ok(Event::Text(e)) => text.extend_from_slice(&e.into_inner()),
+                Ok(Event::CData(e)) => text.extend_from_slice(&e.into_inner()),
+                Ok(Event::End(ref e)) if e.name().as_ref() == end => break,
+                Ok(Event::Eof) => return Err(ParserError::UnexpectedEventEnd),
+                Err(e) => return Err(e.into()),
+                _ => {}
+            }
+        }
+
+        Ok(String::from_utf8(text)?)
     }
 
     /// Attempts to parse the next item from the buffer.

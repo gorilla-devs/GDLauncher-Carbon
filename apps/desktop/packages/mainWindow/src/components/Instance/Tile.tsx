@@ -18,7 +18,10 @@ import {
   ContextMenuSub,
   ContextMenuSubContent,
   ContextMenuSubTrigger,
-  ContextMenuTrigger
+  ContextMenuTrigger,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
 } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useModal } from "@/managers/ModalsManager"
@@ -41,6 +44,8 @@ interface Props {
   isLoading?: boolean
   percentage?: number
   version: string | undefined | null
+  /** Set when the instance is on the wrong Java: which one it needs. */
+  javaNeed?: string
   img: string | undefined
   isInvalid?: boolean
   downloaded?: number
@@ -464,6 +469,29 @@ const Tile = (props: Props) => {
                   />
                 </Show>
                 <span>{props.version}</span>
+                <Show when={props.javaNeed}>
+                  {(need) => (
+                    <Tooltip>
+                      <TooltipTrigger
+                        type="button"
+                        aria-label={t("java:_trn_a11y_wrong_java", {
+                          name: props.instance.name
+                        })}
+                        class="-m-1 flex h-6 w-6 shrink-0 items-center justify-center rounded-md outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
+                        // The fix is in the instance's settings. The tile
+                        // must neither open the instance nor start a drag.
+                        onPointerDown={(e: PointerEvent) => e.stopPropagation()}
+                        onClick={(e: MouseEvent) => {
+                          e.stopPropagation()
+                          handleSettings()
+                        }}
+                      >
+                        <div class="i-hugeicons:alert-02 h-4 w-4 text-yellow-500" />
+                      </TooltipTrigger>
+                      <TooltipContent>{need()}</TooltipContent>
+                    </Tooltip>
+                  )}
+                </Show>
               </div>
             </>
           }

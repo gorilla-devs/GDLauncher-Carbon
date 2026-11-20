@@ -1,6 +1,6 @@
-import { Button } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
+import ConfirmActions from "../../ConfirmActions"
 import { Show } from "solid-js"
 import { useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
@@ -27,20 +27,12 @@ const Confirmation = (props: ModalProps) => {
           <p>{t("general:_trn_instance_unpair_confirmation")}</p>
         </Show>
         <p>{t("instances:_trn_instance_confirm_continue")}</p>
-        <div class="mt-8 flex justify-between">
-          <Button
-            type="primary"
-            onClick={() => {
-              modalContext?.closeModal()
-            }}
-          >
-            <div class="i-hugeicons:cancel-01" />
-            {t("instances:_trn_instance_cancel")}
-          </Button>
-          <Button
-            type="secondary"
-            data-testid="confirm-unpair-confirm"
-            onClick={() => {
+        <div class="mt-8">
+          <ConfirmActions
+            busy={false}
+            confirmTestId="confirm-unpair-confirm"
+            onCancel={() => modalContext?.closeModal()}
+            onConfirm={() => {
               if (data().instanceState === "unlock") {
                 updateInstanceMutation.mutate({
                   modpackLocked: {
@@ -61,7 +53,7 @@ const Confirmation = (props: ModalProps) => {
           >
             <div class="i-hugeicons:tick-02" />
             {t("instances:_trn_instance_confirm")}
-          </Button>
+          </ConfirmActions>
         </div>
       </div>
     </ModalLayout>

@@ -2,6 +2,7 @@ import { createSignal } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import { Button, Input } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
 
@@ -48,24 +49,17 @@ const ServerRename = (props: ModalProps) => {
             autofocus
           />
         </div>
-        <div class="flex w-full justify-between">
+        <DialogFooter>
+          <CancelLink onClick={() => modalsContext?.closeModal()} />
           <Button
-            onClick={() => {
-              modalsContext?.closeModal()
-            }}
-          >
-            <div class="i-hugeicons:cancel-01" />
-            {t("instances:_trn_server_rename_cancel")}
-          </Button>
-          <Button
-            type="secondary"
+            type="primary"
             onClick={handleSave}
             disabled={!name().trim() || name().trim() === props.data?.name}
           >
             <div class="i-hugeicons:tick-02" />
             {t("instances:_trn_server_rename_save")}
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

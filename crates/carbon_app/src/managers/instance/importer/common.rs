@@ -622,6 +622,7 @@ pub async fn apply_imported_settings(
             .java_path
             .clone()
             .map(|path| Some(JavaOverride::Path(Some(path)))),
+        java_floor: None,
         global_java_args: None,
         extra_java_args: settings.extra_java_args.clone().map(Some),
         memory: settings.memory().map(Some),

@@ -138,6 +138,7 @@ impl ManagerRef<'_, InstanceManager> {
             version: None,
             modloader: Some(Some(modloader)),
             java_override: None,
+            java_floor: None,
             global_java_args: None,
             extra_java_args: None,
             memory: None,

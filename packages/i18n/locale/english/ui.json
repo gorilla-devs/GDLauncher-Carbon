@@ -4,8 +4,6 @@
   "_trn_tooltip.apply_and_restart": "Apply and restart",
   "_trn_tooltip.rtp_not_valid": "The runtime path is not valid. Either the path is not a folder or it's not an empty directory",
   "_trn_tooltip.rtp_unchanged": "The runtime path is unchanged",
-  "_trn_path": "Path",
-  "_trn_profile": "Profile",
   "_trn_custom": "Custom",
   "_trn_tile_size": "Tile Size",
   "_trn_sort_options": "Sort Options",

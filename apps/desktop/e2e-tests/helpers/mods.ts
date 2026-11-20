@@ -425,10 +425,11 @@ export async function searchForMod(
       ? TEST_IDS.searchPlatformCurseforge
       : TEST_IDS.searchPlatformModrinth
   const platformWrapper = page.locator(byTestId(platformTestId))
-  // The native `<input type="radio">` `Radio` forwards unknown props onto
-  // (visually hidden — `class="hidden"` — but a real DOM node with a real
-  // `checked` property, see `Radio/index.tsx` and `selectors.ts`'s hazard-1
-  // comment). Reading it first is what makes the click below a *set* rather
+  // The native `<input type="radio">` `Radio` renders inside its label
+  // (transparent, and the pointer passes through it, but a real DOM node
+  // with a real `checked` property, see `Radio/index.tsx` and
+  // `selectors.ts`'s hazard-1 comment), which is why the click below goes
+  // to the wrapper. Reading it first is what makes the click a *set* rather
   // than the *toggle* `PlatformFilter.handleSelect` (`PlatformFilter.tsx:22-38`)
   // actually implements: it deselects (`searchApi: null`) when the clicked
   // value already equals the current selection, and the filter's provider

@@ -331,6 +331,45 @@ mod app {
         manager_getter!(rich_presence_manager: RichPresenceManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
+            self.send_invalidation(key, args);
+
+            // The Java overview is built from these, so it goes stale with them.
+            if crate::managers::java::overview::OVERVIEW_SOURCES
+                .iter()
+                .any(|source| source.full == key.full)
+            {
+                self.send_invalidation(crate::api::keys::java::GET_JAVA_OVERVIEW, None);
+                // So do the instances on the wrong Java, from the same
+                // instances and Javas.
+                self.send_invalidation(crate::api::keys::instance::GET_JAVA_MISMATCHES, None);
+
+                // So do the advisory matches, which say whether an instance
+                // uses each Java.
+                let matches = crate::api::keys::java::GET_JAVA_ADVISORY_MATCHES;
+                if key.full != matches.full {
+                    self.send_invalidation(matches, None);
+                }
+            }
+
+            // The Minecraft ranges fold by what is installed and
+            // downloadable.
+            if crate::managers::java::overview::RANGE_SOURCES
+                .iter()
+                .any(|source| source.full == key.full)
+            {
+                self.send_invalidation(crate::api::keys::java::GET_MINECRAFT_JAVA_MAJORS, None);
+            }
+
+            // Instance details resolve the instance's Java from these.
+            if crate::managers::java::instance_java::RESOLUTION_SOURCES
+                .iter()
+                .any(|source| source.full == key.full)
+            {
+                self.send_invalidation(crate::api::keys::instance::INSTANCE_DETAILS, None);
+            }
+        }
+
+        fn send_invalidation(&self, key: Key, args: Option<serde_json::Value>) {
             match self
                 .invalidation_channel
                 .send(InvalidationEvent::new(key.full, args))

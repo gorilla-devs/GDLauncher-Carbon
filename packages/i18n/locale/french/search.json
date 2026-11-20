@@ -1,6 +1,6 @@
 {
-  "_trn_search_instances": "Rechercher des instances",
-  "_trn_search_servers": "Rechercher des serveurs",
+  "_trn_search_instances": "Rechercher des instances...",
+  "_trn_search_servers": "Rechercher des serveurs...",
   "_trn_browser_table_headers.name": "Nom",
   "_trn_browser_table_headers.published": "Publié",
   "_trn_browser_table_headers.downloads": "Téléchargements",

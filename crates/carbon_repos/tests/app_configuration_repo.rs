@@ -167,3 +167,23 @@ fn patch_persists_blob_column() {
         Some(blob)
     );
 }
+
+#[test]
+fn auto_update_managed_java_defaults_true_and_round_trips() {
+    let (_d, mut conn) = migrated_db();
+    ac::insert_app_configuration_conn(&wg(&mut conn), "stable", 2048, None).unwrap();
+    let row = ac::get_app_configuration_conn(&wg(&mut conn))
+        .unwrap()
+        .unwrap();
+    assert!(row.auto_update_managed_java);
+
+    let patch = ac::AppConfigurationPatch {
+        auto_update_managed_java: Some(false),
+        ..Default::default()
+    };
+    patch.build().unwrap().execute(&wg(&mut conn)).unwrap();
+    let row = ac::get_app_configuration_conn(&wg(&mut conn))
+        .unwrap()
+        .unwrap();
+    assert!(!row.auto_update_managed_java);
+}

@@ -4,7 +4,7 @@ import {
   FEUnifiedSearchType,
   McType
 } from "@gd/core_module/bindings"
-import { Trans } from "@gd/i18n"
+import { Trans, useTransContext } from "@gd/i18n"
 import {
   Checkbox,
   Select,
@@ -56,6 +56,7 @@ interface Props {
 }
 
 const ExploreVersionsNavbar = (props: Props) => {
+  const [t] = useTransContext()
   const [searchParams, _setSearchParams] = useSearchParams<{
     instanceId: string
   }>()
@@ -197,6 +198,8 @@ const ExploreVersionsNavbar = (props: Props) => {
               <div class="text-lightSlate-700 flex gap-2">
                 <Checkbox
                   checked={overrideEnabled()}
+                  // The text beside it, which isn't part of it.
+                  aria-label={t("instances:_trn_rowcontainer.override_filters")}
                   onChange={setOverrideEnabled}
                 />
                 <Trans key="instances:_trn_rowcontainer.override_filters" />

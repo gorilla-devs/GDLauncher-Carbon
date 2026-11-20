@@ -413,6 +413,13 @@ fn wraps_in_quotes_if_necessary(arg: impl AsRef<str>) -> String {
 /// unquoted runs into one token). Within an argument, `\"` is a literal quote
 /// and `\\` a literal backslash; every other character — including lone
 /// backslashes in Windows paths — is taken verbatim. Empty tokens are dropped.
+/// User args are quote-parsed; mitigation args are appended afterwards as their
+/// own argv elements so they win and a stray user quote cannot swallow them.
+fn push_java_args(command: &mut Vec<String>, extra_java_args: &str, mitigation_args: &[String]) {
+    command.extend(parse_extra_java_args(extra_java_args));
+    command.extend(mitigation_args.iter().cloned());
+}
+
 fn parse_extra_java_args(input: &str) -> Vec<String> {
     let mut args = Vec::new();
     let mut current = String::new();
@@ -449,6 +456,7 @@ pub async fn generate_startup_command(
     xms_memory: u16,
     game_resolution: Option<(u16, u16)>,
     extra_java_args: &str,
+    mitigation_args: &[String],
     runtime_path: &RuntimePath,
     version: VersionInfo,
     lwjgl_group: &LibraryGroup,
@@ -662,7 +670,7 @@ pub async fn generate_startup_command(
     // authlib-injector). If a future import path ever ingests third-party JVM args,
     // sanitize them at THAT boundary; a blanket launch-time filter here cannot tell
     // user input from imported input and would only break real agents.
-    command.extend(parse_extra_java_args(extra_java_args));
+    push_java_args(&mut command, extra_java_args, mitigation_args);
 
     if Os::native() == Os::Osx {
         let lwjgl_3 = version
@@ -699,6 +707,7 @@ pub async fn launch_minecraft(
     xms_memory: u16,
     game_resolution: Option<(u16, u16)>,
     extra_java_args: &str,
+    mitigation_args: &[String],
     runtime_path: &RuntimePath,
     version: VersionInfo,
     lwjgl_group: &LibraryGroup,
@@ -724,6 +733,7 @@ pub async fn launch_minecraft(
         xms_memory,
         game_resolution,
         extra_java_args,
+        mitigation_args,
         runtime_path,
         version,
         lwjgl_group,
@@ -1044,6 +1054,7 @@ mod tests {
             2048,
             None,
             "",
+            &[],
             &runtime_path,
             version,
             &lwjgl_group,
@@ -1063,6 +1074,17 @@ mod tests {
                 .unwrap();
 
         file.write_all(command.as_bytes()).await.unwrap();
+    }
+
+    #[test]
+    fn mitigation_args_survive_unbalanced_user_quote() {
+        let mut command = vec!["java".to_string()];
+        push_java_args(
+            &mut command,
+            r#"-Dfoo="a b"#,
+            &["-XX:-UseBASE64Intrinsics".to_string()],
+        );
+        assert_eq!(command.last().unwrap(), "-XX:-UseBASE64Intrinsics");
     }
 
     #[test]

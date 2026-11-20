@@ -77,6 +77,33 @@ pub struct TSubtasksInner {
     pub t_finalize_import: Option<Subtask>,
 }
 
+#[cfg(test)]
+impl TSubtasksInner {
+    /// Subtasks of a throwaway task, for tests of launch steps.
+    pub fn for_test() -> TSubtasks {
+        let task = VisualTask::new(Translation::Test);
+        let subtask = || task.subtask(Translation::Test);
+
+        Arc::new(Self {
+            t_request_version_info: subtask(),
+            t_download_files: subtask(),
+            t_scan_files: subtask(),
+            t_generating_packinfo: subtask(),
+            t_request_modloader_info: subtask(),
+            t_request_minecraft_files: subtask(),
+            t_download_java: subtask(),
+            t_extract_java: subtask(),
+            t_apply_staging: subtask(),
+            t_fill_cache: subtask(),
+            t_extract_natives: subtask(),
+            t_reconstruct_assets: subtask(),
+            t_forge_processors: None,
+            t_neoforge_processors: None,
+            t_finalize_import: None,
+        })
+    }
+}
+
 /// Whether `tmp-packinfo.json` (the full post-apply record) must be
 /// (re)derived by walking `.setup/staging`, or is already the authoritative
 /// target record left by an earlier, possibly-interrupted pass over this
@@ -255,9 +282,11 @@ pub async fn process_modpack(
 
     let t_request_minecraft_files = task.subtask(Translation::InstanceTaskRequestMinecraftFiles);
 
-    let t_download_java = task.subtask(Translation::InstanceTaskLaunchDownloadJava);
+    // The major is only known once the Java is resolved, which names these
+    // before they start (and show).
+    let t_download_java = task.subtask(Translation::InstanceTaskLaunchDownloadJava { major: 0 });
 
-    let t_extract_java = task.subtask(Translation::InstanceTaskLaunchExtractJava);
+    let t_extract_java = task.subtask(Translation::InstanceTaskLaunchExtractJava { major: 0 });
 
     let t_fill_cache = task.subtask(Translation::InstanceTaskFillCache);
 
@@ -730,10 +759,14 @@ pub async fn process_modpack(
                 app.instance_manager().get_modpack_info(instance_id).await?;
             }
 
-            config.game_configuration.version = Some(GameVersion::Standard(StandardVersion {
-                release: v.release.clone(),
-                modloaders: v.modloaders.clone(),
-            }));
+            // A pack update to another Minecraft version or modloader drops
+            // the instance's Java floor.
+            config
+                .game_configuration
+                .set_version(Some(GameVersion::Standard(StandardVersion {
+                    release: v.release.clone(),
+                    modloaders: v.modloaders.clone(),
+                })));
 
             let json = make_instance_config(config.clone())?;
             // Atomically replace the live config (matching update_instance/update_playtime) so a

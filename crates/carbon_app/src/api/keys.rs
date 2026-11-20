@@ -72,7 +72,14 @@ keys! {
         GET_MANAGED_VENDORS                         = "getManagedVendors";
         GET_MANAGED_OS                              = "getManagedOS";
         GET_MANAGED_ARCH                            = "getManagedArch";
-        GET_MANAGED_VERSIONS_BY_VENDOR              = "getManagedVersionsByVendor";
+        GET_MANAGED_CATALOG                         = "getManagedCatalog";
+        GET_MANAGED_JAVA_INSTALLS                   = "getManagedJavaInstalls";
+        GET_MANAGED_JAVA_UPDATES                    = "getManagedJavaUpdates";
+        GET_JAVA_ADVISORY_MATCHES                   = "getJavaAdvisoryMatches";
+        GET_DISMISSED_JAVA_ADVISORIES               = "getDismissedJavaAdvisories";
+        DISMISS_JAVA_ADVISORIES                     = "dismissJavaAdvisories";
+        UPDATE_MANAGED_JAVA                         = "updateManagedJava";
+        GET_MINECRAFT_JAVA_MAJORS                   = "getMinecraftJavaMajors";
         SETUP_MANAGED_JAVA                          = "setupManagedJava";
         GET_SETUP_MANAGED_JAVA_PROGRESS             = "getSetupManagedJavaProgress";
         GET_JAVA_PROFILES                           = "getJavaProfiles";
@@ -83,6 +90,12 @@ keys! {
         CREATE_CUSTOM_JAVA_VERSION                  = "createCustomJavaVersion";
         DELETE_JAVA_VERSION                         = "deleteJavaVersion";
         SYSTEM_JAVA_PROFILE_ASSIGNMENTS             = "systemJavaProfileAssignments";
+        GET_JAVA_OVERVIEW                           = "getJavaOverview";
+        SET_MAJOR_DEFAULT                           = "setMajorDefault";
+        UNPIN_MANAGED_JAVA                          = "unpinManagedJava";
+        ADD_JAVA_FROM_FILE                          = "addJavaFromFile";
+        REMOVE_UNUSED_JAVAS                         = "removeUnusedJavas";
+        SWITCH_JAVA_TO_FIXED                        = "switchJavaToFixed";
     }
 
     mc {
@@ -117,10 +130,14 @@ keys! {
         UPDATE_INSTANCE                             = "updateInstance";
         SET_FAVORITE                                = "setFavorite";
         INSTANCE_DETAILS                            = "getInstanceDetails";
+        GET_JAVA_MISMATCHES                         = "getJavaMismatches";
         INSTANCE_MODS                               = "getInstanceMods";
         PRIORITIZE_INSTANCE_CACHE                   = "prioritizeInstanceCache";
         PREPARE_INSTANCE                            = "prepareInstance";
         LAUNCH_INSTANCE                             = "launchInstance";
+        FIX_JAVA_AND_LAUNCH                         = "fixJavaAndLaunch";
+        FIX_JAVA_MISMATCH                           = "fixJavaMismatch";
+        FIX_JAVA_MISMATCH_AND_LAUNCH                = "fixJavaMismatchAndLaunch";
         KILL_INSTANCE                               = "killInstance";
         GET_LOGS                                    = "getLogs";
         SEARCH_LOGS                                 = "searchLogs";

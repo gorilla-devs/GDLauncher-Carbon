@@ -578,6 +578,7 @@ struct FESettings {
     game_resolution: Option<GameResolution>,
     java_custom_args: String,
     auto_manage_java_system_profiles: bool,
+    auto_update_managed_java: bool,
     mod_sources: ModSources,
     terms_and_privacy_accepted: bool,
     gdl_account_id: Option<String>,
@@ -619,6 +620,7 @@ impl TryFrom<carbon_repos::repos::app_configuration::AppConfigurationRow> for FE
                 .and_then(|r| GameResolution::from_str(&r).ok()),
             java_custom_args: data.java_custom_args,
             auto_manage_java_system_profiles: data.auto_manage_java_system_profiles,
+            auto_update_managed_java: data.auto_update_managed_java,
             mod_sources: ModSources {
                 channels: {
                     use carbon_platforms::ModChannelWithUsage as DModChannelWithUsage;
@@ -740,6 +742,8 @@ pub struct FESettingsUpdate {
     pub java_custom_args: Option<Set<String>>,
     #[specta(optional)]
     pub auto_manage_java_system_profiles: Option<Set<bool>>,
+    #[specta(optional)]
+    pub auto_update_managed_java: Option<Set<bool>>,
     #[specta(optional)]
     pub mod_sources: Option<Set<ModSources>>,
     #[specta(optional)]

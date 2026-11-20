@@ -4,8 +4,6 @@
   "_trn_tooltip.apply_and_restart": "Aplicar y reiniciar",
   "_trn_tooltip.rtp_not_valid": "La ruta de tiempo de ejecución no es válida. O bien la ruta no es una carpeta o no es un directorio vacío",
   "_trn_tooltip.rtp_unchanged": "La ruta de tiempo de ejecución no ha cambiado",
-  "_trn_path": "Ruta",
-  "_trn_profile": "Perfil",
   "_trn_custom": "Personalizado",
   "_trn_tile_size": "Tamaño de mosaico",
   "_trn_sort_options": "Opciones de orden",

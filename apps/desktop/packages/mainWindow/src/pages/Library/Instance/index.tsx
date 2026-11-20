@@ -35,7 +35,7 @@ import {
 } from "@/utils/instances"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import { useModal } from "@/managers/ModalsManager"
-import { convertSecondsToHumanTime } from "@/utils/helpers"
+import { formatSeconds } from "@/utils/intl"
 import Authors from "./Info/Authors"
 import { getModloaderIcon } from "@/utils/sidebar"
 import { getInstanceIdFromPath } from "@/utils/routes"
@@ -70,7 +70,7 @@ const Instance = (props: { children?: any }) => {
     routeData.instanceDetails.data?.name || ""
   )
 
-  const [t] = useTransContext()
+  const [t, { getI18next }] = useTransContext()
   const modalsContext = useModal()
 
   // Detect duplicated mods
@@ -594,8 +594,9 @@ const Instance = (props: { children?: any }) => {
                 <div class="flex items-center gap-2">
                   <div class="i-hugeicons:clock-01 text-lg" />
                   <span class="whitespace-nowrap">
-                    {convertSecondsToHumanTime(
-                      routeData.instanceDetails.data!.secondsPlayed
+                    {formatSeconds(
+                      routeData.instanceDetails.data!.secondsPlayed,
+                      getI18next().language
                     )}
                   </span>
                 </div>

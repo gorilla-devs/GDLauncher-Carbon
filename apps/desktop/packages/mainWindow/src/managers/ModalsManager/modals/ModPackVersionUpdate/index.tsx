@@ -9,6 +9,7 @@ import {
 } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
+import { CancelLink, DialogFooter } from "../../DialogFooter"
 import { extractErrorDisplay, rspc } from "@/utils/rspcClient"
 import { Show, createEffect, createSignal, createMemo } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -259,15 +260,8 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             </div>
           </Show>
 
-          <div class="flex justify-between">
-            <Button
-              type="secondary"
-              onClick={() => {
-                modalContext?.closeModal()
-              }}
-            >
-              {t("instances:_trn_cancel_export")}
-            </Button>
+          <DialogFooter>
+            <CancelLink onClick={() => modalContext?.closeModal()} />
             <Button
               type="primary"
               data-testid="modpack-version-update-confirm"
@@ -276,7 +270,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             >
               {t("instances:_trn_instance_modal_instance_update")}
             </Button>
-          </div>
+          </DialogFooter>
         </Show>
       </div>
     </ModalLayout>

@@ -18,6 +18,7 @@ use carbon_rt_path::ServerPath;
 use chrono::Utc;
 use dashmap::DashMap;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::sync::Arc;
 use sysinfo::{Pid, ProcessesToUpdate, System};
 use tokio::sync::{Mutex, RwLock, mpsc, watch};
@@ -200,6 +201,9 @@ pub struct ServerData {
     /// Log ID from the previous (or current) session, used to clean up
     /// stale entries from `server_logs` when the server is started again.
     pub last_log_id: Option<ServerLogId>,
+    /// The Java its last start runs on, so deleting another Java needn't
+    /// wait for it.
+    pub java_path: Option<PathBuf>,
 }
 
 pub struct ServerManager {
@@ -240,6 +244,34 @@ impl ServerManager {
             crash_restart_state: DashMap::new(),
             crash_restart_abandoned: DashMap::new(),
         }
+    }
+
+    /// Whether any server is starting, running or stopping, so its Java is
+    /// in use and must not be deleted.
+    pub async fn any_server_active(&self) -> bool {
+        self.servers.read().await.values().any(|data| {
+            matches!(
+                data.state,
+                ServerState::Starting(_) | ServerState::Running { .. } | ServerState::Stopping
+            )
+        })
+    }
+
+    /// The Java each starting, running or stopping server runs on; `None`
+    /// for one whose Java isn't known.
+    pub async fn active_server_javas(&self) -> Vec<Option<PathBuf>> {
+        self.servers
+            .read()
+            .await
+            .values()
+            .filter(|data| {
+                matches!(
+                    data.state,
+                    ServerState::Starting(_) | ServerState::Running { .. } | ServerState::Stopping
+                )
+            })
+            .map(|data| data.java_path.clone())
+            .collect()
     }
 
     /// Whether `id`'s auto-restart has given up after repeated fast crashes
@@ -397,6 +429,7 @@ impl ManagerRef<'_, ServerManager> {
                     state: ServerState::Stopped { failed_task: None },
                     handle: None,
                     last_log_id: None,
+                    java_path: None,
                 },
             );
         }
@@ -708,6 +741,7 @@ impl ManagerRef<'_, ServerManager> {
                 state: ServerState::Installing(task_id),
                 handle: None,
                 last_log_id: None,
+                java_path: None,
             },
         );
 
@@ -951,6 +985,7 @@ impl ManagerRef<'_, ServerManager> {
                 state: ServerState::Installing(task_id),
                 handle: None,
                 last_log_id: None,
+                java_path: None,
             },
         );
 
@@ -1553,6 +1588,10 @@ impl ManagerRef<'_, ServerManager> {
         )
         .await?;
 
+        let mitigation_args =
+            crate::managers::java::advisories::mitigation_args_for_path(&self.app, &java_path)
+                .await;
+
         // Start server via provider
         let provider = self.get_provider();
         let handle = provider
@@ -1562,6 +1601,7 @@ impl ManagerRef<'_, ServerManager> {
                 db_server.xmx,
                 db_server.xms,
                 &db_server.extra_java_args,
+                &mitigation_args,
                 &launch_config,
                 db_server.modloader_type.as_deref(),
                 log_tx,
@@ -1583,6 +1623,7 @@ impl ManagerRef<'_, ServerManager> {
                 };
                 server.handle = Some(handle);
                 server.last_log_id = Some(log_id);
+                server.java_path = Some(java_path.clone());
             }
         }
 
@@ -1641,6 +1682,8 @@ impl ManagerRef<'_, ServerManager> {
 
             app.invalidate(GET_ALL_SERVERS, None);
             app.invalidate(GET_SERVER_DETAILS, None);
+            // The Javas whose delete waited for this server may go.
+            app.java_manager().note_runner_ended();
 
             if !should_restart {
                 warn!("Server {} exited unexpectedly", id.0);
@@ -1789,6 +1832,7 @@ impl ManagerRef<'_, ServerManager> {
 
             app.invalidate(GET_ALL_SERVERS, None);
             app.invalidate(GET_SERVER_DETAILS, None);
+            app.java_manager().note_runner_ended();
             info!("Server {} stopped", id.0);
         });
 
@@ -1820,6 +1864,7 @@ impl ManagerRef<'_, ServerManager> {
 
         self.app.invalidate(GET_ALL_SERVERS, None);
         self.app.invalidate(GET_SERVER_DETAILS, None);
+        self.app.java_manager().note_runner_ended();
 
         Ok(())
     }
@@ -3640,6 +3685,33 @@ mod tests {
     // now live in `managers::orphan_pid`, which both this manager and
     // `InstanceManager` share.
 
+    #[tokio::test]
+    async fn any_server_active_follows_server_state() {
+        let manager = ServerManager::new();
+        assert!(!manager.any_server_active().await);
+
+        let mut data = running_server_with_handle();
+        data.state = ServerState::Stopped { failed_task: None };
+        manager.servers.write().await.insert(ServerId(1), data);
+        assert!(!manager.any_server_active().await);
+
+        manager
+            .servers
+            .write()
+            .await
+            .get_mut(&ServerId(1))
+            .unwrap()
+            .state = ServerState::Stopping;
+        assert!(manager.any_server_active().await);
+
+        manager
+            .servers
+            .write()
+            .await
+            .insert(ServerId(1), running_server_with_handle());
+        assert!(manager.any_server_active().await);
+    }
+
     // --- shutdown_running ---------------------------------------------
 
     #[tokio::test]
@@ -3669,6 +3741,7 @@ mod tests {
                 },
                 handle: Some(handle),
                 last_log_id: None,
+                java_path: None,
             },
         );
 
@@ -3695,6 +3768,7 @@ mod tests {
                 state: ServerState::Stopped { failed_task: None },
                 handle: None,
                 last_log_id: None,
+                java_path: None,
             },
         );
 
@@ -3745,6 +3819,7 @@ mod tests {
                 exited,
             }),
             last_log_id: None,
+            java_path: None,
         }
     }
 

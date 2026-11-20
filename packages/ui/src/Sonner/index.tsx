@@ -2,8 +2,13 @@ import { Toaster as Sonner, toast } from "somoto"
 
 export { toast }
 
-// Inject CSS utility class to suppress toast entrance animation
-// Use className="toast-no-animate" on any toast that updates content without needing animation
+// Inject CSS utility classes:
+// - className="toast-no-animate" on any toast that updates content without needing animation
+// - className="toast-actions-below" puts a toast's two buttons on their own
+//   line, so long button labels don't squeeze the title into a narrow column
+// - keyboard focus on a toast's buttons shows the app's focus outline, not
+//   somoto's faint shadow. Somoto's rules are `:where(…) :where(…):focus-visible`
+//   (specificity 0,1,0), so these (0,3,0) win.
 if (typeof document !== "undefined") {
   const style = document.createElement("style")
   style.textContent = `
@@ -11,6 +16,25 @@ if (typeof document !== "undefined") {
       transition: none !important;
       opacity: 1 !important;
       --y: translateY(0) !important;
+    }
+    [data-somoto-toast].toast-actions-below {
+      flex-wrap: wrap;
+      row-gap: 10px;
+    }
+    [data-somoto-toast].toast-actions-below [data-content] {
+      flex: 1 1 calc(100% - 32px);
+    }
+    [data-somoto-toast][data-styled=true].toast-actions-below {
+      justify-content: flex-end;
+    }
+    [data-somoto-toast][data-styled=true].toast-actions-below [data-button] {
+      margin-left: 0;
+    }
+    [data-somoto-toast] [data-button]:focus-visible,
+    [data-somoto-toast] [data-close-button]:focus-visible {
+      outline: 2px solid rgb(var(--primary-500));
+      outline-offset: 2px;
+      box-shadow: none;
     }
   `
   document.head.appendChild(style)
@@ -168,7 +192,7 @@ export const Toaster = (props: Parameters<typeof Sonner>[0]) => {
           padding: "0.75rem 1.25rem",
           "border-radius": "0.375rem",
           "font-weight": "700",
-          border: "none",
+          border: "2px solid transparent",
           cursor: "pointer",
           transition: "all 100ms ease-spring",
           "font-family": "inherit"

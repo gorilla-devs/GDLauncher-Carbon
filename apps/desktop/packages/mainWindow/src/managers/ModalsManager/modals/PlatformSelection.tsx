@@ -1,5 +1,5 @@
-import { Button } from "@gd/ui"
 import { ModalProps, useModal } from ".."
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import ModalLayout from "../ModalLayout"
 import { Trans, useTransContext } from "@gd/i18n"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
@@ -65,11 +65,9 @@ const PlatformSelection = (props: ModalProps) => {
           </button>
         </div>
 
-        <div class="mt-4 flex justify-end">
-          <Button type="secondary" onClick={() => modalContext?.closeModal()}>
-            {t("instances:_trn_cancel")}
-          </Button>
-        </div>
+        <DialogFooter class="mt-4">
+          <CancelLink onClick={() => modalContext?.closeModal()} />
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

@@ -1,0 +1,9 @@
+{ "schema": 1, "advisories": [ {
+    "id": "CVE-2026-114938", "name": "Java4Shell", "severity": "critical",
+    "url": "https://openjdk.org/groups/vulnerability/advisories/2026-11-17",
+    "affected": [ { "major": 17, "introduced": "17.0.6", "fixed": "17.0.21.1" },
+                  { "major": 21, "fixed": "21.0.13.1" },
+                  { "major": 25, "fixed": "25.0.5.1" },
+                  { "major": 27, "fixed": "27.0.1.1" } ],
+    "arch": ["x86_64"], "cpuFeatures": ["avx512vbmi"],
+    "mitigationJvmArgs": ["-XX:-UseBASE64Intrinsics"] } ] }

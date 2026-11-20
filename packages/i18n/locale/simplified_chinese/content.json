@@ -13,7 +13,6 @@
   "_trn_shader_loader_body_vanilla": "此光影包需要 Fabric 和 Iris 才能运行。Carbon 可以为您安装所需的一切。",
   "_trn_shader_loader_auto_setup": "自动设置",
   "_trn_shader_loader_continue_anyway": "继续但不安装",
-  "_trn_shader_loader_cancel": "取消",
   "_trn_shader_loader_installing_modloader": "正在安装 Fabric",
   "_trn_shader_loader_installing_loader": "正在安装光影加载器",
   "_trn_shader_loader_installing_shader": "正在安装您的光影包",
@@ -200,5 +199,7 @@
   "_trn_table.status": "状态",
   "_trn_table.actions": "操作",
   "_trn_mods.search": "搜索模组...",
-  "_trn_sort_by_asc": "升序排列"
+  "_trn_sort_by_asc": "升序排列",
+  "_trn_a11y_select_all": "全选",
+  "_trn_a11y_select_addon": "选择 {{name}}"
 }

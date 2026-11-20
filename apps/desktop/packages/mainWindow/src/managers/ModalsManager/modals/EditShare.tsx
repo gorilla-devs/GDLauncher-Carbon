@@ -1,5 +1,6 @@
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import { Button, Input, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { createSignal } from "solid-js"
@@ -90,10 +91,8 @@ const EditShare = (props: ModalProps) => {
           />
         </div>
 
-        <div class="flex justify-between">
-          <Button type="secondary" onClick={() => modalsContext?.closeModal()}>
-            <Trans key="instances:_trn_instance_share.cancel" />
-          </Button>
+        <DialogFooter>
+          <CancelLink onClick={() => modalsContext?.closeModal()} />
           <Button
             type="primary"
             onClick={handleSave}
@@ -101,7 +100,7 @@ const EditShare = (props: ModalProps) => {
           >
             <Trans key="instances:_trn_my_shares.save" />
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

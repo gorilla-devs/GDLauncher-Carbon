@@ -1,5 +1,5 @@
 import { Button, Radio } from "@gd/ui"
-import { For, Show, createSignal, createEffect } from "solid-js"
+import { For, Show, createSignal, createEffect, createUniqueId } from "solid-js"
 import { getModImageUrl } from "@/utils/instances"
 import { Trans } from "@gd/i18n"
 
@@ -30,6 +30,8 @@ interface Props {
 }
 
 const ModSelectionStep = (props: Props) => {
+  // The versions are one radio group for the keyboard.
+  const versionGroup = createUniqueId()
   const [selectedVersionLocal, setSelectedVersionLocal] = createSignal(
     props.selectedVersion || props.mod.versions[0]?.id
   )
@@ -103,6 +105,7 @@ const ModSelectionStep = (props: Props) => {
                 }}
               >
                 <Radio
+                  name={versionGroup}
                   value={version.id}
                   checked={selectedVersionLocal() === version.id}
                   onChange={handleSelect}

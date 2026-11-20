@@ -25,8 +25,11 @@ const Collapsable = (props: Props) => {
       <Show
         when={props.customHeader}
         fallback={
-          <div
-            class="h-8 flex items-center cursor-pointer press-effect active:scale-97"
+          // A real button, so the section opens from the keyboard too.
+          <button
+            type="button"
+            aria-expanded={opened()}
+            class="h-8 w-full flex items-center text-left cursor-pointer press-effect active:scale-97 rounded-md outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
             classList={{
               "px-6": props.size !== "small" && !props.noPadding,
               "px-2": props.size === "small" && !props.noPadding,
@@ -71,7 +74,7 @@ const Collapsable = (props: Props) => {
                 }}
               />
             </Show>
-          </div>
+          </button>
         }
       >
         {props.customHeader?.(toggle, opened)}
@@ -82,7 +85,20 @@ const Collapsable = (props: Props) => {
           "grid-template-rows": opened() ? "1fr" : "0fr"
         }}
       >
-        <div class="overflow-hidden pt-1">{props.children}</div>
+        {/* Closed, nothing inside can take focus: Tab skips it rather than
+            scrolling a sliver of it into view. Open, it clips 4 px out, so
+            the focus outlines of controls at its edge show; `min-h-0` keeps
+            the opening animation, which `clip` alone would skip. */}
+        <div
+          class="min-h-0 pt-1"
+          inert={!opened()}
+          style={{
+            overflow: opened() ? "clip" : "hidden",
+            "overflow-clip-margin": opened() ? "4px" : undefined
+          }}
+        >
+          {props.children}
+        </div>
       </div>
     </div>
   )

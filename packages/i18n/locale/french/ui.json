@@ -4,8 +4,6 @@
   "_trn_tooltip.apply_and_restart": "Appliquer et redémarrer",
   "_trn_tooltip.rtp_not_valid": "Le chemin d'exécution n'est pas valide. Soit le chemin n'est pas un dossier, soit ce n'est pas un répertoire vide",
   "_trn_tooltip.rtp_unchanged": "Le chemin d'exécution est inchangé",
-  "_trn_path": "Chemin",
-  "_trn_profile": "Profil",
   "_trn_custom": "Personnalisé",
   "_trn_tile_size": "Taille des tuiles",
   "_trn_sort_options": "Options de tri",

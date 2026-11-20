@@ -19,7 +19,14 @@ const PrivacyStatement = (props: ModalProps) => {
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
       <Suspense>
         <div class="h-130 w-190 overflow-hidden">
-          <div class="max-h-full overflow-y-auto" innerHTML={sanitizedHtml()} />
+          {/* Tab reaches the text, so the arrow keys scroll it. */}
+          <div
+            tabindex="0"
+            role="region"
+            aria-label={props.title}
+            class="max-h-full overflow-y-auto outline-none focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary-500"
+            innerHTML={sanitizedHtml()}
+          />
         </div>
       </Suspense>
     </ModalLayout>

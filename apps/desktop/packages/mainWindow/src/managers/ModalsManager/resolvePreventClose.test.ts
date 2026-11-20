@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest"
 import { resolvePreventClose } from "./preventClose"
 
 describe("resolvePreventClose", () => {
-  it("blocks when only the instance's live accessor says so (JavaSetup case)", () => {
-    // JavaSetup has no registry entry (undefined) but passes preventClose as
-    // a ModalLayout prop while on its "automatic" step — the bug this fixes
+  it("blocks when only the instance's live accessor says so (busy confirm case)", () => {
+    // The Java confirm dialogs have no registry entry (undefined) but pass
+    // preventClose as a ModalLayout prop while busy — the bug this fixes
     // was Escape only ever consulting the registry, which was undefined here.
     expect(
       resolvePreventClose(undefined, { preventCloseAccessor: () => true })

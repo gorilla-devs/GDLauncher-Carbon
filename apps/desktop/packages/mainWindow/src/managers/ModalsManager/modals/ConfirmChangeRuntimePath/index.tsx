@@ -1,11 +1,37 @@
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { Button, Progress } from "@gd/ui"
+import ConfirmActions from "../../ConfirmActions"
 import { Trans } from "@gd/i18n"
-import { Match, Show, Switch, createResource, createSignal } from "solid-js"
+import {
+  Match,
+  Show,
+  Switch,
+  createResource,
+  createSignal,
+  onMount
+} from "solid-js"
 import { Portal } from "solid-js/web"
 import { RTprogress, RTsetProgress } from "@/utils/runtimePathProgress"
 import { isChangingRuntimePath, setIsChangingRuntimePath } from "./state"
+
+/** The migration error's way out. Its overlay covers the dialog, and focus
+ *  was on body while the migration ran (Confirm was disabled), so it takes
+ *  focus when it shows. */
+const DismissButton = (props: { onClick: () => void }) => {
+  let button: HTMLButtonElement | undefined
+  onMount(() => button?.focus())
+  return (
+    <Button
+      ref={button}
+      type="primary"
+      class="mt-6"
+      onClick={() => props.onClick()}
+    >
+      <Trans key="general:_trn_dismiss" />
+    </Button>
+  )
+}
 
 const ConfirmChangeRuntimePath = (props: ModalProps) => {
   const modalsContext = useModal()
@@ -71,45 +97,39 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
               {props.data.runtimePath.replaceAll("\\\\", "/")}
             </div>
           </div>
-          <div class="flex w-full justify-between">
-            <Button
-              disabled={isChangingRuntimePath()}
-              onClick={() => {
+          <ConfirmActions
+            busy={isChangingRuntimePath()}
+            onCancel={() => modalsContext?.closeModal()}
+            onConfirm={async () => {
+              setIsChangingRuntimePath(true)
+              setMigrationError(undefined)
+
+              try {
+                await window.changeRuntimePath(
+                  props.data.runtimePath,
+                  props.data.isTargetFolderAlreadyUsed
+                )
                 modalsContext?.closeModal()
-              }}
-            >
-              <Trans key="settings:_trn_confirm_change_cancel_button" />
-            </Button>
-            <Button
-              type="secondary"
-              disabled={isChangingRuntimePath()}
-              onClick={async () => {
-                setIsChangingRuntimePath(true)
-                setMigrationError(undefined)
+              } catch (e: any) {
+                setMigrationError(e.message)
+              }
 
-                try {
-                  await window.changeRuntimePath(
-                    props.data.runtimePath,
-                    props.data.isTargetFolderAlreadyUsed
-                  )
-                  modalsContext?.closeModal()
-                } catch (e: any) {
-                  setMigrationError(e.message)
-                }
-
-                RTsetProgress(undefined)
-                setIsChangingRuntimePath(false)
-              }}
-            >
-              <Trans key="settings:_trn_confirm_change_confirm_button" />
-            </Button>
-          </div>
+              RTsetProgress(undefined)
+              setIsChangingRuntimePath(false)
+            }}
+          >
+            <Trans key="settings:_trn_confirm_change_confirm_button" />
+          </ConfirmActions>
         </div>
       </ModalLayout>
 
       <Show when={isChangingRuntimePath() || migrationError()}>
         <Portal mount={document.getElementById("overlay")!}>
+          {/* Outside the dialog's element, yet part of it
+              (DIALOG_PORTAL_ATTR): focus may stay here and Tab stays inside.
+              Dismiss takes focus when the error shows. */}
           <div
+            data-dialog-portal
             class="z-9999 fixed inset-0 flex flex-col items-center justify-center bg-opacity-65 p-8 backdrop-blur-sm"
             classList={{
               "bg-black": !migrationError(),
@@ -136,16 +156,12 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                   <div class="mt-4 text-base opacity-80">
                     {migrationError()}
                   </div>
-                  <Button
-                    type="secondary"
-                    class="mt-6"
+                  <DismissButton
                     onClick={() => {
                       setMigrationError(undefined)
                       modalsContext?.closeModal()
                     }}
-                  >
-                    <Trans key="general:_trn_dismiss" />
-                  </Button>
+                  />
                 </div>
               </Match>
               <Match when={!migrationError()}>

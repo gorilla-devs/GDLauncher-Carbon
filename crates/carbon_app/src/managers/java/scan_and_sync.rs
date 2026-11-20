@@ -1,13 +1,16 @@
-use super::{discovery::Discovery, java_checker::JavaChecker};
-use crate::domain::java::{
-    JavaArch, JavaComponent, JavaComponentType, JavaVersion, SystemJavaProfileName,
+use super::{
+    discovery::Discovery,
+    java_checker::JavaChecker,
+    major_defaults::{clear_major_defaults_for, get_major_defaults},
+    resolve::{AutomaticPick, host_arch, javas_from_rows, pick_automatic, requirement_for},
 };
+use crate::domain::java::{JavaComponent, JavaComponentType, SystemJavaProfileName};
 use carbon_repos::db_exec::Db;
 use carbon_repos::repos::java as java_repo;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use strum::IntoEnumIterator;
-use tracing::{info, trace, warn};
+use tracing::{info, trace};
 
 /// Collects the set of `Java.path` values that any `JavaProfile` currently links
 /// to, used to decide whether a broken java may be deleted or must be kept and
@@ -82,6 +85,19 @@ pub async fn upsert_java_component_to_db(
 
         Ok(id)
     }
+}
+
+/// Deletes the Java at `path`, and any per-major default that points at it.
+#[tracing::instrument(level = "trace", skip(db))]
+async fn delete_java_at(db: &Db, path: &str) -> anyhow::Result<()> {
+    let Some(java) = java_repo::get_java_by_path(db, path).await? else {
+        return Ok(());
+    };
+
+    java_repo::delete_java_by_path(db, path).await?;
+    clear_major_defaults_for(db, &java.id).await?;
+
+    Ok(())
 }
 
 #[tracing::instrument(level = "trace", skip(db))]
@@ -170,7 +186,7 @@ where
                         .await?;
                     } else {
                         let path = resolved_java_path.display().to_string();
-                        java_repo::delete_java_by_path(db, &path).await?;
+                        delete_java_at(db, &path).await?;
                     }
                 }
             }
@@ -200,7 +216,7 @@ where
             update_java_component_in_db_to_invalid(db, local_java_from_db.path).await?;
         } else {
             let path = local_java_from_db.path;
-            java_repo::delete_java_by_path(db, &path).await?;
+            delete_java_at(db, &path).await?;
         }
     }
 
@@ -271,13 +287,13 @@ where
                     update_java_component_in_db_to_invalid(db, managed_java.path.clone()).await?;
                 } else {
                     let path = managed_java.path.clone();
-                    java_repo::delete_java_by_path(db, &path).await?;
+                    delete_java_at(db, &path).await?;
                 }
             }
             (Err(_), false) => {
                 if !is_java_used_in_profile {
                     let path = managed_java.path.clone();
-                    java_repo::delete_java_by_path(db, &path).await?;
+                    delete_java_at(db, &path).await?;
                 }
             }
         }
@@ -302,62 +318,57 @@ where
     Ok(())
 }
 
+/// Links each system profile to its automatic choice ([`pick_automatic`]),
+/// with `flagged` holding the ids of Javas that have a known issue. A profile
+/// whose choice is a download keeps its link, so a found Java stays linked
+/// until a launch installs GDLauncher's own build.
 #[tracing::instrument(level = "trace", skip_all)]
-pub async fn sync_system_java_profiles(db: &Db) -> anyhow::Result<()> {
-    let all_javas = java_repo::get_all_java(db).await?;
+pub async fn sync_system_java_profiles(db: &Db, flagged: &HashSet<String>) -> anyhow::Result<()> {
+    let javas = javas_from_rows(java_repo::get_all_java(db).await?);
+    let defaults = get_major_defaults(db).await?;
+    let profiles = java_repo::get_all_profiles(db).await?;
+    let host_arch = host_arch();
 
-    let is32bit = std::env::consts::ARCH == "x86" || std::env::consts::ARCH == "arm";
-
+    let mut links = Vec::new();
     for profile in SystemJavaProfileName::iter() {
-        trace!("Syncing system java profile: {}", profile.to_string());
-        let profile_name = profile.to_string();
-        let name_for_lookup = profile_name.clone();
-        let java_in_profile = java_repo::get_profile(db, &name_for_lookup)
-            .await?
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Java system profile {} not found in DB",
-                    profile.to_string()
-                )
-            })?
-            .java_id;
+        let name = profile.to_string();
+        let linked = profiles
+            .iter()
+            .find(|row| row.name == name)
+            .ok_or_else(|| anyhow::anyhow!("The Java {} settings are missing", profile.major()))?
+            .java_id
+            .as_deref();
 
-        if java_in_profile.is_some() {
-            trace!(
-                "Java system profile {} already has a java",
-                profile.to_string()
-            );
-            continue;
-        }
-
-        // Scan for a compatible java
-        for java in all_javas.iter() {
-            trace!("Checking java {}", java.path);
-            if !java.is_valid {
-                warn!("Java {} is invalid, skipping", java.path);
-                continue;
-            }
-
-            let java_version = JavaVersion::try_from(java.full_version.as_str())?;
-            let java_arch = JavaArch::try_from(java.arch.as_str())?;
-
-            let is_arch_allowed = match java_arch {
-                JavaArch::X86_32 | JavaArch::Arm32 => is32bit,
-                _ => true,
-            };
-
-            if profile.is_java_version_compatible(&java_version) && is_arch_allowed {
-                trace!(
-                    "Java {} is compatible with profile {}",
-                    java.path,
-                    profile.to_string()
-                );
-                let name = profile.to_string();
-                java_repo::set_profile_java(db, &name, Some(&java.id)).await?;
-                break;
-            }
+        let pick = pick_automatic(
+            &requirement_for(profile),
+            &javas,
+            &defaults,
+            host_arch,
+            flagged,
+        );
+        if let AutomaticPick::Java { id, reason } = pick
+            && linked != Some(id.as_str())
+        {
+            trace!("Linking system java profile {name} to {id} ({reason:?})");
+            links.push((name, id));
         }
     }
+
+    if links.is_empty() {
+        return Ok(());
+    }
+
+    // One writer dispatch and one transaction, so readers never see half the
+    // profiles moved.
+    db.write(move |mut conn| {
+        let tx = conn.transaction()?;
+        for (name, id) in links {
+            java_repo::set_profile_java_conn(&tx, &name, Some(&id))?;
+        }
+        tx.commit()?;
+        Ok(())
+    })
+    .await?;
 
     Ok(())
 }
@@ -382,6 +393,7 @@ mod test {
         setup_managers_for_test,
     };
     use carbon_repos::repos::java as java_repo;
+    use std::collections::HashSet;
 
     async fn all_javas(db: &carbon_repos::db_exec::Db) -> Vec<java_repo::JavaRow> {
         java_repo::get_all_java(db).await.unwrap()
@@ -641,6 +653,45 @@ mod test {
     }
 
     #[tokio::test]
+    async fn deleting_a_found_java_clears_the_default_pointing_at_it() {
+        use crate::managers::java::major_defaults::{get_major_defaults, set_major_default};
+        use std::collections::HashMap;
+
+        let app = setup_managers_for_test().await;
+        let db = &app.db;
+        let found = |path: &str, major| JavaComponent {
+            path: path.to_string(),
+            version: JavaVersion::from_major(major),
+            _type: JavaComponentType::Local,
+            arch: JavaArch::X86_64,
+            os: JavaOs::Linux,
+            vendor: "Eclipse Adoptium".to_string(),
+        };
+        // One the scan finds broken, one it no longer finds at all.
+        let broken = upsert_java_component_to_db(db, found("/java1", 17))
+            .await
+            .unwrap();
+        let vanished = upsert_java_component_to_db(db, found("/gone/java", 21))
+            .await
+            .unwrap();
+        set_major_default(db, 17, Some(broken)).await.unwrap();
+        set_major_default(db, 21, Some(vanished)).await.unwrap();
+        set_major_default(db, 8, Some("elsewhere".into()))
+            .await
+            .unwrap();
+
+        scan_and_sync_local(db, &MockDiscovery, &MockJavaCheckerInvalid)
+            .await
+            .unwrap();
+
+        assert!(all_javas(db).await.is_empty());
+        assert_eq!(
+            get_major_defaults(db).await.unwrap(),
+            HashMap::from([(8, "elsewhere".to_string())])
+        );
+    }
+
+    #[tokio::test]
     async fn test_scan_and_sync_managed_on_disk_but_not_on_database() {
         let app = setup_managers_for_test().await;
         let db = &app.db;
@@ -673,49 +724,30 @@ mod test {
             .unwrap();
 
         let seed_javas = [
-            java_repo::JavaRow {
-                id: uuid::Uuid::new_v4().to_string(),
-                path: "my_path1".to_string(),
-                major: 8,
-                full_version: "1.8.0_282".to_string(),
-                r#type: "local".to_string(),
-                os: "linux".to_string(),
-                arch: "x86_64".to_string(),
-                vendor: "Azul Systems, Inc.".to_string(),
-                is_valid: true,
-            },
-            java_repo::JavaRow {
-                id: uuid::Uuid::new_v4().to_string(),
-                path: "my_path2".to_string(),
-                major: 17,
-                full_version: "17.0.1".to_string(),
-                r#type: "local".to_string(),
-                os: "linux".to_string(),
-                arch: "x86_64".to_string(),
-                vendor: "Azul Systems, Inc.".to_string(),
-                is_valid: true,
-            },
-            java_repo::JavaRow {
-                id: uuid::Uuid::new_v4().to_string(),
-                path: "my_path3".to_string(),
-                major: 14,
-                full_version: "14.0.1".to_string(),
-                r#type: "local".to_string(),
-                os: "linux".to_string(),
-                arch: "x86_64".to_string(),
-                vendor: "Azul Systems, Inc.".to_string(),
-                is_valid: false,
-            },
+            seed_row("my_path1", 8, "1.8.0_282", "managed", true),
+            seed_row("my_path2", 17, "17.0.1", "managed", true),
+            seed_row("my_path3", 14, "14.0.1", "managed", false),
+            seed_row("my_path4", 21, "21.0.5", "local", true),
         ];
         for java in seed_javas {
             java_repo::insert_java(db, java).await.unwrap();
         }
 
         JavaManager::ensure_profiles_in_db(db).await.unwrap();
-        sync_system_java_profiles(db).await.unwrap();
+        sync_system_java_profiles(db, &HashSet::new())
+            .await
+            .unwrap();
 
         let all_profiles = java_repo::get_all_profiles(db).await.unwrap();
         assert!(all_profiles.iter().all(|profile| profile.is_system_profile));
+
+        // A found Java is never linked automatically.
+        let delta_name = SystemJavaProfileName::Delta.to_string();
+        let delta_profile = java_repo::get_profile(db, &delta_name)
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(delta_profile.java_id.is_none());
 
         // Expect 8 and 17 to be there, but not 14 since it's invalid and 16 because not provided
         let legacy_name = SystemJavaProfileName::Legacy.to_string();
@@ -759,6 +791,91 @@ mod test {
             .unwrap();
 
         assert!(minecraft_exe_profile.java_id.is_none());
+    }
+
+    fn seed_row(
+        path: &str,
+        major: i32,
+        version: &str,
+        ty: &str,
+        valid: bool,
+    ) -> java_repo::JavaRow {
+        java_repo::JavaRow {
+            id: path.to_string(),
+            path: path.to_string(),
+            major,
+            full_version: version.to_string(),
+            r#type: ty.to_string(),
+            os: "linux".to_string(),
+            arch: crate::managers::java::resolve::host_arch().to_string(),
+            vendor: "Azul Systems, Inc.".to_string(),
+            is_valid: valid,
+        }
+    }
+
+    #[tokio::test]
+    async fn sync_links_defaults_then_managed_and_keeps_found_links_otherwise() {
+        let app = setup_managers_for_test().await;
+        let db = &app.db;
+        for java in [
+            seed_row("l17", 17, "17.0.12", "local", true),
+            seed_row("l21", 21, "21.0.5", "local", true),
+            seed_row("m21", 21, "21.0.4", "managed", true),
+            seed_row("c8", 8, "1.8.0_402", "custom", true),
+            seed_row("m8", 8, "1.8.0_492", "managed", true),
+            seed_row("m8old", 8, "1.8.0_302", "managed", true),
+        ] {
+            java_repo::insert_java(db, java).await.unwrap();
+        }
+        let link = |profile: SystemJavaProfileName, id: &'static str| {
+            let db = db.clone();
+            async move {
+                java_repo::set_profile_java(&db, &profile.to_string(), Some(id))
+                    .await
+                    .unwrap();
+            }
+        };
+        link(SystemJavaProfileName::Gamma, "l17").await;
+        link(SystemJavaProfileName::Delta, "l21").await;
+        crate::managers::java::major_defaults::set_major_default(db, 8, Some("c8".into()))
+            .await
+            .unwrap();
+
+        sync_system_java_profiles(db, &HashSet::new())
+            .await
+            .unwrap();
+
+        let linked = |profile: SystemJavaProfileName| {
+            let db = db.clone();
+            async move {
+                java_repo::get_profile(&db, &profile.to_string())
+                    .await
+                    .unwrap()
+                    .unwrap()
+                    .java_id
+            }
+        };
+        // No managed 17: the found one stays until a launch installs one.
+        assert_eq!(
+            linked(SystemJavaProfileName::Gamma).await.as_deref(),
+            Some("l17")
+        );
+        assert_eq!(linked(SystemJavaProfileName::Beta).await, None);
+        // GDLauncher's own build replaces a found one.
+        assert_eq!(
+            linked(SystemJavaProfileName::Delta).await.as_deref(),
+            Some("m21")
+        );
+        // The default beats managed builds, and Forge 1.16.5 keeps its
+        // below-312 build.
+        assert_eq!(
+            linked(SystemJavaProfileName::Legacy).await.as_deref(),
+            Some("c8")
+        );
+        assert_eq!(
+            linked(SystemJavaProfileName::LegacyFixed1).await.as_deref(),
+            Some("m8old")
+        );
     }
 
     #[tokio::test]

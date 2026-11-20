@@ -35,7 +35,9 @@ const WindowCloseWarning = (props: ModalProps) => {
       height="h-70"
       width="w-140"
     >
-      <div class="text-lightSlate-300 flex h-full flex-col justify-between overflow-y-auto">
+      {/* 4 px of padding inside the scroller, taken back by the margin, so
+          focus outlines at its edges (the checkbox, the button) show. */}
+      <div class="text-lightSlate-300 -m-1 box-content flex h-full flex-col justify-between overflow-y-auto p-1">
         <div class="flex flex-col gap-8">
           <div class="text-center text-xl font-bold text-yellow-400">
             <Trans key="window:_trn_window_close_title" />
@@ -82,8 +84,7 @@ const WindowCloseWarning = (props: ModalProps) => {
             <Trans key="window:_trn_window_close_never_show" />
           </Checkbox>
           <Button
-            type="secondary"
-            class="w-full"
+            type="primary"
             data-testid="window-close-warning-quit"
             onClick={() => {
               window.closeWindow()

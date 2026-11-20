@@ -61,7 +61,7 @@ const input = cva(
 )
 
 const container = cva(
-  "outline-none has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-[outline,background-color] duration-200 rounded-md ease-spring",
+  "outline-none has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary-500 h-10 gap-2 box-border transition-[outline,background-color] duration-200 rounded-md ease-spring",
   {
     variants: {
       hasIcon: {
@@ -76,7 +76,7 @@ const container = cva(
       disabled: {
         true: "cursor-not-allowed",
         false:
-          "hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500"
+          "hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-primary-500"
       }
     },
     defaultVariants: {

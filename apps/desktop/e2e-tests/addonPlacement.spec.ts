@@ -164,7 +164,7 @@ test.describe("addon placement", () => {
       //
       // Drives the wizard directly rather than through `installModIntoInstance`
       // (which only ever clicks "Continue anyway") to reach the *Cancel*
-      // button instead: the wizard's `Intro` step
+      // link instead: the wizard's `Intro` step
       // (`ShaderLoaderSetup/index.tsx`) calls `complete(null)` on cancel,
       // which fires the `notifications:_trn_shader_install_cancelled` toast
       // (via `onCleanup`'s guarded `complete`) and never calls either
@@ -179,7 +179,7 @@ test.describe("addon placement", () => {
         await installButton.click()
 
         // Proves the wizard actually opened before looking for its Cancel
-        // control — `shaderLoaderContinueAnyway` is the one sibling button
+        // control — `shaderLoaderContinueAnyway` is the one sibling link
         // in the same `Intro` step that already carries a `data-testid`
         // (installModIntoInstance's own wizard race uses it for the same
         // "did this really open" signal).
@@ -196,7 +196,9 @@ test.describe("addon placement", () => {
         // Cancel carries no `data-testid` (`ShaderLoaderSetup/index.tsx`'s
         // `Intro` step anchors only "Continue anyway" — this task's binding
         // constraints leave `mainWindow/src` untouched, so a new anchor isn't
-        // an option here). Scoped to `#overlay`, the portal every modal in
+        // an option here). `CancelLink` is a `TextLink`, a real `<button>`
+        // labelled `general:_trn_cancel` ("Cancel"), so the role query still
+        // matches. Scoped to `#overlay`, the portal every modal in
         // this app mounts into (`ModalsManager/index.tsx`) and the same
         // element `ensureLibraryInteractive` already reads to prove no modal
         // is open — the identical "role-selector, no testid" precedent

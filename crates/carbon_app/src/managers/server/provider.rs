@@ -56,6 +56,7 @@ pub trait ServerProvider: Send + Sync {
         xmx: i32,
         xms: i32,
         extra_args: &str,
+        mitigation_args: &[String],
         launch_config: &LaunchConfig,
         modloader_type: Option<&str>,
         log_tx: mpsc::UnboundedSender<String>,

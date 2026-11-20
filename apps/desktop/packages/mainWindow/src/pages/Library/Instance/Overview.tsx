@@ -3,8 +3,7 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { For, Show } from "solid-js"
 import useInstanceData from "./instance.data"
 import { useParams } from "@solidjs/router"
-import { formatDuration, intervalToDuration } from "date-fns"
-import { safeFormat } from "@/utils/date"
+import { formatLongDate, formatSeconds } from "@/utils/intl"
 import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner"
 import { apiUrl } from "@/utils/rspcClient"
 import { Button } from "@gd/ui"
@@ -15,7 +14,7 @@ const Overview = () => {
   const routeData = useInstanceData()
   const params = useParams<{ id: string }>()
   const navigator = useGDNavigate()
-  const [t] = useTransContext()
+  const [t, { getI18next }] = useTransContext()
 
   const modpackPlatform = () =>
     routeData.instanceDetails.data?.modpack?.modpack.type
@@ -37,7 +36,7 @@ const Overview = () => {
       <div class="flex w-full flex-wrap justify-center gap-4">
         <Show when={routeData.instanceDetails.data?.version}>
           <Card
-            title="Minecraft version"
+            title={t("instances:_trn_instance_mc_version")}
             text={routeData.instanceDetails.data!.version || ""}
             icon="vanilla"
             class="flex-1"
@@ -80,11 +79,9 @@ const Overview = () => {
         <Show when={routeData.instanceDetails.data?.secondsPlayed}>
           <Card
             title={t("instances:_trn_overview_card_played_time_title")}
-            text={formatDuration(
-              intervalToDuration({
-                start: 0,
-                end: routeData.instanceDetails.data!.secondsPlayed * 1000
-              })
+            text={formatSeconds(
+              routeData.instanceDetails.data!.secondsPlayed,
+              getI18next().language
             )}
             icon="clock"
             class="flex-1"
@@ -93,9 +90,9 @@ const Overview = () => {
         <Show when={routeData.instanceDetails.data?.lastPlayed}>
           <Card
             title={t("instances:_trn_overview_card_last_played_title")}
-            text={safeFormat(
+            text={formatLongDate(
               routeData.instanceDetails.data?.lastPlayed!,
-              "PPP"
+              getI18next().language
             )}
             icon="sign"
             class="flex-1"

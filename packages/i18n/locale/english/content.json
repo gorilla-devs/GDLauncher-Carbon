@@ -13,7 +13,6 @@
   "_trn_shader_loader_body_vanilla": "This shaderpack needs Fabric and Iris to run. Carbon can install everything for you.",
   "_trn_shader_loader_auto_setup": "Auto setup",
   "_trn_shader_loader_continue_anyway": "Continue without",
-  "_trn_shader_loader_cancel": "Cancel",
   "_trn_shader_loader_installing_modloader": "Installing Fabric",
   "_trn_shader_loader_installing_loader": "Installing shader loader",
   "_trn_shader_loader_installing_shader": "Installing your shaderpack",
@@ -201,5 +200,7 @@
   "_trn_table.status": "Status",
   "_trn_table.actions": "Actions",
   "_trn_mods.search": "Search mods...",
-  "_trn_sort_by_asc": "Sort Ascending"
+  "_trn_sort_by_asc": "Sort Ascending",
+  "_trn_a11y_select_all": "Select all",
+  "_trn_a11y_select_addon": "Select {{name}}"
 }

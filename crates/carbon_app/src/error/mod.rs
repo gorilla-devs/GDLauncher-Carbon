@@ -41,6 +41,7 @@ fn extract_fe_error(
 ) -> (Option<String>, Option<serde_json::Value>) {
     use crate::managers::account::gdl_account::{AvatarUploadError, InstanceShareError};
     use crate::managers::instance::run::InsufficientMemoryError;
+    use crate::managers::instance::run::java_issue::JavaMismatchError;
     use crate::managers::server::EulaNotAcceptedError;
 
     macro_rules! try_downcast {
@@ -58,6 +59,7 @@ fn extract_fe_error(
         InstanceShareError,
         AvatarUploadError,
         InsufficientMemoryError,
+        JavaMismatchError,
         EulaNotAcceptedError
     );
 

@@ -4,8 +4,6 @@
   "_trn_tooltip.apply_and_restart": "应用并重启",
   "_trn_tooltip.rtp_not_valid": "运行时路径无效。该路径不是一个文件夹，或不是空目录",
   "_trn_tooltip.rtp_unchanged": "运行时路径未更改",
-  "_trn_path": "路径",
-  "_trn_profile": "配置",
   "_trn_custom": "自定义",
   "_trn_tile_size": "磁贴大小",
   "_trn_sort_options": "排序选项",

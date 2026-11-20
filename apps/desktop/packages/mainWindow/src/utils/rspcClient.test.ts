@@ -16,8 +16,19 @@ vi.mock("@gd/i18n", () => ({
   }
 }))
 
-const { extractErrorDisplay, handleGlobalError, parseInvalidateFrame } =
-  await import("./rspcClient")
+const dispatchJavaMismatch = vi.fn()
+
+vi.mock("./javaMismatchBridge", () => ({
+  dispatchJavaMismatchEvent: dispatchJavaMismatch
+}))
+
+const {
+  extractErrorDisplay,
+  handleGlobalError,
+  parseInvalidateFrame,
+  queryClient,
+  rspcErrorCode
+} = await import("./rspcClient")
 
 describe("extractErrorDisplay", () => {
   it("falls back to the raw text for a bare JSON literal instead of throwing", () => {
@@ -64,6 +75,107 @@ describe("handleGlobalError", () => {
       "Download failed",
       expect.anything()
     )
+  })
+})
+
+describe("rspcErrorCode", () => {
+  it("reads the code of the first cause that has one", () => {
+    const message = JSON.stringify({
+      cause: [
+        { display: "Not enough memory" },
+        { display: "Not enough memory", code: "INSUFFICIENT_MEMORY" }
+      ],
+      backtrace: ""
+    })
+    expect(rspcErrorCode(new Error(message))).toBe("INSUFFICIENT_MEMORY")
+  })
+
+  it("has none for a plain error or a payload without codes", () => {
+    expect(rspcErrorCode(new Error("boom"))).toBeUndefined()
+    expect(
+      rspcErrorCode(new Error(JSON.stringify({ cause: [{ display: "x" }] })))
+    ).toBeUndefined()
+    expect(rspcErrorCode("not an error")).toBeUndefined()
+  })
+})
+
+describe("a launch on a Java that doesn't fit", () => {
+  it("asks through the crash help dialog instead of a toast", () => {
+    toastError.mockClear()
+    const data = {
+      instanceId: 3,
+      instanceName: "Survival",
+      neededMajor: 21,
+      usedMajor: 17,
+      fixMajor: 21
+    }
+    const message = JSON.stringify({
+      cause: [
+        {
+          display: "Survival is set to Java 17, which doesn't fit it",
+          code: "JAVA_MISMATCH",
+          data
+        }
+      ],
+      backtrace: ""
+    })
+
+    handleGlobalError(new Error(message), "mutation")
+
+    expect(dispatchJavaMismatch).toHaveBeenCalledWith(data)
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it("is logged at debug level, not as an error", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {})
+    for (const code of ["JAVA_MISMATCH", "INSUFFICIENT_MEMORY"]) {
+      handleGlobalError(
+        new Error(
+          JSON.stringify({
+            cause: [{ display: "x", code }],
+            backtrace: ""
+          })
+        ),
+        "mutation"
+      )
+    }
+    expect(errorSpy).not.toHaveBeenCalled()
+    expect(debugSpy).toHaveBeenCalledTimes(2)
+    handleGlobalError(new Error("boom"), "mutation")
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    errorSpy.mockRestore()
+    debugSpy.mockRestore()
+  })
+})
+
+describe("query error toasts", () => {
+  beforeEach(() => {
+    toastError.mockClear()
+  })
+
+  const failQuery = (message: string, meta?: Record<string, unknown>) =>
+    queryClient
+      .fetchQuery({
+        queryKey: ["test.failingQuery", message],
+        queryFn: () => Promise.reject(new Error(message)),
+        meta
+      })
+      .catch(() => {})
+
+  it("toasts a failed query by default", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {})
+    await failQuery("default query failure")
+    expect(toastError).toHaveBeenCalledWith(
+      "default query failure",
+      expect.anything()
+    )
+    error.mockRestore()
+  })
+
+  it("stays quiet for a query that shows its own error (meta.silentError)", async () => {
+    await failQuery("silent query failure", { silentError: true })
+    expect(toastError).not.toHaveBeenCalled()
   })
 })
 

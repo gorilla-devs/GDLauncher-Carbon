@@ -1,7 +1,10 @@
-use super::{Managed, ManagedJavaArchMap, ManagedJavaOsMap, ManagedJavaVersion, Step};
+use super::{
+    BuildSource, CatalogCache, Managed, ManagedJavaBuild, ManagedJavaCatalog, Step,
+    register_managed_java,
+};
 use crate::{
-    domain::java::{JavaArch, JavaOs, JavaVersion},
-    managers::java::{java_checker::JavaChecker, scan_and_sync::upsert_java_component_to_db},
+    domain::java::{JavaArch, JavaOs},
+    managers::java::{build_version::JavaBuildVersion, java_checker::JavaChecker},
 };
 use anyhow::Context;
 use carbon_net::{Checksum, DownloadOptions, Downloadable, Progress};
@@ -11,29 +14,95 @@ use reqwest_middleware::ClientBuilder;
 use reqwest_retry::{RetryTransientMiddleware, policies::ExponentialBackoff};
 use serde::Deserialize;
 use std::{
-    collections::HashMap,
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
 };
-use strum::IntoEnumIterator;
-use tokio::{
-    sync::{RwLock, watch::Sender},
-    task::spawn_blocking,
-};
+use tokio::{sync::watch::Sender, task::spawn_blocking};
 use tracing::{instrument, trace};
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct AzulZulu {
-    versions: Arc<RwLock<ManagedJavaOsMap>>,
+    base_url: String,
+    max_retries: u32,
+    pub(super) catalog: CatalogCache,
+}
+
+impl Default for AzulZulu {
+    fn default() -> Self {
+        // Debug builds can point the catalog at another server, e.g. to
+        // simulate Azul being down.
+        #[cfg(debug_assertions)]
+        if let Ok(url) = std::env::var("GDL_AZUL_BASE_URL") {
+            if !url.is_empty() {
+                return Self::with_base_url(url);
+            }
+        }
+
+        Self {
+            base_url: AZUL_BASE_URL.to_string(),
+            max_retries: AZUL_MAX_RETRIES,
+            catalog: CatalogCache::default(),
+        }
+    }
+}
+
+impl AzulZulu {
+    /// For tests. Does not retry, so a failing mock answers at once.
+    pub fn with_base_url(url: String) -> Self {
+        Self {
+            base_url: url,
+            max_retries: 0,
+            catalog: CatalogCache::default(),
+        }
+    }
+
+    /// The last catalog fetched, however old, without fetching one or
+    /// waiting, even while a fetch runs.
+    pub fn cached_catalog(&self) -> Option<ManagedJavaCatalog> {
+        self.catalog.last()
+    }
+
+    /// Whether the catalog was never fetched or is due a refresh.
+    pub fn catalog_is_stale(&self) -> bool {
+        self.catalog.is_stale()
+    }
+
+    /// For tests: serves `catalog` until the cache expires, with no request.
+    #[cfg(test)]
+    pub async fn cache_catalog_for_test(&self, catalog: ManagedJavaCatalog) {
+        self.catalog.set_for_test(catalog);
+    }
+
+    /// For tests: a fetch that never ends, until the guard is dropped.
+    #[cfg(test)]
+    pub async fn hold_fetch_for_test(&self) -> impl Sized + '_ {
+        self.catalog.hold_fetch_for_test().await
+    }
 }
 
 #[async_trait::async_trait]
 impl Managed for AzulZulu {
+    async fn catalog(&self) -> anyhow::Result<ManagedJavaCatalog> {
+        self.catalog
+            .get_or_fetch(|| async {
+                let builds = AzulAPI::fetch_builds(
+                    &JavaOs::get_current_os()?,
+                    &JavaArch::get_current_arch()?,
+                    &self.base_url,
+                    self.max_retries,
+                )
+                .await?;
+
+                Ok(ManagedJavaCatalog::from_builds(builds))
+            })
+            .await
+    }
+
     #[instrument(skip(self, java_checker, db, progress_report))]
     async fn setup<G: JavaChecker + Send + Sync>(
         &self,
-        version: &ManagedJavaVersion,
+        build: &ManagedJavaBuild,
         tmp_path: TempPath,
         base_managed_java_path: ManagedJavasPath,
         java_checker: &G,
@@ -42,11 +111,17 @@ impl Managed for AzulZulu {
     ) -> anyhow::Result<String> {
         let progress_report = Arc::new(progress_report);
 
-        let download_temp_path = tmp_path.to_path().join(&version.name);
+        let download_temp_path = tmp_path.to_path().join(&build.name);
 
         trace!("Download path: {:?}", download_temp_path);
 
-        let download_url = &version.download_url;
+        let BuildSource::AzulZip {
+            download_url,
+            sha256,
+        } = &build.source
+        else {
+            anyhow::bail!("Not an Azul build: {}", build.id);
+        };
 
         // Bounded the same way as every other Azul request in this module
         // (see `azul_client`): calling the bare default client directly here
@@ -59,12 +134,13 @@ impl Managed for AzulZulu {
             .await?
             .content_length();
 
-        // Best-effort: the list endpoint behind `fetch_all_versions` doesn't carry a
-        // checksum at all, but Azul's per-package detail endpoint does. A failure here
-        // (network blip, timeout, unexpected response shape) must never block the
-        // install -- it just means the download proceeds unchecked, exactly as before
-        // this existed.
-        let sha256 = fetch_package_sha256(&version.id).await;
+        // The list carries the checksum. Azul's per-package detail endpoint is the
+        // best-effort fallback when it didn't; a failure there must never block the
+        // install, it just means the download proceeds unchecked.
+        let sha256 = match sha256 {
+            Some(sha256) => Some(sha256.clone()),
+            None => fetch_package_sha256(&self.base_url, &build.id).await,
+        };
 
         let mut downloadable = Downloadable::new(download_url, download_temp_path);
         if let Some(content_length) = content_length {
@@ -116,7 +192,7 @@ impl Managed for AzulZulu {
             })?;
 
             let progress_report_clone = progress_report.clone();
-            let version_name = version.name.clone();
+            let version_name = build.name.clone();
             let (main_binary_path, install_root) = spawn_blocking(move || {
                 let total_archive_files = archive.len() as u64;
 
@@ -264,14 +340,8 @@ impl Managed for AzulZulu {
             Err(_) => main_binary_path,
         };
 
-        let java_component = match java_checker
-            .get_bin_info(
-                &main_binary_path,
-                crate::domain::java::JavaComponentType::Managed,
-            )
-            .await
-        {
-            Ok(component) => component,
+        match register_managed_java(&main_binary_path, java_checker, db).await {
+            Ok(java_id) => Ok(java_id),
             Err(e) => {
                 // A partially or incorrectly extracted JRE would otherwise persist and
                 // fail every launch — the size-based skip in the extraction loop never
@@ -285,28 +355,9 @@ impl Managed for AzulZulu {
                     );
                 }
 
-                return Err(e).with_context(|| {
-                    format!(
-                        "Could not get bin info for main binary: {:?}",
-                        &main_binary_path
-                    )
-                });
+                Err(e)
             }
-        };
-
-        let java_id = upsert_java_component_to_db(db, java_component).await?;
-
-        Ok(java_id)
-    }
-
-    async fn fetch_all_versions(&self) -> anyhow::Result<ManagedJavaOsMap> {
-        let mut versions = self.versions.write().await;
-        if versions.is_empty() {
-            let results = AzulAPI::get_all_versions().await?;
-            *versions = results;
         }
-
-        Ok(versions.clone())
     }
 }
 
@@ -341,21 +392,19 @@ fn single_root_component(root_entry_name: &Path) -> anyhow::Result<std::ffi::OsS
 }
 
 /// Best-effort fetch of a package's sha256 from Azul's per-package detail endpoint
-/// (`{AZUL_BASE_URL}{package_uuid}`). The list endpoint behind `get_all_by_os_arch`
-/// doesn't carry a checksum at all, so this is a second call keyed on the package
-/// UUID already known from that list.
+/// (`{base_url}{package_uuid}`), for packages whose list entry carried no checksum.
 ///
 /// Returns `None` on any failure -- request error, timeout, non-success status,
 /// unexpected response shape, or a missing/null field -- so the install always
 /// proceeds regardless: a missing checksum just means the download isn't
 /// verified against one, and only a genuinely served hash gets checked.
-async fn fetch_package_sha256(package_uuid: &str) -> Option<String> {
+async fn fetch_package_sha256(base_url: &str, package_uuid: &str) -> Option<String> {
     #[derive(Deserialize)]
     struct PackageDetail {
         sha256_hash: Option<String>,
     }
 
-    let url = format!("{AZUL_BASE_URL}{package_uuid}");
+    let url = format!("{base_url}{package_uuid}");
 
     let fetch = async {
         reqwest::get(&url)
@@ -388,28 +437,19 @@ const AZUL_BASE_URL: &str = "https://api.azul.com/metadata/v1/zulu/packages/";
 /// second, so this is generous headroom rather than an expected duration — but
 /// it must exist: see `azul_client` for why an unbounded attempt makes the
 /// retry actively harmful.
-const AZUL_REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
+pub(super) const AZUL_REQUEST_TIMEOUT: Duration = Duration::from_secs(15);
 
 /// Retries per request, on top of the initial attempt.
-const AZUL_MAX_RETRIES: u32 = 3;
+pub(super) const AZUL_MAX_RETRIES: u32 = 3;
 
 /// A retrying HTTP client for the Azul metadata API.
 ///
-/// `get_all_versions` spawns one request chain per `JavaOs` x `JavaArch`
-/// (3 x 4 = 12) and joins them with `task.await??`, which is fail-fast: a
-/// single transient failure among the twelve aborts the entire JRE version
-/// resolution and reaches the user as a failed instance install. With no retry
-/// at all, even a 3% per-request failure rate makes that `1 - 0.97^12` — about
-/// a 31% chance of failing outright, matching the roughly one-in-three rate
-/// observed live.
-///
 /// Both halves are load-bearing and neither works alone. Retrying without a
 /// per-attempt timeout does not bound failure, it multiplies it: a server that
-/// accepts and never answers would stall every attempt in turn. The fail-fast
-/// join in `get_all_versions` is deliberately left as it is — a genuinely
-/// unavailable Azul should fail loudly rather than silently yield a partial
-/// version map.
-fn azul_client(
+/// accepts and never answers would stall every attempt in turn. A single
+/// transient failure is common enough (roughly one request in thirty) that
+/// without a retry it would regularly fail a whole catalog fetch.
+pub(super) fn azul_client(
     timeout: Duration,
     max_retries: u32,
 ) -> anyhow::Result<reqwest_middleware::ClientWithMiddleware> {
@@ -424,79 +464,20 @@ fn azul_client(
 struct AzulAPI;
 
 impl AzulAPI {
-    async fn get_all_versions() -> anyhow::Result<ManagedJavaOsMap> {
-        let results = HashMap::new();
-
-        let rwlock_results = Arc::new(RwLock::new(results));
-        let mut tasks = Vec::new();
-
-        for os in JavaOs::iter() {
-            for arch in JavaArch::iter() {
-                let os = os.clone();
-                let arch = arch.clone();
-                let arced_rwlock_results = rwlock_results.clone();
-                tasks.push(tokio::spawn(async move {
-                    let versions = Self::get_all_by_os_arch(&os, &arch, AZUL_BASE_URL).await?;
-
-                    let mut results = arced_rwlock_results.write().await;
-                    let os = results
-                        .entry(os.clone())
-                        .or_insert_with(|| ManagedJavaArchMap(HashMap::new()));
-
-                    let arch = os.entry(arch).or_insert_with(Vec::new);
-
-                    for version in versions {
-                        arch.push(ManagedJavaVersion {
-                            name: version.name.clone(),
-                            download_url: version.download_url.clone(),
-                            id: version.package_uuid.clone(),
-                            java_version: JavaVersion {
-                                major: version.java_version.first().cloned().ok_or(
-                                    anyhow::anyhow!("No major version found for {}", version.name),
-                                )?,
-                                minor: version.java_version.get(1).cloned().unwrap_or(0),
-                                patch: version
-                                    .java_version
-                                    .get(2)
-                                    .cloned()
-                                    .map(|v| v.to_string())
-                                    .unwrap_or("0".to_string()),
-                                build_metadata: None,
-                                prerelease: None,
-                                update_number: None,
-                            },
-                        });
-                    }
-
-                    Ok::<(), anyhow::Error>(())
-                }));
-            }
-        }
-
-        for task in tasks {
-            task.await??;
-        }
-
-        // Get the hashmap out of the rwlock
-        Ok(ManagedJavaOsMap(std::mem::take(
-            &mut *rwlock_results.write_owned().await,
-        )))
-    }
-
-    async fn get_all_by_os_arch(
+    async fn fetch_builds(
         os: &JavaOs,
         arch: &JavaArch,
         base_url: &str,
-    ) -> anyhow::Result<Vec<AzulZuluVersion>> {
-        let mut results: Vec<AzulZuluVersion> = Vec::new();
+        max_retries: u32,
+    ) -> anyhow::Result<Vec<ManagedJavaBuild>> {
+        let mut results: Vec<AzulZuluPackage> = Vec::new();
         let mut page = 1;
 
-        let client = azul_client(AZUL_REQUEST_TIMEOUT, AZUL_MAX_RETRIES)?;
+        let client = azul_client(AZUL_REQUEST_TIMEOUT, max_retries)?;
 
         loop {
             let url = format!(
-                "{base_url}?java_package_type=jre&javafx_bundled=false&release_status=ga&availability_types=CA&archive_type=zip&page={}&os={}&arch={}",
-                page,
+                "{base_url}?java_package_type=jre&javafx_bundled=false&release_status=ga&availability_types=CA&archive_type=zip&os={}&arch={}&include_fields=build_date,size,sha256_hash,support_term&page={page}&page_size=100",
                 match os {
                     JavaOs::Windows => "windows",
                     JavaOs::Linux => "linux",
@@ -510,7 +491,7 @@ impl AzulAPI {
                 }
             );
 
-            let req = client.get(&url).send().await?;
+            let req = client.get(&url).send().await?.error_for_status()?;
 
             let pagination: Pagination = serde_json::from_str(
                 req.headers()
@@ -519,39 +500,68 @@ impl AzulAPI {
                     .to_str()?,
             )?;
 
-            results.append(&mut req.json::<Vec<AzulZuluVersion>>().await?);
+            let mut packages = req.json::<Vec<AzulZuluPackage>>().await?;
+            let page_was_empty = packages.is_empty();
+            results.append(&mut packages);
 
-            if results.len() as u64 >= pagination.total {
+            if page_was_empty || results.len() as u64 >= pagination.total {
                 break;
             }
 
             page += 1;
         }
 
-        Ok(results)
+        results
+            .into_iter()
+            .map(ManagedJavaBuild::try_from)
+            .collect()
     }
 }
 
 #[derive(Deserialize, Debug)]
-pub struct Pagination {
+struct Pagination {
     total: u64,
-    total_pages: u64,
-    first_page: Option<u64>,
-    last_page: Option<u64>,
-    page: Option<u64>,
 }
 
 #[derive(Deserialize, Debug)]
-pub struct AzulZuluVersion {
+struct AzulZuluPackage {
     package_uuid: String,
     name: String,
-    java_version: Vec<u16>,
-    openjdk_build_number: Option<u32>,
-    latest: bool,
+    java_version: Vec<u32>,
     download_url: String,
-    product: String,
-    distro_version: Vec<u8>,
-    availability_type: String,
+    build_date: Option<String>,
+    size: Option<u64>,
+    sha256_hash: Option<String>,
+    support_term: Option<String>,
+}
+
+impl TryFrom<AzulZuluPackage> for ManagedJavaBuild {
+    type Error = anyhow::Error;
+
+    fn try_from(package: AzulZuluPackage) -> anyhow::Result<Self> {
+        let major = package
+            .java_version
+            .first()
+            .and_then(|major| u8::try_from(*major).ok())
+            .ok_or_else(|| anyhow::anyhow!("No major version found for {}", package.name))?;
+
+        Ok(Self {
+            id: package.package_uuid,
+            name: package.name,
+            major,
+            version: JavaBuildVersion::from_components(&package.java_version),
+            source: BuildSource::AzulZip {
+                download_url: package.download_url,
+                sha256: package
+                    .sha256_hash
+                    .map(|hash| hash.trim().to_lowercase())
+                    .filter(|hash| !hash.is_empty()),
+            },
+            size_bytes: package.size,
+            release_date: package.build_date,
+            lts: package.support_term.as_deref() == Some("lts"),
+        })
+    }
 }
 
 #[cfg(test)]
@@ -560,9 +570,195 @@ mod test {
 
     #[tokio::test]
     async fn test_get_available_versions() {
-        let versions = AzulAPI::get_all_versions().await.unwrap();
+        let catalog = AzulZulu::default().catalog().await.unwrap();
 
-        assert!(!versions.is_empty());
+        assert!(catalog.latest_for_major(17).is_some());
+    }
+
+    /// One package of an Azul list response.
+    fn package(uuid: &str, version: &[u32], lts: bool) -> serde_json::Value {
+        let joined = version
+            .iter()
+            .map(u32::to_string)
+            .collect::<Vec<_>>()
+            .join(".");
+        serde_json::json!({
+            "package_uuid": uuid,
+            "name": format!("zulu-jre{joined}.zip"),
+            "java_version": version,
+            "download_url": format!("https://example.invalid/{uuid}.zip"),
+            "build_date": "2025-01-02T03:04:05Z",
+            "size": 1234,
+            "sha256_hash": format!("ABC{uuid}"),
+            "support_term": if lts { "lts" } else { "mts" },
+        })
+    }
+
+    fn pagination_header(total: usize) -> String {
+        format!(r#"{{"total":{total},"total_pages":2}}"#)
+    }
+
+    fn catalog_query(page: &str) -> mockito::Matcher {
+        mockito::Matcher::AllOf(vec![
+            mockito::Matcher::UrlEncoded(
+                "include_fields".into(),
+                "build_date,size,sha256_hash,support_term".into(),
+            ),
+            mockito::Matcher::UrlEncoded(
+                "os".into(),
+                match JavaOs::get_current_os().unwrap() {
+                    JavaOs::Windows => "windows",
+                    JavaOs::Linux => "linux",
+                    JavaOs::MacOs => "macos",
+                }
+                .into(),
+            ),
+            mockito::Matcher::UrlEncoded("page".into(), page.into()),
+        ])
+    }
+
+    /// Serves three builds, deliberately out of order, over two pages.
+    async fn mock_two_pages(server: &mut mockito::Server, expect: usize) -> Vec<mockito::Mock> {
+        let page1 = server
+            .mock("GET", "/")
+            .match_query(catalog_query("1"))
+            .with_status(200)
+            .with_header("X-Pagination", &pagination_header(3))
+            .with_body(
+                serde_json::json!([
+                    package("a17-19", &[17, 0, 19], true),
+                    package("b21-13", &[21, 0, 13, 1], true),
+                ])
+                .to_string(),
+            )
+            .expect(expect)
+            .create_async()
+            .await;
+        let page2 = server
+            .mock("GET", "/")
+            .match_query(catalog_query("2"))
+            .with_status(200)
+            .with_header("X-Pagination", &pagination_header(3))
+            .with_body(serde_json::json!([package("c17-21", &[17, 0, 21, 1], false)]).to_string())
+            .expect(expect)
+            .create_async()
+            .await;
+        vec![page1, page2]
+    }
+
+    #[tokio::test]
+    async fn catalog_groups_and_sorts_current_platform() {
+        let mut server = mockito::Server::new_async().await;
+        let mocks = mock_two_pages(&mut server, 1).await;
+
+        let azul = AzulZulu::with_base_url(format!("{}/", server.url()));
+        let catalog = azul.catalog().await.unwrap();
+
+        assert_eq!(
+            catalog.majors.iter().map(|m| m.major).collect::<Vec<_>>(),
+            vec![21, 17]
+        );
+        let seventeen = &catalog.majors[1];
+        assert!(seventeen.lts);
+        assert_eq!(
+            seventeen
+                .builds
+                .iter()
+                .map(|b| b.version.to_string())
+                .collect::<Vec<_>>(),
+            vec!["17.0.21.1", "17.0.19"]
+        );
+        assert!(seventeen.builds[1].lts);
+        assert!(!seventeen.builds[0].lts);
+
+        let newest = catalog.latest_for_major(17).unwrap();
+        assert_eq!(newest.id, "c17-21");
+        assert_eq!(newest.release_date.as_deref(), Some("2025-01-02T03:04:05Z"));
+        assert_eq!(newest.size_bytes, Some(1234));
+        match &newest.source {
+            BuildSource::AzulZip {
+                download_url,
+                sha256,
+            } => {
+                assert_eq!(download_url, "https://example.invalid/c17-21.zip");
+                assert_eq!(sha256.as_deref(), Some("abcc17-21"));
+            }
+            other => panic!("not an Azul build: {other:?}"),
+        }
+        assert_eq!(catalog.find("b21-13").unwrap().major, 21);
+
+        for mock in mocks {
+            mock.assert_async().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn catalog_is_cached_within_ttl() {
+        let mut server = mockito::Server::new_async().await;
+        let mocks = mock_two_pages(&mut server, 1).await;
+
+        let azul = AzulZulu::with_base_url(format!("{}/", server.url()));
+        azul.catalog().await.unwrap();
+        azul.catalog().await.unwrap();
+
+        for mock in mocks {
+            mock.assert_async().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn cached_catalog_never_fetches() {
+        let mut server = mockito::Server::new_async().await;
+        let mocks = mock_two_pages(&mut server, 1).await;
+        let azul = AzulZulu::with_base_url(format!("{}/", server.url()));
+
+        // Nothing fetched yet: nothing to read, and no request.
+        assert!(azul.cached_catalog().is_none());
+
+        let majors = |catalog: &ManagedJavaCatalog| {
+            catalog.majors.iter().map(|m| m.major).collect::<Vec<_>>()
+        };
+        let fetched = azul.catalog().await.unwrap();
+        assert_eq!(
+            azul.cached_catalog().as_ref().map(majors),
+            Some(majors(&fetched))
+        );
+
+        // While a fetch waits on the network, a peek reads the last catalog
+        // rather than waiting or reading nothing.
+        let fetching = azul.hold_fetch_for_test().await;
+        assert_eq!(
+            azul.cached_catalog().as_ref().map(majors),
+            Some(majors(&fetched))
+        );
+        drop(fetching);
+        assert!(azul.cached_catalog().is_some());
+        // Only the one fetch above.
+        for mock in mocks {
+            mock.assert_async().await;
+        }
+    }
+
+    #[tokio::test]
+    async fn catalog_error_is_not_cached() {
+        let mut server = mockito::Server::new_async().await;
+        let failing = server
+            .mock("GET", mockito::Matcher::Any)
+            .with_status(500)
+            .expect(1)
+            .create_async()
+            .await;
+
+        let azul = AzulZulu::with_base_url(format!("{}/", server.url()));
+        assert!(azul.catalog().await.is_err());
+        failing.assert_async().await;
+        failing.remove_async().await;
+
+        let mocks = mock_two_pages(&mut server, 1).await;
+        assert!(azul.catalog().await.is_ok());
+        for mock in mocks {
+            mock.assert_async().await;
+        }
     }
 
     /// One page of a well-formed Azul list response.
@@ -581,22 +777,14 @@ mod test {
         .to_string()
     }
 
-    /// Regression test for the fixture-install failure that made the e2e suite
-    /// unable to go green: `get_all_versions` fans out one request per
-    /// `JavaOs` x `JavaArch` combination (3 x 4 = 12) and joins them with
-    /// `task.await??`, which is fail-fast. With no retry on the individual
-    /// request, a single transient failure among the twelve aborted the whole
-    /// JRE version resolution and surfaced to the user as a failed instance
-    /// install. At a 3% per-request failure rate that is `1 - 0.97^12` — about
-    /// a 31% chance of failing the whole resolution, which matches the roughly
-    /// one-in-three rate observed live.
+    /// A single transient failure must not fail the whole catalog fetch.
     ///
     /// Asserts the transient 500 is retried rather than propagated. Serves the
     /// failure first and the success second; mockito hands each request to the
     /// first matching mock that has not yet met its expected hit count, so the
     /// retry is what reaches the second mock.
     #[tokio::test]
-    async fn get_all_by_os_arch_retries_a_transient_failure() {
+    async fn fetch_builds_retries_a_transient_failure() {
         let mut server = mockito::Server::new_async().await;
 
         let failing = server
@@ -616,14 +804,15 @@ mod test {
             .await;
 
         let base_url = format!("{}/", server.url());
-        let result =
-            AzulAPI::get_all_by_os_arch(&JavaOs::Linux, &JavaArch::X86_64, &base_url).await;
+        let result = AzulAPI::fetch_builds(
+            &JavaOs::Linux,
+            &JavaArch::X86_64,
+            &base_url,
+            AZUL_MAX_RETRIES,
+        )
+        .await;
 
-        let versions = result.expect(
-            "a single transient 500 must be retried, not propagated — without a retry-enabled \
-             client this is the failure that aborts all twelve concurrent requests via the \
-             fail-fast `task.await??` join in get_all_versions",
-        );
+        let versions = result.expect("a single transient 500 must be retried, not propagated");
         assert_eq!(versions.len(), 1);
 
         failing.assert_async().await;
@@ -690,7 +879,7 @@ mod test {
         let setup_start = source.find("async fn setup<G").expect("setup fn not found");
         let setup_end = setup_start
             + source[setup_start..]
-                .find("\n    async fn fetch_all_versions")
+                .find("\n}\n\n/// Extracts and validates")
                 .expect("end of setup fn not found");
         let setup_body = &source[setup_start..setup_end];
 

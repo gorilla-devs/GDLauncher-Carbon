@@ -6,6 +6,7 @@ import type { FETask, FESubtask, Translation } from "@gd/core_module/bindings"
 import type { StepProps } from "."
 import { rspc } from "@/utils/rspcClient"
 import { useModal } from "@/managers/ModalsManager"
+import { CancelLink, DialogFooter } from "@/managers/ModalsManager/DialogFooter"
 import { setShaderInstallRunning } from "./state"
 import { formatBytes } from "@/utils/formatBytes"
 
@@ -221,15 +222,13 @@ const Installing = (props: StepProps) => {
         <div class="w-130 flex h-72 flex-col items-center justify-center gap-4 text-center">
           <div class="i-hugeicons:alert-02 text-3xl text-red-400" />
           <p class="text-red-400 m-0 text-sm">{error()}</p>
-          <div class="mt-2 flex gap-2">
-            <Button type="secondary" onClick={cancel}>
-              <Trans key="content:_trn_shader_loader_cancel" />
-            </Button>
+          <DialogFooter class="mt-2">
+            <CancelLink onClick={cancel} />
             <Button type="primary" onClick={retry}>
               <div class="i-hugeicons:refresh h-4 w-4" />
               <Trans key="general:_trn_retry" />
             </Button>
-          </div>
+          </DialogFooter>
         </div>
       }
     >

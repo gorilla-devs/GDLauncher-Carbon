@@ -67,7 +67,8 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
     createSelectColumn({
       selectedCount: config.selectedCount,
       totalRows: config.totalRows,
-      onSelectAll: config.onSelectAll
+      onSelectAll: config.onSelectAll,
+      getDisplayName: config.getDisplayName
     }),
 
     // 2. Icon / thumbnail

@@ -4,8 +4,6 @@
   "_trn_tooltip.apply_and_restart": "Применить и перезагрузить",
   "_trn_tooltip.rtp_not_valid": "Путь среды выполнения недействителен. Либо путь не является папкой, либо каталог не пуст",
   "_trn_tooltip.rtp_unchanged": "Путь среды выполнения не изменился",
-  "_trn_path": "Путь",
-  "_trn_profile": "Профиль",
   "_trn_custom": "Пользовательский",
   "_trn_tile_size": "Размер плитки",
   "_trn_sort_options": "Параметры сортировки",

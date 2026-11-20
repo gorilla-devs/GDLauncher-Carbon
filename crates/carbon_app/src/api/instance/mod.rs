@@ -16,6 +16,8 @@ use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::instance::export::{InstanceTooLargeError, ShareInstanceProgress};
 use crate::managers::instance::importer::ImportShareCodeProgress;
 use crate::managers::instance::log::{LogEntrySourceKind, SearchResult};
+use crate::managers::instance::run::java_issue::JavaIssue;
+use crate::managers::java::instance_java::{JavaMismatch, JavaVia, ResolvedJava, java_mismatches};
 use crate::managers::{App, AppInner, instance::importer};
 use anyhow::anyhow;
 use axum::Json;
@@ -269,6 +271,15 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok(Some(result?))
         }
 
+        query GET_JAVA_MISMATCHES[app, args: ()] {
+            // Best effort: the library never shows an error for it.
+            Ok(java_mismatches(&app)
+                .await
+                .into_iter()
+                .map(FEInstanceJavaMismatch::from)
+                .collect::<Vec<_>>())
+        }
+
         query GET_MODPACK_INFO[app, id: Option<FEInstanceId>] {
             let Some(id) = id else {
                 return Ok(None);
@@ -319,38 +330,26 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 return Err(anyhow::anyhow!("attempted to launch instance without an account"));
             };
 
-            let memory_check_dismissed = crate::api::settings::is_memory_warning_dismissed(
-                &app.db,
-            ).await.unwrap_or(false);
-
-            if !args.skip_memory_check && !memory_check_dismissed {
-                let instance_id = crate::domain::instance::InstanceId(args.id.0);
-                let (_xms, xmx) = app.instance_manager()
-                    .get_effective_memory(instance_id)
-                    .await?;
-
-                let available_bytes = app.system_info_manager()
-                    .get_available_ram()
-                    .await;
-                let available_mb: u64 = available_bytes / 1024 / 1024;
-
-                // If we couldn't determine available RAM, skip the check
-                // and let the user launch normally.
-                if available_mb > 0 {
-                    // JVM needs native memory beyond the heap for JIT compiler, thread
-                    // stacks, metaspace, GC structures, direct buffers, etc.
-                    // A 1500 MB buffer accounts for this overhead.
-                    let total_estimated_mb: u64 = u64::from(xmx).saturating_add(1500);
-
-                    if total_estimated_mb > available_mb {
-                        return Err(crate::managers::instance::run::InsufficientMemoryError {
-                            instance_id: args.id.0,
-                            requested_mb: u64::from(xmx),
-                            needed_mb: total_estimated_mb,
-                            available_mb,
-                        }.into());
-                    }
+            // Before the memory check: "Play anyway" relaunches with this
+            // check skipped and still gets that one.
+            if !args.skip_java_check {
+                match app.instance_manager()
+                    .java_mismatch_before_launch(args.id.into())
+                    .await
+                {
+                    Ok(Some(mismatch)) => return Err(mismatch.into()),
+                    Ok(None) => {}
+                    // Best effort: never what stops a launch.
+                    Err(e) => tracing::warn!(
+                        "could not check the instance's Java before launch: {e:#}"
+                    ),
                 }
+            }
+
+            if !args.skip_memory_check {
+                app.instance_manager()
+                    .check_launch_memory(args.id.into())
+                    .await?;
             }
 
             app.instance_manager()
@@ -358,6 +357,24 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .await?;
 
             Ok(())
+        }
+
+        mutation FIX_JAVA_AND_LAUNCH[app, id: FEInstanceId] {
+            app.instance_manager()
+                .fix_java_and_launch(id.into())
+                .await
+        }
+
+        mutation FIX_JAVA_MISMATCH[app, id: FEInstanceId] {
+            app.instance_manager()
+                .fix_java_mismatch(id.into())
+                .await
+        }
+
+        mutation FIX_JAVA_MISMATCH_AND_LAUNCH[app, id: FEInstanceId] {
+            app.instance_manager()
+                .fix_java_mismatch_and_launch(id.into())
+                .await
         }
 
         mutation KILL_INSTANCE[app, id: FEInstanceId] {
@@ -1143,6 +1160,9 @@ struct ValidListInstance {
     modloader_version: Option<String>,
     modpack: Option<Modpack>,
     state: LaunchState,
+    /// As in [`InstanceDetails`], so one query tells the UI about every
+    /// instance's crash.
+    java_issue: Option<FEJavaIssue>,
 }
 
 #[derive(Type, Debug, Serialize)]
@@ -1536,6 +1556,10 @@ struct FELaunchInstanceArgs {
     id: FEInstanceId,
     #[serde(default)]
     skip_memory_check: bool,
+    /// Launch even on a Java that doesn't fit the instance. Without it, such
+    /// a launch fails with `JAVA_MISMATCH`, so the UI can offer the fix.
+    #[serde(default)]
+    skip_java_check: bool,
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -1772,8 +1796,39 @@ struct InstanceDetails {
     seconds_played: u32,
     modloaders: Vec<ModLoader>,
     java_override: Option<FEJavaOverride>,
+    /// The system profile the Minecraft version asks for: a `Profile`
+    /// override naming it means Automatic.
     required_java_profile: Option<String>,
+    /// The Java major the Minecraft version needs; `None` without version
+    /// data.
+    required_java_major: Option<u8>,
+    /// Set when the version also needs a build below this one of that major
+    /// (Forge 1.16.5 needs Java 8 below 8.0.312).
+    required_java_below: Option<String>,
+    /// Every Java major the version runs on, oldest first (16 and 17 for
+    /// Minecraft 1.17); empty without version data.
+    accepted_java_majors: Vec<u8>,
+    /// Set when a wrong-Java crash raised what the instance needs: every
+    /// Java of this major or later fits, and `required_java_major` is it.
+    java_floor: Option<u8>,
+    resolved_java: Option<FEResolvedJava>,
+    /// What Automatic would give the instance, whatever its override says.
+    automatic_java: Option<FEResolvedJava>,
+    /// The Java major "Download Java N…" offers: the one Automatic would
+    /// download, respecting the floor and Java 17 standing in for a Java 16
+    /// the catalog lacks. `None` while a valid Java that fits is installed.
+    download_major: Option<u8>,
+    /// With `download_major`, when the download must be a build below this
+    /// one (Forge 1.16.5 needs Java 8 below 8.0.312).
+    download_below: Option<String>,
+    /// The override names a Java that doesn't meet the requirement.
     java_override_mismatch: bool,
+    /// With `java_override_mismatch`: the Java major `fixJavaMismatch` moves
+    /// the instance to.
+    java_mismatch_fix_major: Option<u8>,
+    /// The last game crashed on a Java older than a mod needs. Cleared when
+    /// the instance next launches.
+    java_issue: Option<FEJavaIssue>,
     pre_launch_hook: Option<String>,
     post_exit_hook: Option<String>,
     wrapper_command: Option<String>,
@@ -1781,6 +1836,104 @@ struct InstanceDetails {
     state: LaunchState,
     icon_revision: Option<u32>,
     has_pack_update: bool,
+}
+
+/// A game that crashed on a Java older than one of its mods needs.
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FEJavaIssue {
+    /// The oldest Java the crash says works.
+    needed_major: u8,
+    used_major: u8,
+    /// The Java the fix uses: the oldest installed or downloadable one of
+    /// `needed_major` or later, or `needed_major` when that's unknown.
+    fix_major: u8,
+}
+
+impl From<JavaIssue> for FEJavaIssue {
+    fn from(issue: JavaIssue) -> Self {
+        Self {
+            needed_major: issue.needed_major,
+            used_major: issue.used_major,
+            fix_major: issue.fix_major,
+        }
+    }
+}
+
+/// The Java an instance launches with, resolved as a launch does it.
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FEResolvedJava {
+    /// `None` for a download, or a path no listed Java has.
+    java_id: Option<String>,
+    /// For a listed Java.
+    vendor_name: Option<String>,
+    version: Option<String>,
+    path: Option<String>,
+    /// `None` for a path no listed Java has.
+    major: Option<u8>,
+    via: FEJavaVia,
+    /// Nothing is installed for Automatic to use, so a launch downloads it.
+    downloads_at_launch: bool,
+}
+
+impl From<ResolvedJava> for FEResolvedJava {
+    fn from(resolved: ResolvedJava) -> Self {
+        let resolution = resolved.resolution;
+        Self {
+            java_id: resolution.java_id,
+            vendor_name: resolved.vendor_name,
+            version: resolved.version,
+            path: resolution.path,
+            major: resolution.major,
+            via: resolution.via.into(),
+            downloads_at_launch: resolution.downloads_at_launch,
+        }
+    }
+}
+
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+enum FEJavaVia {
+    Automatic,
+    Default,
+    Instance,
+    Profile,
+}
+
+impl From<JavaVia> for FEJavaVia {
+    fn from(via: JavaVia) -> Self {
+        match via {
+            JavaVia::Automatic => Self::Automatic,
+            JavaVia::Default => Self::Default,
+            JavaVia::Instance => Self::Instance,
+            JavaVia::Profile => Self::Profile,
+        }
+    }
+}
+
+/// An instance whose override names a Java its Minecraft version can't run
+/// on, with the Java it needs.
+#[derive(Type, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FEInstanceJavaMismatch {
+    instance_id: FEInstanceId,
+    required_java_major: u8,
+    required_java_below: Option<String>,
+    /// Set when a wrong-Java crash raised what the instance needs: this major
+    /// or later.
+    java_floor: Option<u8>,
+}
+
+impl From<JavaMismatch> for FEInstanceJavaMismatch {
+    fn from(mismatch: JavaMismatch) -> Self {
+        Self {
+            instance_id: mismatch.instance_id.into(),
+            required_java_major: mismatch.need.major,
+            required_java_below: mismatch.need.below.map(|below| below.to_string()),
+            java_floor: mismatch.floor,
+        }
+    }
 }
 
 #[derive(Type, Debug, Serialize, Deserialize)]
@@ -2067,7 +2220,28 @@ impl From<domain::InstanceDetails> for InstanceDetails {
             modloaders: value.modloaders.into_iter().map(Into::into).collect(),
             java_override: value.java_override.map(Into::into),
             required_java_profile: value.required_java_profile,
+            required_java_major: value.required_java.as_ref().map(|need| need.major),
+            required_java_below: value
+                .required_java
+                .and_then(|need| need.below)
+                .map(|below| below.to_string()),
+            accepted_java_majors: {
+                let mut majors: Vec<u8> = value.accepted_java.iter().map(|req| req.major).collect();
+                majors.sort_unstable();
+                majors.dedup();
+                majors
+            },
+            java_floor: value.java_floor,
+            resolved_java: value.resolved_java.map(Into::into),
+            automatic_java: value.automatic_java.map(Into::into),
+            download_major: value.download_java.as_ref().map(|req| req.major),
+            download_below: value
+                .download_java
+                .and_then(|req| req.below)
+                .map(|below| below.to_string()),
             java_override_mismatch: value.java_override_mismatch,
+            java_mismatch_fix_major: value.java_mismatch_fix.map(|fix| fix.major),
+            java_issue: value.java_issue.map(Into::into),
             notes: value.notes,
             state: value.state.into(),
             icon_revision: value.icon_revision,
@@ -2284,6 +2458,7 @@ impl From<manager::ValidListInstance> for ValidListInstance {
             modloader_version: value.modloader_version,
             modpack: value.modpack.map(Into::into),
             state: value.state.into(),
+            java_issue: value.java_issue.map(Into::into),
         }
     }
 }
@@ -2484,6 +2659,8 @@ impl TryFrom<FEUpdateInstance> for domain::InstanceSettingsUpdate {
                 .modloader
                 .map(|x| x.inner().and_then(|v| v.try_into().ok())),
             java_override: value.java_override.map(|x| x.inner().map(Into::into)),
+            // Only a wrong-Java crash's fix sets it.
+            java_floor: None,
             global_java_args: value.global_java_args.map(|x| x.inner()),
             extra_java_args: value.extra_java_args.map(|x| x.inner()),
             memory: value.memory.map(|x| x.inner().map(Into::into)),

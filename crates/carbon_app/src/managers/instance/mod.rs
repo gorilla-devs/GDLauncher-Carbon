@@ -13,10 +13,11 @@ use crate::domain::instance::info::{GameVersion, InstanceIcon, Modpack};
 use crate::domain::instance::{
     self as domain, GameLogId, GroupId, InstanceFolder, InstanceId, InstanceModpackInfo,
 };
-use crate::domain::java::{SYSTEM_JAVA_PROFILE_NAME_PREFIX, SystemJavaProfileName};
 use crate::domain::vtask::VisualTaskId;
 use crate::livenesstracker::LivenessTracker;
 use crate::managers::instance::modpack::PackVersionFile;
+use crate::managers::java::instance_java::instance_java_details;
+use crate::managers::java::resolve::is_missing_managed_java;
 use anyhow::bail;
 use anyhow::{Context, anyhow};
 use carbon_platforms::ModPlatform;
@@ -86,6 +87,9 @@ pub struct InstanceManager {
     >,
     modpack_info_semaphore: Mutex<()>,
     pub any_instance_running: Arc<watch::Sender<bool>>,
+    /// Flips to true once the startup scan has loaded the instances and
+    /// adopted the games still running from the last session.
+    pub instances_scanned: watch::Sender<bool>,
     instance_running_tracker: Arc<LivenessTracker>,
     /// Results of the last completed (or failed-but-partial) run of
     /// [`modpack::check_pack_origin`](ManagerRef::check_pack_origin) per
@@ -98,6 +102,15 @@ pub struct InstanceManager {
 impl Default for InstanceManager {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Marks the startup scan done when dropped, however the scan ended.
+struct ScanDone<'a>(&'a watch::Sender<bool>);
+
+impl Drop for ScanDone<'_> {
+    fn drop(&mut self) {
+        self.0.send_replace(true);
     }
 }
 
@@ -117,6 +130,7 @@ impl InstanceManager {
             game_logs: RwLock::new(HashMap::new()),
             modpack_info_semaphore: Mutex::new(()),
             any_instance_running: any_instance_running.clone(),
+            instances_scanned: watch::channel(false).0,
             instance_running_tracker: LivenessTracker::new(move |count| {
                 drop(any_instance_running.send_replace(count != 0))
             }),
@@ -268,10 +282,23 @@ fn icon_filename(url_segment: Option<String>, content_type: Option<&str>) -> Str
 
 impl<'s> ManagerRef<'s, InstanceManager> {
     pub async fn launch_background_tasks(self) {
-        if let Err(e) = self.scan_instances().await {
-            error!("failed to scan instances: {e:?}");
+        {
+            // Even after a failed or panicking scan: what waits on it must
+            // not wait forever.
+            let _done = ScanDone(&self.instances_scanned);
+            if let Err(e) = self.scan_instances().await {
+                error!("failed to scan instances: {e:?}");
+            }
         }
         self.import_manager().launch_background_tasks();
+    }
+
+    /// Waits until the startup scan has loaded the instances and adopted the
+    /// games still running from the last session.
+    pub async fn wait_for_instance_scan(self) {
+        let mut scanned = self.instances_scanned.subscribe();
+        // The sender lives as long as the manager.
+        let _ = scanned.wait_for(|scanned| *scanned).await;
     }
 
     pub async fn scan_instances(self) -> anyhow::Result<()> {
@@ -370,6 +397,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 ) = (&mut instance, instances.remove(&instance_id))
                 {
                     data.state = old_data.state;
+                    data.java_issue = old_data.java_issue;
                 }
 
                 // A game this core did not spawn, still running: present the
@@ -379,7 +407,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 // replace a state this core does own — the line above carries an
                 // already-Running instance forward, and overwriting it here would
                 // throw away its `kill_tx` and strand the process.
-                if let Some(game) = adopted.get(&instance.shortpath).copied() {
+                if let Some(game) = adopted.get(&instance.shortpath).cloned() {
                     if let InstanceType::Valid(data) = &mut instance.type_ {
                         if matches!(data.state, LaunchState::Inactive { .. }) {
                             data.state = LaunchState::Running(RunningInstance::adopted(
@@ -389,6 +417,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                 Utc::now(),
                             ));
                             adopted_ids.push(instance_id);
+                            // Its instance may have moved to another Java
+                            // since it started; deleting this one waits.
+                            if let Some(java) = &game.java {
+                                self.app
+                                    .java_manager()
+                                    .note_launch_java(instance_id, &java.to_string_lossy());
+                            }
                         }
                     }
                 }
@@ -505,6 +540,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     modpack_update_curseforge: None,
                     modpack_update_modrinth: None,
                     icon_revision,
+                    java_issue: None,
                 };
 
                 Ok(Some(Instance {
@@ -644,6 +680,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                                         .as_ref()
                                         .map(|modpack| modpack.modpack.clone()),
                                     state: (&status.state).into(),
+                                    java_issue: status.java_issue,
                                 })
                             }
                             InstanceType::Invalid(status) => {
@@ -1882,6 +1919,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 extra_java_args: None,
                 memory: None,
                 java_override: None,
+                java_floor: None,
                 game_resolution: None,
             },
             pre_launch_hook: None,
@@ -1957,6 +1995,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     modpack_update_curseforge: None,
                     modpack_update_modrinth: None,
                     icon_revision,
+                    java_issue: None,
                 }),
             },
         );
@@ -2069,38 +2108,45 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             info.game_configuration.java_override = java_override;
         }
 
+        if let Some(java_floor) = update.java_floor {
+            info!(?java_floor, "Updating java floor");
+            info.game_configuration.java_floor = java_floor;
+        }
+
         let mut need_reinstall = false;
 
+        // Through `set_version`, which drops a Java floor the change makes
+        // stale.
         if let Some(version) = update.version {
-            info.game_configuration.version =
-                Some(info::GameVersion::Standard(info::StandardVersion {
+            let modloaders = match &info.game_configuration.version {
+                Some(info::GameVersion::Standard(info::StandardVersion { modloaders, .. })) => {
+                    modloaders.clone()
+                }
+                _ => HashSet::new(),
+            };
+            info.game_configuration
+                .set_version(Some(info::GameVersion::Standard(info::StandardVersion {
                     release: version,
-                    modloaders: match &info.game_configuration.version {
-                        Some(info::GameVersion::Standard(info::StandardVersion {
-                            modloaders,
-                            ..
-                        })) => modloaders.clone(),
-                        _ => HashSet::new(),
-                    },
-                }));
+                    modloaders,
+                })));
             need_reinstall = true;
         }
 
         if let Some(modloader) = update.modloader {
-            info.game_configuration.version =
-                Some(info::GameVersion::Standard(info::StandardVersion {
-                    release: match &info.game_configuration.version {
-                        Some(info::GameVersion::Standard(info::StandardVersion {
-                            release,
-                            ..
-                        })) => release.clone(),
-                        _ => bail!("custom versions are not yet supported"),
-                    },
+            let release = match &info.game_configuration.version {
+                Some(info::GameVersion::Standard(info::StandardVersion { release, .. })) => {
+                    release.clone()
+                }
+                _ => bail!("custom versions are not yet supported"),
+            };
+            info.game_configuration
+                .set_version(Some(info::GameVersion::Standard(info::StandardVersion {
+                    release,
                     modloaders: match modloader {
                         Some(modloader) => HashSet::from([modloader]),
                         None => HashSet::new(),
                     },
-                }));
+                })));
             need_reinstall = true;
         }
 
@@ -2209,6 +2255,119 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         }
 
         Ok(None)
+    }
+
+    #[cfg(test)]
+    pub(crate) async fn set_launch_state_for_test(self, id: InstanceId, state: LaunchState) {
+        let mut instances = self.instances.write().await;
+        instances
+            .get_mut(&id)
+            .unwrap()
+            .type_
+            .data_mut()
+            .unwrap()
+            .state = state;
+    }
+
+    /// Whether any game is running or on its way to running (queued or
+    /// preparing). `any_instance_running` alone only flips once the process is
+    /// spawned, by which time a launch has already resolved its Java.
+    pub async fn any_launch_active(self) -> bool {
+        if *self.any_instance_running.borrow() {
+            return true;
+        }
+
+        let instances = self.instances.read().await;
+        instances.values().any(|instance| {
+            instance
+                .type_
+                .data()
+                .is_ok_and(InstanceData::is_launch_active)
+        })
+    }
+
+    /// Points every instance whose Java path override is `old_path` at
+    /// `new_path`. Returns how many instances changed.
+    pub async fn repoint_java_path_overrides(
+        self,
+        old_path: &str,
+        new_path: &str,
+    ) -> anyhow::Result<usize> {
+        self.repoint_java_path_overrides_except(old_path, new_path, &HashSet::new())
+            .await
+    }
+
+    /// [`Self::repoint_java_path_overrides`], leaving the instances in `keep`
+    /// on `old_path`.
+    pub async fn repoint_java_path_overrides_except(
+        self,
+        old_path: &str,
+        new_path: &str,
+        keep: &HashSet<InstanceId>,
+    ) -> anyhow::Result<usize> {
+        self.replace_java_path_overrides(
+            old_path,
+            Some(info::JavaOverride::Path(Some(new_path.to_string()))),
+            keep,
+        )
+        .await
+    }
+
+    /// Clears the Java override of every instance whose Java path override
+    /// is `path`, so they go back to Automatic. Returns how many changed.
+    pub async fn clear_java_path_overrides(self, path: &str) -> anyhow::Result<usize> {
+        self.replace_java_path_overrides(path, None, &HashSet::new())
+            .await
+    }
+
+    async fn replace_java_path_overrides(
+        self,
+        old_path: &str,
+        replacement: Option<info::JavaOverride>,
+        keep: &HashSet<InstanceId>,
+    ) -> anyhow::Result<usize> {
+        let ids: Vec<InstanceId> = {
+            let instances = self.instances.read().await;
+            instances
+                .iter()
+                .filter(|(id, _)| !keep.contains(id))
+                .filter_map(|(id, instance)| {
+                    let data = instance.type_.data().ok()?;
+                    matches!(
+                        &data.config.game_configuration.java_override,
+                        Some(info::JavaOverride::Path(Some(path))) if path == old_path
+                    )
+                    .then_some(*id)
+                })
+                .collect()
+        };
+
+        let mut count = 0;
+        for instance_id in ids {
+            self.update_instance(domain::InstanceSettingsUpdate {
+                instance_id,
+                name: None,
+                use_loaded_icon: None,
+                notes: None,
+                version: None,
+                modloader: None,
+                java_override: Some(replacement.clone()),
+                java_floor: None,
+                global_java_args: None,
+                extra_java_args: None,
+                memory: None,
+                pre_launch_hook: None,
+                post_exit_hook: None,
+                wrapper_command: None,
+                game_resolution: None,
+                mod_sources: None,
+                modpack_locked: None,
+            })
+            .await?;
+            count += 1;
+        }
+
+        Ok(count)
     }
 
     pub async fn update_playtime(
@@ -2527,6 +2686,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                     modpack_update_curseforge: None,
                     modpack_update_modrinth: None,
                     icon_revision,
+                    java_issue: None,
                 }),
             },
         );
@@ -2691,54 +2851,6 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
-    /// Best-effort check of whether a user-set Java override resolves to a major
-    /// version incompatible with `required_profile`, using only already-scanned
-    /// Javas (no probing at details-fetch time). Returns false when there is no
-    /// override, no requirement, or the override's Java can't be identified
-    /// cheaply — a Path override to an unscanned binary is left for the
-    /// launch-time warning rather than probed here.
-    async fn java_override_mismatch(
-        &self,
-        java_override: &Option<info::JavaOverride>,
-        required_profile: Option<SystemJavaProfileName>,
-    ) -> bool {
-        let (Some(required), Some(java_override)) = (required_profile, java_override) else {
-            return false;
-        };
-
-        let resolved_version = match java_override {
-            info::JavaOverride::Path(Some(path)) => {
-                let Ok(all) = self.app.java_manager().get_available_javas().await else {
-                    return false;
-                };
-                all.values()
-                    .flatten()
-                    .find(|java| java.component.path == *path)
-                    .map(|java| java.component.version.clone())
-            }
-            info::JavaOverride::Profile(Some(name)) => {
-                let java_manager = self.app.java_manager();
-                let (Ok(profiles), Ok(all)) = (
-                    java_manager.get_java_profiles().await,
-                    java_manager.get_available_javas().await,
-                ) else {
-                    return false;
-                };
-                profiles
-                    .iter()
-                    .find(|profile| profile.name == *name)
-                    .and_then(|profile| profile.java_id.as_ref())
-                    .and_then(|java_id| all.values().flatten().find(|java| java.id == *java_id))
-                    .map(|java| java.component.version.clone())
-            }
-            _ => None,
-        };
-
-        resolved_version
-            .map(|version| !required.is_java_version_compatible(&version))
-            .unwrap_or(false)
-    }
-
     pub async fn instance_details(
         self,
         instance_id: InstanceId,
@@ -2764,31 +2876,26 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             None => None,
         };
 
-        let mut mc_manifest = None;
+        // As a launch applies it: a GDLauncher Java that is gone runs on
+        // Automatic, so the settings show Automatic.
+        let managed_root = self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_managed_javas()
+            .to_path();
+        let java_override = match &instance.config.game_configuration.java_override {
+            Some(info::JavaOverride::Path(Some(path)))
+                if is_missing_managed_java(path, &managed_root) =>
+            {
+                None
+            }
+            java_override => java_override.clone(),
+        };
+        let game_version = instance.config.game_configuration.version.clone();
+        let java_floor = instance.config.game_configuration.java_floor;
 
-        if let Some(mc_version) = &mc_version {
-            let manifest = self.app.minecraft_manager().get_minecraft_manifest().await;
-            mc_manifest = manifest.ok();
-        }
-
-        let required_java_profile_name = mc_version.clone().and_then(|version| {
-            let manifest = mc_manifest.as_ref()?;
-            let required_java = manifest
-                .versions
-                .iter()
-                .find(|profile| profile.id == version)
-                .and_then(|version| version.java_profile.clone())?;
-
-            SystemJavaProfileName::try_from(required_java).ok()
-        });
-        let required_java_profile = required_java_profile_name.as_ref().map(|v| v.to_string());
-
-        let java_override = instance.config.game_configuration.java_override.clone();
-        let java_override_mismatch = self
-            .java_override_mismatch(&java_override, required_java_profile_name)
-            .await;
-
-        Ok(domain::InstanceDetails {
+        let mut details = domain::InstanceDetails {
             id: instance_id,
             favorite: instance.favorite,
             name: instance.config.name.clone(),
@@ -2813,8 +2920,17 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 None => Vec::new(),
             },
             java_override,
-            required_java_profile,
-            java_override_mismatch,
+            // Filled in below, once the instances lock is released.
+            required_java_profile: None,
+            required_java: None,
+            accepted_java: Vec::new(),
+            java_floor: None,
+            resolved_java: None,
+            automatic_java: None,
+            download_java: None,
+            java_override_mismatch: false,
+            java_mismatch_fix: None,
+            java_issue: instance.java_issue,
             state: (&instance.state).into(),
             notes: instance.config.notes.clone(),
             icon_revision,
@@ -2823,7 +2939,33 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             pre_launch_hook: instance.config.pre_launch_hook.clone(),
             post_exit_hook: instance.config.post_exit_hook.clone(),
             wrapper_command: instance.config.wrapper_command.clone(),
+        };
+        // Resolving may fetch the Minecraft manifest or the Java catalog.
+        drop(instances);
+
+        // The Java a launch would use, through the same resolution.
+        let java = instance_java_details(
+            &self.app,
+            details.java_override.as_ref(),
+            game_version.as_ref(),
+            java_floor,
+        )
+        .await
+        .inspect_err(|e| {
+            tracing::warn!("could not work out the Java of instance {instance_id}: {e:#}")
         })
+        .unwrap_or_default();
+        details.required_java_profile = java.required_profile.map(|p| p.to_string());
+        details.required_java = java.need;
+        details.accepted_java = java.accepted;
+        details.java_floor = java.floor;
+        details.resolved_java = java.resolved;
+        details.automatic_java = java.automatic;
+        details.download_java = java.download;
+        details.java_override_mismatch = java.mismatch;
+        details.java_mismatch_fix = java.mismatch_fix;
+
+        Ok(details)
     }
 
     pub async fn get_modpack_info(
@@ -3000,6 +3142,7 @@ pub struct ValidListInstance {
     pub modloader_version: Option<String>,
     pub modpack: Option<Modpack>,
     pub state: domain::LaunchState,
+    pub java_issue: Option<run::java_issue::JavaIssue>,
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -3139,12 +3282,49 @@ pub struct InstanceData {
     modpack_update_curseforge: Option<bool>,
     modpack_update_modrinth: Option<bool>,
     icon_revision: Option<u32>,
+    /// Set when the last game crashed on a Java older than a mod needs;
+    /// cleared when the instance next launches.
+    java_issue: Option<run::java_issue::JavaIssue>,
 }
 
 impl InstanceData {
+    /// The Java override configured for this instance, if any.
+    pub fn java_override(&self) -> Option<&info::JavaOverride> {
+        self.config.game_configuration.java_override.as_ref()
+    }
+
     /// The game version this instance is configured to launch, if it has one.
     pub fn game_version(&self) -> Option<&GameVersion> {
         self.config.game_configuration.version.as_ref()
+    }
+
+    /// The oldest Java major a wrong-Java crash showed this instance needs.
+    pub fn java_floor(&self) -> Option<u8> {
+        self.config.game_configuration.java_floor
+    }
+
+    pub fn name(&self) -> &str {
+        &self.config.name
+    }
+
+    /// Whether its game was left running by an earlier session and adopted.
+    pub fn is_adopted_game(&self) -> bool {
+        matches!(&self.state, run::LaunchState::Running(running) if running.is_adopted())
+    }
+
+    /// Whether its game's process runs, spawned or adopted.
+    pub fn is_game_running(&self) -> bool {
+        matches!(self.state, run::LaunchState::Running(_))
+    }
+
+    /// Whether the game is queued, preparing or running.
+    pub fn is_launch_active(&self) -> bool {
+        matches!(
+            self.state,
+            run::LaunchState::Queued(_)
+                | run::LaunchState::Preparing(_)
+                | run::LaunchState::Running(_)
+        )
     }
 }
 
@@ -3181,7 +3361,7 @@ pub struct InvalidInstanceDataError;
 /// A game process found still running when the core started: one this core
 /// did not spawn, belonging to an instance that must therefore be presented
 /// as running without a handle to the process behind it.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 struct AdoptedGame {
     pid: u32,
     /// Taken from the pidfile's mtime, which is written immediately after the
@@ -3196,6 +3376,9 @@ struct AdoptedGame {
     /// lookup — since the game can exit and have its pid recycled by an
     /// unrelated process at any point after this reconcile pass.
     verified_start_time: u64,
+    /// The Java binary the process runs, resolved, when the process table
+    /// tells it. Deleting that Java waits for the game.
+    java: Option<PathBuf>,
 }
 
 /// Reconcile every instance directory directly under `instances_root`
@@ -3326,6 +3509,13 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
                         .map(DateTime::<Utc>::from)
                         .unwrap_or_else(Utc::now);
 
+                // Resolved: the process table names the real file, which a
+                // Java's listed path may reach through a link.
+                let java = match system.process(Pid::from_u32(pid)).and_then(|p| p.exe()) {
+                    Some(exe) => tokio::fs::canonicalize(exe).await.ok(),
+                    None => None,
+                };
+
                 info!(
                     "Instance {} still has a game running (pid {}) from a previous launcher session — adopting it",
                     shortpath, pid
@@ -3336,6 +3526,7 @@ async fn reconcile_running_instances_under(instances_root: &Path) -> HashMap<Str
                         pid,
                         start_time,
                         verified_start_time,
+                        java,
                     },
                 );
             }
@@ -3388,6 +3579,21 @@ mod test {
     };
 
     use super::InstanceVersionSource;
+
+    /// What waits on the scan must not wait forever, even when the scan
+    /// panics.
+    #[test]
+    fn a_scan_that_panics_still_counts_as_done() {
+        let scanned = tokio::sync::watch::channel(false).0;
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let _done = super::ScanDone(&scanned);
+            panic!("the scan broke");
+        }));
+
+        assert!(result.is_err());
+        assert!(*scanned.borrow());
+    }
 
     #[test]
     fn delete_precheck_classifies_launch_states() {
@@ -3790,6 +3996,7 @@ mod test {
                     modloader_version: None,
                     modpack: None,
                     state: domain::LaunchState::Inactive { failed_task: None },
+                    java_issue: None,
                 }),
                 locked: false,
                 last_played: None,
@@ -3819,6 +4026,7 @@ mod test {
                 notes: None,
                 version: None,
                 modloader: None,
+                java_floor: None,
                 global_java_args: None,
                 extra_java_args: None,
                 memory: None,
@@ -4300,6 +4508,15 @@ mod test {
         // later re-checks (the poller, `kill_instance`) can tell this same
         // process apart from whatever the OS hands the pid to next.
         assert_eq!(game.verified_start_time, start_time);
+        // So is the Java it runs on, so deleting that Java waits for it.
+        assert_eq!(
+            game.java.as_deref(),
+            Some(
+                std::fs::canonicalize(bin_dir.path().join("java"))
+                    .unwrap()
+                    .as_path()
+            )
+        );
 
         // The process is the user's session and must survive being found.
         assert!(
@@ -4526,6 +4743,7 @@ mod test {
                 extra_java_args: None,
                 memory: None,
                 java_override: None,
+                java_floor: None,
                 game_resolution: None,
             },
             pre_launch_hook: None,

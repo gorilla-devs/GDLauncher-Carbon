@@ -40,7 +40,7 @@ function Settings(props: { children?: JSX.Element }) {
     {
       name: (
         <div class="relative flex items-center gap-2">
-          {"Appearance"}
+          {t("settings:_trn_appearance")}
           <div class="absolute -top-10 right-0">
             <FeatureStatusBadge type="beta" />
           </div>

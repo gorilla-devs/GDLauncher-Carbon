@@ -64,6 +64,7 @@ const getVariant = (
     }),
     ...getPressEffectClasses(isDisabled),
     "overflow-hidden": true,
+    "outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500": true,
     "font-main": true,
     "max-w-max": !isLoading && !fullWidth,
     "w-full": fullWidth,
@@ -135,6 +136,7 @@ const getVariant = (
     },
     text: {
       ...getPressEffectClasses(isDisabled),
+      "outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500": true,
       "font-main": true,
       "font-medium": true,
       "text-sm": true,

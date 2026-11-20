@@ -1,4 +1,11 @@
-import { createEffect, createSignal, Show, JSX } from "solid-js"
+import {
+  children,
+  createEffect,
+  createSignal,
+  createUniqueId,
+  Show,
+  JSX
+} from "solid-js"
 import { cva, type VariantProps } from "class-variance-authority"
 import { PRESS_CLASSES } from "../Clickable"
 
@@ -36,20 +43,33 @@ interface Props extends VariantProps<typeof checkboxStyles> {
   checked?: boolean
   indeterminate?: boolean
   disabled?: boolean
+  /** Without it, the checkbox is only drawn, for a parent that handles the
+   *  click (a tile, a row): it then takes no focus of its own. */
   onChange?: (_checked: boolean) => void
+  /** Its name when its label isn't among its children. */
+  "aria-label"?: string
   children?: JSX.Element
 }
 
 function Checkbox(props: Props) {
   const [checked, setChecked] = createSignal(props.checked || false)
+  const label = children(() => props.children)
+  const labelId = createUniqueId()
+  const [input, setInput] = createSignal<HTMLInputElement>()
 
   createEffect(() => {
     setChecked(props.checked || false)
   })
 
+  // A property only: screen readers then say "partly checked".
+  createEffect(() => {
+    const el = input()
+    if (el) el.indeterminate = !checked() && !!props.indeterminate
+  })
+
   return (
     <div
-      class={`flex items-center gap-2 rounded-md ${PRESS_CLASSES}`}
+      class={`relative flex items-center gap-2 rounded-md ${PRESS_CLASSES}`}
       classList={{
         "cursor-pointer": !props.disabled,
         "cursor-not-allowed": props.disabled
@@ -73,13 +93,33 @@ function Checkbox(props: Props) {
         props.onChange?.(check)
       }}
     >
+      {/* The real checkbox, for the keyboard and screen readers: Space
+          toggles it. It covers the row unseen, so focusing it scrolls the
+          whole row into view, and lets the pointer through to the press
+          handling above. */}
+      <Show when={props.onChange}>
+        <input
+          ref={setInput}
+          type="checkbox"
+          class="peer pointer-events-none absolute inset-0 m-0 h-full w-full opacity-0"
+          checked={checked()}
+          disabled={props.disabled}
+          aria-labelledby={label() ? labelId : undefined}
+          aria-label={props["aria-label"]}
+          onChange={(e) => {
+            const check = e.currentTarget.checked
+            setChecked(check)
+            props.onChange?.(check)
+          }}
+        />
+      </Show>
       <div
-        class={checkboxStyles({
+        class={`${checkboxStyles({
           checked: checked(),
           disabled: props.disabled,
           indeterminate: props.indeterminate,
           hover: !props.disabled
-        })}
+        })} peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary-500`}
       >
         <Show when={!checked() && props.indeterminate}>
           <div class="bg-primary-500 h-3 min-h-3 w-3 min-w-3 rounded-sm" />
@@ -96,7 +136,12 @@ function Checkbox(props: Props) {
           />
         </Show>
       </div>
-      <Show when={props.children}>{props.children}</Show>
+      <Show when={label()}>
+        {/* No box of its own: the label lays out as before. */}
+        <span id={labelId} class="contents">
+          {label()}
+        </span>
+      </Show>
     </div>
   )
 }

@@ -57,6 +57,7 @@ use tokio::{io::AsyncReadExt, sync::mpsc};
 use tracing::{debug, info, trace, warn};
 
 mod java;
+pub mod java_issue;
 mod minecraft;
 mod modpack;
 
@@ -69,6 +70,28 @@ pub struct InsufficientMemoryError {
     pub requested_mb: u64,
     pub needed_mb: u64,
     pub available_mb: u64,
+}
+
+/// What the JVM needs besides its heap: the JIT compiler, thread stacks,
+/// metaspace, GC structures, direct buffers and so on.
+const JVM_OVERHEAD_MB: u64 = 1500;
+
+/// The shortfall when a heap of `xmx` MB plus [`JVM_OVERHEAD_MB`] is more
+/// than `available_bytes` of free memory. Unknown free memory (0) is none.
+fn memory_shortfall(
+    instance_id: InstanceId,
+    xmx: u16,
+    available_bytes: u64,
+) -> Option<InsufficientMemoryError> {
+    let available_mb = available_bytes / 1024 / 1024;
+    let needed_mb = u64::from(xmx).saturating_add(JVM_OVERHEAD_MB);
+
+    (available_mb > 0 && needed_mb > available_mb).then_some(InsufficientMemoryError {
+        instance_id: instance_id.0,
+        requested_mb: u64::from(xmx),
+        needed_mb,
+        available_mb,
+    })
 }
 
 impl crate::error::FeErrorCode for InsufficientMemoryError {
@@ -106,6 +129,10 @@ impl PersistenceManager {
 /// enough for real setup scripts, but bounds a hook that never exits so it cannot wedge the
 /// launch (or, for a pre-launch hook, the whole launch queue) until the app is restarted.
 const HOOK_TIMEOUT: Duration = Duration::from_secs(300);
+
+/// How long the game's last output may take to reach the log after it exits.
+/// Bounds a process the game left behind that keeps its output open.
+const LOG_DRAIN_TIMEOUT: Duration = Duration::from_secs(5);
 
 type InstanceCallback = Box<
     dyn FnOnce(&Subtask) -> Pin<Box<dyn Future<Output = Result<(), anyhow::Error>> + Send>> + Send,
@@ -157,6 +184,27 @@ impl ManagerRef<'_, InstanceManager> {
         }
     }
 
+    /// Fails with [`InsufficientMemoryError`] when the instance's heap and
+    /// what the JVM needs besides it are more than the free memory, unless
+    /// the user turned that warning off. Every way to play from the UI runs
+    /// it first, so each gets the same warning.
+    pub async fn check_launch_memory(self, instance_id: InstanceId) -> anyhow::Result<()> {
+        let dismissed = crate::api::settings::is_memory_warning_dismissed(&self.app.db)
+            .await
+            .unwrap_or(false);
+        if dismissed {
+            return Ok(());
+        }
+
+        let (_xms, xmx) = self.get_effective_memory(instance_id).await?;
+        let available = self.app.system_info_manager().get_available_ram().await;
+
+        match memory_shortfall(instance_id, xmx, available) {
+            Some(shortfall) => Err(shortfall.into()),
+            None => Ok(()),
+        }
+    }
+
     #[tracing::instrument(skip(self, callback_task))]
     pub async fn prepare_game(
         self,
@@ -195,13 +243,6 @@ impl ManagerRef<'_, InstanceManager> {
                 bail!("cannot prepare an instance that is already running");
             }
         }
-
-        let auto_manage_java_system_profiles = self
-            .app
-            .settings_manager()
-            .get_settings()
-            .await?
-            .auto_manage_java_system_profiles;
 
         let mut config = data.config.clone();
 
@@ -312,6 +353,8 @@ impl ManagerRef<'_, InstanceManager> {
         let id = self.app.task_manager().spawn_task(&task).await;
 
         data.state = LaunchState::Queued(id);
+        // The last game's crash says nothing about this one.
+        data.java_issue = None;
 
         self.app.invalidate(GET_GROUPS, None);
         self.app.invalidate(GET_ALL_INSTANCES, None);
@@ -499,17 +542,38 @@ impl ManagerRef<'_, InstanceManager> {
 
                 t_subtasks.t_request_version_info.complete_opaque();
 
+                // Read now: a pack update above may have changed the version,
+                // which drops the floor.
+                let java_floor = app
+                    .instance_manager()
+                    .instances
+                    .read()
+                    .await
+                    .get(&instance_id)
+                    .and_then(|instance| instance.data().ok())
+                    .and_then(|data| data.java_floor());
+
                 let java = java::check_and_install(
                     Arc::clone(&app),
                     &version_info,
                     &t_subtasks,
                     &version,
                     java_override,
-                    auto_manage_java_system_profiles,
+                    java_floor,
                     log.as_ref(),
                     file.as_mut(),
                 )
                 .await?;
+                // The game keeps this Java even if its instance moves to
+                // another while it runs, so deleting this one waits for it.
+                app.java_manager().note_launch_java(instance_id, &java.path);
+
+                // Appended after the user args as separate argv elements.
+                let mitigation_args = crate::managers::java::advisories::mitigation_args_for_path(
+                    &app,
+                    std::path::Path::new(&java.path),
+                )
+                .await;
 
                 let (lwjgl_group, assets_dir, version_info) = minecraft::process_minecraft(
                     Arc::clone(&app),
@@ -530,6 +594,9 @@ impl ManagerRef<'_, InstanceManager> {
                 if setup_path.exists() {
                     tokio::fs::remove_dir_all(setup_path).await?;
                 }
+
+                // What a crash's Java issue is measured against.
+                let used_java_major = u8::try_from(java.version.major).ok();
 
                 match launch_account {
                     Some(account) => {
@@ -575,7 +642,7 @@ impl ManagerRef<'_, InstanceManager> {
                             );
                         }
 
-                        Ok(Some(
+                        Ok(Some((
                             managers::minecraft::minecraft::launch_minecraft(
                                 java,
                                 account,
@@ -583,6 +650,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 xms_memory,
                                 game_resolution,
                                 &extra_java_args,
+                                &mitigation_args,
                                 &runtime_path,
                                 version_info,
                                 &lwjgl_group,
@@ -591,7 +659,8 @@ impl ManagerRef<'_, InstanceManager> {
                                 wrapper_command,
                             )
                             .await?,
-                        ))
+                            used_java_major,
+                        )))
                     }
                     None => {
                         if let Some(callback_task) = callback_task {
@@ -637,7 +706,7 @@ impl ManagerRef<'_, InstanceManager> {
                         .await;
                 }
                 Ok(None) => {}
-                Ok(Some(mut child)) => {
+                Ok(Some((mut child, used_java_major))) => {
                     drop(task);
 
                     let _liveness_watch = app.instance_manager().instance_running_tracker.marker();
@@ -778,26 +847,54 @@ impl ManagerRef<'_, InstanceManager> {
                     };
 
                     time_at_start = Some(Utc::now());
+                    let mut killed = false;
 
-                    tokio::select! {
-                        _ = child.wait() => {
-                            tracing::debug!("Instance waited");
-                        },
-                        _ = kill_rx.recv() => {
-                            tracing::debug!("Instance killed");
-                            if let Err(e) = child.kill().await {
-                                tracing::warn!(
-                                    "Failed to kill child process for instance {}: {}",
-                                    *instance_id,
-                                    e
-                                );
+                    {
+                        let logs = read_logs(
+                            log.as_ref().expect("log must exist when launching game"),
+                            stdout,
+                            stderr,
+                            file.as_mut(),
+                        );
+                        tokio::pin!(logs);
+                        let mut logs_done = false;
+
+                        tokio::select! {
+                            _ = child.wait() => {
+                                tracing::debug!("Instance waited");
+                            },
+                            _ = kill_rx.recv() => {
+                                tracing::debug!("Instance killed");
+                                killed = true;
+                                if let Err(e) = child.kill().await {
+                                    tracing::warn!(
+                                        "Failed to kill child process for instance {}: {}",
+                                        *instance_id,
+                                        e
+                                    );
+                                }
+                            },
+                            _ = &mut logs => {
+                                logs_done = true;
+                                tracing::debug!("Instance read logs");
+                            },
+                            _ = update_playtime => {
+                                tracing::debug!("Instance updated playtime");
                             }
-                        },
-                        _ = read_logs(log.as_ref().expect("log must exist when launching game"), stdout, stderr, file.as_mut()) => {
-                            tracing::debug!("Instance read logs");
-                        },
-                        _ = update_playtime => {
-                            tracing::debug!("Instance updated playtime");
+                        }
+
+                        // What the game wrote last, often why it stopped and
+                        // what the Java issue check reads, may still be on its
+                        // way through the pipes.
+                        if !logs_done
+                            && tokio::time::timeout(LOG_DRAIN_TIMEOUT, &mut logs)
+                                .await
+                                .is_err()
+                        {
+                            tracing::warn!(
+                                "Instance {} kept its output open after exiting",
+                                *instance_id
+                            );
                         }
                     }
 
@@ -811,6 +908,9 @@ impl ManagerRef<'_, InstanceManager> {
                     if let Err(e) = r {
                         tracing::error!({ error = ?e }, "error updating instance playtime");
                     }
+
+                    // The Java a mod needed, when the game crashed on an older one.
+                    let mut crash_need = None;
 
                     if let Ok(exitcode) = child.wait().await {
                         let msg = format!("{exitcode}");
@@ -826,6 +926,16 @@ impl ManagerRef<'_, InstanceManager> {
                                 .write_all(format_message_as_log4j_event(&msg).as_bytes())
                                 .await;
                         }
+
+                        // A game the user stopped didn't crash.
+                        let crashed = !exitcode.success() && !killed;
+                        crash_need = match (crashed, log.as_ref(), used_java_major) {
+                            (true, Some(log), Some(used)) => {
+                                java_issue::needed_major_in(&log.borrow(), used)
+                                    .map(|needed| (needed, used))
+                            }
+                            _ => None,
+                        };
                     }
 
                     // The game process has exited by this point regardless of
@@ -893,6 +1003,27 @@ impl ManagerRef<'_, InstanceManager> {
                             Err(e) => {
                                 tracing::error!("Post-exit hook failed to parse: {:?}", e);
                             }
+                        }
+                    }
+
+                    // Last, just before the instance can be launched again, so
+                    // the fix it offers never meets a game that's still
+                    // shutting down.
+                    if let Some((needed, used)) = crash_need {
+                        tracing::info!(
+                            "Instance {} crashed on Java {used}, a mod needs Java {needed} or later",
+                            *instance_id
+                        );
+                        let stored = match java_issue::JavaIssue::plan(&app, needed, used).await {
+                            Ok(issue) => {
+                                app.instance_manager()
+                                    .set_java_issue(instance_id, Some(issue))
+                                    .await
+                            }
+                            Err(e) => Err(e),
+                        };
+                        if let Err(e) = stored {
+                            tracing::warn!({ error = ?e }, "could not keep the Java issue");
                         }
                     }
 
@@ -997,7 +1128,7 @@ impl ManagerRef<'_, InstanceManager> {
         Ok((installation_task, id))
     }
 
-    async fn change_launch_state(
+    pub(crate) async fn change_launch_state(
         self,
         instance_id: InstanceId,
         state: LaunchState,
@@ -1028,11 +1159,17 @@ impl ManagerRef<'_, InstanceManager> {
             LaunchState::Queued(_) | LaunchState::Preparing(_) | LaunchState::Deleting => (),
         };
 
+        let ended = matches!(state, LaunchState::Inactive { .. });
         debug!("changing state of instance {instance_id} to {state:?}");
         instance.data_mut()?.state = state;
+        drop(instances);
         self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
+        // The Javas whose delete waited for this game may go.
+        if ended {
+            self.app.java_manager().note_runner_ended();
+        }
 
         Ok(())
     }
@@ -1160,6 +1297,7 @@ impl ManagerRef<'_, InstanceManager> {
             data.state = LaunchState::Inactive { failed_task: None };
             instance.shortpath.clone()
         };
+        self.app.java_manager().note_runner_ended();
 
         let root = self
             .app
@@ -1573,6 +1711,19 @@ impl RunningInstance {
         }
     }
 
+    /// A game this core spawned, with no task left to signal.
+    #[cfg(test)]
+    pub(crate) fn spawned_for_test(process_id: u32) -> Self {
+        Self {
+            process_id,
+            kill_tx: Some(mpsc::channel(1).0),
+            process_start_time: None,
+            start_time: Utc::now(),
+            log: None,
+            playtime: None,
+        }
+    }
+
     /// Whether this core owns the process behind the instance. `false` means
     /// it was adopted from a previous session.
     pub fn is_adopted(&self) -> bool {
@@ -1685,6 +1836,26 @@ async fn process_logs(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn memory_shortfall_counts_the_jvms_overhead() {
+        let mb = 1024 * 1024;
+        let id = InstanceId(7);
+
+        let short = memory_shortfall(id, 4096, 5000 * mb).unwrap();
+        assert_eq!(
+            (
+                short.instance_id,
+                short.requested_mb,
+                short.needed_mb,
+                short.available_mb
+            ),
+            (7, 4096, 5596, 5000)
+        );
+        assert!(memory_shortfall(id, 4096, 5596 * mb).is_none());
+        // Free memory unknown: never what stops a launch.
+        assert!(memory_shortfall(id, 4096, 0).is_none());
+    }
     use crate::managers::instance::{Instance, InstanceData};
 
     fn dummy_config() -> info::Instance {
@@ -1702,6 +1873,7 @@ mod tests {
                 extra_java_args: None,
                 memory: None,
                 java_override: None,
+                java_floor: None,
                 game_resolution: None,
             },
             pre_launch_hook: None,
@@ -1720,6 +1892,7 @@ mod tests {
             modpack_update_curseforge: None,
             modpack_update_modrinth: None,
             icon_revision: None,
+            java_issue: None,
         }
     }
 

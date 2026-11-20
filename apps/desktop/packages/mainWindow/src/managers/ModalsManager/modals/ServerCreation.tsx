@@ -10,6 +10,7 @@ import {
 } from "@gd/ui"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import { Trans, useTransContext } from "@gd/i18n"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
@@ -342,16 +343,11 @@ const ServerCreation = (props: ModalProps) => {
         </Show>
 
         {/* Actions */}
-        <div class="flex justify-between pt-2">
-          <Button
-            type="secondary"
+        <DialogFooter class="pt-2">
+          <CancelLink
             disabled={createServerMutation.isPending}
-            onClick={() => {
-              modalsContext?.closeModal()
-            }}
-          >
-            <Trans key="instances:_trn_server_creation_cancel" />
-          </Button>
+            onClick={() => modalsContext?.closeModal()}
+          />
           <Button
             disabled={!isFormValid() || createServerMutation.isPending}
             loading={createServerMutation.isPending}
@@ -362,7 +358,7 @@ const ServerCreation = (props: ModalProps) => {
               <Trans key="instances:_trn_server_creation_create" />
             </div>
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

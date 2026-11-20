@@ -13,6 +13,8 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { rspc } from "@/utils/rspcClient"
 import { createStore } from "solid-js/store"
 import { bytesToMB } from "@/utils/helpers"
+import { useTransContext } from "@gd/i18n"
+import { javaNeedText } from "@/utils/java/javaText"
 import { useGlobalStore } from "../GlobalStoreContext"
 
 interface InstanceDownloadProgress {
@@ -54,6 +56,7 @@ const InstanceTile = (props: {
 
   const navigator = useGDNavigate()
   const globalStore = useGlobalStore()
+  const [t] = useTransContext()
 
   const validInstance = () =>
     props.instance.status.status === "valid"
@@ -79,6 +82,28 @@ const InstanceTile = (props: {
 
   // Task ID can be from either queued or preparing state
   const taskId = () => isQueuedState() || isPreparingState()
+
+  // One query for every tile: the instances set to a Java their Minecraft
+  // version can't run on.
+  const javaMismatches = rspc.createQuery(() => ({
+    queryKey: ["instance.getJavaMismatches"]
+  }))
+  /** "Minecraft 1.21.4 needs Java 21" when this instance is on the wrong
+   *  Java. */
+  const javaNeed = () => {
+    const mismatch = javaMismatches.data?.find(
+      (m) => m.instanceId === props.instance.id
+    )
+    const mcVersion = validInstance()?.mc_version
+    if (!mismatch || !mcVersion) return undefined
+    return javaNeedText(
+      mcVersion,
+      mismatch.requiredJavaMajor,
+      mismatch.requiredJavaBelow,
+      t,
+      mismatch.javaFloor
+    )
+  }
 
   const isRunning = () => getRunningState(validInstance()?.state)
   const dismissTaskMutation = rspc.createMutation(() => ({
@@ -175,6 +200,7 @@ const InstanceTile = (props: {
       instance={props.instance}
       modloader={modloader()}
       version={validInstance()?.mc_version}
+      javaNeed={javaNeed()}
       isInvalid={props.instance.status.status === "invalid"}
       failError={failError()}
       instanceState={instanceState()}

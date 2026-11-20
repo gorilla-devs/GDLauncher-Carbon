@@ -4,8 +4,6 @@
   "_trn_tooltip.apply_and_restart": "Applica e riavvia",
   "_trn_tooltip.rtp_not_valid": "Il percorso runtime non è valido. Il percorso non è una cartella o non è una directory vuota",
   "_trn_tooltip.rtp_unchanged": "Il percorso runtime è invariato",
-  "_trn_path": "Percorso",
-  "_trn_profile": "Profilo",
   "_trn_custom": "Personalizzato",
   "_trn_tile_size": "Dimensione Riquadro",
   "_trn_sort_options": "Opzioni Ordinamento",

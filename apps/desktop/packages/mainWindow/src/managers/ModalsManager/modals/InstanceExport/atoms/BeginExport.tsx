@@ -3,6 +3,7 @@ import { setTaskId } from "@/utils/import"
 import { rspc } from "@/utils/rspcClient"
 import { useTransContext } from "@gd/i18n"
 import { Button } from "@gd/ui"
+import { CancelLink, DialogFooter } from "../../../DialogFooter"
 import { setPayload, payload, setExportStep } from ".."
 import { ExportArgs, ExportEntry } from "@gd/core_module/bindings"
 import {
@@ -83,16 +84,8 @@ const BeginExport = (props: Props) => {
   }
 
   return (
-    <div class="flex w-full items-center justify-between pt-4">
-      <Button
-        type="secondary"
-        size="large"
-        onClick={() => {
-          modalsContext?.closeModal()
-        }}
-      >
-        {t("instances:_trn_cancel_export")}
-      </Button>
+    <DialogFooter class="w-full pt-4">
+      <CancelLink onClick={() => modalsContext?.closeModal()} />
       <Button
         onClick={() => {
           handleExportInstance()
@@ -103,7 +96,7 @@ const BeginExport = (props: Props) => {
       >
         {t("instances:_trn_begin_export")}
       </Button>
-    </div>
+    </DialogFooter>
   )
 }
 export default BeginExport

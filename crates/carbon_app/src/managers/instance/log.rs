@@ -150,6 +150,10 @@ pub struct LogEntry {
     pub level: LogEntryLevel,
     /// The entry message itself.
     pub message: String,
+    /// The exception logged with the message, if any. Kept for the Java issue
+    /// check, which reads why a game crashed; the log view doesn't show it.
+    #[serde(skip)]
+    pub throwable: Option<String>,
 }
 
 impl From<(LogEntrySourceKind, carbon_parsing::log::LogEntry)> for LogEntry {
@@ -160,6 +164,7 @@ impl From<(LogEntrySourceKind, carbon_parsing::log::LogEntry)> for LogEntry {
             timestamp,
             thread_name,
             message,
+            throwable,
         } = entry;
 
         Self {
@@ -169,6 +174,7 @@ impl From<(LogEntrySourceKind, carbon_parsing::log::LogEntry)> for LogEntry {
             thread: thread_name.to_owned(),
             level: level.into(),
             message: message.to_owned(),
+            throwable,
         }
     }
 }
@@ -183,6 +189,7 @@ impl LogEntry {
             thread: "N/A".into(),
             level: LogEntryLevel::Info,
             message: msg.to_string(),
+            throwable: None,
         }
     }
 
@@ -194,6 +201,7 @@ impl LogEntry {
             thread: "N/A".into(),
             level: LogEntryLevel::Info,
             message: msg.to_string(),
+            throwable: None,
         }
     }
 
@@ -266,7 +274,7 @@ impl GameLog {
             return true;
         }
 
-        self.message_bytes += entry.message.len();
+        self.message_bytes += entry.message.len() + entry.throwable.as_ref().map_or(0, String::len);
         self.entries.push(entry);
         true
     }

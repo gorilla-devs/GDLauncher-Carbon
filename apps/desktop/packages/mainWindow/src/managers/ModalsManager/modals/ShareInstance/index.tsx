@@ -14,6 +14,7 @@ import {
 } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
+import { CancelLink, DialogFooter } from "../../DialogFooter"
 import { apiUrl, rspc } from "@/utils/rspcClient"
 import {
   createEffect,
@@ -530,10 +531,9 @@ function ShareInstance(props: ModalProps) {
           </Match>
         </Switch>
 
-        <div class="flex justify-between gap-3">
+        <DialogFooter>
           <Show when={!shareObject()}>
-            <Button
-              type="secondary"
+            <CancelLink
               onClick={() => {
                 if (sseStream) {
                   sseStream.close()
@@ -541,9 +541,7 @@ function ShareInstance(props: ModalProps) {
                 }
                 modalsContext?.closeModal()
               }}
-            >
-              <Trans key="instances:_trn_instance_share.cancel" />
-            </Button>
+            />
             <Button
               type="primary"
               disabled={isLoading()}
@@ -563,7 +561,7 @@ function ShareInstance(props: ModalProps) {
               </Switch>
             </Button>
           </Show>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

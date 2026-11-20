@@ -3,6 +3,7 @@ import { keepPreviousData } from "@tanstack/solid-query"
 import { rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
+import ConfirmActions from "../../ConfirmActions"
 import { Button, Checkbox, Spinner, toast } from "@gd/ui"
 import { Trans, useTransContext, type TypedTFunction } from "@gd/i18n"
 import { useLocation } from "@solidjs/router"
@@ -484,37 +485,28 @@ const RepairModpack = (props: ModalProps) => {
           </div>
         </Show>
 
-        <div class="flex w-full justify-between">
-          <Button
-            onClick={() => {
-              modalsContext?.closeModal()
-            }}
-          >
-            <div class="i-hugeicons:cancel-01" />
-            {t("instances:_trn_repair_cancel")}
-          </Button>
-          <Button
-            type="secondary"
-            data-testid="repair-modpack-confirm"
-            disabled={!isServer() && preview.isLoading}
-            onClick={() => {
-              modalsContext?.closeModal()
-              navigateAwayIfInsideDetail()
-              if (isServer()) {
-                repairServerMutation.mutate(props?.data?.id)
-              } else {
-                repairInstanceMutation.mutate({
-                  instance: instanceId(),
-                  cleanup_paths: [...ticked()],
-                  re_enable_disabled: reEnable()
-                })
-              }
-            }}
-          >
-            <div class="i-hugeicons:refresh" />
-            {t("instances:_trn_repair_confirm")}
-          </Button>
-        </div>
+        <ConfirmActions
+          busy={false}
+          confirmTestId="repair-modpack-confirm"
+          disabled={!isServer() && preview.isLoading}
+          onCancel={() => modalsContext?.closeModal()}
+          onConfirm={() => {
+            modalsContext?.closeModal()
+            navigateAwayIfInsideDetail()
+            if (isServer()) {
+              repairServerMutation.mutate(props?.data?.id)
+            } else {
+              repairInstanceMutation.mutate({
+                instance: instanceId(),
+                cleanup_paths: [...ticked()],
+                re_enable_disabled: reEnable()
+              })
+            }
+          }}
+        >
+          <div class="i-hugeicons:refresh" />
+          {t("instances:_trn_repair_confirm")}
+        </ConfirmActions>
       </div>
     </ModalLayout>
   )

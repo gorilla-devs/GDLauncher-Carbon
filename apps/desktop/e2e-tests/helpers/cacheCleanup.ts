@@ -40,8 +40,10 @@ export interface CacheScopes {
  * Both scope rows are located by the wrapper `ClickableRow` renders rather
  * than by the `Checkbox` inside them, and their state is read from
  * `data-checked` on that same wrapper. `@gd/ui`'s `Checkbox` forwards no
- * unknown props and renders no queryable input, so it can be neither
- * anchored nor read — see `helpers/selectors.ts`'s note.
+ * unknown props, so it can't be anchored. It does render a real
+ * `input[type="checkbox"]`, named after the row's title, but a transparent
+ * one that the pointer passes through, so the row stays the thing to click —
+ * see `helpers/selectors.ts`'s note.
  */
 export async function runCacheCleanup(
   page: Page,

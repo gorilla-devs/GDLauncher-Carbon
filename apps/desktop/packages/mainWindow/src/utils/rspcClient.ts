@@ -22,6 +22,10 @@ import {
   dispatchServerEulaEvent,
   type ServerEulaData
 } from "./serverEulaBridge"
+import {
+  dispatchJavaMismatchEvent,
+  type JavaMismatchData
+} from "./javaMismatchBridge"
 
 // ---------------------------------------------------------------------------
 // Procedure type utilities
@@ -202,6 +206,13 @@ function parseRspcErrorPayload(raw: string): ParsedRspcError | undefined {
   return parsed
 }
 
+/** The code of an rspc error's first cause that has one, such as
+ *  `INSUFFICIENT_MEMORY`, for UI that reacts to a specific failure. */
+export function rspcErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined
+  return parseRspcErrorPayload(error.message)?.cause?.find((c) => c.code)?.code
+}
+
 /** Extracts a short, human-readable message from an rspc error (or any
  *  thrown value): the first cause's `display` when the rspc {cause,
  *  backtrace} payload parses, else the parsed payload's own `message`, else
@@ -222,13 +233,28 @@ export function extractErrorDisplay(error: unknown): string {
 // Global error handler shared by every query and mutation cache entry
 // ---------------------------------------------------------------------------
 
+/** Errors the core raises on purpose so the UI can ask the user something
+ *  (a dialog), not failures: they are logged at debug level only. */
+const EXPECTED_ERROR_CODES = new Set(["INSUFFICIENT_MEMORY", "JAVA_MISMATCH"])
+
+function logRspcError(
+  error: Error,
+  parsed: ReturnType<typeof parseRspcErrorPayload>
+) {
+  const code = parsed?.cause?.find((c) => c.code)?.code
+  if (code && EXPECTED_ERROR_CODES.has(code)) {
+    console.debug("RSPC flow-control error:", code)
+    return
+  }
+  console.error("RSPC error:", error)
+}
+
 // Exported for unit testing (see rspcClient.test.ts) — not meant to be
 // called from application code, which reaches this only through the
 // QueryCache/MutationCache `onError` wiring below.
 export function handleGlobalError(error: Error, source: "query" | "mutation") {
-  console.error("RSPC error:", error)
-
   const parsed = parseRspcErrorPayload(error.message)
+  logRspcError(error, parsed)
   if (!parsed) {
     showDedupedErrorToast(error.message, source)
     return
@@ -245,6 +271,13 @@ export function handleGlobalError(error: Error, source: "query" | "mutation") {
 
   if (errorCode === "INSUFFICIENT_MEMORY" && errorCause?.data) {
     dispatchMemoryWarningEvent(errorCause.data as InsufficientMemoryData)
+    return
+  }
+
+  // A launch held back on a Java that doesn't fit: the crash help dialog
+  // asks first.
+  if (errorCode === "JAVA_MISMATCH" && errorCause?.data) {
+    dispatchJavaMismatchEvent(errorCause.data as JavaMismatchData)
     return
   }
 
@@ -272,7 +305,12 @@ export function handleGlobalError(error: Error, source: "query" | "mutation") {
 
 export const queryClient = new QueryClient({
   queryCache: new QueryCache({
-    onError: (error) => handleGlobalError(error, "query")
+    // `meta: { silentError: true }` opts a query out, for UI that shows the
+    // error inline itself.
+    onError: (error, query) => {
+      if (query.meta?.silentError === true) return
+      handleGlobalError(error, "query")
+    }
   }),
   mutationCache: new MutationCache({
     onError: (error) => handleGlobalError(error, "mutation")

@@ -13,9 +13,13 @@ use carbon_repos::schema_dump::dump_schema;
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
 
-/// The real floor list (25 historical migrations), the "old binary".
+/// The real floor list (the first 25 historical migrations), the "old binary".
+/// Migrations added after the floor are left out so the version arithmetic
+/// below stays fixed.
 fn base() -> MigrationSet {
-    carbon_repos::get_migrations().0
+    let mut set = carbon_repos::get_migrations().0;
+    set.migrations.truncate(25);
+    set
 }
 
 /// Clones a set and appends synthetic migrations, the "new binary".

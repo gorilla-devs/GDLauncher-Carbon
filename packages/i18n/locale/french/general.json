@@ -31,7 +31,6 @@
   "_trn_common.read_more": "Lire la suite",
   "_trn_common.view_all": "Tout voir",
   "_trn_common.clear_all": "Tout effacer",
-  "_trn_add_custom_java_path": "Ajouter un chemin Java personnalisé",
   "_trn_profile_name": "Nom du profil",
   "_trn_assigned_java_path": "Chemin Java assigné",
   "_trn_instance_unlock_confirmation": "Le déverrouillage vous permet d'installer du contenu supplémentaire sur cette instance. Si ce n'est pas fait correctement, cela pourrait potentiellement empêcher le lancement de l'instance. Cette action ne peut pas être annulée.",
@@ -41,5 +40,6 @@
   "_trn_edit": "Modifier",
   "_trn_ok": "OK",
   "_trn_field_required": "Ce champ est requis",
-  "_trn_dismiss": "Ignorer"
+  "_trn_dismiss": "Ignorer",
+  "_trn_close": "Fermer"
 }

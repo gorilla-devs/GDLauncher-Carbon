@@ -2,6 +2,7 @@ import { Collapsable, Radio } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import useSearchContext from "@/components/SearchInputContext"
 import { capitalize } from "@/utils/helpers"
+import { createUniqueId } from "solid-js"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 
@@ -18,6 +19,8 @@ interface PlatformFilterProps {
 
 export function PlatformFilter(props: PlatformFilterProps) {
   const searchResults = useSearchContext()
+  // The platforms are one radio group for the keyboard.
+  const platformGroup = createUniqueId()
 
   const handleSelect = (value: string | number | string[] | undefined) => {
     const platform = value as "curseforge" | "modrinth"
@@ -59,16 +62,16 @@ export function PlatformFilter(props: PlatformFilterProps) {
     >
       <div class="flex flex-col px-2">
         {/* The div wrapper (not a prop on Radio) carries the anchor: Radio
-            spreads unknown props onto its native `<input type="radio">`,
-            which is visually hidden (`class="hidden"`) behind the clickable
-            label it renders alongside — an anchor there would reach the DOM
-            but never be clickable. */}
+            takes no extra props, and its native `<input type="radio">` lets
+            clicks through to its label, so an anchor there would never be
+            clickable. */}
         <div
           data-testid={
             props.testAnchors ? "search-platform-curseforge" : undefined
           }
         >
           <Radio
+            name={platformGroup}
             value="curseforge"
             checked={searchResults?.searchQuery().searchApi === "curseforge"}
             onChange={handleSelect}
@@ -86,6 +89,7 @@ export function PlatformFilter(props: PlatformFilterProps) {
           }
         >
           <Radio
+            name={platformGroup}
             value="modrinth"
             checked={searchResults?.searchQuery().searchApi === "modrinth"}
             onChange={handleSelect}

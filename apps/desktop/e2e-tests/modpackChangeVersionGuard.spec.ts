@@ -142,8 +142,8 @@ async function openVersionModal(
   await page.click(byTestId(TEST_IDS.instanceSettingsChangeVersion))
 }
 
-/** Closes the still-open modal via its Cancel button, which carries no test
- *  id — matched by role and its English label (`_trn_cancel_export`,
+/** Closes the still-open modal via its Cancel link, which carries no test
+ *  id — matched by role and its English label (`general:_trn_cancel`,
  *  "Cancel"). Only one modal is ever open here. */
 async function cancelVersionModal(page: Page): Promise<void> {
   await page

@@ -1,4 +1,7 @@
-use crate::api::java::managed::{FEManagedJavaSetupArgs, FEManagedJavaSetupProgress};
+use crate::api::java::managed::{
+    FEJavaAdvisoryMatch, FEManagedJavaCatalog, FEManagedJavaInstall, FEManagedJavaSetupArgs,
+    FEManagedJavaSetupProgress, FEManagedJavaUpdate, FEMinecraftJavaMajor,
+};
 use crate::api::managers::App;
 use crate::api::router::router;
 use crate::domain::java::{
@@ -10,9 +13,15 @@ use serde::{Deserialize, Serialize};
 use specta::Type;
 use std::collections::HashMap;
 
-use self::managed::{FEManagedJavaArch, FEManagedJavaOs, FEManagedJavaOsMap, FEVendor};
+use self::managed::{FEManagedJavaArch, FEManagedJavaOs, FEVendor};
+use self::overview::{
+    FEJavaEntry, FEJavaOverview, FERemovedUnusedJavas, FESetMajorDefaultArgs,
+    FESwitchJavaToFixedArgs,
+};
+use crate::managers::java::{overview as java_overview, overview_actions};
 
 mod managed;
+mod overview;
 
 pub(super) fn mount() -> RouterBuilder<App> {
     router! {
@@ -32,16 +41,56 @@ pub(super) fn mount() -> RouterBuilder<App> {
             get_managed_vendors(app, _args)
         }
 
-        query GET_MANAGED_VERSIONS_BY_VENDOR[app, args: FEVendor] {
-            get_managed_versions_by_vendor(app, args).await
+        query GET_MANAGED_CATALOG[app, args: FEVendor] {
+            get_managed_catalog(app, args).await
+        }
+
+        query GET_JAVA_ADVISORY_MATCHES[app, _args: ()] {
+            get_java_advisory_matches(app).await
+        }
+
+        query GET_DISMISSED_JAVA_ADVISORIES[app, _args: ()] {
+            let mut keys = crate::managers::java::advisories::get_dismissed(&app.db)
+                .await?
+                .into_iter()
+                .collect::<Vec<_>>();
+            keys.sort();
+
+            Ok(keys)
+        }
+
+        mutation DISMISS_JAVA_ADVISORIES[app, args: Vec<String>] {
+            crate::managers::java::advisories::add_dismissed(&app.db, args).await?;
+            app.invalidate(GET_DISMISSED_JAVA_ADVISORIES, None);
+
+            Ok(())
         }
 
         mutation SETUP_MANAGED_JAVA[app, args: FEManagedJavaSetupArgs] {
             setup_managed_java(app, args).await
         }
 
-        query GET_SETUP_MANAGED_JAVA_PROGRESS[app, args: ()] {
+        query GET_SETUP_MANAGED_JAVA_PROGRESS[app, args: String] {
             get_setup_managed_java_progress(app, args).await
+        }
+
+        query GET_MANAGED_JAVA_INSTALLS[app, args: ()] {
+            get_managed_java_installs(app, args).await
+        }
+
+        query GET_MANAGED_JAVA_UPDATES[app, args: ()] {
+            get_managed_java_updates(app, args).await
+        }
+
+        mutation UPDATE_MANAGED_JAVA[app, args: String] {
+            let new_id = app.java_manager().update_managed_java(&args).await?;
+            app.invalidate(GET_MANAGED_JAVA_UPDATES, None);
+
+            Ok(new_id)
+        }
+
+        query GET_MINECRAFT_JAVA_MAJORS[app, args: ()] {
+            get_minecraft_java_majors(app, args).await
         }
 
         query SYSTEM_JAVA_PROFILE_ASSIGNMENTS[app, args: ()] {
@@ -92,7 +141,31 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation DELETE_JAVA_VERSION[app, args: String] {
-            app.java_manager().delete_java_version(args).await
+            overview_actions::delete_java(&app, &args).await
+        }
+
+        query GET_JAVA_OVERVIEW[app, _args: ()] {
+            Ok(FEJavaOverview::from(java_overview::get_java_overview(&app).await?))
+        }
+
+        mutation SET_MAJOR_DEFAULT[app, args: FESetMajorDefaultArgs] {
+            overview_actions::set_java_major_default(&app, args.major, args.java_id).await
+        }
+
+        mutation UNPIN_MANAGED_JAVA[app, args: String] {
+            overview_actions::unpin_managed_java(&app, &args).await
+        }
+
+        mutation ADD_JAVA_FROM_FILE[app, args: String] {
+            Ok(FEJavaEntry::from(overview_actions::add_java_from_file(&app, &args).await?))
+        }
+
+        mutation REMOVE_UNUSED_JAVAS[app, _args: ()] {
+            Ok(FERemovedUnusedJavas::from(overview_actions::remove_unused_javas(&app).await?))
+        }
+
+        mutation SWITCH_JAVA_TO_FIXED[app, args: FESwitchJavaToFixedArgs] {
+            overview_actions::switch_java_to_fixed(&app, &args.java_id, &args.build_id).await
         }
     }
 }
@@ -132,46 +205,125 @@ fn get_managed_vendors(app: App, _args: ()) -> anyhow::Result<Vec<FEVendor>> {
     Ok(all_vendors.into_iter().map(FEVendor::from).collect())
 }
 
-async fn get_managed_versions_by_vendor(
-    app: App,
-    args: FEVendor,
-) -> anyhow::Result<FEManagedJavaOsMap> {
-    let managed_java_map_os = app
+async fn get_managed_catalog(app: App, args: FEVendor) -> anyhow::Result<FEManagedJavaCatalog> {
+    let catalog = app
         .java_manager()
         .managed_service
-        .get_versions_for_vendor(JavaVendor::from(args))
+        .get_catalog(JavaVendor::from(args))
         .await?;
 
-    Ok(managed_java_map_os.into())
+    let advisories = app.java_manager().advisories.read().await.clone();
+    let arch = crate::domain::java::JavaArch::get_current_arch()?.to_string();
+
+    Ok(FEManagedJavaCatalog::new(
+        catalog,
+        &advisories,
+        &arch,
+        &crate::managers::java::advisories::RealHostCpu,
+    ))
+}
+
+async fn get_java_advisory_matches(app: App) -> anyhow::Result<Vec<FEJavaAdvisoryMatch>> {
+    Ok(
+        crate::managers::java::advisories::advisory_match_statuses(&app)
+            .await?
+            .into_iter()
+            .map(|status| {
+                let m = status.matched;
+
+                FEJavaAdvisoryMatch {
+                    java_id: m.java_id,
+                    advisory_id: m.advisory.id,
+                    name: m.advisory.name,
+                    severity: m.advisory.severity,
+                    url: m.advisory.url,
+                    fixed_version: m.fixed.map(|v| v.to_string()),
+                    auto_fixable: status.auto_fixable,
+                    in_use: status.in_use,
+                }
+            })
+            .collect(),
+    )
 }
 
 async fn setup_managed_java(app: App, args: FEManagedJavaSetupArgs) -> anyhow::Result<String> {
-    app.java_manager()
+    let java_id = app
+        .java_manager()
         .managed_service
-        .setup_managed(
-            args.os.into(),
-            args.arch.into(),
-            args.vendor.into(),
-            args.id,
-            app.clone(),
-            None,
-        )
-        .await
+        .setup_managed(args.vendor.into(), args.id, app.clone(), None)
+        .await?;
+
+    crate::managers::java::invalidate_java_lists(&app);
+
+    Ok(java_id)
 }
 
+/// `Idle` when the build has no install running.
 async fn get_setup_managed_java_progress(
     app: App,
-    _args: (),
+    build_id: String,
 ) -> anyhow::Result<FEManagedJavaSetupProgress> {
-    let res = app
+    let step = app
         .java_manager()
         .managed_service
         .setup_progress
         .lock()
         .await
-        .clone();
+        .get(&build_id)
+        .map(|p| p.step.clone())
+        .unwrap_or_default();
 
-    Ok(res.into())
+    Ok(step.into())
+}
+
+async fn get_managed_java_installs(
+    app: App,
+    _args: (),
+) -> anyhow::Result<Vec<FEManagedJavaInstall>> {
+    let mut installs = app
+        .java_manager()
+        .managed_service
+        .setup_progress
+        .lock()
+        .await
+        .iter()
+        .map(|(id, p)| FEManagedJavaInstall::new(id.clone(), p.clone()))
+        .collect::<Vec<_>>();
+    installs.sort_by(|a, b| a.build_id.cmp(&b.build_id));
+
+    Ok(installs)
+}
+
+/// From the last catalogs fetched: empty before the first.
+async fn get_managed_java_updates(app: App, _args: ()) -> anyhow::Result<Vec<FEManagedJavaUpdate>> {
+    let catalogs = crate::managers::java::shown_catalogs(&app);
+
+    let pinned = crate::managers::java::updates::get_pinned_managed_javas(&app.db).await?;
+
+    Ok(app
+        .java_manager()
+        .managed_updates(&catalogs)
+        .await?
+        .into_iter()
+        .map(|update| FEManagedJavaUpdate {
+            pinned: pinned.contains(&update.java_id),
+            java_id: update.java_id,
+            current_version: update.current.to_string(),
+            latest_version: update.latest.version.to_string(),
+        })
+        .collect())
+}
+
+/// The ranges Settings › Java groups by, so the Add dialog shows the same.
+async fn get_minecraft_java_majors(
+    app: App,
+    _args: (),
+) -> anyhow::Result<Vec<FEMinecraftJavaMajor>> {
+    Ok(java_overview::shown_minecraft_java_majors(&app)
+        .await?
+        .into_iter()
+        .map(FEMinecraftJavaMajor::from)
+        .collect())
 }
 
 async fn get_java_profiles(app: App, _args: ()) -> anyhow::Result<Vec<FEJavaProfile>> {

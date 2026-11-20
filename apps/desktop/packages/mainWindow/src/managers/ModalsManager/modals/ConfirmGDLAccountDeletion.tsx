@@ -1,10 +1,11 @@
 import { rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, toast } from "@gd/ui"
+import { toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { AccountEntry } from "@gd/core_module/bindings"
+import ConfirmActions from "../ConfirmActions"
 
 const ConfirmGDLAccountDeletion = (props: ModalProps) => {
   const [t] = useTransContext()
@@ -61,30 +62,21 @@ const ConfirmGDLAccountDeletion = (props: ModalProps) => {
     <ModalLayout
       noHeader={props.noHeader}
       title={props?.title}
-      height="h-60"
+      height="h-auto"
       width="w-100"
+      compact
     >
-      <div class="flex h-full flex-col justify-between">
-        <div class="h-h-full">
+      <div class="flex flex-col gap-6">
+        <div>
           <Trans key="accounts:_trn_request_account_deletion_description" />
         </div>
-        <div class="flex w-full justify-between">
-          <Button
-            disabled={requestAccountDeletionMutation.isPending}
-            onClick={() => {
-              modalsContext?.closeModal()
-            }}
-          >
-            {t("instances:_trn_instance_confirm_deletion.cancel")}
-          </Button>
-          <Button
-            type="secondary"
-            loading={requestAccountDeletionMutation.isPending}
-            onClick={confirmDeletion}
-          >
-            {t("instances:_trn_instance_confirm_deletion.delete")}
-          </Button>
-        </div>
+        <ConfirmActions
+          busy={requestAccountDeletionMutation.isPending}
+          onCancel={() => modalsContext?.closeModal()}
+          onConfirm={confirmDeletion}
+        >
+          {t("instances:_trn_instance_confirm_deletion.delete")}
+        </ConfirmActions>
       </div>
     </ModalLayout>
   )

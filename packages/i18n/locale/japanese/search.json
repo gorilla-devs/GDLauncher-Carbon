@@ -1,6 +1,6 @@
 {
-  "_trn_search_instances": "インスタンスを検索",
-  "_trn_search_servers": "サーバーを検索",
+  "_trn_search_instances": "インスタンスを検索...",
+  "_trn_search_servers": "サーバーを検索...",
   "_trn_browser_table_headers.name": "名前",
   "_trn_browser_table_headers.published": "公開日",
   "_trn_browser_table_headers.downloads": "ダウンロード数",

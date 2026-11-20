@@ -168,6 +168,10 @@ impl ManagerRef<'_, SettingsManager> {
                 Some(auto_manage_java_system_profiles.clone().inner());
         }
 
+        if let Some(auto_update_managed_java) = incoming_settings.auto_update_managed_java {
+            patch.auto_update_managed_java = Some(auto_update_managed_java.inner());
+        }
+
         if let Some(mod_sources) = incoming_settings.mod_sources {
             let mod_sources = mod_sources.inner();
 
@@ -221,14 +225,6 @@ impl ManagerRef<'_, SettingsManager> {
                     "_SHOW_APP_CLOSE_WARNING_:{}",
                     show_app_close_warning.inner()
                 );
-            }
-        }
-
-        if let Some(auto_manage_java_system_profiles) =
-            incoming_settings.auto_manage_java_system_profiles
-        {
-            if auto_manage_java_system_profiles.inner() {
-                super::java::scan_and_sync::sync_system_java_profiles(&self.app.db).await?;
             }
         }
 
