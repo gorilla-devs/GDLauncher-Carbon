@@ -46,11 +46,13 @@ pub(crate) async fn target_compatibility(
                 return None;
             };
 
-            let loaders = version
-                .modloaders
-                .iter()
-                .map(|loader| loader.type_.to_string().to_lowercase())
-                .collect::<Vec<_>>();
+            let runs = crate::managers::instance::installer::dependency::Runs::new(
+                &version.release,
+                version.modloaders.iter().map(|loader| loader.type_),
+            );
+            let tags = |tags: Vec<&str>| tags.into_iter().map(str::to_owned).collect::<Vec<_>>();
+            let loaders = tags(runs.own_tags());
+            let also_loads = tags(runs.also_tags());
 
             let game = version.release.clone();
             drop(instances);
@@ -72,6 +74,7 @@ pub(crate) async fn target_compatibility(
             Some(UpdateContext {
                 game,
                 loaders,
+                also_loads,
                 shader_engines,
             })
         }
@@ -87,6 +90,7 @@ pub(crate) async fn target_compatibility(
                     .into_iter()
                     .map(|l| l.to_lowercase())
                     .collect(),
+                also_loads: vec![],
                 shader_engines: vec![],
             })
         }
@@ -298,30 +302,28 @@ impl ModplatformCacher for ModrinthModCacher {
                         .map(|(_, _, kind)| kind.as_str())
                         .collect::<HashSet<_>>();
                     for kind in kinds {
-                        let loaders = context.request_loaders(kind);
-                        if loaders.is_empty() {
-                            continue;
-                        }
                         let hashes = metadata
                             .iter()
                             .filter(|(_, _, k)| k == kind)
                             .map(|(_, hash, _)| hash.clone())
                             .collect::<Vec<_>>();
-                        for version_type in
-                            [VersionType::Release, VersionType::Beta, VersionType::Alpha]
-                        {
-                            mcm.modrinth_throttle.acquire().await;
-                            let latest = mpm
-                                .modrinth
-                                .get_latest_versions_from_hashes(&LatestVersionsBody {
-                                    hashes: hashes.clone(),
-                                    algorithm: HashAlgorithm::SHA512,
-                                    loaders: loaders.clone(),
-                                    game_versions: vec![context.game.clone()],
-                                    version_types: Some(vec![version_type]),
-                                })
-                                .await?;
-                            combined_versions_response.extend(latest.0.into_values());
+                        for loaders in context.lookup_loaders(kind) {
+                            for version_type in
+                                [VersionType::Release, VersionType::Beta, VersionType::Alpha]
+                            {
+                                mcm.modrinth_throttle.acquire().await;
+                                let latest = mpm
+                                    .modrinth
+                                    .get_latest_versions_from_hashes(&LatestVersionsBody {
+                                        hashes: hashes.clone(),
+                                        algorithm: HashAlgorithm::SHA512,
+                                        loaders: loaders.clone(),
+                                        game_versions: vec![context.game.clone()],
+                                        version_types: Some(vec![version_type]),
+                                    })
+                                    .await?;
+                                combined_versions_response.extend(latest.0.into_values());
+                            }
                         }
                     }
                 }
@@ -890,6 +892,100 @@ mod test {
             .len(),
             1
         );
+    }
+
+    /// The update badge of a mod on a Quilt instance, through the cache and
+    /// the mod list: a Fabric mod is badged for a newer Fabric build, and a
+    /// jar built for Quilt is not.
+    #[tokio::test]
+    async fn a_fabric_mod_on_quilt_is_badged_for_a_newer_fabric_build() {
+        use crate::domain::instance::{
+            AddonType,
+            info::{ModLoader, StandardVersion},
+        };
+        let app = crate::setup_managers_for_test().await;
+        let (id, _) = super::super::tests::addon_fixture_version(
+            &app,
+            "quilt-fabric-mod",
+            AddonType::Mods,
+            "mod.jar",
+            b"fabric mod on quilt",
+            StandardVersion {
+                release: "1.20.1".into(),
+                modloaders: [ModLoader {
+                    type_: ModLoaderType::Quilt,
+                    version: "fixture".into(),
+                }]
+                .into_iter()
+                .collect(),
+            },
+        )
+        .await;
+        app.meta_cache_manager()
+            .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+
+        let context = target_compatibility(&app, CacheEntityId::Instance(id))
+            .await
+            .unwrap();
+        assert_eq!(context.loaders, ["quilt"]);
+        assert_eq!(context.also_loads, ["fabric"]);
+
+        let metadata = mfcdb::get_mod_files_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0)
+            .metadata_id;
+        let meta = metarepo::get_metadata_by_id(&app.db, &metadata)
+            .await
+            .unwrap()
+            .unwrap();
+        let hash = hex::encode(meta.sha512);
+        let mut installed = version("installed", "project", 10, VersionType::Release);
+        installed.loaders = vec!["fabric".into()];
+        installed.files = vec![file(&hash)];
+        let mut newer = version("newer", "project", 20, VersionType::Release);
+        newer.loaders = vec!["fabric".into()];
+        ModrinthModCacher::save_batch(
+            &app,
+            CacheEntityId::Instance(id),
+            (
+                vec![hash.clone()],
+                vec![(metadata.clone(), hash.clone(), "mods".into())],
+                VersionHashesResponse([(hash.clone(), installed)].into_iter().collect()),
+                ProjectsResponse(vec![project("project")]),
+                vec![team("project")],
+                vec![newer],
+                Some(context),
+            ),
+        )
+        .await;
+
+        let badged =
+            || async { app.instance_manager().list_mods(id, None).await.unwrap()[0].has_update };
+        for jar in ["fabric", ""] {
+            metarepo::update_local_modloaders(
+                &app.db,
+                &metadata,
+                jar,
+                DbDateTime(chrono::Utc::now().fixed_offset()),
+            )
+            .await
+            .unwrap();
+            assert!(badged().await, "a jar built for {jar:?}");
+        }
+        for jar in ["quilt", "fabric,quilt"] {
+            metarepo::update_local_modloaders(
+                &app.db,
+                &metadata,
+                jar,
+                DbDateTime(chrono::Utc::now().fixed_offset()),
+            )
+            .await
+            .unwrap();
+            assert!(!badged().await, "a jar built for {jar:?}");
+        }
     }
 
     /// A miss leaves the file out of lookups for `IGNORED_HASH_TTL`, not for

@@ -64,18 +64,36 @@ function assertUnambiguous(
 }
 
 /**
- * The **install** path's notion of latest: newest by publish date, with no
- * channel filter at all. `install_latest_modrinth_mod` takes `.get(0)` of the
- * filtered response and `install_latest_curseforge_mod` takes the first entry
- * whose `game_versions` contains the release; neither consults a channel.
+ * The **install** path's notion of latest: the newest release, and with no
+ * release the newest beta, and with neither the newest alpha.
+ * `install_latest_modrinth_mod` and `install_latest_curseforge_mod` both
+ * choose with `dependency::latest_build`, which is how the dependencies of
+ * the same install are chosen. Candidates must already be the ones built for
+ * the loader the install would take (the instance's own before one it also
+ * loads): this orders, it does not judge compatibility.
  */
-export function newestByDate(
+export function newestInstallCandidate(
   candidates: ResolutionCandidate[]
 ): ResolutionCandidate {
   if (candidates.length === 0) {
-    throw new Error("newestByDate: candidate list is empty")
+    throw new Error("newestInstallCandidate: candidate list is empty")
   }
-  return assertUnambiguous(sortNewestFirst(candidates), "newestByDate")
+
+  const sorted = sortNewestFirst(candidates)
+  for (const channel of DEFAULT_CHANNEL_ORDER) {
+    const onChannel = sorted.filter((c) => c.channel === channel)
+    if (onChannel.length > 0) {
+      return assertUnambiguous(
+        onChannel,
+        `newestInstallCandidate (${channel} pass)`
+      )
+    }
+  }
+
+  throw new Error(
+    "newestInstallCandidate: no candidate is on a known channel — " +
+      `channels present: ${[...new Set(candidates.map((c) => c.channel))].join(", ")}`
+  )
 }
 
 /**

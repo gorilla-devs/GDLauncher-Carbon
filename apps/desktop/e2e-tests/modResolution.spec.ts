@@ -18,7 +18,10 @@ import {
   type InstalledMod
 } from "./helpers/mods.js"
 import { listModFiles, verifyModInstalled } from "./helpers/modVerify.js"
-import { newestByDate, newestUpdateCandidate } from "./helpers/resolution.js"
+import {
+  newestInstallCandidate,
+  newestUpdateCandidate
+} from "./helpers/resolution.js"
 import {
   captureCurseforgeVersions,
   captureModrinthVersions,
@@ -79,18 +82,19 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
  * installable build needs the addon page's Versions tab, and that path is
  * only live-verified against Modrinth (see `modLifecycle.spec.ts`'s own
  * update test doc comment for the identical reasoning). Install and update
- * resolve "latest" by genuinely different rules, which is why they need two
- * different predicates from `resolution.ts`, never one shared between them:
- * `install_latest_modrinth_mod` takes `.get(0)` of the filtered response with
- * **no channel filter at all** (modelled by `newestByDate`, already used
- * above), while `find_mod_update` (`managers/instance/mods.rs:616`) sorts
- * newest-first and walks the instance's allowed channels in list order,
- * taking the first candidate at or above that channel's level — under the
- * shipped default (`'stable:true,beta:true,alpha:true'`) the stable pass
- * runs first, so it resolves to the newest *stable* build, not merely the
- * newest outright (modelled by `newestUpdateCandidate`). Neither of the two
+ * resolve "latest" by their own rules, which is why they have two
+ * predicates in `resolution.ts`, never one shared between them:
+ * `install_latest_modrinth_mod` takes the newest release, and a beta or an
+ * alpha only when the project has nothing more stable (modelled by
+ * `newestInstallCandidate`, already used above), while `find_mod_update`
+ * sorts newest-first and walks the instance's allowed channels in list
+ * order, taking the first candidate at or above that channel's level, and
+ * never below the installed file's channel — under the shipped default
+ * (`'stable:true,beta:true,alpha:true'`) the stable pass runs first, so it
+ * resolves to the newest *stable* build, not merely the newest outright
+ * (modelled by `newestUpdateCandidate`). Neither of the two
  * tests below makes a compatibility assertion at all (that's what the two
- * tests above this comment already own) — both `newestByDate` and
+ * tests above this comment already own) — both `newestInstallCandidate` and
  * `newestUpdateCandidate` are ordering-only predicates, fed exclusively by
  * `versions.scoped`, never `versions.unfiltered`, keeping the same rule the
  * rest of this file follows: the scoped list orders, it never proves
@@ -346,7 +350,7 @@ async function resolveForInstance(
   }
 
   // Ordering comes from the SCOPED list — see the module doc comment.
-  const expectedNewest = newestByDate(versions.scoped)
+  const expectedNewest = newestInstallCandidate(versions.scoped)
   if (modrinthVersionId !== expectedNewest.id) {
     throw new Error(
       `resolveForInstance (${loader}): installed modrinthVersionId ` +
@@ -562,7 +566,7 @@ async function resolveForInstanceCurseforge(
   // Ordering comes from the SCOPED list — see resolveForInstance's identical
   // reasoning above and the module doc comment. Never the tautology trap:
   // this is the only place `versions.scoped` is read in this function.
-  const expectedNewest = newestByDate(versions.scoped)
+  const expectedNewest = newestInstallCandidate(versions.scoped)
   if (curseforgeFileIdStr !== expectedNewest.id) {
     throw new Error(
       `resolveForInstanceCurseforge (${loader}): installed curseforgeFileId ` +
@@ -890,7 +894,7 @@ test.describe("mod resolution", () => {
   /**
    * Drives Modrinth's update path (`find_mod_update`) rather than install —
    * see this file's module doc comment for why that needs
-   * `newestUpdateCandidate`, never `newestByDate`, as its oracle. Fabric
+   * `newestUpdateCandidate`, never `newestInstallCandidate`, as its oracle. Fabric
    * only (`installedInstance`): the Versions tab this needs to reach a
    * deliberately-older, still-installable build is only live-verified
    * against Modrinth, and this test needs no second loader to make its
@@ -998,8 +1002,9 @@ test.describe("mod resolution", () => {
         // shipped default ('stable:true,beta:true,alpha:true') the stable
         // pass runs first, so this is the newest STABLE build, not merely
         // the newest outright — modelled by newestUpdateCandidate, never
-        // newestByDate (that predicate is the INSTALL path's model, used by
-        // the two tests above this one). On a mismatch the message names
+        // newestInstallCandidate (that predicate is the INSTALL path's
+        // model, used by the two tests above this one). On a mismatch the
+        // message names
         // both ids plus the full candidate list, since the backend's own
         // candidate list is unobservable from here and a divergence needs
         // this list to diagnose.
@@ -1091,9 +1096,9 @@ test.describe("mod resolution", () => {
     await withCleanup(
       async () => {
         // Install latest via the addon page's main button —
-        // install_latest_modrinth_mod applies NO channel filter at all
-        // (`.get(0)` of the filtered response, beta or not; modelled by
-        // newestByDate, already exercised by the two tests above this file).
+        // install_latest_modrinth_mod takes the newest release, and a
+        // prerelease only when there is no release (modelled by
+        // newestInstallCandidate, already exercised by the two tests above).
         await openInstanceAddons(page, instanceName)
         await searchForMod(page, {
           platform: "modrinth",
@@ -1166,33 +1171,20 @@ test.describe("mod resolution", () => {
           )
         }
 
-        // The central assertion, and the one place this test's failure
-        // message must name the channel-divergence hypothesis explicitly:
-        // install_latest_modrinth_mod applies NO channel filter at all
-        // (`.get(0)` of the filtered response, beta or not), while
-        // find_mod_update prefers the newest STABLE build first (see the
-        // module doc comment). For a project whose newest compatible build is
-        // a beta, the two genuinely disagree — and find_mod_update would then
-        // offer an OLDER stable build as an "update", a downgrade presented
-        // as an upgrade. Cloth Config API was chosen specifically because
-        // its 1.20.1 line is stable-only to keep this test
-        // off that ground, so a failure here is a product finding to triage
-        // first, not a harness defect to patch.
+        // The central assertion: both paths prefer the newest STABLE build
+        // (see the module doc comment), so for a project with releases they
+        // have to land on the same one. Cloth Config API's 1.20.1 line is
+        // stable-only, which keeps this test off the prerelease fallbacks,
+        // so a failure here is a product finding to triage first, not a
+        // harness defect to patch.
         if (installLatestId !== updateId) {
           throw new Error(
             `"${TEST_TITLE_CONVERGE}": install-latest resolved ` +
               `"${installLatestId}" but the update path resolved a ` +
-              `different build, "${updateId}". install_latest_modrinth_mod ` +
-              "applies NO channel filter at all (.get(0) of the filtered " +
-              "response, beta or not), while find_mod_update prefers the " +
-              "newest STABLE build first — so for a project whose newest " +
-              "compatible build is a beta, the two genuinely disagree, and " +
-              "find_mod_update would then offer an OLDER stable build as an " +
-              "'update', a downgrade presented as an upgrade. Cloth Config " +
-              "API was chosen specifically because its 1.20.1 line is " +
-              "stable-only to keep this test off that " +
-              "ground — treat this as a product finding to triage first, " +
-              "not a harness defect to patch."
+              `different build, "${updateId}". Both paths prefer the ` +
+              "newest STABLE build, and Cloth Config API's 1.20.1 line is " +
+              "stable-only, so they have to agree — treat this as a product " +
+              "finding to triage first, not a harness defect to patch."
           )
         }
       },

@@ -226,6 +226,9 @@ pub struct ModUpdateIdsRow {
     pub mr_version_id: Option<String>,
     /// The installed version's cached `ModChannel` id, which the update badge also reads.
     pub mr_release_type: Option<i32>,
+    /// The loaders the installed jar says it is built for, comma separated,
+    /// which the update badge also reads.
+    pub modloaders: String,
 }
 
 /// A metadata `modid`, for shader-loader detection.
@@ -534,7 +537,8 @@ queries! {
          WHERE f.id = :id";
     fn get_instance_mod_update_ids(id: &str) -> Option<ModUpdateIdsRow> =
         "SELECT c.projectId AS cfProjectId, c.fileId AS cfFileId, c.releaseType AS cfReleaseType,
-                r.projectId AS mrProjectId, r.versionId AS mrVersionId, r.releaseType AS mrReleaseType
+                r.projectId AS mrProjectId, r.versionId AS mrVersionId, r.releaseType AS mrReleaseType,
+                m.modloaders AS modloaders
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id

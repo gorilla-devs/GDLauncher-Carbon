@@ -32,30 +32,122 @@ use std::collections::{HashMap, HashSet};
 // ---------------------------------------------------------------------------
 // Loader compatibility, shared with server addons.
 
+/// The other loader whose mods `loader` also loads at `release`: Quilt loads
+/// Fabric mods and NeoForge 1.20.1 loads Forge mods (Prism Launcher's
+/// getSupportedModLoaders).
+pub(crate) fn also_loads(release: &str, loader: ModLoaderType) -> Option<ModLoaderType> {
+    match loader {
+        ModLoaderType::Quilt => Some(ModLoaderType::Fabric),
+        ModLoaderType::Neoforge if release == "1.20.1" => Some(ModLoaderType::Forge),
+        _ => None,
+    }
+}
+
+/// The tag both platforms give a file built for `loader`.
+pub(crate) fn loader_tag(loader: ModLoaderType) -> &'static str {
+    match loader {
+        ModLoaderType::Forge => "forge",
+        ModLoaderType::Neoforge => "neoforge",
+        ModLoaderType::Fabric => "fabric",
+        ModLoaderType::Quilt => "quilt",
+    }
+}
+
 /// Loader tags a file may carry to run on an instance or server with `loaders`
-/// at `release`. Quilt also loads Fabric mods and NeoForge 1.20.1 also loads
-/// Forge mods (Prism Launcher's getSupportedModLoaders).
+/// at `release`: their own, and those of the loaders they also load (see
+/// [`also_loads`]).
 pub(crate) fn accepted_loader_tags(
     release: &str,
     loaders: impl IntoIterator<Item = ModLoaderType>,
 ) -> Vec<&'static str> {
     let mut accepted = Vec::new();
     for loader in loaders {
-        match loader {
-            ModLoaderType::Forge => accepted.push("forge"),
-            ModLoaderType::Neoforge => {
-                accepted.push("neoforge");
-                if release == "1.20.1" {
-                    accepted.push("forge");
-                }
-            }
-            ModLoaderType::Fabric => accepted.push("fabric"),
-            ModLoaderType::Quilt => accepted.extend(["quilt", "fabric"]),
-        }
+        accepted.push(loader_tag(loader));
+        accepted.extend(also_loads(release, loader).map(loader_tag));
     }
     accepted.sort_unstable();
     accepted.dedup();
     accepted
+}
+
+/// What an instance runs, for choosing the build of a project to install on
+/// it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Runs {
+    /// The game version a build has to list.
+    pub release: String,
+    /// The instance's loaders. Empty on a vanilla instance.
+    pub own: Vec<ModLoaderType>,
+    /// The loaders whose mods it loads as well (see [`also_loads`]).
+    pub also: Vec<ModLoaderType>,
+}
+
+impl Runs {
+    pub fn new(release: &str, loaders: impl IntoIterator<Item = ModLoaderType>) -> Self {
+        let own: Vec<_> = loaders.into_iter().collect();
+        let mut also = Vec::new();
+        for loader in own.iter().filter_map(|loader| also_loads(release, *loader)) {
+            if !own.contains(&loader) && !also.contains(&loader) {
+                also.push(loader);
+            }
+        }
+        Self {
+            release: release.to_owned(),
+            own,
+            also,
+        }
+    }
+
+    fn tags(loaders: &[ModLoaderType]) -> Vec<&'static str> {
+        loaders.iter().copied().map(loader_tag).collect()
+    }
+
+    pub fn own_tags(&self) -> Vec<&'static str> {
+        Self::tags(&self.own)
+    }
+
+    pub fn also_tags(&self) -> Vec<&'static str> {
+        Self::tags(&self.also)
+    }
+}
+
+/// The build a one-click Download installs, from a project's builds newest
+/// first: one for the instance's game version, made for the instance's own
+/// loader before one for a loader it also loads, and one that names no
+/// loader only when there is neither (see [`loader_fit`]). Among those, the
+/// newest release, else the newest of the most stable channel there is (see
+/// [`best_candidate`]), which is how the dependencies of the same install are
+/// chosen.
+///
+/// `any_loader`: the project is not a mod, or the instance has no loader to
+/// tell builds apart by, so the loader tags are not looked at. `metadata`
+/// gives a build's game versions, its loader tags and its channel.
+pub(crate) fn latest_build<'a, T>(
+    builds: &'a [T],
+    runs: &Runs,
+    any_loader: bool,
+    metadata: impl Fn(&T) -> (&[String], &[String], ModChannel),
+) -> Option<&'a T> {
+    let pick = |accepted: &[&str], tagged_only: bool| {
+        best_candidate(builds, ModChannel::Stable, |build| {
+            let (games, tags, channel) = metadata(build);
+            if !games.contains(&runs.release) {
+                return None;
+            }
+            let fit = if any_loader {
+                LoaderFit::Tagged
+            } else {
+                loader_fit(tags, accepted)
+            };
+            (fit == LoaderFit::Tagged || !tagged_only).then_some((fit, channel))
+        })
+    };
+    if any_loader {
+        return pick(&[], false);
+    }
+    let own = runs.own_tags();
+    let all = [own.clone(), runs.also_tags()].concat();
+    pick(&own, true).or_else(|| pick(&all, false))
 }
 
 /// Every tag that names a mod loader or plugin platform. CurseForge mixes them
@@ -1392,5 +1484,166 @@ async fn satisfied(request: &Request, skip: &Skip, pin: Option<&str>) -> anyhow:
         }
         InstalledDependency::DisabledOnly(copies) => Err(DependencyGap::disabled(skip, copies)),
         InstalledDependency::Absent => Ok(false),
+    }
+}
+
+#[cfg(test)]
+mod latest_build_tests {
+    use super::*;
+
+    /// A build as a platform lists it: id, game versions, loader tags,
+    /// channel.
+    struct Build(u32, Vec<String>, Vec<String>, ModChannel);
+
+    fn build(id: u32, games: &[&str], tags: &[&str], channel: ModChannel) -> Build {
+        let owned = |names: &[&str]| names.iter().map(|name| name.to_string()).collect();
+        Build(id, owned(games), owned(tags), channel)
+    }
+
+    /// The build chosen from `builds`, which are newest first.
+    fn latest(builds: &[Build], runs: &Runs, any_loader: bool) -> Option<u32> {
+        latest_build(builds, runs, any_loader, |build| {
+            (&build.1, &build.2, build.3)
+        })
+        .map(|build| build.0)
+    }
+
+    const STABLE: ModChannel = ModChannel::Stable;
+
+    #[test]
+    fn what_an_instance_runs_names_the_loader_it_also_loads() {
+        let quilt = Runs::new("1.20.1", [ModLoaderType::Quilt]);
+        assert_eq!(quilt.own_tags(), ["quilt"]);
+        assert_eq!(quilt.also_tags(), ["fabric"]);
+        let neo = Runs::new("1.20.1", [ModLoaderType::Neoforge]);
+        assert_eq!(neo.own_tags(), ["neoforge"]);
+        assert_eq!(neo.also_tags(), ["forge"]);
+        // Only on 1.20.1, where the two still loaded the same mods.
+        assert!(
+            Runs::new("1.21.1", [ModLoaderType::Neoforge])
+                .also
+                .is_empty()
+        );
+        for loader in [ModLoaderType::Fabric, ModLoaderType::Forge] {
+            assert!(Runs::new("1.20.1", [loader]).also.is_empty());
+        }
+        assert!(Runs::new("1.20.1", []).own.is_empty());
+
+        // The one list both spellings of the rule come from.
+        assert_eq!(
+            accepted_loader_tags("1.20.1", [ModLoaderType::Quilt]),
+            ["fabric", "quilt"]
+        );
+        assert_eq!(
+            accepted_loader_tags("1.20.1", [ModLoaderType::Neoforge]),
+            ["forge", "neoforge"]
+        );
+        assert_eq!(
+            accepted_loader_tags("1.21.1", [ModLoaderType::Neoforge]),
+            ["neoforge"]
+        );
+    }
+
+    #[test]
+    fn a_build_for_a_loader_the_instance_also_loads_is_taken_when_it_has_none_of_its_own() {
+        let quilt = Runs::new("1.20.1", [ModLoaderType::Quilt]);
+        let fabric_only = [
+            build(2, &["1.20.1"], &["fabric"], STABLE),
+            build(1, &["1.20.1"], &["fabric"], STABLE),
+        ];
+        assert_eq!(latest(&fabric_only, &quilt, false), Some(2));
+
+        let neo = Runs::new("1.20.1", [ModLoaderType::Neoforge]);
+        let forge_only = [build(7, &["1.20.1", "Forge"], &["1.20.1", "Forge"], STABLE)];
+        assert_eq!(latest(&forge_only, &neo, false), Some(7));
+        // NeoForge after 1.20.1 does not load Forge mods.
+        let later = Runs::new("1.21.1", [ModLoaderType::Neoforge]);
+        let forge_later = [build(8, &["1.21.1"], &["forge"], STABLE)];
+        assert_eq!(latest(&forge_later, &later, false), None);
+        // Nor does Fabric load Quilt mods.
+        let fabric = Runs::new("1.20.1", [ModLoaderType::Fabric]);
+        let quilt_only = [build(9, &["1.20.1"], &["quilt"], STABLE)];
+        assert_eq!(latest(&quilt_only, &fabric, false), None);
+    }
+
+    #[test]
+    fn a_build_for_the_instances_own_loader_comes_first() {
+        let quilt = Runs::new("1.20.1", [ModLoaderType::Quilt]);
+        let builds = [
+            build(3, &["1.20.1"], &["fabric"], STABLE),
+            build(2, &["1.20.1"], &["quilt"], STABLE),
+            build(1, &["1.20.1"], &["fabric", "quilt"], STABLE),
+        ];
+        assert_eq!(latest(&builds, &quilt, false), Some(2));
+        // Even a less stable one: the mod is built for this loader.
+        let builds = [
+            build(3, &["1.20.1"], &["fabric"], STABLE),
+            build(2, &["1.20.1"], &["quilt"], ModChannel::Alpha),
+        ];
+        assert_eq!(latest(&builds, &quilt, false), Some(2));
+        // A build for both loaders is one for its own.
+        let builds = [
+            build(3, &["1.20.1"], &["fabric", "quilt"], STABLE),
+            build(2, &["1.20.1"], &["quilt"], STABLE),
+        ];
+        assert_eq!(latest(&builds, &quilt, false), Some(3));
+    }
+
+    #[test]
+    fn a_build_that_names_no_loader_is_the_last_resort_and_a_foreign_one_never() {
+        let quilt = Runs::new("1.20.1", [ModLoaderType::Quilt]);
+        let builds = [
+            build(4, &["1.20.1"], &["1.20.1", "Forge"], STABLE),
+            build(3, &["1.20.1"], &["1.20.1"], STABLE),
+            build(2, &["1.20.1"], &["1.20.1", "Fabric"], STABLE),
+        ];
+        assert_eq!(latest(&builds, &quilt, false), Some(2));
+        assert_eq!(latest(&builds[..2], &quilt, false), Some(3));
+        assert_eq!(latest(&builds[..1], &quilt, false), None);
+    }
+
+    #[test]
+    fn the_build_has_to_list_the_instances_game_version() {
+        let fabric = Runs::new("1.20.1", [ModLoaderType::Fabric]);
+        let builds = [
+            build(2, &["1.20.2"], &["fabric"], STABLE),
+            build(1, &["1.20", "1.20.1"], &["fabric"], STABLE),
+        ];
+        assert_eq!(latest(&builds, &fabric, false), Some(1));
+        assert_eq!(latest(&builds[..1], &fabric, false), None);
+        assert_eq!(latest(&[], &fabric, false), None);
+    }
+
+    #[test]
+    fn a_release_is_taken_over_a_newer_prerelease() {
+        let fabric = Runs::new("1.20.1", [ModLoaderType::Fabric]);
+        let builds = [
+            build(4, &["1.20.1"], &["fabric"], ModChannel::Alpha),
+            build(3, &["1.20.1"], &["fabric"], ModChannel::Beta),
+            build(2, &["1.20.1"], &["fabric"], STABLE),
+            build(1, &["1.20.1"], &["fabric"], STABLE),
+        ];
+        assert_eq!(latest(&builds, &fabric, false), Some(2));
+        // A mod with no release still installs: its newest beta, then its
+        // newest alpha.
+        assert_eq!(latest(&builds[..2], &fabric, false), Some(3));
+        assert_eq!(latest(&builds[..1], &fabric, false), Some(4));
+    }
+
+    #[test]
+    fn loader_tags_are_not_looked_at_for_what_is_not_a_mod() {
+        // A resource pack, or a vanilla instance: the newest release for the
+        // game version, whatever its tags.
+        for runs in [
+            Runs::new("1.20.1", [ModLoaderType::Quilt]),
+            Runs::new("1.20.1", []),
+        ] {
+            let builds = [
+                build(3, &["1.20.1"], &["minecraft"], ModChannel::Beta),
+                build(2, &["1.20.1"], &["forge"], STABLE),
+                build(1, &["1.20.2"], &["minecraft"], STABLE),
+            ];
+            assert_eq!(latest(&builds, &runs, true), Some(2));
+        }
     }
 }

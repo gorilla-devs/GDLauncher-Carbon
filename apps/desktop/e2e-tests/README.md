@@ -561,7 +561,7 @@ single mistake this whole suite is built to make impossible:
    should an update move to" (update path) — comes from `helpers/resolutionCapture.ts`'s
    `scoped` list: the app's own `getProjectVersions`/`getModFiles` response,
    already filtered server-side to the instance's Minecraft version and
-   loader. `helpers/resolution.ts`'s `newestByDate`/`newestUpdateCandidate`
+   loader. `helpers/resolution.ts`'s `newestInstallCandidate`/`newestUpdateCandidate`
    read `scoped` exclusively.
 2. **Compatibility** — "is the build the app actually installed genuinely
    compatible with this instance" — comes from `unfiltered`: for Modrinth, a
@@ -596,35 +596,31 @@ loud, if it's ever made. Every compatibility assertion in this suite reads
 trusting any change to this file.
 
 The update-path tests add a fourth wrinkle on top of the same rule: install
-and update resolve "latest" by genuinely different logic, so they need two
-different ordering predicates, never one shared between them.
-`install_latest_modrinth_mod`/`install_latest_curseforge_mod` take the first
-(newest-by-date) entry of the filtered response with **no channel filter at
-all** — modelled by `newestByDate`. `find_mod_update`
-(`managers/instance/mods.rs:616`) sorts newest-first and walks the instance's
+and update resolve "latest" by their own logic, so they have two ordering
+predicates, never one shared between them.
+`install_latest_modrinth_mod`/`install_latest_curseforge_mod` take the newest
+**release**, and a beta or an alpha only when the project has nothing more
+stable — modelled by `newestInstallCandidate`. `find_mod_update` sorts
+newest-first and walks the instance's
 allowed channels (`AppConfiguration.mod_channels`) in list order, taking the
 first candidate at or above each channel's level in turn — under the shipped
 default (`'stable:true,beta:true,alpha:true'`) the **stable** pass runs
 first, so this resolves to the newest _stable_ build, not merely the newest
-outright — modelled by `newestUpdateCandidate`. On Cloth Config's all-stable
-1.20.1 line the two predicates happen to agree (there's no beta/alpha to
-diverge on), which is exactly why this project was picked and exactly why
-"install-latest and update converge on the same build" is expected to pass —
-see the next section for what a divergence there would actually mean.
+outright, and never below the installed file's channel — modelled by
+`newestUpdateCandidate`. On Cloth Config's all-stable 1.20.1 line the two
+predicates agree, which is why "install-latest and update converge on the
+same build" is expected to pass — see the next section for what a divergence
+there would mean.
 
-#### The channel-divergence hypothesis behind "install-latest and update converge"
+#### What "install-latest and update converge" guards
 
-The fourth test's whole point is that these two paths **could** disagree.
-Because install applies no channel filter at all while update prefers the
-newest stable first, a project whose newest compatible build happens to be a
-beta would install that beta via the addon page's main button, and then have
-`find_mod_update` offer an _older stable_ build as the "update" — a downgrade
-presented as an upgrade. Exactly one candidate project (JEI) was rejected
-for this reason: its entire 1.20.1 line is beta-only, which would have made
-this test fail by design rather than by regression. If this test ever goes
-red on Cloth Config specifically, treat it as a product finding to triage
-first — not a test to patch to tolerate the divergence — since Cloth Config's
-1.20.1 line was independently confirmed stable-only before it was chosen.
+Both paths prefer the newest stable build, so for a project with releases
+they have to land on the same one. Install used to take the newest build of
+any channel, and a project whose newest build was a beta then had
+`find_mod_update` offer nothing for it while a release sat just below. If
+this test ever goes red on Cloth Config, treat it as a product finding to
+triage first, not a test to patch: its 1.20.1 line was independently
+confirmed stable-only before it was chosen.
 
 #### The pagination completeness guard (CurseForge)
 

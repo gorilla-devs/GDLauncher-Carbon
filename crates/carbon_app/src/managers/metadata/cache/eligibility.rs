@@ -240,12 +240,28 @@ pub(crate) fn choose_update(
 pub(crate) struct UpdateContext {
     pub game: String,
     pub loaders: Vec<String>,
+    /// The loaders whose mods the entity loads as well as its own: Fabric on
+    /// Quilt, Forge on NeoForge 1.20.1 (see `dependency::also_loads`).
+    pub also_loads: Vec<String>,
     pub shader_engines: Vec<String>,
+}
+
+/// The loaders an installed jar says it is built for, from the comma
+/// separated list its metadata is cached with. Empty for a jar that names
+/// none.
+pub(crate) fn jar_loaders(modloaders: &str) -> Vec<String> {
+    modloaders
+        .split(',')
+        .map(|loader| loader.trim().to_lowercase())
+        .filter(|loader| !loader.is_empty())
+        .collect()
 }
 
 impl UpdateContext {
     pub fn base_key(&self) -> String {
-        let mut loaders = self.loaders.clone();
+        // The loaders it also loads are part of what a cached answer was
+        // asked for. With none, the key is what it was before they existed.
+        let mut loaders = [self.loaders.clone(), self.also_loads.clone()].concat();
         loaders.sort();
         loaders.dedup();
         let mut engines = self.shader_engines.clone();
@@ -268,22 +284,67 @@ impl UpdateContext {
         loaders.dedup();
         loaders
     }
+    /// The sets of loaders a lookup of the newest `kind` builds asks for,
+    /// each on its own: the entity's own, then the ones it also loads.
+    /// Asked together, the newest build for either would be the only answer,
+    /// and it would hide a newer build for the own loader behind a still
+    /// newer one that a jar built for the own loader is never moved to (see
+    /// [`Self::takes_over`]).
+    pub fn lookup_loaders(&self, kind: &str) -> Vec<Vec<String>> {
+        [self.request_loaders(kind), self.also_request_loaders(kind)]
+            .into_iter()
+            .filter(|loaders| !loaders.is_empty())
+            .collect()
+    }
+    /// The loaders of the other kind the entity loads `kind` builds of: for
+    /// mods the ones in `also_loads`, for everything else none.
+    pub fn also_request_loaders(&self, kind: &str) -> Vec<String> {
+        if matches!(kind, "resourcepacks" | "datapacks" | "shaders") {
+            return Vec::new();
+        }
+        let mut loaders = self.also_loads.clone();
+        loaders.sort();
+        loaders.dedup();
+        loaders
+    }
+    /// Whether a build with these loader `tags` is made for one of the
+    /// entity's own loaders.
+    pub fn own_build(&self, tags: &[String]) -> bool {
+        Self::names(&self.loaders, tags)
+    }
+    fn names(wanted: &[String], tags: &[String]) -> bool {
+        tags.iter()
+            .any(|tag| wanted.iter().any(|want| want.eq_ignore_ascii_case(tag)))
+    }
+    /// Whether a build with these loader `tags` may replace an installed
+    /// file whose jar is built for `built_for` (see [`jar_loaders`]).
+    ///
+    /// A build for the entity's own loader always may. A build for a loader
+    /// it only also loads may unless the installed jar is built for the own
+    /// loader: a Quilt build is never traded for a Fabric one, and a Fabric
+    /// mod on Quilt follows its Fabric builds. The update badge and the
+    /// Update action both ask this, so they agree.
+    pub fn takes_over(&self, kind: &str, tags: &[String], built_for: &[String]) -> bool {
+        let also = self.also_request_loaders(kind);
+        if also.is_empty() || self.own_build(tags) {
+            return true;
+        }
+        !Self::names(&also, tags) || !Self::names(&self.loaders, built_for)
+    }
     pub fn compatible(&self, kind: &str, games: &[String], loaders: &[String]) -> bool {
         games.iter().any(|g| g.eq_ignore_ascii_case(&self.game))
-            && loaders.iter().any(|l| {
-                self.request_loaders(kind)
-                    .iter()
-                    .any(|want| want.eq_ignore_ascii_case(l))
-            })
+            && (Self::names(&self.request_loaders(kind), loaders)
+                || Self::names(&self.also_request_loaders(kind), loaders))
     }
     pub fn cf_compatible(&self, kind: &str, games_and_loaders: &[String]) -> bool {
         games_and_loaders
             .iter()
             .any(|g| g.eq_ignore_ascii_case(&self.game))
             && match kind {
-                "mods" => games_and_loaders
-                    .iter()
-                    .any(|l| self.loaders.iter().any(|want| want.eq_ignore_ascii_case(l))),
+                "mods" => {
+                    Self::names(&self.loaders, games_and_loaders)
+                        || Self::names(&self.also_loads, games_and_loaders)
+                }
                 "shaders" => !self.shader_engines.is_empty(),
                 "resourcepacks" | "datapacks" => true,
                 _ => false,
@@ -295,16 +356,21 @@ impl UpdateContext {
     /// Applied at read time, so rows cached before the channel floor existed
     /// (with paths for every newer channel) are judged by the same rule as
     /// `choose_update` without waiting for a refresh.
+    ///
+    /// `built_for`: what the installed jar is built for (see [`jar_loaders`]
+    /// and [`Self::takes_over`]).
     pub fn has_path(
         &self,
         kind: &str,
         paths: &str,
         sources: &ModSources,
         installed: ModChannel,
+        built_for: &[String],
     ) -> bool {
         let Some(floor) = channel_floor(installed, sources) else {
             return false;
         };
+        let also = self.also_request_loaders(kind);
         paths.split(';').any(|path| {
             let parts: Vec<_> = path.split(',').collect();
             parts.len() == 3
@@ -312,7 +378,9 @@ impl UpdateContext {
                 && (parts[1] == kind
                     && (matches!(kind, "resourcepacks" | "datapacks")
                         || kind == "shaders" && !self.shader_engines.is_empty())
-                    || self.request_loaders(kind).iter().any(|l| l == parts[1]))
+                    || self.request_loaders(kind).iter().any(|l| l == parts[1])
+                    || also.iter().any(|l| l == parts[1])
+                        && self.takes_over(kind, &[parts[1].to_owned()], built_for))
                 && sources.channels.iter().any(|c| {
                     c.allow_updates && c.channel >= floor && c.channel.as_str() == parts[2]
                 })
@@ -341,6 +409,120 @@ mod tests {
             (ModChannel::Beta, true),
             (ModChannel::Alpha, true),
         ])
+    }
+    fn quilt() -> UpdateContext {
+        UpdateContext {
+            game: "1.20.1".into(),
+            loaders: vec!["quilt".into()],
+            also_loads: vec!["fabric".into()],
+            shader_engines: vec![],
+        }
+    }
+    fn names(names: &[&str]) -> Vec<String> {
+        names.iter().map(|name| name.to_string()).collect()
+    }
+
+    #[test]
+    fn an_update_for_a_loader_the_instance_also_loads_depends_on_the_installed_jar() {
+        let quilt = quilt();
+        let badge = |path: &str, jar: &str| {
+            quilt.has_path(
+                "mods",
+                path,
+                &sources(),
+                ModChannel::Stable,
+                &jar_loaders(jar),
+            )
+        };
+        // A Fabric mod on Quilt follows its Fabric builds.
+        assert!(badge("1.20.1,fabric,stable", "fabric"));
+        // So does a jar that names no loader.
+        assert!(badge("1.20.1,fabric,stable", ""));
+        // A Quilt build is never traded for a Fabric one.
+        assert!(!badge("1.20.1,fabric,stable", "quilt"));
+        assert!(!badge("1.20.1,fabric,stable", "fabric,quilt"));
+        // A build for the own loader is an update for every jar.
+        for jar in ["fabric", "quilt", "fabric,quilt", ""] {
+            assert!(badge("1.20.1,quilt,stable", jar), "{jar}");
+            assert!(
+                badge("1.20.1,fabric,stable;1.20.1,quilt,stable", jar),
+                "{jar}"
+            );
+        }
+        // Not another game version, and not a loader it does not load.
+        assert!(!badge("1.20.2,fabric,stable", "fabric"));
+        assert!(!badge("1.20.1,forge,stable", "fabric"));
+
+        // The Update action asks the same question of each build.
+        let fabric_jar = names(&["fabric"]);
+        let quilt_jar = names(&["quilt"]);
+        assert!(quilt.takes_over("mods", &names(&["fabric"]), &fabric_jar));
+        assert!(!quilt.takes_over("mods", &names(&["Fabric", "1.20.1"]), &quilt_jar));
+        assert!(quilt.takes_over("mods", &names(&["Quilt", "1.20.1"]), &quilt_jar));
+        assert!(quilt.takes_over("mods", &names(&["fabric", "quilt"]), &quilt_jar));
+        assert!(quilt.own_build(&names(&["1.20.1", "Quilt"])));
+        assert!(!quilt.own_build(&names(&["1.20.1", "Fabric"])));
+    }
+
+    #[test]
+    fn builds_for_a_loader_the_instance_also_loads_are_compatible() {
+        let quilt = quilt();
+        let game = names(&["1.20.1"]);
+        assert!(quilt.compatible("mods", &game, &names(&["fabric"])));
+        assert!(quilt.compatible("mods", &game, &names(&["quilt"])));
+        assert!(!quilt.compatible("mods", &game, &names(&["forge"])));
+        assert!(!quilt.compatible("mods", &names(&["1.20.2"]), &names(&["fabric"])));
+        assert!(quilt.cf_compatible("mods", &names(&["1.20.1", "Fabric"])));
+        assert!(quilt.cf_compatible("mods", &names(&["1.20.1", "Quilt"])));
+        assert!(!quilt.cf_compatible("mods", &names(&["1.20.1", "Forge"])));
+        // As before: a file that names no loader is not offered.
+        assert!(!quilt.cf_compatible("mods", &names(&["1.20.1"])));
+
+        // Only mods: nothing else is built for a mod loader.
+        assert!(!quilt.compatible("resourcepacks", &game, &names(&["fabric"])));
+        assert!(quilt.also_request_loaders("resourcepacks").is_empty());
+        assert!(quilt.also_request_loaders("shaders").is_empty());
+        assert!(quilt.also_request_loaders("datapacks").is_empty());
+    }
+
+    #[test]
+    fn the_loaders_an_instance_also_loads_are_looked_up_apart_from_its_own() {
+        let quilt = quilt();
+        assert_eq!(
+            quilt.lookup_loaders("mods"),
+            [names(&["quilt"]), names(&["fabric"])]
+        );
+        assert_eq!(quilt.request_loaders("mods"), names(&["quilt"]));
+        assert_eq!(
+            quilt.lookup_loaders("resourcepacks"),
+            [names(&["minecraft", "quilt"])]
+        );
+        assert_eq!(fabric().lookup_loaders("mods"), [names(&["fabric"])]);
+        assert!(quilt.lookup_loaders("shaders").is_empty());
+    }
+
+    #[test]
+    fn cached_answers_are_kept_unless_the_instance_also_loads_another_loader() {
+        // The key of an instance that loads nothing else is the one its
+        // cached answers were stored under before.
+        assert_eq!(fabric().base_key(), r#"["1.20.1",["fabric"],[]]"#);
+        // Asked again once, with the builds it was never asked about.
+        assert_eq!(quilt().base_key(), r#"["1.20.1",["fabric","quilt"],[]]"#);
+        assert_ne!(
+            quilt().base_key(),
+            UpdateContext {
+                also_loads: vec![],
+                ..quilt()
+            }
+            .base_key()
+        );
+    }
+
+    #[test]
+    fn the_loaders_of_an_installed_jar_are_read_from_its_cached_list() {
+        assert_eq!(jar_loaders("fabric,quilt"), names(&["fabric", "quilt"]));
+        assert_eq!(jar_loaders(" Forge "), names(&["forge"]));
+        assert!(jar_loaders("").is_empty());
     }
     fn policy(channels: &[(ModChannel, bool)]) -> ModSources {
         ModSources {
@@ -387,6 +569,7 @@ mod tests {
         UpdateContext {
             game: "1.20.1".into(),
             loaders: vec!["fabric".into()],
+            also_loads: vec![],
             shader_engines: vec![],
         }
     }
@@ -497,18 +680,37 @@ mod tests {
         let context = fabric();
         let prereleases = "1.20.1,fabric,beta;1.20.1,fabric,alpha";
         assert!(
-            !context.has_path("mods", prereleases, &sources(), ModChannel::Stable),
+            !context.has_path("mods", prereleases, &sources(), ModChannel::Stable, &[]),
             "a Release is not badged for betas or alphas"
         );
         assert!(context.has_path(
             "mods",
             &format!("{prereleases};1.20.1,fabric,stable"),
             &sources(),
-            ModChannel::Stable
+            ModChannel::Stable,
+            &[]
         ));
-        assert!(context.has_path("mods", "1.20.1,fabric,beta", &sources(), ModChannel::Beta));
-        assert!(!context.has_path("mods", "1.20.1,fabric,alpha", &sources(), ModChannel::Beta));
-        assert!(context.has_path("mods", "1.20.1,fabric,alpha", &sources(), ModChannel::Alpha));
+        assert!(context.has_path(
+            "mods",
+            "1.20.1,fabric,beta",
+            &sources(),
+            ModChannel::Beta,
+            &[]
+        ));
+        assert!(!context.has_path(
+            "mods",
+            "1.20.1,fabric,alpha",
+            &sources(),
+            ModChannel::Beta,
+            &[]
+        ));
+        assert!(context.has_path(
+            "mods",
+            "1.20.1,fabric,alpha",
+            &sources(),
+            ModChannel::Alpha,
+            &[]
+        ));
     }
 
     #[test]
@@ -539,7 +741,13 @@ mod tests {
                 "{policy:?}"
             );
             assert!(
-                fabric().has_path("mods", "1.20.1,fabric,beta", &policy, ModChannel::Stable),
+                fabric().has_path(
+                    "mods",
+                    "1.20.1,fabric,beta",
+                    &policy,
+                    ModChannel::Stable,
+                    &[]
+                ),
                 "{policy:?}"
             );
             assert_eq!(
@@ -552,7 +760,13 @@ mod tests {
                 "a beta preference does not reach alphas: {policy:?}"
             );
             assert!(
-                !fabric().has_path("mods", "1.20.1,fabric,alpha", &policy, ModChannel::Stable),
+                !fabric().has_path(
+                    "mods",
+                    "1.20.1,fabric,alpha",
+                    &policy,
+                    ModChannel::Stable,
+                    &[]
+                ),
                 "{policy:?}"
             );
         }
@@ -810,7 +1024,7 @@ mod tests {
             "neither platform moves the Release to a beta"
         );
         for paths in ["1.20.1,fabric,beta", "1.20.1,fabric,alpha"] {
-            assert!(!fabric().has_path("mods", paths, &sources(), channel));
+            assert!(!fabric().has_path("mods", paths, &sources(), channel, &[]));
         }
     }
 
@@ -819,6 +1033,7 @@ mod tests {
         let context = UpdateContext {
             game: "1.20.1".into(),
             loaders: vec!["fabric".into()],
+            also_loads: vec![],
             shader_engines: vec!["iris".into()],
         };
         assert!(
@@ -826,7 +1041,8 @@ mod tests {
                 "shaders",
                 "1.20.1,shaders,stable",
                 &sources(),
-                ModChannel::Stable
+                ModChannel::Stable,
+                &[]
             ),
             "CF typed shader path with detected engine"
         );
@@ -843,7 +1059,8 @@ mod tests {
             "shaders",
             "1.20.1,shaders,stable",
             &sources(),
-            ModChannel::Stable
+            ModChannel::Stable,
+            &[]
         ));
     }
 
@@ -871,6 +1088,7 @@ mod tests {
         let vanilla = UpdateContext {
             game: "1.20.1".into(),
             loaders: vec![],
+            also_loads: vec![],
             shader_engines: vec![],
         };
         for kind in ["resourcepacks", "datapacks"] {

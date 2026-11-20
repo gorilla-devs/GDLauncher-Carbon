@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest"
 import {
   curseforgeChannel,
   modrinthChannel,
-  newestByDate,
+  newestInstallCandidate,
   newestUpdateCandidate,
   type ResolutionCandidate
 } from "./resolution.js"
@@ -18,32 +18,57 @@ function candidate(
   }
 }
 
-describe("newestByDate", () => {
+describe("newestInstallCandidate", () => {
   it("returns the newest regardless of input order", () => {
     const older = candidate({ id: "a", datePublished: "2024-01-01T00:00:00Z" })
     const newer = candidate({ id: "b", datePublished: "2024-06-01T00:00:00Z" })
-    expect(newestByDate([older, newer]).id).toBe("b")
-    expect(newestByDate([newer, older]).id).toBe("b")
+    expect(newestInstallCandidate([older, newer]).id).toBe("b")
+    expect(newestInstallCandidate([newer, older]).id).toBe("b")
   })
 
-  it("ignores channel", () => {
+  it("takes a release over a newer prerelease", () => {
     const stable = candidate({ id: "a", datePublished: "2024-01-01T00:00:00Z" })
     const beta = candidate({
       id: "b",
       datePublished: "2024-06-01T00:00:00Z",
       channel: "beta"
     })
-    expect(newestByDate([stable, beta]).id).toBe("b")
+    const alpha = candidate({
+      id: "c",
+      datePublished: "2024-09-01T00:00:00Z",
+      channel: "alpha"
+    })
+    expect(newestInstallCandidate([alpha, beta, stable]).id).toBe("a")
+  })
+
+  it("falls back to the newest beta, then the newest alpha", () => {
+    const beta = candidate({
+      id: "b",
+      datePublished: "2024-01-01T00:00:00Z",
+      channel: "beta"
+    })
+    const alpha = candidate({
+      id: "c",
+      datePublished: "2024-09-01T00:00:00Z",
+      channel: "alpha"
+    })
+    const olderAlpha = candidate({
+      id: "d",
+      datePublished: "2024-03-01T00:00:00Z",
+      channel: "alpha"
+    })
+    expect(newestInstallCandidate([alpha, beta]).id).toBe("b")
+    expect(newestInstallCandidate([olderAlpha, alpha]).id).toBe("c")
   })
 
   it("throws on an empty list", () => {
-    expect(() => newestByDate([])).toThrow(/empty/i)
+    expect(() => newestInstallCandidate([])).toThrow(/empty/i)
   })
 
-  it("throws when the newest date is shared", () => {
+  it("throws when the newest date of the chosen channel is shared", () => {
     const a = candidate({ id: "a", datePublished: "2024-06-01T00:00:00Z" })
     const b = candidate({ id: "b", datePublished: "2024-06-01T00:00:00Z" })
-    expect(() => newestByDate([a, b])).toThrow(/ambiguous/i)
+    expect(() => newestInstallCandidate([a, b])).toThrow(/ambiguous/i)
   })
 })
 

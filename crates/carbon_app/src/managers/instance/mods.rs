@@ -1,6 +1,6 @@
 use super::{
     InstanceId, InstanceManager, InvalidInstanceIdError,
-    installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller},
+    installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller, dependency},
 };
 use crate::api::keys::instance::INSTANCE_MODS;
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
@@ -8,7 +8,7 @@ use crate::domain::instance::{self as domain, info};
 use crate::managers::AppInner;
 use crate::managers::instance::InstanceType;
 use crate::managers::metadata::cache::eligibility::{
-    Installed, InstalledId, UpdateContext, choose_update, installed_channel,
+    Installed, InstalledId, UpdateContext, choose_update, installed_channel, jar_loaders,
 };
 use crate::util::recycle_bin::Removal;
 use crate::{domain::vtask::VisualTaskId, managers::ManagerRef};
@@ -319,11 +319,12 @@ impl ManagerRef<'_, InstanceManager> {
         let mod_sources = self.instance_cfg_mod_sources(&config).await?;
         // The installed jar's cached channel sets the update floor, so a
         // Release is only badged for a newer Release under the default policy.
-        let has_update_for_paths = |kind: &str, paths: &str, installed: ModChannel| {
-            context
-                .as_ref()
-                .is_some_and(|context| context.has_path(kind, paths, &mod_sources, installed))
-        };
+        let has_update_for_paths =
+            |kind: &str, paths: &str, installed: ModChannel, built_for: &[String]| {
+                context.as_ref().is_some_and(|context| {
+                    context.has_path(kind, paths, &mod_sources, installed, built_for)
+                })
+            };
 
         let instance_id_val = *instance_id;
         let mut mods = mfcdb::get_instance_mods_full(&self.app.db, instance_id_val).await?;
@@ -382,6 +383,7 @@ impl ManagerRef<'_, InstanceManager> {
                     .as_ref()
                     .and_then(|_| cached_channel("modrinth", &m.meta_id, m.mr_release_type)),
             ]);
+            let built_for = jar_loaders(&m.modloaders);
             let has_update_on = |platform: ModPlatform, listed: bool, paths: &Option<String>| {
                 listed
                     && !mod_sources.platform_blacklist.contains(&platform)
@@ -390,6 +392,7 @@ impl ManagerRef<'_, InstanceManager> {
                             &m.addon_type,
                             paths.as_deref().unwrap_or(""),
                             installed,
+                            &built_for,
                         )
                     })
             };
@@ -828,6 +831,30 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(task_id)
     }
 
+    /// What `instance_id` runs, for choosing the build of a project to
+    /// install on it.
+    async fn runs(&self, instance_id: InstanceId) -> anyhow::Result<dependency::Runs> {
+        let instances = self.instances.read().await;
+        let version = instances
+            .get(&instance_id)
+            .ok_or(InvalidInstanceIdError(instance_id))?
+            .data()?
+            .config
+            .game_configuration
+            .version
+            .as_ref()
+            .ok_or(anyhow!("Can't find valid version"))?;
+        match version {
+            GameVersion::Custom(_) => bail!(
+                "Instance uses a custom game version file. Cannot resolve minecraft version for mod installation"
+            ),
+            GameVersion::Standard(version) => Ok(dependency::Runs::new(
+                &version.release,
+                version.modloaders.iter().map(|loader| loader.type_),
+            )),
+        }
+    }
+
     pub async fn install_latest_curseforge_mod(
         self,
         instance_id: InstanceId,
@@ -835,66 +862,13 @@ impl ManagerRef<'_, InstanceManager> {
     ) -> anyhow::Result<VisualTaskId> {
         self.ensure_modpack_not_locked(instance_id).await?;
 
-        let version = {
-            let instances = self.instances.read().await;
-            instances
-                .get(&instance_id)
-                .ok_or(InvalidInstanceIdError(instance_id))?
-                .data()?
-                .config
-                .game_configuration
-                .version
-                .as_ref()
-                .ok_or(anyhow!("Can't find valid version"))?
-                .clone()
-        };
-
-        let project = self
-            .app
-            .modplatforms_manager()
-            .curseforge
-            .get_mod(ModParameters {
-                mod_id: project_id.try_into()?,
-            })
-            .await?;
-
-        let (version, modloader) = match version {
-            domain::info::GameVersion::Custom(_) => todo!("Unsupported"),
-            domain::info::GameVersion::Standard(version) => {
-                let first_modloader = version.modloaders.iter().next();
-
-                let modloader = match project.data.class_id {
-                    Some(carbon_platforms::curseforge::ClassId::Mods) | None => first_modloader,
-                    _ => None,
-                };
-
-                (version.release.clone(), modloader.map(|v| v.type_.into()))
-            }
-        };
-
-        let file_id = self
-            .app
-            .modplatforms_manager()
-            .curseforge
-            .get_mod_files(ModFilesParameters {
-                mod_id: project_id.try_into()?,
-                query: ModFilesParametersQuery {
-                    game_version: Some(version.clone()),
-                    game_version_type_id: None,
-                    mod_loader_type: modloader,
-                    index: None,
-                    page_size: Some(200),
-                },
-            })
-            .await?
-            .data
-            .iter()
-            .find(|value| value.game_versions.contains(&version))
-            .ok_or(anyhow::anyhow!(
-                "Can't find a valid version for this instance"
-            ))?
-            .id
-            .try_into()?;
+        let runs = self.runs(instance_id).await?;
+        let file_id = latest_curseforge_file(
+            &self.app.modplatforms_manager().curseforge,
+            project_id,
+            &runs,
+        )
+        .await?;
 
         let installer = CurseforgeModInstaller::create(self.app, project_id, file_id)
             .await?
@@ -933,60 +907,13 @@ impl ManagerRef<'_, InstanceManager> {
     ) -> anyhow::Result<VisualTaskId> {
         self.ensure_modpack_not_locked(instance_id).await?;
 
-        let version = {
-            let instances = self.instances.read().await;
-            instances
-                .get(&instance_id)
-                .ok_or(InvalidInstanceIdError(instance_id))?
-                .data()?
-                .config
-                .game_configuration
-                .version
-                .as_ref()
-                .ok_or(anyhow!("Can't find valid version"))?
-                .clone()
-        };
-
-        let project = self
-            .app
-            .modplatforms_manager()
-            .modrinth
-            .get_project(ProjectID(project_id.clone()))
-            .await?;
-
-        let (version, modloader) = match version {
-            domain::info::GameVersion::Custom(_) => todo!("Unsupported"),
-            domain::info::GameVersion::Standard(version) => {
-                let first_modloader = version.modloaders.iter().next();
-
-                let modloader = match project.project_type {
-                    carbon_platforms::modrinth::project::ProjectType::Mod => first_modloader,
-                    _ => None,
-                };
-
-                (
-                    version.release.clone(),
-                    modloader.map(|v| vec![v.type_.to_string()]),
-                )
-            }
-        };
-
-        let version_id = self
-            .app
-            .modplatforms_manager()
-            .modrinth
-            .get_project_versions(ProjectVersionsFilters {
-                project_id: ProjectID(project_id.clone()),
-                game_versions: Some(Vec::from([version.clone()])),
-                loaders: modloader,
-                limit: None,
-                offset: None,
-            })
-            .await?
-            .get(0)
-            .ok_or(anyhow!("Can't find a valid version for this instance"))?
-            .id
-            .clone();
+        let runs = self.runs(instance_id).await?;
+        let version_id = latest_modrinth_version(
+            &self.app.modplatforms_manager().modrinth,
+            &project_id,
+            &runs,
+        )
+        .await?;
 
         let installer = ModrinthModInstaller::create(self.app, project_id, version_id)
             .await?
@@ -1300,6 +1227,111 @@ pub struct InvalidInstanceModIdError(pub(super) InstanceId, pub(super) String);
 #[error("invalid mod id '{0}'")]
 pub struct InvalidModIdError(String);
 
+/// The file a one-click Download of a CurseForge project installs on an
+/// instance that `runs` this (see [`dependency::latest_build`]). Kept apart
+/// from the instance lookup so tests can point the platform client at a
+/// stand-in API.
+async fn latest_curseforge_file(
+    curseforge: &crate::managers::modplatforms::curseforge::CurseForge,
+    project_id: u32,
+    runs: &dependency::Runs,
+) -> anyhow::Result<u32> {
+    let project = curseforge
+        .get_mod(ModParameters {
+            mod_id: project_id.try_into()?,
+        })
+        .await?;
+
+    let is_mod = matches!(
+        project.data.class_id,
+        Some(carbon_platforms::curseforge::ClassId::Mods) | None
+    );
+    let any_loader = !is_mod || runs.own.is_empty();
+    // One request per loader, the instance's own first: CurseForge answers
+    // with a page of the newest files, and a page of every loader's files
+    // may hold none for the instance's.
+    let loaders: Vec<Option<ModLoaderType>> = if any_loader {
+        vec![None]
+    } else {
+        runs.own
+            .iter()
+            .chain(&runs.also)
+            .copied()
+            .map(Some)
+            .collect()
+    };
+
+    for loader in loaders {
+        let files = curseforge
+            .get_mod_files(ModFilesParameters {
+                mod_id: project_id.try_into()?,
+                query: ModFilesParametersQuery {
+                    game_version: Some(runs.release.clone()),
+                    game_version_type_id: None,
+                    mod_loader_type: loader.map(Into::into),
+                    index: None,
+                    page_size: Some(200),
+                },
+            })
+            .await?
+            .data;
+        let latest = dependency::latest_build(&files, runs, any_loader, |file| {
+            (
+                &file.game_versions,
+                &file.game_versions,
+                ModChannel::from(file.release_type),
+            )
+        });
+        if let Some(file) = latest {
+            return Ok(file.id.try_into()?);
+        }
+    }
+    bail!("Can't find a valid version for this instance")
+}
+
+/// [`latest_curseforge_file`] for a Modrinth project. Modrinth answers with
+/// every version there is, so the loaders are asked for together.
+async fn latest_modrinth_version(
+    modrinth: &crate::managers::modplatforms::modrinth::Modrinth,
+    project_id: &str,
+    runs: &dependency::Runs,
+) -> anyhow::Result<String> {
+    let project = modrinth
+        .get_project(ProjectID(project_id.to_owned()))
+        .await?;
+
+    let is_mod = project.project_type == carbon_platforms::modrinth::project::ProjectType::Mod;
+    let any_loader = !is_mod || runs.own.is_empty();
+    let loaders = (!any_loader).then(|| {
+        runs.own_tags()
+            .into_iter()
+            .chain(runs.also_tags())
+            .map(str::to_owned)
+            .collect()
+    });
+
+    let versions = modrinth
+        .get_project_versions(ProjectVersionsFilters {
+            project_id: ProjectID(project_id.to_owned()),
+            game_versions: Some(Vec::from([runs.release.clone()])),
+            loaders,
+            limit: None,
+            offset: None,
+        })
+        .await?;
+    let latest = dependency::latest_build(&versions, runs, any_loader, |version| {
+        (
+            &version.game_versions,
+            &version.loaders,
+            version.version_type.into(),
+        )
+    });
+    match latest {
+        Some(version) => Ok(version.id.clone()),
+        None => bail!("Can't find a valid version for this instance"),
+    }
+}
+
 /// Picks the update `find_mod_update` offers for an installed addon, from what
 /// the platforms report for its project. Kept apart from the instance lookup so
 /// tests can point the platform clients at a stand-in API.
@@ -1315,38 +1347,65 @@ async fn resolve_mod_update(
     let cf = row.cf_project_id.zip(row.cf_file_id);
     let mr = row.mr_project_id.clone().zip(row.mr_version_id.clone());
 
+    // A jar built for the instance's own loader is only moved to another
+    // build for it, so the builds for a loader the instance also loads are
+    // not asked for (see `UpdateContext::takes_over`).
+    let built_for = jar_loaders(&row.modloaders);
+    let also = context.also_request_loaders(addon_type);
+    let asks_also = !also.is_empty() && context.takes_over(addon_type, &also, &built_for);
+    let runs = dependency::Runs::new(
+        &version.release,
+        version.modloaders.iter().map(|loader| loader.type_),
+    );
+
     let mut versions = Vec::new();
 
     if let Some((project_id, _)) = cf {
-        let response = curseforge
-            .get_mod_files(ModFilesParameters {
-                mod_id: project_id,
-                query: ModFilesParametersQuery {
-                    game_version: Some(version.release.clone()),
-                    game_version_type_id: None,
-                    mod_loader_type: (addon_type == "mods")
-                        .then(|| version.modloaders.iter().next().map(|v| v.type_.into()))
-                        .flatten(),
-                    index: None,
-                    page_size: None,
-                },
-            })
-            .await?;
+        // As when installing: one request per loader, the instance's own
+        // first (see `install_latest_curseforge_mod`).
+        let mut loaders = vec![
+            (addon_type == "mods")
+                .then(|| version.modloaders.iter().next().map(|v| v.type_.into()))
+                .flatten(),
+        ];
+        if addon_type == "mods" && asks_also {
+            loaders.extend(runs.also.iter().map(|loader| Some((*loader).into())));
+        }
+        let mut seen = std::collections::HashSet::new();
+        for mod_loader_type in loaders {
+            let response = curseforge
+                .get_mod_files(ModFilesParameters {
+                    mod_id: project_id,
+                    query: ModFilesParametersQuery {
+                        game_version: Some(version.release.clone()),
+                        game_version_type_id: None,
+                        mod_loader_type,
+                        index: None,
+                        page_size: None,
+                    },
+                })
+                .await?;
 
-        versions.extend(
-            response
-                .data
-                .into_iter()
-                .map(|f| RemoteVersion::Curseforge(f)),
-        );
+            versions.extend(
+                response
+                    .data
+                    .into_iter()
+                    .filter(|file| seen.insert(file.id))
+                    .map(|f| RemoteVersion::Curseforge(f)),
+            );
+        }
     }
 
     if let Some((project_id, _)) = &mr {
+        let mut loaders = context.request_loaders(addon_type);
+        if asks_also {
+            loaders.extend(also.iter().cloned());
+        }
         let response = modrinth
             .get_project_versions(ProjectVersionsFilters {
                 project_id: ProjectID(project_id.clone()),
                 game_versions: Some(vec![version.release.clone()]),
-                loaders: Some(context.request_loaders(addon_type)),
+                loaders: Some(loaders),
                 limit: None,
                 offset: None,
             })
@@ -1356,8 +1415,14 @@ async fn resolve_mod_update(
     }
 
     versions.retain(|candidate| match candidate {
-        RemoteVersion::Modrinth(v) => context.compatible(addon_type, &v.game_versions, &v.loaders),
-        RemoteVersion::Curseforge(v) => context.cf_compatible(addon_type, &v.game_versions),
+        RemoteVersion::Modrinth(v) => {
+            context.compatible(addon_type, &v.game_versions, &v.loaders)
+                && context.takes_over(addon_type, &v.loaders, &built_for)
+        }
+        RemoteVersion::Curseforge(v) => {
+            context.cf_compatible(addon_type, &v.game_versions)
+                && context.takes_over(addon_type, &v.game_versions, &built_for)
+        }
     });
 
     let mut fetched = Vec::new();
@@ -1400,7 +1465,19 @@ async fn resolve_mod_update(
     ]);
     let installed = installed_states(fetched, cached)?;
 
-    Ok(choose_update(versions, &installed, mod_sources))
+    // A build for the instance's own loader before one for a loader it also
+    // loads, as when installing (see `dependency::latest_build`).
+    // Each candidate is judged alone, so when none of the own loader's is an
+    // update, the answer among the others is the answer among them all.
+    let (own, other): (Vec<_>, Vec<_>) =
+        versions.into_iter().partition(|candidate| match candidate {
+            RemoteVersion::Modrinth(v) => !asks_also || context.own_build(&v.loaders),
+            RemoteVersion::Curseforge(v) => !asks_also || context.own_build(&v.game_versions),
+        });
+    Ok(match choose_update(own, &installed, mod_sources) {
+        Some(update) => Some(update),
+        None => choose_update(other, &installed, mod_sources),
+    })
 }
 
 /// The installed jar as each platform that listed it reports it now.
@@ -1473,6 +1550,38 @@ mod test {
     use std::collections::HashSet;
 
     use crate::managers::instance::InstanceVersionSource;
+
+    /// It used to stop the request with a panic.
+    #[tokio::test]
+    async fn one_click_install_refuses_a_custom_game_version_with_an_error() {
+        let app = crate::setup_managers_for_test().await;
+        let group = app.instance_manager().get_default_group().await.unwrap();
+        let id = app
+            .instance_manager()
+            .create_instance(
+                group,
+                "custom".into(),
+                false,
+                InstanceVersionSource::Version(info::GameVersion::Custom("custom".into())),
+                String::new(),
+            )
+            .await
+            .unwrap();
+
+        let modrinth = app
+            .instance_manager()
+            .install_latest_modrinth_mod(id, "project".into())
+            .await
+            .unwrap_err();
+        let curseforge = app
+            .instance_manager()
+            .install_latest_curseforge_mod(id, 1)
+            .await
+            .unwrap_err();
+        for error in [modrinth, curseforge] {
+            assert!(error.to_string().contains("custom game version"), "{error}");
+        }
+    }
     use crate::{api::keys::instance::INSTANCE_MODS, domain::instance::info};
 
     #[tokio::test]
@@ -2859,10 +2968,21 @@ mod update_resolution_tests {
             &self,
             row: &mfcdb::ModUpdateIdsRow,
         ) -> anyhow::Result<Option<RemoteVersion>> {
+            self.resolve_on(ModLoaderType::Fabric, row).await
+        }
+
+        /// As an instance with `loader` at 1.20.1.
+        async fn resolve_on(
+            &self,
+            loader: ModLoaderType,
+            row: &mfcdb::ModUpdateIdsRow,
+        ) -> anyhow::Result<Option<RemoteVersion>> {
+            let runs = dependency::Runs::new("1.20.1", [loader]);
+            let tags = |tags: Vec<&str>| tags.into_iter().map(str::to_owned).collect();
             let version = StandardVersion {
                 release: "1.20.1".into(),
                 modloaders: [ModLoader {
-                    type_: ModLoaderType::Fabric,
+                    type_: loader,
                     version: "fixture".into(),
                 }]
                 .into_iter()
@@ -2870,7 +2990,8 @@ mod update_resolution_tests {
             };
             let context = UpdateContext {
                 game: "1.20.1".into(),
-                loaders: vec!["fabric".into()],
+                loaders: tags(runs.own_tags()),
+                also_loads: tags(runs.also_tags()),
                 shader_engines: vec![],
             };
             let sources = ModSources {
@@ -2937,6 +3058,7 @@ mod update_resolution_tests {
             mr_project_id: None,
             mr_version_id: None,
             mr_release_type: None,
+            modloaders: "fabric".into(),
         }
     }
 
@@ -2948,6 +3070,7 @@ mod update_resolution_tests {
             mr_project_id: Some("project".into()),
             mr_version_id: Some("installed".into()),
             mr_release_type: Some(ModChannel::Stable as i32),
+            modloaders: "fabric".into(),
         }
     }
 
@@ -3253,6 +3376,440 @@ mod update_resolution_tests {
             .as_deref(),
             Some("250")
         );
+    }
+
+    /// Updates and one-click installs on an instance that also loads another
+    /// loader's mods, against a stand-in API.
+    #[cfg(test)]
+    mod also_loaded_tests {
+        use super::*;
+        use mockito::Matcher;
+        use serde_json::json;
+
+        fn built_for(row: mfcdb::ModUpdateIdsRow, jar: &str) -> mfcdb::ModUpdateIdsRow {
+            mfcdb::ModUpdateIdsRow {
+                modloaders: jar.into(),
+                ..row
+            }
+        }
+
+        fn mr_for(id: &str, day: u32, loaders: &[&str]) -> serde_json::Value {
+            let mut version = mr_version(id, day, "release");
+            version["loaders"] = json!(loaders);
+            version
+        }
+
+        fn cf_for(id: i32, day: u32, release_type: u8, loader: &str) -> serde_json::Value {
+            let mut file = cf_file(id, day, release_type);
+            file["gameVersions"] = json!(["1.20.1", loader]);
+            file
+        }
+
+        #[tokio::test]
+        async fn a_fabric_mod_on_quilt_is_updated_to_its_newer_fabric_build() {
+            let api = serving(
+                vec![],
+                vec![
+                    mr_for("newer", 20, &["fabric"]),
+                    mr_for("installed", 10, &["fabric"]),
+                ],
+            )
+            .await;
+
+            for jar in ["fabric", ""] {
+                let update = api
+                    .resolve_on(ModLoaderType::Quilt, &built_for(mr_row(), jar))
+                    .await
+                    .unwrap();
+                assert_eq!(chosen(update).as_deref(), Some("newer"), "{jar:?}");
+            }
+            // A jar built for Quilt is not moved to a Fabric build.
+            for jar in ["quilt", "fabric,quilt"] {
+                let update = api
+                    .resolve_on(ModLoaderType::Quilt, &built_for(mr_row(), jar))
+                    .await
+                    .unwrap();
+                assert_eq!(chosen(update), None, "{jar:?}");
+            }
+            // Fabric does not load Quilt mods: nothing changes there.
+            let api = serving(
+                vec![],
+                vec![
+                    mr_for("newer", 20, &["quilt"]),
+                    mr_for("installed", 10, &["fabric"]),
+                ],
+            )
+            .await;
+            assert_eq!(chosen(api.resolve(&mr_row()).await.unwrap()), None);
+        }
+
+        #[tokio::test]
+        async fn an_update_built_for_the_instances_own_loader_comes_first() {
+            let api = serving(
+                vec![],
+                vec![
+                    mr_for("fabric-newest", 20, &["fabric"]),
+                    mr_for("quilt-newer", 15, &["quilt"]),
+                    mr_for("installed", 10, &["fabric"]),
+                ],
+            )
+            .await;
+            let update = api
+                .resolve_on(ModLoaderType::Quilt, &mr_row())
+                .await
+                .unwrap();
+            assert_eq!(chosen(update).as_deref(), Some("quilt-newer"));
+
+            // A Quilt build older than the installed file is no update.
+            let api = serving(
+                vec![],
+                vec![
+                    mr_for("fabric-newest", 20, &["fabric"]),
+                    mr_for("installed", 10, &["fabric"]),
+                    mr_for("quilt-older", 5, &["quilt"]),
+                ],
+            )
+            .await;
+            let update = api
+                .resolve_on(ModLoaderType::Quilt, &mr_row())
+                .await
+                .unwrap();
+            assert_eq!(chosen(update).as_deref(), Some("fabric-newest"));
+        }
+
+        /// CurseForge is asked per loader, and for the also loaded one only
+        /// when its builds could be taken.
+        #[tokio::test]
+        async fn curseforge_is_asked_for_the_loader_the_instance_also_loads() {
+            let files = format!("/mods/{CF_PROJECT}/files");
+            let loader = |id: &str| Matcher::UrlEncoded("modLoaderType".into(), id.into());
+            for (jar, asked, expected) in [("fabric", 1, Some("200")), ("quilt", 0, None)] {
+                let mut api = super::api().await;
+                api.get(
+                    &format!("{files}/{CF_INSTALLED}"),
+                    200,
+                    json!({ "data": cf_for(CF_INSTALLED, 10, 1, "Fabric") }),
+                )
+                .await;
+                let own = api
+                    .server
+                    .mock("GET", files.as_str())
+                    .match_query(loader("5"))
+                    .with_body(json!({ "data": [] }).to_string())
+                    .expect(1)
+                    .create_async()
+                    .await;
+                let also = api
+                    .server
+                    .mock("GET", files.as_str())
+                    .match_query(loader("4"))
+                    .with_body(
+                        json!({ "data": [cf_for(200, 20, 1, "Fabric"), cf_for(CF_INSTALLED, 10, 1, "Fabric")] })
+                            .to_string(),
+                    )
+                    .expect(asked)
+                    .create_async()
+                    .await;
+
+                let update = api
+                    .resolve_on(ModLoaderType::Quilt, &built_for(cf_row(), jar))
+                    .await
+                    .unwrap();
+                assert_eq!(chosen(update).as_deref(), expected, "{jar}");
+                own.assert_async().await;
+                also.assert_async().await;
+            }
+        }
+
+        #[tokio::test]
+        async fn a_forge_mod_on_neoforge_1_20_1_is_updated_to_its_newer_forge_build() {
+            let files = format!("/mods/{CF_PROJECT}/files");
+            let loader = |id: &str| Matcher::UrlEncoded("modLoaderType".into(), id.into());
+            let mut api = super::api().await;
+            api.get(
+                &format!("{files}/{CF_INSTALLED}"),
+                200,
+                json!({ "data": cf_for(CF_INSTALLED, 10, 1, "Forge") }),
+            )
+            .await;
+            api.server
+                .mock("GET", files.as_str())
+                .match_query(loader("6"))
+                .with_body(json!({ "data": [] }).to_string())
+                .create_async()
+                .await;
+            api.server
+                .mock("GET", files.as_str())
+                .match_query(loader("1"))
+                .with_body(json!({ "data": [cf_for(200, 20, 1, "Forge")] }).to_string())
+                .create_async()
+                .await;
+
+            let update = api
+                .resolve_on(ModLoaderType::Neoforge, &built_for(cf_row(), "forge"))
+                .await
+                .unwrap();
+            assert_eq!(chosen(update).as_deref(), Some("200"));
+        }
+
+        fn cf_project(class: i32) -> serde_json::Value {
+            json!({ "data": {
+                "id": CF_PROJECT, "gameId": 432, "name": "fixture", "slug": "fixture", "summary": "", "status": 4,
+                "links": {"websiteUrl": null, "wikiUrl": null, "issuesUrl": null, "sourceUrl": null},
+                "downloadCount": 0, "isFeatured": false, "primaryCategoryId": 0, "categories": [], "classId": class,
+                "authors": [], "logo": null, "screenshots": [], "mainFileId": 0, "latestFiles": [], "latestFilesIndexes": [],
+                "dateCreated": "2026-01-01T00:00:00Z", "dateModified": "2026-01-01T00:00:00Z", "dateReleased": "2026-01-01T00:00:00Z",
+                "allowModDistribution": true, "gamePopularityRank": 0, "isAvailable": true, "thumbsUpCount": 0
+            }})
+        }
+
+        fn mr_project(project_type: &str) -> serde_json::Value {
+            json!({
+                "slug": "project", "title": "fixture", "description": "", "categories": [], "client_side": "optional", "server_side": "optional",
+                "body": "", "additional_categories": [], "donation_urls": [], "project_type": project_type, "downloads": 0, "id": "project", "team": "fixture",
+                "published": "2026-01-01T00:00:00Z", "updated": "2026-01-01T00:00:00Z", "followers": 0, "status": "approved",
+                "license": {"id": "MIT", "name": "MIT", "url": null}, "versions": [], "game_versions": [], "loaders": []
+            })
+        }
+
+        fn runs(loader: ModLoaderType) -> dependency::Runs {
+            dependency::Runs::new("1.20.1", [loader])
+        }
+
+        /// The reported failure: Download of a mod with Fabric builds only, on a
+        /// Quilt instance.
+        #[tokio::test]
+        async fn download_on_quilt_installs_a_mod_that_has_fabric_builds_only() {
+            // Modrinth: one request, for both loaders.
+            let mut api = super::api().await;
+            api.get("/project/project", 200, mr_project("mod")).await;
+            let versions = api
+                .server
+                .mock("GET", "/project/project/version")
+                .match_query(Matcher::UrlEncoded(
+                    "loaders".into(),
+                    r#"["quilt","fabric"]"#.into(),
+                ))
+                .with_body(
+                    json!([
+                        mr_for("fabric-new", 20, &["fabric"]),
+                        mr_for("fabric-old", 10, &["fabric"])
+                    ])
+                    .to_string(),
+                )
+                .expect(1)
+                .create_async()
+                .await;
+            let version =
+                latest_modrinth_version(&api.modrinth, "project", &runs(ModLoaderType::Quilt))
+                    .await
+                    .unwrap();
+            assert_eq!(version, "fabric-new");
+            versions.assert_async().await;
+
+            // CurseForge: the Quilt files first, then the Fabric ones.
+            let files = format!("/mods/{CF_PROJECT}/files");
+            let loader = |id: &str| Matcher::UrlEncoded("modLoaderType".into(), id.into());
+            let mut api = super::api().await;
+            api.get(&format!("/mods/{CF_PROJECT}"), 200, cf_project(6))
+                .await;
+            api.server
+                .mock("GET", files.as_str())
+                .match_query(loader("5"))
+                .with_body(json!({ "data": [] }).to_string())
+                .create_async()
+                .await;
+            api.server
+                .mock("GET", files.as_str())
+                .match_query(loader("4"))
+                .with_body(
+                    json!({ "data": [cf_for(300, 20, 1, "Fabric"), cf_for(200, 10, 1, "Fabric")] })
+                        .to_string(),
+                )
+                .create_async()
+                .await;
+            let file = latest_curseforge_file(
+                &api.curseforge,
+                CF_PROJECT as u32,
+                &runs(ModLoaderType::Quilt),
+            )
+            .await
+            .unwrap();
+            assert_eq!(file, 300);
+        }
+
+        #[tokio::test]
+        async fn download_takes_the_instances_own_loader_first_and_asks_no_further() {
+            let mut api = super::api().await;
+            api.get("/project/project", 200, mr_project("mod")).await;
+            api.get(
+                "/project/project/version",
+                200,
+                json!([
+                    mr_for("fabric-newest", 20, &["fabric"]),
+                    mr_for("quilt", 15, &["quilt"]),
+                ]),
+            )
+            .await;
+            let version =
+                latest_modrinth_version(&api.modrinth, "project", &runs(ModLoaderType::Quilt))
+                    .await
+                    .unwrap();
+            assert_eq!(version, "quilt");
+
+            let files = format!("/mods/{CF_PROJECT}/files");
+            let loader = |id: &str| Matcher::UrlEncoded("modLoaderType".into(), id.into());
+            let mut api = super::api().await;
+            api.get(&format!("/mods/{CF_PROJECT}"), 200, cf_project(6))
+                .await;
+            api.server
+                .mock("GET", files.as_str())
+                .match_query(loader("5"))
+                .with_body(json!({ "data": [cf_for(200, 10, 1, "Quilt")] }).to_string())
+                .create_async()
+                .await;
+            let also = api
+                .server
+                .mock("GET", files.as_str())
+                .match_query(loader("4"))
+                .with_body(json!({ "data": [cf_for(300, 20, 1, "Fabric")] }).to_string())
+                .expect(0)
+                .create_async()
+                .await;
+            let file = latest_curseforge_file(
+                &api.curseforge,
+                CF_PROJECT as u32,
+                &runs(ModLoaderType::Quilt),
+            )
+            .await
+            .unwrap();
+            assert_eq!(file, 200);
+            also.assert_async().await;
+        }
+
+        #[tokio::test]
+        async fn download_takes_a_release_over_a_newer_prerelease() {
+            let mut api = super::api().await;
+            api.get("/project/project", 200, mr_project("mod")).await;
+            let mut alpha = mr_for("alpha", 30, &["fabric"]);
+            alpha["version_type"] = json!("alpha");
+            let mut beta = mr_for("beta", 20, &["fabric"]);
+            beta["version_type"] = json!("beta");
+            api.get(
+                "/project/project/version",
+                200,
+                json!([alpha, beta, mr_for("release", 10, &["fabric"])]),
+            )
+            .await;
+            let version =
+                latest_modrinth_version(&api.modrinth, "project", &runs(ModLoaderType::Fabric))
+                    .await
+                    .unwrap();
+            assert_eq!(version, "release");
+
+            let mut api = super::api().await;
+            api.get(&format!("/mods/{CF_PROJECT}"), 200, cf_project(6))
+                .await;
+            api.get(
+                &format!("/mods/{CF_PROJECT}/files"),
+                200,
+                json!({ "data": [
+                    cf_for(400, 30, 3, "Fabric"),
+                    cf_for(300, 20, 2, "Fabric"),
+                    cf_for(200, 10, 1, "Fabric"),
+                ]}),
+            )
+            .await;
+            let file = latest_curseforge_file(
+                &api.curseforge,
+                CF_PROJECT as u32,
+                &runs(ModLoaderType::Fabric),
+            )
+            .await
+            .unwrap();
+            assert_eq!(file, 200);
+        }
+
+        #[tokio::test]
+        async fn download_of_what_is_not_a_mod_asks_for_no_loader() {
+            // A resource pack on a Quilt instance.
+            let mut api = super::api().await;
+            api.get("/project/project", 200, mr_project("resourcepack"))
+                .await;
+            let versions = api
+                .server
+                .mock("GET", "/project/project/version")
+                .match_query(Matcher::Exact(
+                    "project_id=project&game_versions=%5B%221.20.1%22%5D".into(),
+                ))
+                .with_body(json!([mr_for("pack", 10, &["minecraft"])]).to_string())
+                .expect(1)
+                .create_async()
+                .await;
+            let version =
+                latest_modrinth_version(&api.modrinth, "project", &runs(ModLoaderType::Quilt))
+                    .await
+                    .unwrap();
+            assert_eq!(version, "pack");
+            versions.assert_async().await;
+
+            let mut api = super::api().await;
+            api.get(&format!("/mods/{CF_PROJECT}"), 200, cf_project(12))
+                .await;
+            let files = api
+                .server
+                .mock("GET", format!("/mods/{CF_PROJECT}/files").as_str())
+                .match_query(Matcher::Exact("gameVersion=1.20.1&pageSize=200".into()))
+                .with_body(json!({ "data": [cf_for(200, 10, 1, "1.20")] }).to_string())
+                .expect(1)
+                .create_async()
+                .await;
+            let file = latest_curseforge_file(
+                &api.curseforge,
+                CF_PROJECT as u32,
+                &runs(ModLoaderType::Quilt),
+            )
+            .await
+            .unwrap();
+            assert_eq!(file, 200);
+            files.assert_async().await;
+        }
+
+        #[tokio::test]
+        async fn download_says_so_when_no_build_fits() {
+            let mut api = super::api().await;
+            api.get("/project/project", 200, mr_project("mod")).await;
+            api.get("/project/project/version", 200, json!([])).await;
+            let error =
+                latest_modrinth_version(&api.modrinth, "project", &runs(ModLoaderType::Quilt))
+                    .await
+                    .unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "Can't find a valid version for this instance"
+            );
+
+            let mut api = super::api().await;
+            api.get(&format!("/mods/{CF_PROJECT}"), 200, cf_project(6))
+                .await;
+            api.get(
+                &format!("/mods/{CF_PROJECT}/files"),
+                200,
+                json!({ "data": [cf_for(200, 10, 1, "Forge")] }),
+            )
+            .await;
+            let error = latest_curseforge_file(
+                &api.curseforge,
+                CF_PROJECT as u32,
+                &runs(ModLoaderType::Quilt),
+            )
+            .await
+            .unwrap_err();
+            assert_eq!(
+                error.to_string(),
+                "Can't find a valid version for this instance"
+            );
+        }
     }
 }
 
