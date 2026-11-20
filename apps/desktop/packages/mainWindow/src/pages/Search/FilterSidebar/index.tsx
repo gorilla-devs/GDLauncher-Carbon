@@ -278,22 +278,34 @@ export function FilterSidebar() {
     })
   }
 
-  // Container width: hidden until ready, then docked width or collapsed width
+  // Shown once the docked state is known, and only while the search is one
+  // the sidebar acts on (see `searchSidebarApplies`).
+  const isShown = () =>
+    !!searchResults?.sidebarReady() && !!searchResults?.sidebarApplies()
+
+  // A flyout open when the sidebar goes must not be open when it is back.
+  createEffect(
+    on(isShown, (shown) => {
+      if (!shown) setIsHovered(false)
+    })
+  )
+
+  // Container width: none while hidden, then docked width or collapsed width
   const containerWidth = () => {
-    if (!searchResults?.sidebarReady()) return "0px"
+    if (!isShown()) return "0px"
     return isDocked() ? `${SIDEBAR_WIDTH}px` : `${COLLAPSED_WIDTH}px`
   }
 
   return (
     <div
-      inert={!searchResults?.sidebarReady()}
+      inert={!isShown()}
       class="relative shrink-0"
       classList={{
-        "opacity-0": !searchResults?.sidebarReady(),
+        "opacity-0": !isShown(),
         "transition-[width,opacity] duration-300 ease-[cubic-bezier(.4,0,.2,1)]":
           !!searchResults?.sidebarReady(),
-        "overflow-hidden": isDocked(),
-        "z-40": !isDocked()
+        "overflow-hidden": isDocked() || !isShown(),
+        "z-40": !isDocked() && isShown()
       }}
       style={{ width: containerWidth() }}
     >

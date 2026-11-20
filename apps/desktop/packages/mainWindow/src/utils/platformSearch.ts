@@ -21,6 +21,7 @@ import { createInfiniteQuery } from "@tanstack/solid-query"
 import { VirtualizerHandle } from "virtua/lib/solid"
 import { useSearchParams } from "@solidjs/router"
 import { parseSearchQuery, buildBatchRequest } from "./searchQueryParser"
+import { searchSidebarApplies } from "./searchSidebar"
 import { validatedCurseForgeFile } from "./requestedVersion"
 import { i18n } from "@gd/i18n"
 import { LinkedSearchResult, toLinkedFile } from "./linkedFile"
@@ -377,6 +378,14 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       ? item.shareCode
       : null
   })
+
+  const sidebarApplies = createMemo(() =>
+    searchSidebarApplies({
+      share: isShareMode(),
+      direct: isDirectMode(),
+      addingToInstanceOrServer: !!(selectedInstanceId() || selectedServerId())
+    })
+  )
 
   const directBatchRequest = createMemo(() => buildBatchRequest(parsedQuery()))
 
@@ -818,6 +827,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     selectedServer,
     selectedServerAddons,
     sidebarReady,
+    sidebarApplies,
     // Direct search mode
     isDirectMode,
     directErrors: () =>

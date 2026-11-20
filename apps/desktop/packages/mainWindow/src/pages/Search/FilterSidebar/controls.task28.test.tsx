@@ -91,6 +91,7 @@ function searchFixture() {
   })
   const [docked, setDocked] = createSignal(true),
     [ready, setReady] = createSignal(true),
+    [applies, setApplies] = createSignal(true),
     [versions, setVersions] = createSignal([{ id: "1.20.1" }, { id: "1.20.2" }])
   c.search = {
     searchQuery: query,
@@ -98,6 +99,7 @@ function searchFixture() {
     sidebarExpanded: docked,
     setSidebarExpanded: setDocked,
     sidebarReady: ready,
+    sidebarApplies: applies,
     selectedInstanceId: () => undefined,
     selectedServerId: () => undefined
   }
@@ -109,7 +111,7 @@ function searchFixture() {
       }
     }
   }
-  return { query, setQuery, setDocked, setReady, setVersions }
+  return { query, setQuery, setDocked, setReady, setApplies, setVersions }
 }
 function pointer(element: HTMLElement) {
   let captured = false
@@ -212,6 +214,49 @@ it("GPT-0127 inactive sidebar copies and collapsed descendants are inert", () =>
   strip.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }))
   expect(eligible().length).toBeGreaterThan(0)
   setReady(false)
+  expect(eligible()).toHaveLength(0)
+})
+it.each([true, false])(
+  "the sidebar takes no room and no input while the search is one it does not act on (docked: %s)",
+  (docked) => {
+    const { setDocked, setApplies } = searchFixture()
+    setDocked(docked)
+    const root = mount(() => <FilterSidebar />)
+    const sidebar = root.firstElementChild as HTMLElement
+    const eligible = () =>
+      Array.from(root.querySelectorAll<HTMLElement>("input, button")).filter(
+        (i) => !i.closest("[inert]")
+      )
+    const shownWidth = sidebar.style.width
+    expect(shownWidth).not.toBe("0px")
+    expect(sidebar.classList.contains("opacity-0")).toBe(false)
+    if (docked) expect(eligible().length).toBeGreaterThan(0)
+
+    setApplies(false)
+    expect(sidebar.style.width).toBe("0px")
+    expect(sidebar.classList.contains("opacity-0")).toBe(true)
+    expect(sidebar.classList.contains("overflow-hidden")).toBe(true)
+    expect(eligible()).toHaveLength(0)
+
+    // Back for a normal search, as it was left.
+    setApplies(true)
+    expect(sidebar.style.width).toBe(shownWidth)
+    expect(sidebar.classList.contains("opacity-0")).toBe(false)
+  }
+)
+it("a flyout open when the sidebar goes is closed when it is back", () => {
+  const { setDocked, setApplies } = searchFixture()
+  setDocked(false)
+  const root = mount(() => <FilterSidebar />)
+  const eligible = () =>
+    Array.from(
+      root.querySelectorAll<HTMLInputElement>("input[type=radio]")
+    ).filter((i) => !i.closest("[inert]"))
+  const strip = root.firstElementChild!.firstElementChild!
+  strip.dispatchEvent(new MouseEvent("mouseenter", { bubbles: false }))
+  expect(eligible().length).toBeGreaterThan(0)
+  setApplies(false)
+  setApplies(true)
   expect(eligible()).toHaveLength(0)
 })
 it("GPT-0127 Collapsable excludes closed descendants and restores open content", () => {
