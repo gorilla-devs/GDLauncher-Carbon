@@ -8,6 +8,20 @@ interface Data {
   returnPath?: string
 }
 
+/**
+ * The path without the `m[n]` entries that name the open modals: all of them
+ * are closed on the way to the sign-in page, so none is open on the return.
+ */
+function withoutModalParams(path: string): string {
+  const [pathname, search = ""] = path.split("?")
+  const params = new URLSearchParams(search)
+  const modalKeys = [...params.keys()].filter((key) => /^m\[\d+\]$/.test(key))
+  if (modalKeys.length === 0) return path
+  for (const key of modalKeys) params.delete(key)
+  const rest = params.toString()
+  return rest ? `${pathname}?${rest}` : pathname
+}
+
 function RequiresGdlAccountModal(props: ModalProps) {
   const navigator = useGDNavigate()
   const modalsContext = useModal()
@@ -15,11 +29,13 @@ function RequiresGdlAccountModal(props: ModalProps) {
   const data = () => props.data as Data | undefined
 
   const handleLinkAccount = () => {
-    const returnTo = data()?.returnPath || "/"
+    const returnTo = withoutModalParams(data()?.returnPath || "/")
     navigator.navigate(
       `/?addGdlAccount=true&returnTo=${encodeURIComponent(returnTo)}`
     )
-    modalsContext?.closeModal()
+    // The page under the dialogs is being left for the sign-in page, so a
+    // dialog this one was opened from must not stay open over it.
+    modalsContext?.closeAllModals()
   }
 
   return (

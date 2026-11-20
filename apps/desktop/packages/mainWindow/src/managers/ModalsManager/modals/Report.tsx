@@ -14,6 +14,9 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { createSignal, Show } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { getErrorCode } from "@/components/SharePreviewContent"
+import { useGlobalStore } from "@/components/GlobalStoreContext"
+import VerificationRequiredPlaceholder from "@/components/VerificationRequiredPlaceholder"
+import { gdlAccountAccess } from "@/utils/gdlAccountAccess"
 
 /**
  * Generic report dialog. Reusable across report target types (shares today,
@@ -130,85 +133,102 @@ const Report = (props: ModalProps) => {
 
   const showTypeSelector = () => !data()?.defaultReportType
 
+  // The server refuses a report from an account whose email is not verified.
+  const globalStore = useGlobalStore()
+  const needsVerification = () =>
+    gdlAccountAccess(globalStore.gdlAccount.data) === "unverified"
+
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
-      <div class="w-100 flex flex-col gap-4">
-        <p class="text-lightSlate-300 text-sm">
-          <Trans key="instances:_trn_report.description" />
-        </p>
-
-        <Show
-          when={data()?.target.kind === "share" && data()?.target.displayName}
-        >
-          <div class="bg-darkSlate-800 text-lightSlate-200 rounded px-3 py-2 text-sm">
-            {data()!.target.displayName}
+      <Show
+        when={!needsVerification()}
+        fallback={
+          <div class="w-100 flex flex-col">
+            <VerificationRequiredPlaceholder />
           </div>
-        </Show>
+        }
+      >
+        <div class="w-100 flex flex-col gap-4">
+          <p class="text-lightSlate-300 text-sm">
+            <Trans key="instances:_trn_report.description" />
+          </p>
 
-        <Show when={showTypeSelector()}>
+          <Show
+            when={data()?.target.kind === "share" && data()?.target.displayName}
+          >
+            <div class="bg-darkSlate-800 text-lightSlate-200 rounded px-3 py-2 text-sm">
+              {data()!.target.displayName}
+            </div>
+          </Show>
+
+          <Show when={showTypeSelector()}>
+            <div>
+              <label class="text-lightSlate-400 mb-1 block text-sm">
+                <Trans key="instances:_trn_report.type_label" />
+              </label>
+              <Select
+                value={reportType()}
+                onChange={(val) => val && setReportType(val)}
+                options={typeOptions()}
+                itemComponent={(itemProps) => {
+                  const key = optionLabelKey(itemProps.item.rawValue)
+                  return (
+                    <SelectItem item={itemProps.item}>
+                      {key ? t(key) : itemProps.item.rawValue}
+                    </SelectItem>
+                  )
+                }}
+              >
+                <SelectTrigger class="w-full">
+                  <SelectValue<string>>
+                    {(state) => {
+                      const key = optionLabelKey(state.selectedOption())
+                      return key ? t(key) : ""
+                    }}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent />
+              </Select>
+            </div>
+          </Show>
+
           <div>
             <label class="text-lightSlate-400 mb-1 block text-sm">
-              <Trans key="instances:_trn_report.type_label" />
+              <Trans key="instances:_trn_report.reason_label" />
             </label>
-            <Select
-              value={reportType()}
-              onChange={(val) => val && setReportType(val)}
-              options={typeOptions()}
-              itemComponent={(itemProps) => {
-                const key = optionLabelKey(itemProps.item.rawValue)
-                return (
-                  <SelectItem item={itemProps.item}>
-                    {key ? t(key) : itemProps.item.rawValue}
-                  </SelectItem>
+            <TextArea
+              value={reason()}
+              placeholder={t("instances:_trn_report.reason_placeholder")}
+              class="w-full"
+              inputClass="bg-darkSlate-800 min-h-24"
+              onInput={(e: { currentTarget: HTMLTextAreaElement }) => {
+                const trimmed = e.currentTarget.value.slice(
+                  0,
+                  MAX_REASON_LENGTH
                 )
+                setReason(trimmed)
+                e.currentTarget.value = trimmed
               }}
+            />
+            <div class="text-lightSlate-500 mt-1 text-right text-xs">
+              {reason().length}/{MAX_REASON_LENGTH}
+            </div>
+          </div>
+
+          <div class="flex justify-between">
+            <Button
+              type="secondary"
+              onClick={() => modalsContext?.closeModal()}
+              disabled={isPending()}
             >
-              <SelectTrigger class="w-full">
-                <SelectValue<string>>
-                  {(state) => {
-                    const key = optionLabelKey(state.selectedOption())
-                    return key ? t(key) : ""
-                  }}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent />
-            </Select>
-          </div>
-        </Show>
-
-        <div>
-          <label class="text-lightSlate-400 mb-1 block text-sm">
-            <Trans key="instances:_trn_report.reason_label" />
-          </label>
-          <TextArea
-            value={reason()}
-            placeholder={t("instances:_trn_report.reason_placeholder")}
-            class="w-full"
-            inputClass="bg-darkSlate-800 min-h-24"
-            onInput={(e: { currentTarget: HTMLTextAreaElement }) => {
-              const trimmed = e.currentTarget.value.slice(0, MAX_REASON_LENGTH)
-              setReason(trimmed)
-              e.currentTarget.value = trimmed
-            }}
-          />
-          <div class="text-lightSlate-500 mt-1 text-right text-xs">
-            {reason().length}/{MAX_REASON_LENGTH}
+              <Trans key="instances:_trn_report.cancel" />
+            </Button>
+            <Button type="primary" onClick={submit} loading={isPending()}>
+              <Trans key="instances:_trn_report.submit" />
+            </Button>
           </div>
         </div>
-
-        <div class="flex justify-between">
-          <Button
-            type="secondary"
-            onClick={() => modalsContext?.closeModal()}
-            disabled={isPending()}
-          >
-            <Trans key="instances:_trn_report.cancel" />
-          </Button>
-          <Button type="primary" onClick={submit} loading={isPending()}>
-            <Trans key="instances:_trn_report.submit" />
-          </Button>
-        </div>
-      </div>
+      </Show>
     </ModalLayout>
   )
 }

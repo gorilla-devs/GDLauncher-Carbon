@@ -16,6 +16,8 @@ import DefaultImg from "/assets/images/default-instance-img.png"
 import { useModal } from "@/managers/ModalsManager"
 import type { ReportModalData } from "@/managers/ModalsManager/modals/Report"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import { gdlAccountAccess } from "@/utils/gdlAccountAccess"
+import { useLocation } from "@solidjs/router"
 
 // Helper to extract error code from rspc error.
 //
@@ -130,6 +132,7 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
   const [t] = useTransContext()
   const modals = useModal()
   const globalStore = useGlobalStore()
+  const location = useLocation()
 
   const previewQuery = rspc.createQuery(() => ({
     queryKey: ["instance.getSharePreview", props.shareCode ?? ""],
@@ -349,6 +352,20 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                   title={t("instances:_trn_share_preview.report_button")}
                   onClick={(e) => {
                     e.stopPropagation()
+                    // The server takes reports from GDLauncher accounts
+                    // only, and the preview itself needs none.
+                    if (
+                      gdlAccountAccess(globalStore.gdlAccount.data) ===
+                      "noAccount"
+                    ) {
+                      modals?.openModal(
+                        { name: "requiresGdlAccount" },
+                        {
+                          returnPath: `${location.pathname}${location.search}`
+                        }
+                      )
+                      return
+                    }
                     const data: ReportModalData = {
                       target: {
                         kind: "share",

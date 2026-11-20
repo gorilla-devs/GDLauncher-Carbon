@@ -300,6 +300,8 @@ interface Modal {
 interface Context {
   openModal: (_modal: Modal, _data?: any) => void
   closeModal: () => void
+  /** Closes every open modal, for when the page under them is being left. */
+  closeAllModals: () => void
   hasOpenModals: () => boolean
 }
 
@@ -487,6 +489,9 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
       }
     },
     closeModal,
+    closeAllModals: () => {
+      while (modalStack().length > 0) closeModal()
+    },
     hasOpenModals: () => modalStack().length > 0
   }
 
