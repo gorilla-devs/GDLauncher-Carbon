@@ -181,46 +181,30 @@ impl LogParser {
         };
 
         let mut entry = Self::parse_attributes(&start)?;
-        let mut found_message = false;
+        let mut message = None;
+        let mut throwable = Vec::new();
         let mut depth = 1;
 
         loop {
             match reader.read_event_into(&mut buf) {
-                Ok(Event::Start(ref e)) => {
-                    depth += 1;
-                    if e.name().as_ref() == b"log4j:Message" {
-                        let mut message_buf = Vec::new();
-                        let mut message_complete = false;
-
-                        while !message_complete {
-                            match reader.read_event_into(&mut buf) {
-                                Ok(Event::Text(e)) => {
-                                    message_buf.extend_from_slice(&e.into_inner());
-                                }
-                                Ok(Event::CData(e)) => {
-                                    message_buf.extend_from_slice(&e.into_inner());
-                                }
-                                Ok(Event::End(ref e)) if e.name().as_ref() == b"log4j:Message" => {
-                                    message_complete = true;
-                                }
-                                Ok(Event::Eof) => return Err(ParserError::UnexpectedEventEnd),
-                                Err(e) => return Err(e.into()),
-                                _ => {}
-                            }
-                        }
-
-                        entry.message = String::from_utf8(message_buf)?;
-                        found_message = true;
-                        depth -= 1;
+                Ok(Event::Start(ref e)) => match e.name().as_ref() {
+                    b"log4j:Message" => {
+                        let text = Self::read_element_text(&mut reader, b"log4j:Message")?;
+                        message = Some(String::from_utf8(text)?);
                     }
-                }
+                    b"log4j:Throwable" => {
+                        throwable.extend(Self::read_element_text(&mut reader, b"log4j:Throwable")?);
+                    }
+                    _ => depth += 1,
+                },
                 Ok(Event::End(ref e)) => {
                     depth -= 1;
                     if depth == 0 && e.name().as_ref() == b"log4j:Event" {
-                        if found_message {
-                            return Ok(entry);
-                        }
-                        return Err(ParserError::MissingAttribute("message".to_string()));
+                        let Some(message) = message else {
+                            return Err(ParserError::MissingAttribute("message".to_string()));
+                        };
+                        entry.message = Self::with_throwable(message, &throwable);
+                        return Ok(entry);
                     }
                 }
                 Ok(Event::Eof) => return Err(ParserError::UnexpectedEventEnd),
@@ -228,6 +212,46 @@ impl LogParser {
                 _ => {}
             }
         }
+    }
+
+    /// Reads the text of the element whose start tag was just read, up to and
+    /// including its end tag. Its text can come in several pieces: log4j
+    /// splits a CDATA section wherever the text itself holds `]]>`.
+    fn read_element_text(reader: &mut Reader<&[u8]>, name: &[u8]) -> Result<Vec<u8>, ParserError> {
+        let mut buf = Vec::new();
+        let mut text = Vec::new();
+
+        loop {
+            match reader.read_event_into(&mut buf) {
+                Ok(Event::Text(e)) => text.extend_from_slice(&e.into_inner()),
+                Ok(Event::CData(e)) => text.extend_from_slice(&e.into_inner()),
+                Ok(Event::End(ref e)) if e.name().as_ref() == name => return Ok(text),
+                Ok(Event::Eof) => return Err(ParserError::UnexpectedEventEnd),
+                Err(e) => return Err(e.into()),
+                _ => {}
+            }
+        }
+    }
+
+    /// The message with the event's exception under it, the way the game's
+    /// own log file prints the two: log4j carries the stack trace of a logged
+    /// exception in a `<log4j:Throwable>` element next to the message, and it
+    /// is the part of an error that says why it happened.
+    ///
+    /// A trace that is not valid UTF-8 is kept with the bad bytes replaced
+    /// rather than costing the whole event.
+    fn with_throwable(message: String, throwable: &[u8]) -> String {
+        let throwable = String::from_utf8_lossy(throwable);
+        let throwable = throwable.trim_end();
+        if throwable.is_empty() {
+            return message;
+        }
+
+        let message = message.trim_end_matches(['\r', '\n']);
+        if message.is_empty() {
+            return throwable.to_owned();
+        }
+        format!("{message}\n{throwable}")
     }
 
     /// Attempts to parse the next item from the buffer.
@@ -438,5 +462,132 @@ mod task06_tests {
             p.parse_next().unwrap(),
             Some(ParsedItem::LogEntry(_))
         ));
+    }
+}
+
+#[cfg(test)]
+mod throwable_tests {
+    use super::*;
+
+    fn parse(event: &str) -> LogEntry {
+        let mut parser = LogParser::new();
+        parser.feed(event.as_bytes());
+        match parser.parse_next().unwrap() {
+            Some(ParsedItem::LogEntry(entry)) => {
+                assert_eq!(parser.buffered_len(), 0);
+                entry
+            }
+            other => panic!("expected a log entry, got {other:?}"),
+        }
+    }
+
+    fn event(children: &str) -> String {
+        format!(
+            r#"<log4j:Event logger="test" timestamp="1" level="ERROR" thread="main">{children}</log4j:Event>"#
+        )
+    }
+
+    #[test]
+    fn the_stack_trace_follows_the_message() {
+        let entry = parse(&event(
+            "\n  <log4j:Message><![CDATA[Failed to load mod]]></log4j:Message>\n  \
+             <log4j:Throwable><![CDATA[java.lang.IllegalStateException: boom\n\
+             \tat a.B.c(B.java:1)\n\tat a.D.e(D.java:2)\n]]></log4j:Throwable>\n",
+        ));
+
+        assert_eq!(
+            entry.message,
+            "Failed to load mod\njava.lang.IllegalStateException: boom\n\tat a.B.c(B.java:1)\n\tat a.D.e(D.java:2)"
+        );
+    }
+
+    #[test]
+    fn an_event_without_an_exception_keeps_its_message_as_it_is() {
+        let entry = parse(&event(
+            "<log4j:Message><![CDATA[two lines\n]]></log4j:Message>",
+        ));
+        assert_eq!(entry.message, "two lines\n");
+
+        let entry = parse(&event(
+            "<log4j:Message><![CDATA[plain]]></log4j:Message><log4j:Throwable><![CDATA[\n]]></log4j:Throwable>",
+        ));
+        assert_eq!(entry.message, "plain");
+    }
+
+    #[test]
+    fn the_trace_is_read_wherever_it_stands_in_the_event() {
+        let entry = parse(&event(
+            "<log4j:Throwable><![CDATA[java.lang.Error: first]]></log4j:Throwable>\
+             <log4j:Message><![CDATA[message]]></log4j:Message>",
+        ));
+        assert_eq!(entry.message, "message\njava.lang.Error: first");
+    }
+
+    #[test]
+    fn a_trace_split_over_several_cdata_sections_is_joined() {
+        // How log4j writes a text that holds "]]>" itself.
+        let entry = parse(&event(
+            "<log4j:Message><![CDATA[message]]></log4j:Message>\
+             <log4j:Throwable><![CDATA[java.lang.Error: a]]]]><![CDATA[>b\n\tat x.Y.z(Y.java:3)]]></log4j:Throwable>",
+        ));
+        assert_eq!(
+            entry.message,
+            "message\njava.lang.Error: a]]>b\n\tat x.Y.z(Y.java:3)"
+        );
+    }
+
+    #[test]
+    fn an_exception_logged_without_a_message_is_shown_alone() {
+        let entry = parse(&event(
+            "<log4j:Message><![CDATA[]]></log4j:Message>\
+             <log4j:Throwable><![CDATA[java.lang.Error: alone]]></log4j:Throwable>",
+        ));
+        assert_eq!(entry.message, "java.lang.Error: alone");
+    }
+
+    #[test]
+    fn a_trace_with_broken_text_does_not_cost_the_event() {
+        let mut bytes = event("<log4j:Message><![CDATA[message]]></log4j:Message><log4j:Throwable><![CDATA[bad X trace]]></log4j:Throwable>").into_bytes();
+        let at = bytes.iter().position(|&b| b == b'X').unwrap();
+        bytes[at] = 0xff;
+
+        let mut parser = LogParser::new();
+        parser.feed(&bytes);
+        let Some(ParsedItem::LogEntry(entry)) = parser.parse_next().unwrap() else {
+            panic!("expected a log entry");
+        };
+        assert_eq!(entry.message, "message\nbad \u{fffd} trace");
+    }
+
+    #[test]
+    fn an_event_without_a_message_is_still_refused() {
+        let mut parser = LogParser::new();
+        parser.feed(
+            event("<log4j:Throwable><![CDATA[java.lang.Error: x]]></log4j:Throwable>").as_bytes(),
+        );
+        assert!(parser.parse_next().is_err());
+        assert_eq!(parser.buffered_len(), 0);
+    }
+
+    #[test]
+    fn every_trace_of_the_sample_log_reaches_its_entry() {
+        let sample = include_bytes!("../fixtures/log_example.log");
+        let traces = sample
+            .windows(b"<log4j:Throwable>".len())
+            .filter(|window| window == b"<log4j:Throwable>")
+            .count();
+        assert_eq!(traces, 9);
+
+        let mut parser = LogParser::new();
+        parser.feed(sample);
+        let with_trace = parser
+            .parse_available()
+            .unwrap()
+            .into_iter()
+            .filter(|item| {
+                matches!(item, ParsedItem::LogEntry(entry) if entry.message.contains("\n\tat "))
+            })
+            .count();
+        assert_eq!(with_trace, traces);
     }
 }

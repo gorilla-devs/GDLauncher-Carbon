@@ -889,6 +889,51 @@ mod test {
         assert_eq!(log.get_entry(0).unwrap().message.trim(), "good message");
     }
 
+    /// The live path reads the game's output in pieces and past sessions
+    /// are read whole; both go through `process_data`, and both must show the
+    /// stack trace of a logged exception, findable by the search.
+    #[tokio::test]
+    async fn process_data_keeps_the_stack_trace_of_a_logged_exception() {
+        let event = r#"<log4j:Event logger="ModLoader" timestamp="1234567890" level="ERROR" thread="main">
+            <log4j:Message><![CDATA[Failed to create mod instance]]></log4j:Message>
+            <log4j:Throwable><![CDATA[java.lang.IllegalStateException: duplicate member
+	at org.example.Mod.init(Mod.java:151)
+	at org.example.Mod.<init>(Mod.java:64)
+]]></log4j:Throwable>
+        </log4j:Event>"#;
+
+        for pieces in [
+            vec![event.as_bytes()],
+            event.as_bytes().chunks(40).collect(),
+        ] {
+            let (tx, rx) = watch::channel(GameLog::new());
+            let mut processor = LogProcessor::new(LogEntrySourceKind::StdOut, &tx).await;
+            for piece in pieces {
+                processor.process_data(piece, None).await.unwrap();
+            }
+
+            let log = rx.borrow();
+            assert_eq!(log.len(), 1);
+            let lines: Vec<&str> = log
+                .get_entry(0)
+                .unwrap()
+                .message
+                .lines()
+                .map(str::trim)
+                .collect();
+            assert_eq!(
+                lines,
+                [
+                    "Failed to create mod instance",
+                    "java.lang.IllegalStateException: duplicate member",
+                    "at org.example.Mod.init(Mod.java:151)",
+                    "at org.example.Mod.<init>(Mod.java:64)",
+                ]
+            );
+            assert_eq!(log.search("Mod.java:151", true, false, false).len(), 1);
+        }
+    }
+
     #[test]
     fn span() {
         let mut log = GameLog::new();
