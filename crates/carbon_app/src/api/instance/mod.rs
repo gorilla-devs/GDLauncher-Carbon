@@ -11,6 +11,7 @@ use crate::managers::account::gdl_account::{
     PaginatedShares, QuotaInfo, RegenerateShareCodeResponse, ShareInfo, SharePreview, SharedMod,
     UpdateShareBody, WaitForShareInstanceResponse,
 };
+use crate::managers::account::{LaunchSignIn, SignInExpiredError};
 use crate::managers::instance as manager;
 use crate::managers::instance::InstanceMoveTarget;
 use crate::managers::instance::export::{
@@ -412,13 +413,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         }
 
         mutation LAUNCH_INSTANCE[app, args: FELaunchInstanceArgs] {
-            let account = app.account_manager()
-                .get_active_account()
-                .await?;
-
-            let Some(account) = account else {
+            if app.account_manager().get_active_uuid().await?.is_none() {
                 return Err(anyhow::anyhow!("attempted to launch instance without an account"));
-            };
+            }
 
             let memory_check_dismissed = crate::api::settings::is_memory_warning_dismissed(
                 &app.db,
@@ -459,6 +456,24 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     }
                 }
             }
+
+            // After the memory question, so a renewal is not waited for and
+            // then thrown away. A player who chose to start on a sign-in that
+            // has run out is not made to wait for another renewal.
+            let account = if args.skip_account_check {
+                app.account_manager().get_active_account().await?
+            } else {
+                match app.account_manager().get_active_account_for_launch().await? {
+                    Some((_, LaunchSignIn::RanOut)) => {
+                        return Err(SignInExpiredError { instance_id: args.id.0 }.into());
+                    }
+                    Some((account, LaunchSignIn::Usable)) => Some(account),
+                    None => None,
+                }
+            };
+            let Some(account) = account else {
+                return Err(anyhow::anyhow!("attempted to launch instance without an account"));
+            };
 
             app.instance_manager()
                 .prepare_game(args.id.into(), Some(account), None, false)
@@ -1721,6 +1736,9 @@ struct FELaunchInstanceArgs {
     id: FEInstanceId,
     #[serde(default)]
     skip_memory_check: bool,
+    /// Start on the active account's sign-in as it is, run out or not.
+    #[serde(default)]
+    skip_account_check: bool,
 }
 
 #[derive(Type, Debug, Deserialize)]

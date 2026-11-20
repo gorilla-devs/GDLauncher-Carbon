@@ -371,7 +371,7 @@ export type InstancesGroupBy = "modloader" | "gameVersion" | "modplatform"
 
 export type InvalidImportEntry = { name: string; reason: Translation }
 
-export type FELaunchInstanceArgs = { id: FEInstanceId; skipMemoryCheck?: boolean }
+export type FELaunchInstanceArgs = { id: FEInstanceId; skipMemoryCheck?: boolean; skipAccountCheck?: boolean }
 
 export type FEGetUserSharesArgs = { limit: number | null; offset: number | null }
 

@@ -7,6 +7,7 @@ import {
 import { Show, createSignal } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
+import { useLaunchInstance } from "@/utils/launchInstance"
 import { useInstallQueue } from "@/utils/installQueue"
 import {
   ContextMenu,
@@ -30,7 +31,6 @@ import {
 } from "@/managers/ModalsManager/modals/InstanceExport"
 import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent"
 import { setClickedInstanceId } from "../InstanceTile"
-import { useGlobalStore } from "../GlobalStoreContext"
 import useSearchContext from "../SearchInputContext"
 import GdlFeatureContextMenuItem from "../GdlFeatureContextMenuItem"
 import { BaseTile } from "../BaseTile"
@@ -77,15 +77,12 @@ interface Props {
 
 const Tile = (props: Props) => {
   const searchContext = useSearchContext()
-  const globalStore = useGlobalStore()
   const [t] = useTransContext()
   const navigate = useGDNavigate()
   const modalsContext = useModal()
   const [isMenuOpen, setIsMenuOpen] = createSignal(false)
 
-  const launchInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.launchInstance"]
-  }))
+  const { launch, launching } = useLaunchInstance()
 
   const killInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.killInstance"]
@@ -101,7 +98,7 @@ const Tile = (props: Props) => {
     mutationKey: ["instance.setFavorite"]
   }))
 
-  const isLoading = () => props.isLoading
+  const isLoading = () => props.isLoading || launching()
   const isInQueue = () => props.isQueued
   const queue = useInstallQueue(
     () => props.instance.id,
@@ -124,20 +121,7 @@ const Tile = (props: Props) => {
       killInstanceMutation.mutate(props.instance.id)
       return
     }
-    if (
-      globalStore.currentlySelectedAccount()?.status === "expired" ||
-      globalStore.currentlySelectedAccount()?.status === "invalid"
-    ) {
-      modalsContext?.openModal(
-        { name: "accountExpired" },
-        { id: props.instance.id }
-      )
-      return
-    }
-    launchInstanceMutation.mutate({
-      id: props.instance.id,
-      skipMemoryCheck: false
-    })
+    launch(props.instance.id)
   }
 
   const handleDelete = () => {

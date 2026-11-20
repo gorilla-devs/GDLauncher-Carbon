@@ -24,6 +24,7 @@ import {
 } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { queryClient, rspc } from "@/utils/rspcClient"
+import { useLaunchInstance } from "@/utils/launchInstance"
 import {
   LOCAL_ERROR_TOAST,
   toastMutationError
@@ -205,9 +206,7 @@ const Instance = (props: { children?: any }) => {
     return instancePages()[index]?.path || instancePages()[0]?.path
   }
 
-  const launchInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.launchInstance"]
-  }))
+  const { launch, launching } = useLaunchInstance()
 
   // Its failure is told by a notice of its own, which names the instance.
   const renameMutation = rspc.createMutation(() => ({
@@ -240,24 +239,7 @@ const Instance = (props: { children?: any }) => {
     if (isQueued() !== undefined || isPreparing() !== undefined) {
       return
     }
-    if (
-      globalStore.currentlySelectedAccount()?.status === "expired" ||
-      globalStore.currentlySelectedAccount()?.status === "invalid"
-    ) {
-      modalsContext?.openModal(
-        {
-          name: "accountExpired"
-        },
-        {
-          id: parsedInstanceId
-        }
-      )
-      return
-    }
-    launchInstanceMutation.mutate({
-      id: parsedInstanceId,
-      skipMemoryCheck: false
-    })
+    launch(parsedInstanceId)
   }
 
   const isRunning = () =>
@@ -659,7 +641,7 @@ const Instance = (props: { children?: any }) => {
               uppercase
               size="large"
               variant={isRunning() && "red"}
-              loading={isPreparing() !== undefined}
+              loading={isPreparing() !== undefined || launching()}
               style={{
                 "view-transition-name": `instance-tile-play-button`,
                 contain: "layout"
@@ -815,7 +797,7 @@ const Instance = (props: { children?: any }) => {
                 <Button
                   size="small"
                   variant={isRunning() && "red"}
-                  loading={isPreparing() !== undefined}
+                  loading={isPreparing() !== undefined || launching()}
                   holdToConfirm={stopHold()}
                   onClick={handlePlay}
                 >

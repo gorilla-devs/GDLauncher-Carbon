@@ -41,10 +41,14 @@ function AccountExpired(props: ModalProps) {
           <Button
             type="secondary"
             size="large"
+            data-testid="account-expired-launch-anyway"
             onClick={() => {
+              // Asked after the memory question, and only once the sign-in
+              // could not be renewed: neither is gone through again.
               launchInstanceMutation.mutate({
                 id: props.data?.id,
-                skipMemoryCheck: false
+                skipMemoryCheck: true,
+                skipAccountCheck: true
               })
               modalsContext?.closeModal()
             }}

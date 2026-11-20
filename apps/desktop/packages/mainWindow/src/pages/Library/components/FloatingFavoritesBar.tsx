@@ -30,6 +30,7 @@ import {
   TooltipTrigger
 } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
+import { useLaunchInstance } from "@/utils/launchInstance"
 import { useInstallQueue } from "@/utils/installQueue"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useModal } from "@/managers/ModalsManager"
@@ -476,9 +477,7 @@ function DockAvatar(props: DockAvatarProps) {
     isServerMode() ? server()?.favorite : instance()?.favorite
 
   // Instance mutations
-  const launchInstanceMutation = rspc.createMutation(() => ({
-    mutationKey: ["instance.launchInstance"]
-  }))
+  const { launch, launching } = useLaunchInstance()
 
   const killInstanceMutation = rspc.createMutation(() => ({
     mutationKey: ["instance.killInstance"]
@@ -517,7 +516,7 @@ function DockAvatar(props: DockAvatarProps) {
     isServerMode()
       ? serverStatus() === "deleting"
       : instanceState() === "deleting"
-  const isLoading = () => isQueued() || isPreparing()
+  const isLoading = () => isQueued() || isPreparing() || launching()
   const queue = useInstallQueue(() => props.instanceId, isQueued)
   // instance.json missing or broken: it can't run or be edited, only opened,
   // unfavorited or deleted.
@@ -569,21 +568,7 @@ function DockAvatar(props: DockAvatarProps) {
       return
     }
 
-    if (
-      globalStore.currentlySelectedAccount()?.status === "expired" ||
-      globalStore.currentlySelectedAccount()?.status === "invalid"
-    ) {
-      modalsContext?.openModal(
-        { name: "accountExpired" },
-        { id: props.instanceId }
-      )
-      return
-    }
-
-    launchInstanceMutation.mutate({
-      id: props.instanceId,
-      skipMemoryCheck: false
-    })
+    launch(props.instanceId)
   }
 
   // Stop closes a running game at once, so it is held, not clicked. A

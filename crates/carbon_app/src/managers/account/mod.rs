@@ -70,6 +70,12 @@ const TOKEN_EXPIRY_SKEW: Duration = Duration::from_secs(60);
 /// a full refresh is several sequential network round-trips (MS, Xbox, MC).
 const REFRESH_WAIT_TIMEOUT: Duration = Duration::from_secs(60);
 const REFRESH_WAIT_POLL_INTERVAL: Duration = Duration::from_millis(250);
+/// How long Play waits for the active account's sign-in to be renewed before
+/// it asks whether to start the game without one.
+const LAUNCH_RENEWAL_WAIT: Duration = Duration::from_secs(10);
+/// A sign-in with less than this left is renewed before a game starts on it:
+/// the game keeps the sign-in it was started with.
+const LAUNCH_RENEWAL_MARGIN: chrono::Duration = chrono::Duration::minutes(5);
 
 pub(crate) struct AccountManager {
     publication: publication::Publication,
@@ -468,6 +474,54 @@ impl<'s> ManagerRef<'s, AccountManager> {
             .ok_or_else(|| anyhow!("currenly active account could not be read from database"))?;
 
         Ok(Some(account.try_into()?))
+    }
+
+    /// The active account for starting a game, with whether its sign-in can
+    /// be used. A sign-in that has run out, or is about to, is renewed first:
+    /// the renewal in the background runs on its own timer, so it can be
+    /// behind after the computer slept or after a renewal that failed.
+    ///
+    /// Waits for a renewal already running instead of starting a second one,
+    /// and for [`LAUNCH_RENEWAL_WAIT`] at most; the renewal then carries on
+    /// by itself. An account Microsoft asks to sign in again has nothing to
+    /// renew with and is answered at once.
+    pub async fn get_active_account_for_launch(
+        self,
+    ) -> anyhow::Result<Option<(FullAccount, LaunchSignIn)>> {
+        self.active_account_for_launch_within(LAUNCH_RENEWAL_WAIT)
+            .await
+    }
+
+    async fn active_account_for_launch_within(
+        self,
+        wait: Duration,
+    ) -> anyhow::Result<Option<(FullAccount, LaunchSignIn)>> {
+        let Some(account) = self.get_active_account().await? else {
+            return Ok(None);
+        };
+        if !launch_renewal_due(&account.type_, Utc::now()) {
+            return Ok(Some((account, LaunchSignIn::Usable)));
+        }
+
+        let uuid = account.uuid.clone();
+        match tokio::time::timeout(wait, self.refresh_ms_tokens(&uuid)).await {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => debug!("Could not renew the sign-in of {uuid} before a launch: {e:#}"),
+            Err(_) => warn!(
+                "The sign-in of {uuid} was not renewed within {}s of Play",
+                wait.as_secs()
+            ),
+        }
+
+        // Whatever the renewal did is in the saved account by now.
+        let Some(account) = self.get_active_account().await? else {
+            return Ok(None);
+        };
+        let sign_in = match AccountWithStatus::from(account.clone()).status {
+            AccountStatus::Ok { .. } => LaunchSignIn::Usable,
+            _ => LaunchSignIn::RanOut,
+        };
+        Ok(Some((account, sign_in)))
     }
 
     async fn get_account_entries(self) -> anyhow::Result<Vec<account_repo::AccountRow>> {
@@ -1912,6 +1966,52 @@ impl AccountRefreshService {
     }
 }
 
+/// Whether a game can be started on an account's saved sign-in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum LaunchSignIn {
+    Usable,
+    /// It has run out and could not be renewed: the game would start, and
+    /// servers would turn the player away.
+    RanOut,
+}
+
+/// Play's refusal to start a game on a sign-in that has run out and could not
+/// be renewed. The interface asks whether to start it anyway.
+#[derive(Error, Debug)]
+#[error("The Microsoft sign-in of the active account has expired and could not be renewed")]
+pub struct SignInExpiredError {
+    pub instance_id: i32,
+}
+
+impl crate::error::FeErrorCode for SignInExpiredError {
+    fn error_code(&self) -> &'static str {
+        "ACCOUNT_SIGN_IN_EXPIRED"
+    }
+
+    fn error_data(&self) -> Option<serde_json::Value> {
+        Some(serde_json::json!({ "instance_id": self.instance_id }))
+    }
+}
+
+/// Whether an account's sign-in is to be renewed before a game starts on it:
+/// one that has run out or has less than [`LAUNCH_RENEWAL_MARGIN`] left, and
+/// one that lacks what a later renewal needs.
+fn launch_renewal_due(account: &FullAccountType, now: DateTime<Utc>) -> bool {
+    match account {
+        FullAccountType::Offline => false,
+        FullAccountType::Microsoft {
+            token_expires,
+            refresh_token,
+            id_token,
+            ..
+        } => {
+            refresh_token.is_none()
+                || id_token.is_none()
+                || now + LAUNCH_RENEWAL_MARGIN >= DateTime::<Utc>::from(*token_expires)
+        }
+    }
+}
+
 #[derive(Error, Debug)]
 pub enum GetActiveAccountError {
     #[error("account selected but not present")]
@@ -1999,7 +2099,7 @@ pub enum ValidateAccountError {
     AccountMissing(String),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FullAccount {
     pub username: String,
     pub uuid: String,
@@ -2272,5 +2372,214 @@ mod gdl_token_tests {
             Ok(token) => panic!("handed back a token for an expired account: {token}"),
             Err(_) => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod launch_sign_in_tests {
+    use super::*;
+
+    const UUID: &str = "launch-account";
+
+    fn microsoft(left: chrono::Duration, refresh_token: Option<&str>) -> FullAccountType {
+        FullAccountType::Microsoft {
+            access_token: "dummy-access".into(),
+            refresh_token: refresh_token.map(str::to_owned),
+            id_token: Some("dummy-id".into()),
+            gdl_token: None,
+            email: None,
+            token_expires: Utc::now() + left,
+            skin_id: None,
+        }
+    }
+
+    /// The active account of a new app, with `left` of its sign-in to go.
+    async fn app_with(type_: FullAccountType) -> crate::TestEnv {
+        let app = crate::setup_managers_for_test().await;
+        save(&app, type_).await;
+        app.account_manager()
+            .set_active_uuid(Some(UUID.into()))
+            .await
+            .unwrap();
+        app
+    }
+
+    async fn save(app: &crate::managers::App, type_: FullAccountType) {
+        let account = FullAccount {
+            uuid: UUID.into(),
+            username: "Example".into(),
+            last_used: Utc::now().into(),
+            type_,
+        };
+        app.account_manager()
+            .publication
+            .save(&app.db, account, |_| {})
+            .await
+            .unwrap();
+    }
+
+    /// A renewal of the account that is already running, as the background
+    /// starts one. It never ends by itself.
+    async fn renewal_running(app: &crate::managers::App) {
+        let manager = app.account_manager();
+        let mut state = manager.publication.gate.lock().await;
+        state.refreshing.insert(
+            UUID.into(),
+            EnrollmentTask::inert(enroll::EnrollmentStatus::RefreshingMSAuth),
+        );
+    }
+
+    async fn renewals_running(app: &crate::managers::App) -> usize {
+        let manager = app.account_manager();
+        let state = manager.publication.gate.lock().await;
+        state.refreshing.len()
+    }
+
+    async fn sign_in(app: &crate::managers::App, wait: Duration) -> LaunchSignIn {
+        app.account_manager()
+            .active_account_for_launch_within(wait)
+            .await
+            .unwrap()
+            .expect("the active account")
+            .1
+    }
+
+    #[test]
+    fn a_sign_in_is_renewed_before_a_launch_only_when_it_is_about_to_run_out() {
+        let now = Utc::now();
+        let due = |type_: FullAccountType| launch_renewal_due(&type_, now);
+
+        assert!(!due(FullAccountType::Offline));
+        assert!(!due(microsoft(chrono::Duration::hours(13), Some("r"))));
+        // Under the 12 hours at which the background renews: not Play's to do.
+        assert!(!due(microsoft(chrono::Duration::hours(2), Some("r"))));
+        assert!(!due(microsoft(chrono::Duration::minutes(6), Some("r"))));
+        assert!(due(microsoft(chrono::Duration::minutes(4), Some("r"))));
+        assert!(due(microsoft(chrono::Duration::hours(-1), Some("r"))));
+        // Nothing to renew with: asked, so it is answered as run out.
+        assert!(due(microsoft(chrono::Duration::hours(13), None)));
+    }
+
+    #[tokio::test]
+    async fn a_sign_in_that_is_still_good_starts_the_game_without_a_renewal() {
+        let app = app_with(microsoft(chrono::Duration::hours(13), Some("r"))).await;
+
+        let started = Instant::now();
+        assert_eq!(
+            sign_in(&app, Duration::from_secs(30)).await,
+            LaunchSignIn::Usable
+        );
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert_eq!(renewals_running(&app).await, 0);
+    }
+
+    /// What Microsoft's refusal leaves: nothing to renew with. Play is not
+    /// held up for it.
+    #[tokio::test]
+    async fn an_account_that_must_sign_in_again_is_answered_at_once() {
+        let app = app_with(microsoft(chrono::Duration::hours(-1), None)).await;
+
+        let started = Instant::now();
+        assert_eq!(
+            sign_in(&app, Duration::from_secs(30)).await,
+            LaunchSignIn::RanOut
+        );
+        assert!(started.elapsed() < Duration::from_secs(5));
+        assert_eq!(renewals_running(&app).await, 0);
+    }
+
+    #[tokio::test]
+    async fn play_waits_for_a_renewal_already_running_and_starts_on_what_it_saved() {
+        let app = app_with(microsoft(chrono::Duration::hours(-1), Some("r"))).await;
+        renewal_running(&app).await;
+
+        let renewing = app.app.clone();
+        let renewal = tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(600)).await;
+            save(
+                &renewing,
+                microsoft(chrono::Duration::hours(24), Some("r2")),
+            )
+            .await;
+            let manager = renewing.account_manager();
+            manager
+                .publication
+                .gate
+                .lock()
+                .await
+                .refreshing
+                .remove(UUID);
+        });
+
+        let started = Instant::now();
+        let (account, sign_in) = app
+            .account_manager()
+            .active_account_for_launch_within(Duration::from_secs(30))
+            .await
+            .unwrap()
+            .unwrap();
+        renewal.await.unwrap();
+
+        assert_eq!(sign_in, LaunchSignIn::Usable);
+        assert!(started.elapsed() >= Duration::from_millis(600));
+        assert!(started.elapsed() < Duration::from_secs(10));
+        // The account handed to the game is the renewed one.
+        assert!(matches!(
+            account.type_,
+            FullAccountType::Microsoft { refresh_token: Some(token), .. } if token == "r2"
+        ));
+        // No second renewal was started next to the running one.
+        assert_eq!(renewals_running(&app).await, 0);
+    }
+
+    #[tokio::test]
+    async fn play_stops_waiting_for_a_renewal_that_takes_too_long() {
+        let app = app_with(microsoft(chrono::Duration::hours(-1), Some("r"))).await;
+        renewal_running(&app).await;
+
+        let started = Instant::now();
+        assert_eq!(
+            sign_in(&app, Duration::from_millis(700)).await,
+            LaunchSignIn::RanOut
+        );
+        assert!(started.elapsed() >= Duration::from_millis(700));
+        assert!(started.elapsed() < Duration::from_secs(10));
+        // The renewal is left running.
+        assert_eq!(renewals_running(&app).await, 1);
+    }
+
+    /// The sign-in still works for a few minutes: a renewal that did not make
+    /// it is no reason to ask anything.
+    #[tokio::test]
+    async fn a_sign_in_with_minutes_left_starts_the_game_when_its_renewal_fails() {
+        let app = app_with(microsoft(chrono::Duration::minutes(3), Some("r"))).await;
+        renewal_running(&app).await;
+
+        assert_eq!(
+            sign_in(&app, Duration::from_millis(300)).await,
+            LaunchSignIn::Usable
+        );
+    }
+
+    #[tokio::test]
+    async fn an_offline_account_is_never_renewed() {
+        let app = app_with(FullAccountType::Offline).await;
+
+        assert_eq!(
+            sign_in(&app, Duration::from_secs(30)).await,
+            LaunchSignIn::Usable
+        );
+        assert_eq!(renewals_running(&app).await, 0);
+    }
+
+    #[test]
+    fn the_refusal_carries_what_the_dialog_needs_to_start_the_game_anyway() {
+        use crate::error::FeErrorCode;
+        let refusal = SignInExpiredError { instance_id: 7 };
+        assert_eq!(refusal.error_code(), "ACCOUNT_SIGN_IN_EXPIRED");
+        assert_eq!(
+            refusal.error_data(),
+            Some(serde_json::json!({ "instance_id": 7 }))
+        );
     }
 }

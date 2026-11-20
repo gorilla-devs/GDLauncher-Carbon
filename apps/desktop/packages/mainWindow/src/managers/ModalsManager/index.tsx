@@ -16,6 +16,7 @@ import adSize from "@/utils/adhelper"
 import { listenMemoryWarning } from "@/utils/memoryWarningBridge"
 import { listenShutdownQuestion } from "@/utils/shutdownQuestion"
 import { listenServerEula } from "@/utils/serverEulaBridge"
+import { listenSignInExpired } from "@/utils/signInExpiredBridge"
 import { cleanupRunning } from "./modals/CacheCleanup/state"
 import { shaderInstallRunning } from "./modals/ShaderLoaderSetup/state"
 import {
@@ -415,6 +416,11 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     const cleanupEula = listenServerEula((data) => {
       manager.openModal({ name: "serverEulaAcceptance" }, data)
     })
+    // Play could not renew the account's sign-in: asked whether to start
+    // the game anyway.
+    const cleanupSignIn = listenSignInExpired((data) => {
+      manager.openModal({ name: "accountExpired" }, { id: data.instance_id })
+    })
     // Asked before a restart or an update install stops a local server or
     // cancels an install.
     const cleanupShutdownQuestion = listenShutdownQuestion((question) => {
@@ -448,6 +454,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
     onCleanup(() => {
       cleanupMemory()
       cleanupEula()
+      cleanupSignIn()
       cleanupShutdownQuestion()
       document.removeEventListener("keydown", onKeyDown)
     })

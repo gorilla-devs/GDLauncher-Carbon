@@ -26,6 +26,10 @@ import {
   type ServerEulaData
 } from "./serverEulaBridge"
 import {
+  dispatchSignInExpiredEvent,
+  type SignInExpiredData
+} from "./signInExpiredBridge"
+import {
   recoveredServerRefusalKey,
   type RecoveredServerRefusal
 } from "./recoveredServer"
@@ -170,6 +174,8 @@ const globalPresenters: Record<
   ACCOUNT_BANNED: () => dispatchBannedEvent(),
   INSUFFICIENT_MEMORY: (cause) =>
     dispatchMemoryWarningEvent(cause.data as InsufficientMemoryData),
+  ACCOUNT_SIGN_IN_EXPIRED: (cause) =>
+    dispatchSignInExpiredEvent(cause.data as SignInExpiredData),
   EULA_NOT_ACCEPTED: (cause) =>
     dispatchServerEulaEvent(cause.data as ServerEulaData),
   // A server's record from an earlier session refused the action: say so in

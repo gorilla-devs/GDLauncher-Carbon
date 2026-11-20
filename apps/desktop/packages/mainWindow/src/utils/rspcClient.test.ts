@@ -305,6 +305,8 @@ describe("a coded cause with a mutation's own toast", () => {
     ["INSUFFICIENT_MEMORY", undefined],
     ["EULA_NOT_ACCEPTED", { server_id: 1 }],
     ["EULA_NOT_ACCEPTED", undefined],
+    ["ACCOUNT_SIGN_IN_EXPIRED", { instance_id: 1 }],
+    ["ACCOUNT_SIGN_IN_EXPIRED", undefined],
     ["A_CODE_THE_HANDLER_DOES_NOT_PRESENT", undefined]
   ])("%s with data %j is shown once", (code, data) => {
     const error = corePayload([
@@ -324,6 +326,39 @@ describe("a coded cause with a mutation's own toast", () => {
     expect(toastError.mock.calls.length + dispatchEvent.mock.calls.length).toBe(
       1
     )
+  })
+})
+
+describe("Play refused for a sign-in that could not be renewed", () => {
+  const dispatchEvent = vi.fn()
+  beforeEach(() => {
+    toastError.mockClear()
+    vi.stubGlobal("window", { dispatchEvent })
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    dispatchEvent.mockClear()
+  })
+
+  it("asks in the dialog for that instance, not in a toast", () => {
+    queryClient.getMutationCache().config.onError?.(
+      corePayload([
+        {
+          display: "The Microsoft sign-in has expired",
+          code: "ACCOUNT_SIGN_IN_EXPIRED",
+          data: { instance_id: 7 }
+        }
+      ]),
+      undefined,
+      undefined,
+      { meta: undefined } as never,
+      {} as never
+    )
+    expect(toastError).not.toHaveBeenCalled()
+    expect(dispatchEvent).toHaveBeenCalledTimes(1)
+    const event = dispatchEvent.mock.calls[0][0] as CustomEvent
+    expect(event.type).toBe("gdl:sign-in-expired")
+    expect(event.detail).toEqual({ instance_id: 7 })
   })
 })
 
