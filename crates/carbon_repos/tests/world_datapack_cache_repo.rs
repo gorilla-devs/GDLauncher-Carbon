@@ -508,3 +508,60 @@ fn stale_logos_of_world_packs_are_refreshed() {
             .is_empty()
     );
 }
+
+fn add_pack(conn: &mut Connection, world: &str, filename: &str) {
+    wdc::upsert_world_datapack_conn(
+        &wg(conn),
+        7,
+        world,
+        filename,
+        1,
+        false,
+        Some("m1"),
+        None,
+        ts(1),
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_worlds_data_packs_follow_it_and_keep_their_ids() {
+    let (_d, mut conn) = migrated_db();
+    insert_metadata(&conn, "m1");
+    add_pack(&mut conn, "Old", "a.zip");
+    add_pack(&mut conn, "Old", "b.zip");
+    add_pack(&mut conn, "Other", "a.zip");
+    let before = wdc::get_world_datapacks_by_instance_conn(&wg(&mut conn), 7).unwrap();
+
+    let n = wdc::rename_world_of_datapacks_conn(&wg(&mut conn), 7, "Old", "New", ts(5)).unwrap();
+    assert_eq!(n, 2);
+
+    let after = wdc::get_world_datapacks_by_instance_conn(&wg(&mut conn), 7).unwrap();
+    assert_eq!(after.len(), 3);
+    for b in &before {
+        let a = after.iter().find(|r| r.id == b.id).unwrap();
+        let expected = if b.world == "Old" {
+            "New"
+        } else {
+            b.world.as_str()
+        };
+        assert_eq!(a.world, expected);
+        assert_eq!(a.filename, b.filename);
+    }
+}
+
+#[test]
+fn renaming_data_packs_onto_a_taken_world_name_fails_and_changes_nothing() {
+    let (_d, mut conn) = migrated_db();
+    insert_metadata(&conn, "m1");
+    add_pack(&mut conn, "A", "x.zip");
+    add_pack(&mut conn, "B", "x.zip");
+    let before = wdc::get_world_datapacks_by_instance_conn(&wg(&mut conn), 7).unwrap();
+
+    let err = wdc::rename_world_of_datapacks_conn(&wg(&mut conn), 7, "A", "B", ts(5)).unwrap_err();
+    assert!(err.to_string().contains("UNIQUE"), "{err}");
+    assert_eq!(
+        wdc::get_world_datapacks_by_instance_conn(&wg(&mut conn), 7).unwrap(),
+        before
+    );
+}

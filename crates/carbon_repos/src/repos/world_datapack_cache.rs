@@ -81,6 +81,10 @@ queries! {
            fileStamp = excluded.fileStamp,
            lastUpdatedAt = excluded.lastUpdatedAt";
 
+    // The packs of a renamed world keep their ids.
+    fn rename_world_of_datapacks(instance_id: i32, from: &str, to: &str, updated_at: DbDateTime) -> usize =
+        "UPDATE WorldDatapackCache SET world = :to, lastUpdatedAt = :updated_at
+         WHERE instanceId = :instance_id AND world = :from";
     fn delete_world_datapack_by_id(id: &str) -> usize =
         "DELETE FROM WorldDatapackCache WHERE id = :id";
     fn delete_world_datapacks_of_world(instance_id: i32, world: &str) -> usize =

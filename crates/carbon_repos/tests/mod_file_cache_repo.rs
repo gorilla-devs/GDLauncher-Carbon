@@ -1249,3 +1249,75 @@ fn instance_owned_kind_preserves_rows_and_ids() {
         assert!(!after.enabled);
     }
 }
+
+#[test]
+fn a_worlds_row_moves_to_its_new_name_and_keeps_its_id() {
+    let (_d, mut conn) = migrated_db();
+    insert_metadata(&conn, "old-meta", 1, b"a", b"b", None, None);
+    insert_metadata(&conn, "new-meta", 2, b"c", b"d", None, None);
+    mfc::upsert_mod_file_cache_conn(
+        &wg(&mut conn),
+        7,
+        "Old",
+        1,
+        true,
+        "worlds",
+        "old-meta",
+        ts(1),
+    )
+    .unwrap();
+    mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 7, "Old", 1, true, "mods", "old-meta", ts(1))
+        .unwrap();
+    let before =
+        mfc::get_mod_file_cache_by_instance_kind_filename_conn(&wg(&mut conn), 7, "worlds", "Old")
+            .unwrap()
+            .unwrap();
+
+    let n =
+        mfc::rename_world_file_conn(&wg(&mut conn), 7, "Old", "New", "new-meta", ts(9000)).unwrap();
+    assert_eq!(n, 1);
+
+    assert!(
+        mfc::get_mod_file_cache_by_instance_kind_filename_conn(&wg(&mut conn), 7, "worlds", "Old")
+            .unwrap()
+            .is_none()
+    );
+    let after =
+        mfc::get_mod_file_cache_by_instance_kind_filename_conn(&wg(&mut conn), 7, "worlds", "New")
+            .unwrap()
+            .unwrap();
+    assert_eq!(after.id, before.id);
+    assert_eq!(after.metadata_id, "new-meta");
+
+    let mod_row =
+        mfc::get_mod_file_cache_by_instance_kind_filename_conn(&wg(&mut conn), 7, "mods", "Old")
+            .unwrap()
+            .unwrap();
+    assert_eq!(mod_row.metadata_id, "old-meta");
+}
+
+#[test]
+fn renaming_a_world_onto_a_taken_name_fails_and_changes_nothing() {
+    let (_d, mut conn) = migrated_db();
+    insert_metadata(&conn, "m", 1, b"a", b"b", None, None);
+    for name in ["A", "B"] {
+        mfc::upsert_mod_file_cache_conn(&wg(&mut conn), 7, name, 1, true, "worlds", "m", ts(1))
+            .unwrap();
+    }
+
+    let err = mfc::rename_world_file_conn(&wg(&mut conn), 7, "A", "B", "m", ts(2)).unwrap_err();
+    assert!(err.to_string().contains("UNIQUE"), "{err}");
+
+    for name in ["A", "B"] {
+        assert!(
+            mfc::get_mod_file_cache_by_instance_kind_filename_conn(
+                &wg(&mut conn),
+                7,
+                "worlds",
+                name
+            )
+            .unwrap()
+            .is_some()
+        );
+    }
+}

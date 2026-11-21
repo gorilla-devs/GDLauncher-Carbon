@@ -324,6 +324,11 @@ queries! {
         "UPDATE ModFileCache SET id = :restored_id, lastUpdatedAt = :updated_at
          WHERE id = :current_id AND instanceId = :instance_id AND filename = :filename AND addonType = :addon_type
          AND NOT EXISTS (SELECT 1 FROM ModFileCache WHERE id = :restored_id)";
+    // A world keeps its row id when its folder is renamed; its metadata is keyed by the
+    // folder name, so the caller passes the metadata of the new name.
+    fn rename_world_file(instance_id: i32, from: &str, to: &str, metadata_id: &str, updated_at: DbDateTime) -> usize =
+        "UPDATE ModFileCache SET filename = :to, metadataId = :metadata_id, lastUpdatedAt = :updated_at
+         WHERE instanceId = :instance_id AND addonType = 'worlds' AND filename = :from";
     fn delete_mod_file_cache_by_id(id: &str) -> usize =
         "DELETE FROM ModFileCache WHERE id = :id";
     fn delete_mod_file_cache_by_instance_filename(instance_id: i32, filename: &str) -> usize =
