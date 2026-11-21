@@ -71,6 +71,7 @@ pub mod run;
 mod running_publication;
 mod schema;
 pub mod shader_loader;
+mod world_datapacks;
 
 #[derive(Debug)]
 pub struct InstanceManager {

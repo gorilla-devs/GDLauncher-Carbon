@@ -209,14 +209,14 @@ impl std::fmt::Display for CacheEntityId {
 
 /// Intermediate result from hashing and parsing a mod file.
 /// Entity-independent — used by both instance and server caching.
-struct ModFileParseResult {
+pub(crate) struct ModFileParseResult {
     sha512: [u8; 64],
     sha1: [u8; 20],
     murmur2: u32,
-    content_len: usize,
+    pub(crate) content_len: usize,
     meta: Option<super::mods::ModFileMetadata>,
     image_data: Option<Vec<u8>>,
-    file_stamp: Option<String>,
+    pub(crate) file_stamp: Option<String>,
 }
 
 /// Metadata prepared for a privately staged server addon. It keeps the parse
@@ -1524,7 +1524,7 @@ impl ManagerRef<'_, MetaCacheManager> {
 
     /// Cache a mod file without first checking the validity of the instance
     /// Hash a mod file and parse its JAR metadata. Entity-independent.
-    async fn hash_and_parse_mod_file(
+    pub(crate) async fn hash_and_parse_mod_file(
         &self,
         mods_dir_path: &PathBuf,
         mod_filename: &str,
@@ -1682,7 +1682,7 @@ impl ManagerRef<'_, MetaCacheManager> {
     }
 
     /// Find or create a ModMetadata row for the given parse result. Entity-independent.
-    async fn ensure_mod_metadata(
+    pub(crate) async fn ensure_mod_metadata(
         &self,
         result: &ModFileParseResult,
         mod_filename: &str,
@@ -3457,6 +3457,18 @@ async fn cache_instance(
         result = scan_instance(app, update_notifier, instance_id, verify) => result,
     };
     drop(activity);
+    // Here and not in `scan_instance`: the world scan takes the instance gate.
+    if result.is_ok()
+        && let Err(error) = app
+            .instance_manager()
+            .scan_world_datapacks(instance_id)
+            .await
+    {
+        warn!(
+            ?error,
+            "Instance {instance_id}: could not scan the data packs in its worlds"
+        );
+    }
     result
 }
 

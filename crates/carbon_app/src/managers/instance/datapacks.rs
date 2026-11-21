@@ -28,7 +28,11 @@ pub struct CopyDatapack {
 /// save moved away and another put under its name is refused. Not what is
 /// inside: Minecraft rewrites `level.dat` on every save, and playing the
 /// world while the Addons tab stays open must not make it "changed".
-async fn world_identity(instance: InstanceId, root: &Path, world: &Path) -> anyhow::Result<String> {
+pub(super) async fn world_identity(
+    instance: InstanceId,
+    root: &Path,
+    world: &Path,
+) -> anyhow::Result<String> {
     let directory = addon_metadata(world)
         .await?
         .context("Selected world no longer exists")?;
@@ -191,7 +195,7 @@ impl ManagerRef<'_, InstanceManager> {
     }
 }
 
-fn validate_pack_zip(path: &Path) -> anyhow::Result<()> {
+pub(super) fn validate_pack_zip(path: &Path) -> anyhow::Result<()> {
     use std::io::Read;
     let mut archive = zip::ZipArchive::new(std::fs::File::open(path)?)?;
     let metadata = archive
