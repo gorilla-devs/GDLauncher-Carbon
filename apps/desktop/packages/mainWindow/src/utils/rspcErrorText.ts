@@ -91,7 +91,8 @@ export const GLOBALLY_PRESENTED = {
   SERVER_RECOVERED_PROCESS: () => true,
   INSUFFICIENT_MEMORY: (cause: RspcErrorCause) => !!cause.data,
   ACCOUNT_SIGN_IN_EXPIRED: (cause: RspcErrorCause) => !!cause.data,
-  EULA_NOT_ACCEPTED: (cause: RspcErrorCause) => !!cause.data
+  EULA_NOT_ACCEPTED: (cause: RspcErrorCause) => !!cause.data,
+  NO_DATAPACK_FOR_VERSION: () => true
 }
 
 export type GloballyPresentedCode = keyof typeof GLOBALLY_PRESENTED

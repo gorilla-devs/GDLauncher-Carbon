@@ -240,6 +240,7 @@
   "_trn_worlds.replace_files": "Cela remplacera {{files}}.",
   "_trn_worlds.replace": "Remplacer",
   "_trn_worlds.added_to_world": "« {{name}} » a été ajouté au monde « {{world}} ».",
+  "_trn_worlds.no_datapack_for_version": "Ce projet n’a aucun pack de données pour Minecraft {{version}}.",
   "_trn_table.filename": "Nom de fichier",
   "_trn_table.type": "Type",
   "_trn_table.platform": "Plateforme",

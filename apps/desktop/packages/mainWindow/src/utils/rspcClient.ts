@@ -190,6 +190,19 @@ const globalPresenters: Record<
       cause.display ||
       parsed.cause?.[0]?.display
     if (display) showDedupedErrorToast(display, source)
+  },
+  // A data pack install into a world found no build for the game version.
+  NO_DATAPACK_FOR_VERSION: (cause, parsed, source) => {
+    const version = (cause.data as { version?: string } | undefined)?.version
+    const display =
+      (version &&
+        i18n.t("content:_trn_worlds.no_datapack_for_version", {
+          version,
+          interpolation: { escapeValue: false }
+        })) ||
+      cause.display ||
+      parsed.cause?.[0]?.display
+    if (display) showDedupedErrorToast(display, source)
   }
 }
 

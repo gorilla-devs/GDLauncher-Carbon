@@ -12,8 +12,12 @@ vi.mock("@gd/ui", () => ({
 
 vi.mock("@gd/i18n", () => ({
   i18n: {
-    t: (key: string, options?: { pid?: number | null }) =>
-      options?.pid != null ? `${key} ${options.pid}` : key
+    t: (key: string, options?: { pid?: number | null; version?: string }) =>
+      options?.pid != null
+        ? `${key} ${options.pid}`
+        : options?.version
+          ? `${key} ${options.version}`
+          : key
   }
 }))
 
@@ -149,6 +153,44 @@ describe("handleGlobalError for a server's record from an earlier session", () =
       "mutation"
     )
     expect(toastError.mock.calls[0][0]).toBe("Unknown refusal kind 31338")
+  })
+})
+
+describe("a data pack install into a world refused for the game version", () => {
+  beforeEach(() => {
+    toastError.mockClear()
+  })
+  const refusal = (data: unknown) =>
+    corePayload([
+      {
+        display: "This project has no data pack for Minecraft 1.20.1",
+        code: "NO_DATAPACK_FOR_VERSION",
+        data
+      }
+    ])
+
+  it("toasts the translated refusal with the version", () => {
+    // The world install mutation has no toast of its own.
+    queryClient
+      .getMutationCache()
+      .config.onError?.(
+        refusal({ version: "1.20.1" }),
+        undefined,
+        undefined,
+        { meta: undefined } as never,
+        {} as never
+      )
+    expect(toastError).toHaveBeenCalledTimes(1)
+    expect(toastError.mock.calls[0][0]).toBe(
+      "content:_trn_worlds.no_datapack_for_version 1.20.1"
+    )
+  })
+
+  it("falls back to the core's text without a version", () => {
+    handleGlobalError(refusal(undefined), "mutation")
+    expect(toastError.mock.calls[0][0]).toBe(
+      "This project has no data pack for Minecraft 1.20.1"
+    )
   })
 })
 
@@ -307,6 +349,7 @@ describe("a coded cause with a mutation's own toast", () => {
     ["EULA_NOT_ACCEPTED", undefined],
     ["ACCOUNT_SIGN_IN_EXPIRED", { instance_id: 1 }],
     ["ACCOUNT_SIGN_IN_EXPIRED", undefined],
+    ["NO_DATAPACK_FOR_VERSION", { version: "1.19.4" }],
     ["A_CODE_THE_HANDLER_DOES_NOT_PRESENT", undefined]
   ])("%s with data %j is shown once", (code, data) => {
     const error = corePayload([

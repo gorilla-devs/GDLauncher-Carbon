@@ -478,8 +478,29 @@ async fn ensure_listed_kind(
     Ok(())
 }
 
+/// The refusal of an install into a world when the project has no data pack
+/// build for the instance's game version. Nothing changed.
+#[derive(Debug, thiserror::Error)]
+#[error("This project has no data pack for Minecraft {version}")]
+pub struct NoDatapackForVersion {
+    pub version: String,
+}
+
+impl crate::error::FeErrorCode for NoDatapackForVersion {
+    fn error_code(&self) -> &'static str {
+        "NO_DATAPACK_FOR_VERSION"
+    }
+
+    fn error_data(&self) -> Option<serde_json::Value> {
+        Some(serde_json::json!({ "version": self.version }))
+    }
+}
+
 fn no_data_pack(game: &str) -> anyhow::Error {
-    anyhow!("This project has no data pack for Minecraft {game}")
+    NoDatapackForVersion {
+        version: game.to_owned(),
+    }
+    .into()
 }
 
 /// The file of a Modrinth version that goes into a world: its primary file
@@ -1664,6 +1685,11 @@ pub(crate) mod tests {
             error.to_string(),
             "This project has no data pack for Minecraft 1.20.1"
         );
+        // The frontend words the refusal from its code and the version.
+        let sent = serde_json::to_value(crate::error::FeError::from_anyhow(&error)).unwrap();
+        let cause = &sent["cause"][0];
+        assert_eq!(cause["code"], "NO_DATAPACK_FOR_VERSION", "{sent}");
+        assert_eq!(cause["data"], json!({ "version": "1.20.1" }), "{sent}");
         assert_eq!(snapshot(&root, &world), before);
     }
 

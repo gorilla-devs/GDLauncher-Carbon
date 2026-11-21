@@ -44,6 +44,7 @@ fn extract_fe_error(
     use crate::managers::instance::datapacks::AlreadyInWorld;
     use crate::managers::instance::modpack::ChangeVersionRefusal;
     use crate::managers::instance::run::InsufficientMemoryError;
+    use crate::managers::instance::world_datapack_changes::NoDatapackForVersion;
     use crate::managers::server::{EulaNotAcceptedError, RecoveredServerError};
 
     macro_rules! try_downcast {
@@ -65,7 +66,8 @@ fn extract_fe_error(
         ChangeVersionRefusal,
         EulaNotAcceptedError,
         RecoveredServerError,
-        AlreadyInWorld
+        AlreadyInWorld,
+        NoDatapackForVersion
     );
 
     (None, None)

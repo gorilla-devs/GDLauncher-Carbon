@@ -1,7 +1,11 @@
 import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { createInstance } from "i18next"
-import { createI18nOptions, loadLanguageFiles } from "@gd/i18n"
+import {
+  createI18nOptions,
+  languageLocaleCodes,
+  loadLanguageFiles
+} from "@gd/i18n"
 import {
   getImportErrorTranslationKey,
   getTaskTranslationKey
@@ -61,7 +65,8 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_worlds.replace_title",
     "_trn_worlds.replace_files",
     "_trn_worlds.replace",
-    "_trn_worlds.added_to_world"
+    "_trn_worlds.added_to_world",
+    "_trn_worlds.no_datapack_for_version"
   ],
   ui: ["_trn_worlds"],
   notifications: [
@@ -288,6 +293,35 @@ describe("addon and account copy is translated", () => {
           i18n.t("content:_trn_mods_updater.not_started", { count: 2 })
         ).toBe("2 addons were not updated")
       }
+    }
+  )
+
+  // The forms i18next picks among for a count in each language.
+  const COUNT_FORMS: Record<(typeof LANGUAGES)[number], readonly string[]> = {
+    english: ["one", "other"],
+    french: ["one", "many", "other"],
+    italian: ["one", "many", "other"],
+    japanese: ["one", "other"],
+    russian: ["one", "few", "many", "other"],
+    simplified_chinese: ["one", "other"],
+    spanish: ["one", "many", "other"]
+  }
+  it.each(LANGUAGES)(
+    "%s has every plural form of a world's data pack count",
+    (language) => {
+      const content = bundle(language, "content")
+      for (const form of COUNT_FORMS[language]) {
+        const text = content[`_trn_worlds.datapack_count_${form}`]
+        expect(text, `${language} ${form}`).toBeTypeOf("string")
+        expect(text).toContain("{{count}}")
+      }
+      // Every form the language's rules can choose is present.
+      const rules = new Intl.PluralRules(languageLocaleCodes[language])
+      for (const category of rules.resolvedOptions().pluralCategories)
+        expect(
+          content[`_trn_worlds.datapack_count_${category}`],
+          `${language} ${category}`
+        ).toBeTypeOf("string")
     }
   )
 
