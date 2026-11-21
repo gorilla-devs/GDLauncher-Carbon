@@ -182,6 +182,9 @@ it.each([
     const row = instanceItem()!
     expect(row.hasAttribute("data-disabled")).toBe(true)
     expect(row.querySelector(".i-hugeicons\\:tick-02")).not.toBeNull()
+    // No world is left to add it to, so the row does not say to add it.
+    expect(row.textContent).toContain("instances:_trn_status_installed")
+    expect(row.textContent).not.toContain("content:_trn_datapack_downloaded")
     pick(row)
     await flush()
     expect(d.selectInstance).not.toHaveBeenCalled()

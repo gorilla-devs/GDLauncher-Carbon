@@ -10,6 +10,7 @@ const c = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   download: undefined as any,
+  staged: undefined as boolean | undefined,
   worldSelect: undefined as any
 }))
 vi.mock("@/utils/rspcClient", async () => {
@@ -65,6 +66,7 @@ vi.mock("./components/InstanceDropdown", () => ({
 vi.mock("./components/InstallButton", () => ({
   InstallButton: (p: any) => {
     c.download = p.onDownload
+    c.staged = p.staged
     return null
   }
 }))
@@ -190,3 +192,23 @@ it("a refused world install reports no completion", async () => {
   expect(c.mutate).toHaveBeenCalledTimes(1)
   expect(c.success).not.toHaveBeenCalled()
 })
+it.each([
+  ["the instance", undefined, true],
+  ["a world", "My World", false]
+])(
+  "the button for a data pack going into %s says to add it to a world: %s",
+  async (_, selectedWorld, staged) => {
+    c.query.mockImplementation(async ([key]: any) =>
+      key === "instance.getWorlds" ? [world] : running
+    )
+    mount(() => (
+      <ModDownloadButton
+        addon={pack as any}
+        selectedInstanceId={7}
+        selectedWorld={selectedWorld}
+      />
+    ))
+    await tick()
+    expect(c.staged).toBe(staged)
+  }
+)

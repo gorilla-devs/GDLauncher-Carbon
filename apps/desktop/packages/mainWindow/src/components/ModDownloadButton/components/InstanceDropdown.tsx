@@ -202,7 +202,12 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
 
     return (
       <InstanceItem
-        staged={props.addon?.type === "datapack"}
+        // Installed once its worlds are known means no world is left to take
+        // the pack, so "add it to a world" would point nowhere.
+        staged={
+          props.addon?.type === "datapack" &&
+          !(asksForWorld() && worldsSettled() && isInstalled())
+        }
         instance={instance}
         isLoading={isLoading()}
         isInstalled={isInstalled()}
