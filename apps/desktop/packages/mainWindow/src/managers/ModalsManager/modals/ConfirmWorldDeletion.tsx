@@ -1,6 +1,6 @@
 import { Trans, useTransContext } from "@gd/i18n"
 import { Button, Checkbox } from "@gd/ui"
-import { createSignal, Match, Show, Switch } from "solid-js"
+import { createSignal } from "solid-js"
 import ModalLayout from "../ModalLayout"
 import { ModalProps, useModal } from ".."
 import { rspc } from "@/utils/rspcClient"
@@ -15,15 +15,6 @@ function ConfirmWorldDeletion(props: ModalProps) {
   }))
 
   const worldName = () => props.data?.worldName as string
-  const worldCount = () => props.data?.worldCount as number | undefined
-  /** Everything confirming deletes, worlds and non-worlds alike. Only the
-   *  bulk path sets it — a world is what *raises* this dialog, but a bulk
-   *  delete removes the whole selection, so the copy below has to account for
-   *  the addons that are not worlds as well as the ones that are. */
-  const totalCount = () => props.data?.totalCount as number | undefined
-  const isPlural = () => (worldCount() ?? 0) > 1
-  /** True when the confirm button removes more than the world(s) named above. */
-  const deletesMoreThanWorlds = () => (totalCount() ?? 0) > (worldCount() ?? 1)
   const onConfirm = () => props.data?.onConfirm as () => void
 
   // With "Deletion through Recycle Bin" on the world can be taken back out,
@@ -39,45 +30,18 @@ function ConfirmWorldDeletion(props: ModalProps) {
         <div class="flex flex-col gap-4">
           <div class="flex items-center gap-2 text-xl font-bold text-red-400">
             <div class="i-hugeicons:alert-02 h-6 w-6 shrink-0" />
-            <Show
-              when={isPlural()}
-              fallback={
-                <Trans key="instances:_trn_confirm_world_deletion_title" />
-              }
-            >
-              <Trans key="instances:_trn_confirm_world_deletion_title_plural" />
-            </Show>
+            <Trans key="instances:_trn_confirm_world_deletion_title" />
           </div>
           <div class="text-lightSlate-300 flex flex-col gap-2">
-            <Show
-              when={isPlural()}
-              fallback={t(
-                toRecycleBin()
-                  ? "instances:_trn_confirm_world_deletion_body_recycle_bin"
-                  : "instances:_trn_confirm_world_deletion_body",
-                {
-                  name: worldName(),
-                  interpolation: { escapeValue: false }
-                }
-              )}
-            >
-              <Trans
-                key={
-                  toRecycleBin()
-                    ? "instances:_trn_confirm_world_deletion_body_plural_recycle_bin"
-                    : "instances:_trn_confirm_world_deletion_body_plural"
-                }
-                options={{ count: worldCount() }}
-              />
-            </Show>
-            <Show when={deletesMoreThanWorlds()}>
-              <div>
-                <Trans
-                  key="instances:_trn_confirm_world_deletion_body_selection"
-                  options={{ count: totalCount() }}
-                />
-              </div>
-            </Show>
+            {t(
+              toRecycleBin()
+                ? "instances:_trn_confirm_world_deletion_body_recycle_bin"
+                : "instances:_trn_confirm_world_deletion_body",
+              {
+                name: worldName(),
+                interpolation: { escapeValue: false }
+              }
+            )}
           </div>
           <Checkbox
             checked={dontAskAgain()}
@@ -129,21 +93,7 @@ function ConfirmWorldDeletion(props: ModalProps) {
               }
             }}
           >
-            <Switch
-              fallback={
-                <Trans key="instances:_trn_confirm_world_deletion_confirm" />
-              }
-            >
-              <Match when={deletesMoreThanWorlds()}>
-                <Trans
-                  key="instances:_trn_confirm_world_deletion_confirm_selection"
-                  options={{ count: totalCount() }}
-                />
-              </Match>
-              <Match when={isPlural()}>
-                <Trans key="instances:_trn_confirm_world_deletion_confirm_plural" />
-              </Match>
-            </Switch>
+            <Trans key="instances:_trn_confirm_world_deletion_confirm" />
           </Button>
         </div>
       </div>

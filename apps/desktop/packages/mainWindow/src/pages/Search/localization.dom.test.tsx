@@ -445,21 +445,18 @@ it.each(
     ).toContain("&lt;b&gt;")
 })
 it.each(ids)(
-  "PB3 %s fallback plural/mixed warnings and missing import/repair keys resolve without markers",
+  "%s world warning and import/repair keys resolve without markers",
   async (id) => {
     const { root, instance } = await mount(id, () => (
       <ConfirmWorldDeletion
         title="Synthetic confirmation"
         data={{
-          worldCount: 2,
-          totalCount: 4,
+          worldName: "Synthetic World",
           onConfirm: () => c.effects.push("confirm")
         }}
       />
     ))
     expect(root.textContent).not.toMatch(/UNTRANSLATED|_trn_/)
-    expect(root.textContent).toContain("2")
-    expect(root.textContent).toContain("4")
     // Translated in every shipped language now, not an English fallback.
     const importError = instance.t("instances:_trn_import_error_bad_config")
     expect(importError).not.toContain("_trn_")
