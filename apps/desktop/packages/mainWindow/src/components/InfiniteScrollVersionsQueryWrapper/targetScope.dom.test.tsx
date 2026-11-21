@@ -8,7 +8,13 @@ import {
 } from "@tanstack/solid-query"
 import Wrapper, { useInfiniteVersionsQuery } from "./index"
 
-const c = vi.hoisted(() => ({ params: undefined as any, query: vi.fn() }))
+const c = vi.hoisted(() => ({
+  params: undefined as any,
+  query: vi.fn(),
+  // The addon type the search the page was opened from shows; none outside
+  // a search.
+  searched: undefined as string | undefined
+}))
 vi.mock("@solidjs/router", () => ({
   useSearchParams: () => [c.params, vi.fn()]
 }))
@@ -20,7 +26,14 @@ vi.mock("@/utils/rspcClient", () => ({
     })
   }
 }))
-vi.mock("../SearchInputContext", () => ({ default: () => undefined }))
+vi.mock("../SearchInputContext", () => ({
+  default: () =>
+    c.searched && {
+      searchQuery: () => ({ projectType: c.searched }),
+      setSelectedInstanceId: () => {},
+      setSelectedServerId: () => {}
+    }
+}))
 
 const disposals: (() => void)[] = [],
   clients: QueryClient[] = []
@@ -29,6 +42,7 @@ afterEach(() => {
   clients.splice(0).forEach((q) => q.clear())
   document.body.textContent = ""
   c.query.mockReset()
+  c.searched = undefined
 })
 const settle = async () => {
   for (let i = 0; i < 5; i++) await new Promise((r) => setTimeout(r, 5))
@@ -368,18 +382,35 @@ it("without a world the same project lists the builds for the instance's own loa
   expect(f.context.target.world).toBeUndefined()
 })
 
+// A resource pack that is also a data pack, as Modrinth lists it.
+const resourceAndDataPack = ["datapack", "minecraft"]
 it.each([
   [
-    "an instance without a mod loader lists the datapack builds of a Modrinth data pack that also ships as a mod",
+    "opened from a data pack search, an instance without a mod loader lists the datapack builds of a Modrinth data pack that also ships as a mod",
+    "datapack",
     null,
     hybridLoaders
   ],
   [
-    "an instance with a mod loader lists the datapack builds of a Modrinth project that is only a data pack",
+    "opened from a data pack search, an instance with a mod loader lists the datapack builds of a resource pack that is also a data pack",
+    "datapack",
+    "fabric",
+    resourceAndDataPack
+  ],
+  [
+    "opened from a mod search, an instance with a mod loader lists the datapack builds of a Modrinth project that is only a data pack",
+    "mod",
+    "fabric",
+    ["datapack"]
+  ],
+  [
+    "opened outside a search, an instance with a mod loader lists the datapack builds of a Modrinth project that is only a data pack",
+    undefined,
     "fabric",
     ["datapack"]
   ]
-])("%s", async (_, loader, loaders) => {
+])("%s", async (_, searched, loader, loaders) => {
+  c.searched = searched
   backend({ loader, gameVersion: "1.20.1" }, [datapackVersion])
   const f = mount(
     { instanceId: "3" },
@@ -390,6 +421,53 @@ it.each([
     { project_id: "project", game_versions: ["1.20.1"], loaders: ["datapack"] }
   ])
   expect(f.context.target.world).toBeUndefined()
+})
+
+it.each([
+  [
+    "opened from a mod search, an instance without a mod loader lists every build of a Modrinth data pack that also ships as a mod for its game version",
+    "mod",
+    null,
+    hybridLoaders
+  ],
+  [
+    "opened outside a search, an instance without a mod loader lists every build of that project for its game version",
+    undefined,
+    null,
+    hybridLoaders
+  ],
+  [
+    "opened from a resource pack search, an instance with a mod loader lists every build of a resource pack that is also a data pack for its game version",
+    "resourcePack",
+    "fabric",
+    resourceAndDataPack
+  ]
+])("%s", async (_, searched, loader, loaders) => {
+  c.searched = searched
+  backend({ loader, gameVersion: "1.20.1" }, [datapackVersion])
+  const f = mount(
+    { instanceId: "3" },
+    { addonType: "mod", loaders, gameVersions: ["1.20.1"] }
+  )
+  await settle()
+  expect(versionCalls()).toEqual([
+    { project_id: "project", game_versions: ["1.20.1"], loaders: undefined }
+  ])
+  expect(f.context.target.world).toBeUndefined()
+})
+
+it("a world of an instance lists the datapack builds of a resource pack that is also a data pack, whatever was searched", async () => {
+  c.searched = "resourcePack"
+  backend({ loader: "fabric", gameVersion: "1.20.1" }, [datapackVersion])
+  const f = mount(
+    { instanceId: "3", world: "New World" },
+    { addonType: "mod", loaders: resourceAndDataPack, gameVersions: ["1.20.1"] }
+  )
+  await settle()
+  expect(versionCalls()).toEqual([
+    { project_id: "project", game_versions: ["1.20.1"], loaders: ["datapack"] }
+  ])
+  expect(f.context.target.world).toBe("New World")
 })
 
 it("a plain mod ignores a world in its link", async () => {

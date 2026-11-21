@@ -30,6 +30,7 @@ vi.mock("@/utils/rspcClient", () => ({
 }))
 vi.mock("@/components/SearchInputContext", () => ({
   default: () => ({
+    searchQuery: () => ({ projectType: "mod" }),
     setSelectedInstanceId: vi.fn(),
     setSelectedServerId: vi.fn()
   })

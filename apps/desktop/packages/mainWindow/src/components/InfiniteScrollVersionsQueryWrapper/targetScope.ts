@@ -1,6 +1,9 @@
 import type { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { compatibleLoaders } from "../../utils/modLoaders"
-import { instanceInstallIsDatapack } from "../../utils/worldTarget"
+import {
+  instanceInstallIsDatapack,
+  type SearchedType
+} from "../../utils/worldTarget"
 
 /** The target scope a version list is filtered by. `undefined` on either
  *  field means "no filter", which is what an addon page opened outside any
@@ -87,7 +90,9 @@ export const sameAddonSupport = (a: AddonSupport, b: AddonSupport) =>
  * - `intoWorld`, a world of the instance as the target, takes data packs
  *   only: where the addon tags its datapack versions (Modrinth), the list is
  *   kept to those whatever loader the instance runs. The same goes for the
- *   instance itself where an install into it is the addon's data pack build.
+ *   instance itself where an install into it is the addon's data pack build,
+ *   which for an addon that is not only a data pack depends on `searched`,
+ *   the addon type of the search the page was opened from.
  *
  * A target value that is not known filters nothing, so an instance whose
  * game version is not known yet lists every game version instead of failing.
@@ -97,6 +102,7 @@ export function targetDefaults(
   mode: ScopeMode,
   facts: TargetFacts,
   support: AddonSupport,
+  searched: SearchedType,
   intoWorld = false
 ): TargetScope {
   if (kind === "none" || mode === "none") {
@@ -113,7 +119,8 @@ export function targetDefaults(
     (kind === "instance" &&
       instanceInstallIsDatapack(
         { loaders: declared },
-        { modloader: facts.loader, mc_version: facts.gameVersion }
+        { modloader: facts.loader, mc_version: facts.gameVersion },
+        searched
       ))
   if (datapackBuilds && declared?.includes("datapack")) {
     modLoaderType = "datapack"

@@ -315,15 +315,16 @@ it.each(["datapack", "mod", undefined])(
     ])
   }
 )
-// Modrinth types these "mod" too, and no mod loader runs them.
+// Modrinth types these "mod" too, and no mod loader runs them. They are data
+// packs only where data packs are what is searched.
 const resourceAndDataPack = ["datapack", "minecraft"]
 const pluginAndDataPack = ["datapack", "bukkit", "paper", "purpur", "spigot"]
 it.each([
   ["a resource pack that is also a data pack", resourceAndDataPack],
   ["a data pack that is also a plugin", pluginAndDataPack]
-])("%s asks where in a mod search, as a data pack does", async (_, loaders) => {
+])("%s asks where while data packs are searched", async (_, loaders) => {
   serveWorld()
-  const d = mount("mod", loaders, "mod")
+  const d = mount("mod", loaders, "datapack")
   await flush()
   d.click("Addon test")
   await flush()
@@ -333,6 +334,36 @@ it.each([
     "content:_trn_worlds.download_to_instance"
   ])
 })
+const outsideDataPacks = [
+  [
+    "a resource pack that is also a data pack",
+    "resourcePack",
+    resourceAndDataPack
+  ],
+  ["a resource pack that is also a data pack", undefined, resourceAndDataPack],
+  ["a data pack that is also a plugin", "mod", pluginAndDataPack]
+] as const
+it.each(outsideDataPacks)(
+  "%s installs on the instance pick, without asking for a world, when %s is searched",
+  async (_, searched, loaders) => {
+    serveWorld()
+    const d = mount("mod", [...loaders], searched)
+    await flush()
+    d.click("Addon test")
+    expect(d.selectInstance).toHaveBeenCalledWith(4)
+    await flush()
+    expect(worldsRead()).toBe(false)
+  }
+)
+it.each(outsideDataPacks)(
+  "the row of %s reads as the install of a mod does when %s is searched",
+  async (_, searched, loaders) => {
+    c.query.mockImplementation(async () => [])
+    const d = mount("mod", [...loaders], searched, "fabric", "modrinth", true)
+    await flush()
+    expect(d.root.textContent).toContain("instances:_trn_status_installing")
+  }
+)
 it("a plain mod never asks where, even while data packs are searched", async () => {
   serveWorld()
   const d = mount("mod", ["fabric"], "datapack")
@@ -469,7 +500,7 @@ it.each([
   ],
   ["a mod", "mod", ["fabric"], "fabric", "installing"]
 ] as const)(
-  "the row of %s reads as its install does",
+  "the row of %s reads as its install does while data packs are searched",
   async (_, type, loaders, modloader, status) => {
     c.query.mockImplementation(async () => [])
     const d = mount(type, [...loaders], "datapack", modloader, "modrinth", true)

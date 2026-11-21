@@ -34,26 +34,30 @@ const lowerCased = (loaders: readonly string[]) =>
 const installsAsTyped = (project: ProjectKind) =>
   project?.type === "resourcePack" || project?.type === "shader"
 
-/** False for a project that also ships as a mod, like Terralith: one that
- *  lists a mod loader. Any other loader beside "datapack" (a resource pack's
- *  "minecraft", a plugin's "paper") is nothing an instance runs as a mod. */
+/** A project that is nothing but a data pack: CurseForge types it so,
+ *  Modrinth lists "datapack" as its only loader. One that lists anything
+ *  beside it (a mod loader like Terralith, a resource pack's "minecraft", a
+ *  plugin's "paper") is a data pack only where data packs are what the
+ *  player is after: a data pack search, or a world as the target. */
 export function isOnlyDatapack(project: ProjectKind): boolean {
   return (
     project?.type === "datapack" ||
-    (canBeDatapack(project) &&
-      !installsAsTyped(project) &&
-      !lowerCased(project?.loaders ?? []).some((loader) =>
-        MOD_LOADERS.includes(loader)
-      ))
+    (!installsAsTyped(project) &&
+      project?.loaders?.length === 1 &&
+      project.loaders[0] === "datapack")
   )
 }
 
+/** The addon type a search shows (its `projectType`), which an addon page
+ *  opened from it keeps; nothing outside a search. */
+export type SearchedType = string | null | undefined
+
 /** Whether an install with no target chosen asks which world it goes to. A
- *  project that also ships as a mod asks only while data packs are what is
- *  searched (`searchedType`), so a mod search installs its mod in one click. */
+ *  project that is not only a data pack asks only while data packs are what
+ *  is searched, so any other search installs it in one click. */
 export function asksWhichWorld(
   project: ProjectKind,
-  searchedType: string | null | undefined
+  searchedType: SearchedType
 ): boolean {
   return (
     isOnlyDatapack(project) ||
@@ -62,18 +66,29 @@ export function asksWhichWorld(
 }
 
 /** Whether an install into the instance itself is the project's data pack
- *  build, which goes to its `datapacks` folder. A project that also ships as
- *  a mod installs its mod jar where the instance runs one of the loaders it
- *  lists, as the core picks that jar, and until the instance is known. */
+ *  build, which goes to its `datapacks` folder. Outside a data pack search
+ *  only a project that is nothing else installs so: any other goes in as the
+ *  search shows it, by the core's own pick. In a data pack search a project
+ *  that also ships as a mod installs its mod jar where the instance runs one
+ *  of the loaders it lists, as the core picks that jar, and until the
+ *  instance is known. */
 export function instanceInstallIsDatapack(
   project: ProjectKind,
-  instance: LinkTarget | undefined
+  instance: LinkTarget | undefined,
+  searchedType: SearchedType
 ): boolean {
   if (isOnlyDatapack(project)) return true
-  if (!canBeDatapack(project) || installsAsTyped(project) || !instance)
+  if (
+    searchedType !== "datapack" ||
+    !canBeDatapack(project) ||
+    installsAsTyped(project)
+  )
     return false
-  if (!instance.modloader) return true
   const listed = lowerCased(project?.loaders ?? [])
+  // No loader an instance runs as a mod: nothing but the data pack to install.
+  if (!listed.some((loader) => MOD_LOADERS.includes(loader))) return true
+  if (!instance) return false
+  if (!instance.modloader) return true
   return !lowerCased(
     compatibleLoaders(instance.modloader, instance.mc_version)
   ).some((loader) => listed.includes(loader))
@@ -87,10 +102,12 @@ export interface PickedVersion {
 }
 
 /** What a click that installs into the instance itself puts there: `picked`
- *  as what it is, else what the project installs as on that instance. */
+ *  as what it is, whatever is searched, else what the project installs as on
+ *  that instance in that search. */
 export function instanceInstall(
   project: ProjectKind,
   instance: LinkTarget | undefined,
+  searchedType: SearchedType,
   picked?: PickedVersion
 ): InstanceInstall {
   if (!canBeDatapack(project) || installsAsTyped(project)) return "addon"
@@ -102,7 +119,9 @@ export function instanceInstall(
       : picked.datapackBuild
         ? "datapack"
         : "addon"
-  return instanceInstallIsDatapack(project, instance) ? "datapack" : "addon"
+  return instanceInstallIsDatapack(project, instance, searchedType)
+    ? "datapack"
+    : "addon"
 }
 
 interface VersionFiles {

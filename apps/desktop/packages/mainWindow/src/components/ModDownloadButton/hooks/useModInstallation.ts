@@ -11,6 +11,7 @@ import {
 import { effectiveFileId, LinkedFile, LinkTarget } from "@/utils/linkedFile"
 import { extractErrorDisplay } from "@/utils/rspcErrorText"
 import { addonInstallFailure } from "../addonInstallScope"
+import useSearchContext from "@/components/SearchInputContext"
 import type { InstanceInstall } from "@/utils/installedAddon"
 import {
   instanceInstall,
@@ -52,6 +53,7 @@ export const useModInstallation = (
   const [t] = useTransContext()
   const modalsContext = useModal()
   const ctx = rspc.useContext()
+  const searchContext = useSearchContext()
   let active = true
   const attempts = new Map<number, symbol>()
   onCleanup(() => {
@@ -95,7 +97,8 @@ export const useModInstallation = (
   }))
 
   /** What an install into the instance itself puts there: the version
-   *  `fileId` pins as what it is, else what the project installs as there. */
+   *  `fileId` pins as what it is, else what the project installs as there
+   *  in the search it is shown in. */
   const instanceInstallFor = (
     instanceId: number | undefined
   ): InstanceInstall => {
@@ -112,6 +115,7 @@ export const useModInstallation = (
     return instanceInstall(
       props.addon,
       target,
+      searchContext?.searchQuery().projectType,
       fileId ? { datapackBuild: options.fileIsDatapackBuild?.() } : undefined
     )
   }

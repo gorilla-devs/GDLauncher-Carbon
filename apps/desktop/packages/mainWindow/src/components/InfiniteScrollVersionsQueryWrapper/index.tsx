@@ -200,6 +200,9 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       searchParams.world
     )
   )
+  // The addon type of the search the page was opened from: only a data pack
+  // search lists the data pack builds of a project that is more than one.
+  const searched = () => searchContext?.searchQuery().projectType
   const targetReady = () =>
     active &&
     settledGeneration() !== 0 &&
@@ -404,6 +407,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
           mode,
           facts,
           support(),
+          searched(),
           world() !== undefined
         )
         const resolvedDefaults = defaults()
@@ -500,8 +504,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   // single request.
   createEffect(
     on(
-      [support, world],
-      ([current, intoWorld]) => {
+      [support, world, searched],
+      ([current, intoWorld, searchedType]) => {
         const last = settled
         if (
           !last ||
@@ -515,6 +519,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
           last.mode,
           last.facts,
           current,
+          searchedType,
           intoWorld !== undefined
         )
         const previous = defaults()

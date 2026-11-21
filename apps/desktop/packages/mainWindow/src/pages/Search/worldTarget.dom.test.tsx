@@ -17,7 +17,9 @@ const control = vi.hoisted(() => ({
   params: {} as any,
   searchParams: {} as any,
   navigate: vi.fn(),
-  mutations: [] as { key: string; input: any }[]
+  mutations: [] as { key: string; input: any }[],
+  // The keys of the queries that were allowed to run.
+  reads: [] as string[]
 }))
 vi.mock("@/components/SearchInputContext", () => ({
   default: () => control.context
@@ -45,6 +47,7 @@ vi.mock("@/utils/rspcClient", () => ({
     }),
     createQuery: (options: any) => {
       const key = options().queryKey[0]
+      if (options().enabled !== false) control.reads.push(key)
       const data =
         key === "instance.getInstanceMods"
           ? control.mods
@@ -172,6 +175,7 @@ afterEach(() => {
   dispose?.()
   document.body.textContent = ""
   control.mutations = []
+  control.reads = []
   control.mods = []
   control.worlds = []
   control.params = {}
@@ -531,6 +535,63 @@ it.each(["list", "grid"])(
     expect(root.textContent).toContain("status_installed")
   }
 )
+// A resource pack or a plugin that is also a data pack is a data pack only
+// where data packs are what is searched.
+const combinedRows = [
+  [
+    "a resource pack that is also a data pack",
+    { type: "mod", loaders: ["datapack", "minecraft"] },
+    "resourcePack"
+  ],
+  [
+    "a data pack that is also a plugin",
+    {
+      type: "mod",
+      loaders: ["datapack", "bukkit", "paper", "purpur", "spigot"]
+    },
+    "mod"
+  ]
+] as const
+for (const view of ["list", "grid"]) {
+  it.each(combinedRows)(
+    `${view} keeps a plain Download for %s whose data pack build the instance holds, outside a data pack search`,
+    async (_, shape, searched) => {
+      control.mods = [instancePack()]
+      control.worlds = [world("My World")]
+      const root = search(view, [undefined], null, shape, searched)
+      expect(root.textContent).not.toContain("status_installed")
+      expect(root.querySelector("[data-menu-trigger]")).toBeNull()
+      expect(control.reads).not.toContain("instance.getWorlds")
+      installButtons(root)[0].click()
+      await flush()
+      expect(root.querySelector("[data-menu-item]")).toBeNull()
+      expect(control.mutations).toEqual([
+        {
+          key: "instance.installLatestMod",
+          input: { instance_id: 1, mod_source: { Modrinth: "P" } }
+        }
+      ])
+    }
+  )
+  it.each(combinedRows)(
+    `${view} of a data pack search still asks where for %s, and shows it as installed once the instance and every world hold it`,
+    async (_, shape) => {
+      control.worlds = [world("My World", [worldPack()])]
+      let root = search(view, [undefined], null, shape)
+      expect(control.reads).toContain("instance.getWorlds")
+      installButtons(root)[0].click()
+      await flush()
+      expect(menuItem(root, "My World").disabled).toBe(true)
+      expect(menuItem(root, "download_to_instance").disabled).toBe(false)
+      dispose?.()
+      document.body.textContent = ""
+      control.mods = [instancePack()]
+      root = search(view, [undefined], null, shape)
+      expect(installButtons(root)).toHaveLength(0)
+      expect(root.textContent).toContain("status_installed")
+    }
+  )
+}
 it("opening a data pack from a world search keeps the world on the addon page", () => {
   control.worlds = [world("My World")]
   const root = search("list", [undefined])

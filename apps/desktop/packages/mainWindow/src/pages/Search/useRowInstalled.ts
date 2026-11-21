@@ -92,6 +92,7 @@ export function useRowInstalled() {
               install: instanceInstall(
                 row,
                 instanceTarget(),
+                searchContext?.searchQuery().projectType,
                 requested ? { datapackBuild: undefined } : undefined
               )
             },

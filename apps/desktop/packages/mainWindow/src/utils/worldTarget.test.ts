@@ -79,7 +79,7 @@ const modrinthPack = { type: "mod", loaders: ["datapack"] }
 const curseforgePack = { type: "datapack", loaders: [] }
 const plainMod = { type: "mod", loaders: ["fabric"] }
 // A resource pack that is also a data pack, and a data pack that is also a
-// server plugin: neither is anything an instance installs as a mod.
+// server plugin: data packs only where data packs are what is searched.
 const resourceAndDataPack = { type: "mod", loaders: ["datapack", "minecraft"] }
 const pluginAndDataPack = {
   type: "mod",
@@ -96,6 +96,8 @@ const instance = (modloader: string | null, mc_version = "1.21.1") => ({
   modloader,
   mc_version
 })
+// What a search that is not after data packs shows; none outside a search.
+const SEARCHES = ["mod", "resourcePack", "shader", null, undefined]
 
 describe("data pack projects", () => {
   it("a project can be a data pack by its type or by a datapack loader", () => {
@@ -107,18 +109,19 @@ describe("data pack projects", () => {
     expect(canBeDatapack({ type: "resourcePack", loaders: [] })).toBe(false)
     expect(canBeDatapack(undefined)).toBe(false)
   })
-  it("a project is only a data pack when no mod loader can load it", () => {
+  it("a project is only a data pack when it lists nothing beside the datapack loader", () => {
     expect(isOnlyDatapack(modrinthHybrid)).toBe(false)
     expect(isOnlyDatapack(modrinthPack)).toBe(true)
     expect(isOnlyDatapack(curseforgePack)).toBe(true)
     expect(isOnlyDatapack(plainMod)).toBe(false)
     expect(isOnlyDatapack(undefined)).toBe(false)
-    expect(isOnlyDatapack(resourceAndDataPack)).toBe(true)
-    expect(isOnlyDatapack(pluginAndDataPack)).toBe(true)
+    expect(isOnlyDatapack(resourceAndDataPack)).toBe(false)
+    expect(isOnlyDatapack(pluginAndDataPack)).toBe(false)
     expect(
       isOnlyDatapack({ type: "mod", loaders: ["datapack", "Fabric"] })
     ).toBe(false)
     expect(isOnlyDatapack({ type: "mod", loaders: ["minecraft"] })).toBe(false)
+    expect(isOnlyDatapack({ type: "mod", loaders: [] })).toBe(false)
     // CurseForge tags a data pack's files with loaders at will.
     expect(isOnlyDatapack({ type: "datapack", loaders: ["fabric"] })).toBe(true)
   })
@@ -127,28 +130,37 @@ describe("data pack projects", () => {
       expect(isOnlyDatapack(project)).toBe(false)
       for (const searched of ["resourcePack", "shader", "mod", undefined])
         expect(asksWhichWorld(project, searched)).toBe(false)
-      for (const target of [instance("fabric"), instance(null), undefined]) {
-        expect(instanceInstallIsDatapack(project, target)).toBe(false)
-        for (const picked of [
-          undefined,
-          { datapackBuild: true },
-          { datapackBuild: undefined }
-        ])
-          expect(instanceInstall(project, target, picked)).toBe("addon")
-      }
+      for (const target of [instance("fabric"), instance(null), undefined])
+        for (const searched of [...SEARCHES, "datapack"]) {
+          expect(instanceInstallIsDatapack(project, target, searched)).toBe(
+            false
+          )
+          for (const picked of [
+            undefined,
+            { datapackBuild: true },
+            { datapackBuild: undefined }
+          ])
+            expect(instanceInstall(project, target, searched, picked)).toBe(
+              "addon"
+            )
+        }
     }
   })
-  it("a world is asked for a pure data pack always, for a hybrid only in a data pack search", () => {
-    for (const searched of ["datapack", "mod", null, undefined]) {
+  it("a world is asked for a project that is only a data pack always, for any other that can be one only in a data pack search", () => {
+    for (const searched of ["datapack", ...SEARCHES]) {
       expect(asksWhichWorld(modrinthPack, searched)).toBe(true)
       expect(asksWhichWorld(curseforgePack, searched)).toBe(true)
-      expect(asksWhichWorld(resourceAndDataPack, searched)).toBe(true)
-      expect(asksWhichWorld(pluginAndDataPack, searched)).toBe(true)
       expect(asksWhichWorld(plainMod, searched)).toBe(false)
     }
-    expect(asksWhichWorld(modrinthHybrid, "datapack")).toBe(true)
-    expect(asksWhichWorld(modrinthHybrid, "mod")).toBe(false)
-    expect(asksWhichWorld(modrinthHybrid, undefined)).toBe(false)
+    for (const project of [
+      modrinthHybrid,
+      resourceAndDataPack,
+      pluginAndDataPack
+    ]) {
+      expect(asksWhichWorld(project, "datapack")).toBe(true)
+      for (const searched of SEARCHES)
+        expect(asksWhichWorld(project, searched)).toBe(false)
+    }
   })
 })
 
@@ -161,53 +173,113 @@ describe("what an install into the instance itself is", () => {
   ]
   it.each([
     ["a CurseForge data pack", curseforgePack],
-    ["a Modrinth data pack", modrinthPack],
+    ["a Modrinth data pack", modrinthPack]
+  ])(
+    "is the data pack build of %s, whatever the instance runs and whatever is searched",
+    (_, project) => {
+      for (const target of instances)
+        for (const searched of ["datapack", ...SEARCHES])
+          expect(instanceInstallIsDatapack(project, target, searched)).toBe(
+            true
+          )
+    }
+  )
+  it.each([
     ["a resource pack that is also a data pack", resourceAndDataPack],
     ["a data pack that is also a plugin", pluginAndDataPack]
   ])(
-    "is the data pack build of %s, whatever the instance runs",
+    "is the data pack build of %s in a data pack search, whatever the instance runs",
     (_, project) => {
       for (const target of instances)
-        expect(instanceInstallIsDatapack(project, target)).toBe(true)
+        expect(instanceInstallIsDatapack(project, target, "datapack")).toBe(
+          true
+        )
+    }
+  )
+  it.each([
+    ["a resource pack that is also a data pack", resourceAndDataPack],
+    ["a data pack that is also a plugin", pluginAndDataPack],
+    ["a project that also ships as a mod", modrinthHybrid],
+    [
+      "a project that also ships as a mod for another loader",
+      { type: "mod", loaders: ["datapack", "forge"] }
+    ]
+  ])(
+    "is never the data pack build of %s outside a data pack search",
+    (_, project) => {
+      for (const target of instances)
+        for (const searched of SEARCHES) {
+          expect(instanceInstallIsDatapack(project, target, searched)).toBe(
+            false
+          )
+          expect(instanceInstall(project, target, searched)).toBe("addon")
+        }
     }
   )
   it("is the mod jar of a project that also ships as a mod where the instance runs one of its loaders", () => {
     for (const loader of ["fabric", "forge", "neoforge", "quilt"])
-      expect(instanceInstallIsDatapack(modrinthHybrid, instance(loader))).toBe(
-        false
-      )
+      expect(
+        instanceInstallIsDatapack(modrinthHybrid, instance(loader), "datapack")
+      ).toBe(false)
     const fabricOnly = { type: "mod", loaders: ["datapack", "fabric"] }
-    expect(instanceInstallIsDatapack(fabricOnly, instance("fabric"))).toBe(
-      false
-    )
+    expect(
+      instanceInstallIsDatapack(fabricOnly, instance("fabric"), "datapack")
+    ).toBe(false)
     // Quilt also loads Fabric mods, NeoForge 1.20.1 also Forge ones.
-    expect(instanceInstallIsDatapack(fabricOnly, instance("quilt"))).toBe(false)
+    expect(
+      instanceInstallIsDatapack(fabricOnly, instance("quilt"), "datapack")
+    ).toBe(false)
     const forgeOnly = { type: "mod", loaders: ["datapack", "forge"] }
     expect(
-      instanceInstallIsDatapack(forgeOnly, instance("neoforge", "1.20.1"))
+      instanceInstallIsDatapack(
+        forgeOnly,
+        instance("neoforge", "1.20.1"),
+        "datapack"
+      )
     ).toBe(false)
   })
-  it("is the data pack build of a project that also ships as a mod where the instance runs none of its loaders", () => {
-    expect(instanceInstallIsDatapack(modrinthHybrid, instance(null))).toBe(true)
-    const fabricOnly = { type: "mod", loaders: ["datapack", "fabric"] }
-    expect(instanceInstallIsDatapack(fabricOnly, instance("forge"))).toBe(true)
-    const forgeOnly = { type: "mod", loaders: ["datapack", "forge"] }
-    expect(instanceInstallIsDatapack(forgeOnly, instance("fabric"))).toBe(true)
+  it("is the data pack build of a project that also ships as a mod where the instance runs none of its loaders, in a data pack search", () => {
     expect(
-      instanceInstallIsDatapack(forgeOnly, instance("neoforge", "1.21.1"))
+      instanceInstallIsDatapack(modrinthHybrid, instance(null), "datapack")
+    ).toBe(true)
+    const fabricOnly = { type: "mod", loaders: ["datapack", "fabric"] }
+    expect(
+      instanceInstallIsDatapack(fabricOnly, instance("forge"), "datapack")
+    ).toBe(true)
+    const forgeOnly = { type: "mod", loaders: ["datapack", "forge"] }
+    expect(
+      instanceInstallIsDatapack(forgeOnly, instance("fabric"), "datapack")
+    ).toBe(true)
+    expect(
+      instanceInstallIsDatapack(
+        forgeOnly,
+        instance("neoforge", "1.21.1"),
+        "datapack"
+      )
     ).toBe(true)
   })
   it("stays the mod jar of a project that also ships as a mod until the instance is known", () => {
-    expect(instanceInstallIsDatapack(modrinthHybrid, undefined)).toBe(false)
+    expect(
+      instanceInstallIsDatapack(modrinthHybrid, undefined, "datapack")
+    ).toBe(false)
   })
   it("is never a data pack for a mod or another addon", () => {
-    for (const target of instances) {
-      expect(instanceInstallIsDatapack(plainMod, target)).toBe(false)
-      expect(
-        instanceInstallIsDatapack({ type: "shader", loaders: [] }, target)
-      ).toBe(false)
-      expect(instanceInstallIsDatapack(undefined, target)).toBe(false)
-    }
+    for (const target of instances)
+      for (const searched of ["datapack", ...SEARCHES]) {
+        expect(instanceInstallIsDatapack(plainMod, target, searched)).toBe(
+          false
+        )
+        expect(
+          instanceInstallIsDatapack(
+            { type: "shader", loaders: [] },
+            target,
+            searched
+          )
+        ).toBe(false)
+        expect(instanceInstallIsDatapack(undefined, target, searched)).toBe(
+          false
+        )
+      }
   })
 })
 
@@ -216,36 +288,61 @@ describe("the rows an install into the instance is compared with", () => {
   const zip = { datapackBuild: true }
   const untold = { datapackBuild: undefined }
   it("follows what the project installs as on that instance when no version is picked", () => {
-    expect(instanceInstall(modrinthHybrid, instance("fabric"))).toBe("addon")
-    expect(instanceInstall(modrinthHybrid, instance(null))).toBe("datapack")
-    expect(instanceInstall(modrinthHybrid, undefined)).toBe("addon")
-    expect(instanceInstall(modrinthPack, instance("fabric"))).toBe("datapack")
-    expect(instanceInstall(resourceAndDataPack, instance("fabric"))).toBe(
+    const fabric = instance("fabric")
+    expect(instanceInstall(modrinthHybrid, fabric, "datapack")).toBe("addon")
+    expect(instanceInstall(modrinthHybrid, instance(null), "datapack")).toBe(
       "datapack"
     )
-    expect(instanceInstall(curseforgePack, instance("fabric"))).toBe("datapack")
+    expect(instanceInstall(modrinthHybrid, undefined, "datapack")).toBe("addon")
+    expect(instanceInstall(resourceAndDataPack, fabric, "datapack")).toBe(
+      "datapack"
+    )
+    expect(instanceInstall(resourceAndDataPack, fabric, "resourcePack")).toBe(
+      "addon"
+    )
+    expect(instanceInstall(pluginAndDataPack, fabric, "mod")).toBe("addon")
+    for (const searched of ["datapack", ...SEARCHES]) {
+      expect(instanceInstall(modrinthPack, fabric, searched)).toBe("datapack")
+      expect(instanceInstall(curseforgePack, fabric, searched)).toBe("datapack")
+    }
   })
-  it("follows a picked version of a Modrinth project, not the project", () => {
-    for (const project of [modrinthHybrid, modrinthPack, resourceAndDataPack])
-      for (const target of [instance("fabric"), instance(null), undefined]) {
-        expect(instanceInstall(project, target, jar)).toBe("addon")
-        expect(instanceInstall(project, target, zip)).toBe("datapack")
-        expect(instanceInstall(project, target, untold)).toBe("unknown")
-      }
+  it("follows a picked version of a Modrinth project, not the project or the search", () => {
+    for (const project of [
+      modrinthHybrid,
+      modrinthPack,
+      resourceAndDataPack,
+      pluginAndDataPack
+    ])
+      for (const target of [instance("fabric"), instance(null), undefined])
+        for (const searched of ["datapack", ...SEARCHES]) {
+          expect(instanceInstall(project, target, searched, jar)).toBe("addon")
+          expect(instanceInstall(project, target, searched, zip)).toBe(
+            "datapack"
+          )
+          expect(instanceInstall(project, target, searched, untold)).toBe(
+            "unknown"
+          )
+        }
   })
   it("is the addon the project is typed as wherever no data pack is in play", () => {
-    for (const picked of [undefined, jar, zip, untold]) {
-      expect(instanceInstall(plainMod, instance("fabric"), picked)).toBe(
-        "addon"
-      )
-      expect(
-        instanceInstall({ type: "shader", loaders: [] }, instance(null), picked)
-      ).toBe("addon")
-      // Every file of a CurseForge data pack project is a data pack.
-      expect(instanceInstall(curseforgePack, instance("fabric"), picked)).toBe(
-        "datapack"
-      )
-    }
+    for (const picked of [undefined, jar, zip, untold])
+      for (const searched of ["datapack", ...SEARCHES]) {
+        expect(
+          instanceInstall(plainMod, instance("fabric"), searched, picked)
+        ).toBe("addon")
+        expect(
+          instanceInstall(
+            { type: "shader", loaders: [] },
+            instance(null),
+            searched,
+            picked
+          )
+        ).toBe("addon")
+        // Every file of a CurseForge data pack project is a data pack.
+        expect(
+          instanceInstall(curseforgePack, instance("fabric"), searched, picked)
+        ).toBe("datapack")
+      }
   })
 })
 

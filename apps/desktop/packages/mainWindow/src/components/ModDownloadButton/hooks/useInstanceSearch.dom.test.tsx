@@ -41,7 +41,8 @@ const modrinthHybrid = {
 }
 const curseforgeDatapack = { type: "datapack", loaders: [] }
 const plainMod = { type: "mod", loaders: ["fabric"] }
-// Modrinth types these "mod" too, and no mod loader runs them.
+// Modrinth types these "mod" too, and no mod loader runs them. They are data
+// packs only where data packs are what is searched.
 const resourceAndDataPack = { type: "mod", loaders: ["datapack", "minecraft"] }
 const pluginAndDataPack = {
   type: "mod",
@@ -97,14 +98,25 @@ it.each([
   ["a resource pack that is also a data pack", resourceAndDataPack],
   ["a data pack that is also a plugin", pluginAndDataPack]
 ])(
-  "lists instances without a mod loader for %s in a mod search",
+  "lists instances without a mod loader for %s only while data packs are searched",
   (_, shape) => {
     expect(
       listed(
         () => shape,
-        () => "mod"
+        () => "datapack"
       )()
     ).toEqual(ALL)
+    for (const searched of ["mod", "resourcePack", undefined]) {
+      dispose?.()
+      expect(
+        listed(
+          () => shape,
+          () => searched
+        )()
+      ).toEqual(WITH_LOADER)
+    }
+    dispose?.()
+    expect(listed(() => shape)()).toEqual(WITH_LOADER)
   }
 )
 
@@ -203,9 +215,9 @@ it("lists an instance without a mod loader for a project typed as a mod only whe
         () => searched
       )()
       if (names.includes("Vanilla"))
-        expect(instanceInstallIsDatapack(shape, vanilla)).toBe(true)
+        expect(instanceInstallIsDatapack(shape, vanilla, searched)).toBe(true)
       dispose?.()
       dispose = undefined
     }
-  expect(instanceInstallIsDatapack(plainMod, vanilla)).toBe(false)
+  expect(instanceInstallIsDatapack(plainMod, vanilla, "datapack")).toBe(false)
 })

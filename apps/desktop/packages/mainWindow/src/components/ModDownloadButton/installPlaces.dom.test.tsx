@@ -108,7 +108,8 @@ const modrinthHybrid = {
 }
 const plainMod = { ...modrinthPack, id: "M", loaders: ["fabric"] }
 // Projects Modrinth also types "mod" that no mod loader runs: a resource
-// pack that is also a data pack, and a data pack that is also a plugin.
+// pack that is also a data pack, and a data pack that is also a plugin. They
+// are data packs only where data packs are what is searched.
 const resourceAndDataPack = {
   ...modrinthPack,
   loaders: ["datapack", "minecraft"]
@@ -236,11 +237,15 @@ it.each([
   ["a Modrinth data pack outside a search", modrinthPack, undefined],
   ["a Modrinth data pack that also ships as a mod", modrinthHybrid, "datapack"],
   [
-    "a resource pack that is also a data pack, in a mod search",
+    "a resource pack that is also a data pack, in a data pack search",
     resourceAndDataPack,
-    "mod"
+    "datapack"
   ],
-  ["a data pack that is also a plugin", pluginAndDataPack, "datapack"]
+  [
+    "a data pack that is also a plugin, in a data pack search",
+    pluginAndDataPack,
+    "datapack"
+  ]
 ])(
   "Download of %s asks where: the instance's worlds, then the instance",
   async (_, addon, searched) => {
@@ -805,10 +810,10 @@ it.each([
   ["a resource pack that is also a data pack", resourceAndDataPack],
   ["a data pack that is also a plugin", pluginAndDataPack]
 ])(
-  "the picker installs the data pack build of %s on an instance with a mod loader",
+  "the picker installs the data pack build of %s on an instance with a mod loader, in a data pack search",
   async (_, addon) => {
     serveBuilds([world("My World")])
-    await mount(addon, { selectedInstanceId: undefined }, "mod")
+    await mount(addon, { selectedInstanceId: undefined }, "datapack")
     await openPicker()
     await pickRow("Fabric")
     await pick("content:_trn_worlds.download_to_instance")
@@ -1265,6 +1270,102 @@ it.each([
   ])
   expect(disabledItems()).toEqual(ticked)
 })
+
+// Outside a data pack search a project that lists more than the datapack
+// loader is what that search shows: one click, and the core picks the file.
+const outsideDataPacks = [
+  [
+    "a resource pack that is also a data pack, in a resource pack search",
+    resourceAndDataPack,
+    "resourcePack"
+  ],
+  [
+    "a data pack that is also a plugin, in a mod search",
+    pluginAndDataPack,
+    "mod"
+  ],
+  [
+    "a resource pack that is also a data pack, outside a search",
+    resourceAndDataPack,
+    undefined
+  ]
+] as const
+it.each(outsideDataPacks)(
+  "Download of %s is a plain button that installs in one click: no menu, no worlds read, no data pack build",
+  async (_, addon, searched) => {
+    serveBuilds([world("My World")])
+    const client = await mount(addon, {}, searched)
+    expect(trigger()).toBeNull()
+    await download()
+    expect(isOpen()).toBe(false)
+    expect(buildReads()).toEqual([])
+    expect(c.mutate.mock.calls).toEqual([latestMod(7)])
+    expect(worldsRead()).toBe(false)
+    client.setQueryData(["vtask.getTaskOutcome", 61], { type: "Succeeded" })
+    await flush()
+    expect(c.success).toHaveBeenCalledWith(
+      "notifications:_trn_addon_installed:Pack",
+      { duration: 2000 }
+    )
+  }
+)
+it.each(outsideDataPacks)(
+  "%s does not read as installed by the data pack build the instance holds, and Download still installs",
+  async (_, addon, searched) => {
+    serveBuilds([world("My World")])
+    await mount(addon, { selectedInstanceMods: [packRow] }, searched)
+    expect(button().textContent).toContain("instances:_trn_download")
+    expect(button().textContent).not.toContain("downloaded")
+    await download()
+    expect(buildReads()).toEqual([])
+    expect(c.mutate.mock.calls).toEqual([latestMod(7)])
+  }
+)
+it.each([
+  ["on an instance without a mod loader", modrinthHybrid, 8],
+  [
+    "for another loader than the instance's",
+    { ...modrinthHybrid, loaders: ["datapack", "forge", "neoforge"] },
+    7
+  ]
+])(
+  "a mod search installs a Modrinth data pack that also ships as a mod %s in one click, not its data pack build",
+  async (_, addon, instance) => {
+    serveBuilds([world("My World")])
+    await mount(
+      addon,
+      { selectedInstanceId: instance, selectedInstanceMods: [packRow] },
+      "mod"
+    )
+    expect(trigger()).toBeNull()
+    expect(button().textContent).toContain("instances:_trn_download")
+    expect(button().textContent).not.toContain("downloaded")
+    await download()
+    expect(isOpen()).toBe(false)
+    expect(buildReads()).toEqual([])
+    expect(c.mutate.mock.calls).toEqual([latestMod(instance)])
+    expect(worldsRead()).toBe(false)
+  }
+)
+it.each(outsideDataPacks)(
+  "the picker lists and installs %s as it does a mod",
+  async (_, addon, searched) => {
+    servePicker([world("My World")], { 7: [packRow] })
+    await mount(addon, { selectedInstanceId: undefined }, searched)
+    await openPicker()
+    expect(pickerRow("Vanilla")).toBeUndefined()
+    expect(pickerRow("Fabric").textContent).not.toContain(
+      "_trn_status_installed"
+    )
+    await pickRow("Fabric")
+    expect(buildReads()).toEqual([])
+    expect(c.mutate.mock.calls).toEqual([latestMod(7)])
+    expect(worldsRead()).toBe(false)
+    expect(pickerRow("Fabric").textContent).toContain(
+      "instances:_trn_status_installing"
+    )
+  }
+)
 
 // A click must land on what the player saw when clicking.
 it("a click on a linked version that is still being read installs nothing, and the read version then replaces its own kind", async () => {
