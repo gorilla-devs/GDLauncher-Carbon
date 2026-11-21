@@ -602,7 +602,8 @@ impl ManagerRef<'_, InstanceManager> {
     /// the Recycle Bin on, the whole selection goes there in one request.
     /// Each addon has its own result, in the order asked, so one that cannot
     /// be deleted does not hide what happened to the others. An addon asked
-    /// for twice is deleted once.
+    /// for twice is deleted once. A world is refused while the instance's
+    /// game is queued, preparing or running.
     pub async fn delete_mods(
         self,
         instance_id: InstanceId,
@@ -636,7 +637,17 @@ impl ManagerRef<'_, InstanceManager> {
         let mut planned = vec![];
         for id in ids {
             use super::addon_retry::PlannedDelete;
-            match PlannedDelete::of(&self.app.db, instance_id, &id, &instance_path).await {
+            let plan = match PlannedDelete::of(&self.app.db, instance_id, &id, &instance_path).await
+            {
+                // The game has the worlds of a starting or running instance
+                // open: one deleted now would be half removed, or written
+                // back when the game closes. Other addons go as before.
+                Ok(plan) if plan.is_world() => {
+                    self.ensure_game_inactive(instance_id).await.map(|()| plan)
+                }
+                plan => plan,
+            };
+            match plan {
                 Ok(plan) => {
                     planned.push((results.len(), plan));
                     results.push((id, Ok(None)));
@@ -2110,6 +2121,130 @@ pub(crate) mod tests {
         app.instance_manager().delete_mod(id, row.id).await.unwrap();
         assert!(!path.exists());
         assert_eq!(std::fs::read(other.join("level.dat")).unwrap(), b"other");
+    }
+
+    /// The game has a world's files open while it starts or runs, and writes
+    /// them when it closes: a world deleted then would be half removed or
+    /// written back. It is refused with nothing changed, as a change to its
+    /// data packs is; a mod is still deleted meanwhile, as before.
+    #[tokio::test]
+    async fn a_world_is_not_deleted_while_its_instance_starts_or_runs() {
+        use crate::domain::vtask::VisualTaskId;
+        use crate::managers::instance::run::{LaunchState, RunningInstance};
+        use crate::managers::instance::world_datapack_changes::{GAME_ACTIVE, tests::tree};
+        let app = crate::setup_managers_for_test().await;
+        let (id, world_row, world) =
+            addon_fixture(&app, "world-in-use", AddonType::Worlds, "World", b"level").await;
+        std::fs::create_dir_all(world.join("region")).unwrap();
+        std::fs::write(world.join("region/r.0.0.mca"), b"chunks").unwrap();
+        let root = world.parent().unwrap().parent().unwrap().to_path_buf();
+        let mods = root.join("mods");
+        std::fs::create_dir_all(&mods).unwrap();
+        let add_mod = |name: &'static str| {
+            let (app, mods) = (app.clone(), mods.clone());
+            async move {
+                std::fs::write(mods.join(name), name.as_bytes()).unwrap();
+                let now = DbDateTime(Utc::now().fixed_offset());
+                metarepo::insert_metadata(
+                    &app.db,
+                    name,
+                    0,
+                    name.as_bytes(),
+                    name.as_bytes(),
+                    "vanilla",
+                    None,
+                    None,
+                    None,
+                    None,
+                    None,
+                    now.clone(),
+                )
+                .await
+                .unwrap();
+                mfcdb::upsert_mod_file_cache(
+                    &app.db,
+                    *id,
+                    name.to_owned(),
+                    0,
+                    true,
+                    "mods".into(),
+                    name.to_owned(),
+                    now,
+                )
+                .await
+                .unwrap();
+                mfcdb::get_mod_file_cache_by_instance_filename(&app.db, *id, name)
+                    .await
+                    .unwrap()
+                    .unwrap()
+            }
+        };
+        let set_state = |state| {
+            let app = app.clone();
+            async move {
+                app.instance_manager()
+                    .instances
+                    .write()
+                    .await
+                    .get_mut(&id)
+                    .unwrap()
+                    .data_mut()
+                    .unwrap()
+                    .state = state;
+            }
+        };
+
+        for (index, state) in [
+            LaunchState::Queued(VisualTaskId(900)),
+            LaunchState::Preparing(VisualTaskId(900)),
+            LaunchState::Running(RunningInstance::adopted(
+                u32::MAX,
+                1,
+                chrono::Utc::now(),
+                chrono::Utc::now(),
+            )),
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let name = format!("{state:?}");
+            set_state(state).await;
+            let before = tree(&root);
+            let error = app
+                .instance_manager()
+                .delete_mod(id, world_row.id.clone())
+                .await
+                .expect_err(&name);
+            assert_eq!(error.to_string(), GAME_ACTIVE, "{name}");
+            assert_eq!(tree(&root), before, "{name}");
+            assert!(
+                mfcdb::get_mod_file_cache_by_id(&app.db, &world_row.id)
+                    .await
+                    .unwrap()
+                    .is_some(),
+                "{name}"
+            );
+
+            // In one selection with a mod, the mod goes and the world stays.
+            let jar: &'static str = ["a.jar", "b.jar", "c.jar"][index];
+            let mod_row = add_mod(jar).await;
+            let results = app
+                .instance_manager()
+                .delete_mods(id, vec![world_row.id.clone(), mod_row.id.clone()])
+                .await
+                .unwrap();
+            assert!(results[0].1.is_err(), "{name}");
+            assert!(results[1].1.is_ok(), "{name}");
+            assert!(!mods.join(jar).exists(), "{name}");
+            assert!(world.join("region/r.0.0.mca").exists(), "{name}");
+        }
+
+        set_state(LaunchState::Inactive { failed_task: None }).await;
+        app.instance_manager()
+            .delete_mod(id, world_row.id.clone())
+            .await
+            .unwrap();
+        assert!(!world.exists());
     }
 
     #[tokio::test]

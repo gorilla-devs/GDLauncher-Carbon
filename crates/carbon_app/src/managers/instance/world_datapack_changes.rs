@@ -89,6 +89,9 @@ pub(super) const PACK_GONE: &str =
 /// The refusal when what is on disk is not the kind of entry the row lists.
 pub(super) const PACK_CHANGED: &str =
     "This data pack changed since the world list was read. Refresh it and try again";
+/// The refusal of a change to a world while the instance's game is queued,
+/// preparing or running.
+pub(super) const GAME_ACTIVE: &str = "This instance is running or being installed. Close the game or wait for it to finish, then try again.";
 const OTHER_WORLD: &str = "A data pack can only be replaced by one installed into its own world";
 const FOLDER_NOT_REPLACED: &str = "A data pack folder cannot be replaced; remove it instead";
 
@@ -1036,6 +1039,12 @@ impl ManagerRef<'_, InstanceManager> {
         id: InstanceId,
     ) -> anyhow::Result<()> {
         self.ensure_modpack_not_locked(id).await?;
+        self.ensure_game_inactive(id).await
+    }
+
+    /// Refuses while the instance's game is queued, preparing or running:
+    /// it has the worlds open and writes them when it closes.
+    pub(super) async fn ensure_game_inactive(self, id: InstanceId) -> anyhow::Result<()> {
         let inactive = matches!(
             self.instances
                 .read()
@@ -1047,9 +1056,7 @@ impl ManagerRef<'_, InstanceManager> {
             LaunchState::Inactive { .. }
         );
         if !inactive {
-            bail!(
-                "This instance is running or being installed. Close the game or wait for it to finish, then try again."
-            );
+            bail!(GAME_ACTIVE);
         }
         Ok(())
     }

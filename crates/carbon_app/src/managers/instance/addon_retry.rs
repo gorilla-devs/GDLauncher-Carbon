@@ -167,7 +167,7 @@ impl PlannedDelete {
         })
     }
 
-    fn is_world(&self) -> bool {
+    pub(super) fn is_world(&self) -> bool {
         self.kind == AddonType::Worlds
     }
 
