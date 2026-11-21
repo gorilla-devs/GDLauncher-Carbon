@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { beforeAll, describe, expect, it, vi } from "vitest"
 import {
   createI18nOptions,
@@ -157,6 +158,92 @@ describe("a refusal in the player's language", () => {
     expect(refusalText("A_CODE_FROM_A_NEWER_CORE", {}, null)).toBeUndefined()
     expect(refusalText("A_CODE_FROM_A_NEWER_CORE", {}, "")).toBeUndefined()
   })
+})
+
+// The core is the one that adds a refusal. Its sources are read here, so a
+// code added there without a sentence here fails by name instead of reaching
+// players as nothing, or in English.
+describe("the codes the core refuses with", () => {
+  const INSTANCE = "crates/carbon_app/src/managers/instance"
+  const TABLE = "apps/desktop/packages/mainWindow/src/utils/refusalText.ts"
+  const source = (path: string) =>
+    readFileSync(new URL(`../../../../../../${path}`, import.meta.url), "utf8")
+  /** The body of every `error_code` function of a Rust source. */
+  const errorCodeBodies = (rust: string) =>
+    [
+      ...rust.matchAll(
+        /fn error_code\(&self\) -> &'static str \{\n([\s\S]*?)\n {4}\}/g
+      )
+    ].map(([, body]) => body)
+  const codesOf = (rust: string) =>
+    errorCodeBodies(rust).flatMap((body) =>
+      [...body.matchAll(/"([A-Z][A-Z0-9_]*)"/g)].map(([, code]) => code)
+    )
+
+  it("each have a sentence in the refusal table", () => {
+    const path = `${INSTANCE}/world_refusal.rs`
+    const [body, ...others] = errorCodeBodies(source(path))
+    expect(others, `${path} has one error_code function`).toEqual([])
+    const codes = codesOf(source(path))
+    // Every arm of the match returns its code as one literal.
+    expect(codes.length, `the codes read from ${path}`).toBe(
+      body.match(/Self::/g)?.length
+    )
+    expect(codes.length).toBeGreaterThan(0)
+    for (const code of codes)
+      expect(
+        isRefusal(code),
+        `${path} refuses with ${code}, which has no sentence in ${TABLE}: add it to REFUSALS there, with its text in every language`
+      ).toBe(true)
+  })
+
+  it("each have their sentence checked in every language", () => {
+    const listed = new Set(REFUSALS.map(([code]) => code))
+    for (const code of codesOf(source(`${INSTANCE}/world_refusal.rs`)))
+      expect(
+        listed.has(code),
+        `${code} is missing from REFUSALS in this file, which is what every language is checked against`
+      ).toBe(true)
+  })
+
+  // The two refusals of the feature the core codes outside world_refusal.rs,
+  // with where the desktop handles each.
+  it.each([
+    {
+      code: "NO_DATAPACK_FOR_VERSION",
+      raisedIn: `${INSTANCE}/world_datapack_changes.rs`,
+      handledIn: TABLE,
+      sentence: true
+    },
+    {
+      code: "ALREADY_IN_WORLD",
+      raisedIn: `${INSTANCE}/datapacks.rs`,
+      // Not a sentence: the Addons tab asks whether to replace the copy.
+      handledIn:
+        "apps/desktop/packages/mainWindow/src/pages/Library/Instance/Tabs/Addons/hooks/useDatapackWorlds.tsx",
+      sentence: false
+    }
+  ])(
+    "$code is still raised and handled where this says",
+    ({ code, raisedIn, handledIn, sentence }) => {
+      expect(
+        codesOf(source(raisedIn)),
+        `${code} is no longer a code of ${raisedIn}: say here where the core raises it now, or drop it with its handling in ${handledIn}`
+      ).toContain(code)
+      expect(
+        source(handledIn),
+        `${code} (${raisedIn}) is handled in ${handledIn}, which no longer names it`
+      ).toContain(code)
+      // A code with a sentence is told by the global handler; one handled
+      // by a question of its own must not be told there as well.
+      expect(
+        isRefusal(code),
+        sentence
+          ? `${code} (${raisedIn}) has no sentence in ${TABLE}`
+          : `${code} (${raisedIn}) is asked about in ${handledIn}; a sentence in ${TABLE} would tell it a second time`
+      ).toBe(sentence)
+    }
+  )
 })
 
 describe("the world lists after a refusal", () => {
