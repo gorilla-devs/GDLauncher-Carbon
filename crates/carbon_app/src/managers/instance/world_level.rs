@@ -69,6 +69,11 @@ pub(super) fn write_level_name(world: &Path, name: &str) -> anyhow::Result<()> {
     if read_tree(tmp.path())? != root {
         bail!("the new level.dat did not read back as intended");
     }
+    // A new file is created 0600; keep whatever mode the world's file had.
+    let permissions = std::fs::metadata(&target)
+        .with_context(|| format!("reading the permissions of {}", target.display()))?
+        .permissions();
+    tmp.as_file().set_permissions(permissions)?;
     tmp.as_file().sync_all()?;
     tmp.persist(&target)
         .map_err(|e| e.error)
@@ -266,6 +271,11 @@ mod tests {
     fn a_failed_write_leaves_the_file_as_it_was() {
         use std::os::unix::fs::PermissionsExt;
 
+        // A folder mode does not stop root, so the write would succeed.
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+
         let bytes = level_dat(Some("Old"), vec![]);
         let dir = world_with(&bytes);
         let mut perms = std::fs::metadata(dir.path()).unwrap().permissions();
@@ -278,5 +288,25 @@ mod tests {
         std::fs::set_permissions(dir.path(), perms).unwrap();
         assert!(result.is_err());
         assert_eq!(std::fs::read(dir.path().join("level.dat")).unwrap(), bytes);
+        let files: Vec<_> = std::fs::read_dir(dir.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        assert_eq!(files, ["level.dat"]);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn renaming_a_world_keeps_the_file_mode() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let dir = world_with(&level_dat(Some("Old"), vec![]));
+        let path = dir.path().join("level.dat");
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+
+        write_level_name(dir.path(), "New").unwrap();
+
+        let mode = std::fs::metadata(&path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o644);
     }
 }

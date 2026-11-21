@@ -7,6 +7,9 @@ use std::fmt;
 
 const MAX_DEPTH: usize = 512;
 
+/// Each parsed tag costs far more memory than the byte it can come from, so the count is capped.
+const MAX_TAGS: usize = 4_000_000;
+
 #[derive(Debug, Clone)]
 pub enum Tag {
     Byte(i8),
@@ -65,6 +68,7 @@ pub enum NbtError {
     UnknownTag(u8),
     BadLength,
     TooDeep,
+    TooManyTags,
     TrailingBytes,
     RootNotCompound,
 }
@@ -76,6 +80,7 @@ impl fmt::Display for NbtError {
             NbtError::UnknownTag(id) => write!(f, "NBT tag id {id} is unknown"),
             NbtError::BadLength => write!(f, "NBT length is negative or longer than the data"),
             NbtError::TooDeep => write!(f, "NBT is nested too deeply"),
+            NbtError::TooManyTags => write!(f, "NBT holds too many tags"),
             NbtError::TrailingBytes => write!(f, "NBT has bytes after the root tag"),
             NbtError::RootNotCompound => write!(f, "NBT root is not a compound"),
         }
@@ -125,6 +130,7 @@ impl Tag {
 
 struct Cursor<'a> {
     rest: &'a [u8],
+    tags: usize,
 }
 
 impl<'a> Cursor<'a> {
@@ -171,6 +177,10 @@ impl<'a> Cursor<'a> {
 }
 
 fn read_payload(cur: &mut Cursor, id: u8, depth: usize) -> Result<Tag, NbtError> {
+    cur.tags += 1;
+    if cur.tags > MAX_TAGS {
+        return Err(NbtError::TooManyTags);
+    }
     Ok(match id {
         1 => Tag::Byte(i8::from_be_bytes(cur.array()?)),
         2 => Tag::Short(i16::from_be_bytes(cur.array()?)),
@@ -196,7 +206,7 @@ fn read_payload(cur: &mut Cursor, id: u8, depth: usize) -> Result<Tag, NbtError>
             if element == 0 && len > 0 {
                 return Err(NbtError::UnknownTag(0));
             }
-            let mut items = Vec::with_capacity(len);
+            let mut items = Vec::with_capacity(len.min(4096));
             for _ in 0..len {
                 items.push(read_payload(cur, element, depth + 1)?);
             }
@@ -244,7 +254,10 @@ fn read_payload(cur: &mut Cursor, id: u8, depth: usize) -> Result<Tag, NbtError>
 
 /// Reads uncompressed NBT whose root is a compound.
 pub fn read(bytes: &[u8]) -> Result<Root, NbtError> {
-    let mut cur = Cursor { rest: bytes };
+    let mut cur = Cursor {
+        rest: bytes,
+        tags: 0,
+    };
     let id = cur.u8()?;
     if id != 10 {
         return Err(if id > 12 || id == 0 {
@@ -317,8 +330,13 @@ pub fn write(root: &Root) -> Vec<u8> {
 }
 
 /// Decodes Java's modified UTF-8: NUL is `C0 80` and characters beyond the
-/// basic plane are two three-byte surrogates. `None` when the bytes are not that.
+/// basic plane are two three-byte surrogates. Plain UTF-8 written by another
+/// tool is accepted too. `None` when the bytes are neither.
 pub fn decode_string(raw: &[u8]) -> Option<String> {
+    decode_modified(raw).or_else(|| std::str::from_utf8(raw).ok().map(str::to_string))
+}
+
+fn decode_modified(raw: &[u8]) -> Option<String> {
     let mut units: Vec<u16> = Vec::with_capacity(raw.len());
     let mut i = 0;
     while i < raw.len() {
@@ -440,6 +458,10 @@ mod tests {
             Some("a\0😀é".to_string())
         );
         assert_eq!(encode_string("\0"), [0xC0, 0x80]);
+        assert_eq!(
+            decode_string("😀 world".as_bytes()),
+            Some("😀 world".to_string())
+        );
         assert_eq!(decode_string(&[0xFF]), None);
         assert_eq!(decode_string(&[0xE0, 0x80]), None);
     }
@@ -494,5 +516,26 @@ mod tests {
         for (what, bytes) in cases {
             assert!(read(&bytes).is_err(), "{what} must be refused");
         }
+    }
+
+    fn byte_list(len: usize) -> Vec<u8> {
+        let mut b = vec![10, 0, 0];
+        named(&mut b, 9, "x");
+        b.push(1);
+        b.extend_from_slice(&(len as i32).to_be_bytes());
+        b.extend(std::iter::repeat(7).take(len));
+        b.push(0);
+        b
+    }
+
+    #[test]
+    fn a_list_with_millions_of_tags_is_refused() {
+        assert_eq!(read(&byte_list(5_000_000)), Err(NbtError::TooManyTags));
+    }
+
+    #[test]
+    fn a_list_of_a_hundred_thousand_tags_round_trips() {
+        let bytes = byte_list(100_000);
+        assert_eq!(write(&read(&bytes).unwrap()), bytes);
     }
 }

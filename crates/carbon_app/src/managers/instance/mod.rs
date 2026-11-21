@@ -74,8 +74,8 @@ pub mod shader_loader;
 pub(crate) mod world_datapack_changes;
 pub(crate) mod world_datapack_updates;
 pub(crate) mod world_datapacks;
-pub(crate) mod world_refusal;
 mod world_level;
+pub(crate) mod world_refusal;
 
 #[derive(Debug)]
 pub struct InstanceManager {
