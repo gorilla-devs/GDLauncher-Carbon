@@ -41,23 +41,42 @@ pub(super) fn safe_folder_name(name: &str) -> String {
     if text.starts_with('.') {
         text.replace_range(..1, "_");
     }
-    let mut text = text.trim_end_matches(is_dot_or_space).to_string();
+    let text = text.trim_end_matches(is_dot_or_space);
+    let mut text = cut_to_bytes(text, MAX_BYTES)
+        .trim_end_matches(is_dot_or_space)
+        .to_string();
 
-    let stem = text.split('.').next().unwrap_or_default();
+    // Checked last so that the cut cannot leave a reserved name behind.
+    let stem = text
+        .split('.')
+        .next()
+        .unwrap_or_default()
+        .trim_end_matches(' ');
     if RESERVED.iter().any(|r| r.eq_ignore_ascii_case(stem)) {
         text.insert(0, '_');
+        text = cut_to_bytes(&text, MAX_BYTES)
+            .trim_end_matches(is_dot_or_space)
+            .to_string();
     }
 
-    let cut = cut_to_bytes(&text, MAX_BYTES).trim_end_matches(is_dot_or_space);
-    if cut.is_empty() {
+    if text.is_empty() {
         "World".to_string()
     } else {
-        cut.to_string()
+        text
     }
 }
 
+/// Picks a folder name for `wanted` that no other folder in `taken` has,
+/// ignoring case. `current` is the world's own folder and does not count.
+///
+/// `wanted` is expected to be a `safe_folder_name` result, so at most
+/// `MAX_BYTES` bytes.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn free_folder_name(wanted: &str, taken: &[String], current: Option<&str>) -> String {
+    debug_assert!(
+        wanted.len() <= MAX_BYTES,
+        "wanted must be a safe_folder_name result"
+    );
     let is_free = |candidate: &str| {
         let candidate = candidate.to_lowercase();
         !taken
@@ -106,10 +125,20 @@ mod tests {
             ("日本語 😀".into(), "日本語 😀".into()),
             (long, "é".repeat(50)),
             (almost, "a".repeat(99)),
+            (format!("con{}x", " ".repeat(100)), "_con".into()),
+            (format!("NUL{}.x", " ".repeat(97)), "_NUL".into()),
+            ("con .txt".into(), "_con .txt".into()),
+            (
+                format!("COM1{}", "a".repeat(96)),
+                format!("COM1{}", "a".repeat(96)),
+            ),
         ];
         for (input, expected) in cases {
             assert_eq!(safe_folder_name(&input), expected, "input {input:?}");
         }
+        let long_com = safe_folder_name(&format!("COM1{}", "a".repeat(96)));
+        assert_eq!(long_com.len(), 100);
+        assert!(long_com.starts_with("COM1a"));
     }
 
     #[test]
@@ -129,5 +158,12 @@ mod tests {
             free_folder_name("World", &s(&["World", "Other"]), Some("Other")),
             "World (2)"
         );
+        assert_eq!(free_folder_name("É", &s(&["é"]), None), "É (2)");
+
+        let full = "é".repeat(50);
+        let result = free_folder_name(&full, &[full.clone()], None);
+        assert!(result.ends_with(" (2)"), "{result:?}");
+        assert!(result.len() <= 100, "{} bytes", result.len());
+        assert_eq!(result, format!("{} (2)", "é".repeat(48)));
     }
 }
