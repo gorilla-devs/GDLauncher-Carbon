@@ -84,7 +84,7 @@ pub struct InstallWorldDatapack {
 
 /// The refusal when the row asked for is not one of the instance's world
 /// data packs (any more).
-const PACK_GONE: &str =
+pub(super) const PACK_GONE: &str =
     "This data pack is no longer in the world. Refresh the world list and try again";
 /// The refusal when what is on disk is not the kind of entry the row lists.
 const PACK_CHANGED: &str =
@@ -182,7 +182,7 @@ fn set_aside(path: &Path, folder: &Path) -> anyhow::Result<PathBuf> {
 }
 
 impl TakenAway {
-    fn put_back_failure(&self, error: &std::io::Error) -> anyhow::Error {
+    fn put_back_failure(&self, error: &dyn std::fmt::Display) -> anyhow::Error {
         anyhow!(
             "{} could not be put back and is kept at {}: {error}",
             self.original.display(),
@@ -226,35 +226,25 @@ impl TakenAway {
     /// Withdraws the replacement when one was published (it is this
     /// install's own download), then returns the entry under its original
     /// name, never over something that took that name meanwhile. When it
-    /// cannot return, it stays where it waits and `keep` is set.
+    /// cannot return, or the replacement cannot be withdrawn (two builds
+    /// of one pack would then be in the world), it stays where it waits and
+    /// `keep` is set.
     pub(super) async fn put_back(self) -> anyhow::Result<()> {
         let (aside, original, keep) =
             (self.aside.clone(), self.original.clone(), self.keep.clone());
-        let (withdrawn, moved) = self
+        let returned = self
             .settle(move |settlement| {
                 settlement.settled = true;
-                let withdrawn = settlement.published.take().and_then(|published| {
-                    std::fs::remove_file(&published)
-                        .err()
-                        .filter(|error| error.kind() != std::io::ErrorKind::NotFound)
-                        .map(|error| {
-                            anyhow!("{} could not be removed: {error}", published.display())
-                        })
-                });
-                let moved = rename_noclobber(&aside, &original);
-                if moved.is_err() {
-                    keep.store(true, Ordering::SeqCst);
-                }
-                Ok((withdrawn, moved))
+                Ok(settle_back(settlement, &aside, &original, &keep))
             })
             .await?;
-        match (moved, withdrawn) {
-            (Ok(()), None) => Ok(()),
-            (Ok(()), Some(withdrawn)) => Err(withdrawn),
-            (Err(error), None) => Err(self.put_back_failure(&error)),
-            (Err(error), Some(withdrawn)) => Err(anyhow!(
-                "{withdrawn:#}. {:#}",
-                self.put_back_failure(&error)
+        match returned {
+            Returned::Back => Ok(()),
+            Returned::Stuck(error) => Err(self.put_back_failure(&error)),
+            Returned::NotWithdrawn { published, error } => Err(anyhow!(
+                "{} could not be removed: {error}. {:#}",
+                published.display(),
+                self.put_back_failure(&"the replacement is still in its place")
             )),
         }
     }
@@ -304,6 +294,44 @@ fn remove_set_aside(path: &Path, removal: Removal) -> anyhow::Result<()> {
     }
 }
 
+/// How an entry taken away ended when it was put back.
+enum Returned {
+    Back,
+    /// It could not return under its name.
+    Stuck(std::io::Error),
+    /// The replacement could not be withdrawn, so it was not put back.
+    NotWithdrawn {
+        published: PathBuf,
+        error: std::io::Error,
+    },
+}
+
+/// Withdraws the published replacement, if any, then returns the entry at
+/// `aside` to `original`. The replacement is this install's own download;
+/// while it stays, the entry stays aside, so one build of the pack is in the
+/// world. Sets `keep` when the entry stays aside.
+fn settle_back(
+    settlement: &mut Settlement,
+    aside: &Path,
+    original: &Path,
+    keep: &AtomicBool,
+) -> Returned {
+    if let Some(published) = settlement.published.take()
+        && let Err(error) = std::fs::remove_file(&published)
+        && error.kind() != std::io::ErrorKind::NotFound
+    {
+        keep.store(true, Ordering::SeqCst);
+        return Returned::NotWithdrawn { published, error };
+    }
+    match rename_noclobber(aside, original) {
+        Ok(()) => Returned::Back,
+        Err(error) => {
+            keep.store(true, Ordering::SeqCst);
+            Returned::Stuck(error)
+        }
+    }
+}
+
 impl Drop for TakenAway {
     fn drop(&mut self) {
         let settlement = self.settlement.clone();
@@ -312,17 +340,15 @@ impl Drop for TakenAway {
             return;
         }
         settlement.settled = true;
-        // The replacement is this install's own download: withdrawn, so
-        // the pack gets its name back and one build of it stays.
-        if let Some(published) = &settlement.published
-            && let Err(error) = std::fs::remove_file(published)
-            && error.kind() != std::io::ErrorKind::NotFound
-        {
-            warn!(?error, "Could not withdraw {}", published.display());
-        }
-        if let Err(error) = rename_noclobber(&self.aside, &self.original) {
-            self.keep.store(true, Ordering::SeqCst);
-            warn!("{}", self.put_back_failure(&error));
+        match settle_back(&mut settlement, &self.aside, &self.original, &self.keep) {
+            Returned::Back => {}
+            Returned::Stuck(error) => warn!("{}", self.put_back_failure(&error)),
+            Returned::NotWithdrawn { published, error } => warn!(
+                ?error,
+                "{} could not be removed. {}",
+                published.display(),
+                self.put_back_failure(&"the replacement is still in its place")
+            ),
         }
     }
 }
@@ -363,7 +389,7 @@ fn no_data_pack(game: &str) -> anyhow::Error {
 /// (the first when none is flagged), when the version is tagged `datapack`,
 /// lists `game` and that file is a zip. The game loads nothing else from a
 /// world's `datapacks` folder.
-fn modrinth_world_file<'a>(version: &'a Version, game: &str) -> Option<&'a VersionFile> {
+pub(super) fn modrinth_world_file<'a>(version: &'a Version, game: &str) -> Option<&'a VersionFile> {
     if !version.loaders.iter().any(|loader| loader == "datapack")
         || !version.game_versions.iter().any(|listed| listed == game)
     {
@@ -379,7 +405,7 @@ fn modrinth_world_file<'a>(version: &'a Version, game: &str) -> Option<&'a Versi
 
 /// Whether a CurseForge file of `project` goes into a world: the project is a
 /// data pack one, and the file is a zip that lists `game`.
-fn is_curseforge_world_file(
+pub(super) fn is_curseforge_world_file(
     project: &curseforge::Mod,
     file: &curseforge::File,
     game: &str,
@@ -573,7 +599,7 @@ impl ManagerRef<'_, InstanceManager> {
 
     /// [`Self::install_world_datapack`] asking the given platform clients,
     /// with the handle of the work behind the task.
-    async fn install_world_datapack_from(
+    pub(super) async fn install_world_datapack_from(
         self,
         curseforge: &CurseForge,
         modrinth: &Modrinth,
@@ -658,7 +684,7 @@ impl ManagerRef<'_, InstanceManager> {
     }
 
     /// The world data pack `row_id` when it is one of the instance's.
-    async fn instance_world_datapack(
+    pub(super) async fn instance_world_datapack(
         self,
         id: InstanceId,
         row_id: &str,
@@ -841,7 +867,10 @@ impl ManagerRef<'_, InstanceManager> {
 
     /// Refuses while the instance's addons may not change or its game is
     /// queued, preparing, running or being deleted.
-    async fn ensure_world_datapacks_may_change(self, id: InstanceId) -> anyhow::Result<()> {
+    pub(super) async fn ensure_world_datapacks_may_change(
+        self,
+        id: InstanceId,
+    ) -> anyhow::Result<()> {
         self.ensure_modpack_not_locked(id).await?;
         let inactive = matches!(
             self.instances
@@ -953,12 +982,15 @@ impl ManagerRef<'_, InstanceManager> {
         };
         // Declared after the gate, so dropped before it on every return.
         let mut staging = staging;
-        if cancel.is_cancelled() {
-            bail!(CLOSING);
-        }
-        // Removed from wherever the root is now, also when refused.
+        #[cfg(test)]
+        self.test_hooks.pause("world_datapack_gate_taken", id).await;
+        // Removed from wherever the root is now, also when refused or
+        // stopped: a rename the install waited for may have moved it.
         if let Ok(path) = publication::current_path(&self.app, id).await {
             staging.root = long_path(&path.get_root());
+        }
+        if cancel.is_cancelled() {
+            bail!(CLOSING);
         }
         self.ensure_world_datapacks_may_change(id).await?;
         let path = publication::current_path(&self.app, id).await?;
@@ -1149,7 +1181,7 @@ impl Drop for Staging {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::managers::App;
     use crate::managers::instance::mods::tests::addon_fixture;
@@ -1159,16 +1191,16 @@ mod tests {
     use sha2::Digest;
     use std::io::Write;
 
-    const GAME: &str = "1.20.1";
-    const CF_PROJECT: i32 = 4242;
+    pub(crate) const GAME: &str = "1.20.1";
+    pub(crate) const CF_PROJECT: i32 = 4242;
 
-    struct Api {
+    pub(crate) struct Api {
         server: mockito::ServerGuard,
-        curseforge: CurseForge,
-        modrinth: Modrinth,
+        pub(crate) curseforge: CurseForge,
+        pub(crate) modrinth: Modrinth,
     }
 
-    async fn api() -> Api {
+    pub(crate) async fn api() -> Api {
         let server = mockito::Server::new_async().await;
         let base = format!("{}/", server.url());
         let client = || reqwest_middleware::ClientBuilder::new(reqwest::Client::new()).build();
@@ -1180,7 +1212,7 @@ mod tests {
     }
 
     impl Api {
-        async fn get(&mut self, path: &str, body: serde_json::Value) {
+        pub(crate) async fn get(&mut self, path: &str, body: serde_json::Value) {
             self.server
                 .mock("GET", path)
                 .match_query(Matcher::Any)
@@ -1190,7 +1222,7 @@ mod tests {
         }
 
         /// Serves `bytes` as the download at `/files/<name>`; returns its URL.
-        async fn file(&mut self, name: &str, bytes: &[u8]) -> String {
+        pub(crate) async fn file(&mut self, name: &str, bytes: &[u8]) -> String {
             let path = format!("/files/{name}");
             self.server
                 .mock("GET", path.as_str())
@@ -1201,7 +1233,7 @@ mod tests {
         }
     }
 
-    fn pack_zip(description: &str) -> Vec<u8> {
+    pub(crate) fn pack_zip(description: &str) -> Vec<u8> {
         let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
         zip.start_file("pack.mcmeta", zip::write::SimpleFileOptions::default())
             .unwrap();
@@ -1223,7 +1255,7 @@ mod tests {
     }
 
     /// A Modrinth version whose one file, `filename` at `url`, holds `bytes`.
-    fn mr_version(
+    pub(crate) fn mr_version(
         id: &str,
         day: u32,
         version_type: &str,
@@ -1246,7 +1278,7 @@ mod tests {
         })
     }
 
-    fn cf_project(class: i32) -> serde_json::Value {
+    pub(crate) fn cf_project(class: i32) -> serde_json::Value {
         json!({
             "id": CF_PROJECT, "gameId": 432, "name": "Curse Pack", "slug": "curse-pack", "summary": "", "status": 4,
             "links": {"websiteUrl": null, "wikiUrl": null, "issuesUrl": null, "sourceUrl": null},
@@ -1258,7 +1290,7 @@ mod tests {
     }
 
     /// `release_type`: 1 release, 2 beta, 3 alpha.
-    fn cf_file(
+    pub(crate) fn cf_file(
         id: i32,
         day: u32,
         release_type: u8,
@@ -1352,7 +1384,7 @@ mod tests {
         Ok((task, work.await??))
     }
 
-    fn entries(folder: &Path) -> Vec<(String, Vec<u8>)> {
+    pub(crate) fn entries(folder: &Path) -> Vec<(String, Vec<u8>)> {
         let mut entries: Vec<_> = match std::fs::read_dir(folder) {
             Ok(entries) => entries
                 .map(|entry| {
@@ -1369,7 +1401,7 @@ mod tests {
 
     /// The instance root's entries and the world's data packs, to show that
     /// a refused or failed install leaves both as they were.
-    fn snapshot(app_root: &Path, world: &Path) -> (Vec<String>, Vec<(String, Vec<u8>)>) {
+    pub(crate) fn snapshot(app_root: &Path, world: &Path) -> (Vec<String>, Vec<(String, Vec<u8>)>) {
         let mut root: Vec<_> = std::fs::read_dir(app_root)
             .unwrap()
             .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
@@ -1384,7 +1416,7 @@ mod tests {
 
     /// An API whose Modrinth project lists `versions` and serves each of
     /// them alone too.
-    async fn modrinth_serving(api: &mut Api, versions: Vec<serde_json::Value>) {
+    pub(crate) async fn modrinth_serving(api: &mut Api, versions: Vec<serde_json::Value>) {
         api.get("/project/project", mr_project()).await;
         for version in &versions {
             api.get(
@@ -1807,7 +1839,7 @@ mod tests {
     }
 
     /// The private folders of installs in an instance root.
-    fn staging_folders(root: &Path) -> Vec<String> {
+    pub(crate) fn staging_folders(root: &Path) -> Vec<String> {
         std::fs::read_dir(root)
             .map(|entries| {
                 entries
@@ -1861,7 +1893,7 @@ mod tests {
         (pause, work)
     }
 
-    async fn without_recycle_bin(app: &App) {
+    pub(crate) async fn without_recycle_bin(app: &App) {
         app.settings_manager()
             .set(
                 carbon_repos::repos::app_configuration::AppConfigurationPatch {
@@ -2128,7 +2160,7 @@ mod tests {
 
     /// Every entry under `folder` with its bytes (none for a folder or a
     /// link), to show a refused change touched nothing.
-    fn tree(folder: &Path) -> Vec<(String, Option<Vec<u8>>)> {
+    pub(crate) fn tree(folder: &Path) -> Vec<(String, Option<Vec<u8>>)> {
         let mut found = Vec::new();
         let mut pending = vec![folder.to_path_buf()];
         while let Some(next) = pending.pop() {
@@ -2166,7 +2198,7 @@ mod tests {
     }
 
     /// `bytes` as `filename` in the `datapacks` folder of `world`.
-    fn put_pack(world: &Path, filename: &str, bytes: &[u8]) -> PathBuf {
+    pub(crate) fn put_pack(world: &Path, filename: &str, bytes: &[u8]) -> PathBuf {
         let path = world.join("datapacks").join(filename);
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
         std::fs::write(&path, bytes).unwrap();
@@ -2174,7 +2206,7 @@ mod tests {
     }
 
     /// The instance's world data pack rows after a scan.
-    async fn scanned_rows(app: &App, id: InstanceId) -> Vec<WorldDatapackRow> {
+    pub(crate) async fn scanned_rows(app: &App, id: InstanceId) -> Vec<WorldDatapackRow> {
         app.instance_manager()
             .scan_world_datapacks(id)
             .await
@@ -2186,7 +2218,7 @@ mod tests {
         rows
     }
 
-    fn row_of<'a>(
+    pub(crate) fn row_of<'a>(
         rows: &'a [WorldDatapackRow],
         world: &str,
         filename: &str,
@@ -3025,5 +3057,108 @@ mod tests {
             entries(pack.parent().unwrap()),
             vec![("pack.zip".to_owned(), b"old".to_vec())]
         );
+    }
+
+    fn renamed(id: InstanceId, name: &str) -> crate::domain::instance::InstanceSettingsUpdate {
+        crate::domain::instance::InstanceSettingsUpdate {
+            instance_id: id,
+            name: Some(name.into()),
+            use_loaded_icon: None,
+            notes: None,
+            version: None,
+            modloader: None,
+            java_override: None,
+            global_java_args: None,
+            extra_java_args: None,
+            memory: None,
+            pre_launch_hook: None,
+            post_exit_hook: None,
+            wrapper_command: None,
+            game_resolution: None,
+            mod_sources: None,
+            modpack_locked: None,
+        }
+    }
+
+    /// A rename the install waited for moves the root; a quit that comes
+    /// once the install holds the gate stops it, and its private folder is
+    /// removed from the renamed root.
+    #[tokio::test]
+    async fn a_quit_once_the_gate_is_taken_after_a_rename_leaves_no_download_behind() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, _) = world_instance(&app, "renamed-then-quit").await;
+        let root = instance_root(&app, id).await;
+        let mut api = api().await;
+        let (pause, work) = install_held_after_download(&app, &mut api, id, &identity).await;
+        let gate = app
+            .instance_manager()
+            .test_hooks
+            .arm("world_datapack_gate_taken", id);
+        let renaming = app.clone();
+        let mut rename = tokio::spawn(async move {
+            renaming
+                .instance_manager()
+                .update_instance(renamed(id, "renamed-then-quit-later"))
+                .await
+        });
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(150), &mut rename)
+                .await
+                .is_err(),
+            "the rename waits for the download"
+        );
+        pause.release.notify_one();
+        tokio::time::timeout(std::time::Duration::from_secs(10), gate.entered.notified())
+            .await
+            .unwrap();
+        rename.await.unwrap().unwrap();
+        let moved = instance_root(&app, id).await;
+        assert_ne!(moved, root);
+        assert_eq!(staging_folders(&moved).len(), 1, "the download moved along");
+        quit(&app).await;
+        gate.release.notify_one();
+
+        let error = work.await.unwrap().unwrap_err();
+
+        assert_eq!(error.to_string(), CLOSING);
+        assert!(staging_folders(&moved).is_empty(), "{moved:?}");
+        assert!(!install_left_behind(&app));
+    }
+
+    /// The replacement cannot be withdrawn: the old pack stays where it
+    /// waits, its folder kept, and the error names the replacement, the
+    /// pack's own path and where it waits. A drop does the same.
+    #[tokio::test]
+    async fn a_replacement_that_cannot_be_withdrawn_keeps_the_old_pack_aside() {
+        for dropped in [false, true] {
+            let (_dir, pack, aside) = take_away_fixture(b"old");
+            let keep = Arc::new(AtomicBool::new(false));
+            let taken = take_away(&pack, &aside, Removal::Permanent, keep.clone())
+                .await
+                .unwrap();
+            let folder = pack.parent().unwrap().to_path_buf();
+            let replacement = folder.join("pack-2.zip");
+            let mut file = crate::util::publish::temp_in(&folder).unwrap();
+            std::io::Write::write_all(&mut file, b"new").unwrap();
+            taken.publish(file, &replacement).await.unwrap();
+            // A folder in its place cannot be removed as a file.
+            std::fs::remove_file(&replacement).unwrap();
+            std::fs::create_dir(&replacement).unwrap();
+            std::fs::write(replacement.join("inside"), b"x").unwrap();
+            let waiting = aside.join("pack.zip");
+
+            if dropped {
+                drop(taken);
+            } else {
+                let error = taken.put_back().await.unwrap_err().to_string();
+                for path in [&replacement, &pack, &waiting] {
+                    assert!(error.contains(&path.display().to_string()), "{error}");
+                }
+            }
+
+            assert!(!pack.exists(), "dropped: {dropped}");
+            assert_eq!(std::fs::read(&waiting).unwrap(), b"old");
+            assert!(keep.load(Ordering::SeqCst));
+        }
     }
 }

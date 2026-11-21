@@ -898,6 +898,19 @@ impl ManagerRef<'_, InstanceManager> {
         instance_id: InstanceId,
         id: String,
     ) -> anyhow::Result<Option<RemoteVersion>> {
+        let platforms = self.app.modplatforms_manager();
+        self.find_mod_update_from(&platforms.curseforge, &platforms.modrinth, instance_id, id)
+            .await
+    }
+
+    /// [`Self::find_mod_update`] asking the given platform clients.
+    pub(super) async fn find_mod_update_from(
+        self,
+        curseforge: &crate::managers::modplatforms::curseforge::CurseForge,
+        modrinth: &crate::managers::modplatforms::modrinth::Modrinth,
+        instance_id: InstanceId,
+        id: String,
+    ) -> anyhow::Result<Option<RemoteVersion>> {
         let instances = self.instances.read().await;
         let instance = instances
             .get(&instance_id)
@@ -928,10 +941,9 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .ok_or_else(|| InvalidInstanceModIdError(instance_id, id.clone()))?;
 
-        let platforms = self.app.modplatforms_manager();
         resolve_mod_update(
-            &platforms.curseforge,
-            &platforms.modrinth,
+            curseforge,
+            modrinth,
             &row,
             version,
             &owned.addon_type,
@@ -1303,7 +1315,7 @@ async fn latest_modrinth_version(
 /// Picks the update `find_mod_update` offers for an installed addon, from what
 /// the platforms report for its project. Kept apart from the instance lookup so
 /// tests can point the platform clients at a stand-in API.
-async fn resolve_mod_update(
+pub(super) async fn resolve_mod_update(
     curseforge: &crate::managers::modplatforms::curseforge::CurseForge,
     modrinth: &crate::managers::modplatforms::modrinth::Modrinth,
     row: &mfcdb::ModUpdateIdsRow,
@@ -1311,6 +1323,32 @@ async fn resolve_mod_update(
     addon_type: &str,
     context: &UpdateContext,
     mod_sources: &ModSources,
+) -> anyhow::Result<Option<RemoteVersion>> {
+    resolve_mod_update_where(
+        curseforge,
+        modrinth,
+        row,
+        version,
+        addon_type,
+        context,
+        mod_sources,
+        |_| true,
+    )
+    .await
+}
+
+/// [`resolve_mod_update`] among the candidates `takes` accepts only, so one
+/// it refuses never hides an older one it accepts.
+#[allow(clippy::too_many_arguments)]
+pub(super) async fn resolve_mod_update_where(
+    curseforge: &crate::managers::modplatforms::curseforge::CurseForge,
+    modrinth: &crate::managers::modplatforms::modrinth::Modrinth,
+    row: &mfcdb::ModUpdateIdsRow,
+    version: &info::StandardVersion,
+    addon_type: &str,
+    context: &UpdateContext,
+    mod_sources: &ModSources,
+    takes: impl Fn(&RemoteVersion) -> bool,
 ) -> anyhow::Result<Option<RemoteVersion>> {
     let cf = row.cf_project_id.zip(row.cf_file_id);
     let mr = row.mr_project_id.clone().zip(row.mr_version_id.clone());
@@ -1382,15 +1420,18 @@ async fn resolve_mod_update(
         versions.extend(response.into_iter().map(|v| RemoteVersion::Modrinth(v)));
     }
 
-    versions.retain(|candidate| match candidate {
-        RemoteVersion::Modrinth(v) => {
-            context.compatible(addon_type, &v.game_versions, &v.loaders)
-                && context.takes_over(addon_type, &v.loaders, &built_for)
-        }
-        RemoteVersion::Curseforge(v) => {
-            context.cf_compatible(addon_type, &v.game_versions)
-                && context.takes_over(addon_type, &v.game_versions, &built_for)
-        }
+    versions.retain(|candidate| {
+        takes(candidate)
+            && match candidate {
+                RemoteVersion::Modrinth(v) => {
+                    context.compatible(addon_type, &v.game_versions, &v.loaders)
+                        && context.takes_over(addon_type, &v.loaders, &built_for)
+                }
+                RemoteVersion::Curseforge(v) => {
+                    context.cf_compatible(addon_type, &v.game_versions)
+                        && context.takes_over(addon_type, &v.game_versions, &built_for)
+                }
+            }
     });
 
     let mut fetched = Vec::new();

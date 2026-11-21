@@ -593,6 +593,17 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation DELETE_WORLD_DATAPACK[app, request: crate::managers::instance::world_datapack_changes::DeleteWorldDatapack] {
             app.instance_manager().delete_world_datapack(request).await
         }
+        mutation UPDATE_WORLD_DATAPACK[app, request: crate::managers::instance::world_datapack_updates::UpdateWorldDatapack] {
+            Ok(FETaskId::from(app.instance_manager().update_world_datapack(request).await?))
+        }
+        mutation UPDATE_DATAPACK_EVERYWHERE[app, request: crate::managers::instance::world_datapack_updates::UpdateDatapackEverywhere] {
+            Ok(app.instance_manager()
+                .update_datapack_everywhere(request)
+                .await?
+                .into_iter()
+                .map(FEDatapackUpdateResult::from)
+                .collect::<Vec<_>>())
+        }
 
         mutation INSTALL_MOD[app, imod: InstallMod] {
             let task = match imod.mod_source {
@@ -2191,6 +2202,29 @@ struct FEWorldDatapack {
     curseforge: Option<CurseForgeModMetadata>,
     modrinth: Option<ModrinthModMetadata>,
     has_update: bool,
+}
+
+/// How updating one copy of a data pack went; `place` is the world's folder
+/// name, or `None` for the instance's own copy.
+#[derive(Type, Serialize, Debug)]
+struct FEDatapackUpdateResult {
+    place: Option<String>,
+    ok: bool,
+    error: Option<String>,
+}
+
+impl From<crate::managers::instance::world_datapack_updates::DatapackUpdateResult>
+    for FEDatapackUpdateResult
+{
+    fn from(
+        value: crate::managers::instance::world_datapack_updates::DatapackUpdateResult,
+    ) -> Self {
+        Self {
+            place: value.place,
+            ok: value.ok,
+            error: value.error,
+        }
+    }
 }
 
 impl From<crate::managers::instance::world_datapacks::World> for FEWorld {

@@ -151,6 +151,8 @@ keys! {
         INSTALL_LATEST_MOD                          = "installLatestMod";
         INSTALL_WORLD_DATAPACK                      = "installWorldDatapack";
         DELETE_WORLD_DATAPACK                       = "deleteWorldDatapack";
+        UPDATE_WORLD_DATAPACK                       = "updateWorldDatapack";
+        UPDATE_DATAPACK_EVERYWHERE                  = "updateDatapackEverywhere";
         CHECK_SHADER_REQUIREMENTS                   = "checkShaderRequirements";
         ENSURE_SHADER_LOADER                       = "ensureShaderLoader";
         VERIFY_SHADER_LOADER                       = "verifyShaderLoader";

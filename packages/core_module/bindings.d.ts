@@ -182,9 +182,11 @@ export type Procedures = {
         { key: "instance.reportShare", input: FEReportShareArgs, result: null } | 
         { key: "instance.setFavorite", input: SetFavorite, result: null } | 
         { key: "instance.setImportScanTarget", input: [ImportEntity, string], result: string } | 
+        { key: "instance.updateDatapackEverywhere", input: UpdateDatapackEverywhere, result: FEDatapackUpdateResult[] } | 
         { key: "instance.updateInstance", input: FEUpdateInstance, result: FETaskId | null } | 
         { key: "instance.updateMod", input: UpdateMod, result: FETaskId } | 
         { key: "instance.updateShare", input: FEUpdateShareArgs, result: null } | 
+        { key: "instance.updateWorldDatapack", input: UpdateWorldDatapack, result: FETaskId } | 
         { key: "java.createCustomJavaVersion", input: string, result: null } | 
         { key: "java.createJavaProfile", input: FECreateJavaProfileArgs, result: null } | 
         { key: "java.deleteJavaProfile", input: string, result: null } | 
@@ -682,6 +684,10 @@ export type CFFEModLinks = { websiteUrl: string | null; wikiUrl: string | null; 
 export type InstallMod = { instance_id: FEInstanceId; mod_source: ModSource; install_deps: boolean; replaces_mod: string | null }
 export type InstallWorldDatapack = { instance_id: number; world: string; identity: string; source: WorldDatapackSource; replaces: string | null }
 export type DeleteWorldDatapack = { instance_id: number; id: string }
+export type UpdateWorldDatapack = { instance_id: number; id: string }
+export type UpdateDatapackEverywhere = { instance_id: number; origin: DatapackOrigin }
+export type DatapackOrigin = { World: string } | { Instance: string }
+export type FEDatapackUpdateResult = { place: string | null; ok: boolean; error: string | null }
 export type WorldDatapackSource = { Modrinth: { project_id: string; version_id: string | null } } | { Curseforge: { project_id: number; file_id: number | null } }
 
 export type AddOpRequest = { serverId: FEServerId; username: string; level: number }
