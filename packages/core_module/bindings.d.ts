@@ -156,6 +156,7 @@ export type Procedures = {
         { key: "instance.deleteMod", input: RetryableInstanceMod, result: FEKeptAddonCopy | null } | 
         { key: "instance.deleteMods", input: DeleteInstanceMods, result: FEDeletedMod[] } | 
         { key: "instance.deleteShare", input: string, result: null } | 
+        { key: "instance.deleteWorldDatapack", input: DeleteWorldDatapack, result: null } | 
         { key: "instance.disableMod", input: RetryableInstanceMod, result: null } | 
         { key: "instance.duplicateInstance", input: DuplicateInstance, result: FEInstanceId } | 
         { key: "instance.enableMod", input: InstanceMod, result: null } | 
@@ -680,6 +681,7 @@ export type CFFEModLinks = { websiteUrl: string | null; wikiUrl: string | null; 
 
 export type InstallMod = { instance_id: FEInstanceId; mod_source: ModSource; install_deps: boolean; replaces_mod: string | null }
 export type InstallWorldDatapack = { instance_id: number; world: string; identity: string; source: WorldDatapackSource; replaces: string | null }
+export type DeleteWorldDatapack = { instance_id: number; id: string }
 export type WorldDatapackSource = { Modrinth: { project_id: string; version_id: string | null } } | { Curseforge: { project_id: number; file_id: number | null } }
 
 export type AddOpRequest = { serverId: FEServerId; username: string; level: number }

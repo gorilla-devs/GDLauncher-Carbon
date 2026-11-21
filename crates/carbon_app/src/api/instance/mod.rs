@@ -590,6 +590,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation INSTALL_WORLD_DATAPACK[app, request: crate::managers::instance::world_datapack_changes::InstallWorldDatapack] {
             Ok(FETaskId::from(app.instance_manager().install_world_datapack(request).await?))
         }
+        mutation DELETE_WORLD_DATAPACK[app, request: crate::managers::instance::world_datapack_changes::DeleteWorldDatapack] {
+            app.instance_manager().delete_world_datapack(request).await
+        }
 
         mutation INSTALL_MOD[app, imod: InstallMod] {
             let task = match imod.mod_source {

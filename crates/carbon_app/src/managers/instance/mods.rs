@@ -572,7 +572,7 @@ impl ManagerRef<'_, InstanceManager> {
 
     /// How a user's Delete of an addon takes it away, as the "Deletion
     /// through Recycle Bin" setting asks.
-    async fn addon_removal(self) -> anyhow::Result<Removal> {
+    pub(super) async fn addon_removal(self) -> anyhow::Result<Removal> {
         Ok(Removal::from_setting(
             self.app
                 .settings_manager()

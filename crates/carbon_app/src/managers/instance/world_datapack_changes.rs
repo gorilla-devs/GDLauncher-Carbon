@@ -9,7 +9,7 @@ use super::{
         dependency::{LoaderFit, best_candidate},
         publication,
     },
-    mods::validate_addon_basename,
+    mods::{addon_metadata, remove_addon_entry, validate_addon_basename},
     run::LaunchState,
     world_datapacks::world_datapacks_folder,
 };
@@ -28,6 +28,10 @@ use crate::{
         runtime_lifecycle::{ActivityPolicy, spawn_retained},
         vtask::{TaskState, VisualTask},
     },
+    util::{
+        publish::{crosses_devices, long_path, rename_noclobber},
+        recycle_bin::Removal,
+    },
 };
 use anyhow::{Context, anyhow, bail};
 use carbon_net::{Checksum, DownloadOptions, Downloadable};
@@ -43,6 +47,7 @@ use carbon_platforms::{
         version::{Version, VersionFile},
     },
 };
+use carbon_repos::repos::world_datapack_cache::{self as wdb, WorldDatapackRow};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
 use tracing::warn;
@@ -71,6 +76,164 @@ pub struct InstallWorldDatapack {
     pub source: WorldDatapackSource,
     /// The id of the world data pack the install replaces.
     pub replaces: Option<String>,
+}
+
+/// The refusal when the row asked for is not one of the instance's world
+/// data packs (any more).
+const PACK_GONE: &str =
+    "This data pack is no longer in the world. Refresh the world list and try again";
+/// The refusal when what is on disk is not the kind of entry the row lists.
+const PACK_CHANGED: &str =
+    "This data pack changed since the world list was read. Refresh it and try again";
+const OTHER_WORLD: &str = "A data pack can only be replaced by one installed into its own world";
+const FOLDER_NOT_REPLACED: &str = "A data pack folder cannot be replaced; remove it instead";
+
+#[derive(Debug, Clone, Deserialize, specta::Type)]
+pub struct DeleteWorldDatapack {
+    pub instance_id: i32,
+    /// The world data pack's id.
+    pub id: String,
+}
+
+/// A pack moved out of the game's sight until its replacement is in place:
+/// then [`TakenAway::send_on`] removes it as the user's Delete would, or
+/// [`TakenAway::put_back`] returns it under its name. Dropped unsettled, it
+/// is put back too.
+pub(super) struct TakenAway {
+    original: PathBuf,
+    aside: PathBuf,
+    removal: Removal,
+    settled: bool,
+}
+
+/// The name a pack waits under beside itself when the private folder is on
+/// another drive. No `.zip` suffix and no folder: the game does not load it
+/// and the scanner does not list it.
+const WAITING: &str = ".gdl-replaced";
+
+/// Moves the entry at `path` into `aside_folder` under its own name, so the
+/// Recycle Bin later shows that name. A rename only, so the entry keeps its
+/// bytes and times; across drives, where a rename cannot reach, it is
+/// renamed beside itself instead. A folder is never left beside itself: the
+/// game would load it under any name.
+pub(super) async fn take_away(
+    path: &Path,
+    aside_folder: &Path,
+    removal: Removal,
+) -> anyhow::Result<TakenAway> {
+    let (original, folder) = (path.to_owned(), aside_folder.to_owned());
+    let aside = tokio::task::spawn_blocking(move || set_aside(&original, &folder)).await??;
+    Ok(TakenAway {
+        original: path.to_owned(),
+        aside,
+        removal,
+        settled: false,
+    })
+}
+
+fn set_aside(path: &Path, folder: &Path) -> anyhow::Result<PathBuf> {
+    let name = path.file_name().context("a data pack has a name")?;
+    std::fs::create_dir_all(folder)?;
+    let aside = folder.join(name);
+    match rename_noclobber(path, &aside) {
+        Ok(()) => return Ok(aside),
+        Err(error) if crosses_devices(&error) => {}
+        Err(error) => {
+            return Err(error).with_context(|| format!("Could not move {} aside", path.display()));
+        }
+    }
+    if std::fs::metadata(path).is_ok_and(|meta| meta.is_dir()) {
+        bail!(
+            "{} is a folder on another drive than the instance, so it cannot be set aside",
+            path.display()
+        );
+    }
+    let beside = path.parent().context("a data pack is in a folder")?;
+    for attempt in 0..100 {
+        let aside = beside.join(format!("{WAITING}-{attempt}"));
+        match rename_noclobber(path, &aside) {
+            Ok(()) => return Ok(aside),
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(error) => {
+                return Err(error)
+                    .with_context(|| format!("Could not move {} aside", path.display()));
+            }
+        }
+    }
+    bail!("Could not find a free name to set {} aside", path.display())
+}
+
+impl TakenAway {
+    fn put_back_failure(&self, error: &std::io::Error) -> anyhow::Error {
+        anyhow!(
+            "{} could not be put back and is kept at {}: {error}",
+            self.original.display(),
+            self.aside.display()
+        )
+    }
+
+    /// Returns the entry under its original name, never over something
+    /// that took that name meanwhile.
+    pub(super) async fn put_back(mut self) -> anyhow::Result<()> {
+        let (aside, original) = (self.aside.clone(), self.original.clone());
+        let moved =
+            tokio::task::spawn_blocking(move || rename_noclobber(&aside, &original)).await?;
+        self.settled = true;
+        moved.map_err(|error| self.put_back_failure(&error))
+    }
+
+    /// Removes the entry as the "Deletion through Recycle Bin" setting
+    /// asked. On failure it is still where it waited and can be put back.
+    pub(super) async fn send_on(&mut self) -> anyhow::Result<()> {
+        if let Some(meta) = addon_metadata(&self.aside).await?
+            && !remove_addon_entry(&self.aside, &meta, meta.is_dir(), self.removal).await?
+        {
+            bail!(
+                "{} is no file or folder that can be deleted",
+                self.aside.display()
+            );
+        }
+        self.settled = true;
+        Ok(())
+    }
+}
+
+impl Drop for TakenAway {
+    fn drop(&mut self) {
+        if !self.settled
+            && let Err(error) = rename_noclobber(&self.aside, &self.original)
+        {
+            warn!("{}", self.put_back_failure(&error));
+        }
+    }
+}
+
+/// Refuses when the entry at `path` (lstat `meta`) is not the kind of entry
+/// its row lists: a folder for a folder row, a file otherwise. A link is
+/// judged by what it points to; a dangling one passes, as only the link
+/// itself is ever removed.
+async fn ensure_listed_kind(
+    path: &Path,
+    meta: &std::fs::Metadata,
+    is_folder: bool,
+) -> anyhow::Result<()> {
+    let kind = if meta.file_type().is_symlink() {
+        match tokio::fs::metadata(path).await {
+            Ok(followed) => followed,
+            Err(_) => return Ok(()),
+        }
+    } else {
+        meta.clone()
+    };
+    let listed = if is_folder {
+        kind.is_dir()
+    } else {
+        kind.is_file()
+    };
+    if !listed {
+        bail!(PACK_CHANGED);
+    }
+    Ok(())
 }
 
 fn no_data_pack(game: &str) -> anyhow::Error {
@@ -342,6 +505,136 @@ impl ManagerRef<'_, InstanceManager> {
         Ok((task_id, handle))
     }
 
+    /// Removes one data pack from a world, as the "Deletion through Recycle
+    /// Bin" setting asks. Refused, leaving the world as it is, when the
+    /// instance's addons may not change now or the row does not name an
+    /// entry of the `datapacks` folder of one of the instance's saves.
+    pub async fn delete_world_datapack(self, request: DeleteWorldDatapack) -> anyhow::Result<()> {
+        let _activity = self
+            .app
+            .runtime_lifecycle
+            .admit("delete a data pack from a world")?;
+        let id = InstanceId(request.instance_id);
+        {
+            let _operation = self.lock_instance(id).await;
+            self.ensure_world_datapacks_may_change(id).await?;
+            let row = self
+                .instance_world_datapack(id, &request.id)
+                .await?
+                .context(PACK_GONE)?;
+            let removal = self.addon_removal().await?;
+            // None: the `datapacks` folder is gone, and the pack with it.
+            if let Some(path) = self.world_datapack_entry(id, &row).await?
+                && let Some(meta) = addon_metadata(&path).await?
+            {
+                ensure_listed_kind(&path, &meta, row.is_folder).await?;
+                // A link is removed by itself, never what it points to.
+                let is_directory = row.is_folder && !meta.file_type().is_symlink();
+                if !remove_addon_entry(&path, &meta, is_directory, removal).await? {
+                    bail!(PACK_CHANGED);
+                }
+            }
+            wdb::delete_world_datapack_by_id(&self.app.db, &row.id).await?;
+        }
+        self.refresh_worlds(id, "a removal").await;
+        Ok(())
+    }
+
+    /// The world data pack `row_id` when it is one of the instance's.
+    async fn instance_world_datapack(
+        self,
+        id: InstanceId,
+        row_id: &str,
+    ) -> anyhow::Result<Option<WorldDatapackRow>> {
+        Ok(wdb::get_world_datapack_by_id(&self.app.db, row_id)
+            .await?
+            .filter(|row| row.instance_id == *id))
+    }
+
+    /// Where the entry `row` lists is: `saves/<world>/datapacks/<filename>`,
+    /// with each a single name, the world an existing save and its
+    /// `datapacks` folder followed when it is a link, so the entry is a
+    /// direct child of that folder. `None` when there is no `datapacks`
+    /// folder. Call with the instance gate held.
+    async fn world_datapack_entry(
+        self,
+        id: InstanceId,
+        row: &WorldDatapackRow,
+    ) -> anyhow::Result<Option<PathBuf>> {
+        validate_addon_basename(&row.world)?;
+        validate_addon_basename(&row.filename)?;
+        let path = publication::current_path(&self.app, id).await?;
+        let root = path.get_root();
+        let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
+        world_identity(id, &root, &saves.join(&row.world)).await?;
+        let folder = world_datapacks_folder(&saves, &row.world);
+        if !publication::followed_folder(&folder).await? {
+            return Ok(None);
+        }
+        Ok(Some(folder.join(&row.filename)))
+    }
+
+    /// The row an install into `world` replaces, refused when it is in
+    /// another world or a folder. `None` when it is no longer there.
+    async fn replaceable_row(
+        self,
+        id: InstanceId,
+        world: &str,
+        row_id: &str,
+    ) -> anyhow::Result<Option<WorldDatapackRow>> {
+        let Some(row) = self.instance_world_datapack(id, row_id).await? else {
+            return Ok(None);
+        };
+        if row.world != world {
+            bail!(OTHER_WORLD);
+        }
+        if row.is_folder {
+            bail!(FOLDER_NOT_REPLACED);
+        }
+        Ok(Some(row))
+    }
+
+    /// The file an install replaces, as it is now under the gate. `None`
+    /// when it went since the install was admitted: nothing to take away.
+    async fn replaced_entry(
+        self,
+        id: InstanceId,
+        world: &str,
+        row_id: &str,
+    ) -> anyhow::Result<Option<PathBuf>> {
+        let Some(row) = self.replaceable_row(id, world, row_id).await? else {
+            return Ok(None);
+        };
+        let Some(path) = self.world_datapack_entry(id, &row).await? else {
+            return Ok(None);
+        };
+        let Some(meta) = addon_metadata(&path).await? else {
+            return Ok(None);
+        };
+        ensure_listed_kind(&path, &meta, false).await?;
+        Ok(Some(path))
+    }
+
+    /// Rescans the worlds after a change by `what`, and tells the frontend.
+    async fn refresh_worlds(self, id: InstanceId, what: &str) {
+        match self.scan_world_datapacks(id).await {
+            Ok(true) => {
+                self.app
+                    .meta_cache_manager()
+                    .queue_platform_passes(CacheEntityId::Instance(id))
+                    .await;
+            }
+            Ok(false) => {}
+            Err(error) => warn!(
+                ?error,
+                "Instance {id}: could not scan the data packs in its worlds after {what}"
+            ),
+        }
+        // Also when the scan saw no change: a recorded identity is new.
+        self.app.invalidate(GET_WORLDS, Some((*id).into()));
+        self.app.invalidate(INSTANCE_MODS, Some((*id).into()));
+    }
+
     /// Everything before the download: the refusals, the build to install,
     /// its private folder and the visual task.
     async fn admit_world_datapack_install(
@@ -356,9 +649,6 @@ impl ManagerRef<'_, InstanceManager> {
         Staging,
         InstanceRootGuard,
     )> {
-        if request.replaces.is_some() {
-            bail!("Replacing a data pack in a world is not supported yet");
-        }
         let id = InstanceId(request.instance_id);
         validate_addon_basename(&request.world)?;
         let game = self.runs(id).await?.release;
@@ -376,6 +666,14 @@ impl ManagerRef<'_, InstanceManager> {
 
         let operation = self.lock_instance(id).await;
         self.ensure_world_datapacks_may_change(id).await?;
+        let replaced = match &request.replaces {
+            Some(row_id) => Some(
+                self.replaceable_row(id, &request.world, row_id)
+                    .await?
+                    .context(PACK_GONE)?,
+            ),
+            None => None,
+        };
         let path = publication::current_path(&self.app, id).await?;
         let root = path.get_root();
         let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
@@ -384,7 +682,12 @@ impl ManagerRef<'_, InstanceManager> {
             bail!(WORLD_CHANGED);
         }
         let folder = world_datapacks_folder(&saves, &request.world);
-        if publication::followed_folder(&folder).await?
+        // An update keeps the file name: the name is its own, not taken.
+        let own_name = replaced
+            .as_ref()
+            .is_some_and(|row| row.filename == build.filename);
+        if !own_name
+            && publication::followed_folder(&folder).await?
             && publication::selected_file(&folder, &build.filename)
                 .await?
                 .is_some()
@@ -452,7 +755,7 @@ impl ManagerRef<'_, InstanceManager> {
         task: &VisualTask,
         cancel: &tokio_util::sync::CancellationToken,
         build: WorldDatapackBuild,
-        mut staging: Staging,
+        staging: Staging,
         root_hold: InstanceRootGuard,
         request: InstallWorldDatapack,
     ) -> anyhow::Result<PathBuf> {
@@ -486,48 +789,11 @@ impl ManagerRef<'_, InstanceManager> {
         // Given back before the gate is taken (the gate comes first). The
         // downloader is done with the folder: a delete that goes first
         // removes it with the instance, a rename moves it with the root,
-        // and both are seen under the gate below.
+        // and both are seen under the gate.
         drop(root_hold);
-        let destination = {
-            let _operation = self.lock_instance(id).await;
-            // Removed from wherever the root is now, also when refused.
-            if let Ok(path) = publication::current_path(&self.app, id).await {
-                staging.root = crate::util::publish::long_path(&path.get_root());
-            }
-            self.ensure_world_datapacks_may_change(id).await?;
-            let path = publication::current_path(&self.app, id).await?;
-            let root = path.get_root();
-            let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
-            let world = saves.join(&request.world);
-            // Before the folder is made: never in a save put in its place.
-            // A moved root also gives the save another identity.
-            if world_identity(id, &root, &world).await? != request.identity {
-                bail!("Selected world changed during copying; no datapack published");
-            }
-            let artifact = staging.path().join(ARTIFACT);
-            let temporary = tempfile::NamedTempFile::from_parts(
-                std::fs::File::open(&artifact)
-                    .with_context(|| format!("The download of {} is gone", build.filename))?,
-                tempfile::TempPath::from_path(&artifact),
-            );
-            let folder = world_datapacks_folder(&saves, &request.world);
-            if !publication::followed_folder(&folder).await? {
-                tokio::fs::create_dir(&folder).await?;
-            }
-            let destination = self
-                .publish_into_world(
-                    id,
-                    &root,
-                    temporary,
-                    &world,
-                    &request.identity,
-                    &build.filename,
-                )
-                .await?;
-            // Nothing of the install is left in the root once the gate goes.
-            drop(staging);
-            destination
-        };
+        let destination = self
+            .publish_world_datapack_download(id, &build.filename, staging, &request)
+            .await?;
         // The pack is in the world: from here on nothing fails the install.
         if let Err(error) = self
             .record_world_datapack_identity(&destination, &build.filename, &build.identity)
@@ -539,23 +805,135 @@ impl ManagerRef<'_, InstanceManager> {
                 build.filename
             );
         }
-        match self.scan_world_datapacks(id).await {
-            Ok(true) => {
-                self.app
-                    .meta_cache_manager()
-                    .queue_platform_passes(CacheEntityId::Instance(id))
-                    .await;
-            }
-            Ok(false) => {}
-            Err(error) => warn!(
-                ?error,
-                "Instance {id}: could not scan the data packs in its worlds after an install"
-            ),
-        }
-        // Also when the scan saw no change: the recorded identity is new.
-        self.app.invalidate(GET_WORLDS, Some((*id).into()));
-        self.app.invalidate(INSTANCE_MODS, Some((*id).into()));
+        self.refresh_worlds(id, "an install").await;
         Ok(destination)
+    }
+
+    /// Under the instance gate: the re-checks, then the publication, with
+    /// the pack the install replaces taken away first. The private folder
+    /// goes before the gate on every return, so a delete or a rename queued
+    /// behind the gate never meets it half removed.
+    async fn publish_world_datapack_download(
+        self,
+        id: InstanceId,
+        filename: &str,
+        staging: Staging,
+        request: &InstallWorldDatapack,
+    ) -> anyhow::Result<PathBuf> {
+        let operation = self.lock_instance(id).await;
+        // Declared after the gate, so dropped before it on every return.
+        let mut staging = staging;
+        // Removed from wherever the root is now, also when refused.
+        if let Ok(path) = publication::current_path(&self.app, id).await {
+            staging.root = long_path(&path.get_root());
+        }
+        self.ensure_world_datapacks_may_change(id).await?;
+        let path = publication::current_path(&self.app, id).await?;
+        let root = path.get_root();
+        let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
+        let world = saves.join(&request.world);
+        // Before the folder is made: never in a save put in its place.
+        // A moved root also gives the save another identity.
+        if world_identity(id, &root, &world).await? != request.identity {
+            bail!("Selected world changed during copying; no datapack published");
+        }
+        let artifact = staging.path().join(ARTIFACT);
+        let temporary = tempfile::NamedTempFile::from_parts(
+            std::fs::File::open(&artifact)
+                .with_context(|| format!("The download of {filename} is gone"))?,
+            tempfile::TempPath::from_path(&artifact),
+        );
+        let folder = world_datapacks_folder(&saves, &request.world);
+        if !publication::followed_folder(&folder).await? {
+            tokio::fs::create_dir(&folder).await?;
+        }
+        let replaced = match &request.replaces {
+            Some(row_id) => self.replaced_entry(id, &request.world, row_id).await?,
+            None => None,
+        };
+        let removal = self.addon_removal().await?;
+        let (app, identity, filename) = (
+            self.app.clone(),
+            request.identity.clone(),
+            filename.to_owned(),
+        );
+        // Runs to its end even when the install is stopped: once the old
+        // pack is taken away it is either back or sent on its way, and the
+        // private folder it waits in goes only after that.
+        tokio::spawn(async move {
+            let published = app
+                .instance_manager()
+                .publish_replacing(
+                    id,
+                    &root,
+                    temporary,
+                    &world,
+                    &identity,
+                    &filename,
+                    replaced,
+                    &mut staging,
+                    removal,
+                )
+                .await;
+            drop(staging);
+            drop(operation);
+            published
+        })
+        .await?
+    }
+
+    /// [`Self::publish_into_world`], after taking `replaced` away when
+    /// there is one. The old pack is sent on its way with `removal` only
+    /// once the new one is in place; when publishing fails, or the Recycle
+    /// Bin refuses the old pack, the world is put back as it was. When the
+    /// old pack cannot go back, the error says where it is, and `staging`
+    /// is kept so it stays there.
+    #[allow(clippy::too_many_arguments)]
+    async fn publish_replacing(
+        self,
+        id: InstanceId,
+        root: &Path,
+        temporary: tempfile::NamedTempFile,
+        world: &Path,
+        identity: &str,
+        filename: &str,
+        replaced: Option<PathBuf>,
+        staging: &mut Staging,
+        removal: Removal,
+    ) -> anyhow::Result<PathBuf> {
+        let Some(old) = replaced else {
+            return self
+                .publish_into_world(id, root, temporary, world, identity, filename)
+                .await;
+        };
+        let mut taken = take_away(&old, &staging.path().join(REPLACED), removal).await?;
+        let (error, withdrawn) = match self
+            .publish_into_world(id, root, temporary, world, identity, filename)
+            .await
+        {
+            Ok(destination) => match taken.send_on().await {
+                Ok(()) => return Ok(destination),
+                // The new file is this install's own: erased so the old
+                // one can have its name back.
+                Err(error) => (
+                    error,
+                    tokio::fs::remove_file(&destination)
+                        .await
+                        .with_context(|| format!("{} could not be removed", destination.display()))
+                        .err(),
+                ),
+            },
+            Err(error) => (error, None),
+        };
+        let mut message = format!("{error:#}");
+        if let Some(withdrawn) = withdrawn {
+            message.push_str(&format!(". {withdrawn:#}"));
+        }
+        if let Err(put_back) = taken.put_back().await {
+            staging.keep();
+            message.push_str(&format!(". {put_back:#}"));
+        }
+        Err(anyhow!(message))
     }
 
     /// The platform's identity of a file just published, recorded at once:
@@ -590,6 +968,9 @@ impl ManagerRef<'_, InstanceManager> {
 
 /// The name of the download inside the install's private folder.
 const ARTIFACT: &str = "artifact";
+/// The folder inside the install's private folder where the pack it
+/// replaces waits for the new one.
+const REPLACED: &str = "replaced";
 
 /// An install's private folder in the instance root, removed when dropped
 /// from under `root`, which follows the instance's folder if a rename moved
@@ -597,11 +978,12 @@ const ARTIFACT: &str = "artifact";
 struct Staging {
     root: PathBuf,
     name: std::ffi::OsString,
+    kept: bool,
 }
 
 impl Staging {
     fn new(root: &Path) -> std::io::Result<Self> {
-        let root = crate::util::publish::long_path(root);
+        let root = long_path(root);
         let folder = tempfile::Builder::new()
             .prefix(".tmp")
             .tempdir_in(&root)?
@@ -610,16 +992,28 @@ impl Staging {
             .file_name()
             .expect("a temporary folder has a name")
             .to_owned();
-        Ok(Self { root, name })
+        Ok(Self {
+            root,
+            name,
+            kept: false,
+        })
     }
 
     fn path(&self) -> PathBuf {
         self.root.join(&self.name)
     }
+
+    /// Leaves the folder in place: it holds a pack an error names.
+    fn keep(&mut self) {
+        self.kept = true;
+    }
 }
 
 impl Drop for Staging {
     fn drop(&mut self) {
+        if self.kept {
+            return;
+        }
         match std::fs::remove_dir_all(self.path()) {
             Ok(()) => {}
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
@@ -1150,13 +1544,13 @@ mod tests {
             refused(request(id, "another world", modrinth(None))).await,
             "Selected world changed. Refresh the world list and select it again"
         );
-        assert!(
+        assert_eq!(
             refused(InstallWorldDatapack {
                 replaces: Some("row".into()),
                 ..request(id, &identity, modrinth(None))
             })
-            .await
-            .contains("not supported")
+            .await,
+            PACK_GONE
         );
         assert_eq!(snapshot(&root, &world), before);
 
@@ -1608,5 +2002,730 @@ mod tests {
         let pack = &listed[0].datapacks[0];
         assert_eq!(pack.name.as_deref(), Some("Curse Pack"));
         assert_eq!(pack.curseforge.as_ref().unwrap().file_id, 20);
+    }
+
+    /// Every entry under `folder` with its bytes (none for a folder or a
+    /// link), to show a refused change touched nothing.
+    fn tree(folder: &Path) -> Vec<(String, Option<Vec<u8>>)> {
+        let mut found = Vec::new();
+        let mut pending = vec![folder.to_path_buf()];
+        while let Some(next) = pending.pop() {
+            let Ok(entries) = std::fs::read_dir(&next) else {
+                continue;
+            };
+            for entry in entries {
+                let path = entry.unwrap().path();
+                let meta = std::fs::symlink_metadata(&path).unwrap();
+                let name = path
+                    .strip_prefix(folder)
+                    .unwrap()
+                    .to_string_lossy()
+                    .into_owned();
+                if meta.is_dir() {
+                    pending.push(path);
+                    found.push((name, None));
+                } else if meta.is_file() {
+                    found.push((name, Some(std::fs::read(&path).unwrap())));
+                } else {
+                    found.push((name, None));
+                }
+            }
+        }
+        found.sort();
+        found
+    }
+
+    /// A save `name` beside `world`, holding `level.dat`.
+    fn add_world(world: &Path, name: &str) -> PathBuf {
+        let other = world.with_file_name(name);
+        std::fs::create_dir_all(other.join("datapacks")).unwrap();
+        std::fs::write(other.join("level.dat"), b"save").unwrap();
+        other
+    }
+
+    /// `bytes` as `filename` in the `datapacks` folder of `world`.
+    fn put_pack(world: &Path, filename: &str, bytes: &[u8]) -> PathBuf {
+        let path = world.join("datapacks").join(filename);
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(&path, bytes).unwrap();
+        path
+    }
+
+    /// The instance's world data pack rows after a scan.
+    async fn scanned_rows(app: &App, id: InstanceId) -> Vec<WorldDatapackRow> {
+        app.instance_manager()
+            .scan_world_datapacks(id)
+            .await
+            .unwrap();
+        let mut rows = wdb::get_world_datapacks_by_instance(&app.db, *id)
+            .await
+            .unwrap();
+        rows.sort_by(|a, b| (&a.world, &a.filename).cmp(&(&b.world, &b.filename)));
+        rows
+    }
+
+    fn row_of<'a>(
+        rows: &'a [WorldDatapackRow],
+        world: &str,
+        filename: &str,
+    ) -> &'a WorldDatapackRow {
+        rows.iter()
+            .find(|row| row.world == world && row.filename == filename)
+            .unwrap_or_else(|| panic!("no row for {world}/{filename} in {rows:?}"))
+    }
+
+    async fn delete(app: &App, id: InstanceId, row: &str) -> anyhow::Result<()> {
+        app.instance_manager()
+            .delete_world_datapack(DeleteWorldDatapack {
+                instance_id: *id,
+                id: row.to_owned(),
+            })
+            .await
+    }
+
+    async fn row_exists(app: &App, row: &str) -> bool {
+        wdb::get_world_datapack_by_id(&app.db, row)
+            .await
+            .unwrap()
+            .is_some()
+    }
+
+    /// Two worlds holding the same file: removing it from one leaves the
+    /// other's file and row as they were.
+    #[tokio::test]
+    async fn removing_a_pack_leaves_the_same_file_in_another_world() {
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, _, world) = world_instance(&app, "remove-one").await;
+        let other = add_world(&world, "Other");
+        let zip = pack_zip("shared");
+        let removed = put_pack(&world, "pack.zip", &zip);
+        let kept = put_pack(&other, "pack.zip", &zip);
+        let rows = scanned_rows(&app, id).await;
+        let (target, other_row) = (
+            row_of(&rows, "World", "pack.zip").clone(),
+            row_of(&rows, "Other", "pack.zip").clone(),
+        );
+        let mut events = app.invalidation_channel.subscribe();
+
+        delete(&app, id, &target.id).await.unwrap();
+
+        assert!(!removed.exists());
+        assert!(!crate::util::recycle_bin::bin_under_test(&removed).exists());
+        assert_eq!(std::fs::read(&kept).unwrap(), zip);
+        assert_eq!(scanned_rows(&app, id).await, vec![other_row]);
+        assert!(!row_exists(&app, &target.id).await);
+        assert!(worlds_invalidated(&mut events, id));
+    }
+
+    #[tokio::test]
+    async fn a_removed_pack_goes_to_the_recycle_bin_by_default() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, _, world) = world_instance(&app, "remove-binned").await;
+        let zip = pack_zip("binned");
+        let path = put_pack(&world, "pack.zip", &zip);
+        let rows = scanned_rows(&app, id).await;
+
+        delete(&app, id, &rows[0].id).await.unwrap();
+
+        assert!(!path.exists());
+        assert_eq!(
+            std::fs::read(crate::util::recycle_bin::bin_under_test(&path).join("pack.zip"))
+                .unwrap(),
+            zip
+        );
+        assert!(scanned_rows(&app, id).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_folder_pack_is_removed() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, _, world) = world_instance(&app, "remove-folder").await;
+        let folder = world.join("datapacks/unpacked");
+        std::fs::create_dir_all(folder.join("data")).unwrap();
+        std::fs::write(
+            folder.join("pack.mcmeta"),
+            br#"{"pack":{"pack_format":15}}"#,
+        )
+        .unwrap();
+        std::fs::write(folder.join("data/function.mcfunction"), b"say hi").unwrap();
+        let kept = put_pack(&world, "kept.zip", &pack_zip("kept"));
+        let rows = scanned_rows(&app, id).await;
+        let target = row_of(&rows, "World", "unpacked");
+        assert!(target.is_folder);
+
+        delete(&app, id, &target.id).await.unwrap();
+
+        assert!(!folder.exists());
+        let binned = crate::util::recycle_bin::bin_under_test(&folder).join("unpacked");
+        assert_eq!(
+            std::fs::read(binned.join("data/function.mcfunction")).unwrap(),
+            b"say hi"
+        );
+        assert!(kept.exists());
+        let rows = scanned_rows(&app, id).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].filename, "kept.zip");
+    }
+
+    #[tokio::test]
+    async fn a_pack_already_gone_loses_its_row() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, _, world) = world_instance(&app, "remove-gone").await;
+        let path = put_pack(&world, "pack.zip", &pack_zip("gone"));
+        let rows = scanned_rows(&app, id).await;
+        std::fs::remove_file(&path).unwrap();
+
+        delete(&app, id, &rows[0].id).await.unwrap();
+
+        assert!(!row_exists(&app, &rows[0].id).await);
+    }
+
+    /// A row whose world or file name is no single name inside the save's
+    /// `datapacks` folder is refused, and nothing anywhere in the saves is
+    /// touched.
+    #[tokio::test]
+    async fn a_row_naming_a_path_outside_the_datapacks_folder_is_refused() {
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, _, world) = world_instance(&app, "remove-escape").await;
+        put_pack(&world, "pack.zip", &pack_zip("kept"));
+        std::fs::create_dir_all(world.join("datapacks/sub")).unwrap();
+        std::fs::write(world.join("datapacks/sub/pack.zip"), pack_zip("nested")).unwrap();
+        let saves = world.parent().unwrap().to_path_buf();
+        let before = tree(&saves);
+        for (world_name, filename) in [
+            ("World", "../level.dat"),
+            ("World", "sub/pack.zip"),
+            ("World", ".."),
+            ("World", ""),
+            ("..", "World"),
+            ("World/datapacks", "pack.zip"),
+            ("", "pack.zip"),
+        ] {
+            wdb::upsert_world_datapack(
+                &app.db,
+                *id,
+                world_name,
+                filename,
+                0,
+                filename == "..",
+                None,
+                None,
+                carbon_repos::dbtypes::DbDateTime(chrono::Utc::now().fixed_offset()),
+            )
+            .await
+            .unwrap();
+            let row = wdb::get_world_datapacks_by_instance(&app.db, *id)
+                .await
+                .unwrap()
+                .into_iter()
+                .find(|row| row.world == world_name && row.filename == filename)
+                .unwrap();
+            let error = delete(&app, id, &row.id).await.unwrap_err().to_string();
+            assert_eq!(error, "invalid addon filename", "{world_name}/{filename}");
+            assert_eq!(tree(&saves), before, "{world_name}/{filename}");
+            assert!(row_exists(&app, &row.id).await);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_row_of_another_instance_is_refused() {
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, _, _) = world_instance(&app, "remove-asking").await;
+        let (owner, _, world) = world_instance(&app, "remove-owning").await;
+        let path = put_pack(&world, "pack.zip", &pack_zip("owned"));
+        let rows = scanned_rows(&app, owner).await;
+
+        let error = delete(&app, id, &rows[0].id).await.unwrap_err();
+
+        assert_eq!(error.to_string(), PACK_GONE);
+        assert!(path.exists());
+        assert!(row_exists(&app, &rows[0].id).await);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_linked_datapacks_folder_loses_only_the_entry_inside() {
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, _, world) = world_instance(&app, "remove-linked").await;
+        let shared = tempfile::tempdir().unwrap();
+        std::fs::write(shared.path().join("a.zip"), pack_zip("a")).unwrap();
+        std::fs::write(shared.path().join("b.zip"), pack_zip("b")).unwrap();
+        std::os::unix::fs::symlink(shared.path(), world.join("datapacks")).unwrap();
+        let rows = scanned_rows(&app, id).await;
+
+        delete(&app, id, &row_of(&rows, "World", "a.zip").id)
+            .await
+            .unwrap();
+
+        assert!(!shared.path().join("a.zip").exists());
+        assert!(shared.path().join("b.zip").exists());
+        let link = std::fs::symlink_metadata(world.join("datapacks")).unwrap();
+        assert!(link.file_type().is_symlink());
+        let rows = scanned_rows(&app, id).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].filename, "b.zip");
+    }
+
+    /// A zip row whose name is now a folder (or the other way round) is
+    /// refused: it is not what the user chose to remove.
+    #[tokio::test]
+    async fn an_entry_that_is_no_longer_the_listed_kind_is_refused() {
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, _, world) = world_instance(&app, "remove-kind").await;
+        let path = put_pack(&world, "pack.zip", &pack_zip("zip"));
+        let rows = scanned_rows(&app, id).await;
+        std::fs::remove_file(&path).unwrap();
+        std::fs::create_dir(&path).unwrap();
+        std::fs::write(path.join("level.dat"), b"not a pack").unwrap();
+        let before = tree(&world);
+
+        let error = delete(&app, id, &rows[0].id).await.unwrap_err();
+
+        assert_eq!(error.to_string(), PACK_CHANGED);
+        assert_eq!(tree(&world), before);
+    }
+
+    #[tokio::test]
+    async fn a_delete_the_instance_cannot_take_now_changes_nothing() {
+        use crate::managers::instance::run::RunningInstance;
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, _, world) = world_instance(&app, "remove-running").await;
+        put_pack(&world, "pack.zip", &pack_zip("running"));
+        let rows = scanned_rows(&app, id).await;
+        let before = tree(&world);
+        let set_state = |state: LaunchState| {
+            let app = app.clone();
+            async move {
+                app.instance_manager()
+                    .instances
+                    .write()
+                    .await
+                    .get_mut(&id)
+                    .unwrap()
+                    .data_mut()
+                    .unwrap()
+                    .state = state;
+            }
+        };
+        set_state(LaunchState::Running(RunningInstance::adopted(
+            u32::MAX,
+            1,
+            chrono::Utc::now(),
+            chrono::Utc::now(),
+        )))
+        .await;
+        let error = delete(&app, id, &rows[0].id).await.unwrap_err();
+        assert!(error.to_string().contains("running"), "{error}");
+        set_state(LaunchState::Inactive { failed_task: None }).await;
+        assert_eq!(tree(&world), before);
+        assert!(row_exists(&app, &rows[0].id).await);
+
+        // A world that is no save any more.
+        std::fs::remove_file(world.join("level.dat")).unwrap();
+        let before = tree(&world);
+        delete(&app, id, &rows[0].id)
+            .await
+            .expect_err("a folder without level.dat is no save");
+        assert_eq!(tree(&world), before);
+    }
+
+    /// An API serving one Modrinth data pack version, `filename` holding
+    /// `bytes`.
+    async fn serving(api: &mut Api, filename: &str, bytes: &[u8]) {
+        let url = api.file(filename, bytes).await;
+        modrinth_serving(
+            api,
+            vec![mr_version(
+                "release",
+                10,
+                "release",
+                &["datapack"],
+                (filename, &url, bytes),
+            )],
+        )
+        .await;
+    }
+
+    fn replacing(id: InstanceId, identity: &str, world: &str, row: &str) -> InstallWorldDatapack {
+        InstallWorldDatapack {
+            world: world.into(),
+            replaces: Some(row.into()),
+            ..request(id, identity, modrinth(None))
+        }
+    }
+
+    /// An update under the same name leaves the new file alone in the
+    /// world, and the same file in another world with its row.
+    #[tokio::test]
+    async fn an_update_replaces_the_pack_under_the_same_name() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "replace-same").await;
+        let other = add_world(&world, "Other");
+        let old = pack_zip("old");
+        put_pack(&world, "pack.zip", &old);
+        let other_pack = put_pack(&other, "pack.zip", &old);
+        let rows = scanned_rows(&app, id).await;
+        let other_row = row_of(&rows, "Other", "pack.zip").clone();
+        let mut api = api().await;
+        let new = pack_zip("new");
+        serving(&mut api, "pack.zip", &new).await;
+        let root = instance_root(&app, id).await;
+
+        install(
+            &app,
+            &api,
+            replacing(
+                id,
+                &identity,
+                "World",
+                &row_of(&rows, "World", "pack.zip").id,
+            ),
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(
+            entries(&world.join("datapacks")),
+            vec![("pack.zip".to_owned(), new)]
+        );
+        assert_eq!(std::fs::read(&other_pack).unwrap(), old);
+        assert!(staging_folders(&root).is_empty());
+        let rows = scanned_rows(&app, id).await;
+        assert_eq!(rows.len(), 2);
+        assert_eq!(row_of(&rows, "Other", "pack.zip"), &other_row);
+    }
+
+    #[tokio::test]
+    async fn a_replace_by_another_file_name_leaves_only_the_new_one() {
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, identity, world) = world_instance(&app, "replace-renamed").await;
+        put_pack(&world, "pack-1.zip", &pack_zip("one"));
+        let rows = scanned_rows(&app, id).await;
+        let mut api = api().await;
+        let new = pack_zip("two");
+        serving(&mut api, "pack-2.zip", &new).await;
+        let root = instance_root(&app, id).await;
+
+        install(&app, &api, replacing(id, &identity, "World", &rows[0].id))
+            .await
+            .unwrap();
+
+        assert_eq!(
+            entries(&world.join("datapacks")),
+            vec![("pack-2.zip".to_owned(), new)]
+        );
+        assert!(staging_folders(&root).is_empty());
+        let rows = scanned_rows(&app, id).await;
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].filename, "pack-2.zip");
+    }
+
+    #[tokio::test]
+    async fn a_replace_whose_new_name_holds_a_third_file_is_refused() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "replace-taken").await;
+        put_pack(&world, "pack-1.zip", &pack_zip("one"));
+        put_pack(&world, "pack-2.zip", b"the user's own");
+        let rows = scanned_rows(&app, id).await;
+        let mut api = api().await;
+        serving(&mut api, "pack-2.zip", &pack_zip("two")).await;
+        let root = instance_root(&app, id).await;
+        let before = snapshot(&root, &world);
+
+        let error = install(
+            &app,
+            &api,
+            replacing(
+                id,
+                &identity,
+                "World",
+                &row_of(&rows, "World", "pack-1.zip").id,
+            ),
+        )
+        .await
+        .unwrap_err();
+
+        assert_eq!(error.to_string(), NAME_TAKEN);
+        assert_eq!(snapshot(&root, &world), before);
+    }
+
+    #[tokio::test]
+    async fn a_replace_across_two_worlds_or_of_a_folder_is_refused() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "replace-refused").await;
+        let other = add_world(&world, "Other");
+        put_pack(&other, "pack.zip", &pack_zip("other"));
+        std::fs::create_dir_all(world.join("datapacks/unpacked")).unwrap();
+        std::fs::write(
+            world.join("datapacks/unpacked/pack.mcmeta"),
+            br#"{"pack":{"pack_format":15}}"#,
+        )
+        .unwrap();
+        let rows = scanned_rows(&app, id).await;
+        let mut api = api().await;
+        serving(&mut api, "pack.zip", &pack_zip("new")).await;
+        let saves = world.parent().unwrap().to_path_buf();
+        let before = tree(&saves);
+
+        let error = install(
+            &app,
+            &api,
+            replacing(
+                id,
+                &identity,
+                "World",
+                &row_of(&rows, "Other", "pack.zip").id,
+            ),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.to_string(), OTHER_WORLD);
+        assert_eq!(tree(&saves), before);
+
+        let error = install(
+            &app,
+            &api,
+            replacing(
+                id,
+                &identity,
+                "World",
+                &row_of(&rows, "World", "unpacked").id,
+            ),
+        )
+        .await
+        .unwrap_err();
+        assert_eq!(error.to_string(), FOLDER_NOT_REPLACED);
+        assert_eq!(tree(&saves), before);
+    }
+
+    fn modified(path: &Path) -> std::time::SystemTime {
+        std::fs::symlink_metadata(path).unwrap().modified().unwrap()
+    }
+
+    fn set_modified(path: &Path) -> std::time::SystemTime {
+        let time =
+            std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_600_000_000);
+        std::fs::File::options()
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_modified(time)
+            .unwrap();
+        time
+    }
+
+    /// The new file cannot be published: the old one is back under its
+    /// name with its bytes and time, and keeps its row.
+    #[tokio::test]
+    async fn a_failed_publish_puts_the_old_pack_back() {
+        use crate::util::publish::fault::{IN_USE, Step, inject};
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "replace-put-back").await;
+        let old = pack_zip("old");
+        let path = put_pack(&world, "pack.zip", &old);
+        let time = set_modified(&path);
+        let rows = scanned_rows(&app, id).await;
+        let mut api = api().await;
+        serving(&mut api, "pack.zip", &pack_zip("new")).await;
+        let root = instance_root(&app, id).await;
+        let before = snapshot(&root, &world);
+        inject(Step::NoReplace, &path, IN_USE);
+
+        install(&app, &api, replacing(id, &identity, "World", &rows[0].id))
+            .await
+            .expect_err("the publication fails");
+        assert!(
+            !crate::util::publish::fault::pending(Step::NoReplace, &path),
+            "the publication was tried"
+        );
+
+        assert_eq!(snapshot(&root, &world), before);
+        assert_eq!(modified(&path), time);
+        // The same row with the same metadata. Its stamp moves on: a
+        // rename changes the inode change time, so the next scan reads the
+        // file once more.
+        let after = scanned_rows(&app, id).await;
+        let identity = |rows: &[WorldDatapackRow]| {
+            rows.iter()
+                .map(|row| {
+                    (
+                        row.id.clone(),
+                        row.filename.clone(),
+                        row.metadata_id.clone(),
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(identity(&after), identity(&rows));
+    }
+
+    /// The Recycle Bin refuses the old pack once the new one is in place:
+    /// the new one is withdrawn and the old one is back, as before.
+    #[tokio::test]
+    async fn a_recycle_bin_that_refuses_the_old_pack_undoes_the_replace() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "replace-bin-refuses").await;
+        let old = pack_zip("old");
+        put_pack(&world, "pack.zip", &old);
+        let rows = scanned_rows(&app, id).await;
+        let mut api = api().await;
+        serving(&mut api, "pack.zip", &pack_zip("new")).await;
+        let root = instance_root(&app, id).await;
+        let before = snapshot(&root, &world);
+        let pause = app
+            .instance_manager()
+            .test_hooks
+            .arm("world_datapack_downloaded", id);
+        let (_, work) = app
+            .instance_manager()
+            .install_world_datapack_from(
+                &api.curseforge,
+                &api.modrinth,
+                replacing(id, &identity, "World", &rows[0].id),
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(10), pause.entered.notified())
+            .await
+            .unwrap();
+        // A file where the Recycle Bin under test would put the old pack.
+        let staging = staging_folders(&root);
+        std::fs::write(
+            crate::util::recycle_bin::bin_under_test(
+                &root.join(&staging[0]).join(REPLACED).join("pack.zip"),
+            ),
+            b"",
+        )
+        .unwrap();
+        pause.release.notify_one();
+
+        let error = work.await.unwrap().unwrap_err().to_string();
+
+        assert!(error.contains("Nothing was deleted"), "{error}");
+        assert_eq!(snapshot(&root, &world), before);
+    }
+
+    /// When the old pack cannot go back either, the error says where it
+    /// is, and it is still there.
+    #[tokio::test]
+    async fn a_pack_that_cannot_be_put_back_is_named_where_it_waits() {
+        use crate::util::publish::fault::{IN_USE, Step, inject};
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "replace-stuck").await;
+        let old = pack_zip("old");
+        let path = put_pack(&world, "pack.zip", &old);
+        let rows = scanned_rows(&app, id).await;
+        let mut api = api().await;
+        serving(&mut api, "pack.zip", &pack_zip("new")).await;
+        let root = instance_root(&app, id).await;
+        inject(Step::NoReplace, &path, IN_USE);
+        inject(Step::NoReplace, &path, IN_USE);
+
+        let error = install(&app, &api, replacing(id, &identity, "World", &rows[0].id))
+            .await
+            .unwrap_err()
+            .to_string();
+
+        let staging = staging_folders(&root);
+        assert_eq!(staging.len(), 1, "the waiting pack's folder is kept");
+        let waiting = root.join(&staging[0]).join("replaced").join("pack.zip");
+        assert!(error.contains(&path.display().to_string()), "{error}");
+        assert!(error.contains(&waiting.display().to_string()), "{error}");
+        assert_eq!(std::fs::read(&waiting).unwrap(), old);
+        assert!(!path.exists());
+    }
+
+    /// A world and a private folder, two folders deep each, as an instance
+    /// root holds them.
+    fn take_away_fixture(bytes: &[u8]) -> (tempfile::TempDir, PathBuf, PathBuf) {
+        let dir = tempfile::tempdir().unwrap();
+        let pack = dir.path().join("saves/World/datapacks/pack.zip");
+        std::fs::create_dir_all(pack.parent().unwrap()).unwrap();
+        std::fs::write(&pack, bytes).unwrap();
+        let aside = dir.path().join("root/.tmpstaging/replaced");
+        (dir, pack, aside)
+    }
+
+    #[tokio::test]
+    async fn a_pack_taken_away_comes_back_with_its_bytes_and_time() {
+        let (_dir, pack, aside) = take_away_fixture(b"old");
+        let time = set_modified(&pack);
+
+        let taken = take_away(&pack, &aside, Removal::Permanent).await.unwrap();
+        assert!(!pack.exists());
+        assert!(entries(pack.parent().unwrap()).is_empty());
+        assert_eq!(std::fs::read(aside.join("pack.zip")).unwrap(), b"old");
+        taken.put_back().await.unwrap();
+
+        assert_eq!(std::fs::read(&pack).unwrap(), b"old");
+        assert_eq!(modified(&pack), time);
+        assert!(!aside.join("pack.zip").exists());
+    }
+
+    #[tokio::test]
+    async fn a_pack_taken_away_and_dropped_comes_back() {
+        let (_dir, pack, aside) = take_away_fixture(b"old");
+        drop(take_away(&pack, &aside, Removal::Permanent).await.unwrap());
+        assert_eq!(std::fs::read(&pack).unwrap(), b"old");
+    }
+
+    #[tokio::test]
+    async fn a_pack_sent_on_follows_the_recycle_bin_setting() {
+        use crate::util::recycle_bin::bin_under_test;
+        let (_dir, pack, aside) = take_away_fixture(b"binned");
+        let mut taken = take_away(&pack, &aside, Removal::RecycleBin).await.unwrap();
+        taken.send_on().await.unwrap();
+        let waited = aside.join("pack.zip");
+        assert!(!waited.exists() && !pack.exists());
+        assert_eq!(
+            std::fs::read(bin_under_test(&waited).join("pack.zip")).unwrap(),
+            b"binned"
+        );
+
+        let (_dir, pack, aside) = take_away_fixture(b"erased");
+        let mut taken = take_away(&pack, &aside, Removal::Permanent).await.unwrap();
+        taken.send_on().await.unwrap();
+        let waited = aside.join("pack.zip");
+        assert!(!waited.exists() && !pack.exists());
+        assert!(!bin_under_test(&waited).exists());
+    }
+
+    /// With the private folder on another drive the pack waits beside
+    /// itself, under a name the game does not load and the scanner does not
+    /// list.
+    #[tokio::test]
+    async fn a_pack_taken_away_across_drives_waits_beside_itself() {
+        use crate::util::publish::fault::{CROSS_DEVICE, Step, inject};
+        let (_dir, pack, aside) = take_away_fixture(b"old");
+        inject(Step::NoReplace, &aside.join("pack.zip"), CROSS_DEVICE);
+
+        let mut taken = take_away(&pack, &aside, Removal::Permanent).await.unwrap();
+
+        let beside = entries(pack.parent().unwrap());
+        assert_eq!(beside.len(), 1);
+        assert!(
+            !beside[0].0.to_ascii_lowercase().ends_with(".zip"),
+            "{beside:?}"
+        );
+        assert_eq!(beside[0].1, b"old");
+        assert!(!aside.join("pack.zip").exists());
+        taken.send_on().await.unwrap();
+        assert!(entries(pack.parent().unwrap()).is_empty());
+
+        let (_dir, pack, aside) = take_away_fixture(b"old");
+        inject(Step::NoReplace, &aside.join("pack.zip"), CROSS_DEVICE);
+        let taken = take_away(&pack, &aside, Removal::Permanent).await.unwrap();
+        taken.put_back().await.unwrap();
+        assert_eq!(
+            entries(pack.parent().unwrap()),
+            vec![("pack.zip".to_owned(), b"old".to_vec())]
+        );
     }
 }
