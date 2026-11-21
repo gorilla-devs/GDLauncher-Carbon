@@ -315,6 +315,24 @@ it.each(["datapack", "mod", undefined])(
     ])
   }
 )
+// Modrinth types these "mod" too, and no mod loader runs them.
+const resourceAndDataPack = ["datapack", "minecraft"]
+const pluginAndDataPack = ["datapack", "bukkit", "paper", "purpur", "spigot"]
+it.each([
+  ["a resource pack that is also a data pack", resourceAndDataPack],
+  ["a data pack that is also a plugin", pluginAndDataPack]
+])("%s asks where in a mod search, as a data pack does", async (_, loaders) => {
+  serveWorld()
+  const d = mount("mod", loaders, "mod")
+  await flush()
+  d.click("Addon test")
+  await flush()
+  expect(d.selectInstance).not.toHaveBeenCalled()
+  expect(d.items()).toEqual([
+    "My World",
+    "content:_trn_worlds.download_to_instance"
+  ])
+})
 it("a plain mod never asks where, even while data packs are searched", async () => {
   serveWorld()
   const d = mount("mod", ["fabric"], "datapack")
@@ -420,6 +438,34 @@ it.each([
     hybridLoaders,
     "fabric",
     "installing"
+  ],
+  [
+    "a Modrinth data pack that also ships as a mod for another loader",
+    "mod",
+    ["datapack", "forge"],
+    "fabric",
+    "downloading"
+  ],
+  [
+    "a Modrinth data pack that also ships as a Fabric mod, on Quilt",
+    "mod",
+    ["datapack", "fabric"],
+    "quilt",
+    "installing"
+  ],
+  [
+    "a resource pack that is also a data pack",
+    "mod",
+    resourceAndDataPack,
+    "fabric",
+    "downloading"
+  ],
+  [
+    "a data pack that is also a plugin",
+    "mod",
+    pluginAndDataPack,
+    "fabric",
+    "downloading"
   ],
   ["a mod", "mod", ["fabric"], "fabric", "installing"]
 ] as const)(

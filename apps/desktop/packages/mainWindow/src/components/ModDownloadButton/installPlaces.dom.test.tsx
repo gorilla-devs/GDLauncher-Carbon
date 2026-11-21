@@ -106,6 +106,16 @@ const modrinthHybrid = {
   loaders: ["datapack", "fabric", "forge", "neoforge", "quilt"]
 }
 const plainMod = { ...modrinthPack, id: "M", loaders: ["fabric"] }
+// Projects Modrinth also types "mod" that no mod loader runs: a resource
+// pack that is also a data pack, and a data pack that is also a plugin.
+const resourceAndDataPack = {
+  ...modrinthPack,
+  loaders: ["datapack", "minecraft"]
+}
+const pluginAndDataPack = {
+  ...modrinthPack,
+  loaders: ["datapack", "bukkit", "paper", "purpur", "spigot"]
+}
 
 const world = (
   name: string,
@@ -223,7 +233,13 @@ it.each([
   ["a Modrinth data pack", modrinthPack, "datapack"],
   ["a Modrinth data pack in a mod search", modrinthPack, "mod"],
   ["a Modrinth data pack outside a search", modrinthPack, undefined],
-  ["a Modrinth data pack that also ships as a mod", modrinthHybrid, "datapack"]
+  ["a Modrinth data pack that also ships as a mod", modrinthHybrid, "datapack"],
+  [
+    "a resource pack that is also a data pack, in a mod search",
+    resourceAndDataPack,
+    "mod"
+  ],
+  ["a data pack that is also a plugin", pluginAndDataPack, "datapack"]
 ])(
   "Download of %s asks where: the instance's worlds, then the instance",
   async (_, addon, searched) => {
@@ -489,6 +505,21 @@ it.each([
   ["a Modrinth data pack on an instance with a mod loader", modrinthPack, 7],
   ["a Modrinth data pack on an instance without one", modrinthPack, 8],
   [
+    "a resource pack that is also a data pack on an instance with a mod loader",
+    resourceAndDataPack,
+    7
+  ],
+  [
+    "a data pack that is also a plugin on an instance with a mod loader",
+    pluginAndDataPack,
+    7
+  ],
+  [
+    "a Modrinth data pack that also ships as a mod for another loader than the instance's",
+    { ...modrinthHybrid, loaders: ["datapack", "forge", "neoforge"] },
+    7
+  ],
+  [
     "a Modrinth data pack that also ships as a mod on an instance without a mod loader",
     modrinthHybrid,
     8
@@ -666,6 +697,24 @@ it("the picker installs a Modrinth data pack build at once into an instance with
   expect(buildReads()).toEqual(buildsAsked)
   expect(c.mutate.mock.calls).toEqual([buildInstall(8)])
 })
+it.each([
+  ["a resource pack that is also a data pack", resourceAndDataPack],
+  ["a data pack that is also a plugin", pluginAndDataPack]
+])(
+  "the picker installs the data pack build of %s on an instance with a mod loader",
+  async (_, addon) => {
+    serveBuilds([world("My World")])
+    await mount(addon, { selectedInstanceId: undefined }, "mod")
+    await openPicker()
+    await pickRow("Fabric")
+    await pick("content:_trn_worlds.download_to_instance")
+    expect(buildReads()).toEqual(buildsAsked)
+    expect(c.mutate.mock.calls).toEqual([buildInstall(7)])
+    expect(pickerRow("Fabric").textContent).toContain(
+      "instances:_trn_status_downloading"
+    )
+  }
+)
 it("the picker installs the mod of a Modrinth data pack that also ships as a mod on an instance with a mod loader", async () => {
   serveBuilds([world("My World")])
   await mount(modrinthHybrid, { selectedInstanceId: undefined }, "datapack")

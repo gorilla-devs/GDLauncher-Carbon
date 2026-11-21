@@ -74,6 +74,17 @@ const modrinthHybrid = {
 const modrinthPack = { type: "mod", loaders: ["datapack"] }
 const curseforgePack = { type: "datapack", loaders: [] }
 const plainMod = { type: "mod", loaders: ["fabric"] }
+// A resource pack that is also a data pack, and a data pack that is also a
+// server plugin: neither is anything an instance installs as a mod.
+const resourceAndDataPack = { type: "mod", loaders: ["datapack", "minecraft"] }
+const pluginAndDataPack = {
+  type: "mod",
+  loaders: ["datapack", "bukkit", "paper", "purpur", "spigot"]
+}
+const instance = (modloader: string | null, mc_version = "1.21.1") => ({
+  modloader,
+  mc_version
+})
 
 describe("data pack projects", () => {
   it("a project can be a data pack by its type or by a datapack loader", () => {
@@ -85,17 +96,27 @@ describe("data pack projects", () => {
     expect(canBeDatapack({ type: "resourcePack", loaders: [] })).toBe(false)
     expect(canBeDatapack(undefined)).toBe(false)
   })
-  it("a project is only a data pack when nothing else can load it", () => {
+  it("a project is only a data pack when no mod loader can load it", () => {
     expect(isOnlyDatapack(modrinthHybrid)).toBe(false)
     expect(isOnlyDatapack(modrinthPack)).toBe(true)
     expect(isOnlyDatapack(curseforgePack)).toBe(true)
     expect(isOnlyDatapack(plainMod)).toBe(false)
     expect(isOnlyDatapack(undefined)).toBe(false)
+    expect(isOnlyDatapack(resourceAndDataPack)).toBe(true)
+    expect(isOnlyDatapack(pluginAndDataPack)).toBe(true)
+    expect(
+      isOnlyDatapack({ type: "mod", loaders: ["datapack", "Fabric"] })
+    ).toBe(false)
+    expect(isOnlyDatapack({ type: "mod", loaders: ["minecraft"] })).toBe(false)
+    // CurseForge tags a data pack's files with loaders at will.
+    expect(isOnlyDatapack({ type: "datapack", loaders: ["fabric"] })).toBe(true)
   })
   it("a world is asked for a pure data pack always, for a hybrid only in a data pack search", () => {
     for (const searched of ["datapack", "mod", null, undefined]) {
       expect(asksWhichWorld(modrinthPack, searched)).toBe(true)
       expect(asksWhichWorld(curseforgePack, searched)).toBe(true)
+      expect(asksWhichWorld(resourceAndDataPack, searched)).toBe(true)
+      expect(asksWhichWorld(pluginAndDataPack, searched)).toBe(true)
       expect(asksWhichWorld(plainMod, searched)).toBe(false)
     }
     expect(asksWhichWorld(modrinthHybrid, "datapack")).toBe(true)
@@ -105,23 +126,60 @@ describe("data pack projects", () => {
 })
 
 describe("what an install into the instance itself is", () => {
-  it("is the data pack build of a project that is only a data pack, with or without a mod loader", () => {
-    for (const hasModLoader of [true, false]) {
-      expect(instanceInstallIsDatapack(curseforgePack, hasModLoader)).toBe(true)
-      expect(instanceInstallIsDatapack(modrinthPack, hasModLoader)).toBe(true)
+  const instances = [
+    instance("fabric"),
+    instance("forge"),
+    instance(null),
+    undefined
+  ]
+  it.each([
+    ["a CurseForge data pack", curseforgePack],
+    ["a Modrinth data pack", modrinthPack],
+    ["a resource pack that is also a data pack", resourceAndDataPack],
+    ["a data pack that is also a plugin", pluginAndDataPack]
+  ])(
+    "is the data pack build of %s, whatever the instance runs",
+    (_, project) => {
+      for (const target of instances)
+        expect(instanceInstallIsDatapack(project, target)).toBe(true)
     }
+  )
+  it("is the mod jar of a project that also ships as a mod where the instance runs one of its loaders", () => {
+    for (const loader of ["fabric", "forge", "neoforge", "quilt"])
+      expect(instanceInstallIsDatapack(modrinthHybrid, instance(loader))).toBe(
+        false
+      )
+    const fabricOnly = { type: "mod", loaders: ["datapack", "fabric"] }
+    expect(instanceInstallIsDatapack(fabricOnly, instance("fabric"))).toBe(
+      false
+    )
+    // Quilt also loads Fabric mods, NeoForge 1.20.1 also Forge ones.
+    expect(instanceInstallIsDatapack(fabricOnly, instance("quilt"))).toBe(false)
+    const forgeOnly = { type: "mod", loaders: ["datapack", "forge"] }
+    expect(
+      instanceInstallIsDatapack(forgeOnly, instance("neoforge", "1.20.1"))
+    ).toBe(false)
   })
-  it("is the data pack build of a project that also ships as a mod only without a mod loader", () => {
-    expect(instanceInstallIsDatapack(modrinthHybrid, false)).toBe(true)
-    expect(instanceInstallIsDatapack(modrinthHybrid, true)).toBe(false)
+  it("is the data pack build of a project that also ships as a mod where the instance runs none of its loaders", () => {
+    expect(instanceInstallIsDatapack(modrinthHybrid, instance(null))).toBe(true)
+    const fabricOnly = { type: "mod", loaders: ["datapack", "fabric"] }
+    expect(instanceInstallIsDatapack(fabricOnly, instance("forge"))).toBe(true)
+    const forgeOnly = { type: "mod", loaders: ["datapack", "forge"] }
+    expect(instanceInstallIsDatapack(forgeOnly, instance("fabric"))).toBe(true)
+    expect(
+      instanceInstallIsDatapack(forgeOnly, instance("neoforge", "1.21.1"))
+    ).toBe(true)
+  })
+  it("stays the mod jar of a project that also ships as a mod until the instance is known", () => {
+    expect(instanceInstallIsDatapack(modrinthHybrid, undefined)).toBe(false)
   })
   it("is never a data pack for a mod or another addon", () => {
-    for (const hasModLoader of [true, false]) {
-      expect(instanceInstallIsDatapack(plainMod, hasModLoader)).toBe(false)
+    for (const target of instances) {
+      expect(instanceInstallIsDatapack(plainMod, target)).toBe(false)
       expect(
-        instanceInstallIsDatapack({ type: "shader", loaders: [] }, hasModLoader)
+        instanceInstallIsDatapack({ type: "shader", loaders: [] }, target)
       ).toBe(false)
-      expect(instanceInstallIsDatapack(undefined, hasModLoader)).toBe(false)
+      expect(instanceInstallIsDatapack(undefined, target)).toBe(false)
     }
   })
 })

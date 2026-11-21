@@ -91,15 +91,14 @@ export const useModInstallation = (
   }))
 
   /** Whether an install into the instance itself is the project's data pack
-   *  build. Until the instance's loader is known it counts as having one, so
-   *  a project that also ships as a mod keeps installing its mod. */
-  const installsAsDatapack = (instanceId: number | undefined) => {
-    const target =
+   *  build. */
+  const installsAsDatapack = (instanceId: number | undefined) =>
+    instanceInstallIsDatapack(
+      props.addon,
       instanceId === undefined
         ? undefined
         : options.instanceTarget?.(instanceId)
-    return instanceInstallIsDatapack(props.addon, !target || !!target.modloader)
-  }
+    )
 
   // Build both wire variants before requirements yields to reactive selection.
   const captureInstallAttempt = (

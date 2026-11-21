@@ -17,6 +17,7 @@ import { Match, Show, Switch, createMemo } from "solid-js"
 import { createStore } from "solid-js/store"
 import { useInfiniteVersionsQuery } from "../InfiniteScrollVersionsQueryWrapper"
 import { getInstanceImageUrl, getServerImageUrl } from "@/utils/instances"
+import { MOD_LOADERS } from "@/utils/modLoaders"
 import { useGlobalStore } from "../GlobalStoreContext"
 
 const mapTypeToColor = (type: McType) => {
@@ -85,19 +86,16 @@ const ExploreVersionsNavbar = (props: Props) => {
     oldBeta: false
   })
 
-  // Supported modloaders in GDLauncher
-  const SUPPORTED_MODLOADERS = ["forge", "fabric", "quilt", "neoforge"]
-
   const modloaders = () => {
     // Only offer the loaders the addon actually supports (falling back to all when the
     // addon doesn't report any). The default selection is set in
     // InfiniteScrollVersionsQueryWrapper based on the current target.
     const supported = props.supportedModloaders
     const options = !supported?.length
-      ? ["", ...SUPPORTED_MODLOADERS]
+      ? ["", ...MOD_LOADERS]
       : [
           "",
-          ...SUPPORTED_MODLOADERS.filter((loader) =>
+          ...MOD_LOADERS.filter((loader) =>
             supported.includes(loader as FEUnifiedModLoaderType)
           )
         ]

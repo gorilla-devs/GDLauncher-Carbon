@@ -1,27 +1,9 @@
 import { describe, expect, it } from "vitest"
-import {
-  compatibleLoaders,
-  sameAddonSupport,
-  scopeMode,
-  targetDefaults
-} from "./targetScope"
+import { sameAddonSupport, scopeMode, targetDefaults } from "./targetScope"
 
 const scope = (modLoaderType?: string, gameVersion?: string) => ({
   modLoaderType,
   gameVersion
-})
-
-describe("compatibleLoaders", () => {
-  it("adds the loaders the core also accepts, own loader first", () => {
-    expect(compatibleLoaders("quilt", "1.21")).toEqual(["quilt", "fabric"])
-    expect(compatibleLoaders("neoforge", "1.20.1")).toEqual([
-      "neoforge",
-      "forge"
-    ])
-    expect(compatibleLoaders("neoforge", "1.21.1")).toEqual(["neoforge"])
-    expect(compatibleLoaders("fabric", "1.20.1")).toEqual(["fabric"])
-    expect(compatibleLoaders("forge", "1.20.1")).toEqual(["forge"])
-  })
 })
 
 describe("scopeMode", () => {
@@ -199,6 +181,31 @@ describe("targetDefaults", () => {
     expect(targetDefaults("instance", "loader", fabric, hybrid)).toEqual(
       scope("fabric", "1.20.1")
     )
+    // Its data pack build too where the instance runs none of its loaders,
+    // and its mod where the instance runs one through another (Quilt).
+    expect(
+      targetDefaults("instance", "loader", fabric, {
+        loaders: ["datapack", "forge"]
+      })
+    ).toEqual(scope("datapack", "1.20.1"))
+    expect(
+      targetDefaults(
+        "instance",
+        "loader",
+        { loader: "quilt", gameVersion: "1.20.1" },
+        { loaders: ["datapack", "fabric"] }
+      )
+    ).toEqual(scope("fabric", "1.20.1"))
+    // A resource pack or a plugin that is also a data pack has no mod to
+    // install: its data pack build, whatever the instance runs.
+    for (const loaders of [
+      ["datapack", "minecraft"],
+      ["datapack", "bukkit", "paper", "purpur", "spigot"]
+    ])
+      for (const facts of [fabric, vanilla])
+        expect(
+          targetDefaults("instance", "loader", facts, { loaders })
+        ).toEqual(scope("datapack", "1.20.1"))
     // A plain mod and a CurseForge data pack are scoped as before.
     expect(
       targetDefaults("instance", "loader", vanilla, { loaders: ["fabric"] })

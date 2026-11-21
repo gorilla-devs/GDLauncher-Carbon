@@ -41,6 +41,12 @@ const modrinthHybrid = {
 }
 const curseforgeDatapack = { type: "datapack", loaders: [] }
 const plainMod = { type: "mod", loaders: ["fabric"] }
+// Modrinth types these "mod" too, and no mod loader runs them.
+const resourceAndDataPack = { type: "mod", loaders: ["datapack", "minecraft"] }
+const pluginAndDataPack = {
+  type: "mod",
+  loaders: ["datapack", "bukkit", "paper", "purpur", "spigot"]
+}
 
 const ALL = ["Vanilla", "Fabric"]
 const WITH_LOADER = ["Fabric"]
@@ -82,6 +88,21 @@ it.each(["datapack", "mod", undefined])(
       listed(
         () => modrinthOnlyDatapack,
         () => searched
+      )()
+    ).toEqual(ALL)
+  }
+)
+
+it.each([
+  ["a resource pack that is also a data pack", resourceAndDataPack],
+  ["a data pack that is also a plugin", pluginAndDataPack]
+])(
+  "lists instances without a mod loader for %s in a mod search",
+  (_, shape) => {
+    expect(
+      listed(
+        () => shape,
+        () => "mod"
       )()
     ).toEqual(ALL)
   }
@@ -168,16 +189,23 @@ it("follows the project when another one is shown", () => {
 // An instance without a mod loader is only listed for a project typed "mod"
 // when an install into the instance itself is that project's data pack build.
 it("lists an instance without a mod loader for a project typed as a mod only where it gets the data pack build", () => {
-  for (const shape of [modrinthOnlyDatapack, modrinthHybrid, plainMod])
+  const vanilla = { mc_version: "1.20.1", modloader: null }
+  for (const shape of [
+    modrinthOnlyDatapack,
+    modrinthHybrid,
+    resourceAndDataPack,
+    pluginAndDataPack,
+    plainMod
+  ])
     for (const searched of ["datapack", "mod", undefined]) {
       const names = listed(
         () => shape,
         () => searched
       )()
       if (names.includes("Vanilla"))
-        expect(instanceInstallIsDatapack(shape, false)).toBe(true)
+        expect(instanceInstallIsDatapack(shape, vanilla)).toBe(true)
       dispose?.()
       dispose = undefined
     }
-  expect(instanceInstallIsDatapack(plainMod, false)).toBe(false)
+  expect(instanceInstallIsDatapack(plainMod, vanilla)).toBe(false)
 })

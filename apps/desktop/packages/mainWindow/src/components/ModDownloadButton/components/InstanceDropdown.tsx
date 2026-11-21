@@ -79,9 +79,12 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     asksWhichWorld(props.addon, searchContext?.searchQuery().projectType)
 
   // What a project that also ships as a mod installs as into the instance
-  // itself depends on whether the instance has a mod loader to run the mod.
+  // itself depends on whether the instance runs one of the mod's loaders.
   const stagedIn = (instance: DropdownInstance) =>
-    instanceInstallIsDatapack(props.addon, instance.modloader !== "vanilla")
+    instanceInstallIsDatapack(props.addon, {
+      modloader: instance.modloader === "vanilla" ? null : instance.modloader,
+      mc_version: instance.gameVersion || null
+    })
 
   const handleOpenChange = (isOpen: boolean) => {
     setIsDropdownOpen(isOpen)

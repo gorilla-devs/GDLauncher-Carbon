@@ -6,6 +6,8 @@ import type {
   WorldDatapackSource
 } from "@gd/core_module/bindings"
 import { findInstalledAddon } from "./installedAddon"
+import type { LinkTarget } from "./linkedFile"
+import { compatibleLoaders, MOD_LOADERS } from "./modLoaders"
 
 /** A world the core could read, so a data pack can be installed into it. */
 export type ReadableWorld = FEWorld & { identity: string }
@@ -23,11 +25,19 @@ export function canBeDatapack(project: ProjectKind): boolean {
   )
 }
 
-/** False for a project that also ships as a mod, like Terralith. */
+const lowerCased = (loaders: readonly string[]) =>
+  loaders.map((loader) => loader.toLowerCase())
+
+/** False for a project that also ships as a mod, like Terralith: one that
+ *  lists a mod loader. Any other loader beside "datapack" (a resource pack's
+ *  "minecraft", a plugin's "paper") is nothing an instance runs as a mod. */
 export function isOnlyDatapack(project: ProjectKind): boolean {
   return (
     project?.type === "datapack" ||
-    (project?.loaders?.length === 1 && project.loaders[0] === "datapack")
+    (canBeDatapack(project) &&
+      !lowerCased(project?.loaders ?? []).some((loader) =>
+        MOD_LOADERS.includes(loader)
+      ))
   )
 }
 
@@ -46,12 +56,19 @@ export function asksWhichWorld(
 
 /** Whether an install into the instance itself is the project's data pack
  *  build, which goes to its `datapacks` folder. A project that also ships as
- *  a mod installs its mod wherever a mod loader can run it. */
+ *  a mod installs its mod jar where the instance runs one of the loaders it
+ *  lists, as the core picks that jar, and until the instance is known. */
 export function instanceInstallIsDatapack(
   project: ProjectKind,
-  hasModLoader: boolean
+  instance: LinkTarget | undefined
 ): boolean {
-  return isOnlyDatapack(project) || (!hasModLoader && canBeDatapack(project))
+  if (isOnlyDatapack(project)) return true
+  if (!canBeDatapack(project) || !instance) return false
+  if (!instance.modloader) return true
+  const listed = lowerCased(project?.loaders ?? [])
+  return !lowerCased(
+    compatibleLoaders(instance.modloader, instance.mc_version)
+  ).some((loader) => listed.includes(loader))
 }
 
 const STABILITY = ["release", "beta", "alpha"] as const
