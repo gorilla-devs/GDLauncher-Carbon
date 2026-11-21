@@ -37,6 +37,7 @@ vi.mock("@gd/ui", () => {
     DropdownMenuRadioGroup: Wrapper,
     DropdownMenuRadioItem: Item,
     DropdownMenuItem: Item,
+    DropdownMenuSeparator: () => <hr data-separator />,
     Input: () => <input />,
     Spinner: () => <span>spinner</span>
   }
@@ -141,12 +142,56 @@ it("for a data pack, a picked instance asks where: its readable worlds, then the
   expect(d.items()).toEqual([
     "My World",
     "Skyblock",
-    "content:_trn_worlds.instance_copy"
+    "content:_trn_worlds.download_to_instance"
   ])
   expect(d.root.textContent).toContain("Addon test")
   d.click("Skyblock")
   expect(d.selectWorld).toHaveBeenCalledWith(4, worlds[2])
   expect(d.selectInstance).not.toHaveBeenCalled()
+})
+it("names the worlds as a group and sets the instance entry apart from them", async () => {
+  c.query.mockImplementation(async ([key]: any) =>
+    key === "instance.getWorlds" ? [world("My World")] : []
+  )
+  const d = mount("datapack")
+  await flush()
+  d.click("Addon test")
+  await flush()
+  const step = [
+    ...d.root.querySelectorAll<HTMLElement>(
+      "[data-item], [data-separator], [data-group-name]"
+    )
+  ].map((part) =>
+    part.hasAttribute("data-separator") ? "—" : part.textContent?.trim()
+  )
+  expect(step).toEqual([
+    "—",
+    "content:_trn_tabs.worlds",
+    "My World",
+    "—",
+    "content:_trn_worlds.download_to_instance"
+  ])
+})
+it("shows neither the worlds group nor a second line when the step has no world to list", async () => {
+  c.query.mockImplementation(async () => [])
+  const d = mount("mod", ["datapack"], "datapack", "vanilla")
+  await flush()
+  d.click("Addon test")
+  await flush()
+  expect(d.root.textContent).toContain("content:_trn_worlds.none")
+  expect(d.root.querySelector("[data-group-name]")).toBeNull()
+  expect(d.root.querySelectorAll("[data-separator]")).toHaveLength(1)
+})
+it("draws no line under the worlds when the instance entry is not offered", async () => {
+  c.query.mockImplementation(async ([key]: any) =>
+    key === "instance.getWorlds" ? [world("My World")] : []
+  )
+  const d = mount("mod", ["datapack"], "datapack", "vanilla")
+  await flush()
+  d.click("Addon test")
+  await flush()
+  expect(d.items()).toEqual(["My World"])
+  expect(d.root.querySelectorAll("[data-separator]")).toHaveLength(1)
 })
 it("for a data pack, picking Instance installs into the instance as before", async () => {
   c.query.mockImplementation(async ([key]: any) =>
@@ -156,7 +201,7 @@ it("for a data pack, picking Instance installs into the instance as before", asy
   await flush()
   d.click("Addon test")
   await flush()
-  d.click("content:_trn_worlds.instance_copy")
+  d.click("content:_trn_worlds.download_to_instance")
   expect(d.selectInstance).toHaveBeenCalledWith(4)
   expect(d.selectWorld).not.toHaveBeenCalled()
 })
@@ -236,7 +281,10 @@ it("a Modrinth data pack that also ships as a mod asks where while data packs ar
   d.click("Addon test")
   await flush()
   expect(d.selectInstance).not.toHaveBeenCalled()
-  expect(d.items()).toEqual(["My World", "content:_trn_worlds.instance_copy"])
+  expect(d.items()).toEqual([
+    "My World",
+    "content:_trn_worlds.download_to_instance"
+  ])
   d.click("My World")
   expect(d.selectWorld).toHaveBeenCalledWith(4, world("My World"))
 })
@@ -261,7 +309,10 @@ it.each(["datapack", "mod", undefined])(
     d.click("Addon test")
     await flush()
     expect(d.selectInstance).not.toHaveBeenCalled()
-    expect(d.items()).toEqual(["My World", "content:_trn_worlds.instance_copy"])
+    expect(d.items()).toEqual([
+      "My World",
+      "content:_trn_worlds.download_to_instance"
+    ])
   }
 )
 it("a plain mod never asks where, even while data packs are searched", async () => {
@@ -336,8 +387,11 @@ it("an instance without a mod loader keeps the Instance choice for a CurseForge 
   await flush()
   d.click("Addon test")
   await flush()
-  expect(d.items()).toEqual(["My World", "content:_trn_worlds.instance_copy"])
-  d.click("content:_trn_worlds.instance_copy")
+  expect(d.items()).toEqual([
+    "My World",
+    "content:_trn_worlds.download_to_instance"
+  ])
+  d.click("content:_trn_worlds.download_to_instance")
   expect(d.selectInstance).toHaveBeenCalledWith(4)
 })
 it("an instance without a mod loader and without a world gets a CurseForge data pack at instance level", async () => {

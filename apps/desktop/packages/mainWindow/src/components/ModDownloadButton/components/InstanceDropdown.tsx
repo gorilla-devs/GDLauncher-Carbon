@@ -15,6 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuRadioGroup,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
   Input,
   Spinner
@@ -332,6 +333,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
                 <div class="i-hugeicons:arrow-left-01 h-4 w-4 shrink-0" />
                 <span class="truncate">{picked().name}</span>
               </button>
+              <DropdownMenuSeparator class="-mx-1" />
               <Show
                 when={pickedSettled()}
                 fallback={
@@ -340,12 +342,21 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
                   </div>
                 }
               >
+                <Show when={readableWorlds().length > 0}>
+                  <div
+                    data-group-name
+                    class="text-lightSlate-500 px-2 pb-0.5 pt-1.5 text-xs"
+                  >
+                    <Trans key="content:_trn_tabs.worlds" />
+                  </div>
+                </Show>
                 <div class="max-h-[300px] overflow-y-auto">
                   <For each={readableWorlds()}>
                     {(world) => {
                       const holds = () => worldHolds(world)
                       return (
                         <DropdownMenuItem
+                          class="gap-2"
                           disabled={holds()}
                           closeOnSelect={false}
                           onSelect={() => {
@@ -354,6 +365,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
                             props.handleWorldSelection?.(id, world)
                           }}
                         >
+                          <div class="i-hugeicons:globe h-4 w-4 shrink-0" />
                           <span class="min-w-0 flex-1 truncate">
                             {world.name}
                           </span>
@@ -381,8 +393,11 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
                     </Show>
                   }
                 >
+                  <Show when={readableWorlds().length > 0}>
+                    <DropdownMenuSeparator class="-mx-1" />
+                  </Show>
                   <DropdownMenuItem
-                    class="text-lightSlate-500"
+                    class="gap-2"
                     disabled={instanceHolds()}
                     closeOnSelect={false}
                     onSelect={() => {
@@ -391,8 +406,9 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
                       props.handleInstanceSelection(id)
                     }}
                   >
+                    <div class="i-hugeicons:folder-01 h-4 w-4 shrink-0" />
                     <span class="min-w-0 flex-1 truncate">
-                      <Trans key="content:_trn_worlds.instance_copy" />
+                      <Trans key="content:_trn_worlds.download_to_instance" />
                     </span>
                     <Show when={instanceHolds()}>
                       <div class="i-hugeicons:tick-02 h-4 w-4 shrink-0 text-green-400" />

@@ -234,6 +234,7 @@
   "_trn_worlds.update_everywhere": "Aggiorna ovunque",
   "_trn_worlds.update_failed_in": "Pack di dati non aggiornato in: {{places}}",
   "_trn_worlds.instance_copy": "Istanza",
+  "_trn_worlds.download_to_instance": "Scarica nell'istanza",
   "_trn_worlds.busy": "Non disponibile mentre il gioco è in avvio o in esecuzione.",
   "_trn_worlds.add_to_world": "Aggiungi a un mondo",
   "_trn_worlds.replace_title": "Sostituire il pack di dati in «{{world}}»?",

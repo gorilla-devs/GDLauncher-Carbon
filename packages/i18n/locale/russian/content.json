@@ -236,6 +236,7 @@
   "_trn_worlds.update_everywhere": "Обновить везде",
   "_trn_worlds.update_failed_in": "Не удалось обновить датапак: {{places}}",
   "_trn_worlds.instance_copy": "Экземпляр",
+  "_trn_worlds.download_to_instance": "Скачать в экземпляр",
   "_trn_worlds.busy": "Недоступно, пока игра запускается или работает.",
   "_trn_worlds.add_to_world": "Добавить в мир",
   "_trn_worlds.replace_title": "Заменить датапак в мире «{{world}}»?",

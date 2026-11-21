@@ -232,6 +232,7 @@
   "_trn_worlds.update_everywhere": "すべてのコピーを更新",
   "_trn_worlds.update_failed_in": "データパックを更新できなかった場所: {{places}}",
   "_trn_worlds.instance_copy": "インスタンス",
+  "_trn_worlds.download_to_instance": "インスタンスにダウンロード",
   "_trn_worlds.busy": "ゲームの起動中または実行中は使用できません。",
   "_trn_worlds.add_to_world": "ワールドに追加",
   "_trn_worlds.replace_title": "「{{world}}」のデータパックを置き換えますか？",

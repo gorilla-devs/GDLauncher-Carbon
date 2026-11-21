@@ -232,6 +232,7 @@
   "_trn_worlds.update_everywhere": "更新所有副本",
   "_trn_worlds.update_failed_in": "以下位置的数据包未更新：{{places}}",
   "_trn_worlds.instance_copy": "实例",
+  "_trn_worlds.download_to_instance": "下载到实例",
   "_trn_worlds.busy": "游戏启动或运行期间不可用。",
   "_trn_worlds.add_to_world": "添加到存档",
   "_trn_worlds.replace_title": "替换存档“{{world}}”中的数据包？",

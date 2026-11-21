@@ -200,7 +200,10 @@ it("an instance holding the pack with a world that can take it asks where, Insta
   expect(row.hasAttribute("data-disabled")).toBe(false)
   pick(row)
   await flush()
-  expect(items()).toEqual(["My World", "content:_trn_worlds.instance_copy"])
+  expect(items()).toEqual([
+    "My World",
+    "content:_trn_worlds.download_to_instance"
+  ])
   const instanceOption = [
     ...document.querySelectorAll<HTMLElement>('[role="menuitem"]')
   ].at(-1)!
@@ -272,5 +275,8 @@ it("picking an instance that does not hold the pack reads its worlds then", asyn
   pick(instanceItem()!)
   await flush()
   expect(worldReads()).toEqual([["instance.getWorlds", 4]])
-  expect(items()).toEqual(["My World", "content:_trn_worlds.instance_copy"])
+  expect(items()).toEqual([
+    "My World",
+    "content:_trn_worlds.download_to_instance"
+  ])
 })

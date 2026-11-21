@@ -60,6 +60,7 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_worlds.update_everywhere",
     "_trn_worlds.update_failed_in",
     "_trn_worlds.instance_copy",
+    "_trn_worlds.download_to_instance",
     "_trn_worlds.busy",
     "_trn_worlds.add_to_world",
     "_trn_worlds.replace_title",
