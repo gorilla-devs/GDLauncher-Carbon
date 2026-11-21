@@ -111,14 +111,22 @@ const Collapsable = (props: Props) => {
       <div
         class="grid transition-[grid-template-rows] duration-200 ease-in-out"
         style={{
-          "grid-template-rows": opened() ? "1fr" : "0fr"
+          "grid-template-rows": opened() ? "1fr" : "0fr",
+          // One column no wider than the section: a long, truncated label
+          // inside must not widen it (a grid item is as wide as its content
+          // by default).
+          "grid-template-columns": "minmax(0, 1fr)"
         }}
       >
         {/* Closed, nothing inside can take focus: Tab skips it rather than
             scrolling a sliver of it into view. Its clipping is in style.css,
             so a theme can let it spill; `min-h-0` keeps the opening
             animation, which `clip` alone would skip. */}
-        <div data-gdl="collapsable.body" class="min-h-0 pt-1" inert={!opened()}>
+        <div
+          data-gdl="collapsable.body"
+          class="min-h-0 min-w-0 pt-1"
+          inert={!opened()}
+        >
           {props.children}
         </div>
       </div>

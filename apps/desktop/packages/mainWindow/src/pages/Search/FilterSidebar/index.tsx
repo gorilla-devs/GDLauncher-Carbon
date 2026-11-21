@@ -358,10 +358,14 @@ export function FilterSidebar() {
         />
       </div>
 
-      {/* === FLYOUT OVERLAY (slides in on hover when undocked) === */}
+      {/* === FLYOUT OVERLAY (slides in on hover when undocked) ===
+          It floats over the results, so it has the panel's colour of its
+          own: a theme that clears `page.body` for its glass still covers
+          the results here. */}
       <div
         ref={flyoutRef}
-        class="border-darkSlate-700/50 absolute inset-y-0 left-0 z-50 overflow-hidden border-r shadow-xl shadow-black/40 transition-[transform,opacity] duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
+        data-gdl="search.sidebar.flyout"
+        class="bg-darkSlate-800 border-darkSlate-700/50 absolute inset-y-0 left-0 z-50 overflow-hidden border-r shadow-xl shadow-black/40 transition-[transform,opacity] duration-200 ease-[cubic-bezier(.4,0,.2,1)]"
         classList={{
           "pointer-events-none": !showOverlay(),
           "opacity-0": isDocked()

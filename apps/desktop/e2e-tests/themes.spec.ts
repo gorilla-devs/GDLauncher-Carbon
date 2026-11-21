@@ -606,6 +606,7 @@ test.describe("Themes", () => {
         "search.sidebar.header",
         "search.sidebar.title",
         "search.sidebar.collapsed",
+        "search.sidebar.flyout",
         "search.sidebar.fade",
         "search.filter",
         "search.filter.option",
@@ -1864,6 +1865,76 @@ test.describe("Themes", () => {
         getComputedStyle(document.querySelector(selector)!).backgroundImage,
       selector
     )
+
+  // Each filter section keeps to the sidebar's width, whatever its longest
+  // label: a truncated name must not widen its section past the others.
+  test("every Search filter section keeps to the sidebar's width", async ({
+    authenticatedApp
+  }) => {
+    const { page } = authenticatedApp
+    await goTo(page, "#/search")
+    await expect(
+      page.locator(byTestId(TEST_IDS.searchResultRow)).first()
+    ).toBeVisible({ timeout: 90_000 })
+    const overflow = await page.evaluate(() => {
+      const sidebar = document.querySelector('[data-gdl~="search.sidebar"]')!
+      return [...sidebar.querySelectorAll("[data-filter-section]")].flatMap(
+        (section) => {
+          const edge = section.getBoundingClientRect().right
+          return [...section.querySelectorAll("*")]
+            .filter((el) => el.getBoundingClientRect().width > 0)
+            .filter((el) => el.getBoundingClientRect().right > edge + 0.5)
+            .map(
+              (el) =>
+                `${section.getAttribute("data-filter-section")}: ${el.tagName.toLowerCase()} ends at ${Math.round(el.getBoundingClientRect().right)}, the section at ${Math.round(edge)}`
+            )
+            .slice(0, 1)
+        }
+      )
+    })
+    expect(overflow).toEqual([])
+  })
+
+  // Undocked, the filter sidebar flies out over the results on hover. A
+  // theme that clears `page.body` (Silent Night, for its glass) must not make
+  // that fly-out see-through.
+  test("the filter fly-out covers the results under Silent Night", async ({
+    authenticatedApp
+  }) => {
+    const { page, harness } = authenticatedApp
+    // The last button in a sidebar's header docks or undocks it.
+    const dockButton = (sidebar: ReturnType<Page["locator"]>) =>
+      sidebar.locator(`${byHook("search.sidebar.header")} button`).last()
+    try {
+      await silentNightOn(page, harness.runtimePath)
+      await goTo(page, "#/search")
+      await expect(page.locator(byHook("search.sidebar")).first()).toBeVisible()
+      await dockButton(page.locator(byHook("search.sidebar")).first()).click()
+      const strip = page.locator(byHook("search.sidebar.collapsed")).first()
+      await expect(strip).toBeVisible()
+      await strip.hover()
+      const flyout = page.locator(byHook("search.sidebar.flyout"))
+      await expect(flyout).toBeVisible()
+      await page.waitForTimeout(400)
+      const alpha = await flyout.evaluate((el) => {
+        const c = getComputedStyle(el).backgroundColor
+        const m = /rgba?\(([^)]+)\)/.exec(c)
+        const parts = m ? m[1].split(/[ ,/]+/).filter(Boolean) : []
+        return parts.length === 4
+          ? Number(parts[3])
+          : parts.length === 3
+            ? 1
+            : 0
+      })
+      expect(alpha, "the fly-out's own background").toBeGreaterThanOrEqual(0.8)
+      // Dock it again from the fly-out.
+      await dockButton(flyout).click()
+      // Docked, the fly-out stays mounted but fades out.
+      await expect(flyout).toHaveCSS("opacity", "0")
+    } finally {
+      await restoreMain(page, harness.runtimePath)
+    }
+  })
 
   test("Silent Night draws its scene, decorations and effects", async ({
     authenticatedApp

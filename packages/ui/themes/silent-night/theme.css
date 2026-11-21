@@ -69,6 +69,13 @@
   backdrop-filter: blur(16px);
 }
 
+/* The Search filters' fly-out floats over the results: frosted like the bars,
+   but denser, so the filters stay readable over busy pictures. */
+[data-gdl~="search.sidebar.flyout"] {
+  background: rgb(12 22 48 / 0.86);
+  backdrop-filter: blur(16px) saturate(125%);
+}
+
 /* The ledge's icicles hang over the toolbar; clear the tabs. */
 [data-gdl~="library.toolbar"] {
   padding-top: 26px;

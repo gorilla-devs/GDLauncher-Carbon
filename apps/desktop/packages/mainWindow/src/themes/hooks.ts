@@ -210,6 +210,7 @@ export const GDL_HOOKS: readonly string[] = [
   "search.sidebar.header",
   "search.sidebar.title",
   "search.sidebar.collapsed",
+  "search.sidebar.flyout",
   "search.filter",
   "search.filter.option",
   "category-icon",

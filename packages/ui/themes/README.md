@@ -715,39 +715,40 @@ The page of one instance or one server. The two pages share their layout, so mos
 
 The Search page with its filter sidebar and results, and the page of one mod or modpack.
 
-| Hook                        | Where it is                                                                                                        |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `search.context`            | The box at the top of the Search sidebar showing the instance or server.                                           |
-| `search.context.fade`       | The sideways fade layer in that box.                                                                               |
-| `search.context.shade`      | The bottom fade layer in that box.                                                                                 |
-| `search.sidebar.fade`       | The fade at the bottom of the Search filter sidebar.                                                               |
-| `search.sidebar`            | The filter sidebar, docked or flying out (two elements, the docked one and the fly-out). It is also a `page.body`. |
-| `search.sidebar.header`     | Its top row: Filters, clear all, the view switch and the dock button.                                              |
-| `search.sidebar.title`      | The word "Filters" in that row.                                                                                    |
-| `search.sidebar.collapsed`  | The strip of filter icons shown when the sidebar is undocked.                                                      |
-| `search.filter`             | One filter section: platform, categories, loaders, versions, environment or sort. Each holds a `collapsable`.      |
-| `search.filter.option`      | One choice with a checkbox in a filter.                                                                            |
-| `category-icon`             | A category's picture: in the Categories filter, and on the category chips of results and filters.                  |
-| `search.results`            | The results area, in the list or the grid view.                                                                    |
-| `search.result`             | One result.                                                                                                        |
-| `search.result.grid`        | Added to a result in the grid view.                                                                                |
-| `search.result.installed`   | Added to a result that is already installed where you're adding it.                                                |
-| `search.result.image`       | A result's picture: the icon in the list, the whole card in the grid.                                              |
-| `search.result.backdrop`    | The blurred picture behind a result in the list.                                                                   |
-| `search.result.title`       | A result's name.                                                                                                   |
-| `search.result.description` | A result's summary.                                                                                                |
-| `search.result.stats`       | The download count and platform icon at the right of a list row.                                                   |
-| `search.result.action`      | The install button at the right of a list row.                                                                     |
-| `search.result.panel`       | The glass panel at the bottom of a grid card.                                                                      |
-| `search.empty`              | The message shown when nothing matches. Results load as you scroll; there are no pages.                            |
-| `addon-page`                | The page of one mod, modpack or other add-on.                                                                      |
-| `addon-page.header`         | Its cover header.                                                                                                  |
-| `addon-page.header.fade`    | The two fade layers in that header (two elements).                                                                 |
-| `addon-page.cover`          | The cover picture.                                                                                                 |
-| `addon-page.back`           | The back button over the cover.                                                                                    |
-| `addon-page.icon`           | The small square picture next to the name.                                                                         |
-| `addon-page.actions`        | The install buttons under the name.                                                                                |
-| `addon-page.tabs`           | The sticky tab bar under the header.                                                                               |
+| Hook                        | Where it is                                                                                                                                                                                                 |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `search.context`            | The box at the top of the Search sidebar showing the instance or server.                                                                                                                                    |
+| `search.context.fade`       | The sideways fade layer in that box.                                                                                                                                                                        |
+| `search.context.shade`      | The bottom fade layer in that box.                                                                                                                                                                          |
+| `search.sidebar.fade`       | The fade at the bottom of the Search filter sidebar.                                                                                                                                                        |
+| `search.sidebar`            | The filter sidebar, docked or flying out (two elements, the docked one and the fly-out). It is also a `page.body`.                                                                                          |
+| `search.sidebar.header`     | Its top row: Filters, clear all, the view switch and the dock button.                                                                                                                                       |
+| `search.sidebar.title`      | The word "Filters" in that row.                                                                                                                                                                             |
+| `search.sidebar.collapsed`  | The strip of filter icons shown when the sidebar is undocked.                                                                                                                                               |
+| `search.sidebar.flyout`     | The panel the undocked sidebar flies out in on hover, over the results. It has the panel's colour of its own, so a theme that clears `page.body` still covers the results there; give it your panel's look. |
+| `search.filter`             | One filter section: platform, categories, loaders, versions, environment or sort. Each holds a `collapsable`.                                                                                               |
+| `search.filter.option`      | One choice with a checkbox in a filter.                                                                                                                                                                     |
+| `category-icon`             | A category's picture: in the Categories filter, and on the category chips of results and filters.                                                                                                           |
+| `search.results`            | The results area, in the list or the grid view.                                                                                                                                                             |
+| `search.result`             | One result.                                                                                                                                                                                                 |
+| `search.result.grid`        | Added to a result in the grid view.                                                                                                                                                                         |
+| `search.result.installed`   | Added to a result that is already installed where you're adding it.                                                                                                                                         |
+| `search.result.image`       | A result's picture: the icon in the list, the whole card in the grid.                                                                                                                                       |
+| `search.result.backdrop`    | The blurred picture behind a result in the list.                                                                                                                                                            |
+| `search.result.title`       | A result's name.                                                                                                                                                                                            |
+| `search.result.description` | A result's summary.                                                                                                                                                                                         |
+| `search.result.stats`       | The download count and platform icon at the right of a list row.                                                                                                                                            |
+| `search.result.action`      | The install button at the right of a list row.                                                                                                                                                              |
+| `search.result.panel`       | The glass panel at the bottom of a grid card.                                                                                                                                                               |
+| `search.empty`              | The message shown when nothing matches. Results load as you scroll; there are no pages.                                                                                                                     |
+| `addon-page`                | The page of one mod, modpack or other add-on.                                                                                                                                                               |
+| `addon-page.header`         | Its cover header.                                                                                                                                                                                           |
+| `addon-page.header.fade`    | The two fade layers in that header (two elements).                                                                                                                                                          |
+| `addon-page.cover`          | The cover picture.                                                                                                                                                                                          |
+| `addon-page.back`           | The back button over the cover.                                                                                                                                                                             |
+| `addon-page.icon`           | The small square picture next to the name.                                                                                                                                                                  |
+| `addon-page.actions`        | The install buttons under the name.                                                                                                                                                                         |
+| `addon-page.tabs`           | The sticky tab bar under the header.                                                                                                                                                                        |
 
 ### Settings
 
