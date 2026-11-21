@@ -26,6 +26,7 @@
 use super::*;
 use crate::domain::instance::info::ModLoaderType;
 use crate::domain::vtask::{DependencyPlatform, SkippedDependencyReason, TaskWarning};
+use crate::managers::instance::world_datapack_changes::modrinth_world_file;
 use carbon_platforms::curseforge::CurseForgeResponse;
 use std::collections::{HashMap, HashSet};
 
@@ -1032,6 +1033,11 @@ pub(super) struct Request {
     /// Loader tags of the version that declares the requirements (Modrinth
     /// `loaders`, CurseForge `gameVersions`).
     pub parent_loaders: Vec<String>,
+    /// The version that declares the requirements is a Modrinth data pack
+    /// build. Modrinth lists data pack projects as mods, so only this tells
+    /// that a requirement is met by a data pack build, which the game loads
+    /// with any mod loader and with none.
+    pub datapack_parent: bool,
 }
 
 impl Request {
@@ -1274,15 +1280,25 @@ pub(super) async fn modrinth(
         return Ok(None);
     }
     let is_mod = project.project_type == modrinth::project::ProjectType::Mod;
+    // The required project's data pack build for this game, when a data pack
+    // build requires it (see `Request::datapack_parent`).
+    let pack_build = |version: &modrinth::version::Version| {
+        request.datapack_parent
+            && request
+                .target
+                .as_ref()
+                .is_some_and(|(game, _)| modrinth_world_file(version, game).is_some())
+    };
     let fits = |version: &modrinth::version::Version| {
-        select_dependency(
-            std::slice::from_ref(version),
-            request.target.as_ref(),
-            !is_mod,
-            request.preferred,
-            mr_metadata,
-        )
-        .is_ok()
+        pack_build(version)
+            || select_dependency(
+                std::slice::from_ref(version),
+                request.target.as_ref(),
+                !is_mod,
+                request.preferred,
+                mr_metadata,
+            )
+            .is_ok()
     };
     // The declared pin, then the version another dependant settled on. A pin
     // that is gone or is not for this game and loader is replaced by the
@@ -1341,58 +1357,79 @@ pub(super) async fn modrinth(
                 return Err(skip.because(SkippedDependencyReason::NoCompatibleVersion));
             };
             let loaders = target_loaders(target);
-            if is_mod && loaders.is_empty() {
-                // A vanilla instance cannot load any mod; don't ask for one.
-                return Err(skip.because(SkippedDependencyReason::NoCompatibleVersion));
+            // What a data pack build requires is looked for among the data
+            // pack builds first. A requirement without one is a mod, found
+            // as any other; a vanilla instance cannot load any mod, so none
+            // is asked for there.
+            let mut searches = Vec::new();
+            if request.datapack_parent {
+                searches.push(true);
             }
-            let mut versions = Vec::new();
-            for page in 0..PAGES {
-                let response = catalogue
-                    .mr_versions(ProjectVersionsFilters {
-                        project_id: ProjectID(project_id.clone()),
-                        game_versions: Some(vec![target.0.clone()]),
-                        loaders: is_mod.then(|| loaders.iter().map(|l| (*l).to_owned()).collect()),
-                        limit: Some(100),
-                        offset: Some(page as u32 * 100),
-                    })
-                    .await
-                    .map_err(|error| skip.lookup(error))?;
-                let done = response.len() < 100;
-                versions.extend(response);
-                if done {
-                    break;
+            if !(is_mod && loaders.is_empty()) {
+                searches.push(false);
+            }
+            let mut found = None;
+            for packs_only in searches {
+                let mut versions = Vec::new();
+                for page in 0..PAGES {
+                    let response = catalogue
+                        .mr_versions(ProjectVersionsFilters {
+                            project_id: ProjectID(project_id.clone()),
+                            game_versions: Some(vec![target.0.clone()]),
+                            loaders: if packs_only {
+                                Some(vec!["datapack".to_owned()])
+                            } else {
+                                is_mod.then(|| loaders.iter().map(|l| (*l).to_owned()).collect())
+                            },
+                            limit: Some(100),
+                            offset: Some(page as u32 * 100),
+                        })
+                        .await
+                        .map_err(|error| skip.lookup(error))?;
+                    let done = response.len() < 100;
+                    versions.extend(response);
+                    if done {
+                        break;
+                    }
+                    if page == PAGES - 1 {
+                        return Err(skip.because(SkippedDependencyReason::Unavailable));
+                    }
                 }
-                if page == PAGES - 1 {
+                if versions.iter().any(|v| v.project_id != project_id) {
                     return Err(skip.because(SkippedDependencyReason::Unavailable));
                 }
-            }
-            if versions.iter().any(|v| v.project_id != project_id) {
-                return Err(skip.because(SkippedDependencyReason::Unavailable));
-            }
-            // The pinned release built for this Minecraft version, if there is
-            // one, before the newest compatible version.
-            let release = unfit_pin.as_ref().map(release_of).unwrap_or_default();
-            let same_release: Vec<_> = if release.is_empty() {
-                Vec::new()
-            } else {
-                versions
-                    .iter()
-                    .filter(|version| release_of(version) == release)
+                if packs_only {
+                    versions.retain(|version| pack_build(version));
+                }
+                // The pinned release built for this Minecraft version, if there
+                // is one, before the newest compatible version.
+                let release = unfit_pin.as_ref().map(release_of).unwrap_or_default();
+                let same_release: Vec<_> = if release.is_empty() {
+                    Vec::new()
+                } else {
+                    versions
+                        .iter()
+                        .filter(|version| release_of(version) == release)
+                        .cloned()
+                        .collect()
+                };
+                let select = |versions: &[modrinth::version::Version]| {
+                    select_dependency(
+                        versions,
+                        request.target.as_ref(),
+                        packs_only || !is_mod,
+                        request.preferred,
+                        mr_metadata,
+                    )
+                    .ok()
                     .cloned()
-                    .collect()
-            };
-            let select = |versions: &[modrinth::version::Version]| {
-                select_dependency(
-                    versions,
-                    request.target.as_ref(),
-                    !is_mod,
-                    request.preferred,
-                    mr_metadata,
-                )
-                .ok()
-                .cloned()
-            };
-            let Some(version) = select(&same_release).or_else(|| select(&versions)) else {
+                };
+                found = select(&same_release).or_else(|| select(&versions));
+                if found.is_some() {
+                    break;
+                }
+            }
+            let Some(version) = found else {
                 if is_mod && request.for_another_loader(&project.title, &project.loaders) {
                     return Ok(None);
                 }

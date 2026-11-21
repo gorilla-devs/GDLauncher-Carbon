@@ -34,10 +34,15 @@ fn cf(filename: &str, bytes: &[u8], kind: curseforge::ClassId) -> CurseforgeModI
 }
 
 fn mr(filename: &str, bytes: &[u8]) -> ModrinthModInstaller {
+    mr_tagged(filename, bytes, &["fabric"])
+}
+
+/// A version of a Modrinth `mod` project with these loader tags.
+fn mr_tagged(filename: &str, bytes: &[u8], loaders: &[&str]) -> ModrinthModInstaller {
     use sha1::Digest;
     let version = serde_json::from_value(serde_json::json!({
         "name":"fixture", "version_number":"2", "dependencies":[], "game_versions":["1.20.1"],
-        "version_type":"release", "loaders":["fabric"], "featured":false, "id":"v2", "project_id":"fixture",
+        "version_type":"release", "loaders":loaders, "featured":false, "id":"v2", "project_id":"fixture",
         "author_id":"fixture", "date_published":"2026-01-01T00:00:00Z", "downloads":0,
         "files":[{"hashes":{"sha1":hex::encode(sha1::Sha1::digest(bytes)), "sha512":hex::encode(sha2::Sha512::digest(bytes))},
             "url":"https://fixture.invalid/never-requested", "filename":filename, "primary":true, "size":bytes.len()}]
@@ -1896,6 +1901,111 @@ async fn an_update_keeps_its_platform_identity_when_the_lookup_misses() {
         (modrinth.project_id.as_str(), modrinth.version_id.as_str()),
         ("fixture", "v2")
     );
+}
+
+/// Installs `resource`, served from a file holding `bytes`, on `id` and
+/// waits for it to succeed.
+async fn install_served(
+    app: &Arc<AppInner>,
+    id: InstanceId,
+    resource: ModrinthModInstaller,
+    bytes: &[u8],
+) {
+    let source = tempfile::NamedTempFile::new().unwrap();
+    std::fs::write(source.path(), bytes).unwrap();
+    let mut installer = resource.into_installer();
+    installer.download_fixture = Some(source.path().into());
+    let task = installer.install(app, id, true, None).await.unwrap();
+    wait_for_install(&installer, app, task).await;
+    let outcome = settled_outcome(app, task).await;
+    assert!(
+        matches!(outcome, crate::managers::vtask::TaskOutcome::Succeeded),
+        "{}",
+        describe_outcome(outcome)
+    );
+}
+
+/// The kinds `filename` is recorded as among the addons of `id`.
+async fn recorded_kinds(app: &Arc<AppInner>, id: InstanceId, filename: &str) -> Vec<String> {
+    mfcdb::get_mod_files_by_instance(&app.db, *id)
+        .await
+        .unwrap()
+        .into_iter()
+        .filter(|row| row.filename == filename)
+        .map(|row| row.addon_type)
+        .collect()
+}
+
+/// Modrinth lists a data pack project as a mod; its data pack builds are the
+/// versions tagged `datapack` whose file is a zip. One installed into an
+/// instance is a data pack there, whatever loader the instance has.
+#[tokio::test]
+async fn a_modrinth_data_pack_build_installs_into_datapacks_with_and_without_a_mod_loader() {
+    use crate::domain::instance::info::ModLoaderType;
+    let app = crate::setup_managers_for_test().await;
+    let archive = tempfile::NamedTempFile::new().unwrap();
+    zip(
+        archive.path(),
+        &[(
+            "pack.mcmeta",
+            br#"{"pack":{"pack_format":15,"description":"fixture"}}"#,
+        )],
+    );
+    let bytes = std::fs::read(archive.path()).unwrap();
+    for (name, loader) in [
+        ("pack-on-fabric", Some(ModLoaderType::Fabric)),
+        ("pack-without-loader", None),
+    ] {
+        let id = dependency_rule::instance(&app, name, "1.20.1", loader).await;
+        let resource = mr_tagged("pack.zip", &bytes, &["datapack"]);
+        assert_eq!(
+            resource.addon_type(),
+            instance::AddonType::DataPacks,
+            "{name}"
+        );
+        install_served(&app, id, resource, &bytes).await;
+
+        let path = publication::current_path(&app, id).await.unwrap();
+        assert_eq!(
+            std::fs::read(path.get_datapacks_path().join("pack.zip")).unwrap(),
+            bytes,
+            "{name}"
+        );
+        assert!(!path.get_mods_path().join("pack.zip").exists(), "{name}");
+        assert_eq!(
+            recorded_kinds(&app, id, "pack.zip").await,
+            ["datapacks"],
+            "{name}"
+        );
+        assert!(
+            mfcdb::instance_mod_exists_by_mr_project(&app.db, *id, "fixture")
+                .await
+                .unwrap()
+                .is_some(),
+            "{name}"
+        );
+    }
+}
+
+/// A project with data pack builds also publishes mod jars (Terralith does),
+/// some tagged `datapack` as well: a jar stays a mod.
+#[tokio::test]
+async fn a_jar_build_of_a_modrinth_data_pack_project_installs_into_mods() {
+    use crate::domain::instance::info::ModLoaderType;
+    let app = crate::setup_managers_for_test().await;
+    let id =
+        dependency_rule::instance(&app, "jar-of-pack", "1.20.1", Some(ModLoaderType::Fabric)).await;
+    let resource = mr_tagged("pack.jar", b"jar", &["datapack", "fabric"]);
+    assert_eq!(resource.addon_type(), instance::AddonType::Mods);
+    install_served(&app, id, resource, b"jar").await;
+
+    let path = publication::current_path(&app, id).await.unwrap();
+    assert_eq!(
+        std::fs::read(path.get_mods_path().join("pack.jar")).unwrap(),
+        b"jar"
+    );
+    assert!(!path.get_datapacks_path().join("pack.jar").exists());
+    assert_eq!(recorded_kinds(&app, id, "pack.jar").await, ["mods"]);
 }
 
 async fn wait_for_install(installer: &Installer, app: &Arc<AppInner>, task_id: VisualTaskId) {
@@ -5739,7 +5849,7 @@ mod dependency_rule {
         resource
     }
 
-    async fn instance(
+    pub(super) async fn instance(
         app: &Arc<AppInner>,
         name: &str,
         release: &str,
@@ -6653,6 +6763,65 @@ mod dependency_rule {
             "a pin is downloaded as is: {:?}",
             catalogue.calls()
         );
+    }
+
+    /// What a data pack build requires is another data pack: the required
+    /// project's data pack build is planned, never its mod jar, also on an
+    /// instance without a mod loader.
+    #[tokio::test]
+    async fn a_data_pack_builds_requirement_is_met_by_a_data_pack_build() {
+        let app = crate::setup_managers_for_test().await;
+        let mut fixture = Fixture::default();
+        fixture
+            .mr_projects
+            .insert("library".into(), mr_project("library", "Library", "mod"));
+        for (id, filename, loaders) in [
+            ("library-jar", "library.jar", ["fabric"]),
+            ("library-pack", "library.zip", ["datapack"]),
+        ] {
+            fixture.mr_versions.insert(
+                id.into(),
+                mr_version(
+                    "library",
+                    id,
+                    filename,
+                    b"library",
+                    &["1.20.1"],
+                    &loaders,
+                    serde_json::json!([]),
+                ),
+            );
+        }
+        let catalogue = Arc::new(fixture);
+        for (name, loader) in [
+            ("pack-requirement-on-fabric", Some(ModLoaderType::Fabric)),
+            ("pack-requirement-without-loader", None),
+        ] {
+            let id = instance(&app, name, "1.20.1", loader).await;
+            let mut parent = ModrinthModInstaller::from_version(
+                mr_version(
+                    "parent",
+                    "parent-2",
+                    "parent.zip",
+                    b"parent",
+                    &["1.20.1"],
+                    &["datapack"],
+                    modrinth_requires(Some("library"), None),
+                ),
+                mr_project("parent", "Parent", "mod"),
+            )
+            .unwrap();
+            parent.catalogue = Some(catalogue.clone());
+
+            let resolution = plan(&app, id, parent, false).await.unwrap();
+
+            assert!(resolution.skipped.is_empty(), "{name}");
+            assert_eq!(
+                root_children(&resolution, "modrinth:parent:parent-2").await,
+                ["modrinth:library:library-pack"],
+                "{name}"
+            );
+        }
     }
 
     #[tokio::test]

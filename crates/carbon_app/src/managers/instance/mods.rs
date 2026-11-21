@@ -1,6 +1,7 @@
 use super::{
     InstanceId, InstanceManager, InvalidInstanceIdError,
     installer::{CurseforgeModInstaller, IntoInstaller, ModrinthModInstaller, dependency},
+    world_datapack_changes::modrinth_world_file,
 };
 use crate::api::keys::instance::INSTANCE_MODS;
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
@@ -1324,6 +1325,9 @@ pub(super) async fn resolve_mod_update(
     context: &UpdateContext,
     mod_sources: &ModSources,
 ) -> anyhow::Result<Option<RemoteVersion>> {
+    // A Modrinth data pack is only updated to a data pack build: its
+    // project also publishes mod jars, which are no update of it.
+    let pack = addon_type == domain::AddonType::DataPacks.to_db_string();
     resolve_mod_update_where(
         curseforge,
         modrinth,
@@ -1332,7 +1336,12 @@ pub(super) async fn resolve_mod_update(
         addon_type,
         context,
         mod_sources,
-        |_| true,
+        |candidate| match candidate {
+            RemoteVersion::Modrinth(candidate) => {
+                !pack || modrinth_world_file(candidate, &version.release).is_some()
+            }
+            RemoteVersion::Curseforge(_) => true,
+        },
     )
     .await
 }

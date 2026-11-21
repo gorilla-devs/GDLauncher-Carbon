@@ -511,7 +511,10 @@ fn no_data_pack(game: &str) -> anyhow::Error {
 /// (the first when none is flagged), when the version is tagged `datapack`
 /// and that file is a zip. The game loads nothing else from a world's
 /// `datapacks` folder. A version the user picked needs no more than this.
-fn modrinth_datapack_file(version: &Version) -> Option<&VersionFile> {
+/// Modrinth lists a data pack project as a mod, so this is also what tells
+/// its data pack builds from its mod jars when one is installed into an
+/// instance.
+pub(crate) fn modrinth_datapack_file(version: &Version) -> Option<&VersionFile> {
     if !version.loaders.iter().any(|loader| loader == "datapack") {
         return None;
     }
@@ -1440,7 +1443,7 @@ pub(crate) mod tests {
     fn mr_project() -> serde_json::Value {
         json!({
             "slug": "world-pack", "title": "World Pack", "description": "", "categories": [], "client_side": "optional", "server_side": "optional",
-            "body": "", "additional_categories": [], "donation_urls": [], "project_type": "datapack", "downloads": 0, "id": "project", "team": "fixture",
+            "body": "", "additional_categories": [], "donation_urls": [], "project_type": "mod", "downloads": 0, "id": "project", "team": "fixture",
             "published": "2026-01-01T00:00:00Z", "updated": "2026-01-01T00:00:00Z", "followers": 0, "status": "approved",
             "license": {"id": "MIT", "name": "MIT", "url": null}, "versions": [], "game_versions": [], "loaders": []
         })

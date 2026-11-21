@@ -4,7 +4,7 @@ mod planning;
 use graph::InstallGraph;
 pub(crate) use graph::LiveGraphs;
 pub(crate) mod publication;
-use super::{InstanceData, InvalidInstanceIdError};
+use super::{InstanceData, InvalidInstanceIdError, world_datapack_changes::modrinth_datapack_file};
 use crate::{
     api::{
         keys::instance::{INSTANCE_DETAILS, INSTANCE_MODS},
@@ -1714,6 +1714,8 @@ impl ResourceInstaller for CurseforgeModInstaller {
             catalogue: self.catalogue(app),
             previous: self.previous.clone(),
             parent_loaders: self.file.game_versions.clone(),
+            // A CurseForge requirement is a data pack by its project's class.
+            datapack_parent: false,
         };
         let mut installers: Vec<ResourceInstallerGetter> = Vec::new();
         for dep in &self.file.dependencies {
@@ -1803,18 +1805,13 @@ impl ModrinthModInstaller {
 
         let (version, project) = tokio::try_join!(version, project)?;
 
-        let file = version
-            .files
-            .iter()
-            .reduce(|a, b| if b.primary { b } else { a })
-            .cloned()
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Modrinth project '{}' version '{}' does not have a file",
-                    &project_id,
-                    &version_id
-                )
-            })?;
+        let file = Self::installed_file(&version).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Modrinth project '{}' version '{}' does not have a file",
+                &project_id,
+                &version_id
+            )
+        })?;
 
         let download_url = file.url.clone();
 
@@ -1835,18 +1832,13 @@ impl ModrinthModInstaller {
         version: modrinth::version::Version,
         project: modrinth::project::Project,
     ) -> anyhow::Result<Self> {
-        let file = version
-            .files
-            .iter()
-            .reduce(|a, b| if b.primary { b } else { a })
-            .cloned()
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Modrinth project '{}' version '{}' does not have a file",
-                    &version.project_id,
-                    &version.id
-                )
-            })?;
+        let file = Self::installed_file(&version).ok_or_else(|| {
+            anyhow::anyhow!(
+                "Modrinth project '{}' version '{}' does not have a file",
+                &version.project_id,
+                &version.id
+            )
+        })?;
 
         let download_url = file.url.clone();
 
@@ -1870,6 +1862,21 @@ impl ModrinthModInstaller {
         }
         Arc::new(dependency::Live(app.clone()))
     }
+
+    /// The file of `version` an install puts into the instance: the zip of a
+    /// data pack build, else the primary file.
+    fn installed_file(
+        version: &modrinth::version::Version,
+    ) -> Option<modrinth::version::VersionFile> {
+        modrinth_datapack_file(version)
+            .or_else(|| {
+                version
+                    .files
+                    .iter()
+                    .reduce(|a, b| if b.primary { b } else { a })
+            })
+            .cloned()
+    }
 }
 
 #[async_trait::async_trait]
@@ -1891,6 +1898,9 @@ impl ResourceInstaller for ModrinthModInstaller {
             modrinth::project::ProjectType::ResourcePack => instance::AddonType::ResourcePacks,
             modrinth::project::ProjectType::Shader => instance::AddonType::Shaders,
             modrinth::project::ProjectType::DataPack => instance::AddonType::DataPacks,
+            // Modrinth lists a data pack project as a mod: its version tells
+            // a data pack build from a mod jar of the same project.
+            _ if modrinth_datapack_file(&self.version).is_some() => instance::AddonType::DataPacks,
             _ => instance::AddonType::Mods,
         }
     }
@@ -1900,14 +1910,9 @@ impl ResourceInstaller for ModrinthModInstaller {
     }
 
     fn get_install_path(&self, instance_path: &InstancePath) -> PathBuf {
-        match self.mod_info.project_type {
-            modrinth::project::ProjectType::Mod => instance_path.get_mods_path(),
-            modrinth::project::ProjectType::ResourcePack => instance_path.get_resourcepacks_path(),
-            modrinth::project::ProjectType::Shader => instance_path.get_shaderpacks_path(),
-            modrinth::project::ProjectType::DataPack => instance_path.get_datapacks_path(),
-            _ => instance_path.get_mods_path(),
-        }
-        .join(&self.file.filename)
+        self.addon_type()
+            .get_folder_path(instance_path)
+            .join(&self.file.filename)
     }
 
     async fn downloadable(&self, instance_path: &InstancePath) -> Option<Downloadable> {
@@ -1947,6 +1952,7 @@ impl ResourceInstaller for ModrinthModInstaller {
             catalogue: self.catalogue(app),
             previous: self.previous.clone(),
             parent_loaders: self.version.loaders.clone(),
+            datapack_parent: self.addon_type() == instance::AddonType::DataPacks,
         };
         let mut installers: Vec<ResourceInstallerGetter> = Vec::new();
         for dep in &self.version.dependencies {

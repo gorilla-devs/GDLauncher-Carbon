@@ -249,7 +249,7 @@ pub(crate) struct UpdateContext {
 /// The kind the data packs inside an instance's worlds are looked up and
 /// cached as, under [`world_context`]. It is apart from the instance's own
 /// `datapacks`, whose context is the same on an instance without a mod
-/// loader: a world is only offered what its update installs.
+/// loader: each is only offered what its own update installs.
 pub(crate) const WORLD_DATAPACKS: &str = "world_datapacks";
 
 /// What a data pack inside one of an instance's worlds is updated for: the
@@ -295,8 +295,10 @@ impl UpdateContext {
         let mut loaders = self.loaders.clone();
         match kind {
             "resourcepacks" => loaders.push("minecraft".into()),
-            "datapacks" => loaders.extend(["minecraft".into(), "datapack".into()]),
-            WORLD_DATAPACKS => loaders = vec!["datapack".into()],
+            // Modrinth lists a data pack project as a mod, with jars for the
+            // mod loaders beside its data pack builds: asked for with the
+            // entity's loaders, the newest jar would hide the data pack build.
+            "datapacks" | WORLD_DATAPACKS => loaders = vec!["datapack".into()],
             "shaders" => loaders = self.shader_engines.clone(),
             _ => {}
         }
@@ -459,7 +461,7 @@ mod tests {
         assert_ne!(world.key(WORLD_DATAPACKS), quilt().key("datapacks"));
 
         // An instance without a mod loader is what its worlds are, and its
-        // own data packs are still asked for and kept as before.
+        // own data packs are kept apart from theirs.
         let vanilla = UpdateContext {
             game: "1.20.1".into(),
             loaders: vec![],
@@ -468,11 +470,33 @@ mod tests {
         };
         assert_eq!(vanilla.base_key(), world.base_key());
         assert_ne!(world.key(WORLD_DATAPACKS), vanilla.key("datapacks"));
-        assert_eq!(
-            vanilla.request_loaders("datapacks"),
-            ["datapack", "minecraft"]
-        );
         assert_eq!(vanilla.key("datapacks"), r#"["1.20.1",[],[]]:datapacks"#);
+    }
+
+    /// The game loads a data pack from the instance's own `datapacks` folder
+    /// as it does from a world's: a build for the instance's mod loader is
+    /// a jar of the same project, and no update of the data pack.
+    #[test]
+    fn an_instances_own_data_pack_is_asked_for_data_pack_builds_only() {
+        let fabric = UpdateContext {
+            game: "1.20.1".into(),
+            loaders: vec!["fabric".into()],
+            also_loads: vec![],
+            shader_engines: vec![],
+        };
+        assert_eq!(fabric.request_loaders("datapacks"), ["datapack"]);
+        assert_eq!(fabric.lookup_loaders("datapacks"), [["datapack"]]);
+        let game = names(&["1.20.1"]);
+        assert!(fabric.compatible("datapacks", &game, &names(&["datapack"])));
+        assert!(!fabric.compatible("datapacks", &game, &names(&["fabric"])));
+        assert!(!fabric.compatible("datapacks", &game, &names(&["minecraft"])));
+        let badge =
+            |paths: &str| fabric.has_path("datapacks", paths, &sources(), ModChannel::Stable, &[]);
+        assert!(badge("1.20.1,datapack,stable"));
+        // A path cached before the rule, for the instance's loader.
+        assert!(!badge("1.20.1,fabric,stable"));
+        // A mod of the instance is still asked for its loader.
+        assert_eq!(fabric.request_loaders("mods"), ["fabric"]);
     }
 
     #[test]
@@ -1144,10 +1168,10 @@ mod tests {
             also_loads: vec![],
             shader_engines: vec![],
         };
-        for kind in ["resourcepacks", "datapacks"] {
-            assert!(vanilla.compatible(kind, &["1.20.1".into()], &["minecraft".into()]));
+        for (kind, tag) in [("resourcepacks", "minecraft"), ("datapacks", "datapack")] {
+            assert!(vanilla.compatible(kind, &["1.20.1".into()], &[tag.into()]));
             assert!(vanilla.cf_compatible(kind, &["1.20.1".into()]));
-            assert!(!vanilla.compatible(kind, &["1.20.2".into()], &["minecraft".into()]));
+            assert!(!vanilla.compatible(kind, &["1.20.2".into()], &[tag.into()]));
         }
         assert!(!vanilla.cf_compatible("mods", &["1.20.1".into(), "Fabric".into()]));
         assert!(!vanilla.cf_compatible("shaders", &["1.20.1".into()]));

@@ -1268,6 +1268,79 @@ pub(crate) mod tests {
         );
     }
 
+    /// The instance's own copy of a project that also publishes mod jars:
+    /// its update is the newest data pack build, never a newer jar or a
+    /// build for the instance's mod loader, and it replaces the copy in the
+    /// instance's `datapacks` folder.
+    #[tokio::test]
+    async fn an_instance_level_update_takes_the_newest_data_pack_build_never_a_jar() {
+        use crate::managers::instance::installer::{IntoInstaller, ModrinthModInstaller};
+        use carbon_platforms::modrinth::search::ProjectID;
+        let app = crate::setup_managers_for_test().await;
+        let (id, _) = fabric_instance(&app, "update-instance-pack", &[]).await;
+        let old = pack_zip("old");
+        let (instance_id, instance_metadata, instance_file) =
+            instance_pack(&app, id, "pack-1.zip", &old).await;
+        on_modrinth(&app, &instance_metadata, "project", "installed").await;
+        let mut api = api().await;
+        let new = pack_zip("new");
+        let url = api.file("pack-2.zip", &new).await;
+        let unwanted = pack_zip("for fabric");
+        let fabric_url = api.file("fabric.zip", &unwanted).await;
+        let jar_url = api.file("pack.jar", &unwanted).await;
+        modrinth_serving(
+            &mut api,
+            vec![
+                data_pack(
+                    "installed",
+                    5,
+                    &["datapack"],
+                    ("pack-1.zip", "https://cdn.invalid/pack-1.zip", &old),
+                ),
+                data_pack("newer", 10, &["datapack"], ("pack-2.zip", &url, &new)),
+                data_pack(
+                    "jar",
+                    20,
+                    &["datapack", "fabric"],
+                    ("pack.jar", &jar_url, &unwanted),
+                ),
+                data_pack(
+                    "fabric-only",
+                    25,
+                    &["fabric"],
+                    ("fabric.zip", &fabric_url, &unwanted),
+                ),
+            ],
+        )
+        .await;
+
+        let Some(RemoteVersion::Modrinth(version)) = app
+            .instance_manager()
+            .find_mod_update_from(&api.curseforge, &api.modrinth, id, instance_id.clone())
+            .await
+            .unwrap()
+        else {
+            panic!("the newer data pack build is the update");
+        };
+        assert_eq!(version.id, "newer");
+        let project = api
+            .modrinth
+            .get_project(ProjectID(version.project_id.clone()))
+            .await
+            .unwrap();
+        let task = ModrinthModInstaller::from_version(version, project)
+            .unwrap()
+            .into_installer()
+            .install(&app, id, false, Some(instance_id))
+            .await
+            .unwrap();
+        app.instance_manager().task_ended(task).await.unwrap();
+
+        let folder = instance_file.parent().unwrap();
+        only(folder, "pack-2.zip", &new);
+        assert!(!folder.with_file_name("mods").join("pack-2.zip").exists());
+    }
+
     /// The newer build's row is there but its file was deleted outside the
     /// launcher: the old pack is not just removed, the newer build is
     /// installed in its place.
@@ -1463,11 +1536,11 @@ pub(crate) mod tests {
 
     /// On an instance without a mod loader the worlds are updated for what
     /// the instance itself is. The same file as the instance's own data pack
-    /// and in a world still gets an answer for each: the instance's copy
-    /// keeps the arrow it had for a newer build tagged `minecraft`, and the
-    /// world's copy, which that build cannot update, shows none.
+    /// and in a world still gets an answer for each, whichever is saved
+    /// first: both show the arrow for a newer data pack build, and neither
+    /// for a newer build tagged `minecraft`, which is a resource pack.
     #[tokio::test]
-    async fn a_world_copy_and_the_instance_copy_keep_their_own_answers_without_a_mod_loader() {
+    async fn a_world_copy_and_the_instance_copy_each_get_their_answer_without_a_mod_loader() {
         use crate::managers::metadata::cache::{
             eligibility::WORLD_DATAPACKS, modrinth::test::save_lookup,
         };
@@ -1479,33 +1552,35 @@ pub(crate) mod tests {
             instance_pack(&app, id, "pack-1.zip", &old).await;
         let row = scanned_rows(&app, id).await.remove(0);
         assert_eq!(metadata(&row), instance_metadata, "one file, one metadata");
-        let newer = data_pack(
-            "newer",
-            10,
-            &["minecraft"],
-            ("pack-2.zip", "https://cdn.invalid/pack-2.zip", &old),
-        );
-        // Each order the two answers can be saved in.
-        for kinds in [
-            ["datapacks", WORLD_DATAPACKS],
-            [WORLD_DATAPACKS, "datapacks"],
-        ] {
-            save_lookup(
-                &app,
-                id,
-                &instance_metadata,
-                &kinds,
-                as_version(&installed_build(&old)),
-                vec![as_version(&newer)],
-            )
-            .await;
-            assert!(!update_arrow(&app, id).await, "{kinds:?}");
-            let listed = app.instance_manager().list_mods(id, None).await.unwrap();
-            let own = listed
-                .iter()
-                .find(|addon| addon.id == instance_row)
-                .expect("the instance's copy is listed");
-            assert!(own.has_update, "{kinds:?}");
+        for (tag, offered) in [("minecraft", false), ("datapack", true)] {
+            let newer = data_pack(
+                "newer",
+                10,
+                &[tag],
+                ("pack-2.zip", "https://cdn.invalid/pack-2.zip", &old),
+            );
+            // Each order the two answers can be saved in.
+            for kinds in [
+                ["datapacks", WORLD_DATAPACKS],
+                [WORLD_DATAPACKS, "datapacks"],
+            ] {
+                save_lookup(
+                    &app,
+                    id,
+                    &instance_metadata,
+                    &kinds,
+                    as_version(&installed_build(&old)),
+                    vec![as_version(&newer)],
+                )
+                .await;
+                assert_eq!(update_arrow(&app, id).await, offered, "{tag} {kinds:?}");
+                let listed = app.instance_manager().list_mods(id, None).await.unwrap();
+                let own = listed
+                    .iter()
+                    .find(|addon| addon.id == instance_row)
+                    .expect("the instance's copy is listed");
+                assert_eq!(own.has_update, offered, "{tag} {kinds:?}");
+            }
         }
     }
 

@@ -458,9 +458,12 @@ impl ModplatformCacher for ModrinthModCacher {
 
                 if let Some(context) = context {
                     let context = lookup_context(context, &kind);
-                    // A world's pack is offered only what its update installs.
+                    // A data pack is offered only what its update installs:
+                    // a data pack build, in a world and in the instance's
+                    // own folder.
+                    let pack = matches!(kind.as_str(), "datapacks" | WORLD_DATAPACKS);
                     let candidates = combined_versions.iter().filter(|v| context.compatible(&kind, &v.game_versions, &v.loaders)
-                        && (kind != WORLD_DATAPACKS || modrinth_world_file(v, &context.game).is_some())).cloned().collect::<Vec<_>>();
+                        && (!pack || modrinth_world_file(v, &context.game).is_some())).cloned().collect::<Vec<_>>();
                     let paths = build_update_paths(version, &project.id, &candidates);
                     if let Err(error) = metarepo::upsert_mr_update_context(&app.db, &metadata_id, &context.key(&kind), &paths,
                         DbDateTime(chrono::Utc::now().fixed_offset())).await {
@@ -1147,6 +1150,13 @@ pub(crate) mod test {
         }];
         let mut for_fabric = version("for-fabric", "project", 30, VersionType::Beta);
         for_fabric.loaders = vec!["fabric".into()];
+        // A mod jar of the same project that is tagged as a data pack too.
+        let mut jar = version("jar", "project", 31, VersionType::Alpha);
+        jar.loaders = vec!["datapack".into(), "fabric".into()];
+        jar.files = vec![VersionFile {
+            filename: "pack-3.jar".into(),
+            ..file(&"f".repeat(128))
+        }];
         ModrinthModCacher::save_batch(
             &app,
             entity,
@@ -1159,7 +1169,7 @@ pub(crate) mod test {
                 VersionHashesResponse([(hash.clone(), installed)].into_iter().collect()),
                 ProjectsResponse(vec![project("project")]),
                 vec![team("project")],
-                vec![for_worlds, for_fabric],
+                vec![for_worlds, for_fabric, jar],
                 Some(context.clone()),
             ),
         )
@@ -1179,23 +1189,17 @@ pub(crate) mod test {
             stored(world.key(WORLD_DATAPACKS)).await.as_deref(),
             Some("1.20.1,datapack,stable")
         );
-        let mut instance_paths = stored(context.key("datapacks"))
-            .await
-            .unwrap()
-            .split(';')
-            .map(str::to_owned)
-            .collect::<Vec<_>>();
-        instance_paths.sort();
+        // The instance's own copy is offered the data pack build only too.
         assert_eq!(
-            instance_paths,
-            ["1.20.1,datapack,stable", "1.20.1,fabric,beta"]
+            stored(context.key("datapacks")).await.as_deref(),
+            Some("1.20.1,datapack,stable")
         );
         assert_eq!(stored(context.key(WORLD_DATAPACKS)).await, None);
         assert!(due().await.is_empty(), "a fresh world row is not due");
     }
 
-    /// A world's lookup asks Modrinth for data pack builds only; the
-    /// instance's own data packs are asked for as before.
+    /// A lookup for a data pack asks Modrinth for data pack builds only,
+    /// in a world and in the instance's own folder.
     #[test]
     fn a_world_lookup_asks_for_data_pack_builds_only() {
         let fabric = UpdateContext {
@@ -1208,10 +1212,7 @@ pub(crate) mod test {
         assert_eq!(world.lookup_loaders(WORLD_DATAPACKS), [["datapack"]]);
         assert_eq!(world.game, "1.20.1");
         let instance = lookup_context(&fabric, "datapacks");
-        assert_eq!(
-            instance.lookup_loaders("datapacks"),
-            [["datapack", "fabric", "minecraft"]]
-        );
+        assert_eq!(instance.lookup_loaders("datapacks"), [["datapack"]]);
         assert_eq!(instance.key("datapacks"), fabric.key("datapacks"));
     }
 
