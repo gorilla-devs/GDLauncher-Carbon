@@ -1,4 +1,12 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi } from "vitest"
+
+// Without a loaded bundle the key stands in, with the file name it was given.
+vi.mock("@gd/i18n", () => ({
+  i18n: {
+    t: (key: string, options?: { filename?: string }) =>
+      options?.filename ? `${key} ${options.filename}` : key
+  }
+}))
 import { resolveTaskPoll } from "./resolveTaskPoll"
 import type { FETask, Progress } from "@gd/core_module/bindings"
 
@@ -53,6 +61,37 @@ describe("resolveTaskPoll", () => {
       message: "Download failed"
     })
     expect(result.nextLastProgress).toEqual(failedProgress)
+  })
+
+  it.each([
+    [
+      "the sentence of its refusal's code",
+      { display: "Selected world no longer exists", code: "WORLD_GONE" },
+      "content:_trn_worlds.refusal.world_gone"
+    ],
+    [
+      "the file its refusal names",
+      {
+        display: "Failed to download data pack a.zip: timed out",
+        code: "DATAPACK_DOWNLOAD_FAILED",
+        data: { filename: "Tom & Jerry.zip", cause: "timed out" }
+      },
+      "content:_trn_worlds.refusal.download_failed Tom & Jerry.zip"
+    ],
+    [
+      "the core's sentence for a code it does not know",
+      { display: "Something newer", code: "A_CODE_FROM_A_NEWER_CORE" },
+      "Something newer"
+    ]
+  ])("a failed task is worded with %s", (_, cause, message) => {
+    const progress: Progress = {
+      type: "Failed",
+      value: { cause: [{ debug: "debug", ...cause }], backtrace: "" }
+    }
+    expect(
+      resolveTaskPoll({ type: "Failed", value: taskWith(progress) }, null, true)
+        .action
+    ).toEqual({ kind: "failed", message, code: cause.code })
   })
 
   it("Failed progress with no cause falls back to an empty message instead of throwing", () => {

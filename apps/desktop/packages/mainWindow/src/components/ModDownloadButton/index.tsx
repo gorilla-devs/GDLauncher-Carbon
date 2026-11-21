@@ -40,6 +40,7 @@ import { findInstalledAddon, isInstalledArtifact } from "@/utils/installedAddon"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import useSearchContext from "@/components/SearchInputContext"
 import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
+import { refreshWorldsAfter } from "@/utils/refusalText"
 import {
   asksWhichWorld,
   installPlaces,
@@ -102,6 +103,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     server: boolean
     copy: ReturnType<typeof worldVersionCopy>
     world?: string
+    instanceId?: number
   }>()
   const [pendingRequest, setPendingRequest] = createSignal(false)
   const [progress, setProgress] = createSignal<number | null>(null)
@@ -119,6 +121,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   })
 
   const globalStore = useGlobalStore()
+  const ctx = rspc.useContext()
   const instanceTarget = (instanceId: number | undefined) =>
     instanceLinkTarget(globalStore?.instances?.data, instanceId)
   // Only a link row needs the server's release and loader; the search and
@@ -261,6 +264,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
         ),
         action.message ? { description: action.message } : undefined
       )
+      refreshWorldsAfter(action.code, ctx.queryClient, accepted.instanceId)
       batch(() => {
         setAcceptedTask(undefined)
         setProgress(null)
@@ -400,7 +404,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
         staged: false,
         server: false,
         copy: undefined,
-        world: world.name
+        world: world.name,
+        instanceId
       }
       const request = worldDatapackInstall(
         props.addon,

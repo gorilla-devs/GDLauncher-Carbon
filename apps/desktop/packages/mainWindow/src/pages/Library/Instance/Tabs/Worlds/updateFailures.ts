@@ -1,9 +1,11 @@
 import type { FEDatapackUpdateResult } from "@gd/core_module/bindings"
 import { i18n } from "@gd/i18n"
 import { toast } from "@gd/ui"
+import { refusalText } from "../../../../../utils/refusalText"
 
 /** One toast naming every place "Update everywhere" did not update, with the
- *  first error beneath. Nothing when every copy was updated. */
+ *  first error beneath, worded from its code when it has one. Nothing when
+ *  every copy was updated. */
 export function toastUpdateFailures(
   results: readonly FEDatapackUpdateResult[]
 ) {
@@ -19,6 +21,12 @@ export function toastUpdateFailures(
       places,
       interpolation: { escapeValue: false }
     }),
-    { description: failed[0].error ?? undefined }
+    {
+      description: refusalText(
+        failed[0].error_code,
+        failed[0].error_data,
+        failed[0].error
+      )
+    }
   )
 }

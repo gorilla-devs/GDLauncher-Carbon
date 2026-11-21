@@ -67,7 +67,21 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_worlds.replace_files",
     "_trn_worlds.replace",
     "_trn_worlds.added_to_world",
-    "_trn_worlds.no_datapack_for_version"
+    "_trn_worlds.no_datapack_for_version",
+    "_trn_worlds.refusal.world_gone",
+    "_trn_worlds.refusal.world_changed",
+    "_trn_worlds.refusal.name_taken",
+    "_trn_worlds.refusal.datapack_gone",
+    "_trn_worlds.refusal.datapack_changed",
+    "_trn_worlds.refusal.other_world",
+    "_trn_worlds.refusal.folder_not_replaced",
+    "_trn_worlds.refusal.not_a_datapack_version",
+    "_trn_worlds.refusal.not_a_zip",
+    "_trn_worlds.refusal.invalid_datapack",
+    "_trn_worlds.refusal.not_downloadable",
+    "_trn_worlds.refusal.download_failed",
+    "_trn_worlds.refusal.no_update",
+    "_trn_worlds.refusal.instance_datapack_gone"
   ],
   ui: ["_trn_worlds"],
   notifications: [

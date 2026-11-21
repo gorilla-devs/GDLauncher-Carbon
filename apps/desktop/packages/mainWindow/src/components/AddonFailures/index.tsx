@@ -4,6 +4,7 @@ import { rspc } from "@/utils/rspcClient"
 import { useTransContext } from "@gd/i18n"
 import { getTaskTranslationKey } from "@gd/i18n/helpers"
 import { taskTranslationOptions } from "@/utils/taskTranslation"
+import { refusalText } from "@/utils/refusalText"
 import {
   acknowledgeCapturedFailure,
   acknowledgeCapturedFailures,
@@ -137,7 +138,11 @@ export default function AddonFailures() {
                   {(failure) => (
                     <>
                       <For each={failure().cause}>
-                        {(cause) => <p class="break-words">{cause.display}</p>}
+                        {(cause) => (
+                          <p class="break-words">
+                            {refusalText(cause.code, cause.data, cause.display)}
+                          </p>
+                        )}
                       </For>
                       <details>
                         <summary>

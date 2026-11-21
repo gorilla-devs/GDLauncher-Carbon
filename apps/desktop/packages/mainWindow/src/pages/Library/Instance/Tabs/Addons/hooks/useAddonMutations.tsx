@@ -8,6 +8,7 @@ import { queryClient, rspc } from "@/utils/rspcClient"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { Mod as ModType, FEKeptAddonCopy } from "@gd/core_module/bindings"
 import { i18n } from "@gd/i18n"
+import { refusalText } from "@/utils/refusalText"
 import type { BrowsableAddonType } from "@/utils/browsableAddonType"
 import { useModal } from "@/managers/ModalsManager"
 import { requiresDeletionConfirmation } from "@/pages/Library/shared/addons/addonCapabilities"
@@ -331,7 +332,11 @@ export const useAddonMutations = (
       const failed = deleted.filter((addon) => addon.error)
       if (failed.length > 0) {
         toast.error(i18n.t("notifications:_trn_addons_not_deleted"), {
-          description: failed[0].error ?? undefined
+          description: refusalText(
+            failed[0].error_code,
+            failed[0].error_data,
+            failed[0].error
+          )
         })
       }
       if (isCurrentInstance(instanceId)) {

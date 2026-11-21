@@ -24,7 +24,11 @@ const c = vi.hoisted(() => ({
 vi.mock("@gd/i18n", () => ({
   useTransContext: () => [
     (key: string, options?: Record<string, unknown>) => c.i18n.t(key, options)
-  ]
+  ],
+  i18n: {
+    t: (key: string, options?: Record<string, unknown>) =>
+      c.i18n.t(key, options)
+  }
 }))
 vi.mock("@gd/ui", () => ({
   Button: (p: any) => (
@@ -181,5 +185,28 @@ it("F21 a single failure offers only its own Remove", async () => {
   expect(buttons(root).map((button) => button.textContent)).toEqual([
     "Закрыть",
     "Убрать из списка"
+  ])
+})
+
+it("words a failure from the code of its refusal, with the file name as typed", async () => {
+  const coded = failed(1, "InstanceTaskStageDatapack", {
+    mod_name: "Pack",
+    instance_name: "Home"
+  })
+  coded.progress.value.cause = [
+    {
+      display: "Failed to download data pack pack.zip: timed out",
+      debug: "debug",
+      code: "DATAPACK_DOWNLOAD_FAILED",
+      data: { filename: "Tom & Jerry's <pack>.zip", cause: "timed out" }
+    } as any
+  ]
+  const root = await open([coded, failed(2, "ServerTaskInstallMod", {})])
+  const texts = [...root.querySelectorAll("article > p")].map(
+    (line) => line.textContent
+  )
+  expect(texts).toEqual([
+    "Не удалось скачать «Tom & Jerry's <pack>.zip».",
+    "Checksum mismatch"
   ])
 })

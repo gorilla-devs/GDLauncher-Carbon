@@ -694,3 +694,38 @@ it("the picker says the project has no data pack for the instance's Minecraft an
   ])
   expect(pickerRow("Vanilla").textContent).not.toContain("_trn_status_")
 })
+
+it("a world install that failed is told in the player's language and has the worlds read again", async () => {
+  serve([world("My World")])
+  const client = await mount(modrinthPack, {}, "datapack")
+  await download()
+  await pick("My World")
+  expect(requests()).toEqual(["instance.installWorldDatapack"])
+  const worldReads = () =>
+    c.query.mock.calls.filter(([key]) => key[0] === "instance.getWorlds").length
+  const before = worldReads()
+  client.setQueryData(["vtask.getTaskOutcome", 61], {
+    type: "Failed",
+    value: {
+      progress: {
+        type: "Failed",
+        value: {
+          cause: [
+            {
+              display: "Selected world changed during copying",
+              code: "WORLD_CHANGED_DURING_COPY"
+            }
+          ]
+        }
+      }
+    }
+  })
+  await flush()
+  expect(c.error.mock.calls).toEqual([
+    [
+      "notifications:_trn_addon_install_failed:Pack",
+      { description: "content:_trn_worlds.refusal.world_changed" }
+    ]
+  ])
+  expect(worldReads()).toBe(before + 1)
+})

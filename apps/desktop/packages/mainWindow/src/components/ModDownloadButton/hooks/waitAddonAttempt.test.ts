@@ -1,5 +1,8 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi } from "vitest"
 import type { FETask, FETaskOutcome } from "@gd/core_module/bindings"
+
+// Without a loaded bundle the key stands in.
+vi.mock("@gd/i18n", () => ({ i18n: { t: (key: string) => key } }))
 import { waitAddonAttempt } from "./waitAddonAttempt"
 
 const running = { progress: { type: "Known", value: 0.8 } } as FETask
@@ -84,3 +87,24 @@ it.each(["Dismissed", "Unavailable"] as const)(
     ).toBe("failed")
   }
 )
+
+it("words a failed attempt from the code of its refusal", async () => {
+  const refused = {
+    progress: {
+      type: "Failed",
+      value: {
+        cause: [
+          { display: "This instance is running", code: "INSTANCE_GAME_ACTIVE" }
+        ],
+        backtrace: ""
+      }
+    }
+  } as FETask
+  expect(
+    await waitAddonAttempt(
+      99,
+      async () => ({ type: "Failed", value: refused }),
+      () => true
+    )
+  ).toEqual({ kind: "failed", message: "content:_trn_worlds.busy" })
+})

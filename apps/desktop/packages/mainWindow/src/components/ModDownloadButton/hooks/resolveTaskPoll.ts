@@ -1,5 +1,6 @@
 import { FETaskOutcome, Progress } from "@gd/core_module/bindings"
 import { i18n, type NamespacedTranslationKey } from "@gd/i18n"
+import { refusalText } from "../../../utils/refusalText"
 
 /** Text for an outcome the launcher reports itself. Callers count a failure
  *  by its message, so it is never empty: without a loaded bundle the key
@@ -10,7 +11,12 @@ export function addonOutcomeText(key: NamespacedTranslationKey): string {
 
 export type TaskPollAction =
   | { kind: "progress"; percent: number }
-  | { kind: "failed"; message: string }
+  | {
+      kind: "failed"
+      message: string
+      /** The code of the core's refusal, when the task failed with one. */
+      code?: string
+    }
   | { kind: "completed"; showSuccessToast: boolean }
   | { kind: "dismissed" }
   | { kind: "noop" }
@@ -47,14 +53,18 @@ export function resolveTaskPoll(
       nextLastProgress: null
     }
   const progress = outcome.value.progress
-  if (progress.type === "Failed")
+  if (progress.type === "Failed") {
+    // A failed task keeps the code and data of the refusal it failed with.
+    const cause = progress.value.cause[0]
     return {
       action: {
         kind: "failed",
-        message: progress.value.cause[0]?.display || ""
+        message: refusalText(cause?.code, cause?.data, cause?.display) || "",
+        ...(cause?.code && { code: cause.code })
       },
       nextLastProgress: progress
     }
+  }
   if (progress.type === "Known")
     return {
       action: { kind: "progress", percent: Math.round(progress.value * 100) },

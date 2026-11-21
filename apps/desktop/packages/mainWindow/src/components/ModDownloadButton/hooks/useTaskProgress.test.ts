@@ -1,12 +1,18 @@
 import { beforeEach, expect, it, vi } from "vitest"
 const state = vi.hoisted(() => ({
   query: vi.fn(),
+  invalidate: vi.fn(),
   error: vi.fn(),
   success: vi.fn(),
   cleanup: [] as (() => void)[]
 }))
 vi.mock("@/utils/rspcClient", () => ({
-  rspc: { useContext: () => ({ client: { query: state.query } }) }
+  rspc: {
+    useContext: () => ({
+      client: { query: state.query },
+      queryClient: { invalidateQueries: state.invalidate }
+    })
+  }
 }))
 vi.mock("@gd/ui", () => ({
   toast: { error: state.error, success: state.success }
@@ -70,4 +76,39 @@ it("unmounting before an old read finishes neither acknowledges nor reports succ
   await new Promise((resolve) => setTimeout(resolve, 0))
   expect(clear).not.toHaveBeenCalled()
   expect(state.success).not.toHaveBeenCalled()
+})
+it("a world install that failed is told in the player's language and has that instance's worlds read again", async () => {
+  state.query.mockResolvedValue({
+    type: "Failed",
+    value: {
+      progress: {
+        type: "Failed",
+        value: {
+          cause: [
+            {
+              display: "Selected world changed during copying",
+              code: "WORLD_CHANGED_DURING_COPY"
+            }
+          ]
+        }
+      }
+    }
+  })
+  const ids = new Map([
+    [4, { taskId: 73, title: "Pack", staged: false, world: "My World" }]
+  ])
+  useTaskProgress(
+    () => ids,
+    (id: number) => ids.delete(id)
+  )
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  expect(state.error.mock.calls).toEqual([
+    [
+      "notifications:_trn_addon_install_failed",
+      { description: "content:_trn_worlds.refusal.world_changed" }
+    ]
+  ])
+  expect(state.invalidate.mock.calls).toEqual([
+    [{ queryKey: ["instance.getWorlds", 4] }]
+  ])
 })

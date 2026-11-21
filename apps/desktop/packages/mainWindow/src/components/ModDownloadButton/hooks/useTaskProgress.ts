@@ -7,6 +7,7 @@ import {
   addonInstallFailure
 } from "../addonInstallScope"
 import { resolveTaskPoll } from "./resolveTaskPoll"
+import { refreshWorldsAfter } from "../../../utils/refusalText"
 import type { InstanceInstallTask } from "./useModInstallation"
 
 export const useTaskProgress = (
@@ -49,6 +50,7 @@ export const useTaskProgress = (
                 addonInstallFailure(t, title),
                 action.message ? { description: action.message } : undefined
               )
+              refreshWorldsAfter(action.code, ctx.queryClient, instanceId)
               return // Toast delivery does not acknowledge or dismiss Failed.
             }
             if (action.kind === "dismissed") {

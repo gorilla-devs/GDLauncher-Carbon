@@ -12,12 +12,17 @@ vi.mock("@gd/ui", () => ({
 
 vi.mock("@gd/i18n", () => ({
   i18n: {
-    t: (key: string, options?: { pid?: number | null; version?: string }) =>
+    t: (
+      key: string,
+      options?: { pid?: number | null; version?: string; filename?: string }
+    ) =>
       options?.pid != null
         ? `${key} ${options.pid}`
         : options?.version
           ? `${key} ${options.version}`
-          : key
+          : options?.filename
+            ? `${key} ${options.filename}`
+            : key
   }
 }))
 
@@ -350,6 +355,10 @@ describe("a coded cause with a mutation's own toast", () => {
     ["ACCOUNT_SIGN_IN_EXPIRED", { instance_id: 1 }],
     ["ACCOUNT_SIGN_IN_EXPIRED", undefined],
     ["NO_DATAPACK_FOR_VERSION", { version: "1.19.4" }],
+    ["NO_DATAPACK_FOR_VERSION", undefined],
+    ["INSTANCE_GAME_ACTIVE", undefined],
+    ["DATAPACK_GONE", undefined],
+    ["DATAPACK_DOWNLOAD_FAILED", { filename: "pack.zip", cause: "timed out" }],
     ["A_CODE_THE_HANDLER_DOES_NOT_PRESENT", undefined]
   ])("%s with data %j is shown once", (code, data) => {
     const error = corePayload([
@@ -369,6 +378,87 @@ describe("a coded cause with a mutation's own toast", () => {
     expect(toastError.mock.calls.length + dispatchEvent.mock.calls.length).toBe(
       1
     )
+  })
+})
+
+describe("a refused change to a world or its data packs", () => {
+  const invalidate = vi.spyOn(queryClient, "invalidateQueries")
+  beforeEach(() => {
+    toastError.mockClear()
+    invalidate.mockClear()
+    invalidate.mockResolvedValue(undefined)
+  })
+  const refusal = (code: string, display: string, data?: unknown) =>
+    corePayload([
+      { display: "Could not change the world" },
+      { display, code, data }
+    ])
+  // These mutations have no toast of their own.
+  const refuse = (error: Error, variables?: unknown) =>
+    queryClient
+      .getMutationCache()
+      .config.onError?.(
+        error,
+        variables,
+        undefined,
+        { meta: undefined } as never,
+        {} as never
+      )
+
+  it("is told once, in the player's language", () => {
+    refuse(refusal("WORLD_GONE", "Selected world no longer exists"), {
+      instance_id: 5
+    })
+    expect(toastError).toHaveBeenCalledTimes(1)
+    expect(toastError.mock.calls[0][0]).toBe(
+      "content:_trn_worlds.refusal.world_gone"
+    )
+  })
+
+  it("names the file the refusal is about", () => {
+    refuse(
+      refusal("DATAPACK_NAME_TAKEN", "English", { filename: "Tom & Jerry.zip" })
+    )
+    expect(toastError.mock.calls.map(([text]) => text)).toEqual([
+      "content:_trn_worlds.refusal.name_taken Tom & Jerry.zip"
+    ])
+  })
+
+  it("falls back to the core's sentence when the data lacks the file name", () => {
+    refuse(refusal("DATAPACK_NAME_TAKEN", "This world already holds that file"))
+    expect(toastError.mock.calls.map(([text]) => text)).toEqual([
+      "This world already holds that file"
+    ])
+  })
+
+  it.each([
+    ["WORLD_CHANGED", "The world changed"],
+    ["WORLD_CHANGED_DURING_COPY", "The world changed during the copy"],
+    ["DATAPACK_CHANGED", "The data pack changed"]
+  ])(
+    "%s has the worlds of the instance read again, so a second try can work",
+    (code, display) => {
+      refuse(refusal(code, display), { instance_id: 5, world: "My World" })
+      expect(invalidate.mock.calls).toEqual([
+        [{ queryKey: ["instance.getWorlds", 5] }]
+      ])
+    }
+  )
+
+  it("leaves the world lists alone after a refusal that does not outdate them", () => {
+    refuse(refusal("NOT_A_DATAPACK_VERSION", "Not a data pack"), {
+      instance_id: 5
+    })
+    expect(toastError).toHaveBeenCalledTimes(1)
+    expect(invalidate).not.toHaveBeenCalled()
+  })
+
+  it("still leaves a code it has no sentence for to the caller", () => {
+    refuse(refusal("ALREADY_IN_WORLD", "English", { filenames: ["a.zip"] }), {
+      instance_id: 5
+    })
+    expect(toastError).not.toHaveBeenCalled()
+    expect(invalidate).not.toHaveBeenCalled()
   })
 })
 

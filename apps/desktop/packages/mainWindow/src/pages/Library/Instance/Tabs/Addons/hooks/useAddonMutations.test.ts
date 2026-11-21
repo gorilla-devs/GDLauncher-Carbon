@@ -29,6 +29,10 @@ vi.mock(
     import("../../../../../../components/ModDownloadButton/hooks/resolveTaskPoll")
 )
 vi.mock(
+  "@/utils/refusalText",
+  () => import("../../../../../../utils/refusalText")
+)
+vi.mock(
   "@/utils/addonDeletion",
   () => import("../../../../../../utils/addonDeletion")
 )
@@ -435,5 +439,29 @@ describe("asking before addons are deleted", () => {
       expect(optimistic.rollbackToServerState).toHaveBeenCalledOnce()
     )
     expect(refetch).toHaveBeenCalledOnce()
+  })
+
+  it("words what could not be deleted of a selection from the code of its refusal", async () => {
+    state.deleteMods.mockResolvedValueOnce([
+      { mod_id: "a", kept: null, error: null },
+      {
+        mod_id: "b",
+        kept: null,
+        error: "This instance is running or being installed.",
+        error_code: "INSTANCE_GAME_ACTIVE"
+      }
+    ])
+    const { actions } = setup()
+    await actions.handleDeleteSelected([addon("a", "mods"), addon("b", "mods")])
+    await state.openModal.mock.calls[0][1].onConfirm()
+
+    await vi.waitFor(() => expect(state.errorToast).toHaveBeenCalledOnce())
+    expect(state.errorToast.mock.calls[0]).toEqual([
+      "notifications:_trn_addons_not_deleted {}",
+      {
+        description:
+          'content:_trn_worlds.busy {"interpolation":{"escapeValue":false}}'
+      }
+    ])
   })
 })

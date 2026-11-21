@@ -34,12 +34,14 @@ import {
   type RecoveredServerRefusal
 } from "./recoveredServer"
 import {
+  hasOwnPresenter,
   parseRspcErrorPayload,
   presentedGlobally,
   type GloballyPresentedCode,
   type ParsedRspcError,
   type RspcErrorCause
 } from "./rspcErrorText"
+import { refreshWorldsAfter, refusalText } from "./refusalText"
 
 export { extractErrorDisplay } from "./rspcErrorText"
 
@@ -161,8 +163,9 @@ function showDedupedErrorToast(display: string, source: "query" | "mutation") {
 // ---------------------------------------------------------------------------
 
 // How this handler presents each coded cause in GLOBALLY_PRESENTED. Keyed by
-// that table, so a code is presented here exactly when a mutation's own
-// failure toast (mutationErrorToast.ts) stays quiet for it.
+// that table; with the refusals worded below, a code is presented here
+// exactly when a mutation's own failure toast (mutationErrorToast.ts) stays
+// quiet for it.
 const globalPresenters: Record<
   GloballyPresentedCode,
   (
@@ -190,20 +193,32 @@ const globalPresenters: Record<
       cause.display ||
       parsed.cause?.[0]?.display
     if (display) showDedupedErrorToast(display, source)
-  },
-  // A data pack install into a world found no build for the game version.
-  NO_DATAPACK_FOR_VERSION: (cause, parsed, source) => {
-    const version = (cause.data as { version?: string } | undefined)?.version
-    const display =
-      (version &&
-        i18n.t("content:_trn_worlds.no_datapack_for_version", {
-          version,
-          interpolation: { escapeValue: false }
-        })) ||
-      cause.display ||
-      parsed.cause?.[0]?.display
-    if (display) showDedupedErrorToast(display, source)
   }
+}
+
+// A refusal with a sentence in refusalText.ts needs no presenter of its own:
+// one toast in the player's language, whichever request was refused. Where
+// the refusal says the world list is out of date, the worlds of the
+// request's instance are read again.
+function presentRefusal(
+  cause: RspcErrorCause,
+  parsed: ParsedRspcError,
+  source: "query" | "mutation",
+  input: unknown
+) {
+  const display = refusalText(
+    cause.code,
+    cause.data,
+    cause.display || parsed.cause?.[0]?.display
+  )
+  if (display) showDedupedErrorToast(display, source)
+  const instanceId = (input as { instance_id?: unknown } | null | undefined)
+    ?.instance_id
+  refreshWorldsAfter(
+    cause.code,
+    queryClient,
+    typeof instanceId === "number" ? instanceId : undefined
+  )
 }
 
 // Exported for unit testing (see rspcClient.test.ts) — not meant to be
@@ -211,11 +226,13 @@ const globalPresenters: Record<
 // QueryCache/MutationCache `onError` wiring below. `localToast` is set for a
 // mutation that shows its own failure toast (see mutationErrorToast.ts): the
 // plain cause is then left to that toast, and only the codes this handler
-// presents itself are handled here.
+// presents itself are handled here. `input` is what a refused mutation was
+// sent with.
 export function handleGlobalError(
   error: Error,
   source: "query" | "mutation",
-  localToast = false
+  localToast = false,
+  input?: unknown
 ) {
   console.error("RSPC error:", error)
 
@@ -225,11 +242,13 @@ export function handleGlobalError(
     return
   }
 
-  // A coded cause is presented only through `globalPresenters`; any other
-  // code is left to the caller.
+  // A coded cause is presented only through `globalPresenters` or as a
+  // worded refusal; any other code is left to the caller.
   const errorCause = parsed.cause?.find((c) => c.code)
   if (presentedGlobally(errorCause)) {
-    globalPresenters[errorCause.code](errorCause, parsed, source)
+    if (hasOwnPresenter(errorCause))
+      globalPresenters[errorCause.code](errorCause, parsed, source)
+    else presentRefusal(errorCause, parsed, source, input)
     return
   }
 
@@ -259,11 +278,12 @@ export const queryClient = new QueryClient({
       handleGlobalError(error, "query", query.meta?.localErrorToast === true)
   }),
   mutationCache: new MutationCache({
-    onError: (error, _variables, _result, mutation) =>
+    onError: (error, variables, _result, mutation) =>
       handleGlobalError(
         error,
         "mutation",
-        mutation.meta?.localErrorToast === true
+        mutation.meta?.localErrorToast === true,
+        variables
       )
   }),
   defaultOptions: {

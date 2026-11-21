@@ -1,5 +1,6 @@
 import type { FETaskOutcome } from "@gd/core_module/bindings"
 import { addonOutcomeText } from "./resolveTaskPoll"
+import { refusalText } from "../../../utils/refusalText"
 
 /** Poll only the task ID returned by this accepted attempt. Read failures retry;
  * dismissal is deliberately left to the user. */
@@ -36,10 +37,11 @@ export async function waitAddonAttempt(
         outcome.type === "Failed" &&
         outcome.value.progress.type === "Failed"
       ) {
+        const cause = outcome.value.progress.value.cause[0]
         return {
           kind: "failed",
           message:
-            outcome.value.progress.value.cause[0]?.display ||
+            refusalText(cause?.code, cause?.data, cause?.display) ||
             addonOutcomeText("content:_trn_addon_update_failed")
         }
       }

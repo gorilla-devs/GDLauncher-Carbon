@@ -6,9 +6,11 @@
 // that shape gets parsed; the global toast handler in rspcClient.ts and any
 // UI that needs the same clean text (via `extractErrorDisplay`) route
 // through it so they can never drift out of sync with each other. This
-// module imports nothing, so plain helpers can use it without loading the
-// rspc client.
+// module imports nothing but the table of worded refusals, so plain helpers
+// can use it without loading the rspc client.
 // ---------------------------------------------------------------------------
+
+import { isRefusal } from "./refusalText"
 
 export interface RspcErrorCause {
   display: string
@@ -81,25 +83,21 @@ export function extractErrorCodeCause(
   return parseRspcErrorPayload(message)?.cause?.find((c) => c.code)
 }
 
-/** The coded causes the global handler in rspcClient.ts presents itself, as
- *  a translated toast or a dialog, each with what it needs to do so. That
- *  handler presents a coded cause only through this table (its presenters
- *  are typed by these keys), so a mutation's own failure toast, which stays
- *  quiet for exactly these, never repeats it or leaves it unshown. */
+/** The coded causes the global handler in rspcClient.ts has a presenter of
+ *  its own for, a dialog or a toast that needs more than a sentence, each
+ *  with what it needs to do so (its presenters are typed by these keys). */
 export const GLOBALLY_PRESENTED = {
   ACCOUNT_BANNED: () => true,
   SERVER_RECOVERED_PROCESS: () => true,
   INSUFFICIENT_MEMORY: (cause: RspcErrorCause) => !!cause.data,
   ACCOUNT_SIGN_IN_EXPIRED: (cause: RspcErrorCause) => !!cause.data,
-  EULA_NOT_ACCEPTED: (cause: RspcErrorCause) => !!cause.data,
-  NO_DATAPACK_FOR_VERSION: () => true
+  EULA_NOT_ACCEPTED: (cause: RspcErrorCause) => !!cause.data
 }
 
 export type GloballyPresentedCode = keyof typeof GLOBALLY_PRESENTED
 
-/** Whether the global handler in rspcClient.ts presents this coded cause
- *  itself, so a mutation's own failure toast would only repeat it. */
-export function presentedGlobally(
+/** Whether the global handler has a presenter of its own for this cause. */
+export function hasOwnPresenter(
   cause: RspcErrorCause | undefined
 ): cause is RspcErrorCause & { code: GloballyPresentedCode } {
   if (
@@ -109,4 +107,15 @@ export function presentedGlobally(
     return false
   }
   return GLOBALLY_PRESENTED[cause.code as GloballyPresentedCode](cause)
+}
+
+/** Whether the global handler in rspcClient.ts presents this coded cause
+ *  itself: through its own presenter, or as a refusal it words from the
+ *  table in refusalText.ts. That handler presents a coded cause in no other
+ *  case, so a mutation's own failure toast, which stays quiet for exactly
+ *  these, never repeats it or leaves it unshown. */
+export function presentedGlobally(
+  cause: RspcErrorCause | undefined
+): cause is RspcErrorCause & { code: string } {
+  return hasOwnPresenter(cause) || isRefusal(cause?.code)
 }
