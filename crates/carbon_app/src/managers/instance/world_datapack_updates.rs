@@ -8,7 +8,7 @@ use super::{
     installer::publication,
     mods::{InvalidInstanceModIdError, resolve_mod_update_where},
     world_datapack_changes::{
-        DeleteWorldDatapack, InstallWorldDatapack, PACK_GONE, WorldDatapackSource,
+        DeleteWorldDatapack, InstallWorldDatapack, PACK_CHANGED, PACK_GONE, WorldDatapackSource,
         is_curseforge_world_file, modrinth_world_file,
     },
 };
@@ -23,7 +23,7 @@ use crate::{
     },
     managers::{
         ManagerRef,
-        metadata::cache::eligibility::world_context,
+        metadata::cache::{current_file_stamp, eligibility::world_context},
         modplatforms::{curseforge::CurseForge, modrinth::Modrinth},
         vtask::{TaskOutcome, VisualTask},
     },
@@ -31,7 +31,7 @@ use crate::{
 use anyhow::{Context, anyhow, bail};
 use carbon_platforms::{RemoteVersion, curseforge, curseforge::filters::ModParameters};
 use carbon_repos::repos::{
-    mod_file_cache as mfcdb,
+    mod_file_cache as mfcdb, mod_metadata as metarepo,
     world_datapack_cache::{self as wdb, WorldDatapackFullRow, WorldDatapackRow},
 };
 use serde::Deserialize;
@@ -416,19 +416,30 @@ impl ManagerRef<'_, InstanceManager> {
         row: WorldDatapackRow,
         update: RemoteVersion,
     ) -> anyhow::Result<WorldUpdate> {
-        let present = wdb::get_world_datapacks_full(&self.app.db, *id)
-            .await?
-            .into_iter()
-            .any(|other| {
-                other.world == row.world
-                    && other.id != row.id
-                    && match &update {
-                        RemoteVersion::Modrinth(version) => {
-                            other.mr_version_id.as_deref() == Some(version.id.as_str())
-                        }
-                        RemoteVersion::Curseforge(file) => other.cf_file_id == Some(file.id),
+        // The list may be older than the disk: the pack is replaced or
+        // removed only while it holds what the list showed.
+        if !self.holds_recorded_file(id, &row).await? {
+            bail!(PACK_CHANGED);
+        }
+        let mut present = false;
+        for other in wdb::get_world_datapacks_full(&self.app.db, *id).await? {
+            let same_build = other.world == row.world
+                && other.id != row.id
+                && match &update {
+                    RemoteVersion::Modrinth(version) => {
+                        other.mr_version_id.as_deref() == Some(version.id.as_str())
                     }
-            });
+                    RemoteVersion::Curseforge(file) => other.cf_file_id == Some(file.id),
+                };
+            // A row whose file went or changed is no build in the world.
+            if same_build
+                && let Some(other) = self.instance_world_datapack(id, &other.id).await?
+                && self.holds_recorded_file(id, &other).await?
+            {
+                present = true;
+                break;
+            }
+        }
         if present {
             self.delete_world_datapack(DeleteWorldDatapack {
                 instance_id: *id,
@@ -464,6 +475,40 @@ impl ManagerRef<'_, InstanceManager> {
             )
             .await?;
         Ok(WorldUpdate::Installing(task, work))
+    }
+
+    /// Whether the entry `row` lists is still the file the scan recorded:
+    /// the same stamp, as the scan judges "unchanged", or else the same
+    /// bytes as the row's metadata. `false` when it is gone or no file.
+    async fn holds_recorded_file(
+        self,
+        id: InstanceId,
+        row: &WorldDatapackRow,
+    ) -> anyhow::Result<bool> {
+        let Some(path) = self.world_datapack_entry(id, row).await? else {
+            return Ok(false);
+        };
+        if !tokio::fs::metadata(&path)
+            .await
+            .is_ok_and(|meta| meta.is_file())
+        {
+            return Ok(false);
+        }
+        if row.file_stamp.is_some() && current_file_stamp(&path).await == row.file_stamp {
+            return Ok(true);
+        }
+        // A new time alone (a copy, a touch) keeps the same bytes.
+        let Some(metadata_id) = &row.metadata_id else {
+            return Ok(false);
+        };
+        let Some(recorded) = metarepo::get_metadata_by_id(&self.app.db, metadata_id).await? else {
+            return Ok(false);
+        };
+        Ok(
+            crate::managers::instance::modpack::origin_check::hash_file_sha512(&path)
+                .await
+                .is_ok_and(|hash| hash.as_slice() == recorded.sha512.as_slice()),
+        )
     }
 
     /// The name a world pack shows: its platform name, or its file name.
@@ -1150,21 +1195,30 @@ mod tests {
         assert_eq!(tree(&saves.join("B")), before);
     }
 
-    /// `update_mod`, which the Addons tab's updates call, takes instance
-    /// addon ids only: a world copy's id is refused, and the world copy of
-    /// the same project is as it was.
+    /// `update_mod`, as the Addons tab's updates call it, on the
+    /// instance-level copy of a project a world also holds. Its installer
+    /// always asks the real platforms, which do not know this project, so
+    /// the update fails or finds nothing: this shows that the call leaves
+    /// the world's copy and its rows alone, not what a finished
+    /// instance-level install does. A world copy's id is refused outright.
     #[tokio::test]
     async fn an_instance_level_update_never_reaches_a_world_copy() {
         let app = crate::setup_managers_for_test().await;
         let (id, saves) = fabric_instance(&app, "update-mod-only-instance", &["A"]).await;
         let old = pack_zip("old");
         let world_file = put_pack(&saves.join("A"), "pack-1.zip", &old);
-        let (_, instance_metadata, _) = instance_pack(&app, id, "pack-1.zip", &old).await;
+        let (instance_id, instance_metadata, _) = instance_pack(&app, id, "pack-1.zip", &old).await;
         let rows = scanned_rows(&app, id).await;
+        let project = "gdl-test-no-such-project-4f1c9a";
         for meta in [metadata(&rows[0]), &instance_metadata] {
-            on_modrinth(&app, meta, "project", "installed").await;
+            on_modrinth(&app, meta, project, "gdl-test-no-such-version-4f1c9a").await;
         }
 
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_secs(60),
+            app.instance_manager().update_mod(id, instance_id),
+        )
+        .await;
         let error = app
             .instance_manager()
             .update_mod(id, rows[0].id.clone())
@@ -1176,6 +1230,123 @@ mod tests {
             "{error:#}"
         );
         assert_eq!(std::fs::read(&world_file).unwrap(), old);
+        assert_eq!(entries(&saves.join("A/datapacks")).len(), 1);
         assert_eq!(scanned_rows(&app, id).await, rows);
+    }
+
+    /// The newer build's row is there but its file was deleted outside the
+    /// launcher: the old pack is not just removed, the newer build is
+    /// installed in its place.
+    #[tokio::test]
+    async fn a_newer_build_whose_file_is_gone_is_installed_again() {
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, saves) = fabric_instance(&app, "update-stale-row", &["World"]).await;
+        let world = saves.join("World");
+        let old = pack_zip("old");
+        put_pack(&world, "pack-1.zip", &old);
+        let mut api = api().await;
+        let new = newer_on_modrinth(&mut api, &old).await;
+        let gone = put_pack(&world, "pack-2.zip", &new);
+        let rows = scanned_rows(&app, id).await;
+        let old_row = row_of(&rows, "World", "pack-1.zip").clone();
+        on_modrinth(&app, metadata(&old_row), "project", "installed").await;
+        on_modrinth(
+            &app,
+            metadata(row_of(&rows, "World", "pack-2.zip")),
+            "project",
+            "newer",
+        )
+        .await;
+        std::fs::remove_file(&gone).unwrap();
+
+        let published = update(&app, &api, id, &old_row.id).await.unwrap();
+
+        assert_eq!(published, Some(gone));
+        only(&world.join("datapacks"), "pack-2.zip", &new);
+    }
+
+    /// One served newer build and a scanned, recognised `pack-1.zip` in
+    /// World. Returns the instance, the world, the row and the API.
+    async fn recognised_pack(
+        app: &App,
+        name: &str,
+    ) -> (InstanceId, PathBuf, WorldDatapackRow, Api, Vec<u8>) {
+        let (id, saves) = fabric_instance(app, name, &["World"]).await;
+        let world = saves.join("World");
+        let old = pack_zip("old");
+        put_pack(&world, "pack-1.zip", &old);
+        let rows = scanned_rows(app, id).await;
+        on_modrinth(app, metadata(&rows[0]), "project", "installed").await;
+        let mut api = api().await;
+        let new = newer_on_modrinth(&mut api, &old).await;
+        (id, world, rows[0].clone(), api, new)
+    }
+
+    /// The pack's bytes were swapped outside the launcher under the same
+    /// name: the update is refused and the file kept.
+    #[tokio::test]
+    async fn a_pack_swapped_on_disk_is_not_updated() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, world, row, api, _) = recognised_pack(&app, "update-swapped-bytes").await;
+        let swapped = pack_zip("the user's own build");
+        put_pack(&world, "pack-1.zip", &swapped);
+        let root = publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_root();
+        let before = snapshot(&root, &world);
+
+        let error = update(&app, &api, id, &row.id).await.unwrap_err();
+
+        assert_eq!(error.to_string(), PACK_CHANGED);
+        assert_eq!(snapshot(&root, &world), before);
+        only(&world.join("datapacks"), "pack-1.zip", &swapped);
+    }
+
+    /// The world was replaced by another save of the same name holding a
+    /// different `pack-1.zip`: refused, and nothing changes.
+    #[tokio::test]
+    async fn a_world_replaced_by_another_save_is_not_updated() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, world, row, api, _) = recognised_pack(&app, "update-swapped-world").await;
+        let saves = world.parent().unwrap().to_path_buf();
+        std::fs::rename(&world, saves.join("World-old")).unwrap();
+        std::fs::create_dir_all(world.join("datapacks")).unwrap();
+        std::fs::write(world.join("level.dat"), b"another save").unwrap();
+        put_pack(&world, "pack-1.zip", &pack_zip("another save's pack"));
+        let before = tree(&saves);
+
+        let error = update(&app, &api, id, &row.id).await.unwrap_err();
+
+        assert_eq!(error.to_string(), PACK_CHANGED);
+        assert_eq!(tree(&saves), before);
+    }
+
+    /// A new modification time with the same bytes is the same pack: the
+    /// update goes through.
+    #[tokio::test]
+    async fn a_pack_only_touched_on_disk_is_updated() {
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, world, row, api, new) = recognised_pack(&app, "update-touched").await;
+        let pack = world.join("datapacks/pack-1.zip");
+        std::fs::File::options()
+            .write(true)
+            .open(&pack)
+            .unwrap()
+            .set_modified(
+                std::time::SystemTime::UNIX_EPOCH + std::time::Duration::from_secs(1_600_000_000),
+            )
+            .unwrap();
+        assert_ne!(
+            current_file_stamp(&pack).await,
+            row.file_stamp,
+            "the stamp moved on"
+        );
+
+        update(&app, &api, id, &row.id).await.unwrap();
+
+        only(&world.join("datapacks"), "pack-2.zip", &new);
     }
 }

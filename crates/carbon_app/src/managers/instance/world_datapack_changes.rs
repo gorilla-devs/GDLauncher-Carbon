@@ -87,7 +87,7 @@ pub struct InstallWorldDatapack {
 pub(super) const PACK_GONE: &str =
     "This data pack is no longer in the world. Refresh the world list and try again";
 /// The refusal when what is on disk is not the kind of entry the row lists.
-const PACK_CHANGED: &str =
+pub(super) const PACK_CHANGED: &str =
     "This data pack changed since the world list was read. Refresh it and try again";
 const OTHER_WORLD: &str = "A data pack can only be replaced by one installed into its own world";
 const FOLDER_NOT_REPLACED: &str = "A data pack folder cannot be replaced; remove it instead";
@@ -699,7 +699,7 @@ impl ManagerRef<'_, InstanceManager> {
     /// `datapacks` folder followed when it is a link, so the entry is a
     /// direct child of that folder. `None` when there is no `datapacks`
     /// folder. Call with the instance gate held.
-    async fn world_datapack_entry(
+    pub(super) async fn world_datapack_entry(
         self,
         id: InstanceId,
         row: &WorldDatapackRow,
