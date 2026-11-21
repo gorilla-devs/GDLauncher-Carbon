@@ -87,6 +87,16 @@ impl ManagerRef<'_, InstanceManager> {
     /// removed. Does nothing while the game is starting or running, as the
     /// addon scan does not. Stops when the launcher closes.
     pub async fn scan_world_datapacks(self, instance_id: InstanceId) -> anyhow::Result<bool> {
+        self.scan_world_datapacks_started(instance_id, || {}).await
+    }
+
+    /// [`Self::scan_world_datapacks`], calling `started` once the scan holds
+    /// the instance gate: what changes on disk after that may be missed.
+    pub(crate) async fn scan_world_datapacks_started(
+        self,
+        instance_id: InstanceId,
+        started: impl FnOnce() + Send,
+    ) -> anyhow::Result<bool> {
         let activity = self
             .app
             .runtime_lifecycle
@@ -97,12 +107,17 @@ impl ManagerRef<'_, InstanceManager> {
             _ = cancel.cancelled() => Err(anyhow::anyhow!(
                 "Data pack scan of the worlds of instance {instance_id} stopped because the launcher is closing"
             )),
-            result = self.scan_worlds(instance_id) => result,
+            result = self.scan_worlds(instance_id, started) => result,
         }
     }
 
-    async fn scan_worlds(self, instance_id: InstanceId) -> anyhow::Result<bool> {
+    async fn scan_worlds(
+        self,
+        instance_id: InstanceId,
+        started: impl FnOnce() + Send,
+    ) -> anyhow::Result<bool> {
         let _operation = self.lock_instance(instance_id).await;
+        started();
         {
             let instances = self.instances.read().await;
             let state = &instances
@@ -619,20 +634,24 @@ mod tests {
         assert_eq!(passes(), before + 1, "the instance pass ran once");
     }
 
-    /// The platform passes of an instance wait for its world scan, so they
-    /// ask about the packs it finds.
-    #[tokio::test]
-    async fn a_pending_world_scan_holds_the_platform_passes() {
+    /// An instance with a held world scan whose pack `pack.zip` is waiting
+    /// at its hash boundary.
+    async fn held_world_scan(
+        app: &App,
+        name: &str,
+    ) -> (
+        InstanceId,
+        std::sync::Arc<crate::managers::metadata::cache::ScanPause>,
+    ) {
         use std::time::Duration;
-        let app = crate::setup_managers_for_test().await;
-        let (id, saves) = instance_with_world(&app, "held-platform-passes", "World").await;
+        let (id, saves) = instance_with_world(app, name, "World").await;
         let mcm = app.meta_cache_manager();
         mcm.override_caching_and_wait(CacheEntityId::Instance(id), false, false)
             .await
             .unwrap();
         mcm.world_scans_settled(id).await;
         let pack = world_datapacks_folder(&saves, "World").join("pack.zip");
-        std::fs::write(&pack, pack_zip("held")).unwrap();
+        std::fs::write(&pack, pack_zip(name)).unwrap();
         let pause = mcm.arm_scan_pause(&pack, "hash");
         tokio::time::timeout(
             Duration::from_secs(5),
@@ -644,16 +663,82 @@ mod tests {
         tokio::time::timeout(Duration::from_secs(5), pause.entered.notified())
             .await
             .expect("the world scan reaches the pack");
-        assert!(
-            tokio::time::timeout(Duration::from_millis(100), mcm.world_scans_settled(id))
-                .await
-                .is_err(),
-            "the platform passes wait while the world scan runs"
-        );
+        (id, pause)
+    }
+
+    /// A platform pass waits for its instance's world scan only so long, and
+    /// one of another instance does not wait for it at all.
+    #[tokio::test]
+    async fn a_held_world_scan_holds_the_platform_passes_of_its_instance_only_briefly() {
+        use crate::managers::metadata::cache::WORLD_SCAN_WAIT;
+        use std::time::{Duration, Instant};
+        let app = crate::setup_managers_for_test().await;
+        let (id, pause) = held_world_scan(&app, "held-platform-passes").await;
+        let (other, _) = instance_with_world(&app, "other-platform-passes", "World").await;
+        let mcm = app.meta_cache_manager();
+
+        tokio::time::timeout(
+            Duration::from_millis(100),
+            mcm.wait_for_world_scans(CacheEntityId::Instance(other)),
+        )
+        .await
+        .expect("another instance does not wait");
+        tokio::time::timeout(
+            Duration::from_millis(100),
+            mcm.wait_for_world_scans(CacheEntityId::Server(1)),
+        )
+        .await
+        .expect("nor does a server");
+        let started_own = Instant::now();
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            mcm.wait_for_world_scans(CacheEntityId::Instance(id)),
+        )
+        .await
+        .expect("its own instance goes on within the bound");
+        assert!(started_own.elapsed() >= WORLD_SCAN_WAIT - Duration::from_millis(100));
+        assert!(rows(&app, id).await.is_empty(), "the scan is still held");
+
         pause.release.notify_one();
         tokio::time::timeout(Duration::from_secs(5), mcm.world_scans_settled(id))
             .await
-            .expect("and go on once it is done");
+            .expect("the scan finishes once released");
         assert_eq!(rows(&app, id).await.len(), 1);
+    }
+
+    /// Packs a world scan finds after the platform passes went on without
+    /// them are asked about by the passes it queues when it finishes.
+    #[tokio::test]
+    async fn packs_found_after_the_platform_passes_went_on_are_asked_about_next() {
+        use std::time::Duration;
+        let app = crate::setup_managers_for_test().await;
+        let (id, pause) = held_world_scan(&app, "late-world-rows").await;
+        let mcm = app.meta_cache_manager();
+        let entity = CacheEntityId::Instance(id);
+        tokio::time::timeout(Duration::from_secs(5), mcm.wait_for_world_scans(entity))
+            .await
+            .expect("the platform passes go on without the held scan");
+        let (cf, mr) = mcm.platform_requests(entity).await;
+
+        pause.release.notify_one();
+        tokio::time::timeout(Duration::from_secs(5), mcm.world_scans_settled(id))
+            .await
+            .expect("the scan finishes once released");
+        assert_eq!(rows(&app, id).await.len(), 1);
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while mcm.platform_requests(entity).await != (cf + 1, mr + 1) {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("both platform passes are queued for the instance");
+
+        // A scan that changes nothing queues nothing.
+        mcm.override_caching_and_wait(entity, false, false)
+            .await
+            .unwrap();
+        mcm.world_scans_settled(id).await;
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        assert_eq!(mcm.platform_requests(entity).await, (cf + 1, mr + 1));
     }
 }

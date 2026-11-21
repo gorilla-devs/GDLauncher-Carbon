@@ -267,9 +267,9 @@ pub struct MetaCacheManager {
     watched_entity: watch::Sender<Option<CacheEntityId>>,
     pause_caching: watch::Sender<bool>,
     /// Per instance, the world data pack scans started after its local pass
-    /// that have not finished. Its platform passes wait for them, so they
-    /// ask about the packs they find.
-    pending_world_scans: watch::Sender<HashMap<InstanceId, usize>>,
+    /// that have not finished. Its platform passes wait a little for them
+    /// (see [`WORLD_SCAN_WAIT`]), so they usually ask about the packs found.
+    pending_world_scans: watch::Sender<HashMap<InstanceId, WorldScans>>,
     pub(crate) modrinth_throttle: ModrinthCacheThrottle,
     /// Serializes `ensure_mod_metadata` per content hash. Without it two
     /// concurrent scans of the same jar both miss the lookup and each insert a
@@ -1131,9 +1131,7 @@ fn cache_modplatform<C: ModplatformCacher>(
                     };
 
                     let do_caching = async {
-                        if let CacheEntityId::Instance(instance_id) = entity_id {
-                            app.meta_cache_manager().world_scans_settled(instance_id).await;
-                        }
+                        app.meta_cache_manager().wait_for_world_scans(entity_id).await;
 
                         let entity_name = match entity_id {
                             CacheEntityId::Instance(instance_id) => {
@@ -1417,6 +1415,35 @@ impl ManagerRef<'_, MetaCacheManager> {
                 let _ = self.watched_entity.send(entity_id);
             }
         }
+    }
+
+    /// What a platform pass of `entity_id` waits for before it asks: the
+    /// world data pack scans of its instance, for at most
+    /// [`WORLD_SCAN_WAIT`]. A scan that is still held after that (behind
+    /// the instance gate, for example) does not hold up this pass or the
+    /// entities queued after it; when it changes rows it queues the platform
+    /// passes again.
+    pub(crate) async fn wait_for_world_scans(self, entity_id: CacheEntityId) {
+        if let CacheEntityId::Instance(instance_id) = entity_id {
+            let _ =
+                tokio::time::timeout(WORLD_SCAN_WAIT, self.world_scans_settled(instance_id)).await;
+        }
+    }
+
+    /// How many background requests the CurseForge and Modrinth passes of
+    /// `entity_id` were given.
+    #[cfg(test)]
+    pub(crate) async fn platform_requests(self, entity_id: CacheEntityId) -> (u64, u64) {
+        (
+            self.curseforge_targets
+                .borrow()
+                .await
+                .request_count(entity_id),
+            self.modrinth_targets
+                .borrow()
+                .await
+                .request_count(entity_id),
+        )
     }
 
     /// Returns once no world data pack scan of `instance_id` started by a
@@ -3482,57 +3509,114 @@ async fn cache_instance(
     result
 }
 
+/// How long a platform pass of an instance waits for its world data pack
+/// scan before it asks about the rows there are.
+pub(crate) const WORLD_SCAN_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// The world data pack scans of one instance that have not finished: one
+/// that waits for the instance gate, and those that hold it.
+#[derive(Default)]
+struct WorldScans {
+    queued: bool,
+    running: usize,
+}
+
 /// Scan the data packs in the worlds of `instance_id` as a step of its own
 /// after its local pass: the pass is released to its waiters as soon as it is
 /// done, and a pause or a newer request while the world scan runs neither
-/// discards nor repeats it. The scan is pending from this call on, so the
-/// platform passes this pass starts wait for it (see
-/// `MetaCacheManager::world_scans_settled`).
+/// discards nor repeats it. A scan that has not taken the gate yet will see
+/// what this pass saw, so none is added beside it. A scan that changed rows
+/// queues the instance's platform passes: one that went on without waiting
+/// for it (see [`WORLD_SCAN_WAIT`]) did not ask about them.
 fn spawn_world_datapack_scan(app: &App, instance_id: InstanceId) {
-    let pending = PendingWorldScan::start(app, instance_id);
+    let Some(pending) = PendingWorldScan::start(app, instance_id) else {
+        return;
+    };
     tokio::spawn(async move {
-        if let Err(error) = pending
-            .app
+        let app = pending.app.clone();
+        let result = app
             .instance_manager()
-            .scan_world_datapacks(instance_id)
-            .await
-        {
-            warn!(
+            .scan_world_datapacks_started(instance_id, || pending.began())
+            .await;
+        drop(pending);
+        match result {
+            Ok(true) => {
+                let entity_id = CacheEntityId::Instance(instance_id);
+                let mcm = app.meta_cache_manager();
+                join!(
+                    mcm.curseforge_targets
+                        .send_modify_always(|targets| targets.queue(entity_id)),
+                    mcm.modrinth_targets
+                        .send_modify_always(|targets| targets.queue(entity_id)),
+                );
+            }
+            Ok(false) => {}
+            Err(error) => warn!(
                 ?error,
                 "Instance {instance_id}: could not scan the data packs in its worlds"
-            );
+            ),
         }
     });
 }
 
-/// A world scan counted in `pending_world_scans` until it is dropped.
+/// A world scan counted in `pending_world_scans` until it is dropped:
+/// queued until it holds the instance gate, then running.
 struct PendingWorldScan {
     app: App,
     instance_id: InstanceId,
+    began: std::sync::atomic::AtomicBool,
 }
 
 impl PendingWorldScan {
-    fn start(app: &App, instance_id: InstanceId) -> Self {
+    /// `None` when a scan of the instance is already waiting to start.
+    fn start(app: &App, instance_id: InstanceId) -> Option<Self> {
+        let mut queued = false;
         app.meta_cache_manager()
             .pending_world_scans
-            .send_modify(|pending| *pending.entry(instance_id).or_default() += 1);
-        Self {
+            .send_if_modified(|pending| {
+                let scans = pending.entry(instance_id).or_default();
+                queued = !scans.queued;
+                scans.queued = true;
+                queued
+            });
+        queued.then(|| Self {
             app: app.clone(),
             instance_id,
-        }
+            began: std::sync::atomic::AtomicBool::new(false),
+        })
+    }
+
+    fn began(&self) {
+        let mcm = self.app.meta_cache_manager();
+        #[cfg(test)]
+        let _ = mcm.scan_test_boundary(
+            Path::new(&format!("worlds-{}", *self.instance_id)),
+            "world-scan",
+        );
+        self.began.store(true, std::sync::atomic::Ordering::SeqCst);
+        mcm.pending_world_scans.send_modify(|pending| {
+            let scans = pending.entry(self.instance_id).or_default();
+            scans.queued = false;
+            scans.running += 1;
+        });
     }
 }
 
 impl Drop for PendingWorldScan {
     fn drop(&mut self) {
         let instance_id = self.instance_id;
+        let began = *self.began.get_mut();
         self.app
             .meta_cache_manager()
             .pending_world_scans
             .send_modify(|pending| {
-                if let Some(count) = pending.get_mut(&instance_id) {
-                    *count -= 1;
-                    if *count == 0 {
+                if let Some(scans) = pending.get_mut(&instance_id) {
+                    if began {
+                        scans.running -= 1;
+                    } else {
+                        scans.queued = false;
+                    }
+                    if !scans.queued && scans.running == 0 {
                         pending.remove(&instance_id);
                     }
                 }
@@ -4395,6 +4479,42 @@ fn cache_local(app: App, rx: LockNotify<CacheTargets>, update_notifier: UpdateNo
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Local passes that finish while a world scan still waits for the
+    /// instance gate add no scan beside it; one that finishes after it took
+    /// the gate starts the next.
+    #[tokio::test]
+    async fn a_world_scan_waiting_for_the_gate_covers_the_next_local_passes() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, _) = addon_fixture(
+            &app,
+            "coalesced-world-scans",
+            crate::domain::instance::AddonType::Mods,
+            "mod.jar",
+            b"coalesced",
+        )
+        .await;
+        let mcm = app.meta_cache_manager();
+        mcm.override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        mcm.world_scans_settled(id).await;
+        let scans = || mcm.scan_observations(Path::new(&format!("worlds-{}", *id)), "world-scan");
+        let before = scans();
+
+        let gate = app.instance_manager().lock_instance(id).await;
+        // What a successful local pass does, twice, while the scan it started
+        // cannot take the gate.
+        spawn_world_datapack_scan(&app, id);
+        spawn_world_datapack_scan(&app, id);
+        drop(gate);
+        mcm.world_scans_settled(id).await;
+        assert_eq!(scans(), before + 1, "one scan ran");
+
+        spawn_world_datapack_scan(&app, id);
+        mcm.world_scans_settled(id).await;
+        assert_eq!(scans(), before + 2, "a later pass starts the next");
+    }
 
     pub(super) async fn addon_fixture(
         app: &App,
