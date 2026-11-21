@@ -150,7 +150,7 @@ const FROZEN: &[(&str, &str)] = &[
     ),
     (
         "20261121015016_world_datapack_cache",
-        "24d58f080e3b264db809885063b6b4fcc8a8dc1a3de69d0d1436816b5fd03323",
+        "9ebccfd0cb0749f1a75cba9a544178b78f63f11fa3e880d6e1fa83f0ab9def29",
     ),
     // new-migration:anchor — new_migration appends the new (name, checksum) tuple directly above this line
 ];

@@ -360,8 +360,14 @@ fn a_world_pack_with_fresh_platform_data_is_not_due() {
     let (_d, mut conn) = migrated_db();
     world_pack(&mut conn);
     cached_on_both_platforms(&mut conn, 10_000);
-    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "world:datapacks", "", ts(10_000))
-        .unwrap();
+    mm::upsert_mr_update_context_conn(
+        &wg(&mut conn),
+        "m1",
+        "world:world_datapacks",
+        "",
+        ts(10_000),
+    )
+    .unwrap();
     assert!(
         mfc::instance_mods_needing_cf_refresh_conn(&rg(&conn), 7, ts(5_000))
             .unwrap()
@@ -373,7 +379,8 @@ fn a_world_pack_with_fresh_platform_data_is_not_due() {
             .is_empty()
     );
     // Update paths stored under the instance's key do not answer for a world.
-    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "world:datapacks", "", ts(1)).unwrap();
+    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "world:world_datapacks", "", ts(1))
+        .unwrap();
     mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "instance:datapacks", "", ts(10_000))
         .unwrap();
     assert_eq!(
@@ -419,7 +426,46 @@ fn an_addon_that_is_also_a_world_pack_is_due_under_each_context() {
     mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "instance:datapacks", "", ts(10_000))
         .unwrap();
     assert_eq!(due(&conn), ["world_datapacks"]);
-    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "world:datapacks", "", ts(10_000))
+    mm::upsert_mr_update_context_conn(
+        &wg(&mut conn),
+        "m1",
+        "world:world_datapacks",
+        "",
+        ts(10_000),
+    )
+    .unwrap();
+    assert!(due(&conn).is_empty());
+}
+
+/// An instance without a mod loader has the context of its worlds: a fresh
+/// answer for its own data pack still does not answer for the world's copy.
+#[test]
+fn a_world_pack_is_due_apart_from_the_same_addon_under_the_same_context() {
+    let (_d, mut conn) = migrated_db();
+    world_pack(&mut conn);
+    cached_on_both_platforms(&mut conn, 10_000);
+    mfc::upsert_mod_file_cache_conn(
+        &wg(&mut conn),
+        7,
+        "a.zip",
+        10,
+        true,
+        "datapacks",
+        "m1",
+        ts(1),
+    )
+    .unwrap();
+    let due = |conn: &Connection| {
+        mfc::instance_mods_needing_mr_context_conn(&rg(conn), 7, "same", "same", ts(5_000))
+            .unwrap()
+            .into_iter()
+            .map(|r| r.addon_type)
+            .collect::<Vec<_>>()
+    };
+    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "same:datapacks", "", ts(10_000))
+        .unwrap();
+    assert_eq!(due(&conn), ["world_datapacks"]);
+    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "same:world_datapacks", "", ts(10_000))
         .unwrap();
     assert!(due(&conn).is_empty());
 }

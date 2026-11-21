@@ -10,6 +10,7 @@ index|ModrinthModCache_projectId_versionId_idx|ModrinthModCache|CREATE INDEX Mod
 index|ServerModFileCache_metadataId_idx|ServerModFileCache|CREATE INDEX ServerModFileCache_metadataId_idx ON ServerModFileCache ( metadataId )
 index|ServerModFileCache_owner_location_key|ServerModFileCache|CREATE UNIQUE INDEX ServerModFileCache_owner_location_key ON ServerModFileCache ( serverId , addonType , location )
 index|Server_shortpath_key|Server|CREATE UNIQUE INDEX "Server_shortpath_key" ON "Server" ( "shortpath" )
+index|WorldDatapackCache_metadataId_idx|WorldDatapackCache|CREATE INDEX WorldDatapackCache_metadataId_idx ON WorldDatapackCache ( metadataId )
 index|WorldDatapackCache_place|WorldDatapackCache|CREATE UNIQUE INDEX WorldDatapackCache_place ON WorldDatapackCache ( instanceId , world , filename )
 index|sqlite_autoindex_Account_1|Account|
 index|sqlite_autoindex_ActiveDownloads_1|ActiveDownloads|

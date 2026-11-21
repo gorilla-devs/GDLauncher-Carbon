@@ -246,6 +246,12 @@ pub(crate) struct UpdateContext {
     pub shader_engines: Vec<String>,
 }
 
+/// The kind the data packs inside an instance's worlds are looked up and
+/// cached as, under [`world_context`]. It is apart from the instance's own
+/// `datapacks`, whose context is the same on an instance without a mod
+/// loader: a world is only offered what its update installs.
+pub(crate) const WORLD_DATAPACKS: &str = "world_datapacks";
+
 /// What a data pack inside one of an instance's worlds is updated for: the
 /// instance's game version and no loaders. The game loads only zips and
 /// folders from a world's `datapacks` folder, so a build for a mod loader
@@ -290,6 +296,7 @@ impl UpdateContext {
         match kind {
             "resourcepacks" => loaders.push("minecraft".into()),
             "datapacks" => loaders.extend(["minecraft".into(), "datapack".into()]),
+            WORLD_DATAPACKS => loaders = vec!["datapack".into()],
             "shaders" => loaders = self.shader_engines.clone(),
             _ => {}
         }
@@ -312,7 +319,10 @@ impl UpdateContext {
     /// The loaders of the other kind the entity loads `kind` builds of: for
     /// mods the ones in `also_loads`, for everything else none.
     pub fn also_request_loaders(&self, kind: &str) -> Vec<String> {
-        if matches!(kind, "resourcepacks" | "datapacks" | "shaders") {
+        if matches!(
+            kind,
+            "resourcepacks" | "datapacks" | WORLD_DATAPACKS | "shaders"
+        ) {
             return Vec::new();
         }
         let mut loaders = self.also_loads.clone();
@@ -438,17 +448,31 @@ mod tests {
     #[test]
     fn a_world_asks_for_data_pack_builds_only() {
         let world = world_context("1.20.1");
+        assert_eq!(world.request_loaders(WORLD_DATAPACKS), ["datapack"]);
+        assert_eq!(world.lookup_loaders(WORLD_DATAPACKS), [["datapack"]]);
+        let game = names(&["1.20.1"]);
+        assert!(world.compatible(WORLD_DATAPACKS, &game, &names(&["datapack"])));
+        // Not a build for a mod loader, and not a resource pack.
+        assert!(!world.compatible(WORLD_DATAPACKS, &game, &names(&["fabric"])));
+        assert!(!world.compatible(WORLD_DATAPACKS, &game, &names(&["minecraft"])));
+        assert!(!world.compatible(WORLD_DATAPACKS, &names(&["1.20.2"]), &names(&["datapack"])));
+        assert_ne!(world.key(WORLD_DATAPACKS), quilt().key("datapacks"));
+
+        // An instance without a mod loader is what its worlds are, and its
+        // own data packs are still asked for and kept as before.
+        let vanilla = UpdateContext {
+            game: "1.20.1".into(),
+            loaders: vec![],
+            also_loads: vec![],
+            shader_engines: vec![],
+        };
+        assert_eq!(vanilla.base_key(), world.base_key());
+        assert_ne!(world.key(WORLD_DATAPACKS), vanilla.key("datapacks"));
         assert_eq!(
-            world.request_loaders("datapacks"),
+            vanilla.request_loaders("datapacks"),
             ["datapack", "minecraft"]
         );
-        assert_eq!(
-            world.lookup_loaders("datapacks"),
-            [["datapack", "minecraft"]]
-        );
-        assert!(!world.compatible("datapacks", &names(&["1.20.1"]), &names(&["fabric"])));
-        assert!(world.compatible("datapacks", &names(&["1.20.1"]), &names(&["datapack"])));
-        assert_ne!(world.key("datapacks"), quilt().key("datapacks"));
+        assert_eq!(vanilla.key("datapacks"), r#"["1.20.1",[],[]]:datapacks"#);
     }
 
     #[test]

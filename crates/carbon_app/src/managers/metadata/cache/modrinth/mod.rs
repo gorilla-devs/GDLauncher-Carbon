@@ -1,9 +1,10 @@
-use super::eligibility::{UpdateContext, world_context};
+use super::eligibility::{UpdateContext, WORLD_DATAPACKS, world_context};
 use super::{BundleSender, CacheEntityId, ModplatformCacher, UpdateNotifier};
 use crate::domain::instance::InstanceId;
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
 use crate::managers::App;
 use crate::managers::instance::InstanceType;
+use crate::managers::instance::world_datapack_changes::modrinth_world_file;
 use anyhow::anyhow;
 use carbon_platforms::ModChannel;
 use carbon_platforms::modrinth::version::Version;
@@ -145,17 +146,12 @@ fn build_update_paths(installed: &Version, project_id: &str, candidates: &[Versi
         .join(";")
 }
 
-/// The kind `instance_mods_needing_mr_context` reports the data packs inside
-/// an instance's worlds with. It is never stored: such a file is looked up
-/// and its update paths are kept as a `datapacks` file of the world context.
-const WORLD_DATAPACKS: &str = "world_datapacks";
-
-/// The context and kind a due file of `kind` is looked up and stored under.
-fn lookup_context<'a>(context: &UpdateContext, kind: &'a str) -> (UpdateContext, &'a str) {
+/// The context a due file of `kind` is looked up and stored under.
+fn lookup_context(context: &UpdateContext, kind: &str) -> UpdateContext {
     if kind == WORLD_DATAPACKS {
-        (world_context(&context.game), "datapacks")
+        world_context(&context.game)
     } else {
-        (context.clone(), kind)
+        context.clone()
     }
 }
 
@@ -333,7 +329,7 @@ impl ModplatformCacher for ModrinthModCacher {
                             .filter(|(_, _, k)| k == kind)
                             .map(|(_, hash, _)| hash.clone())
                             .collect::<Vec<_>>();
-                        let (context, kind) = lookup_context(context, kind);
+                        let context = lookup_context(context, kind);
                         for loaders in context.lookup_loaders(kind) {
                             for version_type in
                                 [VersionType::Release, VersionType::Beta, VersionType::Alpha]
@@ -461,10 +457,12 @@ impl ModplatformCacher for ModrinthModCacher {
                     .join(", ");
 
                 if let Some(context) = context {
-                    let (context, kind) = lookup_context(context, &kind);
-                    let candidates = combined_versions.iter().filter(|v| context.compatible(kind, &v.game_versions, &v.loaders)).cloned().collect::<Vec<_>>();
+                    let context = lookup_context(context, &kind);
+                    // A world's pack is offered only what its update installs.
+                    let candidates = combined_versions.iter().filter(|v| context.compatible(&kind, &v.game_versions, &v.loaders)
+                        && (kind != WORLD_DATAPACKS || modrinth_world_file(v, &context.game).is_some())).cloned().collect::<Vec<_>>();
                     let paths = build_update_paths(version, &project.id, &candidates);
-                    if let Err(error) = metarepo::upsert_mr_update_context(&app.db, &metadata_id, &context.key(kind), &paths,
+                    if let Err(error) = metarepo::upsert_mr_update_context(&app.db, &metadata_id, &context.key(&kind), &paths,
                         DbDateTime(chrono::Utc::now().fixed_offset())).await {
                         error!(?error, "Could not store Modrinth update context");
                     }
@@ -717,7 +715,7 @@ pub(crate) async fn record_installed_version(
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use super::*;
     use carbon_platforms::modrinth::UtcDateTime;
     use carbon_platforms::modrinth::project::{
@@ -725,6 +723,45 @@ mod test {
     };
     use carbon_platforms::modrinth::user::{TeamMember, User};
     use carbon_platforms::modrinth::version::{Hashes, VersionFile};
+
+    /// Saves what a lookup of the file `metadata_id` of instance `id` brings
+    /// when Modrinth knows it as `installed` and answers `newest` as the
+    /// newest builds, once for each of `kinds` the file is due as.
+    pub(crate) async fn save_lookup(
+        app: &App,
+        id: InstanceId,
+        metadata_id: &str,
+        kinds: &[&str],
+        installed: Version,
+        newest: Vec<Version>,
+    ) {
+        let entity = CacheEntityId::Instance(id);
+        let hash = hex::encode(
+            metarepo::get_metadata_by_id(&app.db, metadata_id)
+                .await
+                .unwrap()
+                .unwrap()
+                .sha512,
+        );
+        let owner = installed.project_id.clone();
+        ModrinthModCacher::save_batch(
+            app,
+            entity,
+            (
+                vec![hash.clone()],
+                kinds
+                    .iter()
+                    .map(|kind| (metadata_id.to_owned(), hash.clone(), (*kind).to_owned()))
+                    .collect(),
+                VersionHashesResponse([(hash, installed)].into_iter().collect()),
+                ProjectsResponse(vec![project(&owner)]),
+                vec![team(&owner)],
+                newest,
+                target_compatibility(app, entity).await,
+            ),
+        )
+        .await;
+    }
 
     fn version(id: &str, project: &str, day: u32, version_type: VersionType) -> Version {
         Version {
@@ -1104,6 +1141,10 @@ mod test {
         installed.files = vec![file(&hash)];
         let mut for_worlds = version("for-worlds", "project", 20, VersionType::Release);
         for_worlds.loaders = vec!["datapack".into()];
+        for_worlds.files = vec![VersionFile {
+            filename: "pack-2.zip".into(),
+            ..file(&"e".repeat(128))
+        }];
         let mut for_fabric = version("for-fabric", "project", 30, VersionType::Beta);
         for_fabric.loaders = vec!["fabric".into()];
         ModrinthModCacher::save_batch(
@@ -1135,7 +1176,7 @@ mod test {
             }
         };
         assert_eq!(
-            stored(world.key("datapacks")).await.as_deref(),
+            stored(world.key(WORLD_DATAPACKS)).await.as_deref(),
             Some("1.20.1,datapack,stable")
         );
         let mut instance_paths = stored(context.key("datapacks"))
@@ -1151,6 +1192,27 @@ mod test {
         );
         assert_eq!(stored(context.key(WORLD_DATAPACKS)).await, None);
         assert!(due().await.is_empty(), "a fresh world row is not due");
+    }
+
+    /// A world's lookup asks Modrinth for data pack builds only; the
+    /// instance's own data packs are asked for as before.
+    #[test]
+    fn a_world_lookup_asks_for_data_pack_builds_only() {
+        let fabric = UpdateContext {
+            game: "1.20.1".into(),
+            loaders: vec!["fabric".into()],
+            also_loads: vec![],
+            shader_engines: vec![],
+        };
+        let world = lookup_context(&fabric, WORLD_DATAPACKS);
+        assert_eq!(world.lookup_loaders(WORLD_DATAPACKS), [["datapack"]]);
+        assert_eq!(world.game, "1.20.1");
+        let instance = lookup_context(&fabric, "datapacks");
+        assert_eq!(
+            instance.lookup_loaders("datapacks"),
+            [["datapack", "fabric", "minecraft"]]
+        );
+        assert_eq!(instance.key("datapacks"), fabric.key("datapacks"));
     }
 
     /// A miss leaves the file out of lookups for `IGNORED_HASH_TTL`, not for

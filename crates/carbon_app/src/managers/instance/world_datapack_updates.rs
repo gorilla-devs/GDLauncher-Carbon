@@ -550,7 +550,19 @@ pub(crate) mod tests {
     /// A Fabric instance at 1.20.1 with the saves `worlds`. Returns the
     /// instance and its `saves` folder.
     async fn fabric_instance(app: &App, name: &str, worlds: &[&str]) -> (InstanceId, PathBuf) {
-        use crate::domain::instance::info::{ModLoader, ModLoaderType};
+        use crate::domain::instance::info::ModLoaderType;
+        instance_running(app, name, &[ModLoaderType::Fabric], worlds).await
+    }
+
+    /// An instance at 1.20.1 running `loaders` (none: no mod loader) with
+    /// the saves `worlds`. Returns the instance and its `saves` folder.
+    async fn instance_running(
+        app: &App,
+        name: &str,
+        loaders: &[crate::domain::instance::info::ModLoaderType],
+        worlds: &[&str],
+    ) -> (InstanceId, PathBuf) {
+        use crate::domain::instance::info::ModLoader;
         use crate::managers::instance::InstanceVersionSource;
         let group = app.instance_manager().get_default_group().await.unwrap();
         let id = app
@@ -561,12 +573,13 @@ pub(crate) mod tests {
                 false,
                 InstanceVersionSource::Version(GameVersion::Standard(StandardVersion {
                     release: GAME.into(),
-                    modloaders: [ModLoader {
-                        type_: ModLoaderType::Fabric,
-                        version: "fixture".into(),
-                    }]
-                    .into_iter()
-                    .collect(),
+                    modloaders: loaders
+                        .iter()
+                        .map(|type_| ModLoader {
+                            type_: *type_,
+                            version: "fixture".into(),
+                        })
+                        .collect(),
                 })),
                 String::new(),
             )
@@ -1302,6 +1315,198 @@ pub(crate) mod tests {
         let mut api = api().await;
         let new = newer_on_modrinth(&mut api, &old).await;
         (id, world, rows[0].clone(), api, new)
+    }
+
+    fn installed_build(old: &[u8]) -> serde_json::Value {
+        data_pack(
+            "installed",
+            5,
+            &["datapack"],
+            ("pack-1.zip", "https://cdn.invalid/pack-1.zip", old),
+        )
+    }
+
+    fn as_version(version: &serde_json::Value) -> carbon_platforms::modrinth::version::Version {
+        serde_json::from_value(version.clone()).unwrap()
+    }
+
+    /// `pack-1.zip` in World after a Modrinth lookup that knows it as the
+    /// build `installed` and answered `newer`, published later, as the
+    /// newest build. The stand-in API lists both.
+    async fn looked_up_pack(
+        app: &App,
+        id: InstanceId,
+        saves: &Path,
+        api: &mut Api,
+        newer: serde_json::Value,
+    ) -> WorldDatapackRow {
+        use crate::managers::metadata::cache::{
+            eligibility::WORLD_DATAPACKS, modrinth::test::save_lookup,
+        };
+        let old = pack_zip("old");
+        put_pack(&saves.join("World"), "pack-1.zip", &old);
+        let row = scanned_rows(app, id).await.remove(0);
+        let installed = installed_build(&old);
+        modrinth_serving(api, vec![installed.clone(), newer.clone()]).await;
+        save_lookup(
+            app,
+            id,
+            metadata(&row),
+            &[WORLD_DATAPACKS],
+            as_version(&installed),
+            vec![as_version(&newer)],
+        )
+        .await;
+        row
+    }
+
+    /// Whether the Worlds list shows the update arrow on World's only pack.
+    async fn update_arrow(app: &App, id: InstanceId) -> bool {
+        use crate::managers::metadata::cache::CacheEntityId;
+        // The list takes the worlds from the instance's addon rows.
+        app.meta_cache_manager()
+            .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        let worlds = app.instance_manager().list_worlds(id).await.unwrap();
+        let world = worlds
+            .iter()
+            .find(|world| world.name == "World")
+            .expect("World is listed");
+        assert_eq!(world.datapacks.len(), 1, "{world:?}");
+        assert!(world.datapacks[0].modrinth.is_some(), "{world:?}");
+        world.datapacks[0].has_update
+    }
+
+    /// The arrow, Update and Update everywhere of a world pack whose newest
+    /// build on Modrinth is one the world cannot take: no arrow, Update
+    /// answers as for any addon without one, Update everywhere skips the
+    /// pack, and the world stays as it was.
+    async fn a_build_no_world_takes_is_no_update(name: &str, loaders: &[&str], filename: &str) {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = fabric_instance(&app, name, &["World"]).await;
+        let mut api = api().await;
+        let unwanted = pack_zip("not for a world");
+        let newer = data_pack(
+            "newer",
+            10,
+            loaders,
+            (filename, "https://cdn.invalid/newer", &unwanted),
+        );
+        let row = looked_up_pack(&app, id, &saves, &mut api, newer).await;
+        let before = tree(&saves);
+
+        assert!(!update_arrow(&app, id).await);
+        let error = update(&app, &api, id, &row.id).await.unwrap_err();
+        assert_eq!(error.to_string(), NO_UPDATE);
+        let instance_updates = InstanceUpdates::new(&app);
+        let results = everywhere(
+            &app,
+            &api,
+            id,
+            DatapackOrigin::World(row.id.clone()),
+            &instance_updates,
+        )
+        .await;
+        assert_eq!(results, vec![]);
+        assert_eq!(tree(&saves), before);
+    }
+
+    /// A project's author published a resource pack build (tagged
+    /// `minecraft` only) after the data pack the world holds.
+    #[tokio::test]
+    async fn a_newer_resource_pack_build_is_no_update_for_a_world_pack() {
+        a_build_no_world_takes_is_no_update("arrow-resource-pack", &["minecraft"], "pack-2.zip")
+            .await;
+    }
+
+    /// The newer build is tagged as a data pack too, but its file is the
+    /// mod jar.
+    #[tokio::test]
+    async fn a_newer_build_whose_file_is_a_jar_is_no_update_for_a_world_pack() {
+        a_build_no_world_takes_is_no_update("arrow-jar", &["datapack", "fabric"], "pack-2.jar")
+            .await;
+    }
+
+    /// A newer data pack zip shows the arrow, and both Update and Update
+    /// everywhere install it.
+    #[tokio::test]
+    async fn a_newer_data_pack_build_is_an_update_the_actions_install() {
+        for everywhere_asked in [false, true] {
+            let app = crate::setup_managers_for_test().await;
+            without_recycle_bin(&app).await;
+            let (id, saves) = fabric_instance(&app, "arrow-data-pack", &["World"]).await;
+            let mut api = api().await;
+            let new = pack_zip("new");
+            let url = api.file("pack-2.zip", &new).await;
+            let newer = data_pack("newer", 10, &["datapack"], ("pack-2.zip", &url, &new));
+            let row = looked_up_pack(&app, id, &saves, &mut api, newer).await;
+
+            assert!(update_arrow(&app, id).await);
+            if everywhere_asked {
+                let instance_updates = InstanceUpdates::new(&app);
+                let results = everywhere(
+                    &app,
+                    &api,
+                    id,
+                    DatapackOrigin::World(row.id.clone()),
+                    &instance_updates,
+                )
+                .await;
+                assert_eq!(results, vec![updated(Some("World"))]);
+            } else {
+                update(&app, &api, id, &row.id).await.unwrap();
+            }
+            only(&saves.join("World/datapacks"), "pack-2.zip", &new);
+        }
+    }
+
+    /// On an instance without a mod loader the worlds are updated for what
+    /// the instance itself is. The same file as the instance's own data pack
+    /// and in a world still gets an answer for each: the instance's copy
+    /// keeps the arrow it had for a newer build tagged `minecraft`, and the
+    /// world's copy, which that build cannot update, shows none.
+    #[tokio::test]
+    async fn a_world_copy_and_the_instance_copy_keep_their_own_answers_without_a_mod_loader() {
+        use crate::managers::metadata::cache::{
+            eligibility::WORLD_DATAPACKS, modrinth::test::save_lookup,
+        };
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = instance_running(&app, "arrow-no-loader", &[], &["World"]).await;
+        let old = pack_zip("old");
+        put_pack(&saves.join("World"), "pack-1.zip", &old);
+        let (instance_row, instance_metadata, _) =
+            instance_pack(&app, id, "pack-1.zip", &old).await;
+        let row = scanned_rows(&app, id).await.remove(0);
+        assert_eq!(metadata(&row), instance_metadata, "one file, one metadata");
+        let newer = data_pack(
+            "newer",
+            10,
+            &["minecraft"],
+            ("pack-2.zip", "https://cdn.invalid/pack-2.zip", &old),
+        );
+        // Each order the two answers can be saved in.
+        for kinds in [
+            ["datapacks", WORLD_DATAPACKS],
+            [WORLD_DATAPACKS, "datapacks"],
+        ] {
+            save_lookup(
+                &app,
+                id,
+                &instance_metadata,
+                &kinds,
+                as_version(&installed_build(&old)),
+                vec![as_version(&newer)],
+            )
+            .await;
+            assert!(!update_arrow(&app, id).await, "{kinds:?}");
+            let listed = app.instance_manager().list_mods(id, None).await.unwrap();
+            let own = listed
+                .iter()
+                .find(|addon| addon.id == instance_row)
+                .expect("the instance's copy is listed");
+            assert!(own.has_update, "{kinds:?}");
+        }
     }
 
     /// The pack's bytes were swapped outside the launcher under the same

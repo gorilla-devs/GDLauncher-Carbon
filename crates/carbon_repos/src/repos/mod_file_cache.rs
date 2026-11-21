@@ -464,7 +464,9 @@ queries! {
            AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff)";
 
     // World data packs are judged against `world_context` and reported as
-    // 'world_datapacks', a kind only the Modrinth cacher reads.
+    // 'world_datapacks', the kind the Modrinth cacher keeps their update
+    // paths under, apart from the same file as one of the instance's own
+    // data packs.
     fn instance_mods_needing_mr_context(instance_id: i32, context: &str, world_context: &str, cutoff: DbDateTime) -> Vec<RefreshContextRow> =
         "SELECT DISTINCT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512, f.addonType AS addonType
          FROM ModFileCache f JOIN ModMetadata m ON m.id=f.metadataId
@@ -476,7 +478,7 @@ queries! {
          SELECT DISTINCT m.id, m.murmur2, m.sha512, 'world_datapacks'
          FROM WorldDatapackCache w JOIN ModMetadata m ON m.id=w.metadataId
          LEFT JOIN ModrinthModCache r ON r.metadataId=m.id AND lower(r.sha512)=lower(hex(m.sha512))
-         LEFT JOIN ModrinthUpdateCache u ON u.metadataId=m.id AND u.context=:world_context || ':datapacks'
+         LEFT JOIN ModrinthUpdateCache u ON u.metadataId=m.id AND u.context=:world_context || ':world_datapacks'
          WHERE w.instanceId=:instance_id
          AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff OR u.metadataId IS NULL OR u.cachedAt <= :cutoff)";
     fn server_mods_needing_mr_context(server_id: i32, context: &str, cutoff: DbDateTime) -> Vec<RefreshContextRow> =

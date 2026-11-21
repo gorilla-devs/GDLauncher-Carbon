@@ -496,6 +496,10 @@ impl crate::error::FeErrorCode for NoDatapackForVersion {
     }
 }
 
+/// The refusal of a version the user picked that the game would not load
+/// from a world: it is not tagged as a data pack, or its file is no zip.
+const NOT_A_DATAPACK_VERSION: &str = "This version is not a data pack";
+
 fn no_data_pack(game: &str) -> anyhow::Error {
     NoDatapackForVersion {
         version: game.to_owned(),
@@ -503,14 +507,12 @@ fn no_data_pack(game: &str) -> anyhow::Error {
     .into()
 }
 
-/// The file of a Modrinth version that goes into a world: its primary file
-/// (the first when none is flagged), when the version is tagged `datapack`,
-/// lists `game` and that file is a zip. The game loads nothing else from a
-/// world's `datapacks` folder.
-pub(super) fn modrinth_world_file<'a>(version: &'a Version, game: &str) -> Option<&'a VersionFile> {
-    if !version.loaders.iter().any(|loader| loader == "datapack")
-        || !version.game_versions.iter().any(|listed| listed == game)
-    {
+/// The file of a Modrinth version that is a data pack: its primary file
+/// (the first when none is flagged), when the version is tagged `datapack`
+/// and that file is a zip. The game loads nothing else from a world's
+/// `datapacks` folder. A version the user picked needs no more than this.
+fn modrinth_datapack_file(version: &Version) -> Option<&VersionFile> {
+    if !version.loaders.iter().any(|loader| loader == "datapack") {
         return None;
     }
     version
@@ -521,15 +523,31 @@ pub(super) fn modrinth_world_file<'a>(version: &'a Version, game: &str) -> Optio
         .filter(|file| file.filename.to_ascii_lowercase().ends_with(".zip"))
 }
 
-/// Whether a CurseForge file of `project` goes into a world: the project is a
-/// data pack one, and the file is a zip that lists `game`.
+/// [`modrinth_datapack_file`] of a version that also lists `game`: the
+/// builds the newest one and an update are chosen among, and the only ones
+/// a world's pack shows an update for.
+pub(crate) fn modrinth_world_file<'a>(version: &'a Version, game: &str) -> Option<&'a VersionFile> {
+    if !version.game_versions.iter().any(|listed| listed == game) {
+        return None;
+    }
+    modrinth_datapack_file(version)
+}
+
+/// Whether a CurseForge file of `project` is a data pack: the project is a
+/// data pack one and the file is a zip.
+fn is_curseforge_datapack_file(project: &curseforge::Mod, file: &curseforge::File) -> bool {
+    project.class_id == Some(ClassId::Datapacks)
+        && file.file_name.to_ascii_lowercase().ends_with(".zip")
+}
+
+/// [`is_curseforge_datapack_file`] for a file that also lists `game` (see
+/// [`modrinth_world_file`]).
 pub(super) fn is_curseforge_world_file(
     project: &curseforge::Mod,
     file: &curseforge::File,
     game: &str,
 ) -> bool {
-    project.class_id == Some(ClassId::Datapacks)
-        && file.file_name.to_ascii_lowercase().ends_with(".zip")
+    is_curseforge_datapack_file(project, file)
         && file.game_versions.iter().any(|listed| listed == game)
 }
 
@@ -620,7 +638,7 @@ async fn resolve_modrinth(
     let project = modrinth
         .get_project(ProjectID(project_id.to_owned()))
         .await?;
-    let version = match version_id {
+    let (version, file) = match version_id {
         Some(id) => {
             let version = modrinth.get_version(VersionID(id.to_owned())).await?;
             if version.project_id != project.id {
@@ -630,13 +648,20 @@ async fn resolve_modrinth(
                     project.id
                 );
             }
-            version
+            // The user's own pick may list another game version.
+            let file = modrinth_datapack_file(&version)
+                .cloned()
+                .context(NOT_A_DATAPACK_VERSION)?;
+            (version, file)
         }
-        None => latest_world_datapack_modrinth(modrinth, &project, game).await?,
+        None => {
+            let version = latest_world_datapack_modrinth(modrinth, &project, game).await?;
+            let file = modrinth_world_file(&version, game)
+                .cloned()
+                .ok_or_else(|| no_data_pack(game))?;
+            (version, file)
+        }
     };
-    let file = modrinth_world_file(&version, game)
-        .cloned()
-        .ok_or_else(|| no_data_pack(game))?;
     let download = Downloadable::new(&file.url, PathBuf::new())
         .with_checksum(Some(Checksum::Sha512(file.hashes.sha512.clone())))
         .with_size(file.size.into());
@@ -666,19 +691,31 @@ async fn resolve_curseforge(
         .data;
     let file = match file_id {
         Some(id) => {
-            curseforge
+            if project.class_id != Some(ClassId::Datapacks) {
+                return Err(no_data_pack(game));
+            }
+            let file = curseforge
                 .get_mod_file(ModFileParameters {
                     mod_id: project.id,
                     file_id: id.try_into()?,
                 })
                 .await?
-                .data
+                .data;
+            if file.mod_id != project.id {
+                bail!(
+                    "CurseForge file {} is not of project {}",
+                    file.id,
+                    project.id
+                );
+            }
+            // The user's own pick may list another game version.
+            if !is_curseforge_datapack_file(&project, &file) {
+                bail!(NOT_A_DATAPACK_VERSION);
+            }
+            file
         }
         None => latest_world_datapack_curseforge(curseforge, &project, game).await?,
     };
-    if file.mod_id != project.id || !is_curseforge_world_file(&project, &file, game) {
-        return Err(no_data_pack(game));
-    }
     let url = file
         .download_url
         .clone()
@@ -1681,6 +1718,14 @@ pub(crate) mod tests {
         )
         .await
         .unwrap_err();
+        // The project may hold a data pack beside the build that was picked.
+        assert_eq!(error.to_string(), NOT_A_DATAPACK_VERSION);
+        assert_eq!(snapshot(&root, &world), before);
+
+        // Asked for its newest build, the project has none for the world.
+        let error = install(&app, &api, request(id, &identity, modrinth(None)))
+            .await
+            .unwrap_err();
         assert_eq!(
             error.to_string(),
             "This project has no data pack for Minecraft 1.20.1"
@@ -1691,6 +1736,135 @@ pub(crate) mod tests {
         assert_eq!(cause["code"], "NO_DATAPACK_FOR_VERSION", "{sent}");
         assert_eq!(cause["data"], json!({ "version": "1.20.1" }), "{sent}");
         assert_eq!(snapshot(&root, &world), before);
+    }
+
+    /// A build tagged as a data pack whose file is the mod jar is refused
+    /// when picked, as the newest one is skipped.
+    #[tokio::test]
+    async fn a_chosen_version_whose_file_is_a_jar_is_refused() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "chosen-jar").await;
+        let mut api = api().await;
+        let jar = pack_zip("jar");
+        let url = api.file("pack.jar", &jar).await;
+        modrinth_serving(
+            &mut api,
+            vec![mr_version(
+                "jar",
+                20,
+                "release",
+                &["datapack", "fabric"],
+                ("pack.jar", &url, &jar),
+            )],
+        )
+        .await;
+        let root = instance_root(&app, id).await;
+        let before = snapshot(&root, &world);
+        let error = install(&app, &api, request(id, &identity, modrinth(Some("jar"))))
+            .await
+            .unwrap_err();
+        assert_eq!(error.to_string(), NOT_A_DATAPACK_VERSION);
+        assert_eq!(snapshot(&root, &world), before);
+    }
+
+    /// A version the user picks only has to be a data pack: one that lists
+    /// another game version than the instance's is installed. The newest
+    /// build is still only one for the instance's game version.
+    #[tokio::test]
+    async fn a_chosen_modrinth_version_for_another_game_version_is_installed() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "chosen-other-game-mr").await;
+        let mut api = api().await;
+        let zip = pack_zip("for 1.20");
+        let url = api.file("pack.zip", &zip).await;
+        let mut version = mr_version(
+            "for-1.20",
+            20,
+            "release",
+            &["datapack"],
+            ("pack.zip", &url, &zip),
+        );
+        version["game_versions"] = json!(["1.20"]);
+        modrinth_serving(&mut api, vec![version]).await;
+
+        let error = install(&app, &api, request(id, &identity, modrinth(None)))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "This project has no data pack for Minecraft 1.20.1"
+        );
+        assert!(entries(&world.join("datapacks")).is_empty());
+
+        let (_, published) = install(
+            &app,
+            &api,
+            request(id, &identity, modrinth(Some("for-1.20"))),
+        )
+        .await
+        .unwrap();
+        assert_eq!(published, world.join("datapacks").join("pack.zip"));
+        assert_eq!(
+            entries(&world.join("datapacks")),
+            vec![("pack.zip".to_owned(), zip)]
+        );
+    }
+
+    /// [`a_chosen_modrinth_version_for_another_game_version_is_installed`]
+    /// for a CurseForge file; one that is no zip is refused.
+    #[tokio::test]
+    async fn a_chosen_curseforge_file_for_another_game_version_is_installed() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "chosen-other-game-cf").await;
+        let mut api = api().await;
+        let zip = pack_zip("curse, for 1.20");
+        let url = api.file("curse.zip", &zip).await;
+        let fingerprint = fingerprint(&app, &zip).await;
+        let mut file = cf_file(20, 10, 1, ("curse.zip", &url, &zip), fingerprint);
+        file["gameVersions"] = json!(["1.20"]);
+        let mut jar = cf_file(21, 11, 1, ("curse.jar", &url, &zip), 0);
+        jar["gameVersions"] = json!(["1.20"]);
+        api.get(
+            &format!("/mods/{CF_PROJECT}"),
+            json!({ "data": cf_project(6945) }),
+        )
+        .await;
+        api.get(
+            &format!("/mods/{CF_PROJECT}/files"),
+            json!({ "data": [jar.clone(), file.clone()] }),
+        )
+        .await;
+        api.get(
+            &format!("/mods/{CF_PROJECT}/files/20"),
+            json!({ "data": file }),
+        )
+        .await;
+        api.get(
+            &format!("/mods/{CF_PROJECT}/files/21"),
+            json!({ "data": jar }),
+        )
+        .await;
+
+        let error = install(&app, &api, request(id, &identity, curseforge(None)))
+            .await
+            .unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "This project has no data pack for Minecraft 1.20.1"
+        );
+        let error = install(&app, &api, request(id, &identity, curseforge(Some(21))))
+            .await
+            .unwrap_err();
+        assert_eq!(error.to_string(), NOT_A_DATAPACK_VERSION);
+        assert!(entries(&world.join("datapacks")).is_empty());
+
+        install(&app, &api, request(id, &identity, curseforge(Some(20))))
+            .await
+            .unwrap();
+        assert_eq!(
+            entries(&world.join("datapacks")),
+            vec![("curse.zip".to_owned(), zip)]
+        );
     }
 
     #[tokio::test]

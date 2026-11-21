@@ -18,7 +18,8 @@ use crate::{
     managers::{
         ManagerRef,
         metadata::cache::{
-            CacheEntityId, current_file_stamp, eligibility::world_context,
+            CacheEntityId, current_file_stamp,
+            eligibility::{WORLD_DATAPACKS, world_context},
             modrinth::target_compatibility,
         },
     },
@@ -411,11 +412,12 @@ impl ManagerRef<'_, InstanceManager> {
         context: Option<&crate::managers::metadata::cache::eligibility::UpdateContext>,
         sources: &carbon_platforms::ModSources,
     ) -> anyhow::Result<WorldDatapack> {
-        // The world context has its own key: paths cached for the instance
-        // may name builds for its mod loaders, which a world never loads.
+        // A world's packs have their own key: paths cached for the instance
+        // may name builds a world never loads, for its mod loaders or, as
+        // its own data packs are asked for, resource packs.
         let mr_update_paths = match (&row.meta_id, context) {
             (Some(meta_id), Some(context)) => {
-                fresh_mr_update_paths(&self.app.db, meta_id, &context.key("datapacks")).await?
+                fresh_mr_update_paths(&self.app.db, meta_id, &context.key(WORLD_DATAPACKS)).await?
             }
             _ => None,
         };
@@ -1206,7 +1208,7 @@ mod tests {
     const NEWER_DATA_PACK: &str = "1.20.1,datapack,stable";
 
     fn world_key() -> String {
-        crate::managers::metadata::cache::eligibility::world_context("1.20.1").key("datapacks")
+        crate::managers::metadata::cache::eligibility::world_context("1.20.1").key(WORLD_DATAPACKS)
     }
 
     #[tokio::test]

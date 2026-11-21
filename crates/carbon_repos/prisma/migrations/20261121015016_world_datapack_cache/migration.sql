@@ -12,3 +12,4 @@ CREATE TABLE WorldDatapackCache (
   FOREIGN KEY (metadataId) REFERENCES ModMetadata(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX WorldDatapackCache_place ON WorldDatapackCache(instanceId, world, filename);
+CREATE INDEX WorldDatapackCache_metadataId_idx ON WorldDatapackCache(metadataId);
