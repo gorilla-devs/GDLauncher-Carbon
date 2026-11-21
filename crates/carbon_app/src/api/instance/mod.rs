@@ -2207,6 +2207,7 @@ struct ModFileMetadata {
 #[derive(Type, Serialize, Debug)]
 struct FEWorld {
     name: String,
+    title: Option<String>,
     addon_id: String,
     identity: Option<String>,
     datapacks: Vec<FEWorldDatapack>,
@@ -2262,6 +2263,7 @@ impl From<crate::managers::instance::world_datapacks::World> for FEWorld {
     fn from(value: crate::managers::instance::world_datapacks::World) -> Self {
         Self {
             name: value.name,
+            title: value.title,
             addon_id: value.addon_id,
             identity: value.identity,
             datapacks: value.datapacks.into_iter().map(Into::into).collect(),

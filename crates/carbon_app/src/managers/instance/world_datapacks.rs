@@ -11,6 +11,7 @@ use super::{
         has_cached_update, validate_addon_basename,
     },
     run::LaunchState,
+    world_level::read_level_name,
 };
 use crate::{
     api::keys::instance::GET_WORLDS,
@@ -46,6 +47,9 @@ pub(super) fn world_datapacks_folder(saves: &Path, world: &str) -> PathBuf {
 pub struct World {
     /// The save's folder name.
     pub name: String,
+    /// The name the game shows, from `level.dat`; `None` when it has none or
+    /// the file cannot be read.
+    pub title: Option<String>,
     /// The id of the world's addon row.
     pub addon_id: String,
     /// `None` when the folder is not a save the launcher may change.
@@ -380,10 +384,36 @@ impl ManagerRef<'_, InstanceManager> {
         }
 
         let mut worlds = Vec::new();
+        let mut rows = Vec::new();
         for row in mfcdb::get_mod_files_by_instance(&self.app.db, *instance_id).await? {
-            if row.addon_type != AddonType::Worlds.to_db_string() {
-                continue;
+            if row.addon_type == AddonType::Worlds.to_db_string() {
+                rows.push(row);
             }
+        }
+
+        let mut titles = match &saves {
+            Some(saves) => {
+                let folders: Vec<_> = rows.iter().map(|row| saves.join(&row.filename)).collect();
+                tokio::task::spawn_blocking(move || {
+                    folders
+                        .iter()
+                        .map(|folder| match read_level_name(folder) {
+                            Ok(title) => title,
+                            Err(error) => {
+                                debug!(?error, "could not read the name of {}", folder.display());
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>()
+                })
+                .await?
+            }
+            None => vec![None; rows.len()],
+        }
+        .into_iter();
+
+        for row in rows {
+            let title = titles.next().flatten();
             let identity = match &saves {
                 Some(saves) => world_identity(instance_id, &root, &saves.join(&row.filename))
                     .await
@@ -397,6 +427,7 @@ impl ManagerRef<'_, InstanceManager> {
             datapacks.sort_by_cached_key(|pack| pack.display_name().to_lowercase());
             worlds.push(World {
                 name: row.filename,
+                title,
                 addon_id: row.id,
                 identity,
                 datapacks,
@@ -1222,6 +1253,40 @@ mod tests {
         assert_eq!(worlds[0].addon_id, addon_id);
         assert!(worlds[0].identity.is_some());
         assert!(worlds[0].datapacks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn the_list_gives_each_world_its_in_game_name_and_survives_one_it_cannot_read() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-titles", &[]).await;
+        for world in ["Named", "Plain", "Unnamed"] {
+            listed_world(&app, id, &saves, world, &[]).await;
+        }
+        let level_dat = |world: &str| saves.join(world).join("level.dat");
+        std::fs::write(
+            level_dat("Named"),
+            super::super::world_level::level_dat_bytes(Some("My Survival")),
+        )
+        .unwrap();
+        std::fs::write(
+            level_dat("Unnamed"),
+            super::super::world_level::level_dat_bytes(None),
+        )
+        .unwrap();
+
+        let worlds = list(&app, id).await;
+        let summary: Vec<_> = worlds
+            .iter()
+            .map(|w| (w.name.as_str(), w.title.as_deref(), w.identity.is_some()))
+            .collect();
+        assert_eq!(
+            summary,
+            vec![
+                ("Named", Some("My Survival"), true),
+                ("Plain", None, true),
+                ("Unnamed", None, true),
+            ]
+        );
     }
 
     #[tokio::test]

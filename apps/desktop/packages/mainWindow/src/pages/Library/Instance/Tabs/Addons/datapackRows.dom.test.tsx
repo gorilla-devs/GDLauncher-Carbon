@@ -231,7 +231,13 @@ const world = (
   name: string,
   datapacks: FEWorldDatapack[] = [],
   identity: string | null = `id-${name}`
-): FEWorld => ({ name, addon_id: `addon-${name}`, identity, datapacks })
+): FEWorld => ({
+  name,
+  title: null,
+  addon_id: `addon-${name}`,
+  identity,
+  datapacks
+})
 const coded = (code: string, data: unknown) =>
   new Error(
     JSON.stringify({ cause: [{ display: "Refused by the core", code, data }] })

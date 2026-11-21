@@ -171,7 +171,13 @@ const world = (
   name: string,
   datapacks: FEWorldDatapack[],
   identity: string | null = name
-): FEWorld => ({ name, addon_id: `addon-${name}`, identity, datapacks })
+): FEWorld => ({
+  name,
+  title: null,
+  addon_id: `addon-${name}`,
+  identity,
+  datapacks
+})
 const worldRow = (name: string, over: Partial<Mod> = {}): Mod => ({
   id: `addon-${name}`,
   filename: name,

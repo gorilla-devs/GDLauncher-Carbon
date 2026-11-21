@@ -962,7 +962,7 @@ export type SetServerIcon = { id: FEServerId; base64Data: string }
 
 export type DatapackWorld = { name: string; identity: string }
 
-export type FEWorld = { name: string; addon_id: string; identity: string | null; datapacks: FEWorldDatapack[] }
+export type FEWorld = { name: string; title: string | null; addon_id: string; identity: string | null; datapacks: FEWorldDatapack[] }
 
 export type FEWorldDatapack = { id: string; filename: string; file_size: number; is_folder: boolean; name: string | null; version: string | null; curseforge: CurseForgeModMetadata | null; modrinth: ModrinthModMetadata | null; has_update: boolean }
 

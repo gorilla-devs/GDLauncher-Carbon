@@ -30,7 +30,6 @@ fn read_tree(path: &Path) -> anyhow::Result<Root> {
     Ok(nbt::read(&raw)?)
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn read_level_name(world: &Path) -> anyhow::Result<Option<String>> {
     let root = read_tree(&world.join("level.dat"))?;
     Ok(
@@ -81,6 +80,12 @@ pub(super) fn write_level_name(world: &Path, name: &str) -> anyhow::Result<()> {
     Ok(())
 }
 
+/// The bytes of a `level.dat` holding `name`, for tests of code that reads one.
+#[cfg(test)]
+pub(super) fn level_dat_bytes(name: Option<&str>) -> Vec<u8> {
+    tests::level_dat(name, vec![])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -109,7 +114,7 @@ mod tests {
         enc.finish().unwrap()
     }
 
-    fn level_dat(name: Option<&str>, extra: Vec<(&str, Tag)>) -> Vec<u8> {
+    pub(super) fn level_dat(name: Option<&str>, extra: Vec<(&str, Tag)>) -> Vec<u8> {
         gzip(&nbt::write(&tree(name, extra)))
     }
 

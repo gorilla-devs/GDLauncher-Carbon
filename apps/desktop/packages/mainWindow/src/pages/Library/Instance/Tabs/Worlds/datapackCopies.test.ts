@@ -40,6 +40,7 @@ const pack = (
 })
 const world = (name: string, datapacks: FEWorldDatapack[]): FEWorld => ({
   name,
+  title: null,
   addon_id: `addon-${name}`,
   identity: name,
   datapacks
