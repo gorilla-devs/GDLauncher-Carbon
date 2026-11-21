@@ -3,7 +3,7 @@
 //! the instance root are written; the instance's own addon folders, the
 //! installer and the addon scanner are not involved.
 use super::{
-    InstanceId, InstanceManager, InvalidInstanceIdError,
+    InstanceId, InstanceManager, InstanceRootGuard, InvalidInstanceIdError,
     datapacks::{NAME_TAKEN, WORLD_CHANGED, world_identity},
     installer::{
         dependency::{LoaderFit, best_candidate},
@@ -44,7 +44,7 @@ use carbon_platforms::{
     },
 };
 use serde::Deserialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::warn;
 
 /// Where the data pack comes from; no version or file means the newest data
@@ -304,7 +304,7 @@ impl ManagerRef<'_, InstanceManager> {
             "install a data pack into a world",
             ActivityPolicy::Installer,
         )?;
-        let (task, task_id, build, staging) = match self
+        let (task, task_id, build, staging, root_hold) = match self
             .admit_world_datapack_install(curseforge, modrinth, &request)
             .await
         {
@@ -322,9 +322,9 @@ impl ManagerRef<'_, InstanceManager> {
         let handle = spawn_retained(activity, move |slot| {
             Box::pin(async move {
                 let cancel = slot.as_ref().unwrap().cancellation();
-                let work = app
-                    .instance_manager()
-                    .finish_world_datapack_install(id, &task, &cancel, build, staging, request);
+                let work = app.instance_manager().finish_world_datapack_install(
+                    id, &task, &cancel, build, staging, root_hold, request,
+                );
                 let result = tokio::select! {
                     biased;
                     _ = cancel.cancelled() => Err(anyhow!(
@@ -353,7 +353,8 @@ impl ManagerRef<'_, InstanceManager> {
         VisualTask,
         VisualTaskId,
         WorldDatapackBuild,
-        tempfile::TempDir,
+        Staging,
+        InstanceRootGuard,
     )> {
         if request.replaces.is_some() {
             bail!("Replacing a data pack in a world is not supported yet");
@@ -361,7 +362,7 @@ impl ManagerRef<'_, InstanceManager> {
         let id = InstanceId(request.instance_id);
         validate_addon_basename(&request.world)?;
         let game = self.runs(id).await?.release;
-        let mut build = match &request.source {
+        let build = match &request.source {
             WorldDatapackSource::Modrinth {
                 project_id,
                 version_id,
@@ -392,10 +393,7 @@ impl ManagerRef<'_, InstanceManager> {
         }
         // A private folder in the instance root: the download and what the
         // downloader keeps beside it go when it is dropped.
-        let staging = tempfile::Builder::new()
-            .prefix(".tmp")
-            .tempdir_in(crate::util::publish::long_path(&root))?;
-        build.download.path = staging.path().join("artifact");
+        let staging = Staging::new(&root)?;
         let instance_name = {
             let instances = self.instances.read().await;
             instances
@@ -412,10 +410,13 @@ impl ManagerRef<'_, InstanceManager> {
         });
         task.require_explicit_completion();
         let task_id = self.app.task_manager().spawn_task(&task).await;
+        // Taken under the gate, so it never waits; a delete or a rename that
+        // moves the folder waits for it, as for a duplicate's copy.
+        let root_hold = self.hold_root(&operation, false).await;
         // The download does not hold up Play, scans or other changes.
         drop(operation);
 
-        Ok((task, task_id, build, staging))
+        Ok((task, task_id, build, staging, root_hold))
     }
 
     /// Refuses while the instance's addons may not change or its game is
@@ -441,17 +442,22 @@ impl ManagerRef<'_, InstanceManager> {
     }
 
     /// The task's work: download, publish, record what the platform said
-    /// about the file and rescan the worlds.
+    /// about the file and rescan the worlds. `root_hold` keeps a delete or a
+    /// rename that moves the instance folder waiting while the download
+    /// writes into `staging`.
+    #[allow(clippy::too_many_arguments)]
     async fn finish_world_datapack_install(
         self,
         id: InstanceId,
         task: &VisualTask,
         cancel: &tokio_util::sync::CancellationToken,
         build: WorldDatapackBuild,
-        staging: tempfile::TempDir,
+        mut staging: Staging,
+        root_hold: InstanceRootGuard,
         request: InstallWorldDatapack,
     ) -> anyhow::Result<PathBuf> {
-        let download = build.download;
+        let mut download = build.download;
+        download.path = staging.path().join(ARTIFACT);
         let subtask = task.subtask(Translation::InstanceTaskInstallModDownloadFile);
         task.edit(|data| data.state = TaskState::KnownProgress)
             .await;
@@ -475,22 +481,35 @@ impl ManagerRef<'_, InstanceManager> {
         result.with_context(|| format!("Failed to download data pack {}", build.filename))?;
         subtask.complete_download();
 
-        let temporary = tempfile::NamedTempFile::from_parts(
-            std::fs::File::open(&download.path)?,
-            tempfile::TempPath::from_path(&download.path),
-        );
         #[cfg(test)]
         self.test_hooks.pause("world_datapack_downloaded", id).await;
-        let (destination, metadata_id) = {
+        // Given back before the gate is taken (the gate comes first). The
+        // downloader is done with the folder: a delete that goes first
+        // removes it with the instance, a rename moves it with the root,
+        // and both are seen under the gate below.
+        drop(root_hold);
+        let destination = {
             let _operation = self.lock_instance(id).await;
+            // Removed from wherever the root is now, also when refused.
+            if let Ok(path) = publication::current_path(&self.app, id).await {
+                staging.root = crate::util::publish::long_path(&path.get_root());
+            }
             self.ensure_world_datapacks_may_change(id).await?;
             let path = publication::current_path(&self.app, id).await?;
+            let root = path.get_root();
             let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
             let world = saves.join(&request.world);
             // Before the folder is made: never in a save put in its place.
-            if world_identity(id, &path.get_root(), &world).await? != request.identity {
+            // A moved root also gives the save another identity.
+            if world_identity(id, &root, &world).await? != request.identity {
                 bail!("Selected world changed during copying; no datapack published");
             }
+            let artifact = staging.path().join(ARTIFACT);
+            let temporary = tempfile::NamedTempFile::from_parts(
+                std::fs::File::open(&artifact)
+                    .with_context(|| format!("The download of {} is gone", build.filename))?,
+                tempfile::TempPath::from_path(&artifact),
+            );
             let folder = world_datapacks_folder(&saves, &request.world);
             if !publication::followed_folder(&folder).await? {
                 tokio::fs::create_dir(&folder).await?;
@@ -498,34 +517,27 @@ impl ManagerRef<'_, InstanceManager> {
             let destination = self
                 .publish_into_world(
                     id,
-                    &path.get_root(),
+                    &root,
                     temporary,
                     &world,
                     &request.identity,
                     &build.filename,
                 )
                 .await?;
-            // The platform's identity of the file, at once: the lookup the
-            // platform passes make later can miss a file just published.
-            let cache = self.app.meta_cache_manager();
-            let parsed = cache
-                .hash_and_parse_mod_file(&folder, &build.filename, true)
-                .await?;
-            (
-                destination,
-                cache.ensure_mod_metadata(&parsed, &build.filename).await?,
-            )
+            // Nothing of the install is left in the root once the gate goes.
+            drop(staging);
+            destination
         };
-        drop(staging);
-        match &build.identity {
-            Identity::Modrinth {
-                project,
-                version,
-                file,
-            } => record_installed_version(self.app, &metadata_id, version, file, project).await?,
-            Identity::Curseforge { project, file } => {
-                record_installed_file(self.app, &metadata_id, file, project).await?
-            }
+        // The pack is in the world: from here on nothing fails the install.
+        if let Err(error) = self
+            .record_world_datapack_identity(&destination, &build.filename, &build.identity)
+            .await
+        {
+            warn!(
+                ?error,
+                "Instance {id}: could not record the platform identity of data pack {}",
+                build.filename
+            );
         }
         match self.scan_world_datapacks(id).await {
             Ok(true) => {
@@ -545,6 +557,79 @@ impl ManagerRef<'_, InstanceManager> {
         self.app.invalidate(INSTANCE_MODS, Some((*id).into()));
         Ok(destination)
     }
+
+    /// The platform's identity of a file just published, recorded at once:
+    /// the lookup the platform passes make later can miss it.
+    async fn record_world_datapack_identity(
+        self,
+        published: &Path,
+        filename: &str,
+        identity: &Identity,
+    ) -> anyhow::Result<()> {
+        let folder = published
+            .parent()
+            .context("a published data pack is in a folder")?
+            .to_path_buf();
+        let cache = self.app.meta_cache_manager();
+        let parsed = cache
+            .hash_and_parse_mod_file(&folder, filename, true)
+            .await?;
+        let metadata_id = cache.ensure_mod_metadata(&parsed, filename).await?;
+        match identity {
+            Identity::Modrinth {
+                project,
+                version,
+                file,
+            } => record_installed_version(self.app, &metadata_id, version, file, project).await,
+            Identity::Curseforge { project, file } => {
+                record_installed_file(self.app, &metadata_id, file, project).await
+            }
+        }
+    }
+}
+
+/// The name of the download inside the install's private folder.
+const ARTIFACT: &str = "artifact";
+
+/// An install's private folder in the instance root, removed when dropped
+/// from under `root`, which follows the instance's folder if a rename moved
+/// it.
+struct Staging {
+    root: PathBuf,
+    name: std::ffi::OsString,
+}
+
+impl Staging {
+    fn new(root: &Path) -> std::io::Result<Self> {
+        let root = crate::util::publish::long_path(root);
+        let folder = tempfile::Builder::new()
+            .prefix(".tmp")
+            .tempdir_in(&root)?
+            .keep();
+        let name = folder
+            .file_name()
+            .expect("a temporary folder has a name")
+            .to_owned();
+        Ok(Self { root, name })
+    }
+
+    fn path(&self) -> PathBuf {
+        self.root.join(&self.name)
+    }
+}
+
+impl Drop for Staging {
+    fn drop(&mut self) {
+        match std::fs::remove_dir_all(self.path()) {
+            Ok(()) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
+            Err(error) => warn!(
+                ?error,
+                "Could not remove the private download folder {}",
+                self.path().display()
+            ),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -557,7 +642,6 @@ mod tests {
     use serde_json::json;
     use sha2::Digest;
     use std::io::Write;
-    use std::path::Path;
 
     const GAME: &str = "1.20.1";
     const CF_PROJECT: i32 = 4242;
@@ -1204,6 +1288,210 @@ mod tests {
         );
         assert!(!world.join("datapacks").exists());
         assert!(entries(&moved.join("datapacks")).is_empty());
+    }
+
+    /// The private folders of installs in an instance root.
+    fn staging_folders(root: &Path) -> Vec<String> {
+        std::fs::read_dir(root)
+            .map(|entries| {
+                entries
+                    .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+                    .filter(|name| name.starts_with(".tmp"))
+                    .collect()
+            })
+            .unwrap_or_default()
+    }
+
+    /// An install of a served Modrinth data pack, stopped once its download
+    /// is done and before it publishes. Returns the work behind its task.
+    async fn install_held_after_download(
+        app: &App,
+        api: &mut Api,
+        id: InstanceId,
+        identity: &str,
+    ) -> (
+        std::sync::Arc<crate::managers::instance::lifecycle_tests::Pause>,
+        tokio::task::JoinHandle<anyhow::Result<PathBuf>>,
+    ) {
+        let zip = pack_zip("held");
+        let url = api.file("pack.zip", &zip).await;
+        modrinth_serving(
+            api,
+            vec![mr_version(
+                "release",
+                10,
+                "release",
+                &["datapack"],
+                ("pack.zip", &url, &zip),
+            )],
+        )
+        .await;
+        let pause = app
+            .instance_manager()
+            .test_hooks
+            .arm("world_datapack_downloaded", id);
+        let (_, work) = app
+            .instance_manager()
+            .install_world_datapack_from(
+                &api.curseforge,
+                &api.modrinth,
+                request(id, identity, modrinth(None)),
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(10), pause.entered.notified())
+            .await
+            .unwrap();
+        (pause, work)
+    }
+
+    async fn without_recycle_bin(app: &App) {
+        app.settings_manager()
+            .set(
+                carbon_repos::repos::app_configuration::AppConfigurationPatch {
+                    deletion_through_recycle_bin: Some(false),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+    }
+
+    /// A delete asked for while the pack downloads waits for the download,
+    /// then removes the instance with nothing of the install left.
+    #[tokio::test]
+    async fn deleting_the_instance_waits_for_the_download() {
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, identity, _) = world_instance(&app, "deleted-while-downloading").await;
+        let root = instance_root(&app, id).await;
+        let mut api = api().await;
+        let (pause, work) = install_held_after_download(&app, &mut api, id, &identity).await;
+        assert_eq!(
+            staging_folders(&root).len(),
+            1,
+            "the download is in the root"
+        );
+
+        let deleting = app.clone();
+        let mut delete =
+            tokio::spawn(async move { deleting.instance_manager()._delete_instance(id).await });
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(150), &mut delete)
+                .await
+                .is_err(),
+            "the folder was deleted while the pack downloaded"
+        );
+        assert!(root.exists());
+        pause.release.notify_one();
+        assert!(work.await.unwrap().is_err(), "the instance is gone");
+        delete.await.unwrap().unwrap();
+        assert!(!root.exists());
+        assert!(!install_left_behind(&app));
+    }
+
+    /// A rename that moves the folder, asked for while the pack downloads,
+    /// waits for the download. The world is then another save as far as its
+    /// identity goes, so the install is refused, and the private folder is
+    /// removed from the renamed root.
+    #[tokio::test]
+    async fn renaming_the_instance_waits_for_the_download() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, _) = world_instance(&app, "renamed-while-downloading").await;
+        let root = instance_root(&app, id).await;
+        let mut api = api().await;
+        let (pause, work) = install_held_after_download(&app, &mut api, id, &identity).await;
+
+        let renaming = app.clone();
+        let mut rename = tokio::spawn(async move {
+            renaming
+                .instance_manager()
+                .update_instance(crate::domain::instance::InstanceSettingsUpdate {
+                    instance_id: id,
+                    name: Some("renamed-later".into()),
+                    use_loaded_icon: None,
+                    notes: None,
+                    version: None,
+                    modloader: None,
+                    java_override: None,
+                    global_java_args: None,
+                    extra_java_args: None,
+                    memory: None,
+                    pre_launch_hook: None,
+                    post_exit_hook: None,
+                    wrapper_command: None,
+                    game_resolution: None,
+                    mod_sources: None,
+                    modpack_locked: None,
+                })
+                .await
+        });
+        assert!(
+            tokio::time::timeout(std::time::Duration::from_millis(150), &mut rename)
+                .await
+                .is_err(),
+            "the folder moved while the pack downloaded"
+        );
+        assert!(root.exists());
+        pause.release.notify_one();
+        let error = work.await.unwrap().unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            "Selected world changed during copying; no datapack published"
+        );
+        rename.await.unwrap().unwrap();
+        let renamed = instance_root(&app, id).await;
+        assert_ne!(renamed, root);
+        assert!(!root.exists());
+        assert!(staging_folders(&renamed).is_empty(), "{renamed:?}");
+        let world = renamed.join("instance/saves/World");
+        assert!(entries(&world.join("datapacks")).is_empty());
+        assert!(!install_left_behind(&app));
+    }
+
+    /// Once the pack is in the world, failing to record its platform
+    /// identity is no failed install: the task succeeds and the list shows
+    /// the pack by its file name.
+    #[tokio::test]
+    async fn a_pack_whose_identity_cannot_be_recorded_is_still_installed() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "unrecorded").await;
+        let mut api = api().await;
+        let zip = pack_zip("unrecorded");
+        let url = api.file("pack.zip", &zip).await;
+        // A version that names another project: `record_installed_version`
+        // refuses it.
+        let mut version = mr_version(
+            "release",
+            10,
+            "release",
+            &["datapack"],
+            ("pack.zip", &url, &zip),
+        );
+        version["project_id"] = json!("another");
+        modrinth_serving(&mut api, vec![version]).await;
+        let mut events = app.invalidation_channel.subscribe();
+        let (task, published) = install(&app, &api, request(id, &identity, modrinth(None)))
+            .await
+            .unwrap();
+        assert_eq!(published, world.join("datapacks/pack.zip"));
+        assert_eq!(std::fs::read(&published).unwrap(), zip);
+        assert!(worlds_invalidated(&mut events, id));
+        let listed = app.instance_manager().list_worlds(id).await.unwrap();
+        let pack = &listed[0].datapacks[0];
+        assert_eq!(pack.filename, "pack.zip");
+        assert_eq!(pack.name, None);
+        assert!(pack.modrinth.is_none());
+        for _ in 0..50 {
+            if matches!(
+                app.task_manager().get_task_outcome(task).await,
+                crate::managers::vtask::TaskOutcome::Succeeded
+            ) {
+                return;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        panic!("the task did not succeed");
     }
 
     /// Whether a quit or move would still wait on an install into a world.
