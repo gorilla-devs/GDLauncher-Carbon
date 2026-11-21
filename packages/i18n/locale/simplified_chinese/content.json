@@ -256,6 +256,7 @@
   "_trn_worlds.refusal.instance_datapack_gone": "此数据包已不在实例中。",
   "_trn_worlds.refusal.name_invalid": "请输入不超过 64 个字符的名称。",
   "_trn_worlds.refusal.rename_incomplete": "无法完全重命名此存档。它现在位于文件夹“{{folder}}”中。",
+  "_trn_worlds.refusal.not_renamed": "无法重命名此存档。未做任何更改。",
   "_trn_table.filename": "文件名",
   "_trn_table.type": "类型",
   "_trn_table.platform": "平台",

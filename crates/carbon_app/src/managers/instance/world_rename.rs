@@ -130,9 +130,19 @@ impl ManagerRef<'_, InstanceManager> {
         );
         let moved = folder != request.world;
         if moved {
-            if let Err(stuck) = move_folder(&saves, &request.world, &folder).await {
+            #[cfg(test)]
+            let first = match self.test_hooks.fail("world_rename_folder", id) {
+                Ok(()) => move_folder(&saves, &request.world, &folder).await,
+                Err(error) => Err(Stuck {
+                    error,
+                    at: request.world.clone(),
+                }),
+            };
+            #[cfg(not(test))]
+            let first = move_folder(&saves, &request.world, &folder).await;
+            if let Err(stuck) = first {
                 if stuck.at == request.world {
-                    return Err(stuck.error);
+                    return Err(WorldRefusal::NotRenamed.caused_by(stuck.error));
                 }
                 error!(error = ?stuck.error, "Instance {id}: a world was left in {}", stuck.at);
                 bail!(WorldRefusal::RenameIncomplete { folder: stuck.at });
@@ -150,8 +160,9 @@ impl ManagerRef<'_, InstanceManager> {
         // Without a folder move there are no records to move, and a failed
         // write leaves level.dat as it was.
         if !moved {
-            written?;
-            return Ok(folder);
+            return written
+                .map(|()| folder)
+                .map_err(|error| WorldRefusal::NotRenamed.caused_by(error));
         }
         let failure = match written {
             Err(error) => Some((error, false)),
@@ -203,12 +214,13 @@ impl ManagerRef<'_, InstanceManager> {
             error!(?error, "Instance {id}: the rename of a world failed");
             bail!(WorldRefusal::RenameIncomplete { folder: now_in });
         }
-        Err(error)
+        Err(WorldRefusal::NotRenamed.caused_by(error))
     }
 
     /// The names a renamed world may not take: every entry of `saves` and
-    /// every world the launcher has a record of, whose folder may be gone
-    /// before a scan removes the record.
+    /// every world the launcher has a record of, or data pack records under,
+    /// whose folder may be gone before a scan removes the records; taking
+    /// such a name would merge those records into the renamed world.
     async fn taken_world_names(self, id: InstanceId, saves: &Path) -> anyhow::Result<Vec<String>> {
         let mut taken = Vec::new();
         let mut entries = tokio::fs::read_dir(saves)
@@ -222,6 +234,11 @@ impl ManagerRef<'_, InstanceManager> {
                 taken.push(row.filename);
             }
         }
+        for row in wdb::get_world_datapacks_by_instance(&self.app.db, *id).await? {
+            taken.push(row.world);
+        }
+        taken.sort();
+        taken.dedup();
         Ok(taken)
     }
 
@@ -288,9 +305,7 @@ async fn move_folder(saves: &Path, from: &str, to: &str) -> Result<(), Stuck> {
             .map_err(stuck(from));
     }
 
-    let step_name = format!("{to}.gdl-renaming");
-    let step: PathBuf = saves.join(&step_name);
-    ensure_free(&step).await.map_err(stuck(from))?;
+    let (step_name, step) = free_step(saves, to).await.map_err(stuck(from))?;
     rename_dir(&source, &step)
         .await
         .with_context(|| format!("renaming {} to {}", source.display(), step.display()))
@@ -316,6 +331,22 @@ async fn move_folder(saves: &Path, from: &str, to: &str) -> Result<(), Stuck> {
         };
     }
     Ok(())
+}
+
+/// The first free temporary name for a change of letter case to `to`, so a
+/// folder left by an earlier rename that stopped midway never blocks it.
+async fn free_step(saves: &Path, to: &str) -> anyhow::Result<(String, PathBuf)> {
+    for n in 1..=100 {
+        let name = match n {
+            1 => format!("{to}.gdl-renaming"),
+            n => format!("{to}.gdl-renaming-{n}"),
+        };
+        let path = saves.join(&name);
+        if ensure_free(&path).await.is_ok() {
+            return Ok((name, path));
+        }
+    }
+    bail!("no free temporary name for {to} in {}", saves.display())
 }
 
 /// Puts the bytes `original` back as the world's `level.dat`, in one step.
@@ -581,7 +612,7 @@ mod tests {
     async fn a_rename_is_refused_when_the_world_is_not_the_one_listed() {
         let app = crate::setup_managers_for_test().await;
         let (id, saves, world) = world_instance(&app, "rename-changed", "New World", None).await;
-        let before = snapshot(&saves);
+        let before = (snapshot(&saves), records(&app, id).await);
 
         let error = rename(
             &app,
@@ -594,7 +625,7 @@ mod tests {
         .unwrap_err();
 
         assert_eq!(code(&error).as_deref(), Some("WORLD_CHANGED"));
-        assert_eq!(snapshot(&saves), before);
+        assert_eq!((snapshot(&saves), records(&app, id).await), before);
     }
 
     #[tokio::test]
@@ -602,14 +633,14 @@ mod tests {
         let app = crate::setup_managers_for_test().await;
         let (id, saves, world) = world_instance(&app, "rename-unreadable", "New World", None).await;
         std::fs::write(saves.join("New World/level.dat"), b"not gzip").unwrap();
-        let before = snapshot(&saves);
+        let before = (snapshot(&saves), records(&app, id).await);
 
         let error = rename(&app, request(id, &world, "Elsewhere"))
             .await
             .unwrap_err();
 
         assert_eq!(code(&error).as_deref(), Some("WORLD_NAME_UNREADABLE"));
-        assert_eq!(snapshot(&saves), before);
+        assert_eq!((snapshot(&saves), records(&app, id).await), before);
     }
 
     #[tokio::test]
@@ -637,6 +668,10 @@ mod tests {
     #[tokio::test]
     async fn a_name_that_cannot_be_written_puts_the_folder_back() {
         use std::os::unix::fs::PermissionsExt;
+        // A folder mode does not stop root, so the write would succeed.
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
         let app = crate::setup_managers_for_test().await;
         let (id, saves, world) = world_instance(&app, "rename-unwritable", "New World", None).await;
         let folder = saves.join("New World");
@@ -650,12 +685,12 @@ mod tests {
 
         std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755)).unwrap();
         let error = error.unwrap_err();
-        // The rename got as far as the write, and says why it stopped.
+        // The rename got as far as the write, and keeps why it stopped.
         assert!(format!("{error:#}").contains("level.dat"), "{error:#}");
-        assert_ne!(
+        assert_eq!(
             code(&error).as_deref(),
-            Some("WORLD_RENAME_INCOMPLETE"),
-            "{error:?}"
+            Some("WORLD_NOT_RENAMED"),
+            "{error:#}"
         );
         assert_eq!(entries(&saves), vec!["New World"]);
         assert_eq!(std::fs::read(folder.join("level.dat")).unwrap(), original);
@@ -682,10 +717,10 @@ mod tests {
             format!("{error:#}").contains("world_rename_records failed (test)"),
             "{error:#}"
         );
-        assert_ne!(
+        assert_eq!(
             code(&error).as_deref(),
-            Some("WORLD_RENAME_INCOMPLETE"),
-            "{error:?}"
+            Some("WORLD_NOT_RENAMED"),
+            "{error:#}"
         );
         assert_eq!(entries(&saves), vec!["New World"]);
         assert_eq!(title(&saves.join("New World")).as_deref(), Some("Old"));
@@ -718,5 +753,108 @@ mod tests {
         );
         assert_eq!(entries(&saves), vec!["Elsewhere"]);
         assert_eq!(title(&saves.join("Elsewhere")).as_deref(), Some("Old"));
+    }
+
+    #[tokio::test]
+    async fn a_folder_that_cannot_be_renamed_changes_nothing() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves, world) =
+            world_instance(&app, "rename-folder-fails", "New World", Some("Old")).await;
+        let before = (snapshot(&saves), records(&app, id).await);
+        app.instance_manager()
+            .test_hooks
+            .arm_failure("world_rename_folder", id);
+
+        let error = rename(&app, request(id, &world, "Elsewhere"))
+            .await
+            .unwrap_err();
+
+        assert!(
+            format!("{error:#}").contains("world_rename_folder failed (test)"),
+            "{error:#}"
+        );
+        assert_eq!(
+            code(&error).as_deref(),
+            Some("WORLD_NOT_RENAMED"),
+            "{error:#}"
+        );
+        assert_eq!((snapshot(&saves), records(&app, id).await), before);
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_name_that_cannot_be_written_in_its_own_folder_changes_nothing() {
+        use std::os::unix::fs::PermissionsExt;
+        // A folder mode does not stop root, so the write would succeed.
+        if unsafe { libc::geteuid() } == 0 {
+            return;
+        }
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves, world) =
+            world_instance(&app, "rename-in-place-unwritable", "New World", Some("Old")).await;
+        let folder = saves.join("New World");
+        let before = (snapshot(&saves), records(&app, id).await);
+        std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o555)).unwrap();
+
+        let error = rename(&app, request(id, &world, "New World")).await;
+
+        std::fs::set_permissions(&folder, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let error = error.unwrap_err();
+        assert!(format!("{error:#}").contains("level.dat"), "{error:#}");
+        assert_eq!(
+            code(&error).as_deref(),
+            Some("WORLD_NOT_RENAMED"),
+            "{error:#}"
+        );
+        assert_eq!((snapshot(&saves), records(&app, id).await), before);
+    }
+
+    #[tokio::test]
+    async fn a_leftover_temporary_folder_does_not_block_a_change_of_letter_case() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves, world) = world_instance(&app, "rename-case-leftover", "world", None).await;
+        let leftover = saves.join("World.gdl-renaming");
+        std::fs::create_dir(&leftover).unwrap();
+        std::fs::write(leftover.join("kept.txt"), b"left by a crash").unwrap();
+
+        let folder = rename(&app, request(id, &world, "World")).await.unwrap();
+
+        assert_eq!(folder, "World");
+        assert_eq!(entries(&saves), vec!["World", "World.gdl-renaming"]);
+        assert_eq!(title(&saves.join("World")).as_deref(), Some("World"));
+        assert_eq!(entries(&leftover), vec!["kept.txt"]);
+        assert_eq!(
+            std::fs::read(leftover.join("kept.txt")).unwrap(),
+            b"left by a crash"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_name_with_stale_data_pack_records_gets_a_number() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves, world) =
+            world_instance(&app, "rename-stale-packs", "New World", None).await;
+        // Data pack rows of a world whose folder is gone.
+        wdb::upsert_world_datapack(
+            &app.db,
+            *id,
+            "Skyblock",
+            "stale.zip",
+            0,
+            false,
+            None,
+            None,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+
+        let folder = rename(&app, request(id, &world, "Skyblock")).await.unwrap();
+
+        assert_eq!(folder, "Skyblock (2)");
+        assert_eq!(entries(&saves), vec!["Skyblock (2)"]);
+        let worlds = listed(&app, id).await;
+        let packs: Vec<_> = worlds[0].datapacks.iter().map(|pack| &pack.id).collect();
+        assert_eq!(packs, vec![&world.datapacks[0].id]);
     }
 }

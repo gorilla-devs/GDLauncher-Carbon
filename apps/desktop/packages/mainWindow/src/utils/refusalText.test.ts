@@ -51,7 +51,8 @@ const REFUSALS: [code: string, data?: Record<string, string>][] = [
   ["INSTANCE_DATAPACK_CHANGED"],
   ["WORLD_NAME_UNREADABLE"],
   ["WORLD_NAME_INVALID"],
-  ["WORLD_RENAME_INCOMPLETE", { folder: FOLDER }]
+  ["WORLD_RENAME_INCOMPLETE", { folder: FOLDER }],
+  ["WORLD_NOT_RENAMED"]
 ]
 const CORE_TEXT = "The core's English sentence"
 
@@ -142,6 +143,9 @@ describe("a refusal in the player's language", () => {
     )
     expect(said("WORLD_RENAME_INCOMPLETE", { folder: FOLDER })).toBe(
       `The world could not be fully renamed. It is now in the folder “${FOLDER}”.`
+    )
+    expect(said("WORLD_NOT_RENAMED")).toBe(
+      "The world couldn't be renamed. Nothing was changed."
     )
   })
 

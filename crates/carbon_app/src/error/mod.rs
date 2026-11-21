@@ -45,7 +45,7 @@ fn extract_fe_error(
     use crate::managers::instance::modpack::ChangeVersionRefusal;
     use crate::managers::instance::run::InsufficientMemoryError;
     use crate::managers::instance::world_datapack_changes::NoDatapackForVersion;
-    use crate::managers::instance::world_refusal::WorldRefusal;
+    use crate::managers::instance::world_refusal::{RefusalWithCause, WorldRefusal};
     use crate::managers::server::{EulaNotAcceptedError, RecoveredServerError};
 
     macro_rules! try_downcast {
@@ -71,6 +71,13 @@ fn extract_fe_error(
         NoDatapackForVersion,
         WorldRefusal
     );
+
+    if let Some(e) = entry.downcast_ref::<RefusalWithCause>() {
+        return (
+            Some(e.refusal.error_code().to_string()),
+            e.refusal.error_data(),
+        );
+    }
 
     if let Some(coded) = entry.downcast_ref::<CodedLine>() {
         return (Some(coded.code.clone()), coded.data.clone());

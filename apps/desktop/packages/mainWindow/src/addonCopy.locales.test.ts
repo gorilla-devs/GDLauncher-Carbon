@@ -83,7 +83,8 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_worlds.refusal.no_update",
     "_trn_worlds.refusal.instance_datapack_gone",
     "_trn_worlds.refusal.name_invalid",
-    "_trn_worlds.refusal.rename_incomplete"
+    "_trn_worlds.refusal.rename_incomplete",
+    "_trn_worlds.refusal.not_renamed"
   ],
   ui: ["_trn_worlds"],
   notifications: [

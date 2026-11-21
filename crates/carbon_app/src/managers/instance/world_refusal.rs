@@ -74,6 +74,39 @@ pub enum WorldRefusal {
     /// A rename failed and could not be undone: the world is in `folder`.
     #[error("The world could not be fully renamed and is now in the folder {folder}")]
     RenameIncomplete { folder: String },
+    /// A rename failed and everything it had done was put back.
+    #[error("The world could not be renamed; nothing was changed")]
+    NotRenamed,
+}
+
+impl WorldRefusal {
+    /// This refusal, with the error that led to it kept as its source, so
+    /// logs and the copied error still say what went wrong.
+    pub fn caused_by(self, cause: anyhow::Error) -> anyhow::Error {
+        anyhow::Error::new(RefusalWithCause {
+            refusal: self,
+            cause,
+        })
+    }
+}
+
+/// A [`WorldRefusal`] with the error behind it; its code is the refusal's.
+#[derive(Debug)]
+pub struct RefusalWithCause {
+    pub refusal: WorldRefusal,
+    cause: anyhow::Error,
+}
+
+impl std::fmt::Display for RefusalWithCause {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.refusal.fmt(f)
+    }
+}
+
+impl std::error::Error for RefusalWithCause {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        Some(self.cause.as_ref())
+    }
 }
 
 /// What makes a folder in `saves` no save the launcher can change.
@@ -126,6 +159,7 @@ impl FeErrorCode for WorldRefusal {
             Self::NameUnreadable => "WORLD_NAME_UNREADABLE",
             Self::InvalidName => "WORLD_NAME_INVALID",
             Self::RenameIncomplete { .. } => "WORLD_RENAME_INCOMPLETE",
+            Self::NotRenamed => "WORLD_NOT_RENAMED",
         }
     }
 
@@ -190,6 +224,7 @@ mod tests {
             WorldRefusal::RenameIncomplete {
                 folder: "Skyblock (2)".into(),
             },
+            WorldRefusal::NotRenamed,
         ];
         all.extend(
             [
@@ -250,6 +285,27 @@ mod tests {
         assert_eq!(
             coded_cause(&error),
             Some(("DATAPACK_CHANGED".to_owned(), None))
+        );
+    }
+
+    /// A refusal that keeps its cause is found by its code, with the cause
+    /// after it.
+    #[test]
+    fn a_refusal_with_its_cause_carries_the_code_and_the_cause() {
+        let cause = anyhow::anyhow!("Permission denied").context("replacing level.dat");
+        let error = WorldRefusal::NotRenamed.caused_by(cause);
+        let causes = sent(&error);
+        assert_eq!(causes[0]["code"], "WORLD_NOT_RENAMED");
+        assert_eq!(causes[0]["display"], WorldRefusal::NotRenamed.to_string());
+        assert_eq!(causes[1]["display"], "replacing level.dat");
+        assert_eq!(causes[2]["display"], "Permission denied");
+        assert_eq!(
+            coded_cause(&error),
+            Some(("WORLD_NOT_RENAMED".to_owned(), None))
+        );
+        assert_eq!(
+            format!("{error:#}"),
+            "The world could not be renamed; nothing was changed: replacing level.dat: Permission denied"
         );
     }
 
