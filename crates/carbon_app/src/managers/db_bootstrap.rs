@@ -1073,13 +1073,13 @@ mod bootstrap_tests {
             assert_eq!(
                 c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
                     .unwrap(),
-                29
+                30
             );
             assert_eq!(
                 c.query_row("SELECT count(*) FROM _migrations", [], |r| r
                     .get::<_, i32>(0))
                     .unwrap(),
-                29
+                30
             );
             assert!(
                 c.prepare("PRAGMA foreign_key_check")
@@ -1335,7 +1335,7 @@ mod legacy_tests {
             data_down: "full",
         });
         assert!(migrate_db(&path, &current).is_err());
-        assert_eq!(version(&path), 29);
+        assert_eq!(version(&path), 30);
         let c = rusqlite::Connection::open(&path).unwrap();
         assert_eq!(
             c.query_row(
@@ -1355,7 +1355,7 @@ mod legacy_tests {
         let fresh = dir.path().join("fresh.db");
         let current = carbon_repos::get_migrations().0;
         assert_eq!(migrate_db(&fresh, &current).unwrap(), OpenVerdict::Proceed);
-        assert_eq!(version(&fresh), 29);
+        assert_eq!(version(&fresh), 30);
         for prefix in [24, 25] {
             let (_dir, path, current) = fixture(prefix);
             assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
@@ -1373,7 +1373,7 @@ mod legacy_tests {
                 c.query_row("SELECT count(*) FROM _migrations", [], |r| r
                     .get::<_, i32>(0))
                     .unwrap(),
-                29
+                30
             );
         }
     }
