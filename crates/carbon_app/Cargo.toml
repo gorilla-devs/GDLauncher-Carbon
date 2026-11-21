@@ -11,6 +11,7 @@ default-run = "carbon_app"
 [dependencies]
 semver = "1.0.25"
 anyhow = { workspace = true }
+flate2 = { workspace = true }
 derive_more = { workspace = true }
 thiserror = { workspace = true }
 sentry = { workspace = true }

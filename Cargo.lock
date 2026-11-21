@@ -440,6 +440,7 @@ dependencies = [
  "dotenvy",
  "dunce",
  "encoding_rs",
+ "flate2",
  "flowtest",
  "fs_extra",
  "futures",
