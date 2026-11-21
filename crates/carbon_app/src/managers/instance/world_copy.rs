@@ -80,7 +80,7 @@ fn walk(world: &Path, relative: &Path, survey: &mut Survey) -> anyhow::Result<()
         let meta = std::fs::symlink_metadata(&full)
             .with_context(|| format!("reading {}", full.display()))?;
         let kind = meta.file_type();
-        // Windows reports a junction as neither; both count as a link.
+        // A link of any kind, or a device, pipe or socket.
         if kind.is_symlink() || !(kind.is_file() || kind.is_dir()) {
             return Err(WorldRefusal::HoldsLink.into());
         }
@@ -133,8 +133,8 @@ pub(super) fn copy_tree(
         }
 
         let source = world.join(&entry.path);
-        let mut from = std::fs::File::open(&source)
-            .with_context(|| format!("opening {}", source.display()))?;
+        let mut from =
+            open_source(&source).with_context(|| format!("opening {}", source.display()))?;
         let mut to = std::fs::File::create_new(&target)
             .with_context(|| format!("creating {}", target.display()))?;
         let mut length = 0u64;
@@ -169,6 +169,10 @@ pub(super) fn copy_tree(
             to.set_modified(modified)
                 .with_context(|| format!("setting the time of {}", target.display()))?;
         }
+        // So a copy published right after this returns cannot hold empty
+        // files after a power cut.
+        to.sync_all()
+            .with_context(|| format!("syncing {}", target.display()))?;
     }
 
     // A folder's time moves whenever something is put in it, so the folders
@@ -180,6 +184,19 @@ pub(super) fn copy_tree(
         }
     }
     Ok(())
+}
+
+/// Opens a surveyed file. On unix a link that replaced it since the survey is
+/// an error instead of a read from outside the world.
+fn open_source(path: &Path) -> std::io::Result<std::fs::File> {
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    options.open(path)
 }
 
 fn set_folder_modified(folder: &Path, modified: SystemTime) -> std::io::Result<()> {
@@ -202,20 +219,71 @@ fn set_folder_modified(folder: &Path, modified: SystemTime) -> std::io::Result<(
 /// lengths and modified times.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn unchanged_since(world: &Path, survey: &Survey) -> anyhow::Result<bool> {
-    Ok(self::survey(world)?.entries == survey.entries)
+    Ok(same_entries(&survey.entries, &self::survey(world)?.entries))
+}
+
+/// Equal lists count only when every entry has a modified time: without one a
+/// rewrite that keeps the length goes unseen, so the copy cannot be proven
+/// untorn.
+fn same_entries(before: &[Entry], after: &[Entry]) -> bool {
+    before == after
+        && before
+            .iter()
+            .chain(after)
+            .all(|entry| entry.stamp.modified.is_some())
 }
 
 /// The room left on the drive that holds `folder`, or `None` when no listed
 /// drive does.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn free_space(folder: &Path) -> Option<u64> {
-    let folder = folder.canonicalize().ok()?;
-    sysinfo::Disks::new_with_refreshed_list()
+    // Not `canonicalize`: on Windows that gives a `\\?\C:\` path, which never
+    // starts with the `C:\` mount point sysinfo reports.
+    let folder = dunce::canonicalize(folder).ok()?;
+    let disks = sysinfo::Disks::new_with_refreshed_list();
+    let mounts = disks
         .list()
         .iter()
-        .filter(|disk| folder.starts_with(disk.mount_point()))
-        .max_by_key(|disk| disk.mount_point().components().count())
-        .map(|disk| disk.available_space())
+        .map(|disk| (disk.mount_point().to_path_buf(), disk.available_space()))
+        .collect::<Vec<_>>();
+    free_space_among(&folder, &mounts, &device_of)
+}
+
+/// Picks the mount point that is the longest prefix of `folder` and returns
+/// its room. sysinfo leaves some mounts out (tmpfs, network drives), which
+/// would make the search settle on a shorter mount, a different drive; so on
+/// unix the answer is given only when `device` says the folder and the chosen
+/// mount point are on the same device.
+fn free_space_among(
+    folder: &Path,
+    mounts: &[(PathBuf, u64)],
+    device: &dyn Fn(&Path) -> Option<u64>,
+) -> Option<u64> {
+    let (mount, available) = mounts
+        .iter()
+        .filter(|(mount, _)| folder.starts_with(mount))
+        .max_by_key(|(mount, _)| mount.components().count())?;
+    #[cfg(unix)]
+    {
+        let on_mount = device(mount)?;
+        if device(folder)? != on_mount {
+            return None;
+        }
+    }
+    #[cfg(not(unix))]
+    let _ = (mount, device);
+    Some(*available)
+}
+
+#[cfg(unix)]
+fn device_of(path: &Path) -> Option<u64> {
+    use std::os::unix::fs::MetadataExt;
+    std::fs::metadata(path).ok().map(|meta| meta.dev())
+}
+
+#[cfg(not(unix))]
+fn device_of(_: &Path) -> Option<u64> {
+    None
 }
 
 #[cfg(test)]
@@ -326,12 +394,13 @@ mod tests {
             make(&world.join("level.dat"), &world.join("region/link"));
             let staging = dir.path().join("staging");
 
+            // The survey fails, so there is nothing to copy.
             let error = match survey(&world) {
                 Err(error) => error,
                 Ok(_) => panic!("a {name} link was accepted"),
             };
             assert_eq!(coded_cause(&error).unwrap().0, "WORLD_HOLDS_LINK", "{name}");
-            assert!(!staging.exists());
+            assert!(!staging.exists(), "{name}");
         }
     }
 
@@ -409,6 +478,113 @@ mod tests {
             change(&world);
             assert!(!unchanged_since(&world, &found).unwrap(), "{name}");
         }
+    }
+
+    #[test]
+    fn a_missing_modified_time_counts_as_changed() {
+        let dir = tempfile::tempdir().unwrap();
+        let world = the_world(dir.path());
+        let found = survey(&world).unwrap();
+        assert!(same_entries(&found.entries, &found.entries));
+        let mut without = found.entries.clone();
+        without[0].stamp.modified = None;
+        assert!(!same_entries(&without, &without));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_file_swapped_for_a_link_after_the_survey_is_not_followed() {
+        let dir = tempfile::tempdir().unwrap();
+        let world = dir.path().join("World");
+        write(&world.join("level.dat"), b"inside");
+        let outside = dir.path().join("outside.txt");
+        write(&outside, b"secret");
+        let found = survey(&world).unwrap();
+        std::fs::remove_file(world.join("level.dat")).unwrap();
+        std::os::unix::fs::symlink(&outside, world.join("level.dat")).unwrap();
+        let staging = dir.path().join("staging");
+
+        copy_tree(
+            &world,
+            &staging,
+            &found,
+            &nothing,
+            &CancellationToken::new(),
+        )
+        .expect_err("a link must not be followed");
+
+        let leaked = std::fs::read_dir(&staging)
+            .unwrap()
+            .any(|entry| std::fs::read(entry.unwrap().path()).is_ok_and(|b| b == b"secret"));
+        assert!(!leaked);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn odd_names_and_deep_folders_are_copied() {
+        use std::os::unix::ffi::OsStrExt;
+        let dir = tempfile::tempdir().unwrap();
+        let world = dir.path().join("World");
+        write(
+            &world.join(std::ffi::OsStr::from_bytes(b"\xff.dat")),
+            b"odd",
+        );
+        let mut deep = world.clone();
+        for level in 0..10 {
+            deep = deep.join(format!("d{level}"));
+        }
+        write(&deep.join("leaf.dat"), b"leaf");
+        let staging = dir.path().join("staging");
+
+        let found = survey(&world).unwrap();
+        copy_tree(
+            &world,
+            &staging,
+            &found,
+            &nothing,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+
+        assert_eq!(tree(&staging), tree(&world));
+        assert!(unchanged_since(&world, &found).unwrap());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn the_drive_rule_picks_the_longest_mount_on_the_same_device() {
+        let mounts = vec![
+            (PathBuf::from("/"), 1u64),
+            (PathBuf::from("/data"), 2),
+            (PathBuf::from("/data/games"), 3),
+        ];
+        let device = |path: &Path| -> Option<u64> {
+            Some(if path.starts_with("/data/games") {
+                30
+            } else if path.starts_with("/data") {
+                20
+            } else {
+                10
+            })
+        };
+        assert_eq!(
+            free_space_among(Path::new("/data/games/saves"), &mounts, &device),
+            Some(3)
+        );
+        assert_eq!(
+            free_space_among(Path::new("/data/x"), &mounts, &device),
+            Some(2)
+        );
+        assert_eq!(
+            free_space_among(Path::new("/home/me"), &mounts, &device),
+            Some(1)
+        );
+        // A mount sysinfo leaves out: the folder is on another device than "/".
+        let other = |path: &Path| -> Option<u64> {
+            Some(if path == Path::new("/run/x") { 99 } else { 10 })
+        };
+        assert_eq!(free_space_among(Path::new("/run/x"), &mounts, &other), None);
+        assert_eq!(free_space_among(Path::new("/x"), &[], &device), None);
     }
 
     #[test]
