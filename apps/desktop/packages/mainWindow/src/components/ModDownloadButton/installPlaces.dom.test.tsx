@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
+import { createSignal } from "solid-js"
 import { render } from "solid-js/web"
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query"
 
@@ -1263,4 +1264,80 @@ it.each([
     "content:_trn_worlds.download_to_instance"
   ])
   expect(disabledItems()).toEqual(ticked)
+})
+
+// A click must land on what the player saw when clicking.
+it("a click on a linked version that is still being read installs nothing, and the read version then replaces its own kind", async () => {
+  let answer!: (version: object) => void
+  c.query.mockImplementation(([key]: any) =>
+    key === "modplatforms.modrinth.getVersion"
+      ? new Promise((resolve) => {
+          answer = resolve
+        })
+      : Promise.resolve(key === "instance.getWorlds" ? [] : running)
+  )
+  c.mutate.mockResolvedValue(61)
+  await mount(
+    modrinthHybrid,
+    { fileId: "JAR2", selectedInstanceMods: [jarRow] },
+    "mod"
+  )
+  await download()
+  expect(requests()).toEqual([])
+  expect(spins()).toBe(true)
+  answer(jarVersion)
+  await flush()
+  expect(spins()).toBe(false)
+  await download()
+  expect(c.mutate.mock.calls).toEqual([versionInstall("JAR2", "row-mods")])
+})
+it("a click that waits for the worlds is dropped when another instance is chosen meanwhile", async () => {
+  const answer = serveLater()
+  const opened = vi.fn()
+  const [instance, setInstance] = createSignal(7)
+  const client = new QueryClient({
+    defaultOptions: { queries: { staleTime: Infinity, retry: false } }
+  })
+  const root = document.createElement("div")
+  document.body.append(root)
+  const dispose = render(
+    () => (
+      <QueryClientProvider client={client}>
+        <SearchInputContext.Provider
+          value={{ searchQuery: () => ({ projectType: "datapack" }) } as any}
+        >
+          <ModDownloadButton
+            addon={curseforgePack as any}
+            selectedInstanceId={instance()}
+            selectedInstanceMods={[]}
+            testId="download"
+            onDropdownOpenChange={opened}
+          />
+        </SearchInputContext.Provider>
+      </QueryClientProvider>
+    ),
+    root
+  )
+  cleanups.push(() => {
+    dispose()
+    client.clear()
+  })
+  await flush()
+  await download()
+  expect(opened.mock.calls).toEqual([[true]])
+  setInstance(8)
+  await flush()
+  expect(opened.mock.calls).toEqual([[true], [false]])
+  expect(spins()).toBe(false)
+  answer([])
+  await flush()
+  expect(requests()).toEqual([])
+})
+it("a button removed while its click waits tells the row the step is over", async () => {
+  serveLater()
+  const opened = vi.fn()
+  await mount(curseforgePack, { onDropdownOpenChange: opened }, "datapack")
+  await download()
+  cleanups.splice(0).forEach((cleanup) => cleanup())
+  expect(opened.mock.calls).toEqual([[true], [false]])
 })

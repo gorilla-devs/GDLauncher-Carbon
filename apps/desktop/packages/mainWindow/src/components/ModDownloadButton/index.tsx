@@ -12,6 +12,7 @@ import {
   createEffect,
   createMemo,
   batch,
+  on,
   onCleanup,
   untrack
 } from "solid-js"
@@ -185,6 +186,15 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     // Unread, the version replaces no installed copy; nothing to tell.
     meta: LOCAL_ERROR_TOAST
   }))
+  // Until the link's version is read nobody knows which copy in the
+  // instance it replaces, so a click then would put a second copy beside it.
+  // A world or a server is not compared by kind and does not wait.
+  const versionUnread = () =>
+    readsVersion() &&
+    !props.selectedServerId &&
+    worldName() === undefined &&
+    linkedVersion.data === undefined &&
+    !linkedVersion.isError
   const fileIsDatapackBuild = () =>
     props.fileIsDatapackBuild ??
     (readsVersion() && linkedVersion.data
@@ -363,7 +373,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   /** Installs into the selected target: the server, the world of the search,
    *  `into` when the "where" step picked a world, or else the instance. */
   const handleDownload = async (into?: ReadableWorld) => {
-    if (!props.addon) return
+    if (!props.addon || versionUnread()) return
 
     // Newer clicks own UI observation. Entered work may still finish after a
     // replacement or disposal; its late response must not publish over them.
@@ -517,14 +527,26 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   }
   // Only with something to choose is Download the trigger of a menu: a
   // trigger acts on pointer down, where a plain button waits for the click.
-  const offersChoice = () => places()?.offers === "choice"
+  const offersChoice = () => !versionUnread() && places()?.offers === "choice"
   /** A click on the plain button. Before the worlds are read nobody knows
    *  whether there is a choice, so the click waits for them. */
   const handlePlainClick = () => {
+    if (versionUnread()) return
     if (!asksWhere() || places()) return handleDownload()
     if (!props.instanceLocked && !loading() && !isInstalled())
       showWhere("waiting")
   }
+  // A waiting click or an open step belongs to the target it was made for.
+  createEffect(
+    on(
+      () => [props.selectedInstanceId, props.selectedServerId, props.addon?.id],
+      () => showWhere("closed"),
+      { defer: true }
+    )
+  )
+  onCleanup(() => {
+    if (where() !== "closed") props.onDropdownOpenChange?.(false)
+  })
   // A click that waited gets its answer once the worlds are read: the step,
   // or with no readable world the install into the instance. An open step
   // only stays while it has something to choose.
@@ -543,7 +565,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
 
   const instanceButton = (onDownload: () => void) => (
     <InstallButton
-      loading={() => loading() || where() === "waiting"}
+      loading={() => loading() || where() === "waiting" || versionUnread()}
       progress={progress}
       isInstalled={isInstalled}
       instanceLocked={() => props.instanceLocked ?? false}
