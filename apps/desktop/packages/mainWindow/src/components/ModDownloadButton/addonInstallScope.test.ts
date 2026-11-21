@@ -53,6 +53,15 @@ describe("single-player datapack completion scope", () => {
       ]
     ])
   })
+  it("says so for a Modrinth data pack too, which is typed as a mod", () => {
+    const keys: string[] = []
+    const spy = ((key: string) => {
+      keys.push(key)
+      return key
+    }) as TypedTFunction
+    addonInstallCompletion(spy, "Terralith", "mod", false, "New World")
+    expect(keys).toEqual(["content:_trn_worlds.added_to_world"])
+  })
   it("keeps names verbatim instead of HTML-escaping them", () => {
     const seen: unknown[] = []
     const spy = ((key: string, options?: unknown) => {

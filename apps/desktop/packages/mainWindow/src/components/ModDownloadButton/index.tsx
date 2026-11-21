@@ -59,8 +59,9 @@ interface ModDownloadButtonProps {
   selectedServerAddons?: ServerAddon[]
   instanceLocked?: boolean
   selectedServerId?: number
-  /** A world of the selected instance (its folder name) that a data pack
-   *  installs into instead of the instance. Ignored for any other addon. */
+  /** A world of the selected instance (its folder name) that a project with
+   *  a data pack build installs into instead of the instance. Ignored for any
+   *  other addon. */
   selectedWorld?: string
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
@@ -116,7 +117,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       ? undefined
       : worldTargetName(
           props.selectedInstanceId,
-          props.addon?.type,
+          props.addon,
           props.selectedWorld
         )
   // Search rows share this query, and the identity it carries lets the core

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest"
 import type { FEWorld, FEWorldDatapack } from "@gd/core_module/bindings"
 import {
+  asksWhichWorld,
+  canBeDatapack,
+  isOnlyDatapack,
   readableWorld,
   withoutWorldParam,
   worldDatapackInstall,
@@ -60,16 +63,61 @@ const addon = (
   id = "P"
 ) => ({ id, platform, type, title: "Pack", slug: "pack" }) as any
 
+// The rows the platforms really return for a data pack search.
+const modrinthHybrid = {
+  type: "mod",
+  loaders: ["datapack", "fabric", "forge", "neoforge", "quilt"]
+}
+const modrinthPack = { type: "mod", loaders: ["datapack"] }
+const curseforgePack = { type: "datapack", loaders: [] }
+const plainMod = { type: "mod", loaders: ["fabric"] }
+
+describe("data pack projects", () => {
+  it("a project can be a data pack by its type or by a datapack loader", () => {
+    expect(canBeDatapack(modrinthHybrid)).toBe(true)
+    expect(canBeDatapack(modrinthPack)).toBe(true)
+    expect(canBeDatapack(curseforgePack)).toBe(true)
+    expect(canBeDatapack(plainMod)).toBe(false)
+    expect(canBeDatapack({ type: "mod" })).toBe(false)
+    expect(canBeDatapack({ type: "resourcePack", loaders: [] })).toBe(false)
+    expect(canBeDatapack(undefined)).toBe(false)
+  })
+  it("a project is only a data pack when nothing else can load it", () => {
+    expect(isOnlyDatapack(modrinthHybrid)).toBe(false)
+    expect(isOnlyDatapack(modrinthPack)).toBe(true)
+    expect(isOnlyDatapack(curseforgePack)).toBe(true)
+    expect(isOnlyDatapack(plainMod)).toBe(false)
+    expect(isOnlyDatapack(undefined)).toBe(false)
+  })
+  it("a world is asked for a pure data pack always, for a hybrid only in a data pack search", () => {
+    for (const searched of ["datapack", "mod", null, undefined]) {
+      expect(asksWhichWorld(modrinthPack, searched)).toBe(true)
+      expect(asksWhichWorld(curseforgePack, searched)).toBe(true)
+      expect(asksWhichWorld(plainMod, searched)).toBe(false)
+    }
+    expect(asksWhichWorld(modrinthHybrid, "datapack")).toBe(true)
+    expect(asksWhichWorld(modrinthHybrid, "mod")).toBe(false)
+    expect(asksWhichWorld(modrinthHybrid, undefined)).toBe(false)
+  })
+})
+
 describe("worldTargetName", () => {
-  it("names the world only beside an instance and only for a data pack", () => {
-    expect(worldTargetName(3, "datapack", "My World")).toBe("My World")
-    expect(worldTargetName(undefined, "datapack", "My World")).toBeUndefined()
-    expect(worldTargetName(NaN, "datapack", "My World")).toBeUndefined()
-    expect(worldTargetName(3, "mod", "My World")).toBeUndefined()
-    expect(worldTargetName(3, "resourcePack", "My World")).toBeUndefined()
-    expect(worldTargetName(3, "world", "My World")).toBeUndefined()
-    expect(worldTargetName(3, "datapack", undefined)).toBeUndefined()
-    expect(worldTargetName(3, "datapack", "")).toBeUndefined()
+  it("names the world only beside an instance and only for a project that can be a data pack", () => {
+    expect(worldTargetName(3, curseforgePack, "My World")).toBe("My World")
+    expect(worldTargetName(3, modrinthHybrid, "My World")).toBe("My World")
+    expect(worldTargetName(3, modrinthPack, "My World")).toBe("My World")
+    expect(
+      worldTargetName(undefined, curseforgePack, "My World")
+    ).toBeUndefined()
+    expect(worldTargetName(NaN, modrinthHybrid, "My World")).toBeUndefined()
+    expect(worldTargetName(3, plainMod, "My World")).toBeUndefined()
+    expect(
+      worldTargetName(3, { type: "resourcePack" }, "My World")
+    ).toBeUndefined()
+    expect(worldTargetName(3, { type: "world" }, "My World")).toBeUndefined()
+    expect(worldTargetName(3, undefined, "My World")).toBeUndefined()
+    expect(worldTargetName(3, curseforgePack, undefined)).toBeUndefined()
+    expect(worldTargetName(3, modrinthHybrid, "")).toBeUndefined()
   })
 })
 
@@ -140,6 +188,16 @@ describe("installed in a world", () => {
     expect(
       isAddonInstalled(addon(), { kind: "world", datapacks: [] }, "V1")
     ).toBe(false)
+  })
+  it("finds and replaces the world's copy of a Modrinth data pack typed as a mod", () => {
+    const hybrid = { ...addon("mod"), loaders: modrinthHybrid.loaders }
+    const target = { kind: "world" as const, datapacks: packs }
+    expect(findInstalledAddon(hybrid, target)?.id).toBe("copy")
+    expect(isAddonInstalled(hybrid, target, "V2")).toBe(false)
+    expect(
+      worldDatapackInstall(hybrid, "V2", 3, readableWorld(world("A", packs))!)
+        .replaces
+    ).toBe("copy")
   })
   it("never matches another platform or another addon type", () => {
     const target = { kind: "world" as const, datapacks: packs }

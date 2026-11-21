@@ -152,6 +152,57 @@ it("a world install's completion says the pack was added to that world", async (
     expect.anything()
   )
 })
+it("a Modrinth data pack typed as a mod installs into the world and its completion names the world", async () => {
+  c.query.mockImplementation(async ([key]: any) =>
+    key === "instance.getWorlds" ? [world] : running
+  )
+  c.mutate.mockResolvedValue(63)
+  const client = mount(() => (
+    <ModDownloadButton
+      addon={
+        {
+          ...pack,
+          type: "mod",
+          loaders: ["datapack", "fabric", "forge", "neoforge", "quilt"]
+        } as any
+      }
+      selectedInstanceId={7}
+      selectedInstanceMods={[]}
+      selectedWorld="My World"
+    />
+  ))
+  await tick()
+  expect(c.staged).toBe(false)
+  await c.download()
+  await tick()
+  expect(c.mutate.mock.calls.map(([key]) => key)).toEqual([
+    "instance.installWorldDatapack"
+  ])
+  client.setQueryData(["vtask.getTaskOutcome", 63], { type: "Succeeded" })
+  await tick()
+  expect(c.success).toHaveBeenCalledWith(
+    "content:_trn_worlds.added_to_world:Pack@My World",
+    { duration: 2000 }
+  )
+})
+it("a Modrinth data pack typed as a mod going into the instance is not told to be added to a world", async () => {
+  c.query.mockImplementation(async () => running)
+  mount(() => (
+    <ModDownloadButton
+      addon={
+        {
+          ...pack,
+          type: "mod",
+          loaders: ["datapack", "fabric", "forge", "neoforge", "quilt"]
+        } as any
+      }
+      selectedInstanceId={7}
+      selectedInstanceMods={[]}
+    />
+  ))
+  await tick()
+  expect(c.staged).toBe(false)
+})
 it("a world picked in the instance dropdown installs there and its completion names it", async () => {
   c.query.mockImplementation(async ([key]: any) =>
     key === "vtask.getTaskOutcome" ? { type: "Succeeded" } : undefined

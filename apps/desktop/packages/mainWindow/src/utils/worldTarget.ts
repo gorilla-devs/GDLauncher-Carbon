@@ -9,14 +9,49 @@ import { findInstalledAddon } from "./installedAddon"
 /** A world the core could read, so a data pack can be installed into it. */
 export type ReadableWorld = FEWorld & { identity: string }
 
+/** What tells a data pack project apart: CurseForge types it "datapack",
+ *  Modrinth types it "mod" and lists "datapack" among its loaders. */
+type ProjectKind =
+  | { type?: string | null; loaders?: readonly string[] | null }
+  | null
+  | undefined
+
+export function canBeDatapack(project: ProjectKind): boolean {
+  return (
+    project?.type === "datapack" || !!project?.loaders?.includes("datapack")
+  )
+}
+
+/** False for a project that also ships as a mod, like Terralith. */
+export function isOnlyDatapack(project: ProjectKind): boolean {
+  return (
+    project?.type === "datapack" ||
+    (project?.loaders?.length === 1 && project.loaders[0] === "datapack")
+  )
+}
+
+/** Whether an install with no target chosen asks which world it goes to. A
+ *  project that also ships as a mod asks only while data packs are what is
+ *  searched (`searchedType`), so a mod search installs its mod in one click. */
+export function asksWhichWorld(
+  project: ProjectKind,
+  searchedType: string | null | undefined
+): boolean {
+  return (
+    isOnlyDatapack(project) ||
+    (searchedType === "datapack" && canBeDatapack(project))
+  )
+}
+
 /** The world an install goes to. The `world` search param counts only beside
- *  an instance and only for a data pack, so it never reaches another install. */
+ *  an instance and only for a project that can be a data pack, so it never
+ *  reaches another install. */
 export function worldTargetName(
   instanceId: number | null | undefined,
-  addonType: string | null | undefined,
+  project: ProjectKind,
   world: string | null | undefined
 ): string | undefined {
-  return instanceId && addonType === "datapack" && world ? world : undefined
+  return instanceId && canBeDatapack(project) && world ? world : undefined
 }
 
 export function readableWorld(

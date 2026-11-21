@@ -43,6 +43,7 @@ vi.mock("@gd/ui", () => {
 })
 vi.mock("@/components/VirtuaWrapper", () => ({ VList: () => null }))
 import { InstanceDropdown } from "./InstanceDropdown"
+import { SearchInputContext } from "@/components/SearchInputContext"
 
 const instance = {
   id: 4,
@@ -73,7 +74,8 @@ const flush = async () => {
     await new Promise((r) => setTimeout(r, 0))
   }
 }
-function mount(type: string) {
+/** `searched` is the addon type the search the row sits in is showing. */
+function mount(type: string, loaders?: string[], searched?: string) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   })
@@ -82,22 +84,27 @@ function mount(type: string) {
   const [query, setQuery] = createSignal("")
   const root = document.createElement("div")
   document.body.append(root)
+  const search = searched
+    ? ({ searchQuery: () => ({ projectType: searched }) } as any)
+    : undefined
   dispose = render(
     () => (
       <QueryClientProvider client={client}>
-        <InstanceDropdown
-          addon={{ id: "P", platform: "modrinth", type } as any}
-          filteredInstances={() => [instance]}
-          shouldVirtualize={() => false}
-          searchQuery={query}
-          setSearchQuery={setQuery}
-          hoveredInstanceId={() => null}
-          setHoveredInstanceId={() => {}}
-          instanceLoadingStates={() => new Map()}
-          clearInstanceLoadingState={() => {}}
-          handleInstanceSelection={selectInstance}
-          handleWorldSelection={selectWorld}
-        />
+        <SearchInputContext.Provider value={search}>
+          <InstanceDropdown
+            addon={{ id: "P", platform: "modrinth", type, loaders } as any}
+            filteredInstances={() => [instance]}
+            shouldVirtualize={() => false}
+            searchQuery={query}
+            setSearchQuery={setQuery}
+            hoveredInstanceId={() => null}
+            setHoveredInstanceId={() => {}}
+            instanceLoadingStates={() => new Map()}
+            clearInstanceLoadingState={() => {}}
+            handleInstanceSelection={selectInstance}
+            handleWorldSelection={selectWorld}
+          />
+        </SearchInputContext.Provider>
       </QueryClientProvider>
     ),
     root
@@ -206,3 +213,55 @@ it.each(["mod", "resourcePack", "shader", "world"])(
     ).toBe(false)
   }
 )
+// Modrinth types a data pack "mod" and lists "datapack" among its loaders.
+const hybridLoaders = ["datapack", "fabric", "forge", "neoforge", "quilt"]
+const serveWorld = () =>
+  c.query.mockImplementation(async ([key]: any) =>
+    key === "instance.getWorlds" ? [world("My World")] : []
+  )
+const worldsRead = () =>
+  c.query.mock.calls.some(([key]) => key[0] === "instance.getWorlds")
+it("a Modrinth data pack that also ships as a mod asks where while data packs are searched", async () => {
+  serveWorld()
+  const d = mount("mod", hybridLoaders, "datapack")
+  await flush()
+  d.click("Addon test")
+  await flush()
+  expect(d.selectInstance).not.toHaveBeenCalled()
+  expect(d.items()).toEqual(["My World", "content:_trn_worlds.instance_copy"])
+  d.click("My World")
+  expect(d.selectWorld).toHaveBeenCalledWith(4, world("My World"))
+})
+it.each(["mod", undefined])(
+  "a Modrinth data pack that also ships as a mod installs its mod in one click when %s is searched",
+  async (searched) => {
+    serveWorld()
+    const d = mount("mod", hybridLoaders, searched)
+    await flush()
+    d.click("Addon test")
+    expect(d.selectInstance).toHaveBeenCalledWith(4)
+    await flush()
+    expect(worldsRead()).toBe(false)
+  }
+)
+it.each(["datapack", "mod", undefined])(
+  "a Modrinth project that is only a data pack asks where when %s is searched",
+  async (searched) => {
+    serveWorld()
+    const d = mount("mod", ["datapack"], searched)
+    await flush()
+    d.click("Addon test")
+    await flush()
+    expect(d.selectInstance).not.toHaveBeenCalled()
+    expect(d.items()).toEqual(["My World", "content:_trn_worlds.instance_copy"])
+  }
+)
+it("a plain mod never asks where, even while data packs are searched", async () => {
+  serveWorld()
+  const d = mount("mod", ["fabric"], "datapack")
+  await flush()
+  d.click("Addon test")
+  expect(d.selectInstance).toHaveBeenCalledWith(4)
+  await flush()
+  expect(worldsRead()).toBe(false)
+})

@@ -331,3 +331,87 @@ it("W02#5 a modpack opened with a server or instance selected lists every pack v
   })
   expect(f.context.targetReady).toBe(true)
 })
+
+// Modrinth types a data pack "mod" and lists "datapack" among its loaders,
+// here beside the loaders of its mod jar.
+const hybridLoaders = ["datapack", "fabric", "forge", "neoforge", "quilt"]
+
+it("a world of a Fabric instance lists the datapack builds of a Modrinth data pack that also ships as a mod", async () => {
+  backend({ loader: "fabric", gameVersion: "1.20.1" }, [datapackVersion])
+  const f = mount(
+    { instanceId: "3", world: "New World" },
+    { addonType: "mod", loaders: hybridLoaders, gameVersions: ["1.20.1"] }
+  )
+  await settle()
+  expect(versionCalls()).toEqual([
+    { project_id: "project", game_versions: ["1.20.1"], loaders: ["datapack"] }
+  ])
+  expect(f.context.target).toMatchObject({
+    kind: "instance",
+    id: 3,
+    name: "Instance 3",
+    world: "New World"
+  })
+})
+
+it("without a world the same project lists the builds for the instance's own loader", async () => {
+  backend({ loader: "fabric", gameVersion: "1.20.1" })
+  const f = mount(
+    { instanceId: "3" },
+    { addonType: "mod", loaders: hybridLoaders, gameVersions: ["1.20.1"] }
+  )
+  await settle()
+  expect(versionCalls()).toEqual([
+    { project_id: "project", game_versions: ["1.20.1"], loaders: ["fabric"] }
+  ])
+  expect(f.context.target.world).toBeUndefined()
+})
+
+it("a plain mod ignores a world in its link", async () => {
+  backend({ loader: "fabric", gameVersion: "1.20.1" })
+  const f = mount(
+    { instanceId: "3", world: "New World" },
+    { addonType: "mod", loaders: ["fabric"], gameVersions: ["1.20.1"] }
+  )
+  await settle()
+  expect(versionCalls()).toEqual([
+    { project_id: "project", game_versions: ["1.20.1"], loaders: ["fabric"] }
+  ])
+  expect(f.context.target.world).toBeUndefined()
+})
+
+it("a CurseForge data pack opened for a world keeps its game-version-only filter", async () => {
+  backend({ loader: "fabric", gameVersion: "1.20.1" })
+  const f = mount(
+    { instanceId: "3", world: "New World" },
+    { addonType: "datapack", loaders: [], platform: "curseforge" }
+  )
+  await settle()
+  expect(
+    calls("modplatforms.curseforge.getModFiles").map((input) => input.query)
+  ).toEqual([
+    { index: 0, pageSize: 20, gameVersion: "1.20.1", modLoaderType: undefined }
+  ])
+  expect(f.context.target.world).toBe("New World")
+})
+
+it("a project loading after the instance resolved re-scopes a world's list to the datapack builds", async () => {
+  backend({ loader: "fabric", gameVersion: "1.20.1" }, [datapackVersion])
+  const f = mount({ instanceId: "3", world: "New World" })
+  await settle()
+  f.setType("mod")
+  f.setLoaders(hybridLoaders)
+  f.setGameVersions(["1.20.1"])
+  await settle()
+  expect(versionCalls().at(-1)).toEqual({
+    project_id: "project",
+    game_versions: ["1.20.1"],
+    loaders: ["datapack"]
+  })
+  expect(f.context.targetReady).toBe(true)
+  expect(f.context.target.world).toBe("New World")
+  expect(
+    calls("instance.getInstanceDetails"),
+    "the instance is not looked up again"
+  ).toHaveLength(1)
+})

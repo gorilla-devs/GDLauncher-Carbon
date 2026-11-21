@@ -175,7 +175,11 @@ const ExploreVersionsNavbar = (props: Props) => {
               }}
             />
             <div class="flex flex-col justify-between">
-              <div>{infiniteQuery.target.name}</div>
+              <div>
+                {[infiniteQuery.target.world, infiniteQuery.target.name]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </div>
               <div class="text-lightSlate-700 flex gap-2">
                 <Checkbox
                   checked={infiniteQuery.overrideEnabled}

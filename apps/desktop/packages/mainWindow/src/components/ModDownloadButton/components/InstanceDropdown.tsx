@@ -26,7 +26,8 @@ import { rspc } from "@/utils/rspcClient"
 import { isModInstalledInInstance } from "../utils/instanceHelpers"
 import { findInstalledAddon } from "@/utils/installedAddon"
 import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
-import type { ReadableWorld } from "@/utils/worldTarget"
+import { asksWhichWorld, ReadableWorld } from "@/utils/worldTarget"
+import useSearchContext from "@/components/SearchInputContext"
 import type { FEWorld } from "@gd/core_module/bindings"
 
 // The core invalidates a world list when the packs in its worlds change, but
@@ -77,8 +78,10 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
   const [isDropdownOpen, setIsDropdownOpen] = createSignal(false)
   // A data pack's picked instance: the menu then asks where in it.
   const [pickedInstance, setPickedInstance] = createSignal<DropdownInstance>()
+  const searchContext = useSearchContext()
   const asksForWorld = () =>
-    props.addon?.type === "datapack" && !!props.handleWorldSelection
+    !!props.handleWorldSelection &&
+    asksWhichWorld(props.addon, searchContext?.searchQuery().projectType)
 
   const handleOpenChange = (isOpen: boolean) => {
     setIsDropdownOpen(isOpen)

@@ -100,7 +100,7 @@ const Versions = () => {
   }))
 
   const world = () =>
-    worldTargetName(instanceId(), mod?.data?.type, searchParams.world)
+    worldTargetName(instanceId(), mod?.data, searchParams.world)
   const worlds = rspc.createQuery(() => ({
     queryKey: ["instance.getWorlds", instanceId() ?? 0],
     enabled: world() !== undefined

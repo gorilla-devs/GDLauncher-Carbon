@@ -20,6 +20,7 @@ import useSearchContext from "../SearchInputContext"
 import { VirtualizerHandle } from "virtua/lib/solid"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { TranslatedError } from "@/utils/translatedError"
+import { worldTargetName } from "@/utils/worldTarget"
 import {
   AddonSupport,
   ScopeMode,
@@ -37,6 +38,8 @@ interface VersionTarget {
   id?: number
   name?: string
   iconRevision?: string | number | null
+  /** The instance's world the addon installs into, for a data pack. */
+  world?: string
 }
 
 export interface VersionRowType {
@@ -113,6 +116,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   const [searchParams, _setSearchParams] = useSearchParams<{
     instanceId: string
     serverId: string
+    world: string
   }>()
   const searchContext = useSearchContext()
   const [ref, setRef] = createSignal<VirtualizerHandle | null>(null)
@@ -185,6 +189,14 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       ])
     }
   })
+  // Known once the project is: only it says whether it has data pack builds.
+  const world = createMemo(() =>
+    worldTargetName(
+      selection().instanceId,
+      { type: props.addonType, loaders: props.supportedModloaders },
+      searchParams.world
+    )
+  )
   const targetReady = () =>
     active &&
     settledGeneration() !== 0 &&
@@ -383,7 +395,13 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
           identity !== selection().identity
         )
           return
-        const next = targetDefaults(target.kind, mode, facts, support())
+        const next = targetDefaults(
+          target.kind,
+          mode,
+          facts,
+          support(),
+          world() !== undefined
+        )
         const resolvedDefaults = defaults()
         const changed =
           defaultsResetPending ||
@@ -472,13 +490,14 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
   })
 
   // The addon's declared loaders and game versions arrive with its project,
-  // usually after the target resolved. Settle the defaults they change for
-  // the same target without resolving it again: an unchanged scope keeps
-  // its list and its single request.
+  // usually after the target resolved, and with them whether a world in the
+  // link is its target. Settle the defaults they change for the same target
+  // without resolving it again: an unchanged scope keeps its list and its
+  // single request.
   createEffect(
     on(
-      support,
-      (current) => {
+      [support, world],
+      ([current, intoWorld]) => {
         const last = settled
         if (
           !last ||
@@ -487,7 +506,13 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
           last.identity !== selection().identity
         )
           return
-        const next = targetDefaults(last.kind, last.mode, last.facts, current)
+        const next = targetDefaults(
+          last.kind,
+          last.mode,
+          last.facts,
+          current,
+          intoWorld !== undefined
+        )
         const previous = defaults()
         if (previous && sameScope(previous, next)) return
         // Changed defaults replace the filters, as a new resolution does.
@@ -528,7 +553,8 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
       )
     },
     get target() {
-      return targetReady() ? targetDetails()! : selection().target
+      const target = targetReady() ? targetDetails()! : selection().target
+      return world() === undefined ? target : { ...target, world: world() }
     },
     get targetReady() {
       return targetReady()

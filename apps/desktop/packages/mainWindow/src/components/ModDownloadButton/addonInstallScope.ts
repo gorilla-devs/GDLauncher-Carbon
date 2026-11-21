@@ -9,7 +9,8 @@ const titleOptions = (title: string) => ({
 
 /** Completion text for the selected installation destination. A single-player
  *  datapack lands in the instance, so its toast says where to add it next,
- *  unless it was installed straight into `world`. */
+ *  unless it was installed straight into `world`: only a data pack is, and
+ *  Modrinth types those "mod". */
 export function addonInstallCompletion(
   t: TypedTFunction,
   title: string,
@@ -18,7 +19,7 @@ export function addonInstallCompletion(
   world?: string
 ): string {
   const options = titleOptions(title)
-  if (!server && type === "datapack" && world)
+  if (!server && world)
     return t("content:_trn_worlds.added_to_world", {
       name: title,
       world,

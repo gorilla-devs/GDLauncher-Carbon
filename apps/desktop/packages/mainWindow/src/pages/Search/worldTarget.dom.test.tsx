@@ -206,15 +206,27 @@ function mount(component: () => any) {
   dispose = render(component, root)
   return root
 }
+// What the platforms really return: Modrinth types a data pack "mod" and
+// lists "datapack" among its loaders, here beside the loaders of its mod jar.
+const hybrid = {
+  type: "mod",
+  loaders: ["datapack", "fabric", "forge", "neoforge", "quilt"]
+}
+const plainMod = { type: "mod", loaders: ["fabric"] }
 function search(
   view: string,
   requested: (string | undefined)[],
-  target: string | null = "My World"
+  target: string | null = "My World",
+  shape: object = {}
 ) {
   const worldName = target ?? undefined
   control.params = { type: "datapack" }
   control.context = {
-    allRows: () => requested.map((v) => ({ type: "value", value: result(v) })),
+    allRows: () =>
+      requested.map((v) => ({
+        type: "value",
+        value: { ...result(v), ...shape }
+      })),
     selectedInstanceId: () => 1,
     selectedInstanceMods: { data: control.mods },
     selectedServerId: () => undefined,
@@ -433,6 +445,115 @@ it("the addon page header installs into the world named in the link", async () =
   )!
   expect(header.getAttribute("data-variant")).toBe("primary")
   header.click()
+  await flush()
+  expect(control.mutations.map((m) => [m.key, m.input.world])).toEqual([
+    ["instance.installWorldDatapack", "My World"]
+  ])
+})
+it.each(["list", "grid"])(
+  "%s Download on a Modrinth data pack that also ships as a mod installs into the world, never into the instance",
+  async (view) => {
+    control.worlds = [world("My World")]
+    const root = search(view, [undefined], "My World", hybrid)
+    installButtons(root)[0].click()
+    await flush()
+    expect(control.mutations).toEqual([
+      {
+        key: "instance.installWorldDatapack",
+        input: {
+          instance_id: 1,
+          world: "My World",
+          identity: "id-My World",
+          source: { Modrinth: { project_id: "P", version_id: null } },
+          replaces: null
+        }
+      }
+    ])
+  }
+)
+it.each(["list", "grid"])(
+  "%s shows a Modrinth data pack typed as a mod as installed from the world's packs",
+  (view) => {
+    control.worlds = [world("My World", [worldPack()])]
+    const root = search(view, [undefined], "My World", hybrid)
+    expect(installButtons(root)).toHaveLength(0)
+    expect(root.textContent).toContain("status_installed")
+  }
+)
+it.each(["list", "grid"])(
+  "%s opens a Modrinth data pack typed as a mod with the world in the addon page link",
+  (view) => {
+    control.worlds = [world("My World")]
+    const root = search(view, [undefined], "My World", hybrid)
+    root
+      .querySelector<HTMLElement>('[data-testid="search-result-row"]')!
+      .click()
+    expect(control.navigate).toHaveBeenCalledWith(
+      "/addon/P/modrinth?instanceId=1&world=My%20World"
+    )
+  }
+)
+it("a plain mod beside a world installs into the instance and opens without the world", async () => {
+  control.worlds = [world("My World")]
+  const root = search("list", [undefined], "My World", plainMod)
+  installButtons(root)[0].click()
+  await flush()
+  expect(control.mutations.map((m) => m.key)).toEqual([
+    "instance.installLatestMod"
+  ])
+  root.querySelector<HTMLElement>('[data-testid="search-result-row"]')!.click()
+  expect(control.navigate).toHaveBeenCalledWith(
+    "/addon/P/modrinth?instanceId=1"
+  )
+})
+it("the versions page installs the chosen build of a Modrinth data pack typed as a mod into the world, replacing its copy", async () => {
+  control.worlds = [world("My World", [worldPack("V1")])]
+  const root = mount(() => (
+    <RowContainer
+      project={{ ...result(), ...hybrid } as any}
+      modVersion={
+        {
+          fileId: "V3",
+          name: "V3",
+          gameVersions: [],
+          datePublished: "fixture",
+          downloads: 1,
+          releaseType: "release"
+        } as any
+      }
+      instanceId={1}
+      instanceMods={[]}
+      world="My World"
+      type="mod"
+      installedFile={undefined}
+      loading={false}
+      disabled={false}
+    />
+  ))
+  root.querySelector<HTMLButtonElement>("button")!.click()
+  await flush()
+  expect(control.mutations).toEqual([
+    {
+      key: "instance.installWorldDatapack",
+      input: {
+        instance_id: 1,
+        world: "My World",
+        identity: "id-My World",
+        source: { Modrinth: { project_id: "P", version_id: "V3" } },
+        replaces: "world-copy"
+      }
+    }
+  ])
+})
+it("the addon page header installs a Modrinth data pack typed as a mod into the world named in the link", async () => {
+  control.params = { id: "P", platform: "modrinth" }
+  control.searchParams = { instanceId: "1", world: "My World" }
+  control.project = { ...result(), ...hybrid }
+  control.worlds = [world("My World")]
+  const root = mount(() => <AddonPage />)
+  root
+    .querySelector<HTMLButtonElement>('[data-testid="addon-install-button"]')!
+    .click()
   await flush()
   expect(control.mutations.map((m) => [m.key, m.input.world])).toEqual([
     ["instance.installWorldDatapack", "My World"]

@@ -14,6 +14,7 @@ import SharePreviewContent from "@/components/SharePreviewContent"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { isAddonInstalled } from "@/utils/installedAddon"
+import { canBeDatapack } from "@/utils/worldTarget"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import {
   effectiveFileId,
@@ -36,7 +37,7 @@ export function List() {
   const isServer = () => !isNaN(serverId()) && serverId() > 0
   // Data pack rows of a world search are judged against that world's packs.
   const worldName = (row: LinkedSearchResult) =>
-    row.type === "datapack" ? searchContext?.selectedWorld?.name : undefined
+    canBeDatapack(row) ? searchContext?.selectedWorld?.name : undefined
   const globalStore = useGlobalStore()
   // A link row whose linked file does not fit the instance or server installs
   // that target's own version, so any installed copy counts as installed. On

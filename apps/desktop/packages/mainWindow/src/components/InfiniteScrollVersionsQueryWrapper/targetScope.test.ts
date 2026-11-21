@@ -186,6 +186,39 @@ describe("targetDefaults", () => {
     ).toEqual(scope(undefined, "1.20.1"))
   })
 
+  it("lists only the datapack builds for a world when the project tags them, whatever the instance runs", () => {
+    const fabric = { loader: "fabric", gameVersion: "1.20.1" }
+    const hybrid = {
+      loaders: ["datapack", "fabric", "forge", "neoforge", "quilt"],
+      gameVersions: ["1.20.1"]
+    }
+    expect(targetDefaults("instance", "loader", fabric, hybrid, true)).toEqual(
+      scope("datapack", "1.20.1")
+    )
+    expect(
+      targetDefaults(
+        "instance",
+        "loader",
+        { gameVersion: "1.20.1" },
+        hybrid,
+        true
+      )
+    ).toEqual(scope("datapack", "1.20.1"))
+    // Without a world the instance's own loader, as before.
+    expect(targetDefaults("instance", "loader", fabric, hybrid)).toEqual(
+      scope("fabric", "1.20.1")
+    )
+    // CurseForge data packs carry no loader tags: the game version only.
+    expect(
+      targetDefaults(
+        "instance",
+        "gameOnly",
+        fabric,
+        { gameVersions: ["1.20.1"] },
+        true
+      )
+    ).toEqual(scope(undefined, "1.20.1"))
+  })
   it("filters nothing for values the target does not know", () => {
     // A modpack instance whose first install did not finish has no version.
     expect(

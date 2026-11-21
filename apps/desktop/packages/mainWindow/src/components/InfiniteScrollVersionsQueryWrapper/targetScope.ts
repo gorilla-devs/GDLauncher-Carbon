@@ -96,6 +96,10 @@ export const sameAddonSupport = (a: AddonSupport, b: AddonSupport) =>
  *   none of the server's loaders is listed by its datapack versions, which
  *   any server runs.
  *
+ * - `intoWorld`, a world of the instance as the target, takes data packs
+ *   only: where the addon tags its datapack versions (Modrinth), the list is
+ *   kept to those whatever loader the instance runs.
+ *
  * A target value that is not known filters nothing, so an instance whose
  * game version is not known yet lists every game version instead of failing.
  */
@@ -103,7 +107,8 @@ export function targetDefaults(
   kind: "none" | "instance" | "server",
   mode: ScopeMode,
   facts: TargetFacts,
-  support: AddonSupport
+  support: AddonSupport,
+  intoWorld = false
 ): TargetScope {
   if (kind === "none" || mode === "none") {
     return { modLoaderType: undefined, gameVersion: undefined }
@@ -113,8 +118,10 @@ export function targetDefaults(
 
   let modLoaderType: string | undefined
   const loader = mode === "loader" ? facts.loader || undefined : undefined
-  if (loader) {
-    const declared = known(support.loaders)?.map((value) => value.toLowerCase())
+  const declared = known(support.loaders)?.map((value) => value.toLowerCase())
+  if (intoWorld && declared?.includes("datapack")) {
+    modLoaderType = "datapack"
+  } else if (loader) {
     const runnable = compatibleLoaders(loader, gameVersion)
     const pick = declared
       ? runnable.find((value) => declared.includes(value.toLowerCase()))

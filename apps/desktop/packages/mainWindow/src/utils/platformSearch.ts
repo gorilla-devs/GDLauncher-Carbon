@@ -185,12 +185,14 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     return isNaN(id) ? undefined : id
   }
 
-  // A world belongs to its instance: any change of target drops it.
+  // A world belongs to its instance: a change of target drops it. The addon
+  // page sets the target of its own link again on every mount, which is no
+  // change and keeps it.
   const setSelectedInstanceId = (instanceId: number | undefined) => {
     _setSearchParams({
       ...searchParams,
       instanceId: instanceId !== undefined ? String(instanceId) : undefined,
-      world: undefined
+      ...(instanceId === selectedInstanceId() ? {} : { world: undefined })
     })
   }
 
@@ -204,7 +206,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     _setSearchParams({
       ...searchParams,
       serverId: serverId !== undefined ? String(serverId) : undefined,
-      world: undefined
+      ...(serverId === selectedServerId() ? {} : { world: undefined })
     })
   }
 
@@ -300,7 +302,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
       ? undefined
       : worldTargetName(
           selectedInstanceId(),
-          searchQuery().projectType,
+          { type: searchQuery().projectType },
           searchParams.world
         )
 

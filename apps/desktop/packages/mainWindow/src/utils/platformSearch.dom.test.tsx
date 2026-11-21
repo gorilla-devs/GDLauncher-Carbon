@@ -819,6 +819,16 @@ it.each([undefined, 5])(
     expect(f.params.instanceId).toBe(next === undefined ? undefined : "5")
   }
 )
+it("setting the instance and the absent server the link already names keeps the world", async () => {
+  // What the addon page does on every mount with the ids in its link.
+  const f = worldFixture("/search?instanceId=3&world=My%20World")
+  await flush()
+  f.search.setSelectedInstanceId(3)
+  f.search.setSelectedServerId(undefined)
+  await flush()
+  expect(f.params.instanceId).toBe("3")
+  expect(f.params.world).toBe("My World")
+})
 it("choosing a server drops the world", async () => {
   const f = worldFixture("/search?instanceId=3&world=My%20World")
   await flush()

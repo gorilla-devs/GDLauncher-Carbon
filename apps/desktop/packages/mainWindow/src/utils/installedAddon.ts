@@ -6,6 +6,7 @@ import type {
   ServerAddon
 } from "@gd/core_module/bindings"
 import type { LinkedFile } from "./linkedFile"
+import { canBeDatapack } from "./worldTarget"
 
 export interface InstalledArtifact {
   id: string
@@ -57,7 +58,7 @@ export function findInstalledAddon(
   if (target.kind === "instance" || target.kind === "world") {
     const rows: readonly Pick<Mod, "id" | "curseforge" | "modrinth">[] =
       target.kind === "world"
-        ? kind === "datapacks"
+        ? canBeDatapack(addon)
           ? target.datapacks
           : []
         : target.addons.filter((mod) => mod.addon_type === kind)
