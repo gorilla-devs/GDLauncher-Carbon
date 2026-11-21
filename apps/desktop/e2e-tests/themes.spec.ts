@@ -381,6 +381,19 @@ test.describe("Themes", () => {
     "library.tile.caption": ["runtime", "a caption theme"],
     // Only a rail theme renders it (themeLayout.spec checks it).
     "nav.rail": ["runtime", "a rail theme"],
+    // The nav rail's account menu; the top bar opens the strip instead
+    // (themeLayout.spec checks these on the rail).
+    "account-menu.trigger.open": ["runtime", "a rail theme's account menu"],
+    "account-menu.popup": ["runtime", "a rail theme's account menu"],
+    "account-menu.section": ["runtime", "a rail theme's account menu"],
+    "account-menu.section.title": ["runtime", "a rail theme's account menu"],
+    "account-menu.item": ["runtime", "a rail theme's account menu"],
+    "account-menu.item.active": ["runtime", "a rail theme's account menu"],
+    "account-menu.account.attention": [
+      "state",
+      "an expired, refreshing or invalid Minecraft account"
+    ],
+    "account-menu.more": ["state", "more than three other Minecraft accounts"],
     "season-dialog": ["season", "the season dialog"],
     "season-dialog.art": ["season", "the season dialog"],
     "season-dialog.name": ["season", "the season dialog"]
@@ -487,13 +500,14 @@ test.describe("Themes", () => {
       ],
       tileSubmenu: ["context-menu.submenu", "context-menu.item.disabled"],
       accountMenu: [
-        "account-menu.trigger.open",
-        "account-menu.popup",
-        "account-menu.section",
-        "account-menu.section.title",
-        "account-menu.item",
-        "account-menu.item.active",
-        "account-menu.manage"
+        "account-menu.strip",
+        "account-menu.account",
+        "account-menu.account.active",
+        "account-menu.account.name",
+        "account-menu.add",
+        "account-menu.gdl",
+        "account-menu.manage",
+        "account-menu.close"
       ]
     },
     instance: {
@@ -796,11 +810,11 @@ test.describe("Themes", () => {
       await expect(page.locator(byHook("context-menu"))).toHaveCount(0)
 
       await page.locator(byHook("account-menu.trigger")).click()
-      await expect(page.locator(byHook("account-menu.popup"))).toBeVisible()
+      await expect(page.locator(byHook("account-menu.strip"))).toBeVisible()
       await expectHooks(steps.accountMenu)
       await expectDocumented("the account menu")
       await closeMenus()
-      await expect(page.locator(byHook("account-menu.popup"))).toHaveCount(0)
+      await expect(page.locator(byHook("account-menu.strip"))).toHaveCount(0)
     } finally {
       try {
         await restoreGrouping?.()
@@ -1507,42 +1521,196 @@ test.describe("Themes", () => {
     }
   })
 
-  // Opened with the mouse, the account menu leaves no focus ring on Manage
-  // Accounts; opened with the keyboard, focus lands on its first item, with
-  // a visible ring.
-  test("the account menu shows a focus ring only for keyboard focus", async ({
+  // Opened with the mouse, the account strip leaves no focus ring; opened
+  // with the keyboard, focus lands on the active account, with a visible
+  // ring, and the arrow keys move along the strip.
+  test("the account strip shows a focus ring only for keyboard focus", async ({
     authenticatedApp
   }) => {
     const { page } = authenticatedApp
-    const popup = page.locator(byHook("account-menu.popup"))
+    const strip = page.locator(byHook("account-menu.strip"))
     const focused = () =>
       page.evaluate(() => {
         const el = document.activeElement as HTMLElement | null
-        const menu = document.querySelector('[data-gdl~="account-menu.popup"]')
         const s = el ? getComputedStyle(el) : null
         return {
-          inMenu: !!el && !!menu && menu.contains(el) && el !== menu,
-          isMenu: el === menu,
+          inStrip:
+            !!el &&
+            el.tagName === "BUTTON" &&
+            !!el.closest('[data-gdl~="account-menu.strip"]'),
+          active: !!el?.matches('[data-gdl~="account-menu.account.active"]'),
+          button: !!el?.matches('[data-gdl~="account-menu.button"]'),
           outline: s ? `${s.outlineStyle} ${s.outlineWidth}` : ""
         }
       })
     await goToLibrary(page)
     await page.locator(byHook("account-menu.trigger")).click()
-    await expect(popup).toBeVisible()
+    await expect(strip).toBeVisible()
     await page.waitForTimeout(300)
-    const byPointer = await focused()
-    expect(byPointer.inMenu, "no item takes focus on a click").toBe(false)
+    expect((await focused()).inStrip, "no button takes focus on a click").toBe(
+      false
+    )
     await page.keyboard.press("Escape")
-    await expect(popup).toHaveCount(0)
+    await expect(strip).toHaveCount(0)
 
     await page.locator(byHook("account-menu.button")).focus()
     await page.keyboard.press("Enter")
-    await expect(popup).toBeVisible()
-    await expect.poll(async () => (await focused()).inMenu).toBe(true)
+    await expect(strip).toBeVisible()
+    await expect.poll(async () => (await focused()).active).toBe(true)
     expect((await focused()).outline).toBe("solid 2px")
+    await page.keyboard.press("ArrowLeft")
+    const moved = await focused()
+    expect(moved.inStrip && !moved.active, "ArrowLeft moves along").toBe(true)
     await page.keyboard.press("Escape")
-    await expect(popup).toHaveCount(0)
+    await expect(strip).toHaveCount(0)
+    await expect.poll(async () => (await focused()).button).toBe(true)
     await page.evaluate(() => (document.activeElement as HTMLElement)?.blur())
+  })
+
+  // With more accounts than faces (stubbed: the e2e login has one), the
+  // active account stands out, others are faces and "+N", and hovering a
+  // face shows its name without moving anything under the pointer.
+  test("the account strip with several accounts", async ({
+    authenticatedApp
+  }) => {
+    const { page } = authenticatedApp
+    const extra = [
+      { username: "Steve_42", status: "ok" },
+      { username: "Alex", status: "expired" },
+      { username: "Notch", status: "ok" },
+      { username: "Herobrine", status: "ok" }
+    ]
+    const added = extra.map((a, i) => ({
+      ...a,
+      uuid: `e2e-extra-${i}`,
+      lastUsed: new Date().toISOString(),
+      type: { type: "offline" }
+    }))
+    // Playwright can't fulfil the page's requests to the core here (the page
+    // is file://), so the page's own fetch adds the accounts, and only while
+    // the flag is set: the other specs share this app.
+    await page.context().addInitScript((json) => {
+      const original = window.fetch
+      window.fetch = async (input, init) => {
+        const res = await original(input, init)
+        const url =
+          typeof input === "string"
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url
+        if (
+          !url.includes("/rspc/account.getAccounts") ||
+          localStorage.getItem("e2e-extra-accounts") !== "1"
+        )
+          return res
+        const body = await res.clone().json()
+        body.result.data = [...body.result.data, ...JSON.parse(json)]
+        return new Response(JSON.stringify(body), {
+          status: res.status,
+          headers: res.headers
+        })
+      }
+    }, JSON.stringify(added))
+    const setFlag = (on: boolean) =>
+      page.evaluate(
+        (on) =>
+          on
+            ? localStorage.setItem("e2e-extra-accounts", "1")
+            : localStorage.removeItem("e2e-extra-accounts"),
+        on
+      )
+    await setFlag(true)
+    try {
+      await page.reload()
+      await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
+      await goToLibrary(page)
+      await page.locator(byHook("account-menu.trigger")).click()
+      const strip = page.locator(byHook("account-menu.strip"))
+      await expect(strip).toBeVisible()
+      await page.waitForTimeout(300)
+
+      const active = page.locator(byHook("account-menu.account.active"))
+      const look = (prop: "backgroundColor" | "color") =>
+        active.evaluate((el, p) => getComputedStyle(el)[p], prop)
+      expect
+        .soft(await look("backgroundColor"), "the active chip")
+        .not.toBe("rgba(0, 0, 0, 0)")
+      expect.soft(await look("color")).toBe("rgb(255, 255, 255)")
+      const faces = strip.locator(
+        `${byHook("account-menu.account")}:not(${byHook("account-menu.account.active")})`
+      )
+      await expect(faces).toHaveCount(3)
+      await expect(page.locator(byHook("account-menu.more"))).toHaveText("+1")
+      // The bar gives the strip its whole width: its last button is inside it,
+      // and it is inside the window.
+      const stripBox = (await strip.boundingBox())!
+      const closeBox = (await page
+        .locator(byHook("account-menu.close"))
+        .boundingBox())!
+      expect(closeBox.x + closeBox.width).toBeLessThanOrEqual(
+        stripBox.x + stripBox.width
+      )
+      expect(stripBox.x + stripBox.width).toBeLessThanOrEqual(
+        await page.evaluate(() => innerWidth)
+      )
+      await expect(
+        page.locator(byHook("account-menu.account.attention"))
+      ).toHaveCount(1)
+
+      const before = {
+        strip: await strip.boundingBox(),
+        search: await page.locator(byHook("nav.search.box")).boundingBox(),
+        alex: await page.locator('[aria-label="Alex"]').boundingBox()
+      }
+      await page.locator('[aria-label="Alex"]').hover()
+      await expect(
+        page.locator(
+          `[aria-label="Alex"] ${byHook("account-menu.account.name")}`
+        )
+      ).toBeVisible()
+      await page.waitForTimeout(400)
+      const after = {
+        strip: await strip.boundingBox(),
+        search: await page.locator(byHook("nav.search.box")).boundingBox(),
+        alex: await page.locator('[aria-label="Alex"]').boundingBox()
+      }
+      expect.soft(after.strip, "the strip keeps its size").toEqual(before.strip)
+      expect
+        .soft(after.search, "the search box stays put")
+        .toEqual(before.search)
+      expect.soft(after.alex, "the hovered face stays put").toEqual(before.alex)
+      await page.keyboard.press("Escape")
+      await expect(strip).toHaveCount(0)
+    } finally {
+      await setFlag(false)
+      await page.reload()
+      await expect(page.locator(byTestId(TEST_IDS.libraryRoot))).toBeVisible()
+    }
+  })
+
+  // The strip opens inside the top bar: never over the search box, and never
+  // below the bar, where the native ad view would hide it.
+  test("the open account strip stays clear of the search box and the ad", async ({
+    authenticatedApp
+  }) => {
+    const { page } = authenticatedApp
+    await goToLibrary(page)
+    await page.locator(byHook("account-menu.trigger")).click()
+    const strip = page.locator(byHook("account-menu.strip"))
+    await expect(strip).toBeVisible()
+    const box = async (hook: string) => {
+      const b = await page.locator(byHook(hook)).first().boundingBox()
+      if (!b) throw new Error(`no box for ${hook}`)
+      return b
+    }
+    const s = await box("account-menu.strip")
+    const search = await box("nav.search.box")
+    const ad = await box("ad-column-background")
+    expect(s.x).toBeGreaterThanOrEqual(search.x + search.width)
+    expect(s.y + s.height).toBeLessThanOrEqual(ad.y)
+    await page.keyboard.press("Escape")
+    await expect(strip).toHaveCount(0)
   })
 
   // With a background, the frame around the panel is see-through; a
@@ -1603,6 +1771,9 @@ test.describe("Themes", () => {
   const SNOW = `${byHook("content")} canvas[data-gdl-effect="snow"]`
   const LIGHTS = `${byHook("content")} canvas[data-gdl-effect="string-lights"]`
   const BG_IMAGES = "#gdl-background img"
+  // The chimney smoke's box, from Silent Night's theme.css: its distance from
+  // the scene's right and bottom edges, in scene units.
+  const SMOKE_BOX = { fromRight: 1520.2, fromBottom: 197.3 }
 
   const silentNightOn = async (page: Page, runtimePath: string) => {
     setSeasonToday(runtimePath, E2E_IN_SEASON_DAY)
@@ -1644,6 +1815,51 @@ test.describe("Themes", () => {
       )) {
         expect(src).not.toMatch(/^data:/)
       }
+
+      // The smoke moves every frame on the background's ::before, placed by
+      // the scene's cover fit (anchored bottom right), so it stays on the
+      // chimneys at any window size.
+      const smoke = await page.evaluate(() => {
+        const bg = document.querySelector('[data-gdl~="background"]')!
+        const s = getComputedStyle(bg, "::before")
+        return {
+          left: parseFloat(s.left),
+          top: parseFloat(s.top),
+          w: innerWidth,
+          h: innerHeight,
+          animation: s.animationName,
+          image: s.backgroundImage
+        }
+      })
+      const scale = Math.max(smoke.w / 1600, smoke.h / 986)
+      expect(
+        Math.abs(smoke.left - (smoke.w - SMOKE_BOX.fromRight * scale))
+      ).toBeLessThanOrEqual(1)
+      expect(
+        Math.abs(smoke.top - (smoke.h - SMOKE_BOX.fromBottom * scale))
+      ).toBeLessThanOrEqual(1)
+      expect(smoke.animation).toBe("gdl-sn-t")
+      // The puffs themselves: an unparsed value would compute to "none".
+      expect(smoke.image.match(/radial-gradient\(/g)?.length).toBe(21)
+
+      // During a page slide the snow, the lights and the content's
+      // decorations keep their own place above the sliding page.
+      const slideNames = await page.evaluate(() => {
+        document.documentElement.classList.add("gdl-page-slide")
+        const name = (sel: string) => {
+          const el = document.querySelector(sel)
+          return el ? getComputedStyle(el).viewTransitionName : null
+        }
+        const names = {
+          effects: name("[data-gdl-effects]"),
+          decorations: name('[data-gdl-decorations="content"]')
+        }
+        document.documentElement.classList.remove("gdl-page-slide")
+        return names
+      })
+      expect(slideNames.effects).toBe("gdl-effects")
+      if (slideNames.decorations !== null)
+        expect(slideNames.decorations).toBe("gdl-content-decorations")
 
       const logo = `${byHook("nav.logo")} [data-gdl-decoration]`
       await expect.poll(() => backgroundImageOf(page, logo)).toContain("hat")

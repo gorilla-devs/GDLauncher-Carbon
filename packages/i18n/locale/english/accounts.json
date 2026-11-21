@@ -43,6 +43,7 @@
   "_trn_type": "Type",
   "_trn_actions": "Actions",
   "_trn_manage_accounts": "Manage Accounts",
+  "_trn_add_account": "Add account",
   "_trn_change_recovery_email_title": "Change Recovery Email",
   "_trn_change_recovery_email_description": "Enter the new recovery email for your GDLauncher account",
   "_trn_change_display_name_title": "Change Display Name",

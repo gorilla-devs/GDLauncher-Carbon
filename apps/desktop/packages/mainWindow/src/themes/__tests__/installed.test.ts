@@ -1,10 +1,6 @@
 import { describe, it, expect } from "vitest"
 import type { FEInstalledTheme } from "@gd/core_module/bindings"
-import {
-  installedTileModel,
-  localizedText,
-  themeCustomization
-} from "../installed"
+import { installedTileModel, localizedText } from "../installed"
 
 const MAIN = {
   "darkSlate-900": "21 24 30",
@@ -119,44 +115,5 @@ describe("installed theme tiles", () => {
     expect(
       installedTileModel(installed(), "main", "english", MAIN).active
     ).toBe(false)
-  })
-
-  it("Customize follows what the theme has", () => {
-    const sounds = {
-      launch: null,
-      downloadComplete: null,
-      click: null,
-      notification: null,
-      error: null
-    }
-    const none = { effects: false, sounds: false }
-    expect(themeCustomization({ effects: [], sounds })).toEqual(none)
-    expect(
-      themeCustomization({
-        effects: [
-          {
-            type: "snow",
-            density: null,
-            speed: null,
-            minSize: null,
-            maxSize: null,
-            wind: null,
-            color: null,
-            layers: null
-          }
-        ],
-        sounds
-      })
-    ).toEqual({ effects: true, sounds: false })
-    for (const key of Object.keys(sounds)) {
-      expect(
-        themeCustomization({
-          effects: [],
-          sounds: { ...sounds, [key]: "/theme/asset?id=a&path=s.wav" }
-        })
-      ).toEqual({ effects: false, sounds: true })
-    }
-    expect(themeCustomization(null)).toEqual(none)
-    expect(themeCustomization(undefined)).toEqual(none)
   })
 })

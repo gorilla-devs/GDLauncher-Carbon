@@ -1,15 +1,15 @@
 import { extractErrorCode, queryClient, rspc } from "@/utils/rspcClient"
 import { i18n, Trans, useTransContext } from "@gd/i18n"
-import { createMemo, For, Show } from "solid-js"
+import { createMemo, For } from "solid-js"
 import { Button, toast } from "@gd/ui"
 import { getBuiltinTheme } from "@/themes/builtin"
 import { themeRefusalKey } from "@/themes/errors"
-import { installedTileModel, themeCustomization } from "@/themes/installed"
+import { installedTileModel } from "@/themes/installed"
 import { THEME_EXTENSION } from "@/themes/install"
 import { useModal } from "@/managers/ModalsManager"
 import useSettingsGeneralData from "./settings.general.data"
 import LoadingError from "@/components/LoadingError"
-import { getAvailableThemes, parseThemeKey } from "@/utils/theme"
+import { getAvailableThemes } from "@/utils/theme"
 import PageTitle from "./components/PageTitle"
 import Row from "./components/Row"
 import Title from "./components/Title"
@@ -67,30 +67,6 @@ const Appearance = () => {
   }))
   const language = () => i18n.language || "english"
   const mainColors = getBuiltinTheme("main").colors
-
-  // The saved theme, never the hover preview, so Customize doesn't flicker.
-  // A user theme's query is the one initThemes keeps. Reading it from the
-  // cache (no refetch on mount) keeps opening this page from re-applying it;
-  // the core's invalidation still refreshes it.
-  const saved = createMemo(() => parseThemeKey(themeName()))
-  const savedUserId = () => {
-    const parsed = saved()
-    return parsed.kind === "user" ? parsed.id : null
-  }
-  const savedUserTheme = rspc.createQuery(() => ({
-    queryKey: ["themes.getTheme", { id: savedUserId() ?? "" }],
-    enabled: savedUserId() !== null,
-    staleTime: Infinity
-  }))
-  const customization = createMemo(() => {
-    const parsed = saved()
-    if (parsed.kind === "builtin") {
-      return themeCustomization(getBuiltinTheme(parsed.id))
-    }
-    if (parsed.kind === "user") return themeCustomization(savedUserTheme.data)
-    return themeCustomization(null)
-  })
-  const hasCustomization = () => Object.values(customization()).some(Boolean)
 
   return (
     <LoadingError routeData={routeData}>
@@ -170,9 +146,7 @@ const Appearance = () => {
             </For>
           </div>
         </Row>
-        <Show when={hasCustomization()}>
-          <CustomizeTheme customization={customization()} />
-        </Show>
+        <CustomizeTheme />
       </div>
     </LoadingError>
   )

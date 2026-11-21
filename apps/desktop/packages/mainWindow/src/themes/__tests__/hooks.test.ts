@@ -17,6 +17,7 @@ describe("state hooks", () => {
       "nav.search.filters": ["open"],
       "account-menu.trigger": ["open"],
       "account-menu.item": ["active"],
+      "account-menu.account": ["active", "attention"],
       "instance.favorite": ["active"],
       "server.favorite": ["active"],
       "server.status": ["running", "starting", "stopping"],

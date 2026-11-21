@@ -92,7 +92,7 @@ export function EnhancedSearchBar(props: { size?: number }) {
     >
       <div
         data-gdl="nav.search.box"
-        class="bg-darkSlate-700 outline-2 outline outline-offset-2 outline-transparent has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 flex max-w-[600px] items-center gap-2 overflow-hidden rounded-md duration-300"
+        class="bg-darkSlate-700 outline-2 outline outline-offset-2 outline-transparent has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 flex max-w-[min(600px,100%)] items-center gap-2 overflow-hidden rounded-md duration-300"
         style={{
           height: `${props.size ?? 40}px`,
           transition:

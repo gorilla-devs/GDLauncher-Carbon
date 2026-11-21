@@ -12,6 +12,13 @@
   background-color: rgb(var(--darkSlate-800));
 }
 
+/* The account in use, in the account strip: a lighter chip. One hook's weight
+   to beat the reset's `[type="button"]` rule, which clears a button's
+   background utility. */
+[data-gdl~="account-menu.account.active"] {
+  background-color: rgb(var(--darkSlate-600));
+}
+
 /* Caption tiles: the name and details sit on the panel, not on the picture. */
 :where(html[data-gdl-tiles="caption"]) [data-gdl~="library.tile.name"] {
   color: rgb(var(--lightSlate-50));
@@ -57,13 +64,14 @@
 }
 
 /* A library group clips what spills out of it, so it can fold shut. While it
-   is open it lets things spill as far as `--gdl-group-bleed` (0 by default):
-   shadows, hover lifts and stickers, and always 4 px, so the focus outlines
-   of tiles at its edge show. `overflow: clip` isn't a scroll container, so
-   the folding row needs `min-height: 0` to close. */
+   is open it lets things spill as far as `--gdl-group-bleed`: shadows, hover
+   lifts and stickers. The default, 4 px, is room for the focus outlines of
+   tiles at its edge. A plain var(): Chromium computes a max() here as 0.
+   `overflow: clip` isn't a scroll container, so the folding row needs
+   `min-height: 0` to close. */
 :where([data-gdl~="library.group"] > div) > [data-gdl~="collapsable.body"] {
   overflow: clip;
-  overflow-clip-margin: max(4px, var(--gdl-group-bleed, 0px));
+  overflow-clip-margin: var(--gdl-group-bleed, 4px);
   min-height: 0;
 }
 :where([data-gdl~="library.group"]:not([data-gdl~="collapsable.open"]) > div)
@@ -122,11 +130,12 @@
   );
 }
 
-/* Keyboard focus on the account button and in its menu: a ring in the accent
-   colour instead of the browser's own. No weight, so a theme's
-   `[data-gdl~="account-menu.button"]:focus-visible` rule wins. */
+/* Keyboard focus on the account button, in its strip and in the rail's menu:
+   a ring in the accent colour instead of the browser's own. No weight, so a
+   theme's `[data-gdl~="account-menu.button"]:focus-visible` rule wins. */
 :where(
   [data-gdl~="account-menu.button"]:focus-visible,
+  [data-gdl~="account-menu.strip"] :focus-visible,
   [data-gdl~="account-menu.popup"] :focus-visible
 ) {
   outline: 2px solid rgb(var(--primary-500));

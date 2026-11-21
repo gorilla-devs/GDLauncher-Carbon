@@ -43,6 +43,7 @@
   "_trn_type": "タイプ",
   "_trn_actions": "アクション",
   "_trn_manage_accounts": "アカウント管理",
+  "_trn_add_account": "アカウントを追加",
   "_trn_change_recovery_email_title": "復旧用メールアドレスを変更",
   "_trn_change_recovery_email_description": "新しい復旧用メールアドレスを入力してください",
   "_trn_change_display_name_title": "表示名を変更",

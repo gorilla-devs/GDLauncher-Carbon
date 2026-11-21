@@ -1,9 +1,5 @@
-import type {
-  FEInstalledTheme,
-  FEResolvedTheme
-} from "@gd/core_module/bindings"
+import type { FEInstalledTheme } from "@gd/core_module/bindings"
 import { themeErrorKey, type ThemeErrorKey } from "./errors"
-import { hasSounds } from "./sounds"
 
 /** What one installed theme's tile on the Appearance page shows. */
 export interface InstalledTileModel {
@@ -60,15 +56,5 @@ export function installedTileModel(
     warning: broken
       ? { reason: themeErrorKey(t.errorCode), detail: t.error }
       : null
-  }
-}
-
-/** The theme's own choices the Customize disclosure offers. */
-export function themeCustomization(
-  theme: Pick<FEResolvedTheme, "effects" | "sounds"> | null | undefined
-): { effects: boolean; sounds: boolean } {
-  return {
-    effects: (theme?.effects.length ?? 0) > 0,
-    sounds: hasSounds(theme?.sounds)
   }
 }

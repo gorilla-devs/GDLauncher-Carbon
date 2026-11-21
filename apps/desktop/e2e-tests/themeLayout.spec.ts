@@ -946,6 +946,16 @@ test.describe("Theme layouts, particles, sounds and anchors", () => {
           .click()
         const menu = page.locator(`${byHook("dropdown")}[data-expanded]`)
         await expect(menu).toBeVisible()
+        // The rail keeps the menu with cards; its hooks are checked here.
+        for (const hook of [
+          "account-menu.trigger.open",
+          "account-menu.popup",
+          "account-menu.section",
+          "account-menu.section.title",
+          "account-menu.item",
+          "account-menu.item.active"
+        ])
+          await expect(page.locator(byHook(hook)).first()).toBeVisible()
         const menuBox = await menu.boundingBox()
         expect(menuBox).not.toBeNull()
         expect(menuBox!.x + menuBox!.width).toBeLessThanOrEqual(left)
@@ -1341,14 +1351,15 @@ test.describe("Theme layouts, particles, sounds and anchors", () => {
           "no players with sounds off"
         ).toEqual([])
 
-        // The switch is under Customize, and only for a sound theme.
+        // The switch is under Customize, which shows both switches with
+        // every theme, even one without effects like this one.
         const customize = page.locator(byTestId("theme-customize"))
         await customize.getByText("Customize", { exact: true }).click()
         const soundsRow = customize
           .locator(byHook("settings.row"))
           .filter({ hasText: "Play theme sounds" })
         await expect(soundsRow).toBeVisible()
-        await expect(customize.getByText("Theme effects")).toHaveCount(0)
+        await expect(customize.getByText("Theme effects")).toBeVisible()
         await soundsRow.locator("label").click()
         await expect
           .poll(

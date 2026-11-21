@@ -203,6 +203,7 @@ export function EffectsLayer(): JSX.Element {
       <div
         ref={setRoot}
         aria-hidden="true"
+        data-gdl-effects=""
         class="pointer-events-none absolute inset-0 z-[1]"
       >
         <Show when={!!lightsCfg()}>

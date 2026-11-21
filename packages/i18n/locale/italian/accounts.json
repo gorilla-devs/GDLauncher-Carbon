@@ -43,6 +43,7 @@
   "_trn_type": "Tipo",
   "_trn_actions": "Azioni",
   "_trn_manage_accounts": "Gestisci Account",
+  "_trn_add_account": "Aggiungi account",
   "_trn_change_recovery_email_title": "Cambia Email di Recupero",
   "_trn_change_recovery_email_description": "Inserisci la nuova email di recupero per il tuo account GDLauncher",
   "_trn_change_display_name_title": "Cambia Nome Visualizzato",

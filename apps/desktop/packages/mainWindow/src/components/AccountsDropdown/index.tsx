@@ -37,8 +37,6 @@ export interface Props {
   id?: string
   /** The rail's trigger: just the avatar, and the menu opens to the right. */
   compact?: boolean
-  /** A 40 px tall trigger, for the 48 px compact top bar. */
-  dense?: boolean
 }
 
 export const AccountsDropdown = (props: Props) => {
@@ -151,8 +149,7 @@ export const AccountsDropdown = (props: Props) => {
           })}
           class="group relative rounded-lg transition-all duration-100 ease-spring"
           classList={{
-            "p-4": !props.compact && !props.dense,
-            "px-4 py-2": !props.compact && props.dense,
+            "p-4": !props.compact,
             "p-2": props.compact,
             "bg-darkSlate-700": showAccountsDropdown()
           }}

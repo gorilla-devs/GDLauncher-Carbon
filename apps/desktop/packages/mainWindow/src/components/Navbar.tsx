@@ -1,9 +1,9 @@
 import { useLocation } from "@solidjs/router"
-import { Show } from "solid-js"
+import { Show, createSignal } from "solid-js"
 import { wideLogoUrl } from "@/utils/logos"
 import { Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { AccountsDropdown } from "./AccountsDropdown"
+import { AccountStrip } from "./AccountStrip"
 
 import { useGlobalStore } from "./GlobalStoreContext"
 import { EnhancedSearchBar } from "./EnhancedSearchBar"
@@ -22,9 +22,12 @@ const AppNavbar = () => {
 
   const [t] = useTransContext()
 
-  const { isLogin, selectedValue, accounts } = useNavState()
+  const { isLogin, selectedValue } = useNavState()
   const metrics = () =>
     layout().nav === "compact" ? NAV_METRICS.compact : NAV_METRICS.standard
+  // The open account strip takes the place of the update, Settings and News
+  // buttons; the search box narrows if it needs more room.
+  const [stripOpen, setStripOpen] = createSignal(false)
 
   return (
     <Show when={!isLogin() && layout().nav !== "rail"}>
@@ -82,18 +85,19 @@ const AppNavbar = () => {
         </div>
         <div
           data-gdl="nav.search"
-          class="flex w-full items-center justify-center gap-4"
+          class="flex w-full min-w-0 items-center justify-center gap-4"
         >
           <EnhancedSearchBar size={metrics().search} />
         </div>
         <div
           data-gdl="nav.actions"
-          class="text-lightSlate-50 flex h-full list-none items-center gap-6"
+          class="text-lightSlate-50 flex h-full shrink-0 list-none items-center gap-6"
         >
           <Show when={hasPendingUpdate()}>
             <div
               data-gdl="nav.update"
               class="animate-icons-on-hover cursor-pointer text-green-500 hover:text-green-400 transition-colors"
+              style={{ display: stripOpen() ? "none" : undefined }}
               onClick={showPendingUpdateToast}
               title={t("app:_trn_update_pending_tooltip")}
             >
@@ -103,6 +107,7 @@ const AppNavbar = () => {
           <Tabs
             value={selectedValue()}
             class="h-auto w-auto flex-row items-center"
+            style={{ display: stripOpen() ? "none" : undefined }}
           >
             <TabsList class="bg-transparent gap-4 h-auto">
               <Show when={selectedValue()}>
@@ -135,10 +140,9 @@ const AppNavbar = () => {
             class="mr-6 flex justify-end lg:min-w-fit"
           >
             <Show when={globalStore.accounts.data}>
-              <AccountsDropdown
+              <AccountStrip
                 dense={layout().nav === "compact"}
-                accounts={accounts()}
-                value={globalStore.currentlySelectedAccountUuid.data}
+                onOpenChange={setStripOpen}
               />
             </Show>
           </div>

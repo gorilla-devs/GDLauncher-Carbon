@@ -7,6 +7,7 @@ import {
 } from "@/utils/routes"
 import { useLocation, useNavigate } from "@solidjs/router"
 import { JSX, createContext, createSignal, useContext } from "solid-js"
+import { createPageSlides } from "./pageSlide"
 
 const getTransitionClassToApply = (from: string, to: string) => {
   if (isSearchPath(from) && isAddonPath(to)) {
@@ -27,6 +28,9 @@ const getTransitionClassToApply = (from: string, to: string) => {
     return "slide-left-transition"
   }
 }
+
+/** The layout's box around the current page (withAds). */
+export const PAGE_ID = "gdl-page"
 
 interface NavigateOptions {
   replace?: boolean
@@ -49,6 +53,8 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
     searchParams: location.search
   })
 
+  const startSlide = createPageSlides(document, PAGE_ID)
+
   const shouldTransition = () =>
     !globalstore.settings.data?.reducedMotion && document.startViewTransition
 
@@ -61,18 +67,13 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
     )
 
     if (shouldTransition()) {
-      if (transitionClass) {
-        document.body.classList.add(transitionClass)
-      }
+      // Only the page slides: the bars, the theme's background and its
+      // effects stay put (pageSlide.ts).
+      const endSlide = startSlide(transitionClass)
       const result = document.startViewTransition(() => {
         navigate(destinationPath, { replace: options?.replace })
       })
-
-      result.finished.then(() => {
-        if (transitionClass) {
-          document.body.classList.remove(transitionClass)
-        }
-      })
+      void result.finished.finally(endSlide)
     } else {
       navigate(destinationPath, { replace: options?.replace })
     }

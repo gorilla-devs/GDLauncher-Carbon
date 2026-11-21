@@ -43,6 +43,7 @@
   "_trn_type": "Тип",
   "_trn_actions": "Действия",
   "_trn_manage_accounts": "Управление учетными записями",
+  "_trn_add_account": "Добавить аккаунт",
   "_trn_change_recovery_email_title": "Изменить резервную почту",
   "_trn_change_recovery_email_description": "Введите новый адрес резервной почты для вашей учетной записи GDLauncher",
   "_trn_change_display_name_title": "Изменить отображаемое имя",

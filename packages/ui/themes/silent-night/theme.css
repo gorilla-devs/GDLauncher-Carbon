@@ -276,3 +276,770 @@
   background: rgb(14 25 52 / 0.97) !important;
   border-color: rgb(190 215 255 / 0.15) !important;
 }
+
+/* Chimney smoke: one box of puffs over the village. */
+@property --gdl-sn-t {
+  syntax: "<number>";
+  inherits: false;
+  initial-value: 0;
+}
+@keyframes gdl-sn-t {
+  from {
+    --gdl-sn-t: 0;
+  }
+  to {
+    --gdl-sn-t: 7;
+  }
+}
+html[data-gdl-motion="run"] [data-gdl~="background"]::before {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  --gdl-sn-s: max(100vw / 1600, 100vh / 986);
+  left: calc(100vw - 1520.2 * var(--gdl-sn-s));
+  top: calc(100vh - 197.3 * var(--gdl-sn-s));
+  width: calc(1313.5 * var(--gdl-sn-s));
+  height: calc(93.7 * var(--gdl-sn-s));
+  background-repeat: no-repeat;
+  background-image:
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.38 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 0, 7),
+                    (7 - mod(var(--gdl-sn-t) + 0, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.38 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 2.25, 7),
+                    (7 - mod(var(--gdl-sn-t) + 2.25, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.38 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 4.5, 7),
+                    (7 - mod(var(--gdl-sn-t) + 4.5, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.4 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 0.75, 7),
+                    (7 - mod(var(--gdl-sn-t) + 0.75, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.4 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 3, 7),
+                    (7 - mod(var(--gdl-sn-t) + 3, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.4 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 5.25, 7),
+                    (7 - mod(var(--gdl-sn-t) + 5.25, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.44 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 1.5, 7),
+                    (7 - mod(var(--gdl-sn-t) + 1.5, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.44 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 3.75, 7),
+                    (7 - mod(var(--gdl-sn-t) + 3.75, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.44 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 6, 7),
+                    (7 - mod(var(--gdl-sn-t) + 6, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.44 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 2, 7),
+                    (7 - mod(var(--gdl-sn-t) + 2, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.44 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 4.5, 7),
+                    (7 - mod(var(--gdl-sn-t) + 4.5, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.44 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 6.75, 7),
+                    (7 - mod(var(--gdl-sn-t) + 6.75, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.44 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 2.75, 7),
+                    (7 - mod(var(--gdl-sn-t) + 2.75, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.44 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 5, 7),
+                    (7 - mod(var(--gdl-sn-t) + 5, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.44 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 7.5, 7),
+                    (7 - mod(var(--gdl-sn-t) + 7.5, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.39 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 3.5, 7),
+                    (7 - mod(var(--gdl-sn-t) + 3.5, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.39 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 5.75, 7),
+                    (7 - mod(var(--gdl-sn-t) + 5.75, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.39 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 8, 7),
+                    (7 - mod(var(--gdl-sn-t) + 8, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.36 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 4.25, 7),
+                    (7 - mod(var(--gdl-sn-t) + 4.25, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.36 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 6.5, 7),
+                    (7 - mod(var(--gdl-sn-t) + 6.5, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    ),
+    radial-gradient(
+      circle closest-side,
+      rgb(
+          201 212 230 /
+            calc(
+              0.36 *
+                clamp(
+                  0,
+                  min(
+                    mod(var(--gdl-sn-t) + 8.75, 7),
+                    (7 - mod(var(--gdl-sn-t) + 8.75, 7)) / 6
+                  ),
+                  1
+                )
+            )
+        )
+        98%,
+      transparent
+    );
+  background-size:
+    calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 0, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 0, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 2.25, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 2.25, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 4.5, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 4.5, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 0.75, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 0.75, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 3, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 3, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 5.25, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 5.25, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 1.5, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 1.5, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 3.75, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 3.75, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 6, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 6, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 2, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 2, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 4.5, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 4.5, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 6.75, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 6.75, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 2.75, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 2.75, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 5, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 5, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 7.5, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 7.5, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 3.5, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 3.5, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 5.75, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 5.75, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 8, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 8, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 4.25, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 5 * (0.6 + mod(var(--gdl-sn-t) + 4.25, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 6.5, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 6 * (0.6 + mod(var(--gdl-sn-t) + 6.5, 7) / 7) * var(--gdl-sn-s)),
+    calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 8.75, 7) / 7) * var(--gdl-sn-s))
+      calc(2 * 7 * (0.6 + mod(var(--gdl-sn-t) + 8.75, 7) / 7) * var(--gdl-sn-s));
+  background-position:
+    calc(
+        (
+            15 + 2 * mod(var(--gdl-sn-t) + 0, 7) - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 0, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            69.5 - 46 * mod(var(--gdl-sn-t) + 0, 7) / 7 - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 0, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            15 + 2 * mod(var(--gdl-sn-t) + 2.25, 7) - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 2.25, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            69.5 - 46 * mod(var(--gdl-sn-t) + 2.25, 7) / 7 - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 2.25, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            15 + 2 * mod(var(--gdl-sn-t) + 4.5, 7) - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 4.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            69.5 - 46 * mod(var(--gdl-sn-t) + 4.5, 7) / 7 - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 4.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            155.5 + 2 * mod(var(--gdl-sn-t) + 0.75, 7) - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 0.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            81.7 - 46 * mod(var(--gdl-sn-t) + 0.75, 7) / 7 - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 0.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            155.5 + 2 * mod(var(--gdl-sn-t) + 3, 7) - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 3, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            81.7 - 46 * mod(var(--gdl-sn-t) + 3, 7) / 7 - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 3, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            155.5 + 2 * mod(var(--gdl-sn-t) + 5.25, 7) - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 5.25, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            81.7 - 46 * mod(var(--gdl-sn-t) + 5.25, 7) / 7 - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 5.25, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            403.2 + 2 * mod(var(--gdl-sn-t) + 1.5, 7) - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 1.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            60 - 46 * mod(var(--gdl-sn-t) + 1.5, 7) / 7 - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 1.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            403.2 + 2 * mod(var(--gdl-sn-t) + 3.75, 7) - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 3.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            60 - 46 * mod(var(--gdl-sn-t) + 3.75, 7) / 7 - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 3.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            403.2 + 2 * mod(var(--gdl-sn-t) + 6, 7) - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 6, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            60 - 46 * mod(var(--gdl-sn-t) + 6, 7) / 7 - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 6, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            608.2 + 2 * mod(var(--gdl-sn-t) + 2, 7) - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 2, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            78.5 - 46 * mod(var(--gdl-sn-t) + 2, 7) / 7 - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 2, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            608.2 + 2 * mod(var(--gdl-sn-t) + 4.5, 7) - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 4.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            78.5 - 46 * mod(var(--gdl-sn-t) + 4.5, 7) / 7 - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 4.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            608.2 + 2 * mod(var(--gdl-sn-t) + 6.75, 7) - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 6.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            78.5 - 46 * mod(var(--gdl-sn-t) + 6.75, 7) / 7 - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 6.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            857.7 + 2 * mod(var(--gdl-sn-t) + 2.75, 7) - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 2.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            66.4 - 46 * mod(var(--gdl-sn-t) + 2.75, 7) / 7 - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 2.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            857.7 + 2 * mod(var(--gdl-sn-t) + 5, 7) - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            66.4 - 46 * mod(var(--gdl-sn-t) + 5, 7) / 7 - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            857.7 + 2 * mod(var(--gdl-sn-t) + 7.5, 7) - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 7.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            66.4 - 46 * mod(var(--gdl-sn-t) + 7.5, 7) / 7 - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 7.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            1157.3 + 2 * mod(var(--gdl-sn-t) + 3.5, 7) - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 3.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            72.7 - 46 * mod(var(--gdl-sn-t) + 3.5, 7) / 7 - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 3.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            1157.3 + 2 * mod(var(--gdl-sn-t) + 5.75, 7) - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 5.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            72.7 - 46 * mod(var(--gdl-sn-t) + 5.75, 7) / 7 - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 5.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            1157.3 + 2 * mod(var(--gdl-sn-t) + 8, 7) - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 8, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            72.7 - 46 * mod(var(--gdl-sn-t) + 8, 7) / 7 - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 8, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            1283.5 + 2 * mod(var(--gdl-sn-t) + 4.25, 7) - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 4.25, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            83.7 - 46 * mod(var(--gdl-sn-t) + 4.25, 7) / 7 - 5 *
+              (0.6 + mod(var(--gdl-sn-t) + 4.25, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            1283.5 + 2 * mod(var(--gdl-sn-t) + 6.5, 7) - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 6.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            83.7 - 46 * mod(var(--gdl-sn-t) + 6.5, 7) / 7 - 6 *
+              (0.6 + mod(var(--gdl-sn-t) + 6.5, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      ),
+    calc(
+        (
+            1283.5 + 2 * mod(var(--gdl-sn-t) + 8.75, 7) - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 8.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      )
+      calc(
+        (
+            83.7 - 46 * mod(var(--gdl-sn-t) + 8.75, 7) / 7 - 7 *
+              (0.6 + mod(var(--gdl-sn-t) + 8.75, 7) / 7)
+          ) *
+          var(--gdl-sn-s)
+      );
+  animation: gdl-sn-t 7s linear infinite;
+}
+/* End of the chimney smoke. */

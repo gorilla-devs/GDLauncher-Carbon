@@ -226,6 +226,41 @@
         contain: paint;
       }
 
+      /* The page slides inside its own box (see NavigationManager). */
+      ::view-transition-group(slide-right-transition),
+      ::view-transition-group(slide-left-transition) {
+        overflow: clip;
+      }
+
+      /* While only the page slides, the rest of the window doesn't
+         cross-fade: the live view shows, so a theme's snow keeps falling. */
+      html.gdl-page-slide::view-transition-old(root) {
+        animation: none;
+        opacity: 0;
+      }
+      html.gdl-page-slide::view-transition-new(root) {
+        animation: none;
+      }
+
+      /* The snow, the lights and the content's decorations sit above the
+         page; in the root's live view they would fall behind the sliding
+         page, so they keep their own place, live and still. */
+      html.gdl-page-slide [data-gdl-effects] {
+        view-transition-name: gdl-effects;
+      }
+      html.gdl-page-slide [data-gdl-decorations="content"] {
+        view-transition-name: gdl-content-decorations;
+      }
+      html.gdl-page-slide::view-transition-old(gdl-effects),
+      html.gdl-page-slide::view-transition-old(gdl-content-decorations) {
+        animation: none;
+        opacity: 0;
+      }
+      html.gdl-page-slide::view-transition-new(gdl-effects),
+      html.gdl-page-slide::view-transition-new(gdl-content-decorations) {
+        animation: none;
+      }
+
       ::view-transition-old(slide-right-transition) {
         animation-name: slide-out-to-left;
       }

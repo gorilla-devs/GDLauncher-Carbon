@@ -15,6 +15,7 @@ import adSize, { bannerAdSize } from "@/utils/adhelper"
 import { Trans, useTransContext } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { useModal } from "@/managers/ModalsManager"
+import { PAGE_ID } from "@/managers/NavigationManager"
 import { SearchInputContext } from "@/components/SearchInputContext"
 import { getSearchResults } from "@/utils/platformSearch"
 import { activeTheme } from "@/themes/active"
@@ -183,7 +184,9 @@ function withAdsLayout(props: { children?: JSX.Element }) {
                     class="relative isolate min-h-0 flex-1"
                     style={CONTENT_COLUMN_CLIP}
                   >
-                    <div class="relative z-0 h-full">{props.children}</div>
+                    <div id={PAGE_ID} class="relative z-0 h-full">
+                      {props.children}
+                    </div>
                     <DecorationSlot anchor="content" />
                     <EffectsLayer />
                   </div>
