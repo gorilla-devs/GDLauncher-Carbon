@@ -259,6 +259,7 @@
   "_trn_worlds.refusal.name_invalid": "Escribe un nombre de hasta 64 caracteres.",
   "_trn_worlds.refusal.rename_incomplete": "No se pudo cambiar el nombre del mundo por completo. Ahora está en la carpeta «{{folder}}».",
   "_trn_worlds.refusal.not_renamed": "No se pudo cambiar el nombre del mundo. No se ha cambiado nada.",
+  "_trn_worlds.refusal.holds_link": "Este mundo contiene un enlace a otra carpeta y no se puede duplicar.",
   "_trn_table.filename": "Nombre del archivo",
   "_trn_table.type": "Tipo",
   "_trn_table.platform": "Plataforma",

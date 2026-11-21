@@ -260,6 +260,7 @@
   "_trn_worlds.refusal.name_invalid": "Enter a name of up to 64 characters.",
   "_trn_worlds.refusal.rename_incomplete": "The world could not be fully renamed. It is now in the folder “{{folder}}”.",
   "_trn_worlds.refusal.not_renamed": "The world couldn't be renamed. Nothing was changed.",
+  "_trn_worlds.refusal.holds_link": "This world contains a link to another folder and can't be duplicated.",
   "_trn_table.filename": "Filename",
   "_trn_table.type": "Type",
   "_trn_table.platform": "Platform",

@@ -71,6 +71,7 @@ pub mod run;
 mod running_publication;
 mod schema;
 pub mod shader_loader;
+mod world_copy;
 pub(crate) mod world_datapack_changes;
 pub(crate) mod world_datapack_updates;
 pub(crate) mod world_datapacks;

@@ -261,6 +261,7 @@
   "_trn_worlds.refusal.name_invalid": "Введите имя длиной не более 64 символов.",
   "_trn_worlds.refusal.rename_incomplete": "Не удалось полностью переименовать мир. Сейчас он находится в папке «{{folder}}».",
   "_trn_worlds.refusal.not_renamed": "Не удалось переименовать мир. Ничего не изменено.",
+  "_trn_worlds.refusal.holds_link": "В этом мире есть ссылка на другую папку, поэтому его нельзя дублировать.",
   "_trn_table.filename": "Имя файла",
   "_trn_table.type": "Тип",
   "_trn_table.platform": "Платформа",

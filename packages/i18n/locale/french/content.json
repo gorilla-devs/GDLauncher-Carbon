@@ -259,6 +259,7 @@
   "_trn_worlds.refusal.name_invalid": "Saisissez un nom de 64 caractères au maximum.",
   "_trn_worlds.refusal.rename_incomplete": "Le monde n’a pas pu être entièrement renommé. Il se trouve maintenant dans le dossier « {{folder}} ».",
   "_trn_worlds.refusal.not_renamed": "Le monde n’a pas pu être renommé. Rien n’a été modifié.",
+  "_trn_worlds.refusal.holds_link": "Ce monde contient un lien vers un autre dossier et ne peut pas être dupliqué.",
   "_trn_table.filename": "Nom de fichier",
   "_trn_table.type": "Type",
   "_trn_table.platform": "Plateforme",

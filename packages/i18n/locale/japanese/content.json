@@ -257,6 +257,7 @@
   "_trn_worlds.refusal.name_invalid": "64文字以内の名前を入力してください。",
   "_trn_worlds.refusal.rename_incomplete": "ワールドの名前を完全には変更できませんでした。現在はフォルダー「{{folder}}」にあります。",
   "_trn_worlds.refusal.not_renamed": "ワールドの名前を変更できませんでした。何も変更されていません。",
+  "_trn_worlds.refusal.holds_link": "このワールドには別のフォルダーへのリンクが含まれているため、複製できません。",
   "_trn_table.filename": "ファイル名",
   "_trn_table.type": "種類",
   "_trn_table.platform": "プラットフォーム",

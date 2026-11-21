@@ -52,7 +52,8 @@ const REFUSALS: [code: string, data?: Record<string, string>][] = [
   ["WORLD_NAME_UNREADABLE"],
   ["WORLD_NAME_INVALID"],
   ["WORLD_RENAME_INCOMPLETE", { folder: FOLDER }],
-  ["WORLD_NOT_RENAMED"]
+  ["WORLD_NOT_RENAMED"],
+  ["WORLD_HOLDS_LINK"]
 ]
 const CORE_TEXT = "The core's English sentence"
 
@@ -146,6 +147,9 @@ describe("a refusal in the player's language", () => {
     )
     expect(said("WORLD_NOT_RENAMED")).toBe(
       "The world couldn't be renamed. Nothing was changed."
+    )
+    expect(said("WORLD_HOLDS_LINK")).toBe(
+      "This world contains a link to another folder and can't be duplicated."
     )
   })
 

@@ -77,6 +77,9 @@ pub enum WorldRefusal {
     /// A rename failed and everything it had done was put back.
     #[error("The world could not be renamed; nothing was changed")]
     NotRenamed,
+    /// A link inside the world: a copy could not say what it should hold.
+    #[error("The world contains a link and cannot be duplicated")]
+    HoldsLink,
 }
 
 impl WorldRefusal {
@@ -160,6 +163,7 @@ impl FeErrorCode for WorldRefusal {
             Self::InvalidName => "WORLD_NAME_INVALID",
             Self::RenameIncomplete { .. } => "WORLD_RENAME_INCOMPLETE",
             Self::NotRenamed => "WORLD_NOT_RENAMED",
+            Self::HoldsLink => "WORLD_HOLDS_LINK",
         }
     }
 
@@ -225,6 +229,7 @@ mod tests {
                 folder: "Skyblock (2)".into(),
             },
             WorldRefusal::NotRenamed,
+            WorldRefusal::HoldsLink,
         ];
         all.extend(
             [

@@ -76,7 +76,8 @@ const REFUSALS: Record<string, Refusal> = {
     names: ["folder"],
     outdatesWorlds: true
   },
-  WORLD_NOT_RENAMED: { key: "content:_trn_worlds.refusal.not_renamed" }
+  WORLD_NOT_RENAMED: { key: "content:_trn_worlds.refusal.not_renamed" },
+  WORLD_HOLDS_LINK: { key: "content:_trn_worlds.refusal.holds_link" }
 }
 
 const refusal = (code: string | null | undefined): Refusal | undefined =>
