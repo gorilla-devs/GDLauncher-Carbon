@@ -193,7 +193,7 @@ impl ManagerRef<'_, InstanceManager> {
         let staging = publication::checked_folder(&path, AddonType::DataPacks).await?;
         let (source, _) = publication::selected_file(&staging, &row.filename)
             .await?
-            .context(WorldRefusal::InstancePackGone)?;
+            .ok_or(WorldRefusal::InstancePackGone)?;
         let source_digest = publication::file_digest(&source).await?;
         let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
         let world = saves.join(&request.world.name);
@@ -1052,6 +1052,21 @@ mod tests {
                 "This world already has this data pack: pack.zip"
             );
             assert_eq!(snapshot(&root, &world), before);
+        }
+
+        #[tokio::test]
+        async fn a_pack_removed_from_the_instance_is_refused_with_its_code() {
+            let app = crate::setup_managers_for_test().await;
+            let (id, mod_id, world, selected) =
+                staged(&app, "copy-source-gone", &pack_zip("new")).await;
+            let path = publication::current_path(&app, id).await.unwrap();
+            std::fs::remove_file(path.get_datapacks_path().join("pack.zip")).unwrap();
+
+            let error = copy(&app, id, &mod_id, &selected, false).await.unwrap_err();
+
+            let sent = serde_json::to_value(crate::error::FeError::from_anyhow(&error)).unwrap();
+            assert_eq!(sent["cause"][0]["code"], "INSTANCE_DATAPACK_GONE", "{sent}");
+            assert!(entries(&world.join("datapacks")).is_empty());
         }
 
         #[tokio::test]
