@@ -18,9 +18,11 @@ vi.mock("@/utils/rspcClient", async () => {
   return {
     rspc: {
       useContext: () => ({ client: { query: c.query } }),
-      createQuery: () => ({
+      createQuery: (options: () => { queryKey: unknown[] }) => ({
         get data() {
-          return c.outcome()
+          return options().queryKey[0] === "instance.getWorlds"
+            ? []
+            : c.outcome()
         }
       }),
       createMutation: (options: () => { mutationKey: string }) => {
@@ -48,7 +50,12 @@ vi.mock("@/utils/rspcClient", async () => {
 vi.mock("@/managers/ModalsManager", () => ({
   useModal: () => ({ openModal: c.open })
 }))
-vi.mock("@gd/ui", () => ({ toast: { error: c.error, success: c.success } }))
+vi.mock("@gd/ui", () => ({
+  toast: { error: c.error, success: c.success },
+  DropdownMenu: (p: any) => p.children,
+  DropdownMenuTrigger: (p: any) => p.children,
+  DropdownMenuContent: () => null
+}))
 vi.mock("@gd/i18n", () => {
   const t = (key: string, vars?: any) =>
     vars?.title ? `${key}:${vars.title}` : key

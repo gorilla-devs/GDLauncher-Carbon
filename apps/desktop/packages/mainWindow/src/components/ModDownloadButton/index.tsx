@@ -7,11 +7,13 @@ import { rspc } from "@/utils/rspcClient"
 import {
   Switch,
   Match,
+  Show,
   createSignal,
   createEffect,
   createMemo,
   batch,
-  onCleanup
+  onCleanup,
+  untrack
 } from "solid-js"
 import {
   FEUnifiedSearchResult,
@@ -25,15 +27,27 @@ import { useTaskProgress } from "./hooks/useTaskProgress"
 import { resolveTaskPoll } from "./hooks/resolveTaskPoll"
 import { InstanceDropdown } from "./components/InstanceDropdown"
 import { InstallButton } from "./components/InstallButton"
-import { toast } from "@gd/ui"
+import { InstallPlacesStep } from "./components/InstallPlacesStep"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+  toast
+} from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
 import { worldVersionCopy } from "./worldVersionCopy"
 import { findInstalledAddon, isInstalledArtifact } from "@/utils/installedAddon"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import useSearchContext from "@/components/SearchInputContext"
+import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
 import {
+  asksWhichWorld,
+  installPlaces,
+  ReadableWorld,
   readableWorld,
   worldDatapackInstall,
-  worldTargetName
+  worldTargetName,
+  WORLDS_STALE_TIME
 } from "@/utils/worldTarget"
 import {
   effectiveFileId,
@@ -63,6 +77,9 @@ interface ModDownloadButtonProps {
    *  a data pack build installs into instead of the instance. Ignored for any
    *  other addon. */
   selectedWorld?: string
+  /** `fileId` is a version picked from the Versions tab's list: it installs
+   *  into the selected instance at once, never asking which world. */
+  pickedVersion?: boolean
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
   /** Opt-in anchor for the rendered install/download button, forwarded to
@@ -120,11 +137,25 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           props.addon,
           props.selectedWorld
         )
+  const searchContext = useSearchContext()
+  // A data pack for an instance with no world chosen asks where in it.
+  const asksWhere = () =>
+    !props.selectedServerId &&
+    !!props.selectedInstanceId &&
+    !props.pickedVersion &&
+    worldName() === undefined &&
+    asksWhichWorld(props.addon, searchContext?.searchQuery().projectType)
   // Search rows share this query, and the identity it carries lets the core
-  // refuse an install into a world that changed since it was read.
+  // refuse an install into a world that changed since it was read. Read only
+  // to offer the worlds, a failure leaves the instance to install into, so
+  // it needs no toast.
   const worlds = rspc.createQuery(() => ({
     queryKey: ["instance.getWorlds", props.selectedInstanceId ?? 0],
-    enabled: worldName() !== undefined
+    enabled: worldName() !== undefined || asksWhere(),
+    ...(worldName() === undefined && {
+      staleTime: WORLDS_STALE_TIME,
+      meta: LOCAL_ERROR_TOAST
+    })
   }))
   const targetWorld = createMemo(() => {
     const name = worldName()
@@ -270,11 +301,25 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       : undefined
   )
 
-  const isInstalled = createMemo(() =>
+  const holdsRequested = () =>
     isInstalledArtifact(installedMod(), scopedFileId())
+  // What the "where" step offers; undefined while the worlds are read.
+  const places = createMemo(() =>
+    asksWhere() && (worlds.isError || worlds.data !== undefined)
+      ? installPlaces(props.addon, worlds.data, holdsRequested())
+      : undefined
+  )
+  // A data pack the instance holds stays installed until a world is known
+  // that could still take it.
+  const isInstalled = createMemo(
+    () =>
+      holdsRequested() &&
+      (!asksWhere() || !places() || places()!.offers === "nothing")
   )
 
-  const handleDownload = async () => {
+  /** Installs into the selected target: the server, the world of the search,
+   *  `into` when the "where" step picked a world, or else the instance. */
+  const handleDownload = async (into?: ReadableWorld) => {
     if (!props.addon) return
 
     // Newer clicks own UI observation. Entered work may still finish after a
@@ -344,8 +389,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     if (!instanceId || isInstalled()) return
 
     // World install path: never falls back to the instance.
-    if (worldName() !== undefined) {
-      const world = readableWorld(targetWorld())
+    if (into || worldName() !== undefined) {
+      const world = into ?? readableWorld(targetWorld())
       if (!world || loading()) return
       const presentation = {
         title: props.addon.title,
@@ -413,6 +458,61 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     }
   }
 
+  const [whereOpen, setWhereOpen] = createSignal(false)
+  const showWhere = (open: boolean) => {
+    if (whereOpen() === open) return
+    setWhereOpen(open)
+    props.onDropdownOpenChange?.(open)
+  }
+  /** Download of a data pack: asks where, or installs at once when only the
+   *  instance can take it. */
+  const requestWhere = () => {
+    if (props.instanceLocked || loading() || isInstalled()) return
+    const offered = places()
+    if (!offered || offered.offers === "choice") showWhere(true)
+    else if (offered.offers === "instance") void handleDownload()
+  }
+  // Opened before its lists were read, the step only stays while it offers
+  // something: with no readable world the pack goes into the instance.
+  createEffect(() => {
+    if (!whereOpen()) return
+    const offered = places()
+    if (asksWhere() && (!offered || offered.offers === "choice")) return
+    untrack(() => {
+      showWhere(false)
+      if (offered?.offers === "instance") void handleDownload()
+    })
+  })
+
+  const instanceButton = (onDownload: () => void) => (
+    <InstallButton
+      loading={loading}
+      progress={progress}
+      isInstalled={isInstalled}
+      instanceLocked={() => props.instanceLocked ?? false}
+      unavailable={worldUnavailable()}
+      // Installed once its worlds are known means no world is left to take
+      // the pack, so "add it to a world" would point nowhere.
+      staged={
+        props.addon?.type === "datapack" &&
+        worldName() === undefined &&
+        !(places() && isInstalled())
+      }
+      copyPresentation={worldVersionCopy(
+        props.addon?.type,
+        instanceFileId(),
+        installedMod()?.id
+      )}
+      fileId={instanceFileId()}
+      linkedFileMismatch={linkedFileMismatch(props.selectedInstanceId)}
+      installedMod={installedMod}
+      onDownload={onDownload}
+      size={props.size}
+      iconOnly={props.iconOnly}
+      testId={props.testId}
+    />
+  )
+
   return (
     <Switch>
       <Match when={props.selectedServerId}>
@@ -424,7 +524,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           fileId={serverFileId()}
           linkedFileMismatch={mismatchFor(serverTarget())}
           installedMod={installedMod}
-          onDownload={handleDownload}
+          onDownload={() => handleDownload()}
           size={props.size}
           iconOnly={props.iconOnly}
           testId={props.testId}
@@ -450,26 +550,34 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
         />
       </Match>
       <Match when={props.selectedInstanceId}>
-        <InstallButton
-          loading={loading}
-          progress={progress}
-          isInstalled={isInstalled}
-          instanceLocked={() => props.instanceLocked ?? false}
-          unavailable={worldUnavailable()}
-          staged={props.addon?.type === "datapack" && worldName() === undefined}
-          copyPresentation={worldVersionCopy(
-            props.addon?.type,
-            instanceFileId(),
-            installedMod()?.id
-          )}
-          fileId={instanceFileId()}
-          linkedFileMismatch={linkedFileMismatch(props.selectedInstanceId)}
-          installedMod={installedMod}
-          onDownload={handleDownload}
-          size={props.size}
-          iconOnly={props.iconOnly}
-          testId={props.testId}
-        />
+        <Show
+          when={asksWhere()}
+          fallback={instanceButton(() => handleDownload())}
+        >
+          {/* The menu's trigger takes the click: it asks where, or installs
+              at once, so the button itself does nothing. */}
+          <DropdownMenu
+            open={whereOpen()}
+            onOpenChange={(open) => (open ? requestWhere() : showWhere(false))}
+          >
+            <DropdownMenuTrigger class="b-0 bg-transparent p-0">
+              {instanceButton(() => {})}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent class="w-80 p-0">
+              <InstallPlacesStep
+                places={places()}
+                onWorld={(world) => {
+                  showWhere(false)
+                  void handleDownload(world)
+                }}
+                onInstance={() => {
+                  showWhere(false)
+                  void handleDownload()
+                }}
+              />
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </Show>
       </Match>
     </Switch>
   )

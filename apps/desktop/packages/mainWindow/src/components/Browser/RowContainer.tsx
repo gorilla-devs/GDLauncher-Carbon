@@ -183,6 +183,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                   selectedWorld={props.world}
                   addon={props.project}
                   fileId={fileId()}
+                  pickedVersion
                   size="small"
                 />
               </Match>

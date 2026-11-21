@@ -60,6 +60,47 @@ export function readableWorld(
   return world?.identity != null ? (world as ReadableWorld) : undefined
 }
 
+// The core invalidates a world list when the packs in its worlds change, but
+// not when the game creates a world, so a read made only to offer the worlds
+// is reused just long enough to cover closing and reopening a menu.
+export const WORLDS_STALE_TIME = 30 * 1000
+
+/** What the "where" step of a data pack install offers for one instance. */
+export interface InstallPlaces {
+  /** The worlds a data pack can go into, and whether each holds the project. */
+  worlds: readonly { world: ReadableWorld; holds: boolean }[]
+  instanceHolds: boolean
+  /** "choice": there is something to choose; "instance": only the instance
+   *  can take it, so nothing is asked; "nothing": every place holds it. */
+  offers: "choice" | "instance" | "nothing"
+}
+
+export function installPlaces(
+  addon: FEUnifiedSearchResult | undefined,
+  worlds: readonly FEWorld[] | undefined,
+  instanceHolds: boolean
+): InstallPlaces {
+  const listed = (worlds ?? [])
+    .filter((world): world is ReadableWorld => world.identity !== null)
+    .map((world) => ({
+      world,
+      holds:
+        !!addon &&
+        !!findInstalledAddon(addon, {
+          kind: "world",
+          datapacks: world.datapacks
+        })
+    }))
+  const offers = listed.some((entry) => !entry.holds)
+    ? "choice"
+    : instanceHolds
+      ? "nothing"
+      : listed.length > 0
+        ? "choice"
+        : "instance"
+  return { worlds: listed, instanceHolds, offers }
+}
+
 /** `null` asks the core for the newest data pack build for the game version. */
 export function worldDatapackSource(
   addon: Pick<FEUnifiedSearchResult, "id" | "platform">,

@@ -37,7 +37,12 @@ vi.mock("@/utils/rspcClient", async () => {
 vi.mock("@/managers/ModalsManager", () => ({
   useModal: () => ({ openModal: vi.fn() })
 }))
-vi.mock("@gd/ui", () => ({ toast: { error: c.error, success: c.success } }))
+vi.mock("@gd/ui", () => ({
+  toast: { error: c.error, success: c.success },
+  DropdownMenu: (p: any) => p.children,
+  DropdownMenuTrigger: (p: any) => p.children,
+  DropdownMenuContent: () => null
+}))
 vi.mock("@gd/i18n", () => {
   const t = (key: string, vars?: any) =>
     vars?.world

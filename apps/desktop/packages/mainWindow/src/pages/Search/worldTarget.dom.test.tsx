@@ -108,9 +108,33 @@ vi.mock("@gd/i18n", () => ({
   Trans: (p: any) => <span>{p.key}</span>,
   useTransContext: () => [(key: string) => key]
 }))
-vi.mock("@gd/ui", () => {
+vi.mock("@gd/ui", async () => {
+  const { createContext, useContext, Show } = await import("solid-js")
   const passthrough = (p: any) => <div>{p.children}</div>
+  // A menu that opens and closes as its owner says.
+  const Menu = createContext<any>()
   return {
+    DropdownMenu: (p: any) => (
+      <Menu.Provider value={p}>{p.children}</Menu.Provider>
+    ),
+    DropdownMenuTrigger: (p: any) => {
+      const menu = useContext(Menu)
+      return (
+        <div data-menu-trigger onClick={() => menu.onOpenChange(!menu.open)}>
+          {p.children}
+        </div>
+      )
+    },
+    DropdownMenuContent: (p: any) => {
+      const menu = useContext(Menu)
+      return <Show when={menu.open}>{p.children}</Show>
+    },
+    DropdownMenuItem: (p: any) => (
+      <button data-menu-item disabled={p.disabled} onClick={p.onSelect}>
+        {p.children}
+      </button>
+    ),
+    DropdownMenuSeparator: () => <hr />,
     Button: (p: any) => (
       <button
         data-variant={p.variant}
@@ -330,15 +354,66 @@ it.each([
   await flush()
   expect(control.mutations).toEqual([])
 })
-it("with an instance only, a data pack still downloads into the instance", async () => {
-  control.worlds = [world("My World")]
-  const root = search("list", [undefined], null)
+// CurseForge types a data pack "datapack" and lists no loader for it.
+const curseforgePack = {
+  id: "12",
+  platform: "curseforge",
+  type: "datapack",
+  loaders: []
+}
+const menuItem = (root: HTMLElement, text: string) =>
+  [...root.querySelectorAll<HTMLButtonElement>("[data-menu-item]")].find(
+    (item) => item.textContent?.includes(text)
+  )!
+it.each(["list", "grid"])(
+  "%s Download with an instance only asks where, and Download to instance installs into the instance",
+  async (view) => {
+    control.worlds = [world("My World")]
+    const root = search(view, [undefined], null, curseforgePack)
+    installButtons(root)[0].click()
+    await flush()
+    expect(control.mutations).toEqual([])
+    menuItem(root, "download_to_instance").click()
+    await flush()
+    expect(control.mutations).toEqual([
+      {
+        key: "instance.installLatestMod",
+        input: { instance_id: 1, mod_source: { Curseforge: 12 } }
+      }
+    ])
+  }
+)
+it.each(["list", "grid"])(
+  "%s Download with an instance only installs into the world picked there",
+  async (view) => {
+    control.worlds = [world("My World")]
+    const root = search(view, [undefined], null, hybrid)
+    installButtons(root)[0].click()
+    await flush()
+    menuItem(root, "My World").click()
+    await flush()
+    expect(control.mutations).toEqual([
+      {
+        key: "instance.installWorldDatapack",
+        input: {
+          instance_id: 1,
+          world: "My World",
+          identity: "id-My World",
+          source: { Modrinth: { project_id: "P", version_id: null } },
+          replaces: null
+        }
+      }
+    ])
+  }
+)
+it("with an instance only and no world, a data pack still downloads into the instance at once", async () => {
+  const root = search("list", [undefined], null, curseforgePack)
   installButtons(root)[0].click()
   await flush()
   expect(control.mutations).toEqual([
     {
       key: "instance.installLatestMod",
-      input: { instance_id: 1, mod_source: { Modrinth: "P" } }
+      input: { instance_id: 1, mod_source: { Curseforge: 12 } }
     }
   ])
 })

@@ -3,6 +3,7 @@ import type { FEWorld, FEWorldDatapack } from "@gd/core_module/bindings"
 import {
   asksWhichWorld,
   canBeDatapack,
+  installPlaces,
   isOnlyDatapack,
   readableWorld,
   withoutWorldParam,
@@ -205,6 +206,64 @@ describe("installed in a world", () => {
       findInstalledAddon(addon("datapack", "curseforge", "P"), target)
     ).toBeUndefined()
     expect(findInstalledAddon(addon("mod"), target)).toBeUndefined()
+  })
+})
+
+describe("where a data pack install can go", () => {
+  const held = [pack("copy", "modrinth", "P", "V1")]
+  const project = { ...addon("mod"), loaders: modrinthPack.loaders }
+  it("lists the readable worlds with whether each holds the project", () => {
+    const places = installPlaces(
+      project,
+      [world("A", held), world("Broken", [], null), world("B")],
+      false
+    )
+    expect(
+      places.worlds.map((entry) => [entry.world.name, entry.holds])
+    ).toEqual([
+      ["A", true],
+      ["B", false]
+    ])
+    expect(places.offers).toBe("choice")
+  })
+  it("asks while a world can take it, even when the instance holds it", () => {
+    expect(installPlaces(project, [world("A")], true).offers).toBe("choice")
+  })
+  it("asks while only the instance can take it and there are worlds", () => {
+    expect(installPlaces(project, [world("A", held)], false).offers).toBe(
+      "choice"
+    )
+  })
+  it.each([
+    ["no world", []],
+    ["only unreadable worlds", [world("Broken", [], null)]],
+    ["worlds that could not be read", undefined]
+  ])("goes into the instance without asking with %s", (_, worlds) => {
+    expect(installPlaces(project, worlds, false).offers).toBe("instance")
+  })
+  it.each([
+    ["no world", []],
+    ["only worlds that hold it too", [world("A", held)]]
+  ])("offers nothing once the instance holds it with %s", (_, worlds) => {
+    expect(installPlaces(project, worlds, true).offers).toBe("nothing")
+  })
+  it("matches a world's copy by the real row shapes only", () => {
+    const worlds = [world("A", held)]
+    const hybrid = { ...addon("mod"), loaders: modrinthHybrid.loaders }
+    expect(installPlaces(hybrid, worlds, false).worlds[0].holds).toBe(true)
+    const plain = { ...addon("mod"), loaders: plainMod.loaders }
+    expect(installPlaces(plain, worlds, false).worlds[0].holds).toBe(false)
+    const curse = {
+      ...addon("datapack", "curseforge", "12"),
+      loaders: curseforgePack.loaders
+    }
+    expect(
+      installPlaces(
+        curse,
+        [world("A", [pack("c", "curseforge", "12", "3")])],
+        false
+      ).worlds[0].holds
+    ).toBe(true)
   })
 })
 

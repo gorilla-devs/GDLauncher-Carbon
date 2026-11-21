@@ -13,33 +13,26 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  Input,
-  Spinner
+  Input
 } from "@gd/ui"
 import { VList } from "@/components/VirtuaWrapper"
 import { InstanceItem } from "./InstanceItem"
+import { InstallPlacesStep } from "./InstallPlacesStep"
 import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 import { rspc } from "@/utils/rspcClient"
 import { isModInstalledInInstance } from "../utils/instanceHelpers"
 import { findInstalledAddon } from "@/utils/installedAddon"
 import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
-import { asksWhichWorld, ReadableWorld } from "@/utils/worldTarget"
+import {
+  asksWhichWorld,
+  installPlaces,
+  ReadableWorld,
+  WORLDS_STALE_TIME
+} from "@/utils/worldTarget"
 import useSearchContext from "@/components/SearchInputContext"
-import type { FEWorld } from "@gd/core_module/bindings"
-
-// The core invalidates a world list when the packs in its worlds change, but
-// not when the game creates a world, so a read is reused only long enough to
-// cover closing and reopening the menu.
-const WORLDS_STALE_TIME = 30 * 1000
-
-const readable = (worlds: readonly FEWorld[] | undefined) =>
-  (worlds ?? []).filter(
-    (world): world is ReadableWorld => world.identity !== null
-  )
 
 interface DropdownInstance {
   id: number
@@ -113,32 +106,35 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     queryKey: ["instance.getInstanceMods", pickedInstance()?.id ?? 0],
     enabled: pickedInstance() !== undefined
   }))
-  const holdsAddon = (rows: Parameters<typeof findInstalledAddon>[1]) =>
-    !!props.addon && !!findInstalledAddon(props.addon, rows)
-  const worldHolds = (world: FEWorld) =>
-    holdsAddon({ kind: "world", datapacks: world.datapacks })
-  const readableWorlds = () => readable(pickedWorlds.data)
-  const instanceHolds = () =>
-    holdsAddon({ kind: "instance", addons: pickedMods.data ?? [] })
-
-  const pickedSettled = () =>
+  // Undefined until both lists are read; a failed read counts as empty.
+  const pickedPlaces = createMemo(() =>
     (pickedWorlds.isError || pickedWorlds.data !== undefined) &&
     (pickedMods.isError || pickedMods.data !== undefined)
+      ? installPlaces(
+          props.addon,
+          pickedWorlds.data,
+          !!props.addon &&
+            !!findInstalledAddon(props.addon, {
+              kind: "instance",
+              addons: pickedMods.data ?? []
+            })
+        )
+      : undefined
+  )
 
   // The step only stays while it offers something. With no readable world
   // the pack goes into the instance, as it always did; the menu stays open
   // on the list, which shows the row's progress.
   createEffect(() => {
     const picked = pickedInstance()
-    if (!picked || !pickedSettled()) return
+    const places = pickedPlaces()
+    if (!picked || !places) return
     // Its worlds are all the step has: it lists them, or says why not.
     if (worldsOnly(picked)) return
-    if (readableWorlds().some((world) => !worldHolds(world))) return
-    if (readableWorlds().length > 0 && !instanceHolds()) return
+    if (places.offers === "choice") return
     untrack(() => {
       setPickedInstance(undefined)
-      if (readableWorlds().length === 0 && !instanceHolds())
-        props.handleInstanceSelection(picked.id)
+      if (places.offers === "instance") props.handleInstanceSelection(picked.id)
     })
   })
 
@@ -204,14 +200,13 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     }))
     const worldsSettled = () =>
       worldsQuery.isError || worldsQuery.data !== undefined
-    const rowWorlds = () => readable(worldsQuery.data)
+    const rowPlaces = () =>
+      installPlaces(props.addon, worldsQuery.data, holdsInInstance())
     // A data pack the instance holds stays installed until a world is known
     // that could still take it.
     const isInstalled = () =>
       holdsInInstance() &&
-      (!asksForWorld() ||
-        !worldsSettled() ||
-        rowWorlds().every((world) => worldHolds(world)))
+      (!asksForWorld() || !worldsSettled() || rowPlaces().offers === "nothing")
 
     return (
       <InstanceItem
@@ -228,7 +223,8 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         hoveredInstanceId={props.hoveredInstanceId()}
         onSelect={(id) =>
           worldsOnly(instance) ||
-          (asksForWorld() && !(worldsSettled() && rowWorlds().length === 0))
+          (asksForWorld() &&
+            !(worldsSettled() && rowPlaces().worlds.length === 0))
             ? setPickedInstance(instance)
             : props.handleInstanceSelection(id)
         }
@@ -325,98 +321,42 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
           }
         >
           {(picked) => (
-            <div class="p-1">
-              <button
-                class="text-lightSlate-400 hover:text-lightSlate-100 flex w-full cursor-pointer items-center gap-2 border-none bg-transparent px-2 py-1.5 text-sm font-medium"
-                onClick={() => setPickedInstance(undefined)}
-              >
-                <div class="i-hugeicons:arrow-left-01 h-4 w-4 shrink-0" />
-                <span class="truncate">{picked().name}</span>
-              </button>
-              <DropdownMenuSeparator class="-mx-1" />
-              <Show
-                when={pickedSettled()}
-                fallback={
-                  <div class="flex justify-center py-3">
-                    <Spinner class="h-4 w-4" />
-                  </div>
-                }
-              >
-                <Show when={readableWorlds().length > 0}>
-                  <div
-                    data-group-name
-                    class="text-lightSlate-500 px-2 pb-0.5 pt-1.5 text-xs"
+            <InstallPlacesStep
+              places={pickedPlaces()}
+              header={
+                <>
+                  <button
+                    class="text-lightSlate-400 hover:text-lightSlate-100 flex w-full cursor-pointer items-center gap-2 border-none bg-transparent px-2 py-1.5 text-sm font-medium"
+                    onClick={() => setPickedInstance(undefined)}
                   >
-                    <Trans key="content:_trn_tabs.worlds" />
-                  </div>
-                </Show>
-                <div class="max-h-[300px] overflow-y-auto">
-                  <For each={readableWorlds()}>
-                    {(world) => {
-                      const holds = () => worldHolds(world)
-                      return (
-                        <DropdownMenuItem
-                          class="gap-2"
-                          disabled={holds()}
-                          closeOnSelect={false}
-                          onSelect={() => {
-                            const id = picked().id
-                            setPickedInstance(undefined)
-                            props.handleWorldSelection?.(id, world)
-                          }}
-                        >
-                          <div class="i-hugeicons:globe h-4 w-4 shrink-0" />
-                          <span class="min-w-0 flex-1 truncate">
-                            {world.name}
-                          </span>
-                          <Show when={holds()}>
-                            <div class="i-hugeicons:tick-02 h-4 w-4 shrink-0 text-green-400" />
-                          </Show>
-                        </DropdownMenuItem>
-                      )
-                    }}
-                  </For>
-                </div>
-                <Show
-                  when={!worldsOnly(picked())}
-                  fallback={
-                    <Show when={readableWorlds().length === 0}>
-                      <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
-                        <Trans
-                          key={
-                            pickedWorlds.data?.length === 0
-                              ? "content:_trn_worlds.none"
-                              : "content:_trn_worlds.load_failed"
-                          }
-                        />
-                      </div>
-                    </Show>
+                    <div class="i-hugeicons:arrow-left-01 h-4 w-4 shrink-0" />
+                    <span class="truncate">{picked().name}</span>
+                  </button>
+                  <DropdownMenuSeparator class="-mx-1" />
+                </>
+              }
+              offersInstance={!worldsOnly(picked())}
+              onWorld={(world) => {
+                const id = picked().id
+                setPickedInstance(undefined)
+                props.handleWorldSelection?.(id, world)
+              }}
+              onInstance={() => {
+                const id = picked().id
+                setPickedInstance(undefined)
+                props.handleInstanceSelection(id)
+              }}
+            >
+              <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
+                <Trans
+                  key={
+                    pickedWorlds.data?.length === 0
+                      ? "content:_trn_worlds.none"
+                      : "content:_trn_worlds.load_failed"
                   }
-                >
-                  <Show when={readableWorlds().length > 0}>
-                    <DropdownMenuSeparator class="-mx-1" />
-                  </Show>
-                  <DropdownMenuItem
-                    class="gap-2"
-                    disabled={instanceHolds()}
-                    closeOnSelect={false}
-                    onSelect={() => {
-                      const id = picked().id
-                      setPickedInstance(undefined)
-                      props.handleInstanceSelection(id)
-                    }}
-                  >
-                    <div class="i-hugeicons:folder-01 h-4 w-4 shrink-0" />
-                    <span class="min-w-0 flex-1 truncate">
-                      <Trans key="content:_trn_worlds.download_to_instance" />
-                    </span>
-                    <Show when={instanceHolds()}>
-                      <div class="i-hugeicons:tick-02 h-4 w-4 shrink-0 text-green-400" />
-                    </Show>
-                  </DropdownMenuItem>
-                </Show>
-              </Show>
-            </div>
+                />
+              </div>
+            </InstallPlacesStep>
           )}
         </Show>
       </DropdownMenuContent>
