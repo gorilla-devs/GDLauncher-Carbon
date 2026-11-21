@@ -28,6 +28,12 @@ export function canBeDatapack(project: ProjectKind): boolean {
 const lowerCased = (loaders: readonly string[]) =>
   loaders.map((loader) => loader.toLowerCase())
 
+/** A project typed as a resource pack or a shader goes into an instance as
+ *  that, whatever its versions are tagged (the core's `addon_type`): there
+ *  its data pack build is never what an install is. */
+const installsAsTyped = (project: ProjectKind) =>
+  project?.type === "resourcePack" || project?.type === "shader"
+
 /** False for a project that also ships as a mod, like Terralith: one that
  *  lists a mod loader. Any other loader beside "datapack" (a resource pack's
  *  "minecraft", a plugin's "paper") is nothing an instance runs as a mod. */
@@ -35,6 +41,7 @@ export function isOnlyDatapack(project: ProjectKind): boolean {
   return (
     project?.type === "datapack" ||
     (canBeDatapack(project) &&
+      !installsAsTyped(project) &&
       !lowerCased(project?.loaders ?? []).some((loader) =>
         MOD_LOADERS.includes(loader)
       ))
@@ -63,7 +70,8 @@ export function instanceInstallIsDatapack(
   instance: LinkTarget | undefined
 ): boolean {
   if (isOnlyDatapack(project)) return true
-  if (!canBeDatapack(project) || !instance) return false
+  if (!canBeDatapack(project) || installsAsTyped(project) || !instance)
+    return false
   if (!instance.modloader) return true
   const listed = lowerCased(project?.loaders ?? [])
   return !lowerCased(
@@ -85,7 +93,7 @@ export function instanceInstall(
   instance: LinkTarget | undefined,
   picked?: PickedVersion
 ): InstanceInstall {
-  if (!canBeDatapack(project)) return "addon"
+  if (!canBeDatapack(project) || installsAsTyped(project)) return "addon"
   // Every file of a project typed as a data pack (CurseForge) is one.
   if (project?.type === "datapack") return "datapack"
   if (picked)

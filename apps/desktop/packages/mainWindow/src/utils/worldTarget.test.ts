@@ -85,6 +85,13 @@ const pluginAndDataPack = {
   type: "mod",
   loaders: ["datapack", "bukkit", "paper", "purpur", "spigot"]
 }
+// The core installs a project Modrinth types as a resource pack or a shader
+// as that, whatever its versions are tagged.
+const typedOtherwise = [
+  { type: "resourcePack", loaders: ["minecraft", "datapack"] },
+  { type: "shader", loaders: ["iris", "datapack"] },
+  { type: "resourcePack", loaders: ["datapack"] }
+]
 const instance = (modloader: string | null, mc_version = "1.21.1") => ({
   modloader,
   mc_version
@@ -114,6 +121,22 @@ describe("data pack projects", () => {
     expect(isOnlyDatapack({ type: "mod", loaders: ["minecraft"] })).toBe(false)
     // CurseForge tags a data pack's files with loaders at will.
     expect(isOnlyDatapack({ type: "datapack", loaders: ["fabric"] })).toBe(true)
+  })
+  it("a resource pack or a shader stays one, even one that lists the datapack loader", () => {
+    for (const project of typedOtherwise) {
+      expect(isOnlyDatapack(project)).toBe(false)
+      for (const searched of ["resourcePack", "shader", "mod", undefined])
+        expect(asksWhichWorld(project, searched)).toBe(false)
+      for (const target of [instance("fabric"), instance(null), undefined]) {
+        expect(instanceInstallIsDatapack(project, target)).toBe(false)
+        for (const picked of [
+          undefined,
+          { datapackBuild: true },
+          { datapackBuild: undefined }
+        ])
+          expect(instanceInstall(project, target, picked)).toBe("addon")
+      }
+    }
   })
   it("a world is asked for a pure data pack always, for a hybrid only in a data pack search", () => {
     for (const searched of ["datapack", "mod", null, undefined]) {

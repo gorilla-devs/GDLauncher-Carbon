@@ -365,7 +365,17 @@ it.each([
     { ...plainMod, type: "resourcePack", loaders: [] },
     "resourcePack"
   ],
-  ["a world", { ...plainMod, type: "world", loaders: [] }, "world"]
+  ["a world", { ...plainMod, type: "world", loaders: [] }, "world"],
+  [
+    "a resource pack that lists the datapack loader",
+    { ...plainMod, type: "resourcePack", loaders: ["minecraft", "datapack"] },
+    "resourcePack"
+  ],
+  [
+    "a shader that lists the datapack loader",
+    { ...plainMod, type: "shader", loaders: ["iris", "datapack"] },
+    "shader"
+  ]
 ])(
   "Download of %s installs in one click, with no menu",
   async (_, addon, searched) => {
