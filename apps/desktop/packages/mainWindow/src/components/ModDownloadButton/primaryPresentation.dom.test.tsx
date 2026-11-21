@@ -11,7 +11,6 @@ const c = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
   download: undefined as any,
-  where: undefined as any,
   loading: undefined as any,
   progress: undefined as any
 }))
@@ -39,14 +38,9 @@ vi.mock("@/utils/rspcClient", async () => {
 vi.mock("@/managers/ModalsManager", () => ({
   useModal: () => ({ openModal: vi.fn() })
 }))
-// A data pack's Download is the trigger of its "where" menu: `c.where`
-// stands for the click on it.
 vi.mock("@gd/ui", () => ({
   toast: { error: c.error, success: c.success },
-  DropdownMenu: (p: any) => {
-    c.where = () => p.onOpenChange(true)
-    return p.children
-  },
+  DropdownMenu: (p: any) => p.children,
   DropdownMenuTrigger: (p: any) => p.children,
   DropdownMenuContent: () => null
 }))
@@ -344,7 +338,7 @@ it("accepted datapack type survives a pending mod request", async () => {
   const o = owner({ type: "datapack" })
   await tick()
   // No world to choose among: the click installs into the instance at once.
-  c.where()
+  await c.download()
   await tick()
   await selectB(o)
   const clickedB = c.download()

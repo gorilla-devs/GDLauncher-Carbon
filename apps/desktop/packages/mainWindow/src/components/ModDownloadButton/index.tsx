@@ -504,35 +504,46 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     }
   }
 
-  const [whereOpen, setWhereOpen] = createSignal(false)
-  const showWhere = (open: boolean) => {
-    if (whereOpen() === open) return
-    setWhereOpen(open)
-    props.onDropdownOpenChange?.(open)
+  // The "where" step under Download: "open" while its menu shows, "waiting"
+  // after a click made before the worlds were read.
+  const [where, setWhere] = createSignal<"closed" | "waiting" | "open">(
+    "closed"
+  )
+  const showWhere = (next: ReturnType<typeof where>) => {
+    const inUse = where() !== "closed"
+    setWhere(next)
+    if (inUse !== (next !== "closed"))
+      props.onDropdownOpenChange?.(next !== "closed")
   }
-  /** Download of a data pack: asks where, or installs at once when only the
-   *  instance can take it. */
-  const requestWhere = () => {
-    if (props.instanceLocked || loading() || isInstalled()) return
-    const offered = places()
-    if (!offered || offered.offers === "choice") showWhere(true)
-    else if (offered.offers === "instance") void handleDownload()
+  // Only with something to choose is Download the trigger of a menu: a
+  // trigger acts on pointer down, where a plain button waits for the click.
+  const offersChoice = () => places()?.offers === "choice"
+  /** A click on the plain button. Before the worlds are read nobody knows
+   *  whether there is a choice, so the click waits for them. */
+  const handlePlainClick = () => {
+    if (!asksWhere() || places()) return handleDownload()
+    if (!props.instanceLocked && !loading() && !isInstalled())
+      showWhere("waiting")
   }
-  // Opened before its lists were read, the step only stays while it offers
-  // something: with no readable world the pack goes into the instance.
+  // A click that waited gets its answer once the worlds are read: the step,
+  // or with no readable world the install into the instance. An open step
+  // only stays while it has something to choose.
   createEffect(() => {
-    if (!whereOpen()) return
+    const now = where()
+    if (now === "closed") return
     const offered = places()
-    if (asksWhere() && (!offered || offered.offers === "choice")) return
+    if (now === "waiting" && asksWhere() && !offered) return
+    if (offered?.offers === "choice") return showWhere("open")
     untrack(() => {
-      showWhere(false)
-      if (offered?.offers === "instance") void handleDownload()
+      showWhere("closed")
+      if (now === "waiting" && offered?.offers === "instance")
+        void handleDownload()
     })
   })
 
   const instanceButton = (onDownload: () => void) => (
     <InstallButton
-      loading={loading}
+      loading={() => loading() || where() === "waiting"}
       progress={progress}
       isInstalled={isInstalled}
       instanceLocked={() => props.instanceLocked ?? false}
@@ -601,15 +612,16 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
         />
       </Match>
       <Match when={props.selectedInstanceId}>
-        <Show
-          when={asksWhere()}
-          fallback={instanceButton(() => handleDownload())}
-        >
-          {/* The menu's trigger takes the click: it asks where, or installs
-              at once, so the button itself does nothing. */}
+        <Show when={offersChoice()} fallback={instanceButton(handlePlainClick)}>
+          {/* The menu's trigger takes the click, so the button itself does
+              nothing. */}
           <DropdownMenu
-            open={whereOpen()}
-            onOpenChange={(open) => (open ? requestWhere() : showWhere(false))}
+            open={where() === "open"}
+            onOpenChange={(open) =>
+              showWhere(
+                open && !props.instanceLocked && !loading() ? "open" : "closed"
+              )
+            }
           >
             <DropdownMenuTrigger class="b-0 bg-transparent p-0">
               {instanceButton(() => {})}
@@ -618,11 +630,11 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
               <InstallPlacesStep
                 places={places()}
                 onWorld={(world) => {
-                  showWhere(false)
+                  showWhere("closed")
                   void handleDownload(world)
                 }}
                 onInstance={() => {
-                  showWhere(false)
+                  showWhere("closed")
                   void handleDownload()
                 }}
               />

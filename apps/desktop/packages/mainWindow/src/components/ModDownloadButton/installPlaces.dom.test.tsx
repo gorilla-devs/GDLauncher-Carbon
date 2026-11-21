@@ -432,7 +432,58 @@ it("a version picked in the Versions tab installs into the instance at once", as
   ])
   expect(worldsRead()).toBe(false)
 })
-it("the menu opened before the worlds are read installs into the instance once they turn out to be none", async () => {
+// With nothing to choose the button is the plain button it always was: a
+// menu trigger would act on pointer down, before the click.
+const trigger = () => document.querySelector("[aria-haspopup]")
+const pointerDown = async () => {
+  button().dispatchEvent(
+    new MouseEvent("pointerdown", { button: 0, bubbles: true })
+  )
+  await flush()
+}
+const spins = () => !!button().querySelector(".animate-spin")
+it.each([
+  ["no world", []],
+  ["only unreadable worlds", [world("Broken", [], null)]],
+  [
+    "worlds that cannot be read",
+    () => {
+      throw new Error("unreadable")
+    }
+  ]
+])(
+  "with %s Download is a plain button: it installs on the click, not on pointer down",
+  async (_, worlds) => {
+    serve(worlds as any)
+    await mount(curseforgePack, {}, "datapack")
+    expect(trigger()).toBeNull()
+    await pointerDown()
+    expect(requests()).toEqual([])
+    button().click()
+    await flush()
+    expect(requests()).toEqual(["instance.installLatestMod"])
+  }
+)
+it("with a world to choose Download is the trigger of the step", async () => {
+  serve([world("My World")])
+  await mount(curseforgePack, {}, "datapack")
+  expect(trigger()).not.toBeNull()
+  await pointerDown()
+  expect(isOpen()).toBe(true)
+  expect(requests()).toEqual([])
+})
+it("once every place holds the data pack the button is plain again", async () => {
+  serve([world("My World", [curseforgeCopy("in-world")])])
+  await mount(
+    curseforgePack,
+    { selectedInstanceMods: [curseforgeCopy("in-instance")] },
+    "datapack"
+  )
+  expect(trigger()).toBeNull()
+})
+// While the worlds are read nobody knows yet whether there is a choice: the
+// click is kept, shown as busy, and answered once they are read.
+function serveLater() {
   let answer!: (worlds: any[]) => void
   c.query.mockImplementation(([key]: any) =>
     key === "instance.getWorlds"
@@ -442,14 +493,55 @@ it("the menu opened before the worlds are read installs into the instance once t
       : Promise.resolve(running)
   )
   c.mutate.mockResolvedValue(61)
+  return (worlds: any[]) => answer(worlds)
+}
+it("Download clicked before the worlds are read waits, then installs into the instance when they turn out to be none", async () => {
+  const answer = serveLater()
   await mount(curseforgePack, {}, "datapack")
+  expect(trigger()).toBeNull()
+  expect(spins()).toBe(false)
   await download()
-  expect(isOpen()).toBe(true)
   expect(requests()).toEqual([])
+  expect(spins()).toBe(true)
   answer([])
   await flush()
   expect(isOpen()).toBe(false)
   expect(requests()).toEqual(["instance.installLatestMod"])
+})
+it("Download clicked before the worlds are read waits, then asks where once a world turns up", async () => {
+  const answer = serveLater()
+  await mount(curseforgePack, {}, "datapack")
+  await download()
+  expect(requests()).toEqual([])
+  answer([world("My World")])
+  await flush()
+  expect(spins()).toBe(false)
+  expect(items()).toEqual([
+    "My World",
+    "content:_trn_worlds.download_to_instance"
+  ])
+  expect(requests()).toEqual([])
+  await pick("My World")
+  expect(requests()).toEqual(["instance.installWorldDatapack"])
+})
+it("pointer down before the worlds are read installs nothing, then or later", async () => {
+  const answer = serveLater()
+  await mount(curseforgePack, {}, "datapack")
+  await pointerDown()
+  expect(spins()).toBe(false)
+  answer([])
+  await flush()
+  expect(requests()).toEqual([])
+})
+it("the row is told the step is in use while a click waits, and no longer once it is answered", async () => {
+  const answer = serveLater()
+  const opened = vi.fn()
+  await mount(curseforgePack, { onDropdownOpenChange: opened }, "datapack")
+  await download()
+  expect(opened.mock.calls).toEqual([[true]])
+  answer([])
+  await flush()
+  expect(opened.mock.calls).toEqual([[true], [false]])
 })
 
 // An install into the instance itself. Modrinth lists the data pack builds
