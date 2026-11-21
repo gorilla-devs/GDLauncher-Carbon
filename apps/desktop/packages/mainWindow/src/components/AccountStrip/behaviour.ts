@@ -1,5 +1,13 @@
 import type { MotionState } from "@/themes/motion"
 
+/** How long the strip takes to open and to close, and its easings: it opens
+ *  quickly and settles, and closes evenly, so its shrinking shows. The top
+ *  bar's other buttons fold away and back on the same timing. */
+export const STRIP_OPEN_MS = 300
+export const STRIP_CLOSE_MS = 260
+export const STRIP_OPEN_EASE = "cubic-bezier(0.2, 0.8, 0.2, 1)"
+export const STRIP_CLOSE_EASE = "cubic-bezier(0.4, 0, 0.2, 1)"
+
 /**
  * While the strip is open: Esc in it closes it and gives focus back to the
  * account button; focus leaving it, or a press anywhere else, closes it and

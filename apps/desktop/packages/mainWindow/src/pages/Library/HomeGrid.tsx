@@ -392,7 +392,16 @@ const HomeGridInner = () => {
           sib = sib.previousElementSibling as HTMLElement | null
         }
       }
+      // The ledge and other panel decorations stay on top while the list
+      // switches, and the gutter band takes the panel's own color
+      // (index.html, modeTransitions.css).
+      const root = document.documentElement
+      root.classList.add("gdl-library-switch")
       if (scrollEl) {
+        root.style.setProperty(
+          "--gdl-library-gutter",
+          getComputedStyle(scrollEl).backgroundColor
+        )
         scrollEl.style.viewTransitionName = "library-content"
         scrollEl.style.setProperty("view-transition-class", direction)
         // Hide the scrollbar while the snapshot is captured so it isn't
@@ -410,6 +419,8 @@ const HomeGridInner = () => {
       })
 
       const finish = () => {
+        root.classList.remove("gdl-library-switch")
+        root.style.removeProperty("--gdl-library-gutter")
         if (scrollEl) {
           scrollEl.style.viewTransitionName = ""
           scrollEl.style.removeProperty("view-transition-class")

@@ -141,3 +141,8 @@
   outline: 2px solid rgb(var(--primary-500));
   outline-offset: 2px;
 }
+/* The account button is nearly as tall as the bar, whose edge clips: its
+   ring goes inside it. */
+:where([data-gdl~="account-menu.button"]:focus-visible) {
+  outline-offset: -2px;
+}

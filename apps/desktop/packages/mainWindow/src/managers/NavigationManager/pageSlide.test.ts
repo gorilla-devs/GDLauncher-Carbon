@@ -6,51 +6,42 @@ const RIGHT = "slide-right-transition"
 const LEFT = "slide-left-transition"
 const html = () => document.documentElement.classList
 
+// The classes go on <html>, which outlives the navigation, so the CSS can
+// name the old page's panel and the new page's, though they are different
+// elements (index.html).
 describe("page slides", () => {
   beforeEach(() => {
+    document.documentElement.className = ""
     document.body.className = ""
-    html().remove(PAGE_SLIDE_CLASS)
-    document.body.innerHTML = '<div id="gdl-page"></div>'
   })
-  const page = () => document.getElementById("gdl-page")!
 
-  it("only the page box slides, and the rest is told so", () => {
-    const end = createPageSlides(document, "gdl-page")(RIGHT)
-    expect(page().classList.contains(RIGHT)).toBe(true)
-    expect(document.body.classList.contains(RIGHT)).toBe(false)
+  it("marks the slide and its direction on <html>, then clears them", () => {
+    const end = createPageSlides(document)(RIGHT)
     expect(html().contains(PAGE_SLIDE_CLASS)).toBe(true)
+    expect(html().contains(RIGHT)).toBe(true)
+    expect(document.body.className).toBe("")
     end()
-    expect(page().classList.contains(RIGHT)).toBe(false)
     expect(html().contains(PAGE_SLIDE_CLASS)).toBe(false)
-  })
-
-  it("without the page box the body slides, as before", () => {
-    document.body.innerHTML = ""
-    const end = createPageSlides(document, "gdl-page")(LEFT)
-    expect(document.body.classList.contains(LEFT)).toBe(true)
-    expect(html().contains(PAGE_SLIDE_CLASS)).toBe(false)
-    end()
-    expect(document.body.classList.contains(LEFT)).toBe(false)
+    expect(html().contains(RIGHT)).toBe(false)
   })
 
   it("a slide that ends after a newer one started leaves the newer one alone", () => {
-    const slide = createPageSlides(document, "gdl-page")
+    const slide = createPageSlides(document)
     const endFirst = slide(RIGHT)
     const endSecond = slide(LEFT)
-    expect(page().classList.contains(RIGHT), "the stale class goes").toBe(false)
-    expect(page().classList.contains(LEFT)).toBe(true)
+    expect(html().contains(RIGHT), "the stale direction goes").toBe(false)
+    expect(html().contains(LEFT)).toBe(true)
     endFirst()
-    expect(page().classList.contains(LEFT)).toBe(true)
+    expect(html().contains(LEFT)).toBe(true)
     expect(html().contains(PAGE_SLIDE_CLASS)).toBe(true)
     endSecond()
-    expect(page().classList.contains(LEFT)).toBe(false)
+    expect(html().contains(LEFT)).toBe(false)
     expect(html().contains(PAGE_SLIDE_CLASS)).toBe(false)
   })
 
   it("a navigation without a slide changes nothing", () => {
-    const end = createPageSlides(document, "gdl-page")(undefined)
-    expect(page().className).toBe("")
-    expect(html().contains(PAGE_SLIDE_CLASS)).toBe(false)
+    const end = createPageSlides(document)(undefined)
+    expect(document.documentElement.className).toBe("")
     end()
   })
 })

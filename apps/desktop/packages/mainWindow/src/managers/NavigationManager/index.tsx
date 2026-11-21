@@ -53,7 +53,7 @@ export const NavigationManager = (props: { children: JSX.Element }) => {
     searchParams: location.search
   })
 
-  const startSlide = createPageSlides(document, PAGE_ID)
+  const startSlide = createPageSlides(document)
 
   const shouldTransition = () =>
     !globalstore.settings.data?.reducedMotion && document.startViewTransition

@@ -200,11 +200,20 @@
         animation-duration: 0s;
       }
 
-      .slide-right-transition {
+      /* What slides (classes on <html>, NavigationManager/pageSlide.ts): the
+         page's panel, so its frame and frosted glass stay put and live behind
+         it (a backdrop-filter inside a transition snapshot has nothing to
+         blur); the page box when a page has no panel; the body outside the
+         app's layout. */
+      html.slide-right-transition #gdl-content-wrapper,
+      html.slide-right-transition #gdl-page:not(:has(#gdl-content-wrapper)),
+      html.slide-right-transition body:not(:has(#gdl-page)) {
         view-transition-name: slide-right-transition;
       }
 
-      .slide-left-transition {
+      html.slide-left-transition #gdl-content-wrapper,
+      html.slide-left-transition #gdl-page:not(:has(#gdl-content-wrapper)),
+      html.slide-left-transition body:not(:has(#gdl-page)) {
         view-transition-name: slide-left-transition;
       }
 
@@ -243,21 +252,32 @@
       }
 
       /* The snow, the lights and the content's decorations sit above the
-         page; in the root's live view they would fall behind the sliding
-         page, so they keep their own place, live and still. */
-      html.gdl-page-slide [data-gdl-effects] {
+         page. In a view transition the root's view falls behind whatever
+         moves, so in every transition they keep their own place, live and
+         still; the panel's decorations (the ledge) too while its contents
+         slide or switch (the library's Instances and Servers). */
+      [data-gdl-effects] {
         view-transition-name: gdl-effects;
       }
-      html.gdl-page-slide [data-gdl-decorations="content"] {
+      [data-gdl-decorations="content"] {
         view-transition-name: gdl-content-decorations;
       }
-      html.gdl-page-slide::view-transition-old(gdl-effects),
-      html.gdl-page-slide::view-transition-old(gdl-content-decorations) {
+      html.gdl-page-slide [data-gdl-decorations="panel"],
+      html.gdl-library-switch [data-gdl-decorations="panel"] {
+        view-transition-name: gdl-panel-decorations;
+      }
+      ::view-transition-old(gdl-effects),
+      ::view-transition-old(gdl-content-decorations),
+      ::view-transition-old(gdl-panel-decorations) {
         animation: none;
         opacity: 0;
       }
-      html.gdl-page-slide::view-transition-new(gdl-effects),
-      html.gdl-page-slide::view-transition-new(gdl-content-decorations) {
+      ::view-transition-group(gdl-effects),
+      ::view-transition-group(gdl-content-decorations),
+      ::view-transition-group(gdl-panel-decorations),
+      ::view-transition-new(gdl-effects),
+      ::view-transition-new(gdl-content-decorations),
+      ::view-transition-new(gdl-panel-decorations) {
         animation: none;
       }
 

@@ -1521,6 +1521,72 @@ test.describe("Themes", () => {
     }
   })
 
+  /** Waits for the account strip's open or close animation to finish. */
+  const stripSettled = async (page: Page) => {
+    let last = -1
+    await expect
+      .poll(
+        async () => {
+          const width = await page
+            .locator(byHook("account-menu.strip"))
+            .evaluate((el) => el.getBoundingClientRect().width)
+          const same = width === last
+          last = width
+          return same
+        },
+        { intervals: [120] }
+      )
+      .toBe(true)
+  }
+
+  /** The search box's x in every frame for a while, started before `act`. */
+  const searchBoxFrames = async (page: Page, act: () => Promise<void>) => {
+    const frames = page.evaluate(
+      () =>
+        new Promise<number[]>((resolve) => {
+          const box = document.querySelector('[data-gdl~="nav.search.box"]')!
+          const xs: number[] = []
+          const start = performance.now()
+          const tick = () => {
+            xs.push(Math.round(box.getBoundingClientRect().x))
+            if (performance.now() - start < 600) requestAnimationFrame(tick)
+            else resolve(xs)
+          }
+          requestAnimationFrame(tick)
+        })
+    )
+    await act()
+    return frames
+  }
+
+  // The strip grows out of the account button and the bar reflows with it:
+  // the search box glides to its new place and back, never jumps.
+  test("the search box glides as the account strip opens and closes", async ({
+    authenticatedApp
+  }) => {
+    const { page } = authenticatedApp
+    await goToLibrary(page)
+    const trigger = page.locator(byHook("account-menu.trigger"))
+    const glided = (xs: number[]) => {
+      const first = xs[0]
+      const last = xs[xs.length - 1]
+      const between = new Set(
+        xs.filter((x) => x > Math.min(first, last) && x < Math.max(first, last))
+      )
+      return { moved: first !== last, between: between.size }
+    }
+    const opening = glided(await searchBoxFrames(page, () => trigger.click()))
+    expect(opening.moved, "the search box makes room").toBe(true)
+    expect(opening.between, "positions in between").toBeGreaterThanOrEqual(4)
+    await stripSettled(page)
+    const closing = glided(
+      await searchBoxFrames(page, () => page.keyboard.press("Escape"))
+    )
+    expect(closing.moved, "the search box comes back").toBe(true)
+    expect(closing.between, "positions in between").toBeGreaterThanOrEqual(4)
+    await expect(page.locator(byHook("account-menu.strip"))).toHaveCount(0)
+  })
+
   // Opened with the mouse, the account strip leaves no focus ring; opened
   // with the keyboard, focus lands on the active account, with a visible
   // ring, and the arrow keys move along the strip.
@@ -1628,7 +1694,7 @@ test.describe("Themes", () => {
       await page.locator(byHook("account-menu.trigger")).click()
       const strip = page.locator(byHook("account-menu.strip"))
       await expect(strip).toBeVisible()
-      await page.waitForTimeout(300)
+      await stripSettled(page)
 
       const active = page.locator(byHook("account-menu.account.active"))
       const look = (prop: "backgroundColor" | "color") =>
@@ -1699,6 +1765,7 @@ test.describe("Themes", () => {
     await page.locator(byHook("account-menu.trigger")).click()
     const strip = page.locator(byHook("account-menu.strip"))
     await expect(strip).toBeVisible()
+    await stripSettled(page)
     const box = async (hook: string) => {
       const b = await page.locator(byHook(hook)).first().boundingBox()
       if (!b) throw new Error(`no box for ${hook}`)
@@ -1860,6 +1927,66 @@ test.describe("Themes", () => {
       expect(slideNames.effects).toBe("gdl-effects")
       if (slideNames.decorations !== null)
         expect(slideNames.decorations).toBe("gdl-content-decorations")
+
+      // A page slide moves the panel's contents, not the page: the frame and
+      // its frosted glass stay live behind them (a backdrop-filter inside a
+      // transition snapshot has nothing to blur), and so does the ledge.
+      await goToLibrary(page)
+      const panelNames = await page.evaluate(() => {
+        const root = document.documentElement
+        const name = (sel: string) => {
+          const el = document.querySelector(sel)
+          return el ? getComputedStyle(el).viewTransitionName : null
+        }
+        root.classList.add("gdl-page-slide", "slide-right-transition")
+        const sliding = {
+          panel: name("#gdl-content-wrapper"),
+          page: name("#gdl-page"),
+          root: getComputedStyle(root).viewTransitionName,
+          ledge: name('[data-gdl-decorations="panel"]')
+        }
+        root.classList.remove("gdl-page-slide", "slide-right-transition")
+        root.classList.add("gdl-library-switch")
+        const switching = name('[data-gdl-decorations="panel"]')
+        root.classList.remove("gdl-library-switch")
+        return { ...sliding, switching }
+      })
+      expect(panelNames.panel).toBe("slide-right-transition")
+      expect(panelNames.page).toBe("none")
+      expect(panelNames.root).toBe("root")
+      expect(panelNames.ledge).toBe("gdl-panel-decorations")
+      expect(panelNames.switching).toBe("gdl-panel-decorations")
+
+      // The library's Instances/Servers switch fills the scrollbar band with
+      // the panel's own colour, transparent here, not a solid colour that
+      // darkens the glass for the whole slide.
+      const tabs = page.locator(byHook("library.tabs"))
+      const gutter = page.evaluate(
+        () =>
+          new Promise<string>((resolve) => {
+            const root = document.documentElement
+            const check = () => {
+              if (root.classList.contains("gdl-library-switch"))
+                resolve(
+                  getComputedStyle(root)
+                    .getPropertyValue("--gdl-library-gutter")
+                    .trim()
+                )
+              else requestAnimationFrame(check)
+            }
+            requestAnimationFrame(check)
+          })
+      )
+      await tabs.getByRole("tab", { name: /Servers/ }).click()
+      expect(await gutter).toBe("rgba(0, 0, 0, 0)")
+      await expect
+        .poll(() =>
+          page.evaluate(() =>
+            document.documentElement.classList.contains("gdl-library-switch")
+          )
+        )
+        .toBe(false)
+      await tabs.getByRole("tab", { name: /Instances/ }).click()
 
       const logo = `${byHook("nav.logo")} [data-gdl-decoration]`
       await expect.poll(() => backgroundImageOf(page, logo)).toContain("hat")
