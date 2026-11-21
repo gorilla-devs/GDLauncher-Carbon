@@ -40,13 +40,15 @@ fn is_gone(path: &Path) -> bool {
 /// Moves `path` to the Recycle Bin with everything in it. One already gone
 /// is fine.
 pub(crate) async fn move_to_recycle_bin(path: PathBuf) -> anyhow::Result<()> {
-    tokio::task::spawn_blocking(move || {
-        if is_gone(&path) {
-            return Ok(());
-        }
-        send_to_bin(std::slice::from_ref(&path)).map_err(|error| refusal(&path, &error))
-    })
-    .await?
+    tokio::task::spawn_blocking(move || move_to_recycle_bin_blocking(&path)).await?
+}
+
+/// [`move_to_recycle_bin`] on the calling thread.
+pub(crate) fn move_to_recycle_bin_blocking(path: &Path) -> anyhow::Result<()> {
+    if is_gone(path) {
+        return Ok(());
+    }
+    send_to_bin(std::slice::from_ref(&path.to_path_buf())).map_err(|error| refusal(path, &error))
 }
 
 /// Moves every one of `paths` to the Recycle Bin in one request, which is one

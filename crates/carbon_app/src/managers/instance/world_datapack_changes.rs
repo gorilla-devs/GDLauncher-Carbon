@@ -50,6 +50,10 @@ use carbon_platforms::{
 use carbon_repos::repos::world_datapack_cache::{self as wdb, WorldDatapackRow};
 use serde::Deserialize;
 use std::path::{Path, PathBuf};
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 use tracing::warn;
 
 /// Where the data pack comes from; no version or file means the newest data
@@ -97,13 +101,25 @@ pub struct DeleteWorldDatapack {
 
 /// A pack moved out of the game's sight until its replacement is in place:
 /// then [`TakenAway::send_on`] removes it as the user's Delete would, or
-/// [`TakenAway::put_back`] returns it under its name. Dropped unsettled, it
-/// is put back too.
+/// [`TakenAway::put_back`] returns it under its name. Dropped unsettled, the
+/// world is put back as it was: the replacement [`TakenAway::publish`] put
+/// in place is withdrawn and the pack returns. When it cannot return, `keep`
+/// is set, so the folder it waits in stays and the warning names it.
 pub(super) struct TakenAway {
     original: PathBuf,
     aside: PathBuf,
     removal: Removal,
+    /// Held while a publication, removal or put-back runs on the blocking
+    /// pool, so a drop waits for that step and then sees what it did.
+    settlement: Arc<std::sync::Mutex<Settlement>>,
+    keep: Arc<AtomicBool>,
+}
+
+#[derive(Default)]
+struct Settlement {
     settled: bool,
+    /// The replacement, once it is in place.
+    published: Option<PathBuf>,
 }
 
 /// The name a pack waits under beside itself when the private folder is on
@@ -120,6 +136,7 @@ pub(super) async fn take_away(
     path: &Path,
     aside_folder: &Path,
     removal: Removal,
+    keep: Arc<AtomicBool>,
 ) -> anyhow::Result<TakenAway> {
     let (original, folder) = (path.to_owned(), aside_folder.to_owned());
     let aside = tokio::task::spawn_blocking(move || set_aside(&original, &folder)).await??;
@@ -127,7 +144,8 @@ pub(super) async fn take_away(
         original: path.to_owned(),
         aside,
         removal,
-        settled: false,
+        settlement: Default::default(),
+        keep,
     })
 }
 
@@ -172,37 +190,138 @@ impl TakenAway {
         )
     }
 
-    /// Returns the entry under its original name, never over something
-    /// that took that name meanwhile.
-    pub(super) async fn put_back(mut self) -> anyhow::Result<()> {
-        let (aside, original) = (self.aside.clone(), self.original.clone());
-        let moved =
-            tokio::task::spawn_blocking(move || rename_noclobber(&aside, &original)).await?;
-        self.settled = true;
-        moved.map_err(|error| self.put_back_failure(&error))
+    /// Runs `step` on the blocking pool with the settlement held, unless
+    /// the entry is settled already.
+    async fn settle<T: Send + 'static>(
+        &self,
+        step: impl FnOnce(&mut Settlement) -> anyhow::Result<T> + Send + 'static,
+    ) -> anyhow::Result<T> {
+        let settlement = self.settlement.clone();
+        tokio::task::spawn_blocking(move || {
+            let mut settlement = settlement.lock().unwrap_or_else(|held| held.into_inner());
+            if settlement.settled {
+                bail!("The data pack set aside was already put back or removed");
+            }
+            step(&mut settlement)
+        })
+        .await?
+    }
+
+    /// Publishes `file` at `destination` without replacing anything, as
+    /// the replacement of the entry taken away.
+    pub(super) async fn publish(
+        &self,
+        file: tempfile::NamedTempFile,
+        destination: &Path,
+    ) -> anyhow::Result<()> {
+        let destination = destination.to_owned();
+        self.settle(move |settlement| {
+            crate::util::publish::persist_noclobber(file, &destination)?;
+            settlement.published = Some(destination);
+            Ok(())
+        })
+        .await
+    }
+
+    /// Withdraws the replacement when one was published (it is this
+    /// install's own download), then returns the entry under its original
+    /// name, never over something that took that name meanwhile. When it
+    /// cannot return, it stays where it waits and `keep` is set.
+    pub(super) async fn put_back(self) -> anyhow::Result<()> {
+        let (aside, original, keep) =
+            (self.aside.clone(), self.original.clone(), self.keep.clone());
+        let (withdrawn, moved) = self
+            .settle(move |settlement| {
+                settlement.settled = true;
+                let withdrawn = settlement.published.take().and_then(|published| {
+                    std::fs::remove_file(&published)
+                        .err()
+                        .filter(|error| error.kind() != std::io::ErrorKind::NotFound)
+                        .map(|error| {
+                            anyhow!("{} could not be removed: {error}", published.display())
+                        })
+                });
+                let moved = rename_noclobber(&aside, &original);
+                if moved.is_err() {
+                    keep.store(true, Ordering::SeqCst);
+                }
+                Ok((withdrawn, moved))
+            })
+            .await?;
+        match (moved, withdrawn) {
+            (Ok(()), None) => Ok(()),
+            (Ok(()), Some(withdrawn)) => Err(withdrawn),
+            (Err(error), None) => Err(self.put_back_failure(&error)),
+            (Err(error), Some(withdrawn)) => Err(anyhow!(
+                "{withdrawn:#}. {:#}",
+                self.put_back_failure(&error)
+            )),
+        }
     }
 
     /// Removes the entry as the "Deletion through Recycle Bin" setting
     /// asked. On failure it is still where it waited and can be put back.
     pub(super) async fn send_on(&mut self) -> anyhow::Result<()> {
-        if let Some(meta) = addon_metadata(&self.aside).await?
-            && !remove_addon_entry(&self.aside, &meta, meta.is_dir(), self.removal).await?
+        let (aside, removal) = (self.aside.clone(), self.removal);
+        self.settle(move |settlement| {
+            remove_set_aside(&aside, removal)?;
+            settlement.settled = true;
+            Ok(())
+        })
+        .await
+    }
+}
+
+/// Removes the entry at `path` the way `removal` says, a link by itself.
+/// One already gone is fine.
+fn remove_set_aside(path: &Path, removal: Removal) -> anyhow::Result<()> {
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error.into()),
+    };
+    if meta.file_type().is_symlink() {
+        // Windows removes a link to a folder (or a junction) as a folder.
+        #[cfg(windows)]
         {
-            bail!(
-                "{} is no file or folder that can be deleted",
-                self.aside.display()
-            );
+            use std::os::windows::fs::FileTypeExt;
+            if meta.file_type().is_symlink_dir() {
+                return Ok(std::fs::remove_dir(path)?);
+            }
         }
-        self.settled = true;
-        Ok(())
+        return Ok(std::fs::remove_file(path)?);
+    }
+    if !meta.is_dir() && !meta.is_file() {
+        bail!(
+            "{} is no file or folder that can be deleted",
+            path.display()
+        );
+    }
+    match removal {
+        Removal::RecycleBin => crate::util::recycle_bin::move_to_recycle_bin_blocking(path),
+        Removal::Permanent if meta.is_dir() => Ok(std::fs::remove_dir_all(path)?),
+        Removal::Permanent => Ok(std::fs::remove_file(path)?),
     }
 }
 
 impl Drop for TakenAway {
     fn drop(&mut self) {
-        if !self.settled
-            && let Err(error) = rename_noclobber(&self.aside, &self.original)
+        let settlement = self.settlement.clone();
+        let mut settlement = settlement.lock().unwrap_or_else(|held| held.into_inner());
+        if settlement.settled {
+            return;
+        }
+        settlement.settled = true;
+        // The replacement is this install's own download: withdrawn, so
+        // the pack gets its name back and one build of it stays.
+        if let Some(published) = &settlement.published
+            && let Err(error) = std::fs::remove_file(published)
+            && error.kind() != std::io::ErrorKind::NotFound
         {
+            warn!(?error, "Could not withdraw {}", published.display());
+        }
+        if let Err(error) = rename_noclobber(&self.aside, &self.original) {
+            self.keep.store(true, Ordering::SeqCst);
             warn!("{}", self.put_back_failure(&error));
         }
     }
@@ -485,16 +604,14 @@ impl ManagerRef<'_, InstanceManager> {
         let handle = spawn_retained(activity, move |slot| {
             Box::pin(async move {
                 let cancel = slot.as_ref().unwrap().cancellation();
-                let work = app.instance_manager().finish_world_datapack_install(
-                    id, &task, &cancel, build, staging, root_hold, request,
-                );
-                let result = tokio::select! {
-                    biased;
-                    _ = cancel.cancelled() => Err(anyhow!(
-                        "Data pack install stopped because the launcher is closing"
-                    )),
-                    result = work => result,
-                };
+                // Stopped by a quit only before it takes the gate, so the
+                // task reports what happened to the world.
+                let result = app
+                    .instance_manager()
+                    .finish_world_datapack_install(
+                        id, &task, &cancel, build, staging, root_hold, request,
+                    )
+                    .await;
                 match &result {
                     Ok(_) => task.complete(),
                     Err(error) => task.clone().fail(anyhow!("{error:#}")).await,
@@ -780,7 +897,11 @@ impl ManagerRef<'_, InstanceManager> {
                 .progress_sender(progress_tx)
                 .build(),
         );
-        let (result, subtask) = tokio::join!(transfer, progress);
+        let (result, subtask) = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => bail!(CLOSING),
+            done = async { tokio::join!(transfer, progress) } => done,
+        };
         result.with_context(|| format!("Failed to download data pack {}", build.filename))?;
         subtask.complete_download();
 
@@ -792,7 +913,7 @@ impl ManagerRef<'_, InstanceManager> {
         // and both are seen under the gate.
         drop(root_hold);
         let destination = self
-            .publish_world_datapack_download(id, &build.filename, staging, &request)
+            .publish_world_datapack_download(id, cancel, &build.filename, staging, &request)
             .await?;
         // The pack is in the world: from here on nothing fails the install.
         if let Err(error) = self
@@ -812,17 +933,29 @@ impl ManagerRef<'_, InstanceManager> {
     /// Under the instance gate: the re-checks, then the publication, with
     /// the pack the install replaces taken away first. The private folder
     /// goes before the gate on every return, so a delete or a rename queued
-    /// behind the gate never meets it half removed.
+    /// behind the gate never meets it half removed. A quit stops it only
+    /// while it waits for the gate.
     async fn publish_world_datapack_download(
         self,
         id: InstanceId,
+        cancel: &tokio_util::sync::CancellationToken,
         filename: &str,
         staging: Staging,
         request: &InstallWorldDatapack,
     ) -> anyhow::Result<PathBuf> {
-        let operation = self.lock_instance(id).await;
+        // The last point a quit stops the install. From here on it runs to
+        // its end, and the quit waits for it: once the old pack is taken
+        // away, it is either back or sent on its way.
+        let operation = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => bail!(CLOSING),
+            operation = self.lock_instance(id) => operation,
+        };
         // Declared after the gate, so dropped before it on every return.
         let mut staging = staging;
+        if cancel.is_cancelled() {
+            bail!(CLOSING);
+        }
         // Removed from wherever the root is now, also when refused.
         if let Ok(path) = publication::current_path(&self.app, id).await {
             staging.root = long_path(&path.get_root());
@@ -852,34 +985,22 @@ impl ManagerRef<'_, InstanceManager> {
             None => None,
         };
         let removal = self.addon_removal().await?;
-        let (app, identity, filename) = (
-            self.app.clone(),
-            request.identity.clone(),
-            filename.to_owned(),
-        );
-        // Runs to its end even when the install is stopped: once the old
-        // pack is taken away it is either back or sent on its way, and the
-        // private folder it waits in goes only after that.
-        tokio::spawn(async move {
-            let published = app
-                .instance_manager()
-                .publish_replacing(
-                    id,
-                    &root,
-                    temporary,
-                    &world,
-                    &identity,
-                    &filename,
-                    replaced,
-                    &mut staging,
-                    removal,
-                )
-                .await;
-            drop(staging);
-            drop(operation);
-            published
-        })
-        .await?
+        let published = self
+            .publish_replacing(
+                id,
+                &root,
+                temporary,
+                &world,
+                &request.identity,
+                filename,
+                replaced,
+                &staging,
+                removal,
+            )
+            .await;
+        drop(staging);
+        drop(operation);
+        published
     }
 
     /// [`Self::publish_into_world`], after taking `replaced` away when
@@ -898,7 +1019,7 @@ impl ManagerRef<'_, InstanceManager> {
         identity: &str,
         filename: &str,
         replaced: Option<PathBuf>,
-        staging: &mut Staging,
+        staging: &Staging,
         removal: Removal,
     ) -> anyhow::Result<PathBuf> {
         let Some(old) = replaced else {
@@ -906,34 +1027,32 @@ impl ManagerRef<'_, InstanceManager> {
                 .publish_into_world(id, root, temporary, world, identity, filename)
                 .await;
         };
-        let mut taken = take_away(&old, &staging.path().join(REPLACED), removal).await?;
-        let (error, withdrawn) = match self
-            .publish_into_world(id, root, temporary, world, identity, filename)
+        let mut taken = take_away(
+            &old,
+            &staging.path().join(REPLACED),
+            removal,
+            staging.keeper(),
+        )
+        .await?;
+        #[cfg(test)]
+        self.test_hooks.pause("world_datapack_taken_away", id).await;
+        let error = match self
+            .world_destination(id, root, &temporary, world, identity, filename)
             .await
         {
-            Ok(destination) => match taken.send_on().await {
-                Ok(()) => return Ok(destination),
-                // The new file is this install's own: erased so the old
-                // one can have its name back.
-                Err(error) => (
-                    error,
-                    tokio::fs::remove_file(&destination)
-                        .await
-                        .with_context(|| format!("{} could not be removed", destination.display()))
-                        .err(),
-                ),
+            Err(error) => error,
+            Ok(destination) => match taken.publish(temporary, &destination).await {
+                Err(error) => error,
+                Ok(()) => match taken.send_on().await {
+                    Ok(()) => return Ok(destination),
+                    Err(error) => error,
+                },
             },
-            Err(error) => (error, None),
         };
-        let mut message = format!("{error:#}");
-        if let Some(withdrawn) = withdrawn {
-            message.push_str(&format!(". {withdrawn:#}"));
+        match taken.put_back().await {
+            Ok(()) => Err(error),
+            Err(put_back) => Err(anyhow!("{error:#}. {put_back:#}")),
         }
-        if let Err(put_back) = taken.put_back().await {
-            staging.keep();
-            message.push_str(&format!(". {put_back:#}"));
-        }
-        Err(anyhow!(message))
     }
 
     /// The platform's identity of a file just published, recorded at once:
@@ -966,6 +1085,8 @@ impl ManagerRef<'_, InstanceManager> {
     }
 }
 
+const CLOSING: &str = "Data pack install stopped because the launcher is closing";
+
 /// The name of the download inside the install's private folder.
 const ARTIFACT: &str = "artifact";
 /// The folder inside the install's private folder where the pack it
@@ -978,7 +1099,8 @@ const REPLACED: &str = "replaced";
 struct Staging {
     root: PathBuf,
     name: std::ffi::OsString,
-    kept: bool,
+    /// Set when the folder holds a pack an error or a warning names.
+    kept: Arc<AtomicBool>,
 }
 
 impl Staging {
@@ -995,7 +1117,7 @@ impl Staging {
         Ok(Self {
             root,
             name,
-            kept: false,
+            kept: Default::default(),
         })
     }
 
@@ -1003,15 +1125,15 @@ impl Staging {
         self.root.join(&self.name)
     }
 
-    /// Leaves the folder in place: it holds a pack an error names.
-    fn keep(&mut self) {
-        self.kept = true;
+    /// The flag that leaves the folder in place once set.
+    fn keeper(&self) -> Arc<AtomicBool> {
+        self.kept.clone()
     }
 }
 
 impl Drop for Staging {
     fn drop(&mut self) {
-        if self.kept {
+        if self.kept.load(Ordering::SeqCst) {
             return;
         }
         match std::fs::remove_dir_all(self.path()) {
@@ -2642,6 +2764,168 @@ mod tests {
         assert!(!path.exists());
     }
 
+    async fn quit(app: &App) {
+        app.runtime_lifecycle
+            .prepare_shutdown(
+                "world-datapack-quit",
+                crate::managers::runtime_lifecycle::ShutdownPurpose::Quit,
+                async { Ok(()) },
+            )
+            .unwrap();
+    }
+
+    async fn succeeded(app: &App, task: VisualTaskId) -> bool {
+        for _ in 0..50 {
+            if matches!(
+                app.task_manager().get_task_outcome(task).await,
+                crate::managers::vtask::TaskOutcome::Succeeded
+            ) {
+                return true;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+        false
+    }
+
+    /// A quit that comes once the old pack is taken away waits for the
+    /// replace, which ends as it would have: the new pack in place, the old
+    /// one removed, and the task a success.
+    #[tokio::test]
+    async fn a_quit_after_the_old_pack_is_taken_away_waits_for_the_replace() {
+        let app = crate::setup_managers_for_test().await;
+        without_recycle_bin(&app).await;
+        let (id, identity, world) = world_instance(&app, "replace-quit").await;
+        put_pack(&world, "pack-1.zip", &pack_zip("old"));
+        let rows = scanned_rows(&app, id).await;
+        let mut api = api().await;
+        let new = pack_zip("new");
+        serving(&mut api, "pack-2.zip", &new).await;
+        let root = instance_root(&app, id).await;
+        let pause = app
+            .instance_manager()
+            .test_hooks
+            .arm("world_datapack_taken_away", id);
+        let (task, work) = app
+            .instance_manager()
+            .install_world_datapack_from(
+                &api.curseforge,
+                &api.modrinth,
+                replacing(id, &identity, "World", &rows[0].id),
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(10), pause.entered.notified())
+            .await
+            .unwrap();
+        quit(&app).await;
+        assert!(install_left_behind(&app), "the quit waits for the replace");
+        pause.release.notify_one();
+
+        let published = work.await.unwrap().unwrap();
+
+        assert_eq!(published, world.join("datapacks/pack-2.zip"));
+        assert_eq!(
+            entries(&world.join("datapacks")),
+            vec![("pack-2.zip".to_owned(), new)]
+        );
+        assert!(staging_folders(&root).is_empty());
+        assert!(succeeded(&app, task).await);
+        assert!(!install_left_behind(&app));
+    }
+
+    /// A quit while the pack is still downloading stops the install, and the
+    /// world is as it was.
+    #[tokio::test]
+    async fn a_quit_before_the_gate_stops_the_replace() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "replace-quit-early").await;
+        put_pack(&world, "pack.zip", &pack_zip("old"));
+        let rows = scanned_rows(&app, id).await;
+        let mut api = api().await;
+        serving(&mut api, "pack.zip", &pack_zip("new")).await;
+        let root = instance_root(&app, id).await;
+        let before = snapshot(&root, &world);
+        let pause = app
+            .instance_manager()
+            .test_hooks
+            .arm("world_datapack_downloaded", id);
+        let (_, work) = app
+            .instance_manager()
+            .install_world_datapack_from(
+                &api.curseforge,
+                &api.modrinth,
+                replacing(id, &identity, "World", &rows[0].id),
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(10), pause.entered.notified())
+            .await
+            .unwrap();
+        quit(&app).await;
+        pause.release.notify_one();
+
+        let error = work.await.unwrap().unwrap_err();
+
+        assert_eq!(error.to_string(), CLOSING);
+        assert_eq!(snapshot(&root, &world), before);
+    }
+
+    /// Dropped unsettled while another file holds its name, the old pack
+    /// stays where it waits, the private folder with it, at the path the
+    /// warning names.
+    #[tokio::test]
+    async fn a_pack_dropped_where_it_cannot_go_back_keeps_its_folder() {
+        let dir = tempfile::tempdir().unwrap();
+        let pack = dir.path().join("saves/World/datapacks/pack.zip");
+        std::fs::create_dir_all(pack.parent().unwrap()).unwrap();
+        std::fs::write(&pack, b"old").unwrap();
+        let root = dir.path().join("root");
+        std::fs::create_dir_all(&root).unwrap();
+        let staging = Staging::new(&root).unwrap();
+        let taken = take_away(
+            &pack,
+            &staging.path().join(REPLACED),
+            Removal::Permanent,
+            staging.keeper(),
+        )
+        .await
+        .unwrap();
+        let waiting = taken.aside.clone();
+        std::fs::write(&pack, b"another file").unwrap();
+
+        drop(taken);
+        drop(staging);
+
+        assert_eq!(std::fs::read(&waiting).unwrap(), b"old");
+        assert_eq!(std::fs::read(&pack).unwrap(), b"another file");
+    }
+
+    /// Dropped once its replacement is in place, under the same name or
+    /// another, the old pack is back and the replacement gone: one build
+    /// stays.
+    #[tokio::test]
+    async fn a_pack_dropped_after_its_replacement_is_published_comes_back_alone() {
+        for name in ["pack.zip", "pack-2.zip"] {
+            let (_dir, pack, aside) = take_away_fixture(b"old");
+            let taken = take_away(&pack, &aside, Removal::Permanent, Default::default())
+                .await
+                .unwrap();
+            let folder = pack.parent().unwrap().to_path_buf();
+            let mut file = crate::util::publish::temp_in(&folder).unwrap();
+            std::io::Write::write_all(&mut file, b"new").unwrap();
+            taken.publish(file, &folder.join(name)).await.unwrap();
+            assert!(folder.join(name).exists());
+
+            drop(taken);
+
+            assert_eq!(
+                entries(&folder),
+                vec![("pack.zip".to_owned(), b"old".to_vec())],
+                "{name}"
+            );
+        }
+    }
+
     /// A world and a private folder, two folders deep each, as an instance
     /// root holds them.
     fn take_away_fixture(bytes: &[u8]) -> (tempfile::TempDir, PathBuf, PathBuf) {
@@ -2658,7 +2942,9 @@ mod tests {
         let (_dir, pack, aside) = take_away_fixture(b"old");
         let time = set_modified(&pack);
 
-        let taken = take_away(&pack, &aside, Removal::Permanent).await.unwrap();
+        let taken = take_away(&pack, &aside, Removal::Permanent, Default::default())
+            .await
+            .unwrap();
         assert!(!pack.exists());
         assert!(entries(pack.parent().unwrap()).is_empty());
         assert_eq!(std::fs::read(aside.join("pack.zip")).unwrap(), b"old");
@@ -2672,7 +2958,11 @@ mod tests {
     #[tokio::test]
     async fn a_pack_taken_away_and_dropped_comes_back() {
         let (_dir, pack, aside) = take_away_fixture(b"old");
-        drop(take_away(&pack, &aside, Removal::Permanent).await.unwrap());
+        drop(
+            take_away(&pack, &aside, Removal::Permanent, Default::default())
+                .await
+                .unwrap(),
+        );
         assert_eq!(std::fs::read(&pack).unwrap(), b"old");
     }
 
@@ -2680,7 +2970,9 @@ mod tests {
     async fn a_pack_sent_on_follows_the_recycle_bin_setting() {
         use crate::util::recycle_bin::bin_under_test;
         let (_dir, pack, aside) = take_away_fixture(b"binned");
-        let mut taken = take_away(&pack, &aside, Removal::RecycleBin).await.unwrap();
+        let mut taken = take_away(&pack, &aside, Removal::RecycleBin, Default::default())
+            .await
+            .unwrap();
         taken.send_on().await.unwrap();
         let waited = aside.join("pack.zip");
         assert!(!waited.exists() && !pack.exists());
@@ -2690,7 +2982,9 @@ mod tests {
         );
 
         let (_dir, pack, aside) = take_away_fixture(b"erased");
-        let mut taken = take_away(&pack, &aside, Removal::Permanent).await.unwrap();
+        let mut taken = take_away(&pack, &aside, Removal::Permanent, Default::default())
+            .await
+            .unwrap();
         taken.send_on().await.unwrap();
         let waited = aside.join("pack.zip");
         assert!(!waited.exists() && !pack.exists());
@@ -2706,7 +3000,9 @@ mod tests {
         let (_dir, pack, aside) = take_away_fixture(b"old");
         inject(Step::NoReplace, &aside.join("pack.zip"), CROSS_DEVICE);
 
-        let mut taken = take_away(&pack, &aside, Removal::Permanent).await.unwrap();
+        let mut taken = take_away(&pack, &aside, Removal::Permanent, Default::default())
+            .await
+            .unwrap();
 
         let beside = entries(pack.parent().unwrap());
         assert_eq!(beside.len(), 1);
@@ -2721,7 +3017,9 @@ mod tests {
 
         let (_dir, pack, aside) = take_away_fixture(b"old");
         inject(Step::NoReplace, &aside.join("pack.zip"), CROSS_DEVICE);
-        let taken = take_away(&pack, &aside, Removal::Permanent).await.unwrap();
+        let taken = take_away(&pack, &aside, Removal::Permanent, Default::default())
+            .await
+            .unwrap();
         taken.put_back().await.unwrap();
         assert_eq!(
             entries(pack.parent().unwrap()),

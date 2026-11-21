@@ -199,6 +199,25 @@ impl ManagerRef<'_, InstanceManager> {
         identity: &str,
         filename: &str,
     ) -> anyhow::Result<PathBuf> {
+        let destination = self
+            .world_destination(instance, root, &temporary, world, identity, filename)
+            .await?;
+        // Off the runtime: a world folder on another drive makes this a copy.
+        crate::util::publish::persist_noclobber_async(temporary, &destination).await?;
+        Ok(destination)
+    }
+
+    /// The checks of [`Self::publish_into_world`], up to the path the file
+    /// would be published at.
+    pub(super) async fn world_destination(
+        self,
+        instance: InstanceId,
+        root: &Path,
+        temporary: &tempfile::NamedTempFile,
+        world: &Path,
+        identity: &str,
+        filename: &str,
+    ) -> anyhow::Result<PathBuf> {
         validate_pack_zip(temporary.path())?;
         #[cfg(test)]
         self.test_hooks
@@ -217,10 +236,7 @@ impl ManagerRef<'_, InstanceManager> {
         {
             bail!("Datapack destination became occupied; existing content retained");
         }
-        let destination = folder.join(filename);
-        // Off the runtime: a world folder on another drive makes this a copy.
-        crate::util::publish::persist_noclobber_async(temporary, &destination).await?;
-        Ok(destination)
+        Ok(folder.join(filename))
     }
 }
 
