@@ -497,13 +497,11 @@ impl ManagerRef<'_, InstanceManager> {
         let name = curseforge
             .as_ref()
             .map(|cf| cf.name.clone())
-            .or_else(|| modrinth.as_ref().map(|mr| mr.title.clone()))
-            .or(row.meta_name);
+            .or_else(|| modrinth.as_ref().map(|mr| mr.title.clone()));
         let version = curseforge
             .as_ref()
             .map(|cf| cf.version.clone())
-            .or_else(|| modrinth.as_ref().map(|mr| mr.version.clone()))
-            .or(row.meta_version);
+            .or_else(|| modrinth.as_ref().map(|mr| mr.version.clone()));
         Ok(WorldDatapack {
             id: row.id,
             filename: row.filename,
@@ -1384,6 +1382,59 @@ mod tests {
         assert_eq!(worlds[0].addon_id, addon_id);
         assert_eq!(worlds[0].identity, None);
         assert!(worlds[0].datapacks.is_empty());
+    }
+
+    /// A data pack zip that also carries a `fabric.mod.json` naming it.
+    fn pack_zip_with_fabric_metadata(name: &str) -> Vec<u8> {
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        let options = zip::write::SimpleFileOptions::default();
+        zip.start_file("pack.mcmeta", options).unwrap();
+        write!(zip, r#"{{"pack":{{"pack_format":15,"description":"x"}}}}"#).unwrap();
+        zip.start_file("fabric.mod.json", options).unwrap();
+        write!(
+            zip,
+            r#"{{"schemaVersion":1,"id":"jarlike","version":"9.9","name":"{name}"}}"#
+        )
+        .unwrap();
+        zip.finish().unwrap().into_inner()
+    }
+
+    /// Only a platform names a pack: one whose own metadata names it but no
+    /// platform knows is shown and sorted by its file name.
+    #[tokio::test]
+    async fn a_pack_named_only_by_its_own_metadata_is_unrecognised() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-jar-metadata", &[]).await;
+        listed_world(&app, id, &saves, "World", &[("x.zip", "plain")]).await;
+        std::fs::write(
+            world_datapacks_folder(&saves, "World").join("y-fabric.zip"),
+            pack_zip_with_fabric_metadata("Aardvark"),
+        )
+        .unwrap();
+        assert!(
+            app.instance_manager()
+                .scan_world_datapacks(id)
+                .await
+                .unwrap()
+        );
+        let metadata = pack_metadata(&app, id, "World", "y-fabric.zip").await;
+        let own = carbon_repos::repos::mod_metadata::get_metadata_by_id(&app.db, &metadata)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            own.name.as_deref(),
+            Some("Aardvark"),
+            "the zip names itself"
+        );
+        let packs = list(&app, id).await.remove(0).datapacks;
+        let filenames: Vec<_> = packs.iter().map(|pack| pack.filename.as_str()).collect();
+        assert_eq!(filenames, ["x.zip", "y-fabric.zip"]);
+        let jarlike = &packs[1];
+        assert_eq!(jarlike.name, None);
+        assert_eq!(jarlike.version, None);
+        assert!(jarlike.curseforge.is_none() && jarlike.modrinth.is_none());
+        assert!(!jarlike.has_update);
     }
 
     #[tokio::test]
