@@ -177,8 +177,8 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
           icon="i-hugeicons:delete-02"
           label={<Trans key="content:_trn_delete_mod" />}
           onClick={props.actions.deleteWorld}
-          // A save can go while the game is busy, as any addon's file can.
-          disabled={props.blocked === "locked"}
+          // The game has the save open and writes it when it closes.
+          disabled={!!props.blocked}
           blocked={props.blocked}
           danger
         />

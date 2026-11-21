@@ -472,13 +472,20 @@ it.each([
   ["running", { modpack: null, state: { state: "running", value: {} } }],
   ["preparing", { modpack: null, state: { state: "preparing", value: 0 } }],
   ["queued", { modpack: null, state: { state: "queued", value: 0 } }]
-])("deletes a world while the game is %s", async (_, details) => {
-  const row = worldRow("Alpha")
-  const root = mount([world("Alpha", [])], { mods: [row], details })
+])("does not delete a world while the game is %s", async (_, details) => {
+  const root = mount([world("Alpha", [])], {
+    mods: [worldRow("Alpha")],
+    details
+  })
   await flush()
-  expect(one(root, "world-delete")!.dataset.disabled).toBe("false")
-  one(root, "world-delete")!.click()
-  expect(io.deleteWorld).toHaveBeenCalledExactlyOnceWith(row)
+  const action = one(root, "world-delete")!
+  expect(action.dataset.disabled).toBe("true")
+  // The tooltip says why, as the other blocked actions do.
+  expect(action.parentElement!.parentElement!.textContent).toBe(
+    "content:_trn_worlds.busy"
+  )
+  action.click()
+  expect(io.deleteWorld).not.toHaveBeenCalled()
 })
 
 it("does not delete a world of a locked modpack", async () => {
@@ -487,9 +494,29 @@ it("does not delete a world of a locked modpack", async () => {
     details: { modpack: { locked: true }, state: { state: "inactive" } }
   })
   await flush()
-  expect(one(root, "world-delete")!.dataset.disabled).toBe("true")
-  one(root, "world-delete")!.click()
+  const action = one(root, "world-delete")!
+  expect(action.dataset.disabled).toBe("true")
+  expect(action.parentElement!.parentElement!.textContent).toBe(
+    "instances:_trn_locked_cannot_apply_changes"
+  )
+  action.click()
   expect(io.deleteWorld).not.toHaveBeenCalled()
+})
+
+it("deletes a world while the game is not running", async () => {
+  const row = worldRow("Alpha")
+  const root = mount([world("Alpha", [])], {
+    mods: [row],
+    details: { modpack: null, state: { state: "inactive" } }
+  })
+  await flush()
+  const action = one(root, "world-delete")!
+  expect(action.dataset.disabled).toBe("false")
+  expect(action.parentElement!.parentElement!.textContent).toBe(
+    "content:_trn_delete_mod"
+  )
+  action.click()
+  expect(io.deleteWorld).toHaveBeenCalledExactlyOnceWith(row)
 })
 
 it("shows a failed world list in place with a retry, not as a toast", async () => {
