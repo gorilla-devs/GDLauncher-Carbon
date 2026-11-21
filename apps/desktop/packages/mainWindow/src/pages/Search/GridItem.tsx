@@ -12,6 +12,7 @@ import ModDownloadButton from "@/components/ModDownloadButton"
 import { Badge } from "@gd/ui"
 import { withStates } from "@gd/ui"
 import { PlatformLogo } from "@/components/PlatformLogo"
+import { resultImageUrl } from "./resultImage"
 
 interface GridItemProps {
   result: FEUnifiedSearchResult
@@ -30,6 +31,8 @@ export function GridItem(props: GridItemProps) {
 
   const authorName = () => props.result.authors?.[0]?.name
 
+  const image = () => resultImageUrl(props.result, "large")
+
   return (
     <div
       data-testid="search-result-row"
@@ -47,15 +50,29 @@ export function GridItem(props: GridItemProps) {
       onClick={() => props.onItemClick(props.result.id, props.result.platform)}
     >
       {/* Background image */}
-      <img
-        data-gdl="search.result.image"
-        class="ease-spring h-full w-full object-cover transition-transform duration-200 group-hover:scale-110"
-        classList={{
-          "scale-110": isHoverActive()
-        }}
-        src={props.result.highResImageUrl || props.result.imageUrl || ""}
-        alt={props.result.title}
-      />
+      <Show
+        when={image()}
+        fallback={
+          <div
+            data-gdl="search.result.image"
+            class="bg-darkSlate-700 flex h-full w-full items-center justify-center"
+          >
+            <div class="i-hugeicons:package text-darkSlate-400 h-12 w-12" />
+          </div>
+        }
+      >
+        {(src) => (
+          <img
+            data-gdl="search.result.image"
+            class="ease-spring h-full w-full object-cover transition-transform duration-200 group-hover:scale-110"
+            classList={{
+              "scale-110": isHoverActive()
+            }}
+            src={src()}
+            alt={props.result.title}
+          />
+        )}
+      </Show>
 
       {/* Subtle vignette overlay */}
       <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />

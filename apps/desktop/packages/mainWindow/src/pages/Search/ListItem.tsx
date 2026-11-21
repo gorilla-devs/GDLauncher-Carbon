@@ -14,6 +14,7 @@ import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
 import { withStates } from "@gd/ui"
 import { PlatformLogo } from "@/components/PlatformLogo"
+import { resultImageUrl } from "./resultImage"
 
 interface SearchResultItemProps {
   result: FEUnifiedSearchResult
@@ -50,6 +51,8 @@ export function ListItem(props: SearchResultItemProps) {
       )
   })
 
+  const image = () => resultImageUrl(props.result, "small")
+
   return (
     <div class="my-1 overflow-hidden rounded-md">
       <div
@@ -79,7 +82,7 @@ export function ListItem(props: SearchResultItemProps) {
             "opacity-20": !isHoverActive()
           }}
           style={{
-            "background-image": `url(${props.result.imageUrl || ""})`,
+            "background-image": image() ? `url(${image()})` : "none",
             "mask-image": "linear-gradient(to right, transparent 20%, black)",
             "-webkit-mask-image":
               "linear-gradient(to right, transparent 20%, black)",
@@ -88,11 +91,25 @@ export function ListItem(props: SearchResultItemProps) {
           }}
         />
         <div class="relative z-10 flex w-full items-center gap-4">
-          <img
-            data-gdl="search.result.image"
-            src={props.result.imageUrl || ""}
-            class="h-16 w-16 rounded-md"
-          />
+          <Show
+            when={image()}
+            fallback={
+              <div
+                data-gdl="search.result.image"
+                class="bg-darkSlate-700 flex h-16 w-16 shrink-0 items-center justify-center rounded-md"
+              >
+                <div class="i-hugeicons:package text-darkSlate-400 h-7 w-7" />
+              </div>
+            }
+          >
+            {(src) => (
+              <img
+                data-gdl="search.result.image"
+                src={src()}
+                class="h-16 w-16 rounded-md"
+              />
+            )}
+          </Show>
           <div class="w-7/10 flex flex-col gap-2">
             <div
               data-gdl="search.result.title"
