@@ -1207,7 +1207,7 @@ fn export_joins_are_scoped_to_the_requested_instance() {
 }
 
 #[test]
-fn task11_instance_owned_kind_preserves_rows_and_ids() {
+fn instance_owned_kind_preserves_rows_and_ids() {
     let (_dir, mut conn) = migrated_db();
     insert_metadata(&conn, "res", 1, b"res", b"res", None, None);
     insert_metadata(&conn, "data", 2, b"data", b"data", None, None);

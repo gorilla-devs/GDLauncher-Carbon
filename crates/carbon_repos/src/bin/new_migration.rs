@@ -601,7 +601,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn task15_authoring_declares_key_only_row_loss() {
+    fn authoring_declares_key_only_row_loss() {
         let entry = build_list_entry(
             "fixture",
             &["CREATE TABLE Membership(id INTEGER PRIMARY KEY)"],
@@ -774,7 +774,7 @@ mod tests {
     }
 
     #[test]
-    fn task16_apply_list_entry_refuses_changed_same_name_metadata() {
+    fn apply_list_entry_refuses_changed_same_name_metadata() {
         use carbon_repos::manifest::verify_kind;
         let (_dir, lib_path) = scratch_lib_rs();
         let prev = ["CREATE TABLE Server(id INTEGER PRIMARY KEY);"];

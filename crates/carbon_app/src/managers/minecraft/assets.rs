@@ -441,7 +441,7 @@ fn asset_matches(path: &std::path::Path, size: u64, expected: &str) -> anyhow::R
 }
 
 #[cfg(test)]
-mod task18_tests {
+mod tests {
     use super::*;
     use sha1::{Digest, Sha1};
     fn boundary_fixture(
@@ -462,7 +462,7 @@ mod task18_tests {
         (runtime, index)
     }
     #[tokio::test]
-    async fn task18_asset_object_destinations_reject_escape_before_overwrite() {
+    async fn asset_object_destinations_reject_escape_before_overwrite() {
         let root = tempfile::tempdir().unwrap();
         let runtime = carbon_rt_path::RuntimePath::new(root.path().into());
         let outside = runtime.get_assets().get_virtual_path().join("outside.txt");
@@ -492,7 +492,7 @@ mod task18_tests {
         }
     }
     #[tokio::test]
-    async fn task18_asset_index_destinations_reject_escape() {
+    async fn asset_index_destinations_reject_escape() {
         let root = tempfile::tempdir().unwrap();
         for id in [
             "../outside",
@@ -519,7 +519,7 @@ mod task18_tests {
         }
     }
     #[tokio::test]
-    async fn task18_asset_index_publication_healthy_and_link_controls() {
+    async fn asset_index_publication_healthy_and_link_controls() {
         let root = tempfile::tempdir().unwrap();
         let cache = root.path().join("indexes");
         publish_index(&cache, "1.7.10", b"index", 5).await.unwrap();
@@ -558,7 +558,7 @@ mod task18_tests {
         }
     }
     #[tokio::test]
-    async fn task18_asset_index_save_failure_names_the_os_reason() {
+    async fn asset_index_save_failure_names_the_os_reason() {
         let root = tempfile::tempdir().unwrap();
         let cache = root.path().join("indexes");
         // A non-empty folder at the index's name cannot be replaced by a file.
@@ -578,7 +578,7 @@ mod task18_tests {
     }
     #[cfg(unix)]
     #[tokio::test]
-    async fn task18_asset_linked_ancestor_preserves_outside_file() {
+    async fn asset_linked_ancestor_preserves_outside_file() {
         let root = tempfile::tempdir().unwrap();
         let (runtime, index) = boundary_fixture(root.path(), "linked/outside.txt");
         let target = runtime.get_assets().get_virtual_path().join("legacy");
@@ -654,20 +654,20 @@ mod task18_tests {
         assert_eq!(target.join("leftover.txt").exists(), !virtual_mapping);
     }
     #[tokio::test]
-    async fn task18_virtual_assets_repair_partial_and_same_size() {
+    async fn virtual_assets_repair_partial_and_same_size() {
         for bytes in [vec![], vec![0; 5], vec![0; 28]] {
             run_case(true, Some(&bytes)).await;
         }
     }
     #[tokio::test]
-    async fn task18_virtual_assets_preserve_resources_and_absent_controls() {
+    async fn virtual_assets_preserve_resources_and_absent_controls() {
         run_case(false, Some(b"user edited resource")).await;
         run_case(false, None).await;
         run_case(true, None).await;
         run_case(true, Some(b"complete fixture asset bytes")).await;
     }
     #[tokio::test]
-    async fn task18_assets_failed_source_preserves_previous_and_modern_skips_mapping() {
+    async fn assets_failed_source_preserves_previous_and_modern_skips_mapping() {
         let root = tempfile::tempdir().unwrap();
         let runtime = carbon_rt_path::RuntimePath::new(root.path().into());
         let good = b"verified";
@@ -718,7 +718,7 @@ mod task18_tests {
         );
     }
     #[tokio::test]
-    async fn task18_assets_concurrent_repair_and_healthy_timestamp() {
+    async fn assets_concurrent_repair_and_healthy_timestamp() {
         let root = tempfile::tempdir().unwrap();
         let runtime = carbon_rt_path::RuntimePath::new(root.path().into());
         let bytes = b"complete shared mapping";
@@ -930,7 +930,7 @@ mod task18_tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn task18_symlinked_asset_folders_keep_every_version_launching() {
+    async fn symlinked_asset_folders_keep_every_version_launching() {
         for linked in ["assets", "assets/indexes", "assets/virtual"] {
             assert_launches_through_link(symlink_dir, linked).await;
         }
@@ -938,7 +938,7 @@ mod task18_tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn task18_symlinked_instances_folder_maps_pre_1_6_resources() {
+    async fn symlinked_instances_folder_maps_pre_1_6_resources() {
         let root = tempfile::tempdir().unwrap();
         let data = root.path().join("data");
         let elsewhere = root.path().join("elsewhere");
@@ -973,7 +973,7 @@ mod task18_tests {
     /// it are never replaced.
     #[cfg(unix)]
     #[tokio::test]
-    async fn task18_linked_folder_inside_resources_gets_missing_files_only() {
+    async fn linked_folder_inside_resources_gets_missing_files_only() {
         let root = tempfile::tempdir().unwrap();
         let runtime = carbon_rt_path::RuntimePath::new(root.path().join("data"));
         let resources = root.path().join("data/instances/old/instance/resources");
@@ -1012,7 +1012,7 @@ mod task18_tests {
     /// as a link: its target is never written or deleted.
     #[cfg(unix)]
     #[tokio::test]
-    async fn task18_virtual_file_links_are_replaced_not_written_through() {
+    async fn virtual_file_links_are_replaced_not_written_through() {
         let root = tempfile::tempdir().unwrap();
         let (runtime, index) = boundary_fixture(root.path(), "test.txt");
         let target = runtime.get_assets().get_virtual_path().join("legacy");
@@ -1066,7 +1066,7 @@ mod task18_tests {
     /// The one refusal left says which link is in the way and how to clear it.
     #[cfg(unix)]
     #[tokio::test]
-    async fn task18_linked_folder_below_virtual_mapping_names_the_way_out() {
+    async fn linked_folder_below_virtual_mapping_names_the_way_out() {
         let root = tempfile::tempdir().unwrap();
         let (runtime, index) = boundary_fixture(root.path(), "linked/outside.txt");
         let target = runtime.get_assets().get_virtual_path().join("legacy");
@@ -1097,7 +1097,7 @@ mod task18_tests {
     /// as 2.0.40 did.
     #[cfg(target_os = "linux")]
     #[tokio::test]
-    async fn task18_virtual_leftover_cleanup_never_fails_the_launch() {
+    async fn virtual_leftover_cleanup_never_fails_the_launch() {
         use std::os::unix::ffi::OsStrExt;
         let root = tempfile::tempdir().unwrap();
         let (runtime, index) = boundary_fixture(root.path(), "test.txt");
@@ -1156,7 +1156,7 @@ mod task18_tests {
 
     #[cfg(windows)]
     #[tokio::test]
-    async fn task18_windows_junctioned_asset_folders_keep_every_version_launching() {
+    async fn windows_junctioned_asset_folders_keep_every_version_launching() {
         for linked in ["assets", "assets/indexes", "assets/virtual"] {
             assert_launches_through_link(junction, linked).await;
         }
@@ -1164,7 +1164,7 @@ mod task18_tests {
 
     #[cfg(windows)]
     #[tokio::test]
-    async fn task18_windows_junction_below_virtual_mapping_is_refused() {
+    async fn windows_junction_below_virtual_mapping_is_refused() {
         let root = tempfile::tempdir().unwrap();
         let (runtime, index) = boundary_fixture(root.path(), "linked/outside.txt");
         let target = runtime.get_assets().get_virtual_path().join("legacy");
@@ -1209,7 +1209,7 @@ mod task18_tests {
 
     #[cfg(windows)]
     #[tokio::test]
-    async fn task18_windows_wof_compressed_assets_keep_launching() {
+    async fn windows_wof_compressed_assets_keep_launching() {
         let root = tempfile::tempdir().unwrap();
         let runtime = carbon_rt_path::RuntimePath::new(root.path().join("data"));
         let assets = runtime.get_assets();

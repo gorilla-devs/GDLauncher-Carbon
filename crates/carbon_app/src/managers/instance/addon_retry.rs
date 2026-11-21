@@ -742,7 +742,7 @@ pub(super) async fn execute_with_token<F: Future<Output = ()>>(
 }
 
 #[cfg(test)]
-mod task32_tests {
+mod tests {
     use super::*;
     use carbon_repos::db_exec::WriteAccess;
     async fn fixture() -> (tempfile::TempDir, Db, InstancePath) {

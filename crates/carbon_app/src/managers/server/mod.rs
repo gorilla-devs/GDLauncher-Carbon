@@ -4903,7 +4903,7 @@ async fn persist_server_settings(
 mod record_tests;
 
 #[cfg(test)]
-mod task26_tests;
+mod helper_tests;
 
 #[cfg(test)]
 mod tests {
@@ -5119,7 +5119,7 @@ mod tests {
     // `InstanceManager` share.
 
     #[test]
-    fn task07_pack_install_ownership_blocks_addon_and_properties_publication() {
+    fn pack_install_ownership_blocks_addon_and_properties_publication() {
         // Refused with what the server is doing and the way out.
         assert_eq!(
             ensure_server_files_available(&ServerState::Installing(VisualTaskId(1)))
@@ -5144,7 +5144,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task07_old_finalizer_cannot_clear_replacement_or_deleting_state() {
+    async fn old_finalizer_cannot_clear_replacement_or_deleting_state() {
         let manager = ServerManager::new();
         let old = running_server_with_handle().handle.unwrap();
         let replacement = running_server_with_handle();
@@ -5181,7 +5181,7 @@ mod tests {
         ));
     }
     #[tokio::test]
-    async fn task07_pending_restart_toggle_off_on_remains_cancelled() {
+    async fn pending_restart_toggle_off_on_remains_cancelled() {
         let manager = ServerManager::new();
         let mut data = running_server_with_handle();
         data.state = ServerState::Stopped { failed_task: None };
@@ -5214,7 +5214,7 @@ mod tests {
     // --- shutdown_running ---------------------------------------------
 
     #[tokio::test]
-    async fn task07_shutdown_requests_stop_and_waits_for_confirmation() {
+    async fn shutdown_requests_stop_and_waits_for_confirmation() {
         let manager = ServerManager::new();
         let (kill_tx, mut kill_rx) = mpsc::channel(1);
         let (stdin_tx, mut stdin_rx) = mpsc::channel(1);

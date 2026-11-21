@@ -188,7 +188,7 @@ mod tests {
         }
     }
 
-    /// R06-launch#4: a crash after hours of play is told whenever it leaves
+    /// A crash after hours of play is told whenever it leaves
     /// a sign, and what the player did themselves never is.
     #[test]
     fn a_crash_is_told_only_with_a_sign_that_the_game_itself_failed() {

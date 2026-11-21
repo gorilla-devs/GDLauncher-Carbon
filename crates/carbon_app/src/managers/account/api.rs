@@ -229,7 +229,7 @@ fn decode_device_poll(status: StatusCode, body: &[u8]) -> anyhow::Result<PollRes
 }
 
 #[cfg(test)]
-mod task19_poll_tests {
+mod poll_tests {
     use super::*;
     #[test]
     fn device_response_honors_interval() {
@@ -554,7 +554,7 @@ fn decode_refresh(status: StatusCode, body: &[u8]) -> anyhow::Result<MsAuth> {
     })
 }
 #[cfg(test)]
-mod task19_refresh_response_tests {
+mod refresh_response_tests {
     use super::*;
     #[test]
     fn invalid_grant_is_a_permanent_refresh_rejection() {

@@ -57,7 +57,7 @@ pub(super) async fn stream_log<S, R, E>(
 }
 
 #[cfg(test)]
-mod task25_stream_tests {
+mod stream_tests {
     use super::*;
     use crate::managers::instance::log::LogEntry;
     use std::{

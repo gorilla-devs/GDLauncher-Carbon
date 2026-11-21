@@ -659,7 +659,7 @@ fn find_bundled_files_with_budget(
     Ok(found)
 }
 #[cfg(test)]
-mod task09_tests;
+mod bundled_content_tests;
 
 #[cfg(test)]
-mod task40_tests;
+mod admission_tests;

@@ -101,7 +101,7 @@ pub enum IdentityStatus {
 /// same for that process's whole life. Windows and macOS report the
 /// creation time the kernel stored when the process started. Linux derives
 /// it from the current wall clock minus uptime, so a clock step moves it
-/// (M23), and only the boot/ticks pair identifies a process there.
+///, and only the boot/ticks pair identifies a process there.
 pub const EPOCH_START_TIMES_ARE_STABLE: bool = cfg!(not(target_os = "linux"));
 
 /// Legacy clock mismatches cannot prove exit/reuse on Linux. A present stable
@@ -1075,7 +1075,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod task22_tests {
+mod process_identity_tests {
     use super::*;
     pub(super) fn record() -> ProcessRecord {
         ProcessRecord {
@@ -1097,7 +1097,7 @@ mod task22_tests {
         }
     }
     #[tokio::test]
-    async fn task22_clock_steps_marker_roundtrip_retains_owned_game() {
+    async fn clock_steps_marker_roundtrip_retains_owned_game() {
         let root = tempfile::tempdir().unwrap();
         let record = record();
         write_process_file(root.path(), ".gdl_instance.pid", record).await;
@@ -1118,7 +1118,7 @@ mod task22_tests {
         assert!(pid_file_path(root.path(), ".gdl_instance.pid").exists());
     }
     #[test]
-    fn task22_reused_ticks_boot_and_non_java_never_authorize_stop() {
+    fn reused_ticks_boot_and_non_java_never_authorize_stop() {
         let record = record();
         let ProcessIdentity::LinuxBootTicks {
             boot_id,
@@ -1171,7 +1171,7 @@ mod task22_tests {
         );
     }
     #[test]
-    fn task22_unknown_never_downgrades_stable_identity() {
+    fn unknown_never_downgrades_stable_identity() {
         let record = record();
         for observation in [
             ProcessObservation::Unknown,
@@ -1185,7 +1185,7 @@ mod task22_tests {
         }
     }
     #[test]
-    fn task22_legacy_epoch_proof_and_pid_only_controls() {
+    fn legacy_epoch_proof_and_pid_only_controls() {
         let mut record = ProcessRecord::legacy(4242, 1000);
         for epoch in [998, 1000, 1002] {
             assert_eq!(
@@ -1217,7 +1217,7 @@ mod task22_tests {
         );
     }
     #[tokio::test]
-    async fn task22_malformed_present_extensions_are_retained_without_epoch_fallback() {
+    async fn malformed_present_extensions_are_retained_without_epoch_fallback() {
         let root = tempfile::tempdir().unwrap();
         let path = pid_file_path(root.path(), "marker");
         for extension in [
@@ -1239,7 +1239,7 @@ mod task22_tests {
         }
     }
     #[tokio::test]
-    async fn task22_exit_cleanup_cannot_remove_replacement_full_identity() {
+    async fn exit_cleanup_cannot_remove_replacement_full_identity() {
         let root = tempfile::tempdir().unwrap();
         let captured = record();
         let mut replacement = captured;
@@ -1261,7 +1261,7 @@ mod task22_tests {
     }
     #[cfg(target_os = "linux")]
     #[test]
-    fn task22_linux_stat_handles_command_parentheses_and_whitespace() {
+    fn linux_stat_handles_command_parentheses_and_whitespace() {
         let stat = format!(
             "4242 (java (worker) ) name) S {} 123456 0",
             vec!["0"; 18].join(" ")
@@ -1285,7 +1285,7 @@ mod task22_tests {
     }
     #[cfg(target_os = "linux")]
     #[test]
-    fn task22_bracketing_refuses_mixed_generations_and_unproven_absence() {
+    fn bracketing_refuses_mixed_generations_and_unproven_absence() {
         let identity = record().identity.unwrap();
         let snapshot = || {
             Some(LiveProc {
@@ -1337,10 +1337,10 @@ mod task22_tests {
 }
 
 #[cfg(test)]
-mod task22_strict_tests {
+mod strict_tests {
     use super::*;
     #[tokio::test]
-    async fn task22_duplicate_strict_cleanup_absence_file_and_failure_controls() {
+    async fn duplicate_strict_cleanup_absence_file_and_failure_controls() {
         let root = tempfile::tempdir().unwrap();
         remove_pid_file_strict(root.path(), "marker").await.unwrap();
         tokio::fs::write(

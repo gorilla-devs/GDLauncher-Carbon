@@ -128,8 +128,7 @@ async fn disk_config(root: &Path) -> anyhow::Result<info::Instance> {
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0001_delete_excludes_rename_and_preserves_replacement() -> anyhow::Result<()>
-{
+async fn lifecycle_delete_excludes_rename_and_preserves_replacement() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     app.settings_manager()
         .set(
@@ -184,7 +183,7 @@ async fn lifecycle_gpt0001_delete_excludes_rename_and_preserves_replacement() ->
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0015_cached_invalid_instances_remain_visible() -> anyhow::Result<()> {
+async fn lifecycle_cached_invalid_instances_remain_visible() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (missing, missing_root) = fixture(&app, "missing").await?;
     let (broken, broken_root) = fixture(&app, "broken").await?;
@@ -229,7 +228,7 @@ async fn lifecycle_gpt0015_cached_invalid_instances_remain_visible() -> anyhow::
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0016_details_releases_map_before_metadata() -> anyhow::Result<()> {
+async fn lifecycle_details_releases_map_before_metadata() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, _) = fixture(&app, "details").await?;
     let (other, _) = fixture(&app, "other").await?;
@@ -268,7 +267,7 @@ async fn lifecycle_gpt0016_details_releases_map_before_metadata() -> anyhow::Res
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0055_settings_preserves_overlapping_playtime() -> anyhow::Result<()> {
+async fn lifecycle_settings_preserves_overlapping_playtime() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "playtime").await?;
     let manager = app.instance_manager();
@@ -310,7 +309,7 @@ async fn lifecycle_gpt0055_settings_preserves_overlapping_playtime() -> anyhow::
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0056_arrange_then_move_to_end_with_folders() -> anyhow::Result<()> {
+async fn lifecycle_arrange_then_move_to_end_with_folders() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (a, _) = fixture(&app, "A").await?;
     let (b, _) = fixture(&app, "B").await?;
@@ -343,8 +342,7 @@ async fn lifecycle_gpt0056_arrange_then_move_to_end_with_folders() -> anyhow::Re
 }
 
 #[test]
-fn lifecycle_gpt0057_long_components_publish_with_graphemes_and_suffix_room() -> anyhow::Result<()>
-{
+fn lifecycle_long_components_publish_with_graphemes_and_suffix_room() -> anyhow::Result<()> {
     let parent = tempfile::tempdir()?;
     for name in [
         "a".repeat(300),
@@ -369,8 +367,7 @@ fn lifecycle_gpt0057_long_components_publish_with_graphemes_and_suffix_room() ->
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0154_display_rename_to_current_component_updates_library()
--> anyhow::Result<()> {
+async fn lifecycle_display_rename_to_current_component_updates_library() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, _) = fixture(&app, "benign-source").await?;
     let manager = app.instance_manager();
@@ -407,8 +404,7 @@ async fn lifecycle_gpt0154_display_rename_to_current_component_updates_library()
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0222_duplicate_aborts_before_publishing_unremovable_marker()
--> anyhow::Result<()> {
+async fn lifecycle_duplicate_aborts_before_publishing_unremovable_marker() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "source").await?;
     // A directory is a deterministic unlink error, including when tests run as root.
@@ -432,7 +428,7 @@ async fn lifecycle_gpt0222_duplicate_aborts_before_publishing_unremovable_marker
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0055_cached_scan_cannot_overwrite_bank() -> anyhow::Result<()> {
+async fn lifecycle_cached_scan_cannot_overwrite_bank() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "scan-bank").await?;
     // Force canonicalization so this scan is both a disk and a map writer.
@@ -469,7 +465,7 @@ async fn lifecycle_gpt0055_cached_scan_cannot_overwrite_bank() -> anyhow::Result
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0055_failed_playtime_write_does_not_publish_memory() -> anyhow::Result<()> {
+async fn lifecycle_failed_playtime_write_does_not_publish_memory() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "failed-bank").await?;
     tokio::fs::remove_file(root.join("instance.json")).await?;
@@ -488,7 +484,7 @@ async fn lifecycle_gpt0055_failed_playtime_write_does_not_publish_memory() -> an
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0055_modpack_publication_preserves_current_edits() -> anyhow::Result<()> {
+async fn lifecycle_modpack_publication_preserves_current_edits() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "pack-publication").await?;
     let manager = app.instance_manager();
@@ -755,8 +751,7 @@ async fn lifecycle_controls_duplicate_marker_absent_and_removed() -> anyhow::Res
 }
 
 #[tokio::test]
-async fn lifecycle_gpt0015_invalid_rescan_preserves_active_launch_ownership() -> anyhow::Result<()>
-{
+async fn lifecycle_invalid_rescan_preserves_active_launch_ownership() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "active-rescan").await?;
     let manager = app.instance_manager();
@@ -799,7 +794,7 @@ async fn lifecycle_gpt0015_invalid_rescan_preserves_active_launch_ownership() ->
     Ok(())
 }
 
-async fn round1_scan_identity_after_initial_snapshot(rename: bool) -> anyhow::Result<()> {
+async fn scan_identity_after_initial_snapshot(rename: bool) -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let manager = app.instance_manager();
     let parent = app
@@ -822,16 +817,16 @@ async fn round1_scan_identity_after_initial_snapshot(rename: bool) -> anyhow::Re
     }
     let id = if let Some(id) = original {
         let mut edit = update(id);
-        edit.name = Some("round1-current".into());
+        edit.name = Some("scan-current".into());
         manager.update_instance(edit).await?;
         id
     } else {
-        fixture(&app, "round1-current").await?.0
+        fixture(&app, "scan-current").await?.0
     };
-    let root = parent.join("round1-current");
+    let root = parent.join("scan-current");
     let json = tokio::fs::read_to_string(root.join("instance.json")).await?;
     tokio::fs::write(root.join("instance.json"), format!("{json}\n")).await?;
-    let read = manager.test_hooks.arm_path("scan_read", "round1-current");
+    let read = manager.test_hooks.arm_path("scan_read", "scan-current");
     admission.release.notify_one();
     tokio::select! {
         _ = read.entered.notified() => {},
@@ -879,17 +874,17 @@ async fn round1_scan_identity_after_initial_snapshot(rename: bool) -> anyhow::Re
 }
 
 #[tokio::test]
-async fn round1_r1_scan_admits_created_identity_after_initial_snapshot() -> anyhow::Result<()> {
-    round1_scan_identity_after_initial_snapshot(false).await
+async fn scan_admits_created_identity_after_initial_snapshot() -> anyhow::Result<()> {
+    scan_identity_after_initial_snapshot(false).await
 }
 
 #[tokio::test]
-async fn round1_r1_scan_admits_renamed_identity_after_initial_snapshot() -> anyhow::Result<()> {
-    round1_scan_identity_after_initial_snapshot(true).await
+async fn scan_admits_renamed_identity_after_initial_snapshot() -> anyhow::Result<()> {
+    scan_identity_after_initial_snapshot(true).await
 }
 
 #[tokio::test]
-async fn round1_r1_scan_waits_for_creation_registration() -> anyhow::Result<()> {
+async fn scan_waits_for_creation_registration() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let manager = app.instance_manager();
     let publication = manager.test_hooks.arm("create_publish", InstanceId(0));
@@ -926,7 +921,7 @@ async fn round1_r1_scan_waits_for_creation_registration() -> anyhow::Result<()> 
 }
 
 #[tokio::test]
-async fn round1_r2_concurrent_owner_and_cancelled_waiter_retire_gate() {
+async fn concurrent_owner_and_cancelled_waiter_retire_gate() {
     let manager = InstanceManager::new();
     let id = InstanceId(321);
     // Both destructors must finish their retirement decision before either
@@ -952,7 +947,7 @@ async fn round1_r2_concurrent_owner_and_cancelled_waiter_retire_gate() {
 }
 
 #[tokio::test]
-async fn round1_r1_create_and_duplicate_preserve_db_only_path_reservations() -> anyhow::Result<()> {
+async fn create_and_duplicate_preserve_db_only_path_reservations() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let manager = app.instance_manager();
     let group = manager.get_default_group().await?;
@@ -992,7 +987,7 @@ async fn round1_r1_create_and_duplicate_preserve_db_only_path_reservations() -> 
 }
 
 #[tokio::test]
-async fn round1_r1_genuinely_uncached_root_registers_once() -> anyhow::Result<()> {
+async fn genuinely_uncached_root_registers_once() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (_, source) = fixture(&app, "seed").await?;
     let mut config = disk_config(&source).await?;
@@ -1022,7 +1017,7 @@ async fn round1_r1_genuinely_uncached_root_registers_once() -> anyhow::Result<()
 }
 
 #[tokio::test]
-async fn task04_runtime_prepare_admission_serializes_with_relocation() -> anyhow::Result<()> {
+async fn runtime_prepare_admission_serializes_with_relocation() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let id = InstanceId(-404);
     let pause = app.instance_manager.test_hooks.arm("runtime_admitted", id);
@@ -1047,7 +1042,7 @@ async fn task04_runtime_prepare_admission_serializes_with_relocation() -> anyhow
 }
 
 #[tokio::test]
-async fn task04_runtime_server_entry_points_obey_same_freeze() -> anyhow::Result<()> {
+async fn runtime_server_entry_points_obey_same_freeze() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     app.runtime_lifecycle.begin_relocation("move")?;
     let manager = app.server_manager();
@@ -1078,7 +1073,7 @@ async fn task04_runtime_server_entry_points_obey_same_freeze() -> anyhow::Result
 /// restart. It used to refuse every move for as long as that unrelated
 /// process ran.
 #[tokio::test]
-async fn task04_runtime_reconciliation_retires_a_legacy_marker_on_a_reused_pid_across_restart()
+async fn runtime_reconciliation_retires_a_legacy_marker_on_a_reused_pid_across_restart()
 -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (_, root) = fixture(&app, "legacy-owner").await?;
@@ -1116,7 +1111,7 @@ async fn task04_runtime_reconciliation_retires_a_legacy_marker_on_a_reused_pid_a
 }
 
 #[tokio::test]
-async fn task04_runtime_reconciliation_preserves_corrupt_pid_evidence() -> anyhow::Result<()> {
+async fn runtime_reconciliation_preserves_corrupt_pid_evidence() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (_, root) = fixture(&app, "corrupt-owner").await?;
     tokio::fs::write(root.join(PID_FILE_NAME), "malformed ownership").await?;
@@ -1271,7 +1266,7 @@ async fn a_quit_during_the_startup_scan_stops_it_at_the_next_folder() -> anyhow:
     Ok(())
 }
 
-fn task08_archive(root: &Path, files: &[(&str, &[u8])]) -> anyhow::Result<()> {
+fn legacy_setup_archive(root: &Path, files: &[(&str, &[u8])]) -> anyhow::Result<()> {
     use std::io::Write;
     // Explicit older producer fixture: no current authoritative session.
     let _ = std::fs::remove_file(root.join(".setup/setup-session.json"));
@@ -1293,11 +1288,11 @@ fn task08_archive(root: &Path, files: &[(&str, &[u8])]) -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-async fn task08_legacy_archive_restores_consumed_complete_membership() -> anyhow::Result<()> {
+async fn legacy_archive_restores_consumed_complete_membership() -> anyhow::Result<()> {
     use super::modpack::packinfo;
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "legacy-consumed").await?;
-    task08_archive(&root, &[("unchanged.txt", b"same"), ("new.txt", b"new")])?;
+    legacy_setup_archive(&root, &[("unchanged.txt", b"same"), ("new.txt", b"new")])?;
     tokio::fs::write(root.join("instance/unchanged.txt"), b"same").await?;
     let old = packinfo::scan_dir(&root.join("instance"), None).await?;
     tokio::fs::write(root.join("packinfo.json"), packinfo::make_packinfo(old)?).await?;
@@ -1347,10 +1342,10 @@ async fn task08_legacy_archive_restores_consumed_complete_membership() -> anyhow
 }
 
 #[tokio::test]
-async fn task08_preparation_preserves_installed_version_until_apply() -> anyhow::Result<()> {
+async fn preparation_preserves_installed_version_until_apply() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "pending-metadata").await?;
-    task08_archive(&root, &[("new.txt", b"new")])?;
+    legacy_setup_archive(&root, &[("new.txt", b"new")])?;
     let (_, config) = app.instance_manager().current_config(id).await?;
     let shortpath = root.file_name().unwrap().to_str().unwrap().to_owned();
     let task = crate::managers::vtask::VisualTask::new(
@@ -1379,7 +1374,7 @@ async fn task08_preparation_preserves_installed_version_until_apply() -> anyhow:
 }
 
 #[tokio::test]
-async fn task08_refused_repair_preserves_accepted_setup() -> anyhow::Result<()> {
+async fn refused_repair_preserves_accepted_setup() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "overlap").await?;
     tokio::fs::remove_dir_all(root.join(".setup")).await?;
@@ -1449,7 +1444,7 @@ async fn task08_refused_repair_preserves_accepted_setup() -> anyhow::Result<()> 
 }
 
 #[tokio::test]
-async fn task08_queued_rename_refuses_before_config_write() -> anyhow::Result<()> {
+async fn queued_rename_refuses_before_config_write() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "queued-name").await?;
     app.instance_manager()
@@ -1469,7 +1464,7 @@ async fn task08_queued_rename_refuses_before_config_write() -> anyhow::Result<()
 }
 
 #[tokio::test]
-async fn task08_cancel_pending_offline_preserves_current_independent_edits() -> anyhow::Result<()> {
+async fn cancel_pending_offline_preserves_current_independent_edits() -> anyhow::Result<()> {
     use super::modpack::session::{Kind, Producer, Session};
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "cancel-local").await?;
@@ -1500,12 +1495,11 @@ async fn task08_cancel_pending_offline_preserves_current_independent_edits() -> 
 }
 
 #[tokio::test]
-async fn task08_legacy_disabled_archive_recovers_with_owned_retained_original() -> anyhow::Result<()>
-{
+async fn legacy_disabled_archive_recovers_with_owned_retained_original() -> anyhow::Result<()> {
     use super::modpack::{packinfo, session::Session};
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "legacy-disabled").await?;
-    task08_archive(&root, &[("mods/a.jar.disabled", b"target")])?;
+    legacy_setup_archive(&root, &[("mods/a.jar.disabled", b"target")])?;
     tokio::fs::create_dir(root.join("instance/mods")).await?;
     tokio::fs::write(root.join("instance/mods/a.jar"), b"old").await?;
     let old = packinfo::scan_dir(&root.join("instance"), None).await?;
@@ -1580,7 +1574,7 @@ async fn an_update_that_renames_mods_keeps_what_the_player_did_with_them() -> an
     let mods = root.join("instance/mods");
     let (map_new, lib_new) = (test_jar("map", "1.1"), test_jar("lib", "1.1"));
     let jei_own = test_jar("jei", "1.2");
-    task08_archive(
+    legacy_setup_archive(
         &root,
         &[
             ("mods/map-1.1.jar", &map_new),
@@ -1678,7 +1672,7 @@ async fn long_instance_root_owned_update_with_disabled_replace_commits() -> anyh
         "a".repeat(40),
         "b".repeat(40)
     );
-    task08_archive(
+    legacy_setup_archive(
         &root,
         &[("mods/a.jar.disabled", b"target"), (deep.as_str(), b"deep")],
     )?;
@@ -1741,12 +1735,11 @@ async fn long_instance_root_owned_update_with_disabled_replace_commits() -> anyh
 }
 
 #[tokio::test]
-async fn task08_promoted_restart_merges_current_edits_and_rejects_old_record() -> anyhow::Result<()>
-{
+async fn promoted_restart_merges_current_edits_and_rejects_old_record() -> anyhow::Result<()> {
     use super::modpack::session::{Phase, Session};
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "promotion-gap").await?;
-    task08_archive(&root, &[("target.txt", b"target")])?;
+    legacy_setup_archive(&root, &[("target.txt", b"target")])?;
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
     let task = crate::managers::vtask::VisualTask::new(
         crate::api::translation::Translation::InstanceTaskPrepare {
@@ -1826,7 +1819,7 @@ async fn task08_promoted_restart_merges_current_edits_and_rejects_old_record() -
 }
 
 #[tokio::test]
-async fn task08_cancel_refuses_stale_foreign_partial_and_retains_evidence() -> anyhow::Result<()> {
+async fn cancel_refuses_stale_foreign_partial_and_retains_evidence() -> anyhow::Result<()> {
     use super::modpack::session::{Kind, Phase, Producer, Session};
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "cancel-refusals").await?;
@@ -1869,10 +1862,10 @@ async fn task08_cancel_refuses_stale_foreign_partial_and_retains_evidence() -> a
 }
 
 #[tokio::test]
-async fn task08_current_missing_source_refuses_without_deleting_live_twins() -> anyhow::Result<()> {
+async fn current_missing_source_refuses_without_deleting_live_twins() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "vanished-source").await?;
-    task08_archive(&root, &[("a.disabled", b"target")])?;
+    legacy_setup_archive(&root, &[("a.disabled", b"target")])?;
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
     let task = crate::managers::vtask::VisualTask::new(
         crate::api::translation::Translation::InstanceTaskPrepare {
@@ -1915,11 +1908,11 @@ async fn task08_current_missing_source_refuses_without_deleting_live_twins() -> 
 }
 
 #[tokio::test]
-async fn task08_copied_pending_archive_is_reconstructed_for_new_identity() -> anyhow::Result<()> {
+async fn copied_pending_archive_is_reconstructed_for_new_identity() -> anyhow::Result<()> {
     use super::modpack::session::Session;
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "copy-pending").await?;
-    task08_archive(&root, &[("target.txt", b"target")])?;
+    legacy_setup_archive(&root, &[("target.txt", b"target")])?;
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
     let task = crate::managers::vtask::VisualTask::new(
         crate::api::translation::Translation::InstanceTaskPrepare {
@@ -1989,7 +1982,7 @@ async fn task08_copied_pending_archive_is_reconstructed_for_new_identity() -> an
 }
 
 #[tokio::test]
-async fn task08_markerless_tmp_only_remains_recoverable() -> anyhow::Result<()> {
+async fn markerless_tmp_only_remains_recoverable() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "ambiguous-tmp").await?;
     tokio::fs::remove_file(root.join(".setup/setup-session.json")).await?;
@@ -2029,8 +2022,7 @@ async fn task08_markerless_tmp_only_remains_recoverable() -> anyhow::Result<()> 
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task08_repair_pipeline_filters_unrelated_but_refuses_required_fault() -> anyhow::Result<()>
-{
+async fn repair_pipeline_filters_unrelated_but_refuses_required_fault() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     for required in [false, true] {
         let (id, root) = fixture(
@@ -2042,7 +2034,7 @@ async fn task08_repair_pipeline_filters_unrelated_but_refuses_required_fault() -
             },
         )
         .await?;
-        task08_archive(&root, &[("mods/required.jar", b"target")])?;
+        legacy_setup_archive(&root, &[("mods/required.jar", b"target")])?;
         tokio::fs::write(
             root.join(".setup/repair"),
             serde_json::to_vec(&super::modpack::RepairMarkerFile::default())?,
@@ -2104,7 +2096,7 @@ async fn task08_repair_pipeline_filters_unrelated_but_refuses_required_fault() -
 }
 
 #[tokio::test]
-async fn task08_all_setup_producers_obey_runtime_freeze_before_disk_write() -> anyhow::Result<()> {
+async fn all_setup_producers_obey_runtime_freeze_before_disk_write() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "frozen-producers").await?;
     let before = tokio::fs::read(root.join("instance.json")).await?;
@@ -2158,8 +2150,8 @@ async fn task08_all_setup_producers_obey_runtime_freeze_before_disk_write() -> a
 }
 
 #[tokio::test]
-async fn task08_private_and_imported_complete_shapes_qualify_without_pack_download()
--> anyhow::Result<()> {
+async fn private_and_imported_complete_shapes_qualify_without_pack_download() -> anyhow::Result<()>
+{
     use super::modpack::session::{Kind, Phase, Session};
     let app = crate::setup_managers_for_test().await;
     for shape in [
@@ -2231,8 +2223,7 @@ async fn task08_private_and_imported_complete_shapes_qualify_without_pack_downlo
 }
 
 #[tokio::test]
-async fn task08_normal_completed_duplication_remains_launchable_without_setup() -> anyhow::Result<()>
-{
+async fn normal_completed_duplication_remains_launchable_without_setup() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "completed-copy").await?;
     tokio::fs::remove_dir_all(root.join(".setup")).await?;
@@ -2275,12 +2266,11 @@ async fn task08_normal_completed_duplication_remains_launchable_without_setup() 
 }
 
 #[tokio::test]
-async fn task08_legacy_transition_adopts_both_records_and_preserves_payload() -> anyhow::Result<()>
-{
+async fn legacy_transition_adopts_both_records_and_preserves_payload() -> anyhow::Result<()> {
     use super::modpack::{packinfo, session::Session};
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "legacy-transition").await?;
-    task08_archive(&root, &[("a.disabled", b"target")])?;
+    legacy_setup_archive(&root, &[("a.disabled", b"target")])?;
     tokio::fs::write(root.join("instance/a"), b"old").await?;
     let old = packinfo::scan_dir(&root.join("instance"), None).await?;
     tokio::fs::write(root.join("packinfo.json"), packinfo::make_packinfo(old)?).await?;
@@ -2369,10 +2359,10 @@ async fn task08_legacy_transition_adopts_both_records_and_preserves_payload() ->
 }
 
 #[tokio::test]
-async fn task08_reconstruction_preserves_prior_target_and_list() -> anyhow::Result<()> {
+async fn reconstruction_preserves_prior_target_and_list() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
     let (id, root) = fixture(&app, "legacy-prior-records").await?;
-    task08_archive(&root, &[("new.txt", b"new")])?;
+    legacy_setup_archive(&root, &[("new.txt", b"new")])?;
     tokio::fs::write(root.join("tmp-packinfo.json"), b"legacy target evidence").await?;
     tokio::fs::write(
         root.join(".setup/staging-packinfo.json"),
@@ -2425,7 +2415,7 @@ async fn task08_reconstruction_preserves_prior_target_and_list() -> anyhow::Resu
 // Round 1 fixtures exercise the real archive decoder, skip selection, record
 // publication and re-entry. Local original bytes only satisfy an already
 // selected Downloadable; the normal integrity check still runs offline.
-fn task08_round1_archive(root: &Path, downloadable: bool) -> anyhow::Result<()> {
+fn downloadable_setup_archive(root: &Path, downloadable: bool) -> anyhow::Result<()> {
     use sha2::Digest;
     use std::io::Write;
     let bytes = b"original downloadable";
@@ -2433,7 +2423,7 @@ fn task08_round1_archive(root: &Path, downloadable: bool) -> anyhow::Result<()> 
         serde_json::json!([{
             "path":"mods/a.jar", "hashes":{"sha1":"", "sha512":hex::encode(sha2::Sha512::digest(bytes))},
             "env":{"client":"required","server":"required"},
-            "downloads":["https://task08.invalid/original.jar"],"fileSize":bytes.len()
+            "downloads":["https://fixture.invalid/original.jar"],"fileSize":bytes.len()
         }])
     } else {
         serde_json::json!([])
@@ -2456,9 +2446,7 @@ fn task08_round1_archive(root: &Path, downloadable: bool) -> anyhow::Result<()> 
     Ok(())
 }
 
-async fn task08_round1_publication(
-    producer: super::modpack::session::Producer,
-) -> anyhow::Result<()> {
+async fn publication_boundaries(producer: super::modpack::session::Producer) -> anyhow::Result<()> {
     use super::modpack::session::{Phase, Producer, Session};
     let app = crate::setup_managers_for_test().await;
     for (index, boundary) in [
@@ -2470,11 +2458,11 @@ async fn task08_round1_publication(
     .into_iter()
     .enumerate()
     {
-        let name = format!("round1-{producer:?}-{index}");
+        let name = format!("publication-{producer:?}-{index}");
         let (id, root) = if producer == Producer::Reconstructed {
             let (id, root) = fixture(&app, &name).await?;
             tokio::fs::remove_file(root.join(".setup/setup-session.json")).await?;
-            task08_round1_archive(&root, false)?;
+            downloadable_setup_archive(&root, false)?;
             (id, root)
         } else {
             let group = app.instance_manager().get_default_group().await?;
@@ -2494,7 +2482,7 @@ async fn task08_round1_publication(
                     String::new(),
                     move |root| async move {
                         if producer == Producer::Import {
-                            task08_round1_archive(&root, false)?;
+                            downloadable_setup_archive(&root, false)?;
                         }
                         Ok(())
                     },
@@ -2508,7 +2496,7 @@ async fn task08_round1_publication(
                 .get_instance_path(&shortpath)
                 .get_root();
             if producer == Producer::Create {
-                task08_round1_archive(&root, false)?;
+                downloadable_setup_archive(&root, false)?;
             }
             assert_eq!(Session::load(&root).await?.unwrap().producer, producer);
             (id, root)
@@ -2596,16 +2584,16 @@ async fn task08_round1_publication(
     Ok(())
 }
 #[tokio::test]
-async fn task08_round1_publication_create() -> anyhow::Result<()> {
-    task08_round1_publication(super::modpack::session::Producer::Create).await
+async fn publication_create() -> anyhow::Result<()> {
+    publication_boundaries(super::modpack::session::Producer::Create).await
 }
 #[tokio::test]
-async fn task08_round1_publication_import() -> anyhow::Result<()> {
-    task08_round1_publication(super::modpack::session::Producer::Import).await
+async fn publication_import() -> anyhow::Result<()> {
+    publication_boundaries(super::modpack::session::Producer::Import).await
 }
 #[tokio::test]
-async fn task08_round1_publication_reconstructed() -> anyhow::Result<()> {
-    task08_round1_publication(super::modpack::session::Producer::Reconstructed).await
+async fn publication_reconstructed() -> anyhow::Result<()> {
+    publication_boundaries(super::modpack::session::Producer::Reconstructed).await
 }
 
 /// Copies the folder `from` to `to`, which must not exist yet.
@@ -2623,24 +2611,24 @@ fn copy_tree(from: &Path, to: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow::Result<()> {
+async fn reenable_after_download(published: bool, mode: &str, cf: bool) -> anyhow::Result<()> {
     use super::modpack::{RepairMarkerFile, packinfo, session::Session};
     let app = crate::setup_managers_for_test().await;
-    let (mut id, mut root) = fixture(&app, "round1-download-reenable").await?;
+    let (mut id, mut root) = fixture(&app, "download-reenable").await?;
     let copied = mode.starts_with("copy");
     let half = mode.ends_with("half");
     tokio::fs::remove_file(root.join(".setup/setup-session.json")).await?;
     let mut metadata_guards = Vec::new();
     if cf {
-        task08_round2_cf_archive(&root)?;
+        cf_archive(&root)?;
         metadata_guards.push(
             crate::managers::minecraft::curseforge::preparation_fixture::set(
                 root.join(".setup/curseforge"),
-                task08_round2_cf_metadata(),
+                cf_metadata(),
             ),
         );
     } else {
-        task08_round1_archive(&root, true)?;
+        downloadable_setup_archive(&root, true)?;
     }
     tokio::fs::create_dir_all(root.join("instance/mods")).await?;
     if cf {
@@ -2745,7 +2733,7 @@ async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow
         saved.save(&root, &saved.owner()?).await?;
         id = app
             .instance_manager()
-            .duplicate_instance(id, "round1-copy".into())
+            .duplicate_instance(id, "reenable-copy".into())
             .await?;
         let (path, _) = app.instance_manager().current_config(id).await?;
         root = app
@@ -2776,7 +2764,7 @@ async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow
         metadata_guards.push(
             crate::managers::minecraft::curseforge::preparation_fixture::set(
                 root.join(".setup/curseforge"),
-                task08_round2_cf_metadata(),
+                cf_metadata(),
             ),
         );
     }
@@ -2922,46 +2910,46 @@ async fn task08_round1_reenable(published: bool, mode: &str, cf: bool) -> anyhow
     Ok(())
 }
 #[tokio::test]
-async fn task08_round1_download_reenable_before() -> anyhow::Result<()> {
-    task08_round1_reenable(false, "legacy", false).await
+async fn download_reenable_before() -> anyhow::Result<()> {
+    reenable_after_download(false, "legacy", false).await
 }
 #[tokio::test]
-async fn task08_round1_download_reenable_after() -> anyhow::Result<()> {
-    task08_round1_reenable(true, "legacy", false).await
-}
-
-#[tokio::test]
-async fn task08_round1_download_copy_before() -> anyhow::Result<()> {
-    task08_round1_reenable(false, "copy", false).await
-}
-#[tokio::test]
-async fn task08_round1_download_copy_after() -> anyhow::Result<()> {
-    task08_round1_reenable(true, "copy", false).await
-}
-#[tokio::test]
-async fn task08_round1_download_legacy_half_adoption() -> anyhow::Result<()> {
-    task08_round1_reenable(true, "legacy-half", false).await
-}
-#[tokio::test]
-async fn task08_round1_download_copy_half_adoption() -> anyhow::Result<()> {
-    task08_round1_reenable(false, "copy-half", false).await
-}
-#[tokio::test]
-async fn task08_round1_download_saved_resolved_retry() -> anyhow::Result<()> {
-    task08_round1_reenable(true, "old-resolved", false).await
-}
-#[tokio::test]
-async fn task08_round1_download_foreign_transition_refused() -> anyhow::Result<()> {
-    task08_round1_reenable(true, "foreign", false).await
+async fn download_reenable_after() -> anyhow::Result<()> {
+    reenable_after_download(true, "legacy", false).await
 }
 
 #[tokio::test]
-async fn task08_round1_publication_requires_original_owner_and_sources() -> anyhow::Result<()> {
+async fn download_copy_before() -> anyhow::Result<()> {
+    reenable_after_download(false, "copy", false).await
+}
+#[tokio::test]
+async fn download_copy_after() -> anyhow::Result<()> {
+    reenable_after_download(true, "copy", false).await
+}
+#[tokio::test]
+async fn download_legacy_half_adoption() -> anyhow::Result<()> {
+    reenable_after_download(true, "legacy-half", false).await
+}
+#[tokio::test]
+async fn download_copy_half_adoption() -> anyhow::Result<()> {
+    reenable_after_download(false, "copy-half", false).await
+}
+#[tokio::test]
+async fn download_saved_resolved_retry() -> anyhow::Result<()> {
+    reenable_after_download(true, "old-resolved", false).await
+}
+#[tokio::test]
+async fn download_foreign_transition_refused() -> anyhow::Result<()> {
+    reenable_after_download(true, "foreign", false).await
+}
+
+#[tokio::test]
+async fn publication_requires_original_owner_and_sources() -> anyhow::Result<()> {
     use super::modpack::session::{self, Phase, Session};
     let app = crate::setup_managers_for_test().await;
-    let (id, root) = fixture(&app, "round1-publication-authority").await?;
+    let (id, root) = fixture(&app, "publication-authority").await?;
     tokio::fs::remove_file(root.join(".setup/setup-session.json")).await?;
-    task08_round1_archive(&root, false)?;
+    downloadable_setup_archive(&root, false)?;
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
     let task = crate::managers::vtask::VisualTask::new(
         crate::api::translation::Translation::InstanceTaskPrepare {
@@ -3075,7 +3063,7 @@ async fn large_pack_applies_with_a_bounded_number_of_session_loads() -> anyhow::
             )
         })
         .collect();
-    task08_archive(
+    legacy_setup_archive(
         &root,
         &files
             .iter()
@@ -3156,7 +3144,7 @@ async fn prepared_pack(
     Option<super::modpack::session::Owner>,
 )> {
     let (id, root) = fixture(app, name).await?;
-    task08_archive(
+    legacy_setup_archive(
         &root,
         &files
             .iter()
@@ -3578,7 +3566,7 @@ async fn fresh_install_syncs_each_published_folder_once_before_applied() -> anyh
     Ok(())
 }
 
-fn task08_round2_cf_archive(root: &Path) -> anyhow::Result<()> {
+fn cf_archive(root: &Path) -> anyhow::Result<()> {
     use std::io::Write;
     let mut zip = zip::ZipWriter::new(std::fs::File::create(root.join(".setup/curseforge"))?);
     zip.start_file("manifest.json", zip::write::SimpleFileOptions::default())?;
@@ -3590,37 +3578,37 @@ fn task08_round2_cf_archive(root: &Path) -> anyhow::Result<()> {
     zip.finish()?;
     Ok(())
 }
-fn task08_round2_cf_metadata() -> serde_json::Value {
+fn cf_metadata() -> serde_json::Value {
     use sha2::Digest;
     let bytes = b"original downloadable";
     let file = |id, mod_id, name| {
         serde_json::json!({"id":id,"gameId":432,"modId":mod_id,"isAvailable":true,"displayName":name,"fileName":name,
         "releaseType":1,"fileStatus":4,"hashes":[{"algo":2,"value":hex::encode(md5::Md5::digest(bytes))},{"algo":1,"value":hex::encode(sha1::Sha1::digest(bytes))}],
-        "fileDate":"2026-01-01T00:00:00Z","fileLength":bytes.len(),"downloadCount":0,"downloadUrl":"https://task08.invalid/original.jar",
+        "fileDate":"2026-01-01T00:00:00Z","fileLength":bytes.len(),"downloadCount":0,"downloadUrl":"https://fixture.invalid/original.jar",
         "gameVersions":["1.20.1"],"sortableGameVersions":[],"dependencies":[],"fileFingerprint":0})
     };
     serde_json::json!({"minecraft":{"latest":{"release":"1.20.1","snapshot":"1.20.1"},"versions":[{
-        "id":"1.20.1","type":"release","url":"https://task08.invalid/version.json","time":"2026-01-01T00:00:00Z","releaseTime":"2026-01-01T00:00:00Z","sha1":"0000000000000000000000000000000000000000","complianceLevel":1}]},
+        "id":"1.20.1","type":"release","url":"https://fixture.invalid/version.json","time":"2026-01-01T00:00:00Z","releaseTime":"2026-01-01T00:00:00Z","sha1":"0000000000000000000000000000000000000000","complianceLevel":1}]},
         "classes":{"100":6,"200":6},"files":{"1000":file(1000,100,"a.jar"),"2000":file(2000,200,"b.jar")}})
 }
 #[tokio::test]
-async fn task08_round2_cf_legacy_before() -> anyhow::Result<()> {
-    task08_round1_reenable(false, "legacy", true).await
+async fn cf_legacy_before() -> anyhow::Result<()> {
+    reenable_after_download(false, "legacy", true).await
 }
 #[tokio::test]
-async fn task08_round2_cf_legacy_after() -> anyhow::Result<()> {
-    task08_round1_reenable(true, "legacy", true).await
+async fn cf_legacy_after() -> anyhow::Result<()> {
+    reenable_after_download(true, "legacy", true).await
 }
 #[tokio::test]
-async fn task08_round2_cf_copy_before() -> anyhow::Result<()> {
-    task08_round1_reenable(false, "copy", true).await
+async fn cf_copy_before() -> anyhow::Result<()> {
+    reenable_after_download(false, "copy", true).await
 }
 #[tokio::test]
-async fn task08_round2_cf_copy_after() -> anyhow::Result<()> {
-    task08_round1_reenable(true, "copy", true).await
+async fn cf_copy_after() -> anyhow::Result<()> {
+    reenable_after_download(true, "copy", true).await
 }
 
-fn task08_round2_pack(version: &str) -> info::Modpack {
+fn synthetic_pack(version: &str) -> info::Modpack {
     info::Modpack::Modrinth(info::ModrinthModpack {
         project_id: "synthetic".into(),
         version_id: version.into(),
@@ -3630,7 +3618,7 @@ fn task08_round2_pack(version: &str) -> info::Modpack {
 /// 2.0.40 import. A version change first records what A installed; the
 /// returned guard supplies that inventory, so no provider is asked for the
 /// synthetic version.
-async fn task08_round2_change_fixture(
+async fn change_fixture(
     app: &crate::App,
     name: &str,
 ) -> anyhow::Result<(
@@ -3642,7 +3630,7 @@ async fn task08_round2_change_fixture(
     tokio::fs::remove_dir_all(root.join(".setup")).await?;
     let (shortpath, mut config) = app.instance_manager().current_config(id).await?;
     config.modpack = Some(info::ModpackInfo {
-        modpack: task08_round2_pack("A"),
+        modpack: synthetic_pack("A"),
         locked: true,
     });
     app.instance_manager()
@@ -3651,7 +3639,7 @@ async fn task08_round2_change_fixture(
     let inventory = super::modpack::inventory_fixture::set(root.clone(), Default::default());
     Ok((id, root, inventory))
 }
-async fn task08_round2_wait_failed(app: &crate::App, id: InstanceId) -> anyhow::Result<()> {
+async fn wait_failed(app: &crate::App, id: InstanceId) -> anyhow::Result<()> {
     tokio::time::timeout(Duration::from_secs(5), async {
         loop {
             if matches!(
@@ -3671,10 +3659,10 @@ async fn task08_round2_wait_failed(app: &crate::App, id: InstanceId) -> anyhow::
     Ok(())
 }
 #[tokio::test]
-async fn task08_round2_request_drop_keeps_real_producer_owned() -> anyhow::Result<()> {
+async fn request_drop_keeps_real_producer_owned() -> anyhow::Result<()> {
     use super::modpack::session::{self, Session};
     let app = crate::setup_managers_for_test().await;
-    let (id, root, _inventory) = task08_round2_change_fixture(&app, "producer-drop").await?;
+    let (id, root, _inventory) = change_fixture(&app, "producer-drop").await?;
     let permit = app
         .instance_manager
         .persistence_manager
@@ -3694,7 +3682,7 @@ async fn task08_round2_request_drop_keeps_real_producer_owned() -> anyhow::Resul
     {
         let request = app
             .instance_manager()
-            .change_modpack(id, task08_round2_pack("B"));
+            .change_modpack(id, synthetic_pack("B"));
         tokio::pin!(request);
         tokio::select! {
             _=pause.entered.notified()=>{},
@@ -3774,7 +3762,7 @@ async fn task08_round2_request_drop_keeps_real_producer_owned() -> anyhow::Resul
     .await?;
     handoff.release.notify_one();
     drop(permit);
-    task08_round2_wait_failed(&app, id).await?;
+    wait_failed(&app, id).await?;
     // A refused id is retired, so each poll asks under a new one.
     let settled = tokio::time::timeout(Duration::from_secs(5), async {
         for attempt in 0.. {
@@ -3794,7 +3782,7 @@ async fn task08_round2_request_drop_keeps_real_producer_owned() -> anyhow::Resul
 /// The baseline record a version change of a linked pack without
 /// `packinfo.json` writes first, from the verified inventory (see
 /// `imported_baseline::ensure`). It stays whatever the request does next.
-async fn task08_round2_baseline_recorded(root: &Path) -> anyhow::Result<()> {
+async fn baseline_recorded(root: &Path) -> anyhow::Result<()> {
     let record: serde_json::Value =
         serde_json::from_slice(&tokio::fs::read(root.join("packinfo.json")).await?)?;
     assert_eq!(
@@ -3804,8 +3792,8 @@ async fn task08_round2_baseline_recorded(root: &Path) -> anyhow::Result<()> {
     Ok(())
 }
 
-async fn task08_round2_settled(app: &crate::App, id: InstanceId) -> anyhow::Result<()> {
-    task08_round2_wait_failed(app, id).await?;
+async fn change_settled(app: &crate::App, id: InstanceId) -> anyhow::Result<()> {
+    wait_failed(app, id).await?;
     let gate = tokio::time::timeout(
         Duration::from_secs(1),
         app.instance_manager().lock_instance(id),
@@ -3829,10 +3817,10 @@ async fn task08_round2_settled(app: &crate::App, id: InstanceId) -> anyhow::Resu
 }
 
 #[tokio::test]
-async fn task08_round2_normal_producer_returns_and_hands_off() -> anyhow::Result<()> {
+async fn normal_producer_returns_and_hands_off() -> anyhow::Result<()> {
     use super::modpack::session::Session;
     let app = crate::setup_managers_for_test().await;
-    let (id, root, _inventory) = task08_round2_change_fixture(&app, "producer-normal").await?;
+    let (id, root, _inventory) = change_fixture(&app, "producer-normal").await?;
     let permit = app
         .instance_manager
         .persistence_manager
@@ -3842,7 +3830,7 @@ async fn task08_round2_normal_producer_returns_and_hands_off() -> anyhow::Result
     let task = tokio::time::timeout(
         Duration::from_secs(5),
         app.instance_manager()
-            .change_modpack(id, task08_round2_pack("B")),
+            .change_modpack(id, synthetic_pack("B")),
     )
     .await??;
     assert!(
@@ -3854,7 +3842,7 @@ async fn task08_round2_normal_producer_returns_and_hands_off() -> anyhow::Result
         tokio::fs::read_to_string(root.join(".setup/change-pack-version.json")).await?,
         saved.requested_pack.unwrap()
     );
-    task08_round2_baseline_recorded(&root).await?;
+    baseline_recorded(&root).await?;
     assert!(
         app.runtime_lifecycle
             .begin_relocation("normal-handoff")
@@ -3872,18 +3860,18 @@ async fn task08_round2_normal_producer_returns_and_hands_off() -> anyhow::Result
     )
     .await?;
     drop(permit);
-    task08_round2_settled(&app, id).await
+    change_settled(&app, id).await
 }
 
 /// A linked pack whose installed version the platform no longer serves
 /// still changes version (2.0.40 did): nothing is recorded, so the change
 /// keeps every file in place, and its task says why once it succeeds.
 #[tokio::test]
-async fn task08_round2_removed_installed_version_changes_without_a_record() -> anyhow::Result<()> {
+async fn removed_installed_version_changes_without_a_record() -> anyhow::Result<()> {
     use super::modpack::{inventory_fixture, session::Session};
     use crate::domain::vtask::{DependencyPlatform, PreviousPackFilesReason, TaskWarning};
     let app = crate::setup_managers_for_test().await;
-    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-gone").await?;
+    let (id, root, inventory) = change_fixture(&app, "producer-gone").await?;
     drop(inventory);
     let _gone = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Gone);
     let permit = app
@@ -3895,7 +3883,7 @@ async fn task08_round2_removed_installed_version_changes_without_a_record() -> a
     let task = tokio::time::timeout(
         Duration::from_secs(5),
         app.instance_manager()
-            .change_modpack(id, task08_round2_pack("B")),
+            .change_modpack(id, synthetic_pack("B")),
     )
     .await??;
     assert!(
@@ -3917,7 +3905,7 @@ async fn task08_round2_removed_installed_version_changes_without_a_record() -> a
     )
     .await?;
     drop(permit);
-    task08_round2_settled(&app, id).await
+    change_settled(&app, id).await
 }
 
 /// The whole fallback through the real worker, up to the game install: a
@@ -3926,8 +3914,7 @@ async fn task08_round2_removed_installed_version_changes_without_a_record() -> a
 /// change plans without a record, so every old file survives and the new
 /// version's record takes over.
 #[tokio::test]
-async fn task08_round2_removed_installed_version_applies_and_warns_when_resumed()
--> anyhow::Result<()> {
+async fn removed_installed_version_applies_and_warns_when_resumed() -> anyhow::Result<()> {
     use super::modpack::{inventory_fixture, session::Session};
     use crate::domain::vtask::{DependencyPlatform, PreviousPackFilesReason, TaskWarning};
     let kept = vec![TaskWarning::PreviousPackFilesKept {
@@ -3935,7 +3922,7 @@ async fn task08_round2_removed_installed_version_applies_and_warns_when_resumed(
         reason: PreviousPackFilesReason::VersionUnavailable,
     }];
     let app = crate::setup_managers_for_test().await;
-    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-gone-apply").await?;
+    let (id, root, inventory) = change_fixture(&app, "producer-gone-apply").await?;
     drop(inventory);
     let _gone = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Gone);
     tokio::fs::create_dir_all(root.join("instance/mods")).await?;
@@ -3949,7 +3936,7 @@ async fn task08_round2_removed_installed_version_applies_and_warns_when_resumed(
         .await?;
     let first = app
         .instance_manager()
-        .change_modpack(id, task08_round2_pack("B"))
+        .change_modpack(id, synthetic_pack("B"))
         .await?;
     assert_eq!(
         app.task_manager().running_task_warnings(first).await,
@@ -3958,14 +3945,14 @@ async fn task08_round2_removed_installed_version_applies_and_warns_when_resumed(
     // The archive the first attempt reads is broken, so that attempt fails.
     tokio::fs::write(root.join(".setup/modrinth"), b"not an archive").await?;
     drop(permit);
-    task08_round2_wait_failed(&app, id).await?;
+    wait_failed(&app, id).await?;
     assert_eq!(
         Session::load(&root).await?.unwrap().warnings,
         kept,
         "the setup keeps its warning when its task fails"
     );
 
-    task08_round1_archive(&root, false)?;
+    downloadable_setup_archive(&root, false)?;
     let staged = app.instance_manager().test_hooks.arm("setup_staged", id);
     let (_, resumed) = app
         .instance_manager()
@@ -4000,15 +3987,15 @@ async fn task08_round2_removed_installed_version_applies_and_warns_when_resumed(
 /// could only fail, and would leave a setup in the way of Play: it is refused
 /// before anything changes, and picking another version still works.
 #[tokio::test]
-async fn task08_round2_removed_installed_version_cannot_be_requested_again() -> anyhow::Result<()> {
+async fn removed_installed_version_cannot_be_requested_again() -> anyhow::Result<()> {
     use super::modpack::inventory_fixture;
     let app = crate::setup_managers_for_test().await;
-    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-gone-same").await?;
+    let (id, root, inventory) = change_fixture(&app, "producer-gone-same").await?;
     drop(inventory);
     let _gone = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Gone);
     let error = app
         .instance_manager()
-        .change_modpack(id, task08_round2_pack("A"))
+        .change_modpack(id, synthetic_pack("A"))
         .await
         .unwrap_err();
     assert_eq!(
@@ -4032,15 +4019,15 @@ async fn task08_round2_removed_installed_version_cannot_be_requested_again() -> 
 /// change: Cancel never ends in a running update. The record stays for the
 /// next attempt to read.
 #[tokio::test]
-async fn task08_round2_cancel_after_the_last_check_still_stops_the_change() -> anyhow::Result<()> {
+async fn cancel_after_the_last_check_still_stops_the_change() -> anyhow::Result<()> {
     let app = crate::setup_managers_for_test().await;
-    let (id, root, _inventory) = task08_round2_change_fixture(&app, "producer-late-cancel").await?;
+    let (id, root, _inventory) = change_fixture(&app, "producer-late-cancel").await?;
     let checked = app.instance_manager().test_hooks.arm("change_checked", id);
     let change = {
         let app = app.clone();
         tokio::spawn(async move {
             app.instance_manager()
-                .change_modpack(id, task08_round2_pack("B"))
+                .change_modpack(id, synthetic_pack("B"))
                 .await
         })
     };
@@ -4061,17 +4048,17 @@ async fn task08_round2_cancel_after_the_last_check_still_stops_the_change() -> a
 /// A request can wait for the gate behind one whose modal was closed. Cancel
 /// stops both, so no update starts behind the player's back.
 #[tokio::test]
-async fn task08_round2_cancel_stops_every_overlapping_change() -> anyhow::Result<()> {
+async fn cancel_stops_every_overlapping_change() -> anyhow::Result<()> {
     use super::modpack::inventory_fixture;
     let app = crate::setup_managers_for_test().await;
-    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-overlap").await?;
+    let (id, root, inventory) = change_fixture(&app, "producer-overlap").await?;
     drop(inventory);
     let _hang = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Hang);
     let request = || {
         let app = app.clone();
         tokio::spawn(async move {
             app.instance_manager()
-                .change_modpack(id, task08_round2_pack("B"))
+                .change_modpack(id, synthetic_pack("B"))
                 .await
         })
     };
@@ -4103,10 +4090,10 @@ async fn task08_round2_cancel_stops_every_overlapping_change() -> anyhow::Result
 /// The player stops a check that is taking long: the change ends without a
 /// setup or a record, and the next attempt can run.
 #[tokio::test]
-async fn task08_round2_cancelled_check_leaves_the_instance_as_it_was() -> anyhow::Result<()> {
+async fn cancelled_check_leaves_the_instance_as_it_was() -> anyhow::Result<()> {
     use super::modpack::inventory_fixture;
     let app = crate::setup_managers_for_test().await;
-    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-cancelled").await?;
+    let (id, root, inventory) = change_fixture(&app, "producer-cancelled").await?;
     drop(inventory);
     let hang = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Hang);
     // Nothing to stop yet.
@@ -4118,7 +4105,7 @@ async fn task08_round2_cancelled_check_leaves_the_instance_as_it_was() -> anyhow
         let app = app.clone();
         tokio::spawn(async move {
             app.instance_manager()
-                .change_modpack(id, task08_round2_pack("B"))
+                .change_modpack(id, synthetic_pack("B"))
                 .await
         })
     };
@@ -4140,7 +4127,7 @@ async fn task08_round2_cancelled_check_leaves_the_instance_as_it_was() -> anyhow
         let app = app.clone();
         tokio::spawn(async move {
             app.instance_manager()
-                .change_modpack(id, task08_round2_pack("B"))
+                .change_modpack(id, synthetic_pack("B"))
                 .await
         })
     };
@@ -4175,7 +4162,7 @@ async fn task08_round2_cancelled_check_leaves_the_instance_as_it_was() -> anyhow
         .acquire()
         .await?;
     app.instance_manager()
-        .change_modpack(id, task08_round2_pack("B"))
+        .change_modpack(id, synthetic_pack("B"))
         .await?;
     assert!(root.join("packinfo.json").exists());
     tokio::fs::write(
@@ -4184,23 +4171,23 @@ async fn task08_round2_cancelled_check_leaves_the_instance_as_it_was() -> anyhow
     )
     .await?;
     drop(permit);
-    task08_round2_settled(&app, id).await
+    change_settled(&app, id).await
 }
 
 /// The platform can't be reached: the change is refused with a way out, and
 /// nothing is recorded or set up.
 #[tokio::test]
-async fn task08_round2_unreachable_platform_refuses_the_change() -> anyhow::Result<()> {
+async fn unreachable_platform_refuses_the_change() -> anyhow::Result<()> {
     use super::modpack::inventory_fixture;
     let app = crate::setup_managers_for_test().await;
-    let (id, root, inventory) = task08_round2_change_fixture(&app, "producer-offline").await?;
+    let (id, root, inventory) = change_fixture(&app, "producer-offline").await?;
     drop(inventory);
     let _offline =
         inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Unreachable);
     let error = tokio::time::timeout(
         Duration::from_secs(5),
         app.instance_manager()
-            .change_modpack(id, task08_round2_pack("B")),
+            .change_modpack(id, synthetic_pack("B")),
     )
     .await?
     .unwrap_err();
@@ -4219,14 +4206,14 @@ async fn task08_round2_unreachable_platform_refuses_the_change() -> anyhow::Resu
     Ok(())
 }
 
-async fn task08_round2_producer_io_error(drop_request: bool) -> anyhow::Result<()> {
+async fn producer_io_error(drop_request: bool) -> anyhow::Result<()> {
     use super::modpack::session;
     let app = crate::setup_managers_for_test().await;
-    let (id, root, _inventory) = task08_round2_change_fixture(&app, "producer-io-error").await?;
+    let (id, root, _inventory) = change_fixture(&app, "producer-io-error").await?;
     let pause = session::publication_fixture::arm_replacement(&root, session::RECORD);
     let request = app
         .instance_manager()
-        .change_modpack(id, task08_round2_pack("B"));
+        .change_modpack(id, synthetic_pack("B"));
     let mut request = Box::pin(request);
     tokio::select! {
         _ = pause.entered.notified() => {},
@@ -4243,7 +4230,7 @@ async fn task08_round2_producer_io_error(drop_request: bool) -> anyhow::Result<(
     // record's name, so its no-replace publication fails on every OS. Nothing
     // is moved while the writer holds its temporary file open (Windows
     // refuses to rename a folder with an open file inside).
-    let next = task08_round2_replacement(&root)?;
+    let next = replacement_setup(&root)?;
     assert!(next.join("change-pack-version.json").is_file());
     tokio::fs::create_dir(next.join(session::RECORD)).await?;
     if drop_request {
@@ -4262,7 +4249,7 @@ async fn task08_round2_producer_io_error(drop_request: bool) -> anyhow::Result<(
                 .is_err()
         );
     }
-    task08_round2_settled(&app, id).await?;
+    change_settled(&app, id).await?;
     // The failure published no setup and removed the replacement it was
     // writing, request included: its record, written last, never completed
     // it. The baseline packinfo.json from the inventory step remains.
@@ -4275,12 +4262,12 @@ async fn task08_round2_producer_io_error(drop_request: bool) -> anyhow::Result<(
             .to_string_lossy()
             .starts_with(".setup-next-")
     }));
-    task08_round2_baseline_recorded(&root).await?;
+    baseline_recorded(&root).await?;
     Ok(())
 }
 /// The one replacement setup a request is writing (see
 /// `session::begin_replacement`).
-fn task08_round2_replacement(root: &Path) -> anyhow::Result<PathBuf> {
+fn replacement_setup(root: &Path) -> anyhow::Result<PathBuf> {
     let mut found = Vec::new();
     for entry in std::fs::read_dir(root)? {
         let entry = entry?;
@@ -4296,12 +4283,12 @@ fn task08_round2_replacement(root: &Path) -> anyhow::Result<PathBuf> {
     Ok(found.remove(0))
 }
 #[tokio::test]
-async fn task08_round2_returned_io_error_releases_owned_producer() -> anyhow::Result<()> {
-    task08_round2_producer_io_error(false).await
+async fn returned_io_error_releases_owned_producer() -> anyhow::Result<()> {
+    producer_io_error(false).await
 }
 #[tokio::test]
-async fn task08_round2_dropped_request_io_error_settles_owned_producer() -> anyhow::Result<()> {
-    task08_round2_producer_io_error(true).await
+async fn dropped_request_io_error_settles_owned_producer() -> anyhow::Result<()> {
+    producer_io_error(true).await
 }
 
 // 2.0.40 leaves `.setup` without a session record: empty after an unfinished
@@ -5563,7 +5550,7 @@ async fn versiononly_fail(
     };
     tokio::fs::write(&injected, b"injected failure").await?;
     drop(queue);
-    task08_round2_settled(app, id).await?;
+    change_settled(app, id).await?;
     match request {
         Some(bytes) => tokio::fs::write(&injected, bytes).await?,
         None => tokio::fs::remove_file(&injected).await?,
@@ -5749,7 +5736,7 @@ async fn versiononly_cancelled_loader_change_is_replaceable() -> anyhow::Result<
         "versiononly-cancel",
         crate::managers::runtime_lifecycle::ShutdownPurpose::Quit,
     )?;
-    task08_round2_wait_failed(&app, id).await?;
+    wait_failed(&app, id).await?;
     drop(queue);
     let cancelled = Session::load(&root)
         .await?
@@ -6549,7 +6536,7 @@ async fn versiononly_installed_pack(
                 // A local .mrpack import copies the archive in; a platform
                 // install downloads it on its first Play.
                 if !linked {
-                    task08_round1_archive(&path, false)?;
+                    downloadable_setup_archive(&path, false)?;
                 }
                 tokio::fs::create_dir_all(path.join("instance/saves/world")).await?;
                 tokio::fs::write(path.join("instance/saves/world/level.dat"), b"world").await?;
@@ -6559,7 +6546,7 @@ async fn versiononly_installed_pack(
         .await?;
     let root = versiononly_root(app, id).await?;
     if linked {
-        task08_round1_archive(&root, false)?;
+        downloadable_setup_archive(&root, false)?;
     }
     // Play puts the pack in place; its game version install then fails.
     legacy_prepare(app, id).await?;
@@ -7059,7 +7046,7 @@ async fn a_setup_an_older_build_left_with_a_marker_folder_is_rebuilt_from_its_ar
     let (id, root) = fixture(&app, "legacy-marker-folder-rebuilt").await?;
     let setup = root.join(".setup");
     tokio::fs::remove_file(setup.join("setup-session.json")).await?;
-    task08_round1_archive(&root, false)?;
+    downloadable_setup_archive(&root, false)?;
     tokio::fs::create_dir(setup.join("modpack-complete")).await?;
     assert!(!root.join("packinfo.json").exists());
 
@@ -8930,7 +8917,7 @@ async fn repairblocked_pending_change(
     Ok(session)
 }
 
-/// GPT-0214: a Repair confirmed in a dialog that went stale never discards a
+/// A Repair confirmed in a dialog that went stale never discards a
 /// setup accepted after it opened. Only the dialog that shows a setup
 /// discards it, and a refusal changes nothing.
 #[tokio::test]
@@ -9498,7 +9485,7 @@ async fn a_damaged_pack_record_is_repaired_by_repair_and_stops_only_an_update() 
             "damaged-record-update"
         };
         let (id, root) = fixture(&app, name).await?;
-        task08_archive(&root, &[("mods/pack.jar", b"pack")])?;
+        legacy_setup_archive(&root, &[("mods/pack.jar", b"pack")])?;
         if repair {
             tokio::fs::write(
                 root.join(".setup/repair"),
@@ -9667,7 +9654,7 @@ async fn a_repair_checks_the_packs_own_files_under_a_counted_step() -> anyhow::R
 
     // An install or update has no such step: it goes by the record.
     let (id, root) = fixture(&app, "update-without-check").await?;
-    task08_archive(&root, &[("mods/pack.jar", b"pack")])?;
+    legacy_setup_archive(&root, &[("mods/pack.jar", b"pack")])?;
     let task = legacy_task();
     let mut owner = None;
     let (shortpath, config) = app.instance_manager().current_config(id).await?;
@@ -10498,7 +10485,7 @@ async fn lost_files_reported(
     .await?)
 }
 
-/// R05-run-modpack#2: a pack file removed between its download and the
+/// A pack file removed between its download and the
 /// record of what to install (antivirus software taking a mod it has just
 /// seen written) used to leave the update one file short with no word of
 /// it: the old version's file deleted, the new one never installed. The
@@ -10601,7 +10588,7 @@ async fn a_given_up_update_reports_only_that_it_was_given_up() -> anyhow::Result
     use crate::domain::vtask::TaskWarning;
     let app = crate::setup_managers_for_test().await;
     let server = lost_files_server().await;
-    let (id, root, inventory) = task08_round2_change_fixture(&app, "lost-update-warned").await?;
+    let (id, root, inventory) = change_fixture(&app, "lost-update-warned").await?;
     drop(inventory);
     let _gone = inventory_fixture::set_fixture(root.clone(), inventory_fixture::Fixture::Gone);
     let (task, prepared, pause) =
@@ -10922,7 +10909,7 @@ async fn kept_files_installed(
     Ok((id, root))
 }
 
-/// R05-run-modpack#3: an update keeps every pack file whose bytes changed
+/// An update keeps every pack file whose bytes changed
 /// since install, and used to say nothing and throw the new version's copy
 /// away. Where the new version changed such a file too, the update now sets
 /// its copy aside and its task says which files those are. A kept file the
@@ -11213,7 +11200,7 @@ async fn queue_state(app: &crate::App, id: InstanceId) -> anyhow::Result<&'stati
     )
 }
 
-/// R06-launch#1: Play on an instance that is already installed used to wait
+/// Play on an instance that is already installed used to wait
 /// in the queue for as long as another instance's install had the turn. It
 /// now starts checking its own files at once. An install still waits.
 #[tokio::test]
@@ -11332,7 +11319,7 @@ async fn a_queued_update_leaves_the_queue_and_stays_pending() -> anyhow::Result<
     Ok(())
 }
 
-/// R06-launch#15, at the modpack's own downloads: a file the server refuses
+/// A file the server refuses
 /// fails the install with the file and the server's answer, not with the
 /// instance's database id.
 #[tokio::test]
@@ -11381,7 +11368,7 @@ fn unpair(id: InstanceId) -> domain::InstanceSettingsUpdate {
     edit
 }
 
-/// R07-instance-manager.1#4: an update of the pack that waits when the
+/// An update of the pack that waits when the
 /// instance is unpaired used to stay queued, with nothing left to cancel it:
 /// Repair, and its Cancel, need the link. Unpair now cancels one that has
 /// changed nothing, as Repair's Cancel does.
@@ -11638,7 +11625,7 @@ async fn folder_of(app: &crate::App, id: InstanceId) -> anyhow::Result<String> {
         .shortpath)
 }
 
-/// R07-instance-manager.2#10: the copy used to be made under the lock that
+/// The copy used to be made under the lock that
 /// hands out folder names, so for the minutes a large instance takes,
 /// creating, importing and renaming any other instance, and the last step of
 /// deleting one, waited. The lock is now held to choose the copy's name and
@@ -11788,7 +11775,7 @@ fn all(name: &str) -> (String, String, String, String) {
     (name.into(), name.into(), name.into(), name.into())
 }
 
-/// R07-instance-manager.2#2: a rename wrote the new name to instance.json,
+/// A rename wrote the new name to instance.json,
 /// then moved the folder, then updated the library. A failure after the
 /// first step left them apart: after a restart the tile showed the old name
 /// and the instance page the new one, and renaming again did nothing.
@@ -12006,7 +11993,7 @@ async fn folder_with_a_hand_deleted_instance(
     Ok((group, ids, instances_root))
 }
 
-/// R07-instance-manager.2#8: the entry of an instance whose folder was
+/// The entry of an instance whose folder was
 /// removed by hand still pointed at its library folder, so "Delete folder
 /// and its instances" deleted the visible instances and then failed on the
 /// database's foreign key, leaving the emptied folder.

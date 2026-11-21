@@ -8,7 +8,7 @@ use thiserror::Error;
 pub struct SkinManager {}
 
 #[cfg(test)]
-mod task20_tests;
+mod tests;
 
 impl ManagerRef<'_, SkinManager> {
     /// Load an account skin from the DB, or download it if not cached.

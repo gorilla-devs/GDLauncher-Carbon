@@ -437,9 +437,9 @@ fn source_locked(is_unlocked: bool) -> bool {
     !is_unlocked
 }
 #[cfg(test)]
-mod task13_tests {
+mod tests {
     #[test]
-    fn task13_cf_lock_matches_source_permissions() {
+    fn cf_lock_matches_source_permissions() {
         assert!(!super::source_locked(true));
         assert!(super::source_locked(false));
         use crate::domain::instance::info::{CurseforgeModpack, Modpack, ModpackInfo};
@@ -512,10 +512,10 @@ impl CurseforgeImporter {
 }
 
 #[cfg(test)]
-mod task13_scan_tests {
+mod scan_tests {
     use super::*;
     #[tokio::test]
-    async fn task13_single_root_and_config_selection() {
+    async fn single_root_and_config_selection() {
         let t = tempfile::tempdir().unwrap();
         let root = t.path().join("Synthetic");
         std::fs::create_dir(&root).unwrap();
@@ -543,10 +543,10 @@ mod task13_scan_tests {
 }
 
 #[cfg(test)]
-mod task13_io_tests {
+mod io_tests {
     use super::*;
     #[tokio::test]
-    async fn task13_read_dir_error_is_not_empty_success() {
+    async fn read_dir_error_is_not_empty_success() {
         let t = tempfile::tempdir().unwrap();
         super::super::common::fail_scan_directory(t.path().to_path_buf());
         let scanner = CurseforgeImporter::new();
@@ -559,10 +559,10 @@ mod task13_io_tests {
 }
 
 #[cfg(test)]
-mod task13_partial_controls {
+mod partial_controls {
     use super::*;
     #[tokio::test]
-    async fn task13_partial_scan_retains_rows_and_retry_clears_fault() {
+    async fn partial_scan_retains_rows_and_retry_clears_fault() {
         let t = tempfile::tempdir().unwrap();
         for name in ["One", "Two"] {
             let root = t.path().join(name);
@@ -609,10 +609,10 @@ mod task13_partial_controls {
 }
 
 #[cfg(test)]
-mod task13_valid_controls {
+mod valid_controls {
     use super::*;
     #[tokio::test]
-    async fn task13_valid_single_config_collection_and_empty() {
+    async fn valid_single_config_collection_and_empty() {
         let t = tempfile::tempdir().unwrap();
         let root = t.path().join("Synthetic");
         std::fs::create_dir(&root).unwrap();

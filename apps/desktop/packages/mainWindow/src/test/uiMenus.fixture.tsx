@@ -1,0 +1,35 @@
+export * from "./uiBasic.fixture"
+import { Wrapper } from "./uiBasic.fixture"
+export const DropdownMenuPortal = Wrapper
+export const DropdownMenuSub = Wrapper
+export const DropdownMenuSubContent = Wrapper
+export const DropdownMenuSubTrigger = Wrapper
+export const DropdownMenuRadioGroup = Wrapper
+export const DropdownMenuRadioItem = Wrapper
+export const DropdownMenuCheckboxItem = Wrapper
+export const Collapsable = (p: any) => (
+  <div data-custom-header={!!p.customHeader}>
+    {p.title}
+    {p.children}
+  </div>
+)
+export const Switch = (p: any) => (
+  <input
+    type="checkbox"
+    checked={p.checked}
+    disabled={p.disabled}
+    onChange={p.onChange}
+  />
+)
+export const Select = (p: any) => (
+  <select
+    disabled={p.disabled}
+    value={p.value}
+    onChange={(e) => p.onChange(e.currentTarget.value)}
+  >
+    {/* eslint-disable-next-line solid/prefer-for -- static test double */}
+    {p.options?.map((v: string) => (
+      <option value={v}>{v}</option>
+    ))}
+  </select>
+)

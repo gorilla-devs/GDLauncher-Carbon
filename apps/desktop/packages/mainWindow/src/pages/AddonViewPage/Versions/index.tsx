@@ -59,8 +59,8 @@ const Versions = () => {
       await Promise.all([
         Promise.resolve().then(() => mod?.refetch()),
         Promise.resolve().then(async () => {
-          // Manual refetch bypasses Query's enabled flag. Task28 publishes
-          // targetReady only after the current scope/defaults are settled.
+          // Manual refetch bypasses Query's enabled flag. targetReady is
+          // published only after the current scope/defaults are settled.
           // Recovering the target enables its new query, which fetches once.
           if (infiniteQuery.targetError) await infiniteQuery.retryTarget()
           else if (infiniteQuery.targetReady)

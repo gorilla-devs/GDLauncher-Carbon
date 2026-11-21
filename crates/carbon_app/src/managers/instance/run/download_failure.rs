@@ -83,7 +83,7 @@ mod tests {
         explain("The game's files could not be downloaded", error).to_string()
     }
 
-    /// R06-launch#15: a failed download said only "Failed to download
+    /// A failed download said only "Failed to download
     /// instance files for instance 12". Each cause now has its own sentence.
     #[test]
     fn each_cause_of_a_failed_download_is_said_with_what_to_do() {

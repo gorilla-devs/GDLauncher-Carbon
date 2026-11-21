@@ -135,7 +135,7 @@ async function leaveAGameRunning(
         .toBe(true)
 
       // The compatible first line is the PID. Later lines hold legacy epoch
-      // and optional Task22 boot/tick identity, so parse only the numeric prefix.
+      // and optional boot/tick identity, so parse only the numeric prefix.
       const gamePid = Number(
         fs.readFileSync(pidFile, "utf8").split("\n")[0].trim()
       )

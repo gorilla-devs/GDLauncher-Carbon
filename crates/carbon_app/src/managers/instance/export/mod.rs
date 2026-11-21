@@ -40,7 +40,7 @@ pub mod gdlauncher_archive;
 mod modrinth_archive;
 
 #[cfg(test)]
-mod task12_tests;
+mod gdl_archive_tests;
 
 /// A linked mod as the user sees it in the instance, e.g. `mods/jei.jar`.
 fn linked_mod_name(path: &Path) -> String {
@@ -1546,7 +1546,7 @@ mod share_breakdown_tests {
 
     #[cfg(unix)]
     #[test]
-    fn task39_no_saves_refuses_unresolved_actual_root() {
+    fn no_saves_refuses_unresolved_actual_root() {
         let dir = tempfile::tempdir().unwrap();
         std::os::unix::fs::symlink("saves", dir.path().join("saves")).unwrap();
         assert!(build_share_filter(dir.path(), false).is_err());
@@ -1555,7 +1555,7 @@ mod share_breakdown_tests {
 
     #[cfg(unix)]
     #[test]
-    fn task39_no_saves_refuses_dangling_actual_root() {
+    fn no_saves_refuses_dangling_actual_root() {
         let dir = tempfile::tempdir().unwrap();
         std::os::unix::fs::symlink("missing-worlds", dir.path().join("saves")).unwrap();
         assert!(build_share_filter(dir.path(), false).is_err());
@@ -1563,7 +1563,7 @@ mod share_breakdown_tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn task39_filter_excludes_physical_alias() {
+    fn filter_excludes_physical_alias() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(dir.path().join("saves")).unwrap();
         std::os::unix::fs::symlink("saves", dir.path().join("Saves")).unwrap();
@@ -1583,7 +1583,7 @@ mod share_breakdown_tests {
 
     #[cfg(unix)]
     #[test]
-    fn task39_no_saves_refuses_unresolved_case_candidate() {
+    fn no_saves_refuses_unresolved_case_candidate() {
         let dir = tempfile::tempdir().unwrap();
         std::os::unix::fs::symlink("Saves", dir.path().join("Saves")).unwrap();
         assert!(build_share_filter(dir.path(), false).is_err());
@@ -1592,7 +1592,7 @@ mod share_breakdown_tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn task39_absent_root_preserves_distinct_saves_and_unrelated_links() {
+    fn absent_root_preserves_distinct_saves_and_unrelated_links() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(dir.path().join("Saves")).unwrap();
         std::os::unix::fs::symlink("missing", dir.path().join("unrelated")).unwrap();
@@ -1609,7 +1609,7 @@ mod share_breakdown_tests {
     }
 
     #[test]
-    fn task39_preserved_spelling_uses_actual_filesystem_resolution() {
+    fn preserved_spelling_uses_actual_filesystem_resolution() {
         let dir = tempfile::tempdir().unwrap();
         let base = dir.path();
         std::fs::create_dir(base.join("Saves")).unwrap();
@@ -1666,7 +1666,7 @@ mod share_breakdown_tests {
 
     #[cfg(target_os = "linux")]
     #[test]
-    fn task39_archive_preserves_sensitive_distinct_saves_and_disclosed_contents() {
+    fn archive_preserves_sensitive_distinct_saves_and_disclosed_contents() {
         let dir = tempfile::tempdir().unwrap();
         let base = dir.path();
         for name in [
@@ -1872,12 +1872,12 @@ fn zip_excluding<W: io::Write + io::Seek, T: FileOptionExtension + Clone>(
 }
 
 #[cfg(test)]
-mod task11_tests {
+mod linked_export_tests {
     use super::*;
     use crate::domain::instance::AddonType;
     use carbon_repos::dbtypes::DbDateTime;
     #[tokio::test]
-    async fn task11_linked_export_rechecks_mutation_before_publication() {
+    async fn linked_export_rechecks_mutation_before_publication() {
         for (mutate, self_contained, mismatched_hash) in [
             (false, false, false),
             (true, false, false),
@@ -1887,7 +1887,7 @@ mod task11_tests {
             let app = crate::setup_managers_for_test().await;
             let (id, _, path) = super::super::mods::tests::addon_fixture(
                 &app,
-                "task11-export",
+                "export",
                 AddonType::Mods,
                 "mod.jar",
                 b"first bytes",
@@ -1965,7 +1965,7 @@ mod task11_tests {
             let barrier = app
                 .instance_manager()
                 .test_hooks
-                .arm("task11_export_before_publish", id);
+                .arm("export_before_publish", id);
             let output = path
                 .parent()
                 .unwrap()
@@ -2257,7 +2257,7 @@ mod linked_export_scan_tests {
         );
     }
 
-    /// GPT-0084: a same-size replacement that keeps the old modification time
+    /// A same-size replacement that keeps the old modification time
     /// is re-read at export and ships as its own bytes, not the old file.
     #[tokio::test]
     async fn same_size_time_preserving_replacement_does_not_keep_its_old_link() {

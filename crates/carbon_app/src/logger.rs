@@ -150,7 +150,7 @@ pub fn cleanup_old_logs_report(logs_path: &Path, keep_count: usize) -> Vec<Strin
 }
 
 #[cfg(test)]
-mod task21_log_cleanup_tests {
+mod log_cleanup_tests {
     use super::*;
 
     fn logs(root: &Path) {
@@ -166,7 +166,7 @@ mod task21_log_cleanup_tests {
     }
 
     #[test]
-    fn task21_log_cleanup_keeps_newest_ten_and_unrelated_files() {
+    fn log_cleanup_keeps_newest_ten_and_unrelated_files() {
         let root = tempfile::tempdir().unwrap();
         logs(root.path());
         assert!(cleanup_old_logs_report(root.path(), 10).is_empty());
@@ -185,7 +185,7 @@ mod task21_log_cleanup_tests {
 
     #[cfg(unix)]
     #[test]
-    fn task21_log_cleanup_reports_effective_denials_without_retiring_recent_logs() {
+    fn log_cleanup_reports_effective_denials_without_retiring_recent_logs() {
         use std::os::unix::fs::PermissionsExt;
         let root = tempfile::tempdir().unwrap();
         logs(root.path());

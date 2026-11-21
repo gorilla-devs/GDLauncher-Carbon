@@ -284,7 +284,7 @@ mod tests {
         }
     }
     #[tokio::test]
-    async fn task18_child_requester_drop_stops_but_wait_proves_settlement() {
+    async fn child_requester_drop_stops_but_wait_proves_settlement() {
         let lifecycle = Arc::new(RuntimeLifecycle::default());
         lifecycle.reconciliation_finished(Ok(()));
         let mut owner = lifecycle
@@ -324,7 +324,7 @@ mod tests {
         lifecycle.begin_relocation("move").unwrap();
     }
     #[tokio::test]
-    async fn task18_child_normal_output_and_nonzero_exit_are_reaped() {
+    async fn child_normal_output_and_nonzero_exit_are_reaped() {
         let lifecycle = Arc::new(RuntimeLifecycle::default());
         lifecycle.reconciliation_finished(Ok(()));
         let owner = lifecycle
@@ -390,7 +390,7 @@ mod tests {
         (lifecycle, owner, semaphore)
     }
     #[tokio::test]
-    async fn task18_child_wait_error_is_unknown_and_preserves_installation_cleanup_signal() {
+    async fn child_wait_error_is_unknown_and_preserves_installation_cleanup_signal() {
         let (lifecycle, owner, semaphore) = owner_with_permit();
         let (events, waits) = tokio::sync::mpsc::channel(2);
         let kills = Arc::new(AtomicUsize::new(0));
@@ -496,7 +496,7 @@ mod tests {
         drop(held_writer);
     }
     #[tokio::test]
-    async fn task18_child_progress_is_bounded_and_counts_final_partial_line() {
+    async fn child_progress_is_bounded_and_counts_final_partial_line() {
         let mut bytes = vec![b'x'; MAX_CAPTURE + 8192];
         bytes.push(b'\n');
         bytes.extend_from_slice(b"Processing: first\n[worker] Processing: last");
@@ -520,7 +520,7 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn task18_child_cancel_kill_failure_waits_for_proof_and_releases_permit() {
+    async fn child_cancel_kill_failure_waits_for_proof_and_releases_permit() {
         let (lifecycle, owner, semaphore) = owner_with_permit();
         let cancel = owner.cancellation();
         let (events, waits) = tokio::sync::mpsc::channel(1);
@@ -550,7 +550,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task18_child_reap_budget_reports_unknown_then_retains_late_wait() {
+    async fn child_reap_budget_reports_unknown_then_retains_late_wait() {
         let (lifecycle, owner, semaphore) = owner_with_permit();
         let cancel = owner.cancellation();
         let (events, waits) = tokio::sync::mpsc::channel(1);
@@ -616,7 +616,7 @@ mod tests {
         }
     }
     #[tokio::test]
-    async fn task18_child_reader_failure_waits_for_reap_before_settled_error() {
+    async fn child_reader_failure_waits_for_reap_before_settled_error() {
         let (lifecycle, owner, semaphore) = owner_with_permit();
         let (events, waits) = tokio::sync::mpsc::channel(1);
         let kills = Arc::new(AtomicUsize::new(0));

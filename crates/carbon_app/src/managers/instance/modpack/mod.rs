@@ -2579,7 +2579,7 @@ mod tests {
         }
     }
     #[tokio::test]
-    async fn task03_preview_rejects_origin_for_edited_content() {
+    async fn preview_rejects_origin_for_edited_content() {
         use super::{OriginVerdict, origin_check::OriginResults};
         let tmp = tempfile::tempdir().unwrap();
         std::fs::create_dir(tmp.path().join("config")).unwrap();
@@ -2635,7 +2635,7 @@ mod tests {
         assert_eq!(after[0].origin, None);
     }
     #[test]
-    fn task03_selection_admission_and_persisted_marker_bind_content_context() {
+    fn selection_admission_and_persisted_marker_bind_content_context() {
         use super::{
             CleanupSelection, OriginVerdict, PackProofContext, origin_check::OriginResults,
             validate_cleanup_selections,

@@ -1059,7 +1059,7 @@ pub(in crate::managers::metadata) mod test {
     }
 
     #[test]
-    fn task11_neoforge_source_identifies_neoforge() {
+    fn neoforge_source_identifies_neoforge() {
         let body = "[[mods]]\nmodId = 'example'\nversion = '1.0.0'\ndisplayName = 'Example'\n";
         let parsed = parsemeta("META-INF/neoforge.mods.toml", body)
             .unwrap()

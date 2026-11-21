@@ -940,11 +940,11 @@ pub struct InvalidTaskIdError;
 pub struct NonFailedDismissError;
 
 #[cfg(test)]
-mod task10_tests {
+mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn task10_r1_terminal_outcomes_retain_failure_and_captured_dismissal() {
+    async fn terminal_outcomes_retain_failure_and_captured_dismissal() {
         let app = crate::setup_managers_for_test().await;
         let task = VisualTask::new(Translation::Test);
         task.require_explicit_completion();
@@ -985,7 +985,7 @@ mod task10_tests {
     }
 
     #[tokio::test]
-    async fn task10_r1_terminal_success_legacy_drop_and_bounded_unknown() {
+    async fn terminal_success_legacy_drop_and_bounded_unknown() {
         let app = crate::setup_managers_for_test().await;
         let legacy = VisualTask::new(Translation::Test);
         let legacy_id = app.task_manager().spawn_task(&legacy).await;
@@ -1038,7 +1038,7 @@ mod task10_tests {
     }
 
     #[tokio::test]
-    async fn task10_explicit_success_removes_and_unfinished_drop_retains() {
+    async fn explicit_success_removes_and_unfinished_drop_retains() {
         let app = crate::setup_managers_for_test().await;
         let finished = VisualTask::new(Translation::Test);
         finished.require_explicit_completion();
@@ -1059,7 +1059,7 @@ mod task10_tests {
     }
 
     #[tokio::test]
-    async fn task10_failed_clone_survives_original_owner_and_late_poll() {
+    async fn failed_clone_survives_original_owner_and_late_poll() {
         let app = crate::setup_managers_for_test().await;
         let task = VisualTask::new(Translation::Test);
         let id = app.task_manager().spawn_task(&task).await;
@@ -1080,11 +1080,11 @@ mod task10_tests {
 }
 
 #[cfg(test)]
-mod task21_bytes_tests {
+mod bytes_tests {
     use super::*;
 
     #[tokio::test]
-    async fn task21_bytes_five_gib_preserve_ratio_and_weights() {
+    async fn bytes_five_gib_preserve_ratio_and_weights() {
         let task = VisualTask::new(Translation::Test);
         let download = task.subtask(Translation::Test);
         let _pending = task.subtask(Translation::Test);
@@ -1096,7 +1096,7 @@ mod task21_bytes_tests {
     }
 
     #[tokio::test]
-    async fn task21_bytes_aggregate_does_not_wrap_or_poison() {
+    async fn bytes_aggregate_does_not_wrap_or_poison() {
         let task = VisualTask::new(Translation::Test);
         task.subtask(Translation::Test)
             .update_download(3_000_000_000, 3_000_000_000, false);
@@ -1111,7 +1111,7 @@ mod task21_bytes_tests {
     }
 
     #[tokio::test]
-    async fn task21_bytes_small_complete_and_items_controls() {
+    async fn bytes_small_complete_and_items_controls() {
         let task = VisualTask::new(Translation::Test);
         let download = task.subtask(Translation::Test);
         download.update_download(50, 100, false);
@@ -1132,10 +1132,10 @@ mod task21_bytes_tests {
 }
 
 #[cfg(test)]
-mod task21_saturation_tests {
+mod saturation_tests {
     use super::*;
     #[tokio::test]
-    async fn task21_bytes_native_aggregate_saturates_both_fields() {
+    async fn bytes_native_aggregate_saturates_both_fields() {
         let task = VisualTask::new(Translation::Test);
         task.subtask(Translation::Test)
             .update_download(u64::MAX, u64::MAX, false);

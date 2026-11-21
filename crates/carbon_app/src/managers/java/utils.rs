@@ -162,10 +162,10 @@ fn publish_in(dir: &Path) -> anyhow::Result<PathBuf> {
 }
 
 #[cfg(test)]
-mod task18_tests {
+mod tests {
     use super::*;
     #[tokio::test]
-    async fn task18_java_check_repairs_stale_and_replaced_bytes() {
+    async fn java_check_repairs_stale_and_replaced_bytes() {
         let root = tempfile::tempdir().unwrap();
         let path = locate_java_check_class_in(root.path().into())
             .await
@@ -182,7 +182,7 @@ mod task18_tests {
         }
     }
     #[tokio::test]
-    async fn task18_java_check_absent_healthy_and_deleted() {
+    async fn java_check_absent_healthy_and_deleted() {
         let root = tempfile::tempdir().unwrap();
         for _ in 0..2 {
             let path = locate_java_check_class_in(root.path().into())

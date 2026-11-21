@@ -1252,10 +1252,10 @@ mod test {
 }
 
 #[cfg(test)]
-mod task13_tests {
+mod release_id_tests {
     use super::*;
     #[test]
-    fn task13_pcl_exact_release_and_comparison_only() {
+    fn pcl_exact_release_and_comparison_only() {
         for release in ["1.20.1", "24w14a"] {
             let setup = parse_pcl_ini(&format!(
                 "VersionVanillaName:{release}\nVersionVanilla:20.0.1\n"
@@ -1272,7 +1272,7 @@ mod task13_tests {
         );
     }
     #[test]
-    fn task13_custom_id_yields_to_authoritative_library() {
+    fn custom_id_yields_to_authoritative_library() {
         let json = serde_json::json!({"id":"ATM9", "libraries":[{"name":"net.minecraftforge:forge:1.20.1-47.2.0"}]});
         let v = versions_from_hmcl_json(&json);
         assert_eq!(v.minecraft.as_deref(), Some("1.20.1"));
@@ -1287,10 +1287,10 @@ mod task13_tests {
 }
 
 #[cfg(test)]
-mod task13_hmcl_tests {
+mod hmcl_tests {
     use super::*;
     #[tokio::test]
-    async fn task13_inherited_running_directory_uses_associated_preset() {
+    async fn inherited_running_directory_uses_associated_preset() {
         let t = tempfile::tempdir().unwrap();
         let base = t.path().join(".minecraft");
         let version = base.join("versions/Synthetic");
@@ -2153,10 +2153,10 @@ mod hmcl_home_tests {
 }
 
 #[cfg(test)]
-mod task13_hmcl_controls {
+mod hmcl_controls {
     use super::*;
     #[tokio::test]
-    async fn task13_hmcl_external_default_and_unavailable_context() {
+    async fn hmcl_external_default_and_unavailable_context() {
         let t = tempfile::tempdir().unwrap();
         let home = t.path().join("home");
         let base = t.path().join("external-game");
@@ -2222,7 +2222,7 @@ async fn initialize_version_copy(instance: &Importable, destination: &Path) -> a
 }
 
 #[cfg(test)]
-mod task13_round01_tests {
+mod version_resolution_tests {
     use super::*;
     fn version(base: &Path, id: &str, json: serde_json::Value) -> PathBuf {
         let root = base.join("versions").join(id);
@@ -2231,7 +2231,7 @@ mod task13_round01_tests {
         root
     }
     #[tokio::test]
-    async fn task13_round01_renamed_digit_id_uses_library_or_exact_cache() {
+    async fn renamed_digit_id_uses_library_or_exact_cache() {
         let t = tempfile::tempdir().unwrap();
         for libraries in [
             serde_json::json!([{"name":"net.minecraftforge:forge:1.20.1-47.2.0"}]),
@@ -2262,7 +2262,7 @@ VersionVanilla:20.0.1
         }
     }
     #[tokio::test]
-    async fn task13_round01_legacy_local_directory_survives_modern_default() {
+    async fn legacy_local_directory_survives_modern_default() {
         let t = tempfile::tempdir().unwrap();
         let base = t.path().join(".minecraft");
         let root = version(&base, "Legacy", serde_json::json!({"id":"1.20.1"}));
@@ -2301,7 +2301,7 @@ VersionVanilla:20.0.1
         }
     }
     #[tokio::test]
-    async fn task13_round01_removed_selected_root_with_present_payload_fails() {
+    async fn removed_selected_root_with_present_payload_fails() {
         let t = tempfile::tempdir().unwrap();
         let root = version(t.path(), "Selected", serde_json::json!({"id":"1.20.1"}));
         let Some(InternalImportEntry::Valid(entry)) =
@@ -2323,10 +2323,10 @@ VersionVanilla:20.0.1
 }
 
 #[cfg(test)]
-mod task13_round01_controls {
+mod controls {
     use super::*;
     #[tokio::test]
-    async fn task13_round01_composed_schema_and_present_root_controls() {
+    async fn composed_schema_and_present_root_controls() {
         let t = tempfile::tempdir().unwrap();
         let base = t.path().join(".minecraft");
         let root = base.join("versions/Synthetic");
@@ -2430,10 +2430,10 @@ mod task13_round01_controls {
 }
 
 #[cfg(test)]
-mod task13_round02_tests {
+mod release_family_tests {
     use super::*;
     #[tokio::test]
-    async fn task13_round02_published_release_families_scan_as_valid() {
+    async fn published_release_families_scan_as_valid() {
         let t = tempfile::tempdir().unwrap();
         let mut rejected = Vec::new();
         for id in [

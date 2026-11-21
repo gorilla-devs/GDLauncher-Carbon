@@ -62,7 +62,7 @@ function fixture(
   )
   return { flow, resume, refetch, finalize, cancel, begin, beginBrowser, query }
 }
-describe("Task19 profile continuation ownership", () => {
+describe("profile continuation ownership", () => {
   it("does not resume a replacement after cancelled profile creation", async () => {
     const creation = deferred()
     const { flow, resume, refetch } = fixture(() => creation.promise)
@@ -144,7 +144,7 @@ it("cancel during final account query preserves replacement local data", async (
 })
 
 for (const stage of ["finalize", "refetch", "account-list"] as const) {
-  it(`round1 stale ${stage} cannot update or advance replacement enrollment`, async () => {
+  it(`stale ${stage} cannot update or advance replacement enrollment`, async () => {
     const pending = deferred<any>()
     const { flow, finalize, refetch } = fixture(async () => null)
     if (stage === "finalize")
@@ -181,7 +181,7 @@ for (const stage of ["finalize", "refetch", "account-list"] as const) {
     flow.cleanup()
   })
 }
-it("round1 stale finalize failure cannot navigate replacement to error", async () => {
+it("stale finalize failure cannot navigate replacement to error", async () => {
   let reject!: (reason: unknown) => void
   const pending = new Promise<"complete">((_, r) => {
     reject = r
@@ -206,7 +206,7 @@ it("round1 stale finalize failure cannot navigate replacement to error", async (
     flow.cleanup()
   }
 })
-it("round1 delayed switch cancellation cannot start after leaving and beginning B", async () => {
+it("delayed switch cancellation cannot start after leaving and beginning B", async () => {
   const pending = deferred<null>()
   const { flow, cancel, begin, beginBrowser } = fixture(async () => null)
   cancel.mockImplementationOnce(() => pending.promise)
@@ -223,7 +223,7 @@ it("round1 delayed switch cancellation cannot start after leaving and beginning 
   expect(loading.mock.calls).toEqual([[true]])
   flow.cleanup()
 })
-it("round1 leaving enrolling retires immediately and cancels backend", async () => {
+it("leaving enrolling retires immediately and cancels backend", async () => {
   const pending = deferred<null>()
   const { flow, cancel } = fixture(async () => null)
   cancel.mockImplementationOnce(() => pending.promise)
@@ -234,7 +234,7 @@ it("round1 leaving enrolling retires immediately and cancels backend", async () 
   pending.resolve(null)
   flow.cleanup()
 })
-it("round1 current completion binds its flow and advances normally", async () => {
+it("current completion binds its flow and advances normally", async () => {
   const { flow, finalize } = fixture(async () => null)
   vi.spyOn(flow, "checkGDLAccount").mockResolvedValue({ type: "none" })
   await completeEnrollment(flow, "flow-a")
@@ -245,7 +245,7 @@ it("round1 current completion binds its flow and advances normally", async () =>
   })
   flow.cleanup()
 })
-it("round1 current switch cancels then begins and clears loading", async () => {
+it("current switch cancels then begins and clears loading", async () => {
   const { flow, cancel, begin } = fixture(async () => null)
   const loading = vi.fn()
   await switchEnrollment(flow, loading)
@@ -260,7 +260,7 @@ it("round1 current switch cancels then begins and clears loading", async () => {
   expect(loading.mock.calls).toEqual([[true], [false]])
   flow.cleanup()
 })
-it("round1 cancellation during GDL check cannot advance replacement", async () => {
+it("cancellation during GDL check cannot advance replacement", async () => {
   const pending = deferred<any>()
   const { flow } = fixture(async () => null)
   const check = vi
@@ -278,7 +278,7 @@ it("round1 cancellation during GDL check cannot advance replacement", async () =
   })
   flow.cleanup()
 })
-it("round1 an already obsolete caller cannot issue finalize", async () => {
+it("an already obsolete caller cannot issue finalize", async () => {
   const { flow, finalize } = fixture(async () => null)
   const old = flow.captureEnrollment()
   await flow.cancelEnrollment()
@@ -286,7 +286,7 @@ it("round1 an already obsolete caller cannot issue finalize", async () => {
   expect(finalize).not.toHaveBeenCalled()
   flow.cleanup()
 })
-it("round1 cached obsolete Complete event cannot adopt replacement ownership", async () => {
+it("cached obsolete Complete event cannot adopt replacement ownership", async () => {
   const { flow, finalize, refetch } = fixture(async () => null)
   await flow.startEnrollment("browser")
   await flow.goToStep({ type: "enrolling", method: "browser" })
@@ -305,7 +305,7 @@ it("round1 cached obsolete Complete event cannot adopt replacement ownership", a
   })
   flow.cleanup()
 })
-it("round1 current finalize failure remains actionable", async () => {
+it("current finalize failure remains actionable", async () => {
   const { flow, finalize } = fixture(async () => null)
   finalize.mockRejectedValueOnce(new Error("synthetic current write failure"))
   const check = vi

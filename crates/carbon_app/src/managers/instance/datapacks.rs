@@ -302,7 +302,7 @@ mod tests {
         validate(br#"{"pack":{"pack_format":15,"description":"x"}}"#).unwrap();
     }
     #[tokio::test]
-    async fn task10_datapack_real_selected_copy_collision_and_independent_mutations() {
+    async fn datapack_real_selected_copy_collision_and_independent_mutations() {
         let app = crate::setup_managers_for_test().await;
         let bytes = zip_bytes();
         let (id, row, source) = addon_fixture(
@@ -365,7 +365,7 @@ mod tests {
         assert_eq!(std::fs::read(copied).unwrap(), b"independent world edit");
     }
     #[tokio::test]
-    async fn task10_datapack_rejects_foreign_replaced_world_and_links() {
+    async fn datapack_rejects_foreign_replaced_world_and_links() {
         let app = crate::setup_managers_for_test().await;
         let (id, row, _) = addon_fixture(
             &app,
@@ -702,7 +702,7 @@ mod tests {
         assert_eq!(std::fs::read(shared.join("pack.zip")).unwrap(), bytes);
     }
     #[tokio::test]
-    async fn task10_datapack_copy_rechecks_selected_world_and_late_collision() {
+    async fn datapack_copy_rechecks_selected_world_and_late_collision() {
         for mode in ["world", "collision", "foreign-row"] {
             let app = crate::setup_managers_for_test().await;
             let (id, row, _) =

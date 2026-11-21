@@ -878,7 +878,7 @@ impl Drop for RuntimeActivity {
 }
 
 fn relocation_process_absent(observed_start: Option<u64>, _recorded_start: u64) -> bool {
-    // Epoch start times may change after a wall-clock correction (Task22/M23).
+    // Epoch start times may change after a wall-clock correction.
     // This is the absence probe only: a present PID is never absence proof.
     // Whether a present PID was reused is `classify_observed`'s decision.
     observed_start.is_none()
@@ -1030,7 +1030,7 @@ fn sync_new_record(file: &std::fs::File, root: &Path, new_folder: bool) -> Resul
 /// a different creation time on Windows and macOS. `Same` and `Unknown`
 /// keep the record. On Linux a legacy record without boot/ticks identity
 /// whose epoch start differs from a live Java process stays `Unknown`: a
-/// wall-clock step moves that epoch (M23).
+/// wall-clock step moves that epoch.
 pub(crate) fn recorded_identity_status(
     record: ProcessRecord,
     require_java: bool,
@@ -1322,7 +1322,7 @@ impl RuntimeLifecycle {
         drop(state);
         Ok(activity)
     }
-    /// Whole-operation producer ownership for Task18. Dropping a producer,
+    /// Whole-operation producer ownership. Dropping a producer,
     /// including before spawn, retains Unknown; only explicit finish settles it.
     pub fn admit_owned(
         self: &Arc<Self>,
@@ -2499,7 +2499,7 @@ mod tests {
         lifecycle
     }
     #[test]
-    fn task07_freeze_cancels_preparation_and_serializes_spawn() {
+    fn freeze_cancels_preparation_and_serializes_spawn() {
         let l = ready();
         let mut activity = l.admit("queued server").unwrap();
         let cancel = activity.cancellation();
@@ -2527,7 +2527,7 @@ mod tests {
             .unwrap();
     }
     #[test]
-    fn task07_game_survival_is_proven_at_spawn_and_finalization_blocks() {
+    fn game_survival_is_proven_at_spawn_and_finalization_blocks() {
         let l = ready();
         let preparation = l.admit("game preparation").unwrap();
         let mut child = l.admit("game child").unwrap();
@@ -2557,7 +2557,7 @@ mod tests {
         );
     }
     #[test]
-    fn task07_relocation_commit_retries_and_unknown_retains_evidence() {
+    fn relocation_commit_retries_and_unknown_retains_evidence() {
         let l = ready();
         let mut child = l.admit("owned server").unwrap();
         child.external();
@@ -2905,7 +2905,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod task07_request_tests {
+mod request_tests {
     use super::*;
     #[derive(Debug)]
     struct InjectedAbsence(std::sync::atomic::AtomicBool);
@@ -2930,8 +2930,7 @@ mod task07_request_tests {
     /// time, and never a quit or an update: quitting leaves it running either
     /// way, so it is not counted, not signalled and not forgotten.
     #[tokio::test]
-    async fn task07r1_r6_live_reused_unknown_block_only_relocation_and_adopted_game_survives_quit()
-    {
+    async fn live_reused_unknown_block_only_relocation_and_adopted_game_survives_quit() {
         for start in [Some(10), Some(99), None] {
             for (published, kind) in [
                 (false, RuntimeBlockerKind::PreviousProcess),
@@ -3038,7 +3037,7 @@ mod task07_request_tests {
         );
     }
     #[tokio::test]
-    async fn task07r1_r6_relocation_retry_refreshes_confirmed_recovered_absence() {
+    async fn relocation_retry_refreshes_confirmed_recovered_absence() {
         let observed = Arc::new(InjectedAbsence(std::sync::atomic::AtomicBool::new(false)));
         let lifecycle = Arc::new(RuntimeLifecycle {
             process_observer: observed.clone(),
@@ -3071,7 +3070,7 @@ mod task07_request_tests {
         assert!(lifecycle.shutdown_committed());
     }
     #[tokio::test]
-    async fn task07_request_worker_survives_waiter_loss_and_retry_is_single_owner() {
+    async fn request_worker_survives_waiter_loss_and_retry_is_single_owner() {
         let lifecycle = Arc::new(RuntimeLifecycle::default());
         lifecycle.reconciliation_finished(Ok(()));
         let (done, wait) = tokio::sync::oneshot::channel();
@@ -3113,10 +3112,10 @@ mod task07_request_tests {
 }
 
 #[cfg(test)]
-mod task18_settlement_tests {
+mod settlement_tests {
     use super::*;
     #[tokio::test]
-    async fn task18_shutdown_waits_for_whole_operation_then_readies() {
+    async fn shutdown_waits_for_whole_operation_then_readies() {
         let lifecycle = Arc::new(RuntimeLifecycle::default());
         lifecycle.reconciliation_finished(Ok(()));
         let operation = lifecycle
@@ -3153,7 +3152,7 @@ mod task18_settlement_tests {
         );
     }
     #[tokio::test]
-    async fn task18_running_game_keeps_core_writer_blocking() {
+    async fn running_game_keeps_core_writer_blocking() {
         let lifecycle = Arc::new(RuntimeLifecycle::default());
         lifecycle.reconciliation_finished(Ok(()));
         let operation = lifecycle
@@ -3214,7 +3213,7 @@ mod task18_settlement_tests {
         lifecycle
     }
     #[tokio::test]
-    async fn task18_retained_handoff_waiter_loss_keeps_same_owner_gate_and_real_writes() {
+    async fn retained_handoff_waiter_loss_keeps_same_owner_gate_and_real_writes() {
         let lifecycle = ready();
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("session");
@@ -3291,7 +3290,7 @@ mod task18_settlement_tests {
             .unwrap();
     }
     #[tokio::test]
-    async fn task18_surviving_game_detaches_only_after_core_io_and_preserves_evidence() {
+    async fn surviving_game_detaches_only_after_core_io_and_preserves_evidence() {
         let root = tempfile::tempdir().unwrap();
         let lifecycle = Arc::new(RuntimeLifecycle::with_runtime_path(root.path()));
         lifecycle.reconciliation_finished(Ok(()));
@@ -3372,7 +3371,7 @@ mod task18_settlement_tests {
         assert_eq!(state.activities[&game_id].phase, ActivityPhase::Running);
     }
     #[tokio::test]
-    async fn task18_unknown_worker_and_late_game_transition_block_commit() {
+    async fn unknown_worker_and_late_game_transition_block_commit() {
         let lifecycle = ready();
         let activity = lifecycle
             .admit_owned("lost worker", ActivityPolicy::CoreWork)
@@ -3427,7 +3426,7 @@ mod task18_settlement_tests {
             .unwrap();
     }
     #[tokio::test]
-    async fn task18_signal_commit_waiter_loss_and_failed_drain_never_commit_early() {
+    async fn signal_commit_waiter_loss_and_failed_drain_never_commit_early() {
         let lifecycle = ready();
         let owner = lifecycle
             .admit_owned("entered write", ActivityPolicy::CoreWork)
@@ -3476,7 +3475,7 @@ mod task18_settlement_tests {
     }
 
     #[tokio::test]
-    async fn task18_borrowed_setup_normal_error_drop_waits_destructors_and_unknown_blocks() {
+    async fn borrowed_setup_normal_error_drop_waits_destructors_and_unknown_blocks() {
         for fail in [false, true] {
             let lifecycle = ready();
             let root = tempfile::tempdir().unwrap();
@@ -3550,7 +3549,7 @@ mod task18_settlement_tests {
         );
     }
     #[tokio::test]
-    async fn task18_queued_cancellation_does_not_wait_for_unrelated_permit() {
+    async fn queued_cancellation_does_not_wait_for_unrelated_permit() {
         let lifecycle = ready();
         let semaphore = Arc::new(tokio::sync::Semaphore::new(1));
         let held = semaphore.clone().acquire_owned().await.unwrap();
@@ -4829,7 +4828,7 @@ mod failed_shutdown_tests {
 }
 
 #[cfg(test)]
-mod task22_tests {
+mod durable_record_tests {
     use super::*;
     /// The real classification on an injected observation. Injected Absent
     /// means the native probe confirmed no process holds the PID.
@@ -4872,7 +4871,7 @@ mod task22_tests {
         }
     }
     #[test]
-    fn task22_lifecycle_clock_unknown_stop_and_captured_release_controls() {
+    fn lifecycle_clock_unknown_stop_and_captured_release_controls() {
         let record = record();
         let observer = Arc::new(SyntheticObserver(Mutex::new(observed(record, 1700000030))));
         let lifecycle = Arc::new(RuntimeLifecycle {
@@ -4924,7 +4923,7 @@ mod task22_tests {
         assert!(lifecycle.begin_relocation("gone".into()).is_ok());
     }
     #[tokio::test]
-    async fn task22_durable_child_restart_clock_reuse_unknown_and_legacy_controls() {
+    async fn durable_child_restart_clock_reuse_unknown_and_legacy_controls() {
         let root = tempfile::tempdir().unwrap();
         let record = record();
         let observer = Arc::new(SyntheticObserver(Mutex::new(observed(record, 1700000030))));
@@ -4967,7 +4966,7 @@ mod task22_tests {
             assert!(!file.exists());
             std::fs::write(&file, &legacy_bytes).unwrap();
         } else {
-            // On Linux a clock step can explain it (M23): kept, unconfirmed.
+            // On Linux a clock step can explain it: kept, unconfirmed.
             assert!(file.exists());
             assert!(
                 lifecycle
@@ -4986,7 +4985,7 @@ mod task22_tests {
         );
     }
     #[test]
-    fn task22_durable_malformed_version_has_no_legacy_fallback() {
+    fn durable_malformed_version_has_no_legacy_fallback() {
         assert_eq!(
             decode_child_record(b"[4242,1700000000]").unwrap(),
             ProcessRecord::legacy(4242, 1700000000)
@@ -4996,10 +4995,10 @@ mod task22_tests {
 }
 
 #[cfg(test)]
-mod task22_spawn_tests {
+mod spawn_tests {
     use super::*;
     #[test]
-    fn task22_owned_capture_persists_same_token_and_unconfirmed_intent() {
+    fn owned_capture_persists_same_token_and_unconfirmed_intent() {
         let root = tempfile::tempdir().unwrap();
         let lifecycle = Arc::new(RuntimeLifecycle::with_runtime_path(root.path()));
         lifecycle.reconciliation_finished(Ok(()));
@@ -5044,7 +5043,7 @@ mod task22_spawn_tests {
 }
 
 #[cfg(test)]
-mod task22_metadata_tests {
+mod metadata_tests {
     use super::*;
     fn record(epoch: u64) -> ProcessRecord {
         ProcessRecord {
@@ -5057,7 +5056,7 @@ mod task22_metadata_tests {
         }
     }
     #[test]
-    fn task22_stable_owner_metadata_does_not_split_game_survival_authority() {
+    fn stable_owner_metadata_does_not_split_game_survival_authority() {
         let lifecycle = RuntimeLifecycle::default();
         lifecycle.reconciliation_finished(Ok(()));
         lifecycle
@@ -5077,7 +5076,7 @@ mod task22_metadata_tests {
         assert_eq!(lifecycle.state.lock().unwrap().adopted.len(), 1);
     }
     #[test]
-    fn task22_reconciled_durable_record_is_idempotent_for_same_stable_token() {
+    fn reconciled_durable_record_is_idempotent_for_same_stable_token() {
         let root = tempfile::tempdir().unwrap();
         let lifecycle = RuntimeLifecycle::with_runtime_path(root.path());
         lifecycle
@@ -5096,10 +5095,10 @@ mod task22_metadata_tests {
 }
 
 #[cfg(test)]
-mod task22_invalid_token_tests {
+mod invalid_token_tests {
     use super::*;
     #[test]
-    fn task22_nil_boot_durable_extension_is_malformed_without_fallback() {
+    fn nil_boot_durable_extension_is_malformed_without_fallback() {
         let bytes = br#"{"version":1,"process":{"pid":4242,"start_time":1700000000,"identity":{"kind":"LinuxBootTicks","boot_id":"00000000-0000-0000-0000-000000000000","start_ticks":123456}}}"#;
         assert!(
             decode_child_record(bytes).is_err(),
@@ -5689,7 +5688,7 @@ mod stale_marker_tests {
             ),
             GoneOrReused
         );
-        // A clock step moves the epoch Linux reports (M23): unconfirmed.
+        // A clock step moves the epoch Linux reports: unconfirmed.
         assert_eq!(
             classify(
                 record,

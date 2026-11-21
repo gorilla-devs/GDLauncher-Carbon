@@ -320,7 +320,7 @@ enum AdmissionPhase {
     Unknown,
 }
 
-// Live-work ownership is independent of Task10's completed-artifact bookkeeping.
+// Live-work ownership is independent of the completed-artifact bookkeeping.
 // A node is registered before any recursive work and outlives its own worker ACK.
 struct InstallOwnership {
     owner: Arc<Mutex<InstallerAbortHandle>>,
@@ -732,7 +732,7 @@ impl Installer {
                     ),
                 }
             }
-            // Planning is part of the same Task6 admission authority. Abort
+            // Planning is part of the same admission authority. Abort
             // drains it, and a dropped planning future remains Unknown.
             let started = std::time::Instant::now();
             let admission = self.admission.lock().await;

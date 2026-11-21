@@ -538,7 +538,7 @@ mod tests {
         );
         // Windows and macOS creation times never move, so there another
         // start time proves the PID was reused and the record is removed.
-        // On Linux a clock step could explain it (M23): kept, unconfirmed.
+        // On Linux a clock step could explain it: kept, unconfirmed.
         let reuse_proven = cfg!(not(target_os = "linux"));
         assert_eq!(
             blockers.iter().any(|blocker| blocker["pid"] == pid),

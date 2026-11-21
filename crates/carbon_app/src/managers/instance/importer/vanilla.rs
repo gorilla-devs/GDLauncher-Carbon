@@ -1238,10 +1238,10 @@ mod test {
 }
 
 #[cfg(test)]
-mod task13_tests {
+mod tests {
     use super::*;
     #[tokio::test]
-    async fn task13_unavailable_explicit_profile_keeps_source() {
+    async fn unavailable_explicit_profile_keeps_source() {
         let t = tempfile::tempdir().unwrap();
         let missing = t.path().join("detached");
         std::fs::write(t.path().join("launcher_profiles.json"), serde_json::json!({"profiles":{"custom":{"name":"Synthetic custom", "gameDir":missing,"lastVersionId":"1.20.1"},"default":{"lastVersionId":"1.20.1"}}}).to_string()).unwrap();

@@ -156,7 +156,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn task21_server_jar_progress_keeps_native_bytes() {
+    async fn server_jar_progress_keeps_native_bytes() {
         let task =
             crate::managers::vtask::VisualTask::new(crate::api::translation::Translation::Test);
         let p = task.subtask(crate::api::translation::Translation::Test);
@@ -229,10 +229,10 @@ fn operation_download_options(
 }
 
 #[cfg(test)]
-mod task18_r1_download_tests {
+mod download_tests {
     use super::*;
     #[tokio::test]
-    async fn task18_r1_operation_token_reaches_download_supervisor() {
+    async fn operation_token_reaches_download_supervisor() {
         let cancel = tokio_util::sync::CancellationToken::new();
         cancel.cancel();
         let (tx, _rx) = tokio::sync::watch::channel(carbon_net::Progress::new());

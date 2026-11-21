@@ -1103,7 +1103,7 @@ mod test {
 }
 
 #[cfg(test)]
-mod task13_tests {
+mod command_tests {
     use super::*;
     async fn scan_valid(importer: &MmcImporter, path: &Path) -> Importable {
         match importer.scan_instance(path.to_path_buf()).await.unwrap() {
@@ -1115,7 +1115,7 @@ mod task13_tests {
     /// The packwiz setup Prism documents: the instance and its files import,
     /// only the command GDLauncher cannot run is left out, and the row says so.
     #[tokio::test]
-    async fn task13_enabled_placeholder_commands_are_skipped_not_refused() {
+    async fn enabled_placeholder_commands_are_skipped_not_refused() {
         let t = tempfile::tempdir().unwrap();
         std::fs::write(
             t.path().join("mmc-pack.json"),
@@ -1361,7 +1361,7 @@ fn has_launcher_placeholder(value: &str) -> bool {
 }
 
 #[cfg(test)]
-mod task14_tests {
+mod disabled_loader_tests {
     use super::*;
     const CFG: &str = "name=Pack\nIntendedVersion=1.20.1\nForgeVersion=47.2.0\n";
     fn pack(fabric: bool) -> String {
@@ -1376,7 +1376,7 @@ mod task14_tests {
         serde_json::json!({"components":components}).to_string()
     }
     #[test]
-    fn task14_disabled_forge_with_fabric() {
+    fn disabled_forge_with_fabric() {
         let meta = parse_mmc_meta(CFG, Some(&pack(true))).unwrap();
         assert_eq!(
             meta.loaders,
@@ -1384,7 +1384,7 @@ mod task14_tests {
         );
     }
     #[test]
-    fn task14_disabled_forge_cannot_return_from_cfg() {
+    fn disabled_forge_cannot_return_from_cfg() {
         assert!(
             parse_mmc_meta(CFG, Some(&pack(false)))
                 .unwrap()
@@ -1393,7 +1393,7 @@ mod task14_tests {
         );
     }
     #[tokio::test]
-    async fn task14_disabled_loader_folder_scan() {
+    async fn disabled_loader_folder_scan() {
         let tmp = tempfile::tempdir().unwrap();
         std::fs::write(tmp.path().join("instance.cfg"), CFG).unwrap();
         std::fs::write(tmp.path().join("mmc-pack.json"), pack(true)).unwrap();
@@ -1413,10 +1413,10 @@ mod task14_tests {
 }
 
 #[cfg(test)]
-mod task14_component_controls {
+mod component_controls {
     use super::*;
     #[test]
-    fn task14_enabled_disabled_and_legacy_component_controls() {
+    fn enabled_disabled_and_legacy_component_controls() {
         let cfg = "IntendedVersion=1.20.1\nForgeVersion=1.20.1-47.2.0\n";
         for pack in [None, Some("malformed"), Some(r#"{"components":[]}"#)] {
             assert_eq!(

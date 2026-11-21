@@ -102,7 +102,7 @@ pub enum PlanReason {
     /// Legacy VersionChange shortcut for an older apply that consumed its
     /// staged source while publishing a disabled target. The old bare hash
     /// and coexisting target twin permit finishing that legacy Delete. This
-    /// is not new-session provenance: Task8 must qualify legacy setup before
+    /// is not new-session provenance: legacy setup has to be qualified before
     /// relying on it. New representation changes retain their sources and
     /// resume through a target/options-bound record before this planner runs.
     DisabledReplaceResumed,
@@ -2091,7 +2091,7 @@ mod test {
     }
 
     #[test]
-    fn task03_case_alias_pristine_update_and_save_protection() {
+    fn case_alias_pristine_update_and_save_protection() {
         for (old_path, target_path, mode, expected) in [
             (
                 "/Config/x.cfg",

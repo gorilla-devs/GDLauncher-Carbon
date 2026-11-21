@@ -797,15 +797,15 @@ where
 }
 
 #[cfg(test)]
-mod task06_tests {
+mod tests {
     use super::*;
     fn fixture(name: &str) -> PathBuf {
-        let path = std::env::temp_dir().join(format!("task06-{name}-{}", std::process::id()));
+        let path = std::env::temp_dir().join(format!("gdl-rt-path-{name}-{}", std::process::id()));
         std::fs::create_dir_all(&path).unwrap();
         path
     }
     #[tokio::test]
-    async fn task06_temp_inner_error() {
+    async fn temp_inner_error() {
         let root = fixture("temp");
         let file = root.join("file");
         std::fs::write(&file, b"test").unwrap();
@@ -836,7 +836,7 @@ mod task06_tests {
     }
     #[cfg(unix)]
     #[tokio::test]
-    async fn task06_included_copy_error_and_excluded_control() {
+    async fn included_copy_error_and_excluded_control() {
         use std::os::unix::fs::PermissionsExt;
         let root = fixture("copy");
         let source = root.join("source");

@@ -160,7 +160,7 @@ function owned(
   return { ownedShutdown, prompts, context }
 }
 async function fixture() {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "task24-caller-"))
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "gdl-caller-"))
   await fs.writeFile(path.join(root, "gdl_conf.db"), "metadata")
   const child = Object.assign(new EventEmitter(), {
     exitCode: null,

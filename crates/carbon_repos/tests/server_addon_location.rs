@@ -37,7 +37,7 @@ fn seed(conn: &Connection) {
       ('mod',7,'one.jar',3,0,'mods','shared'), ('pack',7,'pack.zip',3,1,'datapacks','shared');").unwrap();
 }
 #[test]
-fn task07_upgrade_preserves_known_ids_refs_and_same_name_worlds_are_distinct() {
+fn upgrade_preserves_known_ids_refs_and_same_name_worlds_are_distinct() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("fixture.db");
     let mut conn = Connection::open(&path).unwrap();
@@ -117,7 +117,7 @@ fn task07_upgrade_preserves_known_ids_refs_and_same_name_worlds_are_distinct() {
     );
 }
 #[test]
-fn task07_representable_downgrade_preserves_rows_and_metadata() {
+fn representable_downgrade_preserves_rows_and_metadata() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("fixture.db");
     let mut conn = Connection::open(&path).unwrap();
@@ -158,7 +158,7 @@ fn task07_representable_downgrade_preserves_rows_and_metadata() {
     );
 }
 #[test]
-fn task07_fresh_baseline_has_location_and_matches_chain() {
+fn fresh_baseline_has_location_and_matches_chain() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("fixture.db");
     let mut conn = Connection::open(&path).unwrap();
@@ -168,7 +168,7 @@ fn task07_fresh_baseline_has_location_and_matches_chain() {
 }
 
 #[test]
-fn task07_old_filename_collision_downgrades_keeping_the_mods_row() {
+fn old_filename_collision_downgrades_keeping_the_mods_row() {
     let root = tempfile::tempdir().unwrap();
     let path = root.path().join("fixture.db");
     let mut conn = Connection::open(&path).unwrap();
@@ -198,7 +198,7 @@ fn task07_old_filename_collision_downgrades_keeping_the_mods_row() {
 }
 
 #[test]
-fn task07r1_r4_selected_source_down_keeps_the_row_and_falls_back_to_the_hash_caches() {
+fn selected_source_down_keeps_the_row_and_falls_back_to_the_hash_caches() {
     use carbon_repos::repos::mod_metadata as metadata;
     for provider in ["cf", "mr"] {
         for representable in [false, true] {
@@ -349,7 +349,7 @@ fn task07r1_r4_selected_source_down_keeps_the_row_and_falls_back_to_the_hash_cac
 }
 
 #[test]
-fn task07r1_r4_scan_preserves_source_only_for_current_physical_hash() {
+fn scan_preserves_source_only_for_current_physical_hash() {
     let root = tempfile::tempdir().unwrap();
     let mut conn = Connection::open(root.path().join("fixture.db")).unwrap();
     carbon_repos::get_migrations()

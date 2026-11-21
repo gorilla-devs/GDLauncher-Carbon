@@ -54,13 +54,13 @@ impl fmt::Debug for LivenessTracker {
 }
 
 #[cfg(test)]
-mod task21_tests {
+mod tests {
     use super::*;
     use std::sync::{Mutex, mpsc};
     use std::time::Duration;
 
     #[test]
-    fn task21_liveness_publication_is_ordered() {
+    fn liveness_publication_is_ordered() {
         let (running_tx, running) = tokio::sync::watch::channel(false);
         let (entered_tx, entered) = mpsc::channel();
         let (release_tx, release) = mpsc::channel();
@@ -68,7 +68,7 @@ mod task21_tests {
         let counts = Arc::new(Mutex::new(Vec::new()));
         let observed = counts.clone();
         let tracker = LivenessTracker::new(move |count| {
-            if std::thread::current().name() == Some("task21-first-drop") {
+            if std::thread::current().name() == Some("first-drop") {
                 entered_tx.send(()).unwrap();
                 release
                     .lock()
@@ -83,7 +83,7 @@ mod task21_tests {
         let b = tracker.marker();
         assert!(*running.borrow());
         let first = std::thread::Builder::new()
-            .name("task21-first-drop".into())
+            .name("first-drop".into())
             .spawn(move || drop(a))
             .unwrap();
         entered.recv_timeout(Duration::from_secs(5)).unwrap();
@@ -112,7 +112,7 @@ mod task21_tests {
     }
 
     #[test]
-    fn task21_liveness_sequential_and_weak_owner_controls() {
+    fn liveness_sequential_and_weak_owner_controls() {
         let (tx, rx) = tokio::sync::watch::channel(false);
         let tracker = LivenessTracker::new(move |count| {
             tx.send_replace(count != 0);

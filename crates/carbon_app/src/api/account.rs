@@ -458,7 +458,7 @@ impl EnrollmentStatus {
 }
 
 #[cfg(test)]
-mod task20_tests {
+mod tests {
     use super::*;
     #[test]
     fn provider_denial_is_a_safe_structured_terminal_failure() {
@@ -799,7 +799,7 @@ impl From<DisplayNameHistoryEntry> for FEDisplayNameHistoryEntry {
 }
 
 #[cfg(test)]
-mod task19_serialization_tests {
+mod serialization_tests {
     use super::*;
     #[test]
     fn profile_retry_exposes_only_flow_and_creation_token() {
@@ -921,7 +921,7 @@ mod failure_category_wire_tests {
 }
 
 #[cfg(test)]
-mod task29_terminal_tests {
+mod terminal_tests {
     use super::*;
 
     #[test]

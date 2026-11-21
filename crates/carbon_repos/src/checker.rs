@@ -694,7 +694,7 @@ pub const SCAN_GUARDED_TABLES: &[&str] = &[
 pub const SCAN_ALLOWLIST: &[&str] = &[
     // Whole-cache collection uses a fixed number of set-based scans. Reference
     // metadataId indexes also bound SQLite's implicit FK checks for every
-    // deleted parent. task15_metadata measures the complete transaction with
+    // deleted parent. The metadata_gc tests measure the complete transaction with
     // both FK-off cleanup and FK-on growing live/orphan populations.
     "gc_local_images",
     "gc_cf_images",

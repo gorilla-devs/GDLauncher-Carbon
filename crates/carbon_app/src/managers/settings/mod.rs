@@ -1023,11 +1023,11 @@ mod tests {
 }
 
 #[cfg(all(test, unix))]
-mod task21_cleanup_tests {
+mod cleanup_tests {
     use super::*;
     use std::os::unix::fs::PermissionsExt;
     #[tokio::test]
-    async fn task21_cleanup_denied_file_is_not_counted_as_removed() {
+    async fn cleanup_denied_file_is_not_counted_as_removed() {
         let dir = tempfile::tempdir().unwrap();
         let denied = dir.path().join("denied");
         std::fs::create_dir(&denied).unwrap();
@@ -1069,7 +1069,7 @@ mod task21_cleanup_tests {
         (dir, db, runtime)
     }
     #[tokio::test]
-    async fn task21_cleanup_partial_db_error_retains_failure_and_retry_preserves_metadata() {
+    async fn cleanup_partial_db_error_retains_failure_and_retry_preserves_metadata() {
         use carbon_repos::db_exec::WriteAccess;
         let (_dir, db, runtime) = db_fixture();
         db.write(|c|Ok(c.execute_batch("INSERT INTO HTTPCache(url,status_code,data) VALUES('synthetic',200,x'01');
@@ -1128,7 +1128,7 @@ mod task21_cleanup_tests {
         assert_eq!(try_count_table(&db, "ModMetadata").await.unwrap(), 1);
     }
     #[tokio::test]
-    async fn task21_cleanup_vacuum_failure_and_selected_scope_controls() {
+    async fn cleanup_vacuum_failure_and_selected_scope_controls() {
         use carbon_repos::db_exec::WriteAccess;
         let (_dir, db, runtime) = db_fixture();
         let temp = runtime.get_temp().to_path();
@@ -1181,7 +1181,7 @@ mod task21_cleanup_tests {
         ));
     }
     #[tokio::test]
-    async fn task21_cleanup_writable_missing_and_mixed_directory_controls() {
+    async fn cleanup_writable_missing_and_mixed_directory_controls() {
         let dir = tempfile::tempdir().unwrap();
         let task = VisualTask::new(Translation::CacheCleanup);
         let work = Arc::new(task.subtask(Translation::CacheCleanup));
@@ -1283,19 +1283,19 @@ mod task21_cleanup_tests {
         ));
     }
     #[tokio::test]
-    async fn task21_r1_failed_count_zero_known_units_stays_incomplete() {
+    async fn failed_count_zero_known_units_stays_incomplete() {
         failed_count_case(false, false).await;
     }
     #[tokio::test]
-    async fn task21_r1_failed_count_with_removed_known_subtotal_stays_incomplete() {
+    async fn failed_count_with_removed_known_subtotal_stays_incomplete() {
         failed_count_case(true, false).await;
     }
     #[tokio::test]
-    async fn task21_r1_failed_count_preserves_weighted_vacuum() {
+    async fn failed_count_preserves_weighted_vacuum() {
         failed_count_case(true, true).await;
     }
     #[tokio::test]
-    async fn task21_r1_empty_and_counted_worker_success_controls() {
+    async fn empty_and_counted_worker_success_controls() {
         for populated in [false, true] {
             let (_dir, db, runtime) = db_fixture();
             let assets = runtime.get_assets().to_path();

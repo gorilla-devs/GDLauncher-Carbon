@@ -391,7 +391,7 @@ pub async fn export_gdlauncher(
                 #[cfg(test)]
                 app.instance_manager()
                     .test_hooks
-                    .pause("task12_gdl_export_before_publish", instance_id)
+                    .pause("gdl_export_before_publish", instance_id)
                     .await;
                 super::verify_linked_export_files(&app, instance_id, &linked_files).await?;
                 tmpfile.try_rename_or_move(save_path).await?;

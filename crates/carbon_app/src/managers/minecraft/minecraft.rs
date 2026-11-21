@@ -1263,7 +1263,7 @@ mod tests {
     }
 
     #[test]
-    fn task14_extra_java_args_retains_explicit_empty_tokens() {
+    fn extra_java_args_retains_explicit_empty_tokens() {
         assert_eq!(parse_extra_java_args(r#"a "" " " b"#), ["a", "", " ", "b"]);
         assert!(parse_extra_java_args(" \t\n ").is_empty());
     }
@@ -1552,7 +1552,7 @@ mod tests {
 }
 
 #[cfg(test)]
-mod task17_native_tests {
+mod native_tests {
     use super::*;
     use std::io::Write;
 
@@ -1572,7 +1572,7 @@ mod task17_native_tests {
             }}},
         })).unwrap();
         let version: VersionInfo = serde_json::from_value(serde_json::json!({
-            "id":"task17", "assetIndex":{"id":"test","sha1":"","size":0,"totalSize":0,"url":"https://fixture.invalid/assets"},
+            "id":"fixture", "assetIndex":{"id":"test","sha1":"","size":0,"totalSize":0,"url":"https://fixture.invalid/assets"},
             "assets":"test", "downloads":{}, "libraries":[lib], "mainClass":"fixture.Main", "minimumLauncherVersion":0,
             "releaseTime":"2025-01-01T00:00:00Z", "time":"2025-01-01T00:00:00Z", "type":"release"
         })).unwrap();
@@ -1600,7 +1600,7 @@ mod task17_native_tests {
     }
 
     #[tokio::test]
-    async fn task17_native_cache_repairs_selected_missing_nested_output() {
+    async fn native_cache_repairs_selected_missing_nested_output() {
         let (_dir, runtime, version, group) = fixture();
         extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
             .await
@@ -1619,7 +1619,7 @@ mod task17_native_tests {
     }
 
     #[tokio::test]
-    async fn task17_native_cache_complete_empty_and_mismatched_controls() {
+    async fn native_cache_complete_empty_and_mismatched_controls() {
         let (_dir, runtime, version, group) = fixture();
         extract_natives(&runtime, &version, &group, &JavaArch::X86_64)
             .await
@@ -1645,7 +1645,7 @@ mod task17_native_tests {
         assert_eq!(std::fs::read(&one).unwrap(), b"one");
     }
     #[tokio::test]
-    async fn task17_native_cache_selection_failure_and_occupied_output() {
+    async fn native_cache_selection_failure_and_occupied_output() {
         let (_dir, runtime, mut version, group) = fixture();
         let mut denied = version.libraries[0].clone();
         denied.rules = Some(vec![
@@ -1699,7 +1699,7 @@ mod task17_native_tests {
     }
 
     #[tokio::test]
-    async fn task17_native_cache_cancelled_waiter_keeps_worker_gate_and_stage() {
+    async fn native_cache_cancelled_waiter_keeps_worker_gate_and_stage() {
         let (_dir, runtime, version, group) = fixture();
         let dest = runtime.get_natives().get_versioned(&version.id);
         std::fs::create_dir_all(&dest).unwrap();
@@ -1753,7 +1753,7 @@ mod task17_native_tests {
     }
 
     #[test]
-    fn task17_native_cache_publication_never_clobbers_existing() {
+    fn native_cache_publication_never_clobbers_existing() {
         let dir = tempfile::tempdir().unwrap();
         let source = dir.path().join("source");
         let target = dir.path().join("target");
@@ -1764,7 +1764,7 @@ mod task17_native_tests {
     }
 
     #[tokio::test]
-    async fn task17_native_cache_nested_only_is_complete_and_lwjgl_wins() {
+    async fn native_cache_nested_only_is_complete_and_lwjgl_wins() {
         let (_dir, runtime, version, mut group) = fixture();
         let archive = runtime
             .get_libraries()
@@ -1819,7 +1819,7 @@ mod task17_native_tests {
         assert_eq!(std::fs::read(output).unwrap(), b"last");
     }
     #[tokio::test]
-    async fn task17_native_cache_retains_generic_archive_formats() {
+    async fn native_cache_retains_generic_archive_formats() {
         let cases: &[(&[u8], &str)] = &[
             (
                 include_bytes!(concat!(
@@ -1919,17 +1919,17 @@ mod task17_native_tests {
     }
 
     #[tokio::test]
-    async fn task17_r1_native_partial_cache_repairs_without_hard_links() {
+    async fn native_partial_cache_repairs_without_hard_links() {
         rejected_link_repair(false).await;
     }
 
     #[tokio::test]
-    async fn task17_r1_native_empty_cache_repairs_without_hard_links() {
+    async fn native_empty_cache_repairs_without_hard_links() {
         rejected_link_repair(true).await;
     }
 
     #[test]
-    fn task17_r1_native_fallback_preserves_competing_regular_occupant() {
+    fn native_fallback_preserves_competing_regular_occupant() {
         let dir = tempfile::tempdir().unwrap();
         let source = dir.path().join("staged");
         let target = dir.path().join("output");
@@ -1951,7 +1951,7 @@ mod task17_native_tests {
     }
 
     #[test]
-    fn task17_r1_native_fallback_rejects_competing_directory() {
+    fn native_fallback_rejects_competing_directory() {
         let dir = tempfile::tempdir().unwrap();
         let source = dir.path().join("staged");
         let target = dir.path().join("output");
@@ -1974,7 +1974,7 @@ mod task17_native_tests {
     }
 
     #[test]
-    fn task17_r1_native_failed_fallback_retains_owned_staging() {
+    fn native_failed_fallback_retains_owned_staging() {
         let dir = tempfile::tempdir().unwrap();
         let source = dir.path().join("staged");
         let parent = dir.path().join("target-parent");

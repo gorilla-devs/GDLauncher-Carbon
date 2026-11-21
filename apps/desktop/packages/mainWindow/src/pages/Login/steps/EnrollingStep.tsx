@@ -81,7 +81,7 @@ export function EnrollingStep(props: EnrollingStepProps) {
   let ownedQuery: Query | undefined
   let active = true
   // Keep the no-input RPC key and invalidation prefix. Cache ownership uses
-  // Task19's existing operation revision, rather than a second generation.
+  // the existing operation revision, rather than a second generation.
   const statusHash = (revision: number) =>
     JSON.stringify(["account.enroll.getStatus", revision])
   const retireStatus = (revision: number) => {

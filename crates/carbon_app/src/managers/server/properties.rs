@@ -480,10 +480,10 @@ pub async fn finalize_pack_properties(
 }
 
 #[cfg(test)]
-mod task07_port_tests {
+mod port_tests {
     use super::*;
     #[tokio::test]
-    async fn task07_pack_port_preserves_unspecified_explicit_and_repair_intent() {
+    async fn pack_port_preserves_unspecified_explicit_and_repair_intent() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("server.properties");
         std::fs::write(

@@ -4,7 +4,7 @@ import vm from "node:vm"
 import path from "node:path"
 import { runBuild } from "../../../../../scripts/build.mjs"
 const quiet = { log() {} }
-it("Task23 public switch sets both halves in all ordered target plans", () => {
+it("public switch sets both halves in all ordered target plans", () => {
   for (const target of ["linux-x64", "win-x64", "mac-universal"])
     for (const input of [
       undefined,
@@ -53,7 +53,7 @@ it("Task23 public switch sets both halves in all ordered target plans", () => {
   )
   expect(define).toBe("false")
 })
-it("Task23 injected driver rejects invalid targets and signal/status/spawn failures", () => {
+it("injected driver rejects invalid targets and signal/status/spawn failures", () => {
   for (const target of [undefined, "invalid"])
     expect(() =>
       runBuild(
@@ -85,7 +85,7 @@ it("Task23 injected driver rejects invalid targets and signal/status/spawn failu
     expect(calls).toBe(1)
   }
 })
-it("Task23 actual production cross-env forwards false despite inherited public/internal true", () => {
+it("actual production cross-env forwards false despite inherited public/internal true", () => {
   const root = path.resolve(__dirname, "../../../../.."),
     scripts = JSON.parse(
       fs.readFileSync(path.join(root, "package.json"), "utf8")

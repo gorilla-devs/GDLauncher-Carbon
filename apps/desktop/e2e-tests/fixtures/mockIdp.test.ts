@@ -247,7 +247,7 @@ describe("game logs", () => {
   })
 })
 
-describe("Task43 owned logs", () => {
+describe("owned logs", () => {
   it("never opens or copies a fresh foreign main log, even without an app launch", async () => {
     const root = makeTempDir()
     const runtimePath = path.join(root, "runtime")

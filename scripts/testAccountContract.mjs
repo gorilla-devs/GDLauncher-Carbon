@@ -7,7 +7,7 @@ import { join } from "node:path"
  * Account invalidation contract between the core and the app.
  *
  * A carbon_app test drives the real account publication code and writes the
- * invalidation events it emits to `TASK19_ACCOUNT_EVENTS`. The desktop's
+ * invalidation events it emits to `ACCOUNT_EVENTS_FIXTURE`. The desktop's
  * queryInvalidation.integration.ts then feeds those events to the real
  * frontend parser and QueryClient. Both sides get one fresh path, so the
  * frontend never reads a stale capture; it fails, never skips, when the file
@@ -16,20 +16,20 @@ import { join } from "node:path"
  *
  * To run the two halves by hand, give both the same path:
  *
- *   fixture="$(mktemp -d)/task19-account-events.json"
- *   TASK19_ACCOUNT_EVENTS="$fixture" cargo test -p carbon_app --features e2e --bin carbon_app <PRODUCER> -- --exact
- *   TASK19_ACCOUNT_EVENTS="$fixture" pnpm --dir apps/desktop exec vitest run --config vitest.account-integration.config.mjs
+ *   fixture="$(mktemp -d)/account-events.json"
+ *   ACCOUNT_EVENTS_FIXTURE="$fixture" cargo test -p carbon_app --features e2e --bin carbon_app <PRODUCER> -- --exact
+ *   ACCOUNT_EVENTS_FIXTURE="$fixture" pnpm --dir apps/desktop exec vitest run --config vitest.account-integration.config.mjs
  *
  * If the first command prints `running 0 tests`, the Rust test was renamed:
  * update PRODUCER below.
  */
 const PRODUCER =
-  "managers::account::publication::task19_publication_tests::captured_account_events_match_the_live_no_input_wire_contract"
+  "managers::account::publication::publication_tests::captured_account_events_match_the_live_no_input_wire_contract"
 
 const dir = mkdtempSync(join(tmpdir(), "gdl-account-contract-"))
 const env = {
   ...process.env,
-  TASK19_ACCOUNT_EVENTS: join(dir, "task19-account-events.json")
+  ACCOUNT_EVENTS_FIXTURE: join(dir, "account-events.json")
 }
 
 /** @param {string} command */
@@ -50,7 +50,7 @@ try {
   )
   // A renamed or moved producer test matches nothing, and cargo still
   // exits 0 after "running 0 tests".
-  if (status === 0 && !existsSync(env.TASK19_ACCOUNT_EVENTS)) {
+  if (status === 0 && !existsSync(env.ACCOUNT_EVENTS_FIXTURE)) {
     console.error(
       "The Rust producer test did not write the account events fixture, so there is nothing to check. " +
         "Check that PRODUCER in scripts/testAccountContract.mjs still names an existing carbon_app test."

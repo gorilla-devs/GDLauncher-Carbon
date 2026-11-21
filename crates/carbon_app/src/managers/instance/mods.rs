@@ -1989,7 +1989,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn task05_delete_missing_world_preserves_literal_disabled_save() {
+    async fn delete_missing_world_preserves_literal_disabled_save() {
         let app = crate::setup_managers_for_test().await;
         let (id, row, path) =
             addon_fixture(&app, "stale-world", AddonType::Worlds, "World", b"old").await;
@@ -2018,7 +2018,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn task05_delete_exact_world_preserves_other_spelling() {
+    async fn delete_exact_world_preserves_other_spelling() {
         let app = crate::setup_managers_for_test().await;
         let (id, row, path) =
             addon_fixture(&app, "exact", AddonType::Worlds, "World", b"world").await;
@@ -2031,7 +2031,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn task05_delete_literal_disabled_world_is_exact() {
+    async fn delete_literal_disabled_world_is_exact() {
         let app = crate::setup_managers_for_test().await;
         let (id, row, path) = addon_fixture(
             &app,
@@ -2049,7 +2049,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn task05_delete_invalid_kind_and_name_keep_row_and_bytes() {
+    async fn delete_invalid_kind_and_name_keep_row_and_bytes() {
         let app = crate::setup_managers_for_test().await;
         let (id, row, path) =
             addon_fixture(&app, "invalid", AddonType::Mods, "safe.jar", b"safe").await;
@@ -2199,7 +2199,7 @@ pub(crate) mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn task05_delete_links_preserve_target_and_row() {
+    async fn delete_links_preserve_target_and_row() {
         let app = crate::setup_managers_for_test().await;
         let (id, row, path) =
             addon_fixture(&app, "link", AddonType::Worlds, "World", b"safe").await;
@@ -2420,7 +2420,7 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn task05_delete_late_survivor_keeps_cache_row_and_reports_error() {
+    async fn delete_late_survivor_keeps_cache_row_and_reports_error() {
         let app = crate::setup_managers_for_test().await;
         let (id, row, path) =
             addon_fixture(&app, "survivor", AddonType::Mods, "mod.jar", b"selected").await;

@@ -184,7 +184,7 @@ export function parseMrpackIndex(zip: Buffer): PackIndex {
   // Built once, together, so `overrides` and `overrideFiles` can never
   // disagree on which paths exist — `overrides` is derived from this rather
   // than computed by a second, separate filter.
-  // Same two-pass precedence as Task9 extraction: client wins regardless
+  // Same two-pass precedence as the launcher's own extraction: client wins regardless
   // of archive ordering. Server-only overrides do not belong to this client.
   const effective = new Map<string, PackOverrideFile>()
   for (const layer of ["overrides/", "client-overrides/"]) {

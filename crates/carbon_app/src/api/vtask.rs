@@ -418,10 +418,10 @@ impl From<domain::SubtaskProgress> for FESubtaskProgress {
 }
 
 #[cfg(test)]
-mod task21_wire_tests {
+mod wire_tests {
     use super::*;
     #[test]
-    fn task21_bytes_wire_is_decimal_strings() {
+    fn bytes_wire_is_decimal_strings() {
         let task = domain::Task {
             id: domain::VisualTaskId(1),
             name: Translation::Test,
@@ -447,10 +447,10 @@ mod task21_wire_tests {
 }
 
 #[cfg(test)]
-mod task21_boundary_tests {
+mod boundary_tests {
     use super::*;
     #[test]
-    fn task21_bytes_api_boundaries_are_lossless_strings() {
+    fn bytes_api_boundaries_are_lossless_strings() {
         for n in [
             5_368_709_120u64,
             9_007_199_254_740_991,

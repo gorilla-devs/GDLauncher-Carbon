@@ -912,10 +912,10 @@ mod test {
 }
 
 #[cfg(test)]
-mod task13_release_controls {
+mod release_controls {
     use super::*;
     #[test]
-    fn task13_ordinary_and_legacy_release_ids_remain_supported() {
+    fn ordinary_and_legacy_release_ids_remain_supported() {
         for id in [
             "1.20.1",
             "24w14a",
@@ -940,10 +940,10 @@ mod task13_release_controls {
 }
 
 #[cfg(test)]
-mod task13_round01_controls {
+mod controls {
     use super::*;
     #[test]
-    fn task13_round01_release_provenance_and_supported_ids() {
+    fn release_provenance_and_supported_ids() {
         for id in [
             "1.20.1",
             "24w14a",
@@ -992,11 +992,11 @@ mod task13_round01_controls {
 }
 
 #[cfg(test)]
-mod task13_round02_tests {
+mod tests {
     use super::*;
     #[test]
-    fn task13_round02_preserves_all_previously_supported_official_ids() {
-        let ids: Vec<_> = include_str!("fixtures/task13_official_release_ids.txt")
+    fn preserves_all_previously_supported_official_ids() {
+        let ids: Vec<_> = include_str!("fixtures/official_release_ids.txt")
             .lines()
             .filter(|line| !line.is_empty() && !line.starts_with('#'))
             .collect();
@@ -1021,10 +1021,10 @@ mod task13_round02_tests {
 }
 
 #[cfg(test)]
-mod task13_round02_custom_controls {
+mod custom_controls {
     use super::*;
     #[test]
-    fn task13_round02_release_shaped_pack_labels_remain_unproven() {
+    fn release_shaped_pack_labels_remain_unproven() {
         for id in [
             "1.20.1-ATM9",
             "26.4-snapshot-MyPack",

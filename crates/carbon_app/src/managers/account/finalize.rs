@@ -37,8 +37,8 @@ where
 }
 
 #[cfg(test)]
-mod task19_finalize_tests {
-    use super::super::publication::task19_publication_tests::api_account;
+mod finalize_tests {
+    use super::super::publication::publication_tests::api_account;
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
 
@@ -73,7 +73,7 @@ mod task19_finalize_tests {
     }
     #[tokio::test]
     async fn current_finalize_persists_selects_and_retires_once() {
-        use super::super::publication::{Publication, task19_publication_tests::database};
+        use super::super::publication::{Publication, publication_tests::database};
         let (_dir, db) = database().await;
         carbon_repos::repos::app_configuration::insert_app_configuration(
             &db,

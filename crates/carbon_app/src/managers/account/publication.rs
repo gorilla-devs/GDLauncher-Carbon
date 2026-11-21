@@ -372,7 +372,7 @@ async fn persist(
 }
 
 #[cfg(test)]
-pub(super) mod task19_publication_tests {
+pub(super) mod publication_tests {
     use super::*;
     pub async fn database() -> (tempfile::TempDir, Db) {
         let dir = tempfile::tempdir().unwrap();
@@ -761,20 +761,20 @@ pub(super) mod task19_publication_tests {
         let bytes = serde_json::to_vec(&*events.lock().unwrap()).unwrap();
         // queryInvalidation.integration.ts consumes this file; `pnpm
         // test:account-contract` points both sides at one fresh path.
-        let fixture = std::env::var_os("TASK19_ACCOUNT_EVENTS")
+        let fixture = std::env::var_os("ACCOUNT_EVENTS_FIXTURE")
             .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| std::env::temp_dir().join("task19-account-events.json"));
+            .unwrap_or_else(|| std::env::temp_dir().join("account-events.json"));
         if let Some(parent) = fixture.parent() {
             std::fs::create_dir_all(parent).unwrap_or_else(|error| {
                 panic!(
-                    "cannot create {} for TASK19_ACCOUNT_EVENTS: {error}",
+                    "cannot create {} for ACCOUNT_EVENTS_FIXTURE: {error}",
                     parent.display()
                 )
             });
         }
         std::fs::write(&fixture, bytes).unwrap_or_else(|error| {
             panic!(
-                "cannot write TASK19_ACCOUNT_EVENTS to {}: {error}",
+                "cannot write ACCOUNT_EVENTS_FIXTURE to {}: {error}",
                 fixture.display()
             )
         });

@@ -594,7 +594,7 @@ mod tests {
     }
 
     #[test]
-    fn task11_channel_resolver_keeps_installed_release_on_stable() {
+    fn channel_resolver_keeps_installed_release_on_stable() {
         let installed = [Installed::present(version("installed", 10, "release"))];
         let prereleases = || vec![version("beta", 20, "beta"), version("alpha", 25, "alpha")];
         assert_eq!(
@@ -661,7 +661,7 @@ mod tests {
     }
 
     #[test]
-    fn task11_channel_resolver_never_downgrades_installed_beta() {
+    fn channel_resolver_never_downgrades_installed_beta() {
         assert!(
             choose_update(
                 vec![
@@ -1029,7 +1029,7 @@ mod tests {
     }
 
     #[test]
-    fn task11_shader_policy_requires_the_detected_engine() {
+    fn shader_policy_requires_the_detected_engine() {
         let context = UpdateContext {
             game: "1.20.1".into(),
             loaders: vec!["fabric".into()],
@@ -1065,7 +1065,7 @@ mod tests {
     }
 
     #[test]
-    fn task11_channel_and_type_normal_controls() {
+    fn channel_and_type_normal_controls() {
         let mut policy = sources();
         let installed = [Installed::present(version("installed", 10, "release"))];
         let candidates = || {

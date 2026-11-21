@@ -392,13 +392,13 @@ pub struct FEUnifiedBatchResponse {
 }
 
 #[cfg(test)]
-mod task21_filter_tests {
+mod filter_tests {
     use super::*;
     fn params(versions: serde_json::Value) -> FEUnifiedSearchParameters {
         serde_json::from_value(serde_json::json!({"gameVersions":versions})).unwrap()
     }
     #[test]
-    fn task21_cf_distinct_versions_reject_before_provider_dispatch() {
+    fn cf_distinct_versions_reject_before_provider_dispatch() {
         let converted: Result<ModSearchParameters, _> =
             params(serde_json::json!(["1.20.1", "1.21.1"])).try_into();
         assert!(
@@ -407,7 +407,7 @@ mod task21_filter_tests {
         );
     }
     #[test]
-    fn task21_cf_single_none_and_mr_or_controls() {
+    fn cf_single_none_and_mr_or_controls() {
         let single: ModSearchParameters = params(serde_json::json!(["1.20.1"])).try_into().unwrap();
         assert_eq!(single.query.game_version.as_deref(), Some("1.20.1"));
         let none: ModSearchParameters = params(serde_json::Value::Null).try_into().unwrap();

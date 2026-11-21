@@ -1282,11 +1282,11 @@ mod test {
 }
 
 #[cfg(test)]
-mod task06_tests {
+mod copy_marker_tests {
     use super::*;
     #[cfg(unix)]
     #[tokio::test]
-    async fn task06_copy_marker_follows_included_success() {
+    async fn copy_marker_follows_included_success() {
         use std::os::unix::fs::PermissionsExt;
         let root = tempfile::tempdir().unwrap();
         let source = root.path().join("source");
@@ -1331,10 +1331,10 @@ mod task06_tests {
 }
 
 #[cfg(test)]
-mod task13_tests {
+mod moved_source_tests {
     use super::*;
     #[tokio::test]
-    async fn task13_moved_required_source_fails_without_completion() {
+    async fn moved_required_source_fails_without_completion() {
         let t = tempfile::tempdir().unwrap();
         let source = t.path().join("source");
         std::fs::create_dir(&source).unwrap();
@@ -1415,10 +1415,10 @@ pub(super) fn clear_scan_failure(path: &Path) {
     SCAN_FAILURES.lock().unwrap().remove(path);
 }
 #[cfg(test)]
-mod task13_copy_controls {
+mod copy_controls {
     use super::*;
     #[tokio::test]
-    async fn task13_present_empty_and_optional_missing_are_distinct() {
+    async fn present_empty_and_optional_missing_are_distinct() {
         let t = tempfile::tempdir().unwrap();
         let source = t.path().join("source");
         std::fs::create_dir(&source).unwrap();
@@ -1443,7 +1443,7 @@ mod task13_copy_controls {
 
 /// Round-trip the actual persisted schema before using the launch tokenizer.
 #[cfg(test)]
-pub(super) fn task14_persisted_config(
+pub(super) fn persisted_config(
     settings: &ImportedSettings,
 ) -> crate::domain::instance::info::GameConfig {
     use crate::domain::instance::info::{GameConfig, Instance, InstanceIcon};
@@ -1476,18 +1476,18 @@ pub(super) fn task14_persisted_config(
 }
 
 #[cfg(test)]
-pub(super) fn task14_persisted_args(settings: &ImportedSettings) -> Vec<String> {
-    let restored = task14_persisted_config(settings);
+pub(super) fn persisted_args(settings: &ImportedSettings) -> Vec<String> {
+    let restored = persisted_config(settings);
     crate::managers::minecraft::minecraft::parse_extra_java_args(
         restored.extra_java_args.as_deref().unwrap_or(""),
     )
 }
 
 #[cfg(test)]
-mod task14_argv_controls {
+mod argv_controls {
     use super::*;
     #[test]
-    fn task14_exact_argv_grammar_memory_and_append() {
+    fn exact_argv_grammar_memory_and_append() {
         let expected = [
             "-Dfoo=bar",
             "-XX:+UseG1GC",
@@ -1520,15 +1520,15 @@ mod task14_argv_controls {
             .filter(|arg| !arg.trim().is_empty())
             .collect();
         assert_eq!(kept.len(), expected.len() - 3);
-        assert_eq!(task14_persisted_args(&settings), kept);
+        assert_eq!(persisted_args(&settings), kept);
         settings.absorb_jvm_argv(["-Xmx2G", "-Xms512M", "-Xmx3G"]);
         assert_eq!(settings.memory(), Some((8192, 8192)));
         let mut appended = kept.clone();
         appended.extend(["-Xmx2G", "-Xms512M", "-Xmx3G"]);
-        assert_eq!(task14_persisted_args(&settings), appended);
+        assert_eq!(persisted_args(&settings), appended);
         settings.absorb_jvm_argv(["", "next", " "]);
         appended.push("next");
-        assert_eq!(task14_persisted_args(&settings), appended);
+        assert_eq!(persisted_args(&settings), appended);
         let before = settings.clone();
         settings.absorb_jvm_argv([]);
         assert_eq!(settings, before);
@@ -1536,35 +1536,35 @@ mod task14_argv_controls {
 }
 
 #[cfg(test)]
-mod task14_r1_memory_tests {
+mod memory_literal_tests {
     use super::*;
 
     fn assert_literal(tokens: &[&str]) {
         let mut settings = ImportedSettings::default();
         settings.absorb_jvm_argv(tokens.iter().copied());
-        assert_eq!(task14_persisted_args(&settings), tokens);
+        assert_eq!(persisted_args(&settings), tokens);
         assert_eq!(settings.memory_max_mb, None);
         assert_eq!(settings.memory_min_mb, None);
-        assert_eq!(task14_persisted_config(&settings).memory, None);
+        assert_eq!(persisted_config(&settings).memory, None);
     }
 
     #[test]
-    fn task14_r1_multi_letter_memory_units_remain_literal() {
+    fn multi_letter_memory_units_remain_literal() {
         assert_literal(&["-Xmx2GB", "-Xms512MB", "-Xmx4096kb", "-Xms1TB"]);
     }
 
     #[test]
-    fn task14_r1_sub_mib_bare_numbers_remain_literal() {
+    fn sub_mib_bare_numbers_remain_literal() {
         assert_literal(&["-Xmx65536", "-Xms1024", "-Xmx1048575"]);
     }
 
     #[test]
-    fn task14_r1_nonintegral_mib_memory_remains_literal() {
+    fn nonintegral_mib_memory_remains_literal() {
         assert_literal(&["-Xmx2097153", "-Xms1025K", "-Xmx67107841k"]);
     }
 
     #[test]
-    fn task14_r1_out_of_representation_memory_remains_literal() {
+    fn out_of_representation_memory_remains_literal() {
         assert_literal(&[
             "-Xmx65536M",
             "-Xms64G",
@@ -1577,7 +1577,7 @@ mod task14_r1_memory_tests {
     }
 
     #[test]
-    fn task14_r1_exact_memory_values_round_trip() {
+    fn exact_memory_values_round_trip() {
         for (value, mb) in [
             ("1048576", 1),
             ("2097152", 2),
@@ -1598,15 +1598,15 @@ mod task14_r1_memory_tests {
             assert_eq!(settings.memory_max_mb, Some(mb), "{value}");
             assert_eq!(settings.memory_min_mb, Some(mb), "{value}");
             assert_eq!(
-                task14_persisted_config(&settings).memory,
+                persisted_config(&settings).memory,
                 Some((mb as u16, mb as u16))
             );
-            assert!(task14_persisted_args(&settings).is_empty());
+            assert!(persisted_args(&settings).is_empty());
         }
     }
 
     #[test]
-    fn task14_r1_unrecognized_memory_forms_and_order_are_preserved() {
+    fn unrecognized_memory_forms_and_order_are_preserved() {
         assert_literal(&[
             "-Xmx0",
             "-Xms0M",
@@ -1622,15 +1622,15 @@ mod task14_r1_memory_tests {
         ]);
         let mut settings = ImportedSettings::default();
         settings.absorb_jvm_argv(["-Xmx2G", "-Xms512M", "-Xmx2GB", "-Xms1025K"]);
-        assert_eq!(task14_persisted_config(&settings).memory, None);
+        assert_eq!(persisted_config(&settings).memory, None);
         assert_eq!(
-            task14_persisted_args(&settings),
+            persisted_args(&settings),
             ["-Xmx2G", "-Xms512M", "-Xmx2GB", "-Xms1025K"]
         );
         settings.absorb_jvm_argv(["-Xmx1G", "-Xms256m"]);
-        assert_eq!(task14_persisted_config(&settings).memory, None);
+        assert_eq!(persisted_config(&settings).memory, None);
         assert_eq!(
-            task14_persisted_args(&settings),
+            persisted_args(&settings),
             [
                 "-Xmx2G",
                 "-Xms512M",
@@ -1643,24 +1643,24 @@ mod task14_r1_memory_tests {
     }
 
     #[test]
-    fn task14_r1_legacy_human_memory_policy_is_unchanged() {
+    fn legacy_human_memory_policy_is_unchanged() {
         assert_eq!(parse_memory_size("2GB"), Some(2048));
         assert_eq!(parse_memory_size("512MB"), Some(512));
         assert_eq!(parse_memory_size("65536"), Some(65536));
         assert_eq!(parse_memory_size("2097153"), Some(2));
         let mut settings = ImportedSettings::default();
         settings.absorb_jvm_args(r#"-Xmx2GB -Xms512MB "-Dlabel=My Pack""#);
-        assert_eq!(task14_persisted_config(&settings).memory, Some((512, 2048)));
-        assert_eq!(task14_persisted_args(&settings), ["-Dlabel=My Pack"]);
+        assert_eq!(persisted_config(&settings).memory, Some((512, 2048)));
+        assert_eq!(persisted_args(&settings), ["-Dlabel=My Pack"]);
     }
 }
 
 #[cfg(test)]
-mod task14_r2_memory_tests {
+mod memory_precedence_tests {
     use super::*;
 
     #[test]
-    fn task14_r2_retained_and_valid_maxima_preserve_source_precedence() {
+    fn retained_and_valid_maxima_preserve_source_precedence() {
         for args in [
             ["-Xmx65536M", "-Xmx2G", "-Xms512M"],
             ["-Xms512M", "-Xmx2G", "-Xmx65536M"],
@@ -1672,8 +1672,8 @@ mod task14_r2_memory_tests {
                 };
                 let before = settings.memory();
                 settings.absorb_jvm_argv(args);
-                assert_eq!(task14_persisted_args(&settings), args);
-                assert_eq!(task14_persisted_config(&settings).memory, before);
+                assert_eq!(persisted_args(&settings), args);
+                assert_eq!(persisted_config(&settings).memory, before);
                 assert_eq!(settings.memory_min_mb, None);
                 assert_eq!(settings.memory_max_mb, maximum);
             }
@@ -1681,36 +1681,36 @@ mod task14_r2_memory_tests {
     }
 
     #[test]
-    fn task14_r2_repeated_arrays_preserve_retained_heap_precedence() {
+    fn repeated_arrays_preserve_retained_heap_precedence() {
         let mut settings = ImportedSettings::default();
         settings.absorb_jvm_argv(["-Xmx65536M"]);
         settings.absorb_jvm_argv(["-Xmx2G", "-Xms256M", "-Dlabel=My Pack"]);
         assert_eq!(
-            task14_persisted_args(&settings),
+            persisted_args(&settings),
             ["-Xmx65536M", "-Xmx2G", "-Xms256M", "-Dlabel=My Pack"]
         );
-        assert_eq!(task14_persisted_config(&settings).memory, None);
+        assert_eq!(persisted_config(&settings).memory, None);
         // A lone minimum is managed, so a later pair still decides by last-wins.
         let mut settings = ImportedSettings::default();
         settings.absorb_jvm_argv(["-Xms512M"]);
         settings.absorb_jvm_argv(["-Xmx2G", "-Xms256M", "-Dlabel=My Pack"]);
-        assert_eq!(task14_persisted_args(&settings), ["-Dlabel=My Pack"]);
-        assert_eq!(task14_persisted_config(&settings).memory, Some((256, 2048)));
+        assert_eq!(persisted_args(&settings), ["-Dlabel=My Pack"]);
+        assert_eq!(persisted_config(&settings).memory, Some((256, 2048)));
     }
 
     #[test]
-    fn task14_r2_heap_free_prior_args_allow_managed_absorption() {
+    fn heap_free_prior_args_allow_managed_absorption() {
         let args = ["-Dlabel=-Xmx65536M", "-Dtext=prefix -Xms512M", ""];
         let mut settings = ImportedSettings::default();
         settings.absorb_jvm_argv(args);
         settings.absorb_jvm_argv(["-Xms512M", "-Xmx2G"]);
         settings.absorb_jvm_argv(["-Xmx3G"]);
-        assert_eq!(task14_persisted_args(&settings), &args[..2]);
-        assert_eq!(task14_persisted_config(&settings).memory, Some((512, 3072)));
+        assert_eq!(persisted_args(&settings), &args[..2]);
+        assert_eq!(persisted_config(&settings).memory, Some((512, 3072)));
     }
 
     #[test]
-    fn task14_r2_unpublishable_existing_maxima_do_not_consume_minimum() {
+    fn unpublishable_existing_maxima_do_not_consume_minimum() {
         // A zero maximum is no maximum; see lone_minimum_without_a_maximum_is_not_passed_literally.
         let mut settings = ImportedSettings {
             memory_max_mb: Some(65536),
@@ -1718,20 +1718,20 @@ mod task14_r2_memory_tests {
         };
         let before = settings.memory();
         settings.absorb_jvm_argv(["-Xms512M"]);
-        assert_eq!(task14_persisted_args(&settings), ["-Xms512M"]);
+        assert_eq!(persisted_args(&settings), ["-Xms512M"]);
         assert_eq!(settings.memory_min_mb, None);
         assert_eq!(settings.memory_max_mb, Some(65536));
-        assert_eq!(task14_persisted_config(&settings).memory, before);
+        assert_eq!(persisted_config(&settings).memory, before);
     }
 
     #[test]
-    fn task14_r2_retained_maximum_keeps_minimum_in_both_orders() {
+    fn retained_maximum_keeps_minimum_in_both_orders() {
         for maximum in ["-Xmx65536M", "-Xmx2GB"] {
             for args in [[maximum, "-Xms512M"], ["-Xms512M", maximum]] {
                 let mut settings = ImportedSettings::default();
                 settings.absorb_jvm_argv(args);
-                assert_eq!(task14_persisted_config(&settings).memory, None);
-                assert_eq!(task14_persisted_args(&settings), args);
+                assert_eq!(persisted_config(&settings).memory, None);
+                assert_eq!(persisted_args(&settings), args);
             }
         }
     }
@@ -1746,13 +1746,13 @@ mod task14_r2_memory_tests {
                 ..Default::default()
             };
             settings.absorb_jvm_argv(["-Xms4G", "-XX:+UseG1GC"]);
-            assert_eq!(task14_persisted_args(&settings), ["-XX:+UseG1GC"]);
-            assert_eq!(task14_persisted_config(&settings).memory, None);
+            assert_eq!(persisted_args(&settings), ["-XX:+UseG1GC"]);
+            assert_eq!(persisted_config(&settings).memory, None);
             assert_eq!(settings.memory_min_mb, Some(4096));
         }
         let mut settings = ImportedSettings::default();
         settings.absorb_jvm_argv(["-Xms512M"]);
-        assert!(task14_persisted_args(&settings).is_empty());
+        assert!(persisted_args(&settings).is_empty());
         assert!(!settings.has_launch_overrides());
         // A maximum that arrives later pairs with the kept minimum.
         settings.memory_max_mb = Some(2048);
@@ -1760,57 +1760,54 @@ mod task14_r2_memory_tests {
     }
 
     #[test]
-    fn task14_r2_clamped_combination_keeps_literal_order() {
+    fn clamped_combination_keeps_literal_order() {
         for args in [["-Xms4G", "-Xmx2G"], ["-Xmx2G", "-Xms4G"]] {
             let mut settings = ImportedSettings::default();
             settings.absorb_jvm_argv(args);
-            assert_eq!(task14_persisted_args(&settings), args);
-            assert_eq!(task14_persisted_config(&settings).memory, None);
+            assert_eq!(persisted_args(&settings), args);
+            assert_eq!(persisted_config(&settings).memory, None);
         }
     }
 
     #[test]
-    fn task14_r2_preexisting_minimum_is_not_clamped_by_consumption() {
+    fn preexisting_minimum_is_not_clamped_by_consumption() {
         let mut settings = ImportedSettings {
             memory_min_mb: Some(4096),
             memory_max_mb: Some(8192),
             ..Default::default()
         };
         settings.absorb_jvm_argv(["-Xmx2G"]);
-        assert_eq!(task14_persisted_args(&settings), ["-Xmx2G"]);
-        assert_eq!(
-            task14_persisted_config(&settings).memory,
-            Some((4096, 8192))
-        );
+        assert_eq!(persisted_args(&settings), ["-Xmx2G"]);
+        assert_eq!(persisted_config(&settings).memory, Some((4096, 8192)));
     }
 
     #[test]
-    fn task14_r2_later_and_existing_valid_maxima_publish_exactly() {
+    fn later_and_existing_valid_maxima_publish_exactly() {
         for args in [["-Xms512M", "-Xmx2G"], ["-Xmx2G", "-Xms512M"]] {
             let mut settings = ImportedSettings::default();
             settings.absorb_jvm_argv(args);
-            assert_eq!(task14_persisted_config(&settings).memory, Some((512, 2048)));
-            assert!(task14_persisted_args(&settings).is_empty());
+            assert_eq!(persisted_config(&settings).memory, Some((512, 2048)));
+            assert!(persisted_args(&settings).is_empty());
         }
         let mut settings = ImportedSettings {
             memory_max_mb: Some(4096),
             ..Default::default()
         };
         settings.absorb_jvm_argv(["-Xms512M"]);
-        assert_eq!(task14_persisted_config(&settings).memory, Some((512, 4096)));
-        assert!(task14_persisted_args(&settings).is_empty());
+        assert_eq!(persisted_config(&settings).memory, Some((512, 4096)));
+        assert!(persisted_args(&settings).is_empty());
     }
 
     #[test]
-    fn task14_r2_last_valid_values_decide_combination() {
+    fn last_valid_values_decide_combination() {
         let mut settings = ImportedSettings::default();
         settings.absorb_jvm_argv(["-Xms4G", "-Xmx2G", "-Xms512M", "-Xmx3G"]);
-        assert_eq!(task14_persisted_config(&settings).memory, Some((512, 3072)));
-        assert!(task14_persisted_args(&settings).is_empty());
+        assert_eq!(persisted_config(&settings).memory, Some((512, 3072)));
+        assert!(persisted_args(&settings).is_empty());
         let mut settings = ImportedSettings::default();
         let args = ["-Xms512M", "-Xmx2G", "-Dlabel=My Pack", "-Xms4G"];
         settings.absorb_jvm_argv(args);
-        assert_eq!(task14_persisted_args(&settings), args);
-        assert_eq!(task14_persisted_config(&settings).memory, None);
+        assert_eq!(persisted_args(&settings), args);
+        assert_eq!(persisted_config(&settings).memory, None);
     }
 }

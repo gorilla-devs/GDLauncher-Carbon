@@ -434,11 +434,11 @@ fn is_potential_log4j_start(buffer: &[u8]) -> bool {
 }
 
 #[cfg(test)]
-mod task06_tests {
+mod tests {
     use super::*;
     const EVENT: &[u8] = br#"<log4j:Event logger="test" timestamp="1" level="INFO" thread="main"><log4j:Message><![CDATA[A & B]]></log4j:Message></log4j:Event>"#;
     #[test]
-    fn task06_literal_ampersand_then_event() {
+    fn literal_ampersand_then_event() {
         let mut p = LogParser::new();
         for text in ["A & B\n", "ordinary\n", "&amp;\n"] {
             p.feed(text.as_bytes());
@@ -454,7 +454,7 @@ mod task06_tests {
         assert_eq!(p.buffered_len(), 0);
     }
     #[test]
-    fn task06_partial_utf8_and_invalid_prefix() {
+    fn partial_utf8_and_invalid_prefix() {
         let mut p = LogParser::new();
         p.feed(&[0xe2, 0x82]);
         assert!(matches!(

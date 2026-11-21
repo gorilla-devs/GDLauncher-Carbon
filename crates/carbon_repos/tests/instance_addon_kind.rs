@@ -17,7 +17,7 @@ fn seed(conn: &Connection) {
       VALUES ('pack',1,'shared.zip',3,0,'resourcepacks','shared');").unwrap();
 }
 #[test]
-fn task11_populated_upgrade_and_representable_down_preserve_owners() {
+fn populated_upgrade_and_representable_down_preserve_owners() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("fixture.db");
     let mut conn = Connection::open(&path).unwrap();
@@ -58,7 +58,7 @@ fn task11_populated_upgrade_and_representable_down_preserve_owners() {
     );
 }
 #[test]
-fn task11_colliding_owner_down_keeps_one_row_per_file_name() {
+fn colliding_owner_down_keeps_one_row_per_file_name() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("fixture.db");
     let mut conn = Connection::open(&path).unwrap();
@@ -124,7 +124,7 @@ fn task11_colliding_owner_down_keeps_one_row_per_file_name() {
 }
 
 #[test]
-fn task11_context_cache_keeps_foreign_keys_and_negative_freshness() {
+fn context_cache_keeps_foreign_keys_and_negative_freshness() {
     use carbon_repos::{
         db_exec::test_support::{rg, wg},
         dbtypes::DbDateTime,

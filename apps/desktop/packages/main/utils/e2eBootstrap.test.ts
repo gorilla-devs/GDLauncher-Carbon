@@ -18,7 +18,7 @@ const identity = {
 
 describe("owned E2E main bootstrap", () => {
   it("sets owned userData and logger before initialization without selecting snapshot/default paths", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "task43-bootstrap-"))
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-bootstrap-"))
     const owned = path.join(root, "owned")
     const calls: string[] = []
     let resolveLog: (name: string) => string = () => {
@@ -55,9 +55,7 @@ describe("owned E2E main bootstrap", () => {
     }
   })
   it("released defaults remain lazy and ignore an E2E override", () => {
-    const root = fs.mkdtempSync(
-      path.join(os.tmpdir(), "task43-release-default-")
-    )
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-release-default-"))
     try {
       const result = initializeMainUserData({
         e2eBuild: false,
@@ -85,7 +83,7 @@ describe("owned E2E main bootstrap", () => {
     }
   })
   it("atomic main-start publication replaces generation on relaunch and refuses unknown/helper identities", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "task43-marker-"))
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-marker-"))
     try {
       const options = {
         e2eBuild: true,
@@ -119,9 +117,7 @@ describe("owned E2E main bootstrap", () => {
     }
   })
   it("malformed markers and relative override paths cannot authorize startup evidence", () => {
-    const root = fs.mkdtempSync(
-      path.join(os.tmpdir(), "task43-invalid-marker-")
-    )
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-invalid-marker-"))
     try {
       fs.writeFileSync(
         path.join(root, "e2e-main-start.json"),
@@ -170,7 +166,7 @@ describe("conservative main process adapters with injected IO", () => {
   })
 
   it("Linux observes physical synthetic proc data and excludes helpers/zombies/reuse/errors", () => {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "task43-proc-"))
+    const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-proc-"))
     const stat = (ticks: string, state = "S") =>
       `101 (app (name)) ${[state, ...Array(18).fill("0"), ticks].join(" ")}`
     fs.writeFileSync(path.join(root, "stat"), stat("100"))

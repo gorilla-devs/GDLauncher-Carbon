@@ -835,7 +835,7 @@ describe("runtime relocation transaction controls", () => {
   })
   it("rejects missing removable mounts before creating host directories", async () => {
     await expect(
-      validateRuntimeDestination("/run/media/task04-missing/disk/gdl", null, {
+      validateRuntimeDestination("/run/media/missing/disk/gdl", null, {
         platform: "linux",
         mountInfo: ""
       })
@@ -886,7 +886,7 @@ it.skipIf(process.platform !== "linux")(
   "validated mounted storage agrees with advisory path validation",
   async () => {
     const f = await fixture()
-    const mount = "/run/media/task04-fixture/disk"
+    const mount = "/run/media/fixture/disk"
     const virtualTarget = mount + "/target"
     const translate = (file: any) =>
       typeof file === "string" && file.startsWith(mount)
@@ -928,7 +928,7 @@ it.skipIf(process.platform !== "linux")(
 describe.skipIf(process.platform !== "linux")(
   "a link to a folder on a removable drive",
   () => {
-    const mount = "/run/media/task04-fixture/disk"
+    const mount = "/run/media/fixture/disk"
     /** A link in the data folder's parent, and `at` resolving to `destination`. */
     async function linked(destination: string, at?: string) {
       const f = await fixture()

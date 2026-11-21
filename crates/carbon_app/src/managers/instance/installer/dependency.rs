@@ -511,7 +511,7 @@ pub(crate) struct ReplacedIds {
 /// already the user's to manage: 2.0.40 never added any on update, and the
 /// user may provide them with a jar the scan cannot link to the project, so
 /// downloading the project again would install the same mod twice. Only the
-/// requirements the new version introduces are resolved (GPT-0022).
+/// requirements the new version introduces are resolved.
 pub(crate) struct Previous {
     version: PreviousVersion,
     declared: tokio::sync::OnceCell<HashSet<String>>,
@@ -1176,7 +1176,7 @@ pub(super) async fn curseforge(
                 | curseforge::ClassId::Worlds
         )
     );
-    // Never fall back to an incompatible file (GPT-0071).
+    // Never fall back to an incompatible file.
     let Ok(file) = select_dependency(
         &files,
         request.target.as_ref(),
@@ -1286,7 +1286,7 @@ pub(super) async fn modrinth(
     };
     // The declared pin, then the version another dependant settled on. A pin
     // that is gone or is not for this game and loader is replaced by the
-    // newest compatible version, never by an incompatible file (GPT-0071).
+    // newest compatible version, never by an incompatible file.
     let mut candidates: Vec<String> = Vec::new();
     for pin in [declared.clone(), planned.clone()].into_iter().flatten() {
         if !candidates.contains(&pin) {

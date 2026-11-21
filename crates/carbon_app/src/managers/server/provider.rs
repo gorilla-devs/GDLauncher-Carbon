@@ -205,7 +205,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn task04_runtime_exit_requires_true_not_sender_loss_or_timeout() {
+    async fn runtime_exit_requires_true_not_sender_loss_or_timeout() {
         let (tx, mut signal) = exit_signal();
         drop(tx);
         assert!(signal.wait_confirmed().await.is_err());
@@ -321,10 +321,10 @@ mod tests {
 }
 
 #[cfg(test)]
-mod task07_tests {
+mod stop_tests {
     use super::*;
     #[tokio::test]
-    async fn task07_stop_sender_loss_is_unknown_and_escalation_is_captured() {
+    async fn stop_sender_loss_is_unknown_and_escalation_is_captured() {
         let (kill_tx, mut kill_rx) = mpsc::channel(1);
         let (stdin_tx, mut stdin_rx) = mpsc::channel(1);
         let (exit_tx, exited) = exit_signal();
@@ -486,10 +486,10 @@ mod task07_tests {
 }
 
 #[cfg(test)]
-mod task22_tests {
+mod marker_tests {
     use super::*;
     #[tokio::test]
-    async fn task22_server_marker_roundtrip_keeps_stable_identity() {
+    async fn server_marker_roundtrip_keeps_stable_identity() {
         let root = tempfile::tempdir().unwrap();
         let record = orphan_pid::ProcessRecord {
             pid: 4242,
@@ -519,7 +519,7 @@ mod task22_tests {
         assert_eq!(read_process_file(root.path()).await.unwrap(), None);
     }
     #[tokio::test]
-    async fn task22_server_recovery_cleanup_preserves_replacement_marker() {
+    async fn server_recovery_cleanup_preserves_replacement_marker() {
         let root = tempfile::tempdir().unwrap();
         let captured = orphan_pid::ProcessRecord {
             pid: 4242,

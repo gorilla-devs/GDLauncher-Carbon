@@ -2131,7 +2131,7 @@ pub(crate) mod publication_fixture {
 }
 
 #[cfg(test)]
-mod task33_shader_recovery_tests {
+mod shader_recovery_tests {
     use super::*;
     use crate::{domain::vtask::VisualTaskId, managers::vtask::TaskOutcome};
 
@@ -2160,7 +2160,7 @@ mod task33_shader_recovery_tests {
         )
     }
     #[test]
-    fn task33_exact_owner_and_repeated_rebinding_reject_old_task() {
+    fn exact_owner_and_repeated_rebinding_reject_old_task() {
         let (mut session, config) = bound();
         validate(&session, &config).unwrap();
         session
@@ -2180,7 +2180,7 @@ mod task33_shader_recovery_tests {
             .unwrap();
     }
     #[test]
-    fn task33_foreign_replaced_copied_and_unbound_sessions_refused() {
+    fn foreign_replaced_copied_and_unbound_sessions_refused() {
         let (session, config) = bound();
         for altered in 0..5 {
             let mut other = session.clone();
@@ -2200,7 +2200,7 @@ mod task33_shader_recovery_tests {
         }
     }
     #[test]
-    fn task33_non_settings_non_version_only_and_non_fabric_refused() {
+    fn non_settings_non_version_only_and_non_fabric_refused() {
         let (session, config) = bound();
         let mut other = session.clone();
         other.producer = Producer::Repair;
@@ -2218,7 +2218,7 @@ mod task33_shader_recovery_tests {
         assert!(validate(&other, &config).is_err());
     }
     #[test]
-    fn task33_changed_game_loader_and_expected_mc_refused() {
+    fn changed_game_loader_and_expected_mc_refused() {
         let (session, config) = bound();
         for change in 0..2 {
             let mut current = config.clone();
@@ -2252,7 +2252,7 @@ mod task33_shader_recovery_tests {
         );
     }
     #[test]
-    fn task33_generation_mismatch_stale_failed_owner_and_unavailable_refused() {
+    fn generation_mismatch_stale_failed_owner_and_unavailable_refused() {
         let (session, config) = bound();
         assert!(
             session
@@ -2303,7 +2303,7 @@ mod task33_shader_recovery_tests {
         );
     }
     #[test]
-    fn task33_failed_outcome_has_exact_task_identity() {
+    fn failed_outcome_has_exact_task_identity() {
         let (session, config) = bound();
         let task = crate::domain::vtask::Task {
             id: VisualTaskId(11),
@@ -2328,7 +2328,7 @@ mod task33_shader_recovery_tests {
             .unwrap();
     }
     #[test]
-    fn task33_running_or_foreign_failed_outcome_cannot_authorize_recovery() {
+    fn running_or_foreign_failed_outcome_cannot_authorize_recovery() {
         let (session, config) = bound();
         let task = |id, progress| crate::domain::vtask::Task {
             id: VisualTaskId(id),
@@ -2363,7 +2363,7 @@ mod task33_shader_recovery_tests {
         }
     }
     #[tokio::test]
-    async fn task33_later_reload_rejects_a_valid_replacement_and_rebound_authority() {
+    async fn later_reload_rejects_a_valid_replacement_and_rebound_authority() {
         let (expected, config) = bound();
         let root = tempfile::tempdir().unwrap();
         tokio::fs::create_dir(root.path().join(".setup"))
@@ -2411,7 +2411,7 @@ mod task33_shader_recovery_tests {
             .unwrap();
     }
     #[tokio::test]
-    async fn task33_actual_session_publication_keeps_binding_and_old_record_default() {
+    async fn actual_session_publication_keeps_binding_and_old_record_default() {
         let (mut session, config) = bound();
         let root = tempfile::tempdir().unwrap();
         tokio::fs::create_dir(root.path().join(".setup"))

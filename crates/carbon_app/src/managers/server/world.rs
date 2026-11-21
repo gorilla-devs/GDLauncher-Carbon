@@ -733,11 +733,11 @@ pub fn legacy_datapack_evidence(path: &Path) -> Result<bool> {
 }
 
 #[cfg(test)]
-mod task07_tests {
+mod tests {
     use super::*;
     use std::io::Write;
     #[test]
-    fn task07_world_switch_rejects_old_owner_and_preserves_both_files() {
+    fn world_switch_rejects_old_owner_and_preserves_both_files() {
         let root = tempfile::tempdir().unwrap();
         for world in ["A", "B"] {
             std::fs::create_dir_all(root.path().join(format!("{world}/datapacks"))).unwrap();
@@ -764,7 +764,7 @@ mod task07_tests {
         );
     }
     #[test]
-    fn task07_protection_refuses_wipe_overlap_and_unsafe_selected_world() {
+    fn protection_refuses_wipe_overlap_and_unsafe_selected_world() {
         let root = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(root.path().join("mods/nested-world")).unwrap();
         std::fs::write(root.path().join("mods/nested-world/level.dat"), b"save").unwrap();
@@ -780,7 +780,7 @@ mod task07_tests {
         assert!(selected(root.path()).is_err());
     }
     #[test]
-    fn task07_legacy_zip_requires_positive_bounded_datapack_metadata() {
+    fn legacy_zip_requires_positive_bounded_datapack_metadata() {
         let root = tempfile::tempdir().unwrap();
         for (name, metadata, expected) in [
             ("pack.zip", r#"{"pack":{"pack_format":48}}"#, true),
@@ -805,7 +805,7 @@ mod task07_tests {
 
 #[cfg(test)]
 #[test]
-fn task07r1_r1_case_policy_uses_filesystem_acceptance_not_global_folding() {
+fn case_policy_uses_filesystem_acceptance_not_global_folding() {
     assert_eq!(
         spelling_by_name("adventuremap", &["AdventureMap".into()], true).unwrap(),
         "AdventureMap"

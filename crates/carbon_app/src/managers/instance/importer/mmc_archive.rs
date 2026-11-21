@@ -345,7 +345,7 @@ mod test {
     }
 
     #[test]
-    fn task14_disabled_loader_zip_metadata() {
+    fn disabled_loader_zip_metadata() {
         let tmp = tempfile::tempdir().unwrap();
         for prefix in ["", "Pack/"] {
             let path = tmp.path().join("pack.zip");

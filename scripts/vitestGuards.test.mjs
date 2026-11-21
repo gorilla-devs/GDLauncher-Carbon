@@ -34,12 +34,12 @@ function write(file, content = "") {
 
 test("a config no project or script runs names where to wire it", () => {
   write("vitest.config.mjs")
-  write("vitest.task1.config.mjs")
+  write("vitest.wired.config.mjs")
   write("vitest.extra.config.mjs")
 
   assert.throws(
     () =>
-      assertEveryConfigRuns(root, ["vitest.task1.config.mjs"], {
+      assertEveryConfigRuns(root, ["vitest.wired.config.mjs"], {
         "vitest.contract.config.mjs": "pnpm test:contract"
       }),
     (error) => {
@@ -52,7 +52,7 @@ test("a config no project or script runs names where to wire it", () => {
         error.message,
         /standalone list that vitest\.config\.mjs passes to assertEveryConfigRuns/
       )
-      assert.doesNotMatch(error.message, /task1/)
+      assert.doesNotMatch(error.message, /wired/)
       return true
     }
   )
@@ -60,16 +60,16 @@ test("a config no project or script runs names where to wire it", () => {
 
 test("wired and standalone configs pass", () => {
   write("vitest.config.mjs")
-  write("vitest.task1.config.mjs")
+  write("vitest.wired.config.mjs")
   write("vitest.contract.config.mjs")
 
-  assertEveryConfigRuns(root, ["vitest.task1.config.mjs"], {
+  assertEveryConfigRuns(root, ["vitest.wired.config.mjs"], {
     "vitest.contract.config.mjs": "pnpm test:contract"
   })
 })
 
 test("a test file claimed by two projects is named with both owners", () => {
-  write("src/a.task1.test.ts")
+  write("src/a.narrow.test.ts")
   write("src/b.test.ts")
 
   assert.throws(
@@ -77,12 +77,12 @@ test("a test file claimed by two projects is named with both owners", () => {
       assertOneProjectPerFile(
         root,
         [
-          { name: "task1", include: ["src/**/*.task1.test.ts"] },
+          { name: "narrow", include: ["src/**/*.narrow.test.ts"] },
           { name: "wide", include: ["src/**/*.test.ts"] }
         ],
         []
       ),
-    /src\/a\.task1\.test\.ts: task1, wide/
+    /src\/a\.narrow\.test\.ts: narrow, wide/
   )
 })
 

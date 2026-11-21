@@ -446,10 +446,10 @@ impl LegacyGDLauncherImporter {
 }
 
 #[cfg(test)]
-mod task13_scan_tests {
+mod scan_tests {
     use super::*;
     #[tokio::test]
-    async fn task13_single_root_and_config_selection() {
+    async fn single_root_and_config_selection() {
         let t = tempfile::tempdir().unwrap();
         let root = t.path().join("Synthetic");
         std::fs::create_dir(&root).unwrap();
@@ -477,10 +477,10 @@ mod task13_scan_tests {
 }
 
 #[cfg(test)]
-mod task13_valid_controls {
+mod valid_controls {
     use super::*;
     #[tokio::test]
-    async fn task13_valid_single_config_collection_and_empty() {
+    async fn valid_single_config_collection_and_empty() {
         let t = tempfile::tempdir().unwrap();
         let root = t.path().join("Synthetic");
         std::fs::create_dir(&root).unwrap();

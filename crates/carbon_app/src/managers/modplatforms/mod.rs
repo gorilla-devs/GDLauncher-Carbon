@@ -97,13 +97,13 @@ fn logical_loader_version<'a>(value: &'a str, minecraft: &str, loader: &str) -> 
 }
 
 #[cfg(test)]
-mod task11_tests {
+mod tests {
     fn select<'a>(candidates: &[&'a str], pin: &str, mc: &str, loader: &str) -> Option<&'a str> {
         super::select_pinned_loader(candidates.to_vec(), |id| *id, pin, mc, loader)
     }
 
     #[test]
-    fn task11_loader_pins_do_not_match_neighbouring_versions() {
+    fn loader_pins_do_not_match_neighbouring_versions() {
         for (loader, mc, pin, candidates, expected) in [
             (
                 "fabric",
@@ -147,7 +147,7 @@ mod task11_tests {
     // Prism, ATLauncher, the Modrinth App, the FTB App and packwiz name the
     // build alone; the CurseForge app writes `neoforge-1.20.1-47.1.x`.
     #[test]
-    fn task11_neoforge_1_20_1_pins_resolve_with_or_without_the_minecraft_prefix() {
+    fn neoforge_1_20_1_pins_resolve_with_or_without_the_minecraft_prefix() {
         let meta = ["1.20.1-47.1.106", "1.20.1-47.1.790", "1.20.1-47.1.79"];
         for pin in ["47.1.79", "1.20.1-47.1.79", "neoforge-47.1.79"] {
             assert_eq!(
@@ -178,7 +178,7 @@ mod task11_tests {
     // Ids as GDL's Forge metadata lists them; packs and GDL's own CurseForge
     // export name these builds without the branch suffix.
     #[test]
-    fn task11_old_forge_builds_resolve_without_their_branch_suffix() {
+    fn old_forge_builds_resolve_without_their_branch_suffix() {
         for (mc, pin, candidates, expected) in [
             (
                 "1.7.10",
@@ -284,7 +284,7 @@ mod task11_tests {
     }
 
     #[test]
-    fn task11_exact_loader_matches_win_and_shared_builds_are_refused() {
+    fn exact_loader_matches_win_and_shared_builds_are_refused() {
         // The exact id wins even when a suffixed entry of the same build comes first.
         assert_eq!(
             select(
@@ -322,7 +322,7 @@ mod task11_tests {
     // GDL's CurseForge export names Forge by its build and NeoForge by its full
     // id; importing that export again has to land on the same entries.
     #[test]
-    fn task11_gdl_curseforge_export_resolves_back_to_the_same_loader() {
+    fn gdl_curseforge_export_resolves_back_to_the_same_loader() {
         use crate::domain::instance::info::{ModLoader, ModLoaderType, StandardVersion};
 
         for (mc, type_, id, meta) in [
@@ -367,7 +367,7 @@ mod task11_tests {
     }
 
     #[test]
-    fn task11_loader_pins_preserve_full_legacy_and_absent_controls() {
+    fn loader_pins_preserve_full_legacy_and_absent_controls() {
         for candidate in [
             "1.20.1-47.2.1",
             "forge-47.2.1",

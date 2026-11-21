@@ -770,10 +770,10 @@ mod tests {
 }
 
 #[cfg(test)]
-mod task18_tests {
+mod zip_validation_tests {
     use super::*;
     #[tokio::test]
-    async fn task18_processor_zip_rejects_incomplete_records_and_directories() {
+    async fn processor_zip_rejects_incomplete_records_and_directories() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("processor.jar");
         let mut eocd = vec![0; 22];
@@ -812,7 +812,7 @@ mod task18_tests {
         }
     }
     #[tokio::test]
-    async fn task18_processor_zip_rejects_out_of_bounds_directory() {
+    async fn processor_zip_rejects_out_of_bounds_directory() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("bounds.jar");
         for field in [12, 16] {
@@ -835,7 +835,7 @@ mod task18_tests {
         }
     }
     #[tokio::test]
-    async fn task18_processor_zip_accepts_empty_and_comment_signature() {
+    async fn processor_zip_accepts_empty_and_comment_signature() {
         let root = tempfile::tempdir().unwrap();
         for comment in [b"".as_slice(), b"comment PK\x05\x06 trailing".as_slice()] {
             let path = root.path().join("valid.zip");
@@ -858,7 +858,7 @@ mod task18_tests {
         }
     }
     #[tokio::test]
-    async fn task18_processor_zip_accepts_regular_and_zip64_empty_controls() {
+    async fn processor_zip_accepts_regular_and_zip64_empty_controls() {
         use std::io::Write;
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("regular.jar");

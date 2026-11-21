@@ -492,10 +492,10 @@ where
 }
 
 #[cfg(test)]
-mod task21_category_tests {
+mod category_tests {
     use super::*;
     #[tokio::test]
-    async fn task21_categories_healthy_provider_survives_other_failure() {
+    async fn categories_healthy_provider_survives_other_failure() {
         let cf = carbon_platforms::curseforge::CurseForgeResponse {
             data: Vec::new(),
             pagination: None,
@@ -522,7 +522,7 @@ mod task21_category_tests {
 }
 
 #[cfg(test)]
-mod task21_batch_tests {
+mod batch_tests {
     use super::*;
     fn project() -> carbon_platforms::modrinth::project::Project {
         serde_json::from_value(serde_json::json!({"slug":"alias","title":"fixture","description":"fixture","categories":[],"client_side":"required","server_side":"optional","body":"fixture","additional_categories":[],"donation_urls":[],"project_type":"modpack","downloads":1,"id":"owner","team":"team","published":"2026-01-01T00:00:00Z","updated":"2026-01-02T00:00:00Z","followers":1,"status":"approved","license":{"id":"MIT","name":"MIT"},"versions":["historical","chosenA","chosenB"],"game_versions":[],"loaders":[]})).unwrap()
@@ -531,7 +531,7 @@ mod task21_batch_tests {
         serde_json::from_value(serde_json::json!({"name":"fixture","version_number":"1","dependencies":[],"game_versions":[],"version_type":"release","loaders":[],"featured":true,"id":id,"project_id":"owner","author_id":"author","date_published":"2026-01-01T00:00:00Z","downloads":1,"files":[]})).unwrap()
     }
     #[tokio::test]
-    async fn task21_typed_versions_aliases_missing_items_and_separate_selections() {
+    async fn typed_versions_aliases_missing_items_and_separate_selections() {
         let calls = std::sync::Mutex::new(Vec::new());
         let response = resolve_modrinth_batch(
             vec!["alias".into(), "owner".into(), "missing".into()],
@@ -576,7 +576,7 @@ mod task21_batch_tests {
         );
     }
     #[tokio::test]
-    async fn task21_version_owner_mismatch_or_missing_owner_is_explicit() {
+    async fn version_owner_mismatch_or_missing_owner_is_explicit() {
         let result = resolve_modrinth_batch(
             Vec::new(),
             vec!["chosen".into()],
@@ -601,7 +601,7 @@ mod task21_batch_tests {
         assert!(result.errors[0].contains("owner"));
     }
     #[tokio::test]
-    async fn task21_category_maps_and_independent_errors_cover_all_provider_outcomes() {
+    async fn category_maps_and_independent_errors_cover_all_provider_outcomes() {
         for cf_ok in [false, true] {
             for mr_ok in [false, true] {
                 let cf: carbon_platforms::curseforge::Category=serde_json::from_value(serde_json::json!({"id":1,"name":"healthy CF","slug":"healthy","url":"synthetic","dateModified":"fixture","classId":4471})).unwrap();

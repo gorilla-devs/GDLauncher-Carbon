@@ -313,7 +313,7 @@ fn constant_time_eq(a: &[u8], b: &[u8]) -> bool {
 }
 
 #[cfg(test)]
-mod task20_tests;
+mod callback_tests;
 
 #[cfg(test)]
 mod tests {

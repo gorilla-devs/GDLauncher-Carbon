@@ -82,7 +82,7 @@ const installation = {
   arch: "x64",
   format: "zip" as const
 }
-describe("Task23 updater settlement", () => {
+describe("updater settlement", () => {
   it("null updater clears checking payloads, broadcasts unsupported and permits retry", async () => {
     const value = controller()
     expect((await value.wrapper.check("stable")).status).toBe("unsupported")
@@ -370,7 +370,7 @@ function provider(base: string, channel = "latest") {
     }
   )
 }
-describe("Task23 active-provider matching metadata", () => {
+describe("active-provider matching metadata", () => {
   it("active feed resolves relative/absolute metadata with folders and no launch publish env", () => {
     for (const base of [
       "https://packaged.invalid/folder",

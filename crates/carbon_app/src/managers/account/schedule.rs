@@ -57,8 +57,8 @@ impl RefreshSchedule {
     }
 }
 #[cfg(test)]
-mod task19_schedule_tests {
-    use super::super::publication::task19_publication_tests::{account, database};
+mod schedule_tests {
+    use super::super::publication::publication_tests::{account, database};
     use super::*;
     #[tokio::test]
     async fn fast_failed_priority_account_does_not_starve_other_accounts() {

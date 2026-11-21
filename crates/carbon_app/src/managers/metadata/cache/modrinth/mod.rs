@@ -722,7 +722,7 @@ mod test {
     }
 
     #[test]
-    fn task11_non_mod_loader_tags_produce_update_paths() {
+    fn non_mod_loader_tags_produce_update_paths() {
         for loader in ["minecraft", "datapack", "iris", "optifine"] {
             let mut installed = version("installed", "project", 10, VersionType::Release);
             installed.loaders = vec![loader.into()];
@@ -736,7 +736,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn task11_shared_artifact_refresh_keeps_both_game_contexts() {
+    async fn shared_artifact_refresh_keeps_both_game_contexts() {
         use crate::domain::instance::{
             AddonType,
             info::{ModLoader, StandardVersion},

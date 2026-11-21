@@ -17,7 +17,7 @@ import {
 } from "./recoveryRelaunch"
 
 function fixture() {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "task43-relaunch-"))
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-relaunch-"))
   const expected = {
     userDataPath: path.join(root, "userData"),
     runtimePath: root,

@@ -3506,11 +3506,11 @@ impl From<manager::KeptAddonCopy> for FEKeptAddonCopy {
 }
 
 #[cfg(test)]
-mod task17_search_wire_tests {
+mod search_wire_tests {
     use super::*;
 
     #[test]
-    fn task17_search_wire_preserves_original_utf16_offsets() {
+    fn search_wire_preserves_original_utf16_offsets() {
         use crate::managers::instance::log::{GameLog, LogEntry};
         let mut log = GameLog::new();
         log.add_entry(LogEntry::system_message("😀 ERROR"));
@@ -3529,10 +3529,10 @@ mod task17_search_wire_tests {
 }
 
 #[cfg(test)]
-mod task33_prepare_input_tests {
+mod prepare_input_tests {
     use super::*;
     #[test]
-    fn task33_prepare_keeps_numeric_callers_and_guarded_input_exact() {
+    fn prepare_keeps_numeric_callers_and_guarded_input_exact() {
         assert!(matches!(
             serde_json::from_str::<FEPrepareInstanceArgs>("7").unwrap(),
             FEPrepareInstanceArgs::Ordinary(FEInstanceId(7))

@@ -616,7 +616,7 @@ mod test {
 }
 
 #[cfg(test)]
-mod task09_tests;
+mod override_tests;
 
 fn operation_download_options(
     cancel: &tokio_util::sync::CancellationToken,
@@ -630,10 +630,10 @@ fn operation_download_options(
 }
 
 #[cfg(test)]
-mod task18_r1_download_tests {
+mod download_tests {
     use super::*;
     #[tokio::test]
-    async fn task18_r1_operation_token_reaches_download_supervisor() {
+    async fn operation_token_reaches_download_supervisor() {
         let cancel = tokio_util::sync::CancellationToken::new();
         cancel.cancel();
         let (tx, _rx) = tokio::sync::watch::channel(carbon_net::Progress::new());
@@ -658,7 +658,7 @@ mod task18_r1_download_tests {
 }
 
 #[cfg(test)]
-mod task18_r2_phase_tests {
+mod phase_tests {
     use super::*;
     use std::io::Write;
     fn fixture(root: &Path) -> (PathBuf, InstancePath) {
@@ -678,7 +678,7 @@ mod task18_r2_phase_tests {
         (path, InstancePath::new(root.join("staging")))
     }
     #[tokio::test]
-    async fn task18_r2_cancel_before_mr_preparation_refuses_real_callee() {
+    async fn cancel_before_mr_preparation_refuses_real_callee() {
         let root = tempfile::tempdir().unwrap();
         let (path, target) = fixture(root.path());
         let cancel = tokio_util::sync::CancellationToken::new();
@@ -702,7 +702,7 @@ mod task18_r2_phase_tests {
         assert!(!target.get_data_path().exists());
     }
     #[tokio::test]
-    async fn task18_r2_entered_mr_extraction_settles_despite_cancellation() {
+    async fn entered_mr_extraction_settles_despite_cancellation() {
         let root = tempfile::tempdir().unwrap();
         let (path, target) = fixture(root.path());
         let output = target.get_data_path();

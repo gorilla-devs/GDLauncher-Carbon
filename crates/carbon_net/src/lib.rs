@@ -2818,10 +2818,10 @@ mod tests {
 }
 
 #[cfg(test)]
-mod task06_tests;
+mod transfer_tests;
 
 #[cfg(test)]
-mod task09_tests;
+mod mirror_tests;
 
 #[cfg(test)]
 mod leftover_tests;

@@ -5697,7 +5697,7 @@ mod test {
     /// Write a minimal, valid `instance.json` directly to `dir` — the same
     /// on-disk shape `scan_instances` reads, without going through
     /// `create_instance` (which needs a resolvable game version) or the DB.
-    /// R07-instance-manager.2#1: one entry with such a name used to panic
+    /// One entry with such a name used to panic
     /// the scan, so nothing after it loaded, on every start.
     #[cfg(unix)]
     #[tokio::test]
@@ -5975,10 +5975,10 @@ mod test {
 }
 
 #[cfg(test)]
-mod task18_icon_tests {
+mod icon_tests {
     use super::*;
     #[tokio::test]
-    async fn task18_icon_staging_control_names_are_owned_paths() {
+    async fn icon_staging_control_names_are_owned_paths() {
         for basename in [
             ".setup",
             "instance.json",
@@ -6037,7 +6037,7 @@ mod task18_icon_tests {
         }
     }
     #[tokio::test]
-    async fn task18_icon_missing_and_supported_svg_keep_usable_storage() {
+    async fn icon_missing_and_supported_svg_keep_usable_storage() {
         let root = tempfile::tempdir().unwrap();
         assert!(matches!(
             stage_instance_icon(root.path(), None).await.unwrap(),
@@ -6056,7 +6056,7 @@ mod task18_icon_tests {
 }
 
 #[cfg(test)]
-mod task22_tests {
+mod tests {
     use super::*;
     fn record() -> orphan_pid::ProcessRecord {
         orphan_pid::ProcessRecord {
@@ -6069,7 +6069,7 @@ mod task22_tests {
         }
     }
     #[tokio::test]
-    async fn task22_actual_adoption_roundtrip_survives_clock_step() {
+    async fn actual_adoption_roundtrip_survives_clock_step() {
         let root = tempfile::tempdir().unwrap();
         let instance = root.path().join("owned");
         tokio::fs::create_dir(&instance).await.unwrap();
@@ -6097,7 +6097,7 @@ mod task22_tests {
         }
     }
     #[tokio::test]
-    async fn task22_actual_adoption_unknown_and_legacy_mismatch_retains_markers() {
+    async fn actual_adoption_unknown_and_legacy_mismatch_retains_markers() {
         let root = tempfile::tempdir().unwrap();
         let instance = root.path().join("owned");
         tokio::fs::create_dir(&instance).await.unwrap();
@@ -6160,7 +6160,7 @@ mod task22_tests {
         assert!(instance.join(PID_FILE_NAME).exists());
     }
     #[tokio::test]
-    async fn task22_actual_legacy_upgrade_requires_java_epoch_proof_and_reuse_cleanup() {
+    async fn actual_legacy_upgrade_requires_java_epoch_proof_and_reuse_cleanup() {
         let root = tempfile::tempdir().unwrap();
         let instance = root.path().join("owned");
         tokio::fs::create_dir(&instance).await.unwrap();

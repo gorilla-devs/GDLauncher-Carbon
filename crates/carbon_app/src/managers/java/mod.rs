@@ -709,7 +709,7 @@ async fn create_custom_profile(
     }
 
     #[cfg(test)]
-    TASK15_PROFILE_LOOKUPS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    PROFILE_LOOKUPS.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
     // The unique name boundary and its valid Java assignment commit together.
     // The pre-read is only a friendly error; it cannot authorize an upsert.
@@ -729,8 +729,7 @@ async fn create_custom_profile(
 }
 
 #[cfg(test)]
-static TASK15_PROFILE_LOOKUPS: std::sync::atomic::AtomicUsize =
-    std::sync::atomic::AtomicUsize::new(0);
+static PROFILE_LOOKUPS: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 #[cfg(test)]
 mod test {
@@ -854,10 +853,10 @@ mod test {
 }
 
 #[cfg(test)]
-mod task15_profile_tests {
+mod profile_tests {
     use super::*;
     #[tokio::test]
-    async fn task15_concurrent_profile_creation_keeps_winners_assignment() {
+    async fn concurrent_profile_creation_keeps_winners_assignment() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("profile.db");
         {
@@ -878,7 +877,7 @@ mod task15_profile_tests {
             let a = create_custom_profile(&db, "new".into(), Some("jdk8".into()));
             let b = create_custom_profile(&db, "new".into(), Some("jdk21".into()));
             let release = async {
-                while TASK15_PROFILE_LOOKUPS.load(std::sync::atomic::Ordering::SeqCst) < 2 {
+                while PROFILE_LOOKUPS.load(std::sync::atomic::Ordering::SeqCst) < 2 {
                     tokio::task::yield_now().await;
                 }
                 release_tx.send(()).unwrap();

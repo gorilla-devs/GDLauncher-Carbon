@@ -691,10 +691,10 @@ mod test {
 }
 
 #[cfg(test)]
-mod task13_tests {
+mod tests {
     use super::*;
     #[test]
-    fn task13_java_home_maps_to_binary() {
+    fn java_home_maps_to_binary() {
         let t = tempfile::tempdir().unwrap();
         let binary = t
             .path()
@@ -708,10 +708,10 @@ mod task13_tests {
 }
 
 #[cfg(test)]
-mod task13_java_controls {
+mod java_controls {
     use super::*;
     #[tokio::test]
-    async fn task13_java_binary_and_unavailable_home_scan() {
+    async fn java_binary_and_unavailable_home_scan() {
         let t = tempfile::tempdir().unwrap();
         let root = t.path().join("Synthetic");
         let home = t.path().join("java-home");

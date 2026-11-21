@@ -920,22 +920,22 @@ mod test {
 }
 
 #[cfg(test)]
-mod task14_tests {
+mod tests {
     use super::*;
     #[test]
-    fn task14_r2_xmcl_minimum_without_managed_maximum_survives() {
+    fn xmcl_minimum_without_managed_maximum_survives() {
         for args in [["-Xmx65536M", "-Xms512M"], ["-Xms512M", "-Xmx65536M"]] {
             let settings = instance_settings(&serde_json::json!({"vmOptions":args}));
             assert_eq!(
-                super::super::common::task14_persisted_config(&settings).memory,
+                super::super::common::persisted_config(&settings).memory,
                 None
             );
-            assert_eq!(super::super::common::task14_persisted_args(&settings), args);
+            assert_eq!(super::super::common::persisted_args(&settings), args);
         }
     }
 
     #[test]
-    fn task14_r1_xmcl_memory_tokens_survive_array_route() {
+    fn xmcl_memory_tokens_survive_array_route() {
         let args = [
             "-Xmx2GB",
             "-Xms512MB",
@@ -945,24 +945,24 @@ mod task14_tests {
             "-Xms512m",
         ];
         let settings = instance_settings(&serde_json::json!({"vmOptions":args}));
-        assert_eq!(super::super::common::task14_persisted_args(&settings), args);
+        assert_eq!(super::super::common::persisted_args(&settings), args);
         assert_eq!(
-            super::super::common::task14_persisted_config(&settings).memory,
+            super::super::common::persisted_config(&settings).memory,
             None
         );
     }
 
     #[test]
-    fn task14_argv_xmcl_array_persists_tokens() {
+    fn argv_xmcl_array_persists_tokens() {
         let args = [
             "-Dlabel=My Pack",
             r"-javaagent:C:\Program Files\Local Agent\agent.jar",
         ];
         let settings = instance_settings(&serde_json::json!({"vmOptions":args}));
-        assert_eq!(super::super::common::task14_persisted_args(&settings), args);
+        assert_eq!(super::super::common::persisted_args(&settings), args);
     }
     #[tokio::test]
-    async fn task14_default_relocation_keeps_external_and_groups() {
+    async fn default_relocation_keeps_external_and_groups() {
         let tmp = tempfile::tempdir().unwrap();
         let appdata = tmp.path().join("appdata");
         let game = tmp.path().join("gamedata");
@@ -1006,10 +1006,10 @@ mod task14_tests {
 }
 
 #[cfg(test)]
-mod task14_discovery_controls {
+mod discovery_controls {
     use super::*;
     #[tokio::test]
-    async fn task14_default_missing_invalid_and_legacy_layouts() {
+    async fn default_missing_invalid_and_legacy_layouts() {
         let tmp = tempfile::tempdir().unwrap();
         assert!(
             default_scan_path_from_candidates(vec![tmp.path().join("missing")])
@@ -1066,13 +1066,13 @@ mod task14_discovery_controls {
         assert_eq!(collect_instances(&appdata).await.unwrap(), (dirs, groups));
     }
     #[test]
-    fn task14_xmcl_legacy_command_string_keeps_grammar() {
+    fn xmcl_legacy_command_string_keeps_grammar() {
         let settings = instance_settings(
             &serde_json::json!({"vmOptions":r#"-Xmx2G -Dfoo=bar "-Dlabel=My Pack""#}),
         );
         assert_eq!(settings.memory_max_mb, Some(2048));
         assert_eq!(
-            super::super::common::task14_persisted_args(&settings),
+            super::super::common::persisted_args(&settings),
             ["-Dfoo=bar", "-Dlabel=My Pack"]
         );
     }

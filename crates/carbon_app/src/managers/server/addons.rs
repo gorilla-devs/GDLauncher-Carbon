@@ -43,7 +43,7 @@
 //! - a `mods/` folder linked to a folder shared between servers is read
 //!   through, as publication writes through it (see [`occupant_at`]).
 //!
-//! Only the selected addon replaces an installed version of itself (GPT-0024),
+//! Only the selected addon replaces an installed version of itself,
 //! whichever platform the installed copy came from; next to duplicates, the
 //! copy the server loads (see [`replaced_copy`]). Another file where the
 //! selected addon goes stops the installation before anything is published,
@@ -1264,7 +1264,7 @@ async fn plan(
 /// Those were already the user's to manage: 2.0.40 never added any on a
 /// version change, and the user may have removed one on purpose (a library
 /// that only runs on clients), so only the requirements the new version
-/// introduces are resolved, as on instances (GPT-0022). Looked up once, and
+/// introduces are resolved, as on instances. Looked up once, and
 /// only when one of the selected addon's requirements is missing.
 struct Previous<'a> {
     lookup: Option<
@@ -2902,7 +2902,7 @@ fn replacement_candidates<'a>(
         .collect()
 }
 /// Only the selected addon replaces an installed version of itself
-/// (GPT-0024). A required dependency is planned only when the server does not
+///. A required dependency is planned only when the server does not
 /// have its project, so it never takes over, replaces or deletes an installed
 /// copy; one the planner could not identify is settled at publication.
 async fn prepare_artifact(
@@ -2966,7 +2966,7 @@ fn addon_kind(filename: &str) -> &'static str {
 /// The installed copy the selected addon replaces, among the copies of its
 /// project in its folder (on either platform) whose file is still there. With
 /// several, as 2.0.40 left them when a version was picked next to another
-/// (GPT-0024), the copy the server loads is replaced and disabled copies are
+///, the copy the server loads is replaced and disabled copies are
 /// left as they are; when none is loaded, the one at the destination. Two
 /// loaded copies, or several disabled ones elsewhere, are the user's to sort
 /// out, and the refusal names them.
@@ -3429,7 +3429,7 @@ async fn publish_staged(
 }
 
 #[cfg(test)]
-mod task07_tests {
+mod tests {
     use super::*;
     fn artifact(key: &str, version: &str) -> Artifact {
         Artifact {
@@ -3500,7 +3500,7 @@ mod task07_tests {
     /// selected addon published with a warning that it is missing; other bytes
     /// are still an enabled copy, kept as they are.
     #[tokio::test]
-    async fn task07r1_r2_satisfied_dependency_revalidated_after_operator_mutation() {
+    async fn satisfied_dependency_revalidated_after_operator_mutation() {
         use carbon_repos::db_exec::test_support::wg;
         for action in ["unchanged", "disable", "delete", "change"] {
             let root = tempfile::tempdir().unwrap();
@@ -3591,7 +3591,7 @@ mod task07_tests {
         }
     }
     #[test]
-    fn task07r1_r3_inactive_world_is_not_replacement_candidate() {
+    fn inactive_world_is_not_replacement_candidate() {
         let root = tempfile::tempdir().unwrap();
         let (_conn, mut row) =
             review_fixture(root.path(), "A/datapacks/pack.zip", "pack.zip", "datapacks");
@@ -3612,7 +3612,7 @@ mod task07_tests {
         assert_eq!(found[0].id, "B-owner");
     }
     #[tokio::test]
-    async fn task07r1_r3_installs_and_replaces_b_while_a_owner_and_file_survive() {
+    async fn installs_and_replaces_b_while_a_owner_and_file_survive() {
         use carbon_repos::{db_exec::test_support::wg, repos::mod_metadata as metadata};
         let root = tempfile::tempdir().unwrap();
         for name in ["A", "B"] {
@@ -3715,7 +3715,7 @@ mod task07_tests {
     }
 
     #[test]
-    fn task07r1_r4_identical_bytes_accept_distinct_selected_versions() {
+    fn identical_bytes_accept_distinct_selected_versions() {
         use carbon_repos::db_exec::test_support::wg;
         for provider in ["cf", "mr"] {
             let root = tempfile::tempdir().unwrap();
@@ -3733,7 +3733,7 @@ mod task07_tests {
         }
     }
     #[test]
-    fn task07r1_r5_selected_jar_loader_is_independent_of_discovery_filter() {
+    fn selected_jar_loader_is_independent_of_discovery_filter() {
         let forge = vec!["forge".into()];
         // Both specific/latest resolution branches converge on this selected-file validator.
         assert!(
@@ -3746,7 +3746,7 @@ mod task07_tests {
     }
 
     #[tokio::test]
-    async fn task07r1_r4_shared_hash_selection_and_sql_failure_restore_current_owner() {
+    async fn shared_hash_selection_and_sql_failure_restore_current_owner() {
         use carbon_repos::{db_exec::test_support::wg, repos::mod_metadata as metadata};
         for provider in ["cf", "mr"] {
             for same_name in [false, true] {
@@ -3953,7 +3953,7 @@ mod task07_tests {
     }
 
     #[tokio::test]
-    async fn task07_immediate_versions_replace_without_background_enrichment() {
+    async fn immediate_versions_replace_without_background_enrichment() {
         use carbon_repos::{db_exec::test_support::wg, repos::mod_metadata as metadata};
         for provider in ["mr", "cf"] {
             for same_name in [false, true] {
@@ -4123,7 +4123,7 @@ mod task07_tests {
     }
 
     #[tokio::test]
-    async fn task07_required_graph_deduplicates_cycles_and_honors_setting() {
+    async fn required_graph_deduplicates_cycles_and_honors_setting() {
         let installed = InstalledAddons::default();
         let plan = plan_graph(
             Selection::Modrinth("a".into(), Some("v1".into())),
@@ -4176,7 +4176,7 @@ mod task07_tests {
     /// a server error) stays an error, so a transient problem never installs
     /// an addon without its dependency.
     #[tokio::test]
-    async fn task07_dependency_pin_conflict_warns_and_lookup_failure_is_an_error() {
+    async fn dependency_pin_conflict_warns_and_lookup_failure_is_an_error() {
         let installed = InstalledAddons::default();
         let plan = plan_graph(
             Selection::Modrinth("a".into(), Some("v1".into())),
@@ -4228,7 +4228,7 @@ mod task07_tests {
         );
     }
     #[tokio::test]
-    async fn task07_replacement_preserves_disabled_and_same_path_and_failure() {
+    async fn replacement_preserves_disabled_and_same_path_and_failure() {
         for same_path in [false, true] {
             let root = tempfile::tempdir().unwrap();
             let folder = root.path().join("mods");
@@ -4279,7 +4279,7 @@ mod task07_tests {
         }
     }
     #[tokio::test]
-    async fn task07_replacement_rejects_changed_old_and_unrelated_collision() {
+    async fn replacement_rejects_changed_old_and_unrelated_collision() {
         let root = tempfile::tempdir().unwrap();
         let staged = root.path().join("staged");
         std::fs::write(&staged, b"new").unwrap();
@@ -4324,7 +4324,7 @@ mod task07_tests {
         );
     }
     #[tokio::test]
-    async fn task07_artifact_failure_is_retained_in_actual_visual_task() {
+    async fn artifact_failure_is_retained_in_actual_visual_task() {
         let task = crate::managers::vtask::VisualTask::new(
             crate::api::translation::Translation::ServerTaskInstallMod {
                 mod_name: "fixture".into(),
@@ -7027,7 +7027,7 @@ mod dependency_tests {
         }
     }
 
-    // A server 2.0.40 left with two copies of Fabric API (GPT-0024): picking
+    // A server 2.0.40 left with two copies of Fabric API: picking
     // a version replaces the copy the server loads and leaves a disabled one
     // as it is. When both are loaded the message names them, and nothing is
     // downloaded or changed.

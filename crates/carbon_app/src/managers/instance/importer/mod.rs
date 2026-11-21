@@ -894,10 +894,10 @@ async fn wait_for_target_change(
     }
 }
 #[cfg(test)]
-mod task13_watch_tests {
+mod watch_tests {
     use super::*;
     #[tokio::test]
-    async fn task13_replacement_and_cancel_interrupt_active_scan() {
+    async fn replacement_and_cancel_interrupt_active_scan() {
         for target in [
             Some(("B".into(), Entity::CurseForge, PathBuf::from("synthetic-B"))),
             None,
@@ -963,11 +963,11 @@ fn test_import_activity() -> crate::managers::runtime_lifecycle::RuntimeActivity
 }
 
 #[cfg(test)]
-mod task13_temp_tests {
+mod temp_tests {
     use super::*;
     use tracing::Instrument;
     #[tokio::test]
-    async fn task13_info_logging_retains_temporary_owner() {
+    async fn info_logging_retains_temporary_owner() {
         let t = tempfile::tempdir().unwrap();
         let tmp = carbon_rt_path::TempPath::new(t.path().to_path_buf())
             .maketmpdir()
@@ -997,10 +997,10 @@ mod task13_temp_tests {
 }
 
 #[cfg(test)]
-mod task13_session_tests {
+mod session_tests {
     use super::*;
     #[tokio::test]
-    async fn task13_latest_target_runs_cancellation_revokes_and_errors_retry() {
+    async fn latest_target_runs_cancellation_revokes_and_errors_retry() {
         let manager = Arc::new(InstanceImportManager::new());
         let rx = manager.scan_path.subscribe();
         let (started, mut starts) = mpsc::unbounded_channel();
@@ -1078,7 +1078,7 @@ mod task13_session_tests {
         worker.abort();
     }
     #[tokio::test]
-    async fn task13_temp_survives_dropped_request_until_owned_io_settles() {
+    async fn temp_survives_dropped_request_until_owned_io_settles() {
         let t = tempfile::tempdir().unwrap();
         let tmp = carbon_rt_path::TempPath::new(t.path().to_path_buf())
             .maketmpdir()

@@ -103,7 +103,7 @@ where
 }
 
 #[cfg(test)]
-mod task19_tests {
+mod tests {
     use super::*;
     use chrono::Utc;
     use std::sync::{
@@ -280,7 +280,7 @@ mod task19_tests {
     }
     #[tokio::test]
     async fn retry_persists_full_authentication_and_selects_the_same_enrollment() {
-        use super::super::publication::{Publication, task19_publication_tests::database};
+        use super::super::publication::{Publication, publication_tests::database};
         let (_dir, db) = database().await;
         carbon_repos::repos::app_configuration::insert_app_configuration(
             &db,
@@ -367,9 +367,9 @@ mod task19_tests {
                 redirect_uri: "https://example.invalid/callback".into(),
                 expires_at: Utc::now(),
             },
-            EnrollmentStatus::Complete(
-                super::super::publication::task19_publication_tests::api_account("dummy"),
-            ),
+            EnrollmentStatus::Complete(super::super::publication::publication_tests::api_account(
+                "dummy",
+            )),
         ] {
             let before = std::mem::discriminant(&status);
             let active = RwLock::new(Some(EnrollmentTask::inert(status)));
@@ -460,7 +460,7 @@ mod task19_tests {
 
     #[tokio::test]
     async fn cancellation_during_verification_does_not_persist_or_select() {
-        use super::super::publication::{Publication, task19_publication_tests::database};
+        use super::super::publication::{Publication, publication_tests::database};
         for replacement in [false, true] {
             let (_dir, db) = database().await;
             let db = Arc::new(db);

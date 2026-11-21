@@ -2045,7 +2045,7 @@ async fn apply_started_marker_is_durably_creatable_and_discoverable() {
 }
 
 #[tokio::test]
-async fn task03_uppercase_save_is_preserved_by_real_execution() {
+async fn uppercase_save_is_preserved_by_real_execution() {
     let (_tmp, root, staging) = scaffold();
     let path = "/Saves/world/level.dat";
     write_live(&root, path, b"played world").await;
@@ -2075,7 +2075,7 @@ async fn task03_uppercase_save_is_preserved_by_real_execution() {
 }
 
 #[tokio::test]
-async fn task03_late_save_create_is_preserved() {
+async fn late_save_create_is_preserved() {
     let (_tmp, root, staging) = scaffold();
     let path = "/saves/world/level.dat";
     write_staged(&staging, path, b"bundled world").await;
@@ -2105,7 +2105,7 @@ async fn task03_late_save_create_is_preserved() {
 }
 
 #[tokio::test]
-async fn task03_disabled_replace_failure_retains_source_for_retry() {
+async fn disabled_replace_failure_retains_source_for_retry() {
     let (_tmp, root, staging) = scaffold();
     let path = "/mods/b.jar";
     write_staged(&staging, "/mods/b.jar.disabled", b"target disabled").await;
@@ -2155,7 +2155,7 @@ async fn a_repair_without_a_readable_record_skips_no_download() {
 }
 
 #[tokio::test]
-async fn task03_apply_refreshes_skip_oracle() {
+async fn apply_refreshes_skip_oracle() {
     let (_tmp, root, staging) = scaffold();
     let path = "/mods/foo.jar";
     write_disabled(&root, path, b"disabled mod").await;
@@ -2195,7 +2195,7 @@ async fn task03_apply_refreshes_skip_oracle() {
 }
 
 #[tokio::test]
-async fn task03_legacy_cleanup_has_no_retroactive_consent() {
+async fn legacy_cleanup_has_no_retroactive_consent() {
     let (_tmp, root, _staging) = scaffold();
     write_live(&root, "/config/retired.cfg", b"edited settings").await;
     let target = packinfo(&[("/config/current.cfg", 1)]);
@@ -2321,7 +2321,7 @@ async fn settled_recovery_copies_go_once_the_setup_is_done_with_them() {
 }
 
 #[tokio::test]
-async fn task03_selected_cleanup_preserves_later_edit() {
+async fn selected_cleanup_preserves_later_edit() {
     let (_tmp, root, _) = scaffold();
     let path = "/config/retired.cfg";
     write_live(&root, path, b"selected bytes").await;
@@ -2336,7 +2336,7 @@ async fn task03_selected_cleanup_preserves_later_edit() {
 }
 
 #[tokio::test]
-async fn task03_cleanup_retains_payload_after_finalization_and_retry() {
+async fn cleanup_retains_payload_after_finalization_and_retry() {
     let (_tmp, root, staging) = scaffold();
     let path = "/config/retired.cfg";
     write_live(&root, path, b"selected bytes").await;
@@ -2411,7 +2411,7 @@ pub(super) fn run_hook(event: &'static str, path: &std::path::Path) {
 /// A save written after the plan, just before the staged world is linked
 /// into place, is kept: the link never replaces what arrived first.
 #[tokio::test]
-async fn task03_no_clobber_at_actual_publication_boundary_and_audit() {
+async fn no_clobber_at_actual_publication_boundary_and_audit() {
     let (_tmp, root, staging) = scaffold();
     let path = "/saves/new/level.dat";
     write_staged(&staging, path, b"complete target").await;
@@ -2442,7 +2442,7 @@ async fn task03_no_clobber_at_actual_publication_boundary_and_audit() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_permission_failure_resumes_original_disabled_repair_options() {
+async fn permission_failure_resumes_original_disabled_repair_options() {
     use std::os::unix::fs::PermissionsExt;
     for flag in [false, true] {
         let (_tmp, root, staging) = scaffold();
@@ -2520,7 +2520,7 @@ async fn task03_permission_failure_resumes_original_disabled_repair_options() {
 }
 
 #[tokio::test]
-async fn task03_cleanup_move_race_retains_and_restores_without_clobber() {
+async fn cleanup_move_race_retains_and_restores_without_clobber() {
     for occupied in [false, true] {
         let (_tmp, root, _) = scaffold();
         let path = "/config/retired.cfg";
@@ -2577,7 +2577,7 @@ async fn task03_cleanup_move_race_retains_and_restores_without_clobber() {
 }
 
 #[tokio::test]
-async fn task03_interrupted_cleanup_finishes_same_payload_without_taking_new_file() {
+async fn interrupted_cleanup_finishes_same_payload_without_taking_new_file() {
     let (_tmp, root, _) = scaffold();
     let path = "/config/retired.cfg";
     write_live(&root, path, b"selected").await;
@@ -2617,7 +2617,7 @@ async fn task03_interrupted_cleanup_finishes_same_payload_without_taking_new_fil
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_physical_save_alias_and_sensitive_distinct_name() {
+async fn physical_save_alias_and_sensitive_distinct_name() {
     use std::os::unix::fs::symlink;
     let (_tmp, root, staging) = scaffold();
     // /Saves is a folder of its own on a case-sensitive volume, and the saves
@@ -2682,7 +2682,7 @@ async fn task03_physical_save_alias_and_sensitive_distinct_name() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_case_ownership_fresh_scan_actual_update_and_modified_control() {
+async fn case_ownership_fresh_scan_actual_update_and_modified_control() {
     use std::os::unix::fs::symlink;
     for modified in [false, true] {
         let (_tmp, root, staging) = scaffold();
@@ -2744,7 +2744,7 @@ async fn task03_case_ownership_fresh_scan_actual_update_and_modified_control() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_publication_io_error_and_hash_mismatch_retain_source() {
+async fn publication_io_error_and_hash_mismatch_retain_source() {
     use std::os::unix::fs::PermissionsExt;
     let (_tmp, root, staging) = scaffold();
     let path = "/mods/new.jar";
@@ -2779,7 +2779,7 @@ async fn task03_publication_io_error_and_hash_mismatch_retain_source() {
 }
 
 #[tokio::test]
-async fn task03_cleanup_context_change_preserves_selected_file() {
+async fn cleanup_context_change_preserves_selected_file() {
     let (_tmp, root, _) = scaffold();
     let path = "/config/retired.cfg";
     write_live(&root, path, b"selected").await;
@@ -2801,7 +2801,7 @@ async fn task03_cleanup_context_change_preserves_selected_file() {
 }
 
 #[test]
-fn task03_cleanup_audit_preserves_title_and_list_contract() {
+fn cleanup_audit_preserves_title_and_list_contract() {
     let entries = vec![PlanEntry {
         path: "/mods/new.jar".into(),
         action: PlanAction::Create,
@@ -2924,7 +2924,7 @@ pub(in crate::managers::instance) fn syncs_under(dir: &std::path::Path) -> HashM
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_r1_recovery_ancestor_barriers_precede_move() {
+async fn recovery_ancestor_barriers_precede_move() {
     let (_tmp, root, _) = scaffold();
     let path = "/config/retired.cfg";
     write_live(&root, path, b"selected").await;
@@ -2960,7 +2960,7 @@ async fn task03_r1_recovery_ancestor_barriers_precede_move() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_r1_recovery_ancestor_failure_preserves_live() {
+async fn recovery_ancestor_failure_preserves_live() {
     for ancestor in ["root", "recovery"] {
         let (_tmp, root, _) = scaffold();
         let path = "/config/retired.cfg";
@@ -2989,7 +2989,7 @@ async fn task03_r1_recovery_ancestor_failure_preserves_live() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_r1_payload_sync_failure_is_not_reported_as_retained_success() {
+async fn payload_sync_failure_is_not_reported_as_retained_success() {
     let (_tmp, root, _) = scaffold();
     let path = "/config/retired.cfg";
     write_live(&root, path, b"selected").await;
@@ -3018,7 +3018,7 @@ async fn task03_r1_payload_sync_failure_is_not_reported_as_retained_success() {
     );
 }
 
-async fn round1_apply(
+async fn apply_staged_pack(
     root: &std::path::Path,
     staging: &std::path::Path,
     target: &PackInfo,
@@ -3066,7 +3066,7 @@ async fn round1_apply(
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_r1_reenable_removal_interruption_resumes_same_files_and_audit() {
+async fn reenable_removal_interruption_resumes_same_files_and_audit() {
     use std::os::unix::fs::PermissionsExt;
     let mut audits = Vec::new();
     for interrupted in [false, true] {
@@ -3087,12 +3087,12 @@ async fn task03_r1_reenable_removal_interruption_resumes_same_files_and_audit() 
             hook("remove-twin", disabled_path(&root, path), move || {
                 std::fs::set_permissions(locked, std::fs::Permissions::from_mode(0o555)).unwrap()
             });
-            let first = round1_apply(&root, &staging, &target, &options).await;
+            let first = apply_staged_pack(&root, &staging, &target, &options).await;
             std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o755)).unwrap();
             assert!(first.is_err(), "real first-attempt IO error");
         }
         audits.push(
-            round1_apply(&root, &staging, &target, &options)
+            apply_staged_pack(&root, &staging, &target, &options)
                 .await
                 .unwrap(),
         );
@@ -3106,7 +3106,7 @@ async fn task03_r1_reenable_removal_interruption_resumes_same_files_and_audit() 
 }
 
 #[tokio::test]
-async fn task03_r1_completed_disabled_replace_retries_both_flags_same_audit() {
+async fn completed_disabled_replace_retries_both_flags_same_audit() {
     for flag in [false, true] {
         let (_tmp, root, staging) = scaffold();
         let path = "/mods/a.jar";
@@ -3119,10 +3119,10 @@ async fn task03_r1_completed_disabled_replace_retries_both_flags_same_audit() {
             re_enable_disabled: flag,
             ..Default::default()
         };
-        let uninterrupted = round1_apply(&root, &staging, &target, &options)
+        let uninterrupted = apply_staged_pack(&root, &staging, &target, &options)
             .await
             .unwrap();
-        let resumed = round1_apply(&root, &staging, &target, &options)
+        let resumed = apply_staged_pack(&root, &staging, &target, &options)
             .await
             .unwrap();
         assert!(
@@ -3141,7 +3141,7 @@ async fn task03_r1_completed_disabled_replace_retries_both_flags_same_audit() {
 }
 
 #[tokio::test]
-async fn task03_r1_opposite_edited_during_publication_is_preserved_with_audit() {
+async fn opposite_edited_during_publication_is_preserved_with_audit() {
     for disabled in [false, true] {
         let (_tmp, root, staging) = scaffold();
         let path = "/mods/a.jar";
@@ -3178,7 +3178,7 @@ async fn task03_r1_opposite_edited_during_publication_is_preserved_with_audit() 
             re_enable_disabled: true,
             ..Default::default()
         };
-        let audit = round1_apply(&root, &staging, &target, &options)
+        let audit = apply_staged_pack(&root, &staging, &target, &options)
             .await
             .unwrap();
         assert_eq!(std::fs::read(&opposite).unwrap(), b"external edit");
@@ -3187,7 +3187,7 @@ async fn task03_r1_opposite_edited_during_publication_is_preserved_with_audit() 
             "{audit}"
         );
         assert_eq!(
-            round1_apply(&root, &staging, &target, &options)
+            apply_staged_pack(&root, &staging, &target, &options)
                 .await
                 .unwrap(),
             audit
@@ -3196,7 +3196,7 @@ async fn task03_r1_opposite_edited_during_publication_is_preserved_with_audit() 
 }
 
 #[tokio::test]
-async fn task03_r1_transition_binding_rejects_changed_options_target_and_malformed_record() {
+async fn transition_binding_rejects_changed_options_target_and_malformed_record() {
     for changed in ["options", "target", "malformed", "foreign"] {
         let (_tmp, root, staging) = scaffold();
         let path = "/mods/a.jar";
@@ -3206,7 +3206,7 @@ async fn task03_r1_transition_binding_rejects_changed_options_target_and_malform
             .await
             .unwrap();
         let mut options = super::RepairMarkerFile::default();
-        round1_apply(&root, &staging, &target, &options)
+        apply_staged_pack(&root, &staging, &target, &options)
             .await
             .unwrap();
         let file = super::transition_path(&root, path);
@@ -3225,7 +3225,7 @@ async fn task03_r1_transition_binding_rejects_changed_options_target_and_malform
         }
         let diagnostic = std::fs::read(&file).unwrap();
         assert!(
-            round1_apply(&root, &staging, &target, &options)
+            apply_staged_pack(&root, &staging, &target, &options)
                 .await
                 .is_err(),
             "{changed}"
@@ -3240,7 +3240,7 @@ async fn task03_r1_transition_binding_rejects_changed_options_target_and_malform
 }
 
 #[tokio::test]
-async fn task03_r1_completion_record_failure_reuses_original_payload_and_audit() {
+async fn completion_record_failure_reuses_original_payload_and_audit() {
     for disabled in [false, true] {
         let mut audits = Vec::new();
         for interrupted in [false, true] {
@@ -3276,13 +3276,13 @@ async fn task03_r1_completion_record_failure_reuses_original_payload_and_audit()
             if interrupted {
                 fail_io("transition-complete", super::transition_path(&root, path));
                 assert!(
-                    round1_apply(&root, &staging, &target, &options)
+                    apply_staged_pack(&root, &staging, &target, &options)
                         .await
                         .is_err()
                 );
             }
             audits.push(
-                round1_apply(&root, &staging, &target, &options)
+                apply_staged_pack(&root, &staging, &target, &options)
                     .await
                     .unwrap(),
             );
@@ -3305,7 +3305,7 @@ async fn task03_r1_completion_record_failure_reuses_original_payload_and_audit()
                 disabled_path(&root, path)
             };
             std::fs::write(&opposite, b"new occupant after completion").unwrap();
-            let audit = round1_apply(&root, &staging, &target, &options)
+            let audit = apply_staged_pack(&root, &staging, &target, &options)
                 .await
                 .unwrap();
             assert!(audit.contains("Representation conflict preserved"));
@@ -3367,12 +3367,12 @@ async fn a_read_only_original_is_kept_aside_when_its_mod_switches_between_enable
                 // completed, so the next apply resumes at the flush.
                 fail_io("transition-complete", super::transition_path(&root, path));
                 assert!(
-                    round1_apply(&root, &staging, &target, &options)
+                    apply_staged_pack(&root, &staging, &target, &options)
                         .await
                         .is_err()
                 );
             }
-            round1_apply(&root, &staging, &target, &options)
+            apply_staged_pack(&root, &staging, &target, &options)
                 .await
                 .unwrap();
             let record = super::read_transition(&super::transition_path(&root, path))
@@ -3461,7 +3461,7 @@ async fn only_a_read_only_recovery_copy_skips_its_flush() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_r1_intent_and_manifest_write_failure_preserve_live_and_resume() {
+async fn intent_and_manifest_write_failure_preserve_live_and_resume() {
     for barrier in ["intent", "manifest"] {
         let (_tmp, root, staging) = scaffold();
         let path = "/mods/a.jar";
@@ -3479,7 +3479,7 @@ async fn task03_r1_intent_and_manifest_write_failure_preserve_live_and_resume() 
             // then fail its immutable recovery manifest on the next attempt.
             fail_io("sync-directory", root.clone());
             assert!(
-                round1_apply(&root, &staging, &target, &options)
+                apply_staged_pack(&root, &staging, &target, &options)
                     .await
                     .is_err()
             );
@@ -3490,13 +3490,13 @@ async fn task03_r1_intent_and_manifest_write_failure_preserve_live_and_resume() 
             fail_io("transition-record", manifest);
         }
         assert!(
-            round1_apply(&root, &staging, &target, &options)
+            apply_staged_pack(&root, &staging, &target, &options)
                 .await
                 .is_err()
         );
         assert_eq!(std::fs::read(live_path(&root, path)).unwrap(), b"original");
         assert!(!disabled_path(&root, path).exists());
-        round1_apply(&root, &staging, &target, &options)
+        apply_staged_pack(&root, &staging, &target, &options)
             .await
             .unwrap();
         let record = super::read_transition(&record_path).await.unwrap();
@@ -3510,7 +3510,7 @@ async fn task03_r1_intent_and_manifest_write_failure_preserve_live_and_resume() 
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_r1_conflict_restore_failure_resumes_retained_payload() {
+async fn conflict_restore_failure_resumes_retained_payload() {
     use std::os::unix::fs::PermissionsExt;
     let (_tmp, root, staging) = scaffold();
     let path = "/mods/a.jar";
@@ -3530,7 +3530,7 @@ async fn task03_r1_conflict_restore_failure_resumes_retained_payload() {
     hook("publish", opposite.clone(), move || {
         std::fs::set_permissions(locked, std::fs::Permissions::from_mode(0o555)).unwrap()
     });
-    let result = round1_apply(&root, &staging, &target, &options).await;
+    let result = apply_staged_pack(&root, &staging, &target, &options).await;
     std::fs::set_permissions(parent, std::fs::Permissions::from_mode(0o755)).unwrap();
     assert!(result.is_err(), "real denied no-clobber restore");
     let record_path = super::transition_path(&root, path);
@@ -3539,7 +3539,7 @@ async fn task03_r1_conflict_restore_failure_resumes_retained_payload() {
         .join(super::record_key(path))
         .join("payload");
     assert_eq!(std::fs::read(&payload).unwrap(), b"external edit");
-    let audit = round1_apply(&root, &staging, &target, &options)
+    let audit = apply_staged_pack(&root, &staging, &target, &options)
         .await
         .unwrap();
     assert!(audit.contains("Representation conflict preserved"));
@@ -3552,7 +3552,7 @@ async fn task03_r1_conflict_restore_failure_resumes_retained_payload() {
         1
     );
     assert_eq!(
-        round1_apply(&root, &staging, &target, &options)
+        apply_staged_pack(&root, &staging, &target, &options)
             .await
             .unwrap(),
         audit
@@ -3560,7 +3560,7 @@ async fn task03_r1_conflict_restore_failure_resumes_retained_payload() {
 }
 
 #[tokio::test]
-async fn task03_r1_fresh_setup_uses_new_recovery_storage() {
+async fn fresh_setup_uses_new_recovery_storage() {
     let (_tmp, root, staging) = scaffold();
     let path = "/mods/a.jar";
     let options = super::RepairMarkerFile::default();
@@ -3570,7 +3570,7 @@ async fn task03_r1_fresh_setup_uses_new_recovery_storage() {
         let target = super::packinfo::scan_dir(&staging.join("instance"), None)
             .await
             .unwrap();
-        round1_apply(&root, &staging, &target, &options)
+        apply_staged_pack(&root, &staging, &target, &options)
             .await
             .unwrap();
         let record = super::read_transition(&super::transition_path(&root, path))
@@ -3593,7 +3593,7 @@ async fn task03_r1_fresh_setup_uses_new_recovery_storage() {
 }
 
 #[tokio::test]
-async fn task03_r1_pristine_no_download_reenable_has_same_resume_audit() {
+async fn pristine_no_download_reenable_has_same_resume_audit() {
     let (_tmp, root, staging) = scaffold();
     let path = "/mods/a.jar";
     write_live(&root, "/mods/a.jar.disabled", b"verified installed bytes").await;
@@ -3604,11 +3604,11 @@ async fn task03_r1_pristine_no_download_reenable_has_same_resume_audit() {
         re_enable_disabled: true,
         ..Default::default()
     };
-    let first = round1_apply(&root, &staging, &target, &options)
+    let first = apply_staged_pack(&root, &staging, &target, &options)
         .await
         .unwrap();
     assert_eq!(
-        round1_apply(&root, &staging, &target, &options)
+        apply_staged_pack(&root, &staging, &target, &options)
             .await
             .unwrap(),
         first
@@ -3622,7 +3622,7 @@ async fn task03_r1_pristine_no_download_reenable_has_same_resume_audit() {
 
 #[cfg(unix)]
 #[tokio::test]
-async fn task03_r1_cleanup_payload_failure_resume_syncs_both_rename_directories() {
+async fn cleanup_payload_failure_resume_syncs_both_rename_directories() {
     let (_tmp, root, _staging) = scaffold();
     let path = "/config/retired.cfg";
     write_live(&root, path, b"selected bytes").await;
@@ -3670,7 +3670,7 @@ async fn task03_r1_cleanup_payload_failure_resume_syncs_both_rename_directories(
 }
 
 #[tokio::test]
-async fn task03_r1_resume_keeps_full_case_ownership_for_other_entries() {
+async fn resume_keeps_full_case_ownership_for_other_entries() {
     let (_tmp, root, staging) = scaffold();
     let path = "/mods/a.jar";
     let alias = "/mods/A.jar";
@@ -3682,7 +3682,7 @@ async fn task03_r1_resume_keeps_full_case_ownership_for_other_entries() {
         re_enable_disabled: true,
         ..Default::default()
     };
-    round1_apply(&root, &staging, &target, &options)
+    apply_staged_pack(&root, &staging, &target, &options)
         .await
         .unwrap();
     let old = PackInfo {
@@ -5185,7 +5185,7 @@ fn private_link_names_are_hidden_siblings_that_are_never_mods() {
     }
 }
 
-/// GPT-0215: a replacement the pack ships disabled, interrupted before the
+/// A replacement the pack ships disabled, interrupted before the
 /// old bare file moves out, resumes from its staged source, which is still
 /// there.
 #[tokio::test]
@@ -5836,7 +5836,7 @@ fn a_version_change_that_cannot_be_given_up_names_the_lost_file() {
     );
 }
 
-/// R05-run-modpack#5: a pack file the apply could not remove, replace or
+/// A pack file the apply could not remove, replace or
 /// install failed the update with the system's bare error, which names no
 /// file. The failure now says which file, and how to go on. The system's own
 /// error stays behind it for the log.

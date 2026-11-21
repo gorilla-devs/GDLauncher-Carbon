@@ -99,7 +99,7 @@ function evaluate(text: string, context: Record<string, unknown>) {
     context
   )
 }
-it("Task23 actual main output integration returns whole credentials and redacted IPC logs while forwarding current identity", () => {
+it("actual main output integration returns whole credentials and redacted IPC logs while forwarding current identity", () => {
   const text = source("apps/desktop/packages/main/index.ts"),
     logs: string[] = [],
     results: any[] = [],
@@ -136,7 +136,7 @@ it("Task23 actual main output integration returns whole credentials and redacted
   expect(JSON.stringify(logs)).not.toContain("café@example.invalid")
   expect(JSON.stringify(results[0].logs)).not.toContain("synthetic-token")
 })
-it("Task23 actual core-load guard refuses interrupted restore before any spawn or development connection", async () => {
+it("actual core-load guard refuses interrupted restore before any spawn or development connection", async () => {
   const load = evaluate(
     initializer(
       source("apps/desktop/packages/main/index.ts"),
@@ -182,7 +182,7 @@ it("a marker the guard cannot check is not offered as an interrupted restore", a
   expect(result.type).toBe("error")
   expect(result.dbRecovery).toBeUndefined()
 })
-it("Task23 actual main protocol IPC validates current sender frame before ready and ACK", () => {
+it("actual main protocol IPC validates current sender frame before ready and ACK", () => {
   const text = source("apps/desktop/packages/main/index.ts"),
     sender = { mainFrame: {} },
     otherFrame = {},
@@ -293,7 +293,7 @@ it("actual main start: a restart after the App acted on the link that started th
   start(["/opt/GDLauncher/gdlauncher", ...relaunch.mock.calls[1][0].args], next)
   expect(next.pending()).toEqual([])
 })
-it("Task23 actual main-window update consumer clears busy/manual state and Copy Link uses active artifact", async () => {
+it("actual main-window update consumer clears busy/manual state and Copy Link uses active artifact", async () => {
   let checking = true,
     manual = true,
     action: any,
@@ -378,7 +378,7 @@ it("Task23 actual main-window update consumer clears busy/manual state and Copy 
   await action.onClick()
   expect(clipboard).toBe("https://active.invalid/GDLauncher__2__linux__x64.zip")
 })
-it("Task23 actual recovery broadcast/hydration reducer resets unsupported button and manual clipboard action", async () => {
+it("actual recovery broadcast/hydration reducer resets unsupported button and manual clipboard action", async () => {
   let copied = ""
   vi.stubGlobal("navigator", {
     clipboard: {
@@ -418,7 +418,7 @@ it("Task23 actual recovery broadcast/hydration reducer resets unsupported button
     vi.unstubAllGlobals()
   }
 })
-it("Task23 actual updater wrapper null branch hydrates a packaged-provider manual artifact without ambient feed env", async () => {
+it("actual updater wrapper null branch hydrates a packaged-provider manual artifact without ambient feed env", async () => {
   const handlers: Record<string, (...args: any[]) => any> = {},
     events: Record<string, (...args: any[]) => any> = {},
     broadcast: any[] = []
@@ -517,7 +517,7 @@ it("Task23 actual updater wrapper null branch hydrates a packaged-provider manua
   )
   expect(broadcast.at(-1)).toBe(result.currentState)
 })
-it("Task36 actual fatal consumer keeps positive token beside an error and Retry invokes the displayed artifact", async () => {
+it("actual fatal consumer keeps positive token beside an error and Retry invokes the displayed artifact", async () => {
   const installs: number[] = []
   let checks = 0
   const screen = recoveryUpdateScreen(async (name, id) => {
@@ -539,7 +539,7 @@ it("Task36 actual fatal consumer keeps positive token beside an error and Retry 
   expect(installs).toEqual([3])
   expect(checks).toBe(0)
 })
-it("Task36 actual main wrapper owns a queued install callback through error before a successor completion", async () => {
+it("actual main wrapper owns a queued install callback through error before a successor completion", async () => {
   const handlers: Record<string, (...args: any[]) => any> = {},
     events: Record<string, (...args: any[]) => any> = {},
     broadcast: any[] = []

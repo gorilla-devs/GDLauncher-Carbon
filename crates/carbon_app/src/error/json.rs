@@ -204,14 +204,14 @@ fn json_matching_brace(c: char) -> char {
 }
 
 #[cfg(test)]
-mod task22_tests {
+mod tests {
     use super::*;
     #[derive(Debug, serde::Deserialize)]
     struct Payload {
         bad: bool,
     }
     #[test]
-    fn task22_multiline_unicode_marks_failing_value() {
+    fn multiline_unicode_marks_failing_value() {
         let body = "{\n  \"bad\": \"é\",\n  \"next\": \"innocent\"\n}";
         let err = serde_json::from_str::<Payload>(body).unwrap_err();
         assert_eq!((err.line(), err.column()), (2, 13));
@@ -219,7 +219,7 @@ mod task22_tests {
         assert!(context.contains("\"é\"<~~ "), "{context}");
     }
     #[test]
-    fn task22_ascii_first_middle_last_crlf_and_blank_line_controls() {
+    fn ascii_first_middle_last_crlf_and_blank_line_controls() {
         for body in [
             "{\"bad\":\"x\"}   ",
             "{\n\"bad\":\"x\",\n\"next\":1}",
@@ -235,7 +235,7 @@ mod task22_tests {
         assert!(parsed.bad);
     }
     #[test]
-    fn task22_eof_and_syntax_remain_at_consumed_byte_boundary() {
+    fn eof_and_syntax_remain_at_consumed_byte_boundary() {
         for body in [
             "{\"bad\":",
             "{\"bad\":\"unfinished",
@@ -257,7 +257,7 @@ mod task22_tests {
         assert_eq!(get_json_context(&err, "", 400), "");
     }
     #[test]
-    fn task22_unicode_bounds_and_unlimited_zero_contract() {
+    fn unicode_bounds_and_unlimited_zero_contract() {
         let body = format!(
             "{{\"bad\":\"{}\",\"next\":\"{}\"}}",
             "é".repeat(1200),

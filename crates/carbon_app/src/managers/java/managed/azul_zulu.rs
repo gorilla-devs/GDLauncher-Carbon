@@ -24,7 +24,7 @@ use tokio::{
 use tracing::{instrument, trace};
 
 #[cfg(test)]
-mod task18_r1_tests {
+mod tests {
     use super::*;
     use crate::managers::runtime_lifecycle::{RuntimeLifecycle, ShutdownPurpose};
     struct Checker(&'static str, Arc<RuntimeLifecycle>);
@@ -106,15 +106,15 @@ mod task18_r1_tests {
         }
     }
     #[tokio::test]
-    async fn task18_r1_managed_frozen_probe_preserves_existing_install() {
+    async fn managed_frozen_probe_preserves_existing_install() {
         cleanup_case("freeze").await;
     }
     #[tokio::test]
-    async fn task18_r1_managed_cancelled_probe_preserves_existing_install() {
+    async fn managed_cancelled_probe_preserves_existing_install() {
         cleanup_case("cancel").await;
     }
     #[tokio::test]
-    async fn task18_r1_managed_unknown_and_invalid_cleanup_controls() {
+    async fn managed_unknown_and_invalid_cleanup_controls() {
         cleanup_case("unknown").await;
         cleanup_case("invalid").await;
     }

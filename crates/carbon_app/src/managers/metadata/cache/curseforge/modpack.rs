@@ -160,9 +160,9 @@ fn cached_version_name(file: &carbon_platforms::curseforge::File) -> &str {
 }
 
 #[cfg(test)]
-mod task11_tests {
+mod tests {
     #[tokio::test]
-    async fn task11_cache_label_matches_upstream_display_name() {
+    async fn cache_label_matches_upstream_display_name() {
         let file = serde_json::from_value(serde_json::json!({
             "id": 2, "gameId": 432, "modId": 10, "isAvailable": true,
             "displayName": "Pack Release 2", "fileName": "pack-release-2-client.zip", "releaseType": 1,

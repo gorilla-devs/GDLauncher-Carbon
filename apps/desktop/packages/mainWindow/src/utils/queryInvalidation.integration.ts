@@ -7,7 +7,7 @@ import { parseInvalidateFrame, invalidationKey } from "./queryInvalidation"
 // and run by `pnpm test:account-contract`, which produces the fixture first.
 // Absence, invalid JSON, wrong frames or a wrong count must fail, never skip.
 it("captured production account events invalidate the installed no-input query", async () => {
-  const path = process.env.TASK19_ACCOUNT_EVENTS
+  const path = process.env.ACCOUNT_EVENTS_FIXTURE
   if (!path)
     throw new Error(
       "required captured backend event fixture is absent: run `pnpm test:account-contract` from the repository root"

@@ -78,7 +78,7 @@ pub(super) fn stdout(event: Event) {
     ));
 }
 #[cfg(test)]
-mod task19_identity_tests {
+mod identity_tests {
     use super::*;
     #[tokio::test]
     async fn stale_startup_and_save_lookup_cannot_restore_logged_out_identity() {

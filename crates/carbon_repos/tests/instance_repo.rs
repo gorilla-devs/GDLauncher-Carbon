@@ -308,7 +308,7 @@ async fn register_instance_tx_preserves_an_existing_shortpath_owner() {
 }
 
 #[tokio::test]
-async fn task15_unlink_allocates_separate_sparse_root_coordinates() {
+async fn unlink_allocates_separate_sparse_root_coordinates() {
     let (_d, db) = migrated_db().await;
     let root = seed_group(&db, "root", 0).await;
     let folder = seed_group(&db, "folder", 1).await;
@@ -332,7 +332,7 @@ async fn task15_unlink_allocates_separate_sparse_root_coordinates() {
 }
 
 #[tokio::test]
-async fn task15_unlink_overflow_and_late_failure_roll_back() {
+async fn unlink_overflow_and_late_failure_roll_back() {
     for failure in ["overflow", "trigger", "self"] {
         let (_d, db) = migrated_db().await;
         let root = seed_group(&db, "root", 0).await;
@@ -366,7 +366,7 @@ async fn task15_unlink_overflow_and_late_failure_roll_back() {
 }
 
 #[tokio::test]
-async fn task15_concurrent_and_empty_unlinks_preserve_root_order_after_reopen() {
+async fn concurrent_and_empty_unlinks_preserve_root_order_after_reopen() {
     let (dir, db) = migrated_db().await;
     db.write(|c| {
         c.raw().execute_batch("PRAGMA foreign_keys=ON")?;

@@ -1711,7 +1711,7 @@ mod tests {
         );
     }
     #[test]
-    fn task03_failed_installed_check_cannot_prove_staleness() {
+    fn failed_installed_check_cannot_prove_staleness() {
         let mut verdicts = HashMap::new();
         let mut remaining = HashMap::from([("/config/retired.cfg".to_string(), sha(1))]);
         let older = test_version("older", "2023-01-01T00:00:00Z", vec![]);
@@ -1731,11 +1731,11 @@ mod tests {
 }
 
 #[cfg(test)]
-mod task09_tests {
+mod effective_origin_tests {
     use super::*;
     use std::io::Write;
     #[tokio::test]
-    async fn task09_effective_origin_ignores_archive_order_and_invalidates_shadowed_hash() {
+    async fn effective_origin_ignores_archive_order_and_invalidates_shadowed_hash() {
         for reverse in [false, true] {
             for (entry_budget, total_budget) in [(100, 100), (4, 100), (100, 3)] {
                 let dir = tempfile::tempdir().unwrap();
@@ -1796,11 +1796,11 @@ mod task09_tests {
 }
 
 #[cfg(test)]
-mod task09_read_failure {
+mod read_failure {
     use super::*;
     use std::io::{Seek, SeekFrom, Write};
     #[tokio::test]
-    async fn task09_client_crc_failure_removes_shadowed_origin_evidence() {
+    async fn client_crc_failure_removes_shadowed_origin_evidence() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("pack.mrpack");
         let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
@@ -1841,10 +1841,10 @@ mod task09_read_failure {
 }
 
 #[cfg(test)]
-mod task13_round01_budget_controls {
+mod budget_controls {
     use super::*;
     #[test]
-    fn task13_round01_required_reader_never_overshoots_or_resets_shared_work() {
+    fn required_reader_never_overshoots_or_resets_shared_work() {
         let mut remaining = 10;
         let mut first = std::io::Cursor::new(b"123456".to_vec());
         read_inventory_bytes(&mut first, &mut remaining, |_| {}).unwrap();

@@ -380,10 +380,10 @@ fn forward_java_download(task: &Subtask, step: &Step) {
     }
 }
 #[cfg(test)]
-mod task21_java_progress_tests {
+mod java_progress_tests {
     use super::*;
     #[tokio::test]
-    async fn task21_java_progress_retains_u64_step_bytes() {
+    async fn java_progress_retains_u64_step_bytes() {
         let task = VisualTask::new(Translation::Test);
         let subtask = task.subtask(Translation::Test);
         forward_java_download(&subtask, &Step::Downloading(4_294_967_296, 5_368_709_120));

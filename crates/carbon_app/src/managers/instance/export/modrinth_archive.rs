@@ -232,7 +232,7 @@ pub async fn export_modrinth(
             }
 
             #[cfg(test)]
-            app.instance_manager().test_hooks.pause("task11_export_before_publish", instance_id).await;
+            app.instance_manager().test_hooks.pause("export_before_publish", instance_id).await;
             super::verify_linked_export_files(&app, instance_id, &linked_files).await?;
             tmpfile.try_rename_or_move(save_path).await?;
 
@@ -635,7 +635,7 @@ async fn select_linked_mod(
 }
 
 #[cfg(test)]
-mod task15_export_tests {
+mod export_tests {
     use super::*;
     use sha1::Sha1;
     use sha2::{Digest, Sha512};
@@ -656,7 +656,7 @@ mod task15_export_tests {
         }
     }
     #[tokio::test]
-    async fn task15_linked_selection_bundles_untrusted_bytes_and_accepts_renamed_artifact() {
+    async fn linked_selection_bundles_untrusted_bytes_and_accepts_renamed_artifact() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(dir.path().join("mods")).unwrap();
         let mut selected = HashMap::new();
@@ -714,7 +714,7 @@ mod task15_export_tests {
         );
     }
     #[tokio::test]
-    async fn task15_empty_remote_url_remains_local() {
+    async fn empty_remote_url_remains_local() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(dir.path().join("mods")).unwrap();
         std::fs::write(dir.path().join("mods/a.jar"), b"bytes").unwrap();
@@ -730,7 +730,7 @@ mod task15_export_tests {
         assert!(filter.contains_key("a.jar"));
     }
     #[tokio::test]
-    async fn task15_linked_selection_rechecks_changed_content_before_omitting_override() {
+    async fn linked_selection_rechecks_changed_content_before_omitting_override() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(dir.path().join("mods")).unwrap();
         std::fs::write(dir.path().join("mods/a.jar"), b"changed").unwrap();
@@ -743,7 +743,7 @@ mod task15_export_tests {
         assert!(filter.contains_key("a.jar"));
     }
     #[tokio::test]
-    async fn task15_round01_remote_urls_preserve_local_bytes_or_original_download() {
+    async fn remote_urls_preserve_local_bytes_or_original_download() {
         let cases = [
             ("malformed.jar", Some("not-a-url"), false),
             ("hostless.jar", Some("https:///"), false),

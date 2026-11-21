@@ -92,7 +92,7 @@ impl AdmittedArchive {
 }
 
 #[cfg(test)]
-mod task40_tests {
+mod tests {
     use super::*;
     use std::io::Write;
     fn pack(path: &Path, optional: bool, version: u32, content: &[u8]) {
@@ -129,7 +129,7 @@ mod task40_tests {
         );
     }
     #[test]
-    fn task40_preview_refuses_optional_shader_before_admission() {
+    fn preview_refuses_optional_shader_before_admission() {
         let t = tempfile::tempdir().unwrap();
         let p = t.path().join("pack.gdlpack");
         pack(&p, true, 1, b"{}");
@@ -139,7 +139,7 @@ mod task40_tests {
         }
     }
     #[tokio::test]
-    async fn task40_changed_preview_refuses_before_initializer() {
+    async fn changed_preview_refuses_before_initializer() {
         let t = tempfile::tempdir().unwrap();
         let p = t.path().join("pack.gdlpack");
         pack(&p, false, 1, b"original");
@@ -153,7 +153,7 @@ mod task40_tests {
         assert!(!t.path().join(".setup").exists());
     }
     #[tokio::test]
-    async fn task40_admitted_bytes_survive_external_replacement() {
+    async fn admitted_bytes_survive_external_replacement() {
         let t = tempfile::tempdir().unwrap();
         let p = t.path().join("pack.gdlpack");
         pack(&p, false, 1, b"original");
@@ -176,7 +176,7 @@ mod task40_tests {
         );
     }
     #[test]
-    fn task40_unknown_format_and_required_controls() {
+    fn unknown_format_and_required_controls() {
         let t = tempfile::tempdir().unwrap();
         let p = t.path().join("pack.gdlpack");
         pack(&p, false, 2, b"{}");

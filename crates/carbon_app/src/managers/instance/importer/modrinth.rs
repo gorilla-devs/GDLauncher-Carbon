@@ -1048,7 +1048,7 @@ mod test {
     }
 
     #[test]
-    fn task14_checkpoint_before_snapshot_preserves_committed_runtime() {
+    fn checkpoint_before_snapshot_preserves_committed_runtime() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("app.db");
         old_schema_db(&db);
@@ -1088,7 +1088,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn task14_foreign_database_cannot_override_portable_manifest() {
+    async fn foreign_database_cannot_override_portable_manifest() {
         let tmp = tempfile::tempdir().unwrap();
         let selected = tmp.path().join("portable/profiles/ATM9");
         let foreign = tmp.path().join("default");
@@ -1137,25 +1137,25 @@ mod test {
         assert_eq!(record.settings.group.as_deref(), Some("Kitchen sink"));
         assert_eq!(record.settings.memory(), Some((8192, 8192)));
         assert_eq!(
-            super::super::common::task14_persisted_args(&record.settings),
+            super::super::common::persisted_args(&record.settings),
             ["-XX:+UseZGC"]
         );
     }
     #[test]
-    fn task14_legacy_jsonb_groups() {
+    fn legacy_jsonb_groups() {
         jsonb_legacy(true, false);
     }
     #[test]
-    fn task14_legacy_jsonb_args() {
+    fn legacy_jsonb_args() {
         jsonb_legacy(false, true);
     }
     #[test]
-    fn task14_legacy_jsonb_both() {
+    fn legacy_jsonb_both() {
         jsonb_legacy(true, true);
     }
 
     #[test]
-    fn task14_r2_modrinth_minimum_without_managed_maximum_survives() {
+    fn modrinth_minimum_without_managed_maximum_survives() {
         for args in [["-Xmx65536M", "-Xms512M"], ["-Xms512M", "-Xmx65536M"]] {
             let overrides =
                 settings_from_overrides_json(&serde_json::json!({"extra_launch_args":args}));
@@ -1163,16 +1163,16 @@ mod test {
                 record_from_profile_json(&serde_json::json!({"java":{"extra_arguments":args}}));
             for settings in [&overrides, &profile.settings] {
                 assert_eq!(
-                    super::super::common::task14_persisted_config(settings).memory,
+                    super::super::common::persisted_config(settings).memory,
                     None
                 );
-                assert_eq!(super::super::common::task14_persisted_args(settings), args);
+                assert_eq!(super::super::common::persisted_args(settings), args);
             }
         }
     }
 
     #[test]
-    fn task14_r1_modrinth_memory_tokens_survive_all_array_routes() {
+    fn modrinth_memory_tokens_survive_all_array_routes() {
         let args = [
             "-Xmx2GB",
             "-Xms512MB",
@@ -1207,35 +1207,32 @@ mod test {
             (&records["ATM9"].settings, Some((8192, 8192))),
             (&records["Fabulously Optimized"].settings, None),
         ] {
-            assert_eq!(super::super::common::task14_persisted_args(settings), args);
+            assert_eq!(super::super::common::persisted_args(settings), args);
             assert_eq!(
-                super::super::common::task14_persisted_config(settings).memory,
+                super::super::common::persisted_config(settings).memory,
                 memory
             );
         }
     }
 
     #[test]
-    fn task14_argv_overrides_persists_tokens() {
+    fn argv_overrides_persists_tokens() {
         let args = [
             r"-javaagent:C:\Program Files\Local Agent\agent.jar",
             "-Dlabel=My  Pack",
         ];
         let settings = settings_from_overrides_json(&serde_json::json!({"extra_launch_args":args}));
-        assert_eq!(super::super::common::task14_persisted_args(&settings), args);
+        assert_eq!(super::super::common::persisted_args(&settings), args);
     }
     #[test]
-    fn task14_argv_profile_json_persists_tokens() {
+    fn argv_profile_json_persists_tokens() {
         let args = ["-Dlabel=My Pack"];
         let record =
             record_from_profile_json(&serde_json::json!({"java":{"extra_arguments":args}}));
-        assert_eq!(
-            super::super::common::task14_persisted_args(&record.settings),
-            args
-        );
+        assert_eq!(super::super::common::persisted_args(&record.settings), args);
     }
     #[test]
-    fn task14_argv_legacy_text_persists_tokens() {
+    fn argv_legacy_text_persists_tokens() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("app.db");
         old_schema_db(&db);
@@ -1247,13 +1244,13 @@ mod test {
         .unwrap();
         let records = read_database_records(&db).unwrap();
         assert_eq!(
-            super::super::common::task14_persisted_args(&records["ATM9"].settings),
+            super::super::common::persisted_args(&records["ATM9"].settings),
             ["-Dlabel=My Pack"]
         );
     }
 
     #[test]
-    fn task14_snapshot_wal_and_post_boundary_coherence() {
+    fn snapshot_wal_and_post_boundary_coherence() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("app.db");
         new_schema_db(&db);
@@ -1296,7 +1293,7 @@ mod test {
     }
 
     #[test]
-    fn task14_snapshot_readonly_and_error_disposal() {
+    fn snapshot_readonly_and_error_disposal() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("app.db");
         old_schema_db(&db); // ordinary rollback journal; no settings table
@@ -1326,7 +1323,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn task14_associated_database_precedence_and_relocation_controls() {
+    async fn associated_database_precedence_and_relocation_controls() {
         let tmp = tempfile::tempdir().unwrap();
         let local = tmp.path().join("local");
         let selected = local.join("profiles/ATM9");
@@ -1407,7 +1404,7 @@ mod test {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn task14_existing_root_alias_preserves_database_authority() {
+    async fn existing_root_alias_preserves_database_authority() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path().join("source");
         std::fs::create_dir_all(root.join("profiles/ATM9")).unwrap();
@@ -1423,7 +1420,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn task14_unknown_association_retains_manifest_with_error() {
+    async fn unknown_association_retains_manifest_with_error() {
         let tmp = tempfile::tempdir().unwrap();
         let root = tmp.path();
         let profile = root.join("profiles/ATM9");
@@ -1452,7 +1449,7 @@ mod test {
     }
 
     #[test]
-    fn task14_legacy_null_malformed_and_current_precedence() {
+    fn legacy_null_malformed_and_current_precedence() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("app.db");
         old_schema_db(&db);
@@ -1483,7 +1480,7 @@ mod test {
     }
 
     #[test]
-    fn task14_argv_jsonb_and_current_database_round_trip() {
+    fn argv_jsonb_and_current_database_round_trip() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("app.db");
         old_schema_db(&db);
@@ -1497,7 +1494,7 @@ mod test {
         let records = read_database_records(&db).unwrap();
         // Blank elements are dropped, as the Modrinth App does when it launches.
         assert_eq!(
-            super::super::common::task14_persisted_args(&records["ATM9"].settings),
+            super::super::common::persisted_args(&records["ATM9"].settings),
             args[2..4]
         );
         assert_eq!(records["ATM9"].settings.memory_max_mb, Some(2048));
@@ -1509,14 +1506,14 @@ mod test {
         .unwrap();
         let records = read_database_records(&db).unwrap();
         assert_eq!(
-            super::super::common::task14_persisted_args(&records["Fabulously Optimized"].settings),
+            super::super::common::persisted_args(&records["Fabulously Optimized"].settings),
             args[2..4]
         );
     }
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn task14_unreadable_candidate_reports_unknown_association() {
+    async fn unreadable_candidate_reports_unknown_association() {
         use std::os::unix::fs::PermissionsExt;
         let tmp = tempfile::tempdir().unwrap();
         let selected = tmp.path().join("profiles");
@@ -1544,7 +1541,7 @@ mod test {
     }
 
     #[test]
-    fn task14_checkpoint_rendezvous_with_retained_writer() {
+    fn checkpoint_rendezvous_with_retained_writer() {
         let tmp = tempfile::tempdir().unwrap();
         let db = tmp.path().join("app.db");
         old_schema_db(&db);

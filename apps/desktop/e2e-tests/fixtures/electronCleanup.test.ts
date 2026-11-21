@@ -8,7 +8,7 @@ import { closeAppAndCore, electronProcess } from "./electronApp"
 const cleanExit = { exitCode: 0, signalCode: null }
 
 it("strict app/core shutdown awaits synthetic owned resource release and propagates unknown exit", async () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "task43-app-close-"))
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-app-close-"))
   const main = path.join(root, "main")
   const core = path.join(root, "core")
   fs.writeFileSync(main, "main")

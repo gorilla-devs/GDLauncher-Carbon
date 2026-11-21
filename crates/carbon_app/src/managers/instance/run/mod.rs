@@ -2072,10 +2072,10 @@ impl ManagerRef<'_, InstanceManager> {
 }
 
 #[cfg(test)]
-mod task18_r1_adopted_tests {
+mod adopted_tests {
     use super::*;
     #[tokio::test]
-    async fn task18_r1_adopted_detach_banks_observed_time_before_owner_ack() {
+    async fn adopted_detach_banks_observed_time_before_owner_ack() {
         use crate::managers::runtime_lifecycle::{
             ActivityPolicy, RuntimeLifecycle, ShutdownPurpose, spawn_retained,
         };
@@ -2161,7 +2161,7 @@ mod task18_r1_adopted_tests {
         );
     }
     #[tokio::test]
-    async fn task18_r1_adopted_normal_exit_zero_and_replaced_session_controls() {
+    async fn adopted_normal_exit_zero_and_replaced_session_controls() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("banked");
         std::fs::write(&path, b"0").unwrap();
@@ -2710,7 +2710,7 @@ mod tests {
     }
 
     #[test]
-    fn task23_running_publication_follows_real_mutation_and_suppresses_preparation_exit() {
+    fn running_publication_follows_real_mutation_and_suppresses_preparation_exit() {
         let publication = super::super::running_publication::RunningPublication::default();
         let mut instances = std::collections::HashMap::new();
         for id in [1, 2] {
@@ -2779,7 +2779,7 @@ mod tests {
     }
 
     #[test]
-    fn task23_adopted_snapshot_rescan_release_preserves_keyed_running_sessions() {
+    fn adopted_snapshot_rescan_release_preserves_keyed_running_sessions() {
         let publication = super::super::running_publication::RunningPublication::default();
         let mut instances = std::collections::HashMap::new();
         let mut records = Vec::new();
@@ -2817,7 +2817,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task08_stale_task_cannot_clear_replacement_owner() -> anyhow::Result<()> {
+    async fn stale_task_cannot_clear_replacement_owner() -> anyhow::Result<()> {
         let app = crate::setup_managers_for_test().await;
         let id = InstanceId(222);
         app.instance_manager.instances.write().await.insert(
@@ -2855,7 +2855,7 @@ mod tests {
         Ok(())
     }
 
-    async fn task17_owned_manager() -> (InstanceManager, mpsc::Receiver<()>) {
+    async fn owned_manager() -> (InstanceManager, mpsc::Receiver<()>) {
         let manager = InstanceManager::new();
         let (tx, rx) = mpsc::channel(1);
         manager.instances.write().await.insert(
@@ -2880,8 +2880,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task17_stop_duplicate_hook_window_releases_map() {
-        let (manager, mut rx) = task17_owned_manager().await;
+    async fn stop_duplicate_hook_window_releases_map() {
+        let (manager, mut rx) = owned_manager().await;
         manager.request_instance_stop(InstanceId(17)).await.unwrap();
         // Receiver is held but unpolled, representing the post-exit hook window.
         let duplicate = manager.request_instance_stop(InstanceId(17));
@@ -2904,8 +2904,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task17_stop_cancel_and_closed_controls() {
-        let (manager, rx) = task17_owned_manager().await;
+    async fn stop_cancel_and_closed_controls() {
+        let (manager, rx) = owned_manager().await;
         manager.request_instance_stop(InstanceId(17)).await.unwrap();
         let pending = manager.request_instance_stop(InstanceId(17));
         let _ = tokio::time::timeout(Duration::from_millis(10), pending).await;
@@ -2925,7 +2925,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task17_drain_ready_exit_retains_both_streams() {
+    async fn drain_ready_exit_retains_both_streams() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("session.log");
         let mut file = File::create(&path).await.unwrap();
@@ -2951,7 +2951,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task17_drain_alone_control() {
+    async fn drain_alone_control() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("session.log");
         let mut file = File::create(&path).await.unwrap();
@@ -2973,8 +2973,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task17_stop_waiting_for_map_can_cancel_and_adopted_stays_separate() {
-        let (manager, mut rx) = task17_owned_manager().await;
+    async fn stop_waiting_for_map_can_cancel_and_adopted_stays_separate() {
+        let (manager, mut rx) = owned_manager().await;
         let mut map = manager.instances.write().await;
         assert!(
             tokio::time::timeout(
@@ -3014,7 +3014,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task17_drain_inherited_pipe_deadline_preserves_delivered_bytes() {
+    async fn drain_inherited_pipe_deadline_preserves_delivered_bytes() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("session.log");
         let mut file = File::create(&path).await.unwrap();
@@ -3057,7 +3057,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task17_drain_eof_keeps_stop_supervision_alive() {
+    async fn drain_eof_keeps_stop_supervision_alive() {
         let (stop, stop_rx) = watch::channel(false);
         let (tx, _rx) = watch::channel(GameLog::new());
         let (finish_tx, finish_rx) = tokio::sync::oneshot::channel();
@@ -3081,7 +3081,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task17_drain_deadline_finishes_a_chunk_waiting_to_enqueue() {
+    async fn drain_deadline_finishes_a_chunk_waiting_to_enqueue() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("queued.log");
         let mut file = File::create(&path).await.unwrap();
@@ -3111,8 +3111,8 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task17_drain_stop_and_split_xml_keep_sources() {
-        let (manager, mut stop_rx) = task17_owned_manager().await;
+    async fn drain_stop_and_split_xml_keep_sources() {
+        let (manager, mut stop_rx) = owned_manager().await;
         manager.request_instance_stop(InstanceId(17)).await.unwrap();
         let (tx, rx) = watch::channel(GameLog::new());
         let (mut writer, reader) = tokio::io::duplex(16);
@@ -3320,7 +3320,7 @@ mod tests {
         );
     }
 
-    /// R06-launch#6: a game followed from an earlier session of the launcher
+    /// A game followed from an earlier session of the launcher
     /// ended without its post-exit hook ever running. It now runs when that
     /// game ends, in the instance's game folder. A release that does not
     /// happen (the instance has moved on) runs nothing.
@@ -3518,10 +3518,10 @@ mod tests {
 pub(super) use modpack::execute_plan as execute_import_baseline_test_plan;
 
 #[cfg(test)]
-mod task22_tests {
+mod adopted_identity_tests {
     use super::*;
     #[test]
-    fn task22_adopted_session_carries_full_identity_and_rejects_stale_bank() {
+    fn adopted_session_carries_full_identity_and_rejects_stale_bank() {
         let at = DateTime::<Utc>::from_timestamp(1700000000, 0).unwrap();
         let record = orphan_pid::ProcessRecord {
             pid: 4242,

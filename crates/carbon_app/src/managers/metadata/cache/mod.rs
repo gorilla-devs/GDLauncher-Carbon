@@ -4374,11 +4374,11 @@ mod tests {
         (id, path)
     }
 
-    async fn task11r1_observation_failure(stage: &'static str, ordinary: bool) {
+    async fn observation_failure(stage: &'static str, ordinary: bool) {
         let app = crate::setup_managers_for_test().await;
         let (id, path) = addon_fixture(
             &app,
-            "task11r1-observation",
+            "observation",
             crate::domain::instance::AddonType::Mods,
             "one.jar",
             b"one",
@@ -4399,7 +4399,7 @@ mod tests {
             metarepo::upsert_mr_update_context(
                 &app.db,
                 &owner.metadata_id,
-                "task11r1-reference",
+                "reference",
                 "healthy",
                 DbDateTime(Utc::now().fixed_offset()),
             )
@@ -4480,7 +4480,7 @@ mod tests {
                     .is_some()
             );
             assert_eq!(
-                metarepo::get_mr_update_context(&app.db, &owner.metadata_id, "task11r1-reference")
+                metarepo::get_mr_update_context(&app.db, &owner.metadata_id, "reference")
                     .await
                     .unwrap()
                     .unwrap()
@@ -4516,31 +4516,31 @@ mod tests {
         assert_eq!(std::fs::read(path).unwrap(), b"one");
     }
     #[tokio::test]
-    async fn task11r1_folder_stat_failure_preserves_owners() {
-        task11r1_observation_failure("folder-stat", false).await;
+    async fn folder_stat_failure_preserves_owners() {
+        observation_failure("folder-stat", false).await;
     }
     #[tokio::test]
-    async fn task11r1_read_dir_failure_preserves_owners() {
-        task11r1_observation_failure("read-dir", false).await;
+    async fn read_dir_failure_preserves_owners() {
+        observation_failure("read-dir", false).await;
     }
     #[tokio::test]
-    async fn task11r1_partial_iteration_preserves_owners() {
-        task11r1_observation_failure("iterate", false).await;
+    async fn partial_iteration_preserves_owners() {
+        observation_failure("iterate", false).await;
     }
     #[tokio::test]
-    async fn task11r1_entry_stat_failure_preserves_owners() {
-        task11r1_observation_failure("entry-stat", false).await;
+    async fn entry_stat_failure_preserves_owners() {
+        observation_failure("entry-stat", false).await;
     }
     #[tokio::test]
-    async fn task11r1_cache_read_failure_is_not_success() {
-        task11r1_observation_failure("cache-read", false).await;
+    async fn cache_read_failure_is_not_success() {
+        observation_failure("cache-read", false).await;
     }
     #[tokio::test]
-    async fn task11r1_ordinary_incomplete_scan_preserves_owners() {
-        task11r1_observation_failure("iterate", true).await;
+    async fn ordinary_incomplete_scan_preserves_owners() {
+        observation_failure("iterate", true).await;
     }
     #[tokio::test]
-    async fn task11r1_missing_target_is_not_verified_success() {
+    async fn missing_target_is_not_verified_success() {
         let app = crate::setup_managers_for_test().await;
         assert!(
             app.meta_cache_manager()
@@ -4555,7 +4555,7 @@ mod tests {
     }
     #[cfg(unix)]
     #[tokio::test]
-    async fn task11r2_stable_symlink_equal_size_and_changed_target() {
+    async fn stable_symlink_equal_size_and_changed_target() {
         let app = crate::setup_managers_for_test().await;
         let body = r#"{"schemaVersion":1,"id":"example","version":"1"}"#;
         let bytes = metadata_jar("fabric.mod.json", body);
@@ -4564,7 +4564,7 @@ mod tests {
         assert!(bytes.len() < 255);
         let (id, path) = addon_fixture(
             &app,
-            "task11r2-symlink",
+            "symlink",
             crate::domain::instance::AddonType::Mods,
             "example.jar",
             &bytes,
@@ -4636,7 +4636,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task11r1_forced_unchanged_verifies_without_parse_or_rewrite() {
+    async fn forced_unchanged_verifies_without_parse_or_rewrite() {
         let app = crate::setup_managers_for_test().await;
         let bytes = metadata_jar(
             "fabric.mod.json",
@@ -4644,7 +4644,7 @@ mod tests {
         );
         let (id, path) = addon_fixture(
             &app,
-            "task11r1-reuse",
+            "reuse",
             crate::domain::instance::AddonType::Mods,
             "mod.jar",
             &bytes,
@@ -4710,11 +4710,11 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn task11r1_proven_deletion_and_absent_optional_folders_succeed() {
+    async fn proven_deletion_and_absent_optional_folders_succeed() {
         let app = crate::setup_managers_for_test().await;
         let (id, path) = addon_fixture(
             &app,
-            "task11r1-absence",
+            "absence",
             crate::domain::instance::AddonType::Mods,
             "one.jar",
             b"one",
@@ -4759,11 +4759,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task11r1_marker_change_and_legacy_qualification_controls() {
+    async fn marker_change_and_legacy_qualification_controls() {
         let app = crate::setup_managers_for_test().await;
         let (id, path) = addon_fixture(
             &app,
-            "task11r1-qualification",
+            "qualification",
             crate::domain::instance::AddonType::Mods,
             "mod.jar",
             b"qualified bytes",
@@ -4852,7 +4852,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task11r1_image_loop_retains_same_entity_notification() {
+    async fn image_loop_retains_same_entity_notification() {
         let targets = LockNotify::new(None::<CacheEntityId>);
         let worker_targets = targets.clone();
         let (entered, mut events) = mpsc::unbounded_channel();
@@ -4905,7 +4905,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task11_expired_thumbnail_retry_releases_lock() {
+    async fn expired_thumbnail_retry_releases_lock() {
         let failures = RwLock::new(HashMap::new());
         assert!(thumbnail_retry_allowed(&failures, &"project").await);
         failures.write().await.insert(
@@ -4941,7 +4941,7 @@ mod tests {
     }
 
     #[test]
-    fn task11_late_request_waits_for_a_pass_that_observed_it() {
+    fn late_request_waits_for_a_pass_that_observed_it() {
         let mut targets = CacheTargets::new();
         let entity = CacheEntityId::Instance(InstanceId(1));
         targets.set_override(CacheTarget {
@@ -5188,7 +5188,7 @@ mod tests {
     }
 
     #[test]
-    fn task11_foreground_entities_keep_independent_callbacks() {
+    fn foreground_entities_keep_independent_callbacks() {
         let mut targets = CacheTargets::new();
         let a = CacheEntityId::Instance(InstanceId(101));
         let b = CacheEntityId::Instance(InstanceId(102));
@@ -5231,7 +5231,7 @@ mod tests {
     struct ProbeCacher;
     #[async_trait::async_trait]
     impl ModplatformCacher for ProbeCacher {
-        const NAME: &'static str = "task11-probe";
+        const NAME: &'static str = "probe";
         type SaveBundle = ();
         async fn query_platform(
             _app: &App,
@@ -5254,7 +5254,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task11_remote_loop_waits_for_query_and_save_while_globally_paused() {
+    async fn remote_loop_waits_for_query_and_save_while_globally_paused() {
         let app = crate::setup_managers_for_test().await;
         let (stages, mut events) = mpsc::unbounded_channel();
         assert!(
@@ -5349,7 +5349,7 @@ mod tests {
     }
 
     #[test]
-    fn task11_callback_errors_and_revocation_stay_with_their_entity() {
+    fn callback_errors_and_revocation_stay_with_their_entity() {
         let mut q = CacheTargets::new();
         let mut receivers = Vec::new();
         for entity_id in [
@@ -5379,7 +5379,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task11_explicit_finalization_ignores_unrelated_global_pause() {
+    async fn explicit_finalization_ignores_unrelated_global_pause() {
         let app = crate::setup_managers_for_test().await;
         // Set the actual source of the global pause without starting any process.
         let mut paused = app.meta_cache_manager().pause_caching.subscribe();
@@ -5391,7 +5391,7 @@ mod tests {
         }
         let (id, path) = addon_fixture(
             &app,
-            "task11-idle",
+            "idle",
             crate::domain::instance::AddonType::Mods,
             "mod.jar",
             b"idle target",
@@ -5439,12 +5439,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task11_instance_scan_retains_equal_names_in_distinct_kinds() {
+    async fn instance_scan_retains_equal_names_in_distinct_kinds() {
         use crate::domain::instance::AddonType;
         let app = crate::setup_managers_for_test().await;
         let (id, path) = addon_fixture(
             &app,
-            "task11-folders",
+            "folders",
             AddonType::ResourcePacks,
             "shared.zip",
             b"resource",
@@ -5472,12 +5472,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task11_instance_scan_uppercase_and_disabled_extensions() {
+    async fn instance_scan_uppercase_and_disabled_extensions() {
         use crate::domain::instance::AddonType;
         let app = crate::setup_managers_for_test().await;
         let (id, path) = addon_fixture(
             &app,
-            "task11-upper",
+            "upper",
             AddonType::ResourcePacks,
             "Pack.ZIP",
             b"resource",
@@ -5582,21 +5582,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task11_forced_scan_rehashes_same_size_preserved_time_replacement() {
+    async fn forced_scan_rehashes_same_size_preserved_time_replacement() {
         use crate::domain::instance::AddonType;
         let app = crate::setup_managers_for_test().await;
         let body = r#"{"schemaVersion":1,"id":"example","version":"1.0.0","name":"Example"}"#;
         let first = metadata_jar("fabric.mod.json", body);
         let second = metadata_jar("fabric.mod.json", &body.replace("1.0.0", "2.0.0"));
         assert_eq!(first.len(), second.len());
-        let (id, path) = addon_fixture(
-            &app,
-            "task11-same-size",
-            AddonType::Mods,
-            "test.jar",
-            &first,
-        )
-        .await;
+        let (id, path) =
+            addon_fixture(&app, "same-size", AddonType::Mods, "test.jar", &first).await;
         // The export pass: the mods folder is verified byte for byte.
         let cache = || {
             app.meta_cache_manager().override_caching_verified_and_wait(
@@ -5737,7 +5731,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn task11_neoforge_legacy_metadata_heals_without_replacing_identity() {
+    async fn neoforge_legacy_metadata_heals_without_replacing_identity() {
         let app = crate::setup_managers_for_test().await;
         let bytes = metadata_jar(
             "META-INF/neoforge.mods.toml",
@@ -5745,7 +5739,7 @@ mod tests {
         );
         let (id, path) = addon_fixture(
             &app,
-            "task11-heal",
+            "heal",
             crate::domain::instance::AddonType::Mods,
             "neo.jar",
             &bytes,

@@ -332,81 +332,78 @@ fn full_schema_dump_matches_the_committed_baseline() {
     );
 }
 
-// Task16: explicit DML must survive a later nullable-column rebuild.
-const TASK16_PREV: &str = "CREATE TABLE T(id INTEGER PRIMARY KEY, value TEXT);";
-const TASK16_REBUILD: &str = "CREATE TABLE T_new(id INTEGER PRIMARY KEY, value TEXT, extra TEXT);
+// Explicit DML must survive a later nullable-column rebuild.
+const PREV: &str = "CREATE TABLE T(id INTEGER PRIMARY KEY, value TEXT);";
+const REBUILD: &str = "CREATE TABLE T_new(id INTEGER PRIMARY KEY, value TEXT, extra TEXT);
     INSERT INTO T_new(id, value) SELECT id, value FROM T;
     DROP TABLE T;
     ALTER TABLE T_new RENAME TO T;";
 
-fn task16_assert_dml(up: &str, label: &str) {
+fn assert_dml(up: &str, label: &str) {
     use carbon_repos::{
         compat::MigrationKind,
         manifest::{derive_kind, verify_kind},
     };
-    let analysis = analyze_up(&[TASK16_PREV], up).unwrap();
+    let analysis = analyze_up(&[PREV], up).unwrap();
     assert!(!analysis.rename);
     assert_eq!(analysis.dml_on_existing, vec![label.to_string()]);
     assert_eq!(
         analysis.human_actions(),
         vec![HumanAction::Dml(vec![label.to_string()])]
     );
-    assert_eq!(
-        derive_kind(&[TASK16_PREV], up).unwrap(),
-        MigrationKind::Breaking
-    );
-    assert!(verify_kind(&[TASK16_PREV], up, MigrationKind::Additive).is_err());
+    assert_eq!(derive_kind(&[PREV], up).unwrap(), MigrationKind::Breaking);
+    assert!(verify_kind(&[PREV], up, MigrationKind::Additive).is_err());
 }
 
 #[test]
-fn task16_update_survives_table_rebuild() {
-    task16_assert_dml(
-        &format!("UPDATE T SET value=lower(value); {TASK16_REBUILD}"),
+fn update_survives_table_rebuild() {
+    assert_dml(
+        &format!("UPDATE T SET value=lower(value); {REBUILD}"),
         "UPDATE T",
     );
 }
 
 #[test]
-fn task16_insert_survives_table_rebuild() {
-    task16_assert_dml(
-        &format!("INSERT INTO T(id,value) VALUES(42,'AbC'); {TASK16_REBUILD}"),
+fn insert_survives_table_rebuild() {
+    assert_dml(
+        &format!("INSERT INTO T(id,value) VALUES(42,'AbC'); {REBUILD}"),
         "INSERT T",
     );
 }
 
 #[test]
-fn task16_delete_survives_table_rebuild() {
+fn delete_survives_table_rebuild() {
     for up in [
-        format!("DELETE FROM T WHERE id=42; {TASK16_REBUILD}"),
-        format!("{TASK16_REBUILD} DELETE FROM T WHERE id=42;"),
-        format!("DELETE FROM T WHERE id=42; {TASK16_REBUILD} DELETE FROM T WHERE id=43;"),
+        format!("DELETE FROM T WHERE id=42; {REBUILD}"),
+        format!("{REBUILD} DELETE FROM T WHERE id=42;"),
+        format!("DELETE FROM T WHERE id=42; {REBUILD} DELETE FROM T WHERE id=43;"),
     ] {
-        task16_assert_dml(&up, "DELETE T");
+        assert_dml(&up, "DELETE T");
     }
 }
 
 #[test]
-fn task16_pure_rebuild_and_standalone_update_controls() {
+fn pure_rebuild_and_standalone_update_controls() {
     use carbon_repos::{compat::MigrationKind, manifest::derive_kind};
-    let analysis = analyze_up(&[TASK16_PREV], TASK16_REBUILD).unwrap();
+    let analysis = analyze_up(&[PREV], REBUILD).unwrap();
     assert!(!analysis.rename);
     assert!(analysis.dml_on_existing.is_empty());
     assert!(analysis.human_actions().is_empty());
     assert_eq!(
-        derive_kind(&[TASK16_PREV], TASK16_REBUILD).unwrap(),
+        derive_kind(&[PREV], REBUILD).unwrap(),
         MigrationKind::Additive
     );
-    gen_ok(&[TASK16_PREV], TASK16_REBUILD);
-    task16_assert_dml("UPDATE T SET value=lower(value);", "UPDATE T");
+    gen_ok(&[PREV], REBUILD);
+    assert_dml("UPDATE T SET value=lower(value);", "UPDATE T");
 }
 
 #[test]
-fn task16_schema_inverse_still_discloses_text_loss() {
+fn schema_inverse_still_discloses_text_loss() {
     use carbon_repos::manifest::{seeded_lost_fields, verify_data_down};
-    let up = format!("UPDATE T SET value=lower(value); {TASK16_REBUILD}");
-    let down = gen_ok(&[TASK16_PREV], &up);
+    let up = format!("UPDATE T SET value=lower(value); {REBUILD}");
+    let down = gen_ok(&[PREV], &up);
     let conn = Connection::open_in_memory().unwrap();
-    conn.execute_batch(TASK16_PREV).unwrap();
+    conn.execute_batch(PREV).unwrap();
     conn.execute("INSERT INTO T VALUES(7,'AbC')", []).unwrap();
     conn.execute_batch(&up).unwrap();
     conn.execute_batch(&down).unwrap();
@@ -419,27 +416,27 @@ fn task16_schema_inverse_still_discloses_text_loss() {
         (7, "abc".to_string())
     );
     assert_eq!(
-        seeded_lost_fields(&[TASK16_PREV], &up, &down).unwrap(),
+        seeded_lost_fields(&[PREV], &up, &down).unwrap(),
         ["T.value".to_string()].into_iter().collect()
     );
-    assert!(verify_data_down(&[TASK16_PREV], &up, &down, "full").is_err());
-    verify_data_down(&[TASK16_PREV], &up, &down, "partial:T.value").unwrap();
+    assert!(verify_data_down(&[PREV], &up, &down, "full").is_err());
+    verify_data_down(&[PREV], &up, &down, "partial:T.value").unwrap();
 }
 
 #[test]
-fn task16_analysis_propagates_sql_errors() {
+fn analysis_propagates_sql_errors() {
     assert!(
         analyze_up(
-            &[TASK16_PREV],
+            &[PREV],
             "UPDATE T SET value='x'; SELECT * FROM missing_table;"
         )
         .is_err()
     );
-    task16_assert_dml("UPDATE T SET value=lower(value);", "UPDATE T");
+    assert_dml("UPDATE T SET value=lower(value);", "UPDATE T");
 }
 
 #[test]
-fn task16_insert_refuses_changed_kind_or_data_down() {
+fn insert_refuses_changed_kind_or_data_down() {
     let once = insert_migration_entry(FIXTURE_LIB_SRC, FIXTURE_ENTRY).unwrap();
     for changed in [
         FIXTURE_ENTRY.replace("MigrationKind::Additive", "MigrationKind::Breaking"),
@@ -455,7 +452,7 @@ fn task16_insert_refuses_changed_kind_or_data_down() {
 }
 
 #[test]
-fn task16_insert_refuses_duplicate_or_handwritten_identity() {
+fn insert_refuses_duplicate_or_handwritten_identity() {
     let once = insert_migration_entry(FIXTURE_LIB_SRC, FIXTURE_ENTRY).unwrap();
     let duplicate = once.replace(
         MIGRATION_LIST_ANCHOR,
@@ -474,7 +471,7 @@ fn task16_insert_refuses_duplicate_or_handwritten_identity() {
 }
 
 #[test]
-fn task16_insert_matches_list_entry_not_an_outside_copy() {
+fn insert_matches_list_entry_not_an_outside_copy() {
     let outside = format!("fn unrelated() {{\n{FIXTURE_ENTRY}}}\n{FIXTURE_LIB_SRC}");
     let updated = insert_migration_entry(&outside, FIXTURE_ENTRY).unwrap();
     assert_eq!(
@@ -490,7 +487,7 @@ fn task16_insert_matches_list_entry_not_an_outside_copy() {
 }
 
 #[test]
-fn task16_insert_accepts_recognized_crlf_and_indentation() {
+fn insert_accepts_recognized_crlf_and_indentation() {
     let once = insert_migration_entry(FIXTURE_LIB_SRC, FIXTURE_ENTRY).unwrap();
     let formatted = once
         .lines()

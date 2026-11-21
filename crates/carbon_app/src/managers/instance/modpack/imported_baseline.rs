@@ -877,11 +877,11 @@ fn cf_archive(
 }
 
 #[cfg(test)]
-mod task13_tests {
+mod baseline_tests {
     use super::*;
     use sha2::{Digest, Sha512};
     #[tokio::test]
-    async fn task13_pinned_baseline_owns_only_pristine_declared_bytes() {
+    async fn pinned_baseline_owns_only_pristine_declared_bytes() {
         let t = tempfile::tempdir().unwrap();
         let data = t.path().join("instance/mods");
         std::fs::create_dir_all(&data).unwrap();
@@ -923,7 +923,7 @@ mod task13_tests {
     /// launcher doesn't know) records nothing, so the change keeps every
     /// file in place, as 2.0.40 did, and says so instead of refusing.
     #[tokio::test]
-    async fn task13_unreadable_inventory_records_nothing_and_lets_the_change_keep_files() {
+    async fn unreadable_inventory_records_nothing_and_lets_the_change_keep_files() {
         let t = tempfile::tempdir().unwrap();
         let baseline = ensure(t.path(), MODRINTH, async {
             anyhow::bail!("Unsupported installed MRPack inventory format")
@@ -945,7 +945,7 @@ mod task13_tests {
     /// The platform no longer serves the installed version: the change goes
     /// ahead without a record and names why it kept the old files.
     #[tokio::test]
-    async fn task13_removed_installed_version_records_nothing_and_lets_the_change_keep_files() {
+    async fn removed_installed_version_records_nothing_and_lets_the_change_keep_files() {
         let t = tempfile::tempdir().unwrap();
         let _fixture = inventory_fixture::set_fixture(
             t.path().to_path_buf(),
@@ -976,7 +976,7 @@ mod task13_tests {
     /// Only a platform that can't be reached refuses the change, and the
     /// refusal says what to do; retrying records the baseline.
     #[tokio::test]
-    async fn task13_unreachable_platform_refuses_with_a_retry_hint() {
+    async fn unreachable_platform_refuses_with_a_retry_hint() {
         let t = tempfile::tempdir().unwrap();
         let fixture = inventory_fixture::set_fixture(
             t.path().to_path_buf(),
@@ -1011,7 +1011,7 @@ mod task13_tests {
     }
 
     #[test]
-    fn task13_only_connection_and_server_failures_count_as_unreachable() {
+    fn only_connection_and_server_failures_count_as_unreachable() {
         use crate::error::request::{RequestContext, RequestError, RequestErrorDetails};
         let request = |error| {
             anyhow::Error::new(RequestError {
@@ -1062,7 +1062,7 @@ mod task13_tests {
     /// errors the download and the fetches give for them, next to a real
     /// connection failure, which does.
     #[tokio::test]
-    async fn task13_permanent_request_failures_are_not_unreachable() {
+    async fn permanent_request_failures_are_not_unreachable() {
         let t = tempfile::tempdir().unwrap();
         let cancel = CancellationToken::new();
         for url in ["http://[bad", "not a url", "ftp://example.invalid/pack.zip"] {
@@ -1131,7 +1131,7 @@ mod task13_tests {
     /// failure as one lost before it: the check refuses and retrying fixes it.
     /// An answer that arrives whole and isn't what was asked for is permanent.
     #[tokio::test]
-    async fn task13_connection_lost_mid_answer_refuses_but_a_bad_answer_does_not() {
+    async fn connection_lost_mid_answer_refuses_but_a_bad_answer_does_not() {
         use crate::error::request::GoodJsonRequestError;
         let t = tempfile::tempdir().unwrap();
         let lost = answer_once(b"HTTP/1.1 200 OK\r\nContent-Length: 100000\r\n\r\n{\"data\"")
@@ -1165,7 +1165,7 @@ mod task13_tests {
     /// A folder that won't take the record doesn't stop the change, which
     /// keeps every file and says so, as when the version can't be read.
     #[tokio::test]
-    async fn task13_record_that_cant_be_written_lets_the_change_keep_files() {
+    async fn record_that_cant_be_written_lets_the_change_keep_files() {
         use crate::util::publish::fault::{IN_USE, Step, inject};
         let t = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(t.path().join("instance/mods")).unwrap();
@@ -1198,7 +1198,7 @@ mod task13_tests {
     /// A record another writer published while the check ran is the one the
     /// change reads, so it stays and the change relies on it.
     #[tokio::test]
-    async fn task13_record_published_meanwhile_is_kept_and_relied_on() {
+    async fn record_published_meanwhile_is_kept_and_relied_on() {
         let t = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(t.path().join("instance/mods")).unwrap();
         std::fs::write(t.path().join("instance/mods/a.jar"), b"a").unwrap();
@@ -1224,7 +1224,7 @@ mod task13_tests {
     /// A launcher service failing is not the platform's fault, and a malformed
     /// answer from it is as permanent as any other.
     #[tokio::test]
-    async fn task13_launcher_service_failures_do_not_name_the_platform() {
+    async fn launcher_service_failures_do_not_name_the_platform() {
         use crate::error::request::{RequestContext, RequestError, RequestErrorDetails};
         let t = tempfile::tempdir().unwrap();
         let error = ensure(t.path(), CURSEFORGE, async {
@@ -1260,7 +1260,7 @@ mod task13_tests {
     /// A cancelled check stops the change: it isn't a reason to go ahead
     /// without a record, or to blame the network.
     #[tokio::test]
-    async fn task13_cancelled_check_stops_without_recording_or_falling_back() {
+    async fn cancelled_check_stops_without_recording_or_falling_back() {
         let t = tempfile::tempdir().unwrap();
         let cancel = CancellationToken::new();
         cancel.cancel();
@@ -1289,7 +1289,7 @@ mod task13_tests {
     /// A cancel that lands while the files are being hashed also stops the
     /// change and records nothing, so the next attempt starts clean.
     #[test]
-    fn task13_cancel_while_hashing_records_nothing() {
+    fn cancel_while_hashing_records_nothing() {
         let t = tempfile::tempdir().unwrap();
         std::fs::create_dir_all(t.path().join("instance/mods")).unwrap();
         std::fs::write(t.path().join("instance/mods/a.jar"), b"a").unwrap();
@@ -1310,7 +1310,7 @@ mod task13_tests {
     /// A partial record stays partial for every attempt until a change goes
     /// through: the warning isn't lost because an earlier attempt wrote it.
     #[tokio::test]
-    async fn task13_retry_after_a_partial_record_warns_again() {
+    async fn retry_after_a_partial_record_warns_again() {
         let t = tempfile::tempdir().unwrap();
         let resolved = Resolved {
             files: HashMap::new(),
@@ -1335,7 +1335,7 @@ mod task13_tests {
     /// One manifest entry the platform no longer describes leaves that entry
     /// unresolved and keeps every other one, instead of failing the pack.
     #[test]
-    fn task13_cf_manifest_entries_that_cant_be_resolved_are_counted_not_fatal() {
+    fn cf_manifest_entries_that_cant_be_resolved_are_counted_not_fatal() {
         use carbon_platforms::curseforge as cf;
         let sha1 = hex::encode(sha1::Sha1::digest(b"bytes"));
         let file = |id: i32, mod_id: i32, name: &str, hashes: serde_json::Value| -> cf::File {
@@ -1373,7 +1373,7 @@ mod task13_tests {
         .unwrap();
         let mc: daedalus::minecraft::VersionManifest = serde_json::from_value(serde_json::json!({
             "latest":{"release":"1.20.1","snapshot":"1.20.1"},"versions":[{
-            "id":"1.20.1","type":"release","url":"https://task08.invalid/version.json","time":"2026-01-01T00:00:00Z","releaseTime":"2026-01-01T00:00:00Z",
+            "id":"1.20.1","type":"release","url":"https://fixture.invalid/version.json","time":"2026-01-01T00:00:00Z","releaseTime":"2026-01-01T00:00:00Z",
             "sha1":"0000000000000000000000000000000000000000","complianceLevel":1}]
         }))
         .unwrap();
@@ -1401,7 +1401,7 @@ mod task13_tests {
     /// name or a malformed digest, stay unrecorded (so the change keeps
     /// them); the rest of the inventory is still recorded.
     #[tokio::test]
-    async fn task13_unresolvable_entries_leave_a_partial_record() {
+    async fn unresolvable_entries_leave_a_partial_record() {
         let t = tempfile::tempdir().unwrap();
         let data = t.path().join("instance");
         std::fs::create_dir_all(data.join("mods")).unwrap();
@@ -1447,11 +1447,11 @@ const MODRINTH: DependencyPlatform = DependencyPlatform::Modrinth;
 const CURSEFORGE: DependencyPlatform = DependencyPlatform::Curseforge;
 
 #[cfg(test)]
-mod task13_controls {
+mod controls {
     use super::super::{apply_plan, disk_scan};
     use super::*;
     #[tokio::test]
-    async fn task13_baseline_reconciles_renamed_mod_and_preserves_user_and_disabled_bytes() {
+    async fn baseline_reconciles_renamed_mod_and_preserves_user_and_disabled_bytes() {
         let t = tempfile::tempdir().unwrap();
         let root = t.path();
         let data = root.join("instance/mods");
@@ -1679,7 +1679,7 @@ mod task13_controls {
     /// whether or not the new version changes it, instead of deleting it as a
     /// file the pack dropped.
     #[tokio::test]
-    async fn task13_disabled_override_survives_the_first_update() {
+    async fn disabled_override_survives_the_first_update() {
         for target_bytes in [b"optional".as_slice(), b"optional v2"] {
             let t = tempfile::tempdir().unwrap();
             let root = t.path();
@@ -1736,7 +1736,7 @@ mod task13_controls {
     /// first update leaves the mod enabled and in place, whether the new
     /// version changes the file or drops it, as 2.0.40 did.
     #[tokio::test]
-    async fn task13_optional_file_the_user_enabled_stays_enabled_on_the_first_update() {
+    async fn optional_file_the_user_enabled_stays_enabled_on_the_first_update() {
         for target_ships in [None, Some(b"optional".as_slice()), Some(b"optional v2")] {
             let t = tempfile::tempdir().unwrap();
             let root = t.path();
@@ -1795,7 +1795,7 @@ mod task13_controls {
     /// A file in place under its other spelling, or both spellings at once,
     /// stays unrecorded and is kept.
     #[tokio::test]
-    async fn task13_file_shipped_enabled_and_disabled_is_owned_by_its_enabled_bytes() {
+    async fn file_shipped_enabled_and_disabled_is_owned_by_its_enabled_bytes() {
         let sha = |bytes: &[u8]| Checksum::Sha512(hex::encode(Sha512::digest(bytes)));
         let inventory = || -> Inventory {
             HashMap::from([
@@ -1866,7 +1866,7 @@ mod task13_controls {
     }
 
     #[tokio::test]
-    async fn task13_existing_record_and_incomplete_inventory_controls() {
+    async fn existing_record_and_incomplete_inventory_controls() {
         let t = tempfile::tempdir().unwrap();
         // A malformed digest owns nothing: nothing can match it.
         std::fs::create_dir_all(t.path().join("instance/mods")).unwrap();
@@ -1902,10 +1902,10 @@ mod task13_controls {
 }
 
 #[cfg(test)]
-mod task13_archive_controls {
+mod archive_controls {
     use super::*;
     #[test]
-    fn task13_pinned_cf_override_inventory_and_format_gate() {
+    fn pinned_cf_override_inventory_and_format_gate() {
         let t = tempfile::tempdir().unwrap();
         let path = t.path().join("synthetic.zip");
         for format in [1, 2] {
@@ -1987,7 +1987,7 @@ async fn mr_archive(path: &Path, index_budget: u64, total_budget: u64) -> anyhow
 }
 
 #[cfg(test)]
-mod task13_round01_tests {
+mod inventory_limit_tests {
     use super::*;
     fn archive(path: &Path, entries: &[(&str, &[u8])]) {
         let mut zip = zip::ZipWriter::new(std::fs::File::create(path).unwrap());
@@ -2005,7 +2005,7 @@ mod task13_round01_tests {
         zip.finish().unwrap();
     }
     #[tokio::test]
-    async fn task13_round01_required_inventory_exceeds_preview_entry_limit() {
+    async fn required_inventory_exceeds_preview_entry_limit() {
         let t = tempfile::tempdir().unwrap();
         let path = t.path().join("synthetic.mrpack");
         let bytes = vec![b'x'; 1025];
@@ -2036,7 +2036,7 @@ mod task13_round01_tests {
     /// override of the same path doesn't stand in for it: the download
     /// replaced that override when the pack was installed.
     #[tokio::test]
-    async fn task13_index_file_without_a_digest_is_left_unrecorded() {
+    async fn index_file_without_a_digest_is_left_unrecorded() {
         let t = tempfile::tempdir().unwrap();
         let path = t.path().join("synthetic.mrpack");
         let mut zip = zip::ZipWriter::new(std::fs::File::create(&path).unwrap());
@@ -2104,7 +2104,7 @@ mod task13_round01_tests {
         );
     }
     #[tokio::test]
-    async fn task13_round01_required_inventory_rejects_aggregate_overshoot() {
+    async fn required_inventory_rejects_aggregate_overshoot() {
         let t = tempfile::tempdir().unwrap();
         let path = t.path().join("synthetic.mrpack");
         archive(

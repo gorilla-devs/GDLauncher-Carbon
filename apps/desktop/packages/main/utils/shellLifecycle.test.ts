@@ -41,7 +41,7 @@ function output() {
   })
   return { core, logs, results, records }
 }
-describe("Task23 complete core records", () => {
+describe("complete core records", () => {
   it("preserves readiness and structured identity across every UTF8 byte split", () => {
     const ready = "_STATUS_:READY|1234|fixture-token\r\n"
     const identity =
@@ -271,7 +271,7 @@ function windows(
     }
   }
 }
-describe("Task23 window and keyed game ownership", () => {
+describe("window and keyed game ownership", () => {
   it("launch-close bypasses only its warning and remains alive until matching owned exit", () => {
     const value = windows(),
       w = value.make()
@@ -970,7 +970,7 @@ describe("Close warning before a quit stops a server or an install", () => {
     ])
   })
 })
-describe("Task23 App callback readiness", () => {
+describe("App callback readiness", () => {
   it("late subscription consumes FIFO share/search only after callback and ACK", async () => {
     const value = protocol(),
       actions: string[] = []
@@ -1051,7 +1051,7 @@ describe("Task23 App callback readiness", () => {
   })
 })
 async function fixture() {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "task23-db-"))
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "gdl-db-"))
   for (const [name, bytes] of [
     ["gdl_conf.db", "original"],
     ["gdl_conf.db-wal", "wal"],
@@ -1109,7 +1109,7 @@ function refusingFolderSyncs() {
 }
 // Windows does not sync folders at all.
 const syncsFolders = process.platform !== "win32"
-describe("Task23 data preserving restore and recovery retry", () => {
+describe("data preserving restore and recovery retry", () => {
   it("missing allowed snapshot preserves all bytes without shutdown and retry through actual button succeeds", async () => {
     const value = await fixture(),
       button = {
@@ -1370,7 +1370,7 @@ describe("Task23 data preserving restore and recovery retry", () => {
     expect(error.textContent).toBe("<img src=x>")
   })
 })
-it("Task23 reload delayed prior readiness cannot suppress current subscription redelivery", () => {
+it("reload delayed prior readiness cannot suppress current subscription redelivery", () => {
   const sender = {},
     deliveries: ProtocolDelivery[] = []
   const queue = new ProtocolQueue<object>((_, delivery) =>
@@ -1385,7 +1385,7 @@ it("Task23 reload delayed prior readiness cannot suppress current subscription r
   queue.ready(sender, "1", queue.session(sender)!) // new renderer revision can restart at 1
   expect(deliveries).toHaveLength(1)
 })
-it("Task23 supported link-unsupported filesystem still restores a known snapshot safely", async () => {
+it("supported link-unsupported filesystem still restores a known snapshot safely", async () => {
   const value = await fixture()
   await fs.writeFile(value.snapshot, "snapshot")
   const files = {
@@ -1404,7 +1404,7 @@ it("Task23 supported link-unsupported filesystem still restores a known snapshot
   )
 })
 
-it("Task23 exclusive publication refuses occupied destination without overwriting or unsafe unlink", async () => {
+it("exclusive publication refuses occupied destination without overwriting or unsafe unlink", async () => {
   const value = await fixture()
   await fs.writeFile(value.snapshot, "snapshot")
   let exclusiveCalls = 0
@@ -1443,7 +1443,7 @@ it("Task23 exclusive publication refuses occupied destination without overwritin
     "needs recovery"
   )
 })
-it("Task23 partial exclusive copy retains original bundle and guards startup", async () => {
+it("partial exclusive copy retains original bundle and guards startup", async () => {
   const value = await fixture()
   await fs.writeFile(value.snapshot, "snapshot")
   const files = {
@@ -1478,7 +1478,7 @@ it("Task23 partial exclusive copy retains original bundle and guards startup", a
     "needs recovery"
   )
 })
-it("Task23 permission/link IO errors never use fallback; rollback renames the originals back", async () => {
+it("permission/link IO errors never use fallback; rollback renames the originals back", async () => {
   const value = await fixture()
   await fs.writeFile(value.snapshot, "snapshot")
   let fallback = 0
@@ -1735,7 +1735,7 @@ describe("restore on a linked data folder", () => {
     async (named) => {
       const value = await fixture()
       await fs.writeFile(value.snapshot, "snapshot")
-      const linked = await fs.mkdtemp(path.join(os.tmpdir(), "task23-link-"))
+      const linked = await fs.mkdtemp(path.join(os.tmpdir(), "gdl-link-"))
       const link = path.join(linked, "data")
       await fs.symlink(value.root, link, "junction")
       const result = await restoreDatabaseSnapshot(
@@ -1755,7 +1755,7 @@ describe("restore on a linked data folder", () => {
   )
   it("still refuses a snapshot from another folder", async () => {
     const value = await fixture()
-    const other = await fs.mkdtemp(path.join(os.tmpdir(), "task23-other-"))
+    const other = await fs.mkdtemp(path.join(os.tmpdir(), "gdl-other-"))
     await fs.writeFile(path.join(other, "gdl_conf.pre-downgrade.db"), "foreign")
     const result = await restoreDatabaseSnapshot(
       value.root,
@@ -1769,7 +1769,7 @@ describe("restore on a linked data folder", () => {
   it("a database file that is a link stays refused", async () => {
     const value = await fixture()
     await fs.writeFile(value.snapshot, "snapshot")
-    const other = await fs.mkdtemp(path.join(os.tmpdir(), "task23-other-"))
+    const other = await fs.mkdtemp(path.join(os.tmpdir(), "gdl-other-"))
     await fs.writeFile(path.join(other, "wal"), "elsewhere")
     await fs.unlink(path.join(value.root, "gdl_conf.db-wal"))
     await fs.symlink(
@@ -2162,7 +2162,7 @@ describe("Recover Database after an interrupted restore", () => {
   })
   it("works through a linked data folder", async () => {
     const value = await interrupted(allMoved)
-    const linked = await fs.mkdtemp(path.join(os.tmpdir(), "task23-link-"))
+    const linked = await fs.mkdtemp(path.join(os.tmpdir(), "gdl-link-"))
     const link = path.join(linked, "data")
     await fs.symlink(value.root, link, "junction")
     const result = await recoverInterruptedRestore(link, value)
@@ -2191,7 +2191,7 @@ describe("Recover Database after an interrupted restore", () => {
   })
 })
 
-it("Task23 asynchronous actual closed event retains launch purpose; canceled unload retains handle and user warning", () => {
+it("asynchronous actual closed event retains launch purpose; canceled unload retains handle and user warning", () => {
   const value = windows(),
     w = value.make()
   value.lifecycle.snapshot('{"revision":1,"instances":[1]}')
@@ -2214,7 +2214,7 @@ it("Task23 asynchronous actual closed event retains launch purpose; canceled unl
   expect(canceled.warnings).toBe(1)
 })
 
-it("Task23 a new core session rejects old snapshots and owned actions", () => {
+it("a new core session rejects old snapshots and owned actions", () => {
   const value = windows()
   const w = value.make()
   value.lifecycle.beginCore("old")
@@ -2228,7 +2228,7 @@ it("Task23 a new core session rejects old snapshots and owned actions", () => {
 })
 
 // Round01 controls execute the actual owners with inert windows and runner-local bytes.
-describe("Task23 round01 restore namespace and close settlement", () => {
+describe("restore namespace and close settlement", () => {
   async function absent() {
     const value = await fixture()
     for (const name of ["gdl_conf.db", "gdl_conf.db-wal", "gdl_conf.db-shm"])
@@ -2236,7 +2236,7 @@ describe("Task23 round01 restore namespace and close settlement", () => {
     await fs.writeFile(value.snapshot, "complete snapshot")
     return value
   }
-  it("round01 absent-original partial-copy keeps intent and refuses actual startup guard", async () => {
+  it("absent-original partial-copy keeps intent and refuses actual startup guard", async () => {
     const value = await absent()
     const files = {
       ...fs,
@@ -2272,7 +2272,7 @@ describe("Task23 round01 restore namespace and close settlement", () => {
     ).toBe("complete snapshot")
     expect(await fs.readFile(value.snapshot, "utf8")).toBe("complete snapshot")
   })
-  it("round01 healthy absent originals support linked and exclusive-copy restoration", async () => {
+  it("healthy absent originals support linked and exclusive-copy restoration", async () => {
     for (const fallback of [false, true]) {
       const value = await absent()
       const files = fallback
@@ -2299,7 +2299,7 @@ describe("Task23 round01 restore namespace and close settlement", () => {
         ).rejects.toMatchObject({ code: "ENOENT" })
     }
   })
-  it("round01 clean prepublication failure reconciles captured absence without blocking retry", async () => {
+  it("clean prepublication failure reconciles captured absence without blocking retry", async () => {
     const value = await absent()
     const files = {
       ...fs,
@@ -2329,7 +2329,7 @@ describe("Task23 round01 restore namespace and close settlement", () => {
       )
     ).toBe("complete snapshot")
   })
-  it("round01 newly occupied absent sidecar preserves rollback bytes and startup intent", async () => {
+  it("newly occupied absent sidecar preserves rollback bytes and startup intent", async () => {
     const value = await fixture()
     await fs.writeFile(value.snapshot, "snapshot")
     await fs.unlink(path.join(value.root, "gdl_conf.db-wal"))
@@ -2363,7 +2363,7 @@ describe("Task23 round01 restore namespace and close settlement", () => {
       await fs.readFile(path.join(value.root, "gdl_conf.db-wal"), "utf8")
     ).toBe("foreign sidecar")
   })
-  it("round01 changed unmoved original cannot retire intent after another file rolls back", async () => {
+  it("changed unmoved original cannot retire intent after another file rolls back", async () => {
     const value = await fixture()
     await fs.writeFile(value.snapshot, "snapshot")
     const files = {
@@ -2392,7 +2392,7 @@ describe("Task23 round01 restore namespace and close settlement", () => {
       await fs.readFile(path.join(value.root, "gdl_conf.db-wal"), "utf8")
     ).toBe("changed unmoved WAL")
   })
-  it("round01 matching exit before delayed actual closed reopens once and retires purpose", () => {
+  it("matching exit before delayed actual closed reopens once and retires purpose", () => {
     const value = windows(),
       w = value.make()
     w.close = () => w.closing({ preventDefault() {} })
@@ -2410,7 +2410,7 @@ describe("Task23 round01 restore namespace and close settlement", () => {
     expect(value.creates).toBe(2)
     expect(value.current).toBe(replacement)
   })
-  it("round01 current replacement suppresses reopen and retires the completed close purpose", () => {
+  it("current replacement suppresses reopen and retires the completed close purpose", () => {
     const value = windows(),
       w = value.make()
     value.lifecycle.snapshot('{"revision":1,"instances":[1]}')
@@ -2423,7 +2423,7 @@ describe("Task23 round01 restore namespace and close settlement", () => {
     w.destroy()
     expect(value.current).toBe(replacement)
   })
-  it("round01 delayed closure preserves replacement and quit/cancellation ownership", () => {
+  it("delayed closure preserves replacement and quit/cancellation ownership", () => {
     for (const mode of ["replacement", "quit", "cancel"] as const) {
       const value = windows(),
         w = value.make()
@@ -2444,7 +2444,7 @@ describe("Task23 round01 restore namespace and close settlement", () => {
   })
 })
 
-it("Task23 round01 delayed actual closed before exit reopens once and retires purpose", () => {
+it("delayed actual closed before exit reopens once and retires purpose", () => {
   const value = windows(),
     w = value.make()
   w.close = () => w.closing({ preventDefault() {} })
@@ -2463,7 +2463,7 @@ it("Task23 round01 delayed actual closed before exit reopens once and retires pu
   expect(value.creates).toBe(2)
   expect(value.current).toBe(replacement)
 })
-it("Task23 round01 shared window close purposes preserve another owned game until its exit", () => {
+it("shared window close purposes preserve another owned game until its exit", () => {
   const value = windows(),
     w = value.make()
   w.close = () => w.closing({ preventDefault() {} })
@@ -2484,7 +2484,7 @@ it("Task23 round01 shared window close purposes preserve another owned game unti
   expect(value.creates).toBe(2)
   expect(value.lifecycle.keepAliveWithoutWindows()).toBe(false)
 })
-it("Task23 round01 canceled close before exit retains warnings and never claims reopen purpose", () => {
+it("canceled close before exit retains warnings and never claims reopen purpose", () => {
   const value = windows(),
     w = value.make()
   w.close = () => w.closing({ preventDefault() {} })

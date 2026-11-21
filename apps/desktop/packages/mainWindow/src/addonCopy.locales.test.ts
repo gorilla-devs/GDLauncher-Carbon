@@ -7,9 +7,9 @@ import {
   getTaskTranslationKey
 } from "../../../../../packages/i18n/helpers"
 
-// The addon, datapack, search, login, cache and updater copy added by the
-// fix round shipped in English only. Every key below is shown to players, so
-// each of the seven shipped languages must carry its own text.
+// This addon, datapack, search, login, cache and updater copy once shipped
+// in English only. Every key below is shown to players, so each of the seven
+// shipped languages must carry its own text.
 const LANGUAGES = [
   "english",
   "french",
@@ -192,7 +192,7 @@ const cases = LANGUAGES.flatMap((language) =>
   )
 )
 
-describe("fix-round addon and account copy is translated", () => {
+describe("addon and account copy is translated", () => {
   it.each(cases)("%s has %s with every English placeholder", (language, id) => {
     const [namespace, key] = id.split(":")
     const english = bundle("english", namespace)[key]

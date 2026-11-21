@@ -3,11 +3,11 @@ import { expect, it } from "vitest"
 import type { ListServer } from "@gd/core_module/bindings"
 import { computeServerLibraryItems } from "../../packages/mainWindow/src/pages/Library/utils/serverGrouping"
 
-it.skipIf(!process.env.TASK43_SERVER_PROJECTION)(
+it.skipIf(!process.env.SERVER_PROJECTION_FIXTURE)(
   "actual reopened repository rows project in folders-first destination/source order",
   () => {
     const lines = fs
-      .readFileSync(process.env.TASK43_SERVER_PROJECTION!, "utf8")
+      .readFileSync(process.env.SERVER_PROJECTION_FIXTURE!, "utf8")
       .split("\n")
       .map((line) => line.split("\t"))
     const position = (value: string) =>

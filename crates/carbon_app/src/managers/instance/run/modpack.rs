@@ -2782,7 +2782,7 @@ async fn sync_linked_folder(dir: &Path) -> anyhow::Result<()> {
 }
 
 // This records one representation change in the existing setup. It is not
-// setup admission or a session identifier. Task8 binds this consumer to its
+// setup admission or a session identifier. This consumer is bound to its
 // sole versioned session; target/options binding already rejects re-use by
 // a changed request. No defaults turn legacy absence into ownership.
 #[derive(serde::Serialize, serde::Deserialize, Clone, PartialEq, Eq)]

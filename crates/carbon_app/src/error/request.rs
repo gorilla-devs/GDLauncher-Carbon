@@ -319,7 +319,7 @@ pub fn censor_error(error: reqwest_middleware::Error) -> reqwest_middleware::Err
 }
 
 #[cfg(test)]
-mod task22_tests {
+mod tests {
     use super::*;
     #[derive(Debug, serde::Deserialize)]
     struct Payload {
@@ -327,7 +327,7 @@ mod task22_tests {
         _bad: bool,
     }
     #[test]
-    fn task22_direct_request_error_preserves_actual_serde_coordinates_and_context() {
+    fn direct_request_error_preserves_actual_serde_coordinates_and_context() {
         let body = "{\n  \"bad\": \"é\",\n  \"next\": \"innocent\"\n}";
         let error = serde_json::from_str::<Payload>(body).unwrap_err();
         let source = error.to_string();

@@ -485,10 +485,10 @@ fn operation_download_options(
 }
 
 #[cfg(test)]
-mod task18_r1_download_tests {
+mod download_tests {
     use super::*;
     #[tokio::test]
-    async fn task18_r1_operation_token_reaches_download_supervisor() {
+    async fn operation_token_reaches_download_supervisor() {
         let cancel = tokio_util::sync::CancellationToken::new();
         cancel.cancel();
         let (tx, _rx) = tokio::sync::watch::channel(carbon_net::Progress::new());

@@ -43,7 +43,7 @@ impl Fixture {
             INSERT INTO Server(id,name,shortpath,\"index\",groupId,gameVersion,motd,onlineMode) VALUES(12,'server','synthetic-server',5,1,'1.20.1','keep this',0);
             INSERT INTO Account(uuid,username,lastUsed) VALUES('synthetic-account','fixture',1);
             INSERT INTO AppConfiguration(id,releaseChannel,xmx,language,activeAccountUuid) VALUES(0,'stable',4096,'german','synthetic-account');
-            INSERT INTO FrontendPreference(key,value) VALUES('task46','preserve');
+            INSERT INTO FrontendPreference(key,value) VALUES('kept','preserve');
             INSERT INTO Java(id,path,major,fullVersion,type,os,arch,vendor) VALUES('synthetic-java','fixture-only',21,'21','local','linux','x64','fixture');
             INSERT INTO JavaProfile(name,javaId) VALUES('custom','synthetic-java');
             INSERT INTO HTTPCache(url,status_code,data) VALUES('synthetic-key',200,x'ff');").unwrap();
@@ -202,7 +202,7 @@ fn clear_empty_caches_is_idempotent() {
 
 fn failed_clear(close_without_rollback: bool) {
     let fixture = Fixture::new(false, true, true, true);
-    fixture.conn.execute_batch("CREATE TRIGGER task46_late_failure BEFORE DELETE ON ModMetadata BEGIN SELECT RAISE(ABORT,'task46 late failure'); END;").unwrap();
+    fixture.conn.execute_batch("CREATE TRIGGER late_failure BEFORE DELETE ON ModMetadata BEGIN SELECT RAISE(ABORT,'late failure'); END;").unwrap();
     let before = snapshot(&fixture.conn);
     assert_fk(&fixture.conn);
     let result = if close_without_rollback {
@@ -210,12 +210,7 @@ fn failed_clear(close_without_rollback: bool) {
     } else {
         clear(&fixture.conn)
     };
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("task46 late failure")
-    );
+    assert!(result.unwrap_err().to_string().contains("late failure"));
     assert_eq!(
         fixture
             .conn

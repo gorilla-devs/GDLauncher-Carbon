@@ -1536,7 +1536,7 @@ mod test {
 }
 
 #[cfg(test)]
-mod task17_tests {
+mod tests {
     use super::*;
 
     fn log(message: &str) -> GameLog {
@@ -1546,7 +1546,7 @@ mod task17_tests {
     }
 
     #[test]
-    fn task17_search_regex_case_toggle() {
+    fn search_regex_case_toggle() {
         let log = log("ERROR launching Minecraft");
         assert_eq!(log.search("ERROR", false, false, true).len(), 1);
         assert_eq!(log.search("ERROR", true, false, true).len(), 1);
@@ -1558,7 +1558,7 @@ mod task17_tests {
     }
 
     #[test]
-    fn task17_search_original_utf16_spans() {
+    fn search_original_utf16_spans() {
         for message in [
             "😀 ERROR",
             "e\u{301} ERROR",
@@ -1581,7 +1581,7 @@ mod task17_tests {
     }
 
     #[test]
-    fn task17_search_literal_controls() {
+    fn search_literal_controls() {
         assert_eq!(log("banana").search("ana", true, false, false).len(), 2);
         assert_eq!(
             log("error terror error_ error!")
@@ -1595,7 +1595,7 @@ mod task17_tests {
     }
 
     #[tokio::test]
-    async fn task17_history_play_before_logs_preserves_live_receiver() {
+    async fn history_play_before_logs_preserves_live_receiver() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(
             dir.path().join("2025-01-14_12-00-00.log"),
@@ -1643,7 +1643,7 @@ mod task17_tests {
     }
 
     #[tokio::test]
-    async fn task17_history_logs_first_and_current_only() {
+    async fn history_logs_first_and_current_only() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("2025-01-14_12-00-00.log"), b"retained\n").unwrap();
         let manager = InstanceManager::new();
@@ -1667,7 +1667,7 @@ mod task17_tests {
         assert_eq!(manager.game_logs.read().await.len(), 1);
     }
     #[tokio::test]
-    async fn task17_history_concurrent_load_retry_and_registration_orders() {
+    async fn history_concurrent_load_retry_and_registration_orders() {
         let dir = tempfile::tempdir().unwrap();
         let blocked = dir.path().join("logs");
         std::fs::write(&blocked, b"not a directory").unwrap();
@@ -1712,7 +1712,7 @@ mod task17_tests {
     }
 
     #[test]
-    fn task17_search_matching_unicode_and_regex_syntax() {
+    fn search_matching_unicode_and_regex_syntax() {
         for (message, query, pos, len) in [
             ("a 😀 b", "😀", 2, 2),
             ("a e\u{301} b", "e\u{301}", 2, 2),
@@ -1728,7 +1728,7 @@ mod task17_tests {
         assert_eq!(log("ΟΣ").search("ος", false, false, false).len(), 1);
     }
     #[tokio::test]
-    async fn task17_r1_history_bad_entry_does_not_hide_later_healthy_sessions() {
+    async fn history_bad_entry_does_not_hide_later_healthy_sessions() {
         let dir = tempfile::tempdir().unwrap();
         let bad = dir.path().join("2025-01-14_12-00-00.log");
         let good = dir.path().join("2025-01-15_12-00-00.log");
@@ -1808,7 +1808,7 @@ mod task17_tests {
     }
 
     #[tokio::test]
-    async fn task17_r1_history_entry_enumeration_error_keeps_following_file() {
+    async fn history_entry_enumeration_error_keeps_following_file() {
         let dir = tempfile::tempdir().unwrap();
         let good = dir.path().join("2025-01-15_12-00-00.log");
         std::fs::write(&good, b"retained after enumeration error\n").unwrap();

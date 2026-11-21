@@ -240,10 +240,10 @@ async fn complete_managed_setup<F: std::future::Future<Output = anyhow::Result<S
 }
 
 #[cfg(test)]
-mod task18_tests {
+mod tests {
     use super::*;
     #[tokio::test]
-    async fn task18_managed_invalidation_follows_persistence_and_not_failure() {
+    async fn managed_invalidation_follows_persistence_and_not_failure() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("managed.db");
         let mut conn = rusqlite::Connection::open(&path).unwrap();

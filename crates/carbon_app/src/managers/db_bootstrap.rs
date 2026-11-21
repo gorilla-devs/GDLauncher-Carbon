@@ -559,7 +559,7 @@ mod test {
     }
 
     #[test]
-    fn task24_db_recovery_noncorruption_causes_have_structured_status() {
+    fn db_recovery_noncorruption_causes_have_structured_status() {
         for (code, category) in [
             (rusqlite::ErrorCode::DatabaseBusy, "locked"),
             (rusqlite::ErrorCode::DatabaseLocked, "locked"),
@@ -585,7 +585,7 @@ mod test {
     }
 
     #[test]
-    fn task24_db_recovery_real_cannot_open_preserves_snapshot() {
+    fn db_recovery_real_cannot_open_preserves_snapshot() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("gdl_conf.db");
         std::fs::create_dir(&path).unwrap();
@@ -602,7 +602,7 @@ mod test {
     }
 
     #[test]
-    fn task24_db_recovery_real_persistent_lock_preserves_bytes() {
+    fn db_recovery_real_persistent_lock_preserves_bytes() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("gdl_conf.db");
         let conn = rusqlite::Connection::open(&path).unwrap();
@@ -622,7 +622,7 @@ mod test {
     }
 
     #[test]
-    fn task24_db_recovery_transient_lock_uses_existing_busy_tolerance() {
+    fn db_recovery_transient_lock_uses_existing_busy_tolerance() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join("gdl_conf.db");
         let conn = rusqlite::Connection::open(&path).unwrap();
@@ -1018,10 +1018,10 @@ mod test {
 }
 
 #[cfg(test)]
-mod task15_bootstrap_tests {
+mod bootstrap_tests {
     use super::*;
     #[test]
-    fn task15_populated_prisma_shim_and_post_shim_upgrade_keep_identities() {
+    fn populated_prisma_shim_and_post_shim_upgrade_keep_identities() {
         for prisma in [true, false] {
             let dir = tempfile::tempdir().unwrap();
             let path = dir.path().join("fixture.db");
@@ -1095,7 +1095,7 @@ mod task15_bootstrap_tests {
 }
 
 #[cfg(test)]
-mod task21_legacy_tests {
+mod legacy_tests {
     use super::*;
     fn fixture(prefix: usize) -> (tempfile::TempDir, PathBuf, MigrationSet) {
         let dir = tempfile::tempdir().unwrap();
@@ -1130,7 +1130,7 @@ mod task21_legacy_tests {
             .unwrap()
     }
     #[test]
-    fn task21_legacy_rolled_back_and_failed_attempts_add_no_slots() {
+    fn legacy_rolled_back_and_failed_attempts_add_no_slots() {
         for prefix in [24, 25] {
             let (_dir, path, current) = fixture(prefix);
             let c = rusqlite::Connection::open(&path).unwrap();
@@ -1165,7 +1165,7 @@ mod task21_legacy_tests {
         }
     }
     #[test]
-    fn task21_legacy_malformed_history_is_retained() {
+    fn legacy_malformed_history_is_retained() {
         let (_dir, path, current) = fixture(25);
         let c = rusqlite::Connection::open(&path).unwrap();
         c.execute_batch("DROP TABLE _prisma_migrations;CREATE TABLE _prisma_migrations(id TEXT,finished_at TEXT);INSERT INTO _prisma_migrations VALUES('bad','done')").unwrap();
@@ -1224,7 +1224,7 @@ mod task21_legacy_tests {
         assert_eq!(carbon_repos::schema_dump::dump_schema(&c).unwrap(), before);
     }
     #[test]
-    fn task21_legacy_gap_unknown_duplicate_and_schema_mismatch_refuse_without_mutation() {
+    fn legacy_gap_unknown_duplicate_and_schema_mismatch_refuse_without_mutation() {
         for case in ["gap", "unknown", "duplicate", "schema"] {
             let (_dir, path, current) = fixture(25);
             let c = rusqlite::Connection::open(&path).unwrap();
@@ -1257,7 +1257,7 @@ mod task21_legacy_tests {
         }
     }
     #[test]
-    fn task21_legacy_metadata_write_failure_rolls_conversion_back() {
+    fn legacy_metadata_write_failure_rolls_conversion_back() {
         let (_dir, path, current) = fixture(25);
         let mut c = rusqlite::Connection::open(&path).unwrap();
         let mut prefix = carbon_repos::get_migrations().0;
@@ -1291,7 +1291,7 @@ mod task21_legacy_tests {
         assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
     }
     #[test]
-    fn task21_legacy_valid_checksum_and_contradictory_owned_metadata() {
+    fn legacy_valid_checksum_and_contradictory_owned_metadata() {
         for bad in [false, true] {
             let (_dir, path, current) = fixture(25);
             let c = rusqlite::Connection::open(&path).unwrap();
@@ -1325,7 +1325,7 @@ mod task21_legacy_tests {
         assert_eq!(version(&path), 24);
     }
     #[test]
-    fn task21_legacy_conversion_does_not_promise_pending_upgrade_atomicity() {
+    fn legacy_conversion_does_not_promise_pending_upgrade_atomicity() {
         let (_dir, path, mut current) = fixture(25);
         current.migrations.push(carbon_repos::compat::MigrationDef {
             name: "synthetic_pending_failure",
@@ -1350,7 +1350,7 @@ mod task21_legacy_tests {
         assert_eq!(migrate_db(&path, &current).unwrap(), OpenVerdict::Proceed);
     }
     #[test]
-    fn task21_legacy_absent_history_fresh_and_clean_prefix_controls() {
+    fn legacy_absent_history_fresh_and_clean_prefix_controls() {
         let dir = tempfile::tempdir().unwrap();
         let fresh = dir.path().join("fresh.db");
         let current = carbon_repos::get_migrations().0;
@@ -1382,7 +1382,7 @@ mod task21_legacy_tests {
 /// Legacy conversion against the history table Prisma's engine really wrote
 /// (2.0.0-2.0.9, before 2.0.11-beta dropped it): Prisma's exact SQLite DDL,
 /// DATETIME columns holding INTEGER `timestamp_millis()`, sha256 checksums of
-/// the migration scripts. The task15/task21 fixtures above use a reduced table
+/// the migration scripts. The fixtures above use a reduced table
 /// with TEXT timestamps and never reach the decode path real users take.
 #[cfg(test)]
 mod prisma_era_history_tests {

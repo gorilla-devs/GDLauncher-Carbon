@@ -298,11 +298,11 @@ async fn archive_digest(file: fs::File) -> anyhow::Result<String> {
 }
 
 #[cfg(test)]
-mod task13_tests {
+mod tests {
     use super::*;
     use std::io::{Seek, Write};
     #[tokio::test]
-    async fn task13_archive_digest_covers_manifest_and_tail() {
+    async fn archive_digest_covers_manifest_and_tail() {
         let t = tempfile::tempdir().unwrap();
         let path = t.path().join("synthetic.mrpack");
         let mut zip = zip::ZipWriter::new(fs::File::create(&path).unwrap());

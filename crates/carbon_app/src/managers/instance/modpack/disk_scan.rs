@@ -353,7 +353,7 @@ mod tests {
 
     #[cfg(unix)]
     #[tokio::test]
-    async fn task08_fresh_required_dangling_path_is_error_not_verified_missing() {
+    async fn fresh_required_dangling_path_is_error_not_verified_missing() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::create_dir(dir.path().join("mods")).unwrap();
         std::os::unix::fs::symlink("absent", dir.path().join("mods/required.jar")).unwrap();
@@ -782,7 +782,7 @@ mod tests {
         );
     }
     #[tokio::test]
-    async fn task03_case_probe_preserves_aged_user_notes() {
+    async fn case_probe_preserves_aged_user_notes() {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().join(".gdl-case-probe-user-notes.txt");
         std::fs::write(&path, b"my notes").unwrap();

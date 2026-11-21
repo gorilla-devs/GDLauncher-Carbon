@@ -1267,10 +1267,10 @@ fn mrpack_downloadable(
         )))
 }
 #[cfg(test)]
-mod task06_tests {
+mod descriptor_tests {
     use super::*;
     #[test]
-    fn task06_mrpack_descriptor_keeps_integrity() {
+    fn mrpack_descriptor_keeps_integrity() {
         let file: carbon_platforms::modrinth::version::ModrinthFile = serde_json::from_value(serde_json::json!({
             "path": "mods/fixture.jar", "hashes": {"sha1": "a94a8fe5ccb19ba61c4c0873d391e987982fbbd3", "sha512": "ee26b0dd4af7e749aa1a8ee3c10ae9923f618980772e473f8819a5d4940e0db27ac185f8a0e1d5f84f88bc887fd67b143732c304cc5fa9ad8e6f57f50028a8ff"},
             "downloads": ["https://fixture.invalid/artifact"], "fileSize": 4
@@ -1284,11 +1284,11 @@ mod task06_tests {
 }
 
 #[cfg(test)]
-mod task07_save_tests {
+mod save_tests {
     use super::*;
     use std::io::Write;
     #[test]
-    fn task07_custom_and_metadata_worlds_survive_pack_extraction() {
+    fn custom_and_metadata_worlds_survive_pack_extraction() {
         let root = tempfile::tempdir().unwrap();
         let data = root.path().join("server");
         std::fs::create_dir(&data).unwrap();
@@ -1551,11 +1551,11 @@ mod odd_entry_tests {
 }
 
 #[cfg(test)]
-mod task07r1_alias_tests {
+mod alias_tests {
     use super::*;
     use std::io::Write;
     #[test]
-    fn task07r1_r1_effective_save_config_eula_aliases_are_preserved() {
+    fn effective_save_config_eula_aliases_are_preserved() {
         for mr in [false, true] {
             for prefix in ["./", "config/../", "Wrapper/config/../"] {
                 let root = tempfile::tempdir().unwrap();
@@ -1627,7 +1627,7 @@ mod task07r1_alias_tests {
 
 #[cfg(test)]
 #[test]
-fn task07r1_r1_index_destinations_share_effective_save_and_operator_policy() {
+fn index_destinations_share_effective_save_and_operator_policy() {
     let root = tempfile::tempdir().unwrap();
     std::fs::create_dir(root.path().join("AdventureMap")).unwrap();
     std::fs::write(
@@ -1665,7 +1665,7 @@ fn task07r1_r1_index_destinations_share_effective_save_and_operator_policy() {
 }
 
 #[cfg(all(test, target_os = "linux"))]
-mod task07r2_operator_tests {
+mod operator_tests {
     use super::*;
     use std::io::Write;
 
@@ -1701,7 +1701,7 @@ mod task07r2_operator_tests {
     }
 
     #[test]
-    fn task07r2_operator_case_equivalence_preserves_real_cf_mr_archive_destinations() {
+    fn operator_case_equivalence_preserves_real_cf_mr_archive_destinations() {
         for mr in [false, true] {
             for insensitive in [true, false] {
                 for disk_upper in [true, false] {
@@ -1775,7 +1775,7 @@ mod task07r2_operator_tests {
     }
 
     #[test]
-    fn task07r2_index_operator_policy_uses_canonical_destination_equivalence() {
+    fn index_operator_policy_uses_canonical_destination_equivalence() {
         for insensitive in [true, false] {
             for disk_upper in [true, false] {
                 for archive_upper in [false, true] {
@@ -1830,7 +1830,7 @@ mod task07r2_operator_tests {
     }
 
     #[test]
-    fn task07r2_native_case_distinct_files_remain_independent() {
+    fn native_case_distinct_files_remain_independent() {
         let root = tempfile::tempdir().unwrap();
         std::fs::write(root.path().join("server.properties"), ORIGINAL).unwrap();
         std::fs::write(
@@ -1862,7 +1862,7 @@ mod task07r2_operator_tests {
 /// Shared direct archive writer. The owner retains entered writes and flushes.
 
 #[cfg(test)]
-mod task18_r1_stream_tests {
+mod stream_cancel_tests {
     use super::*;
     use std::{
         pin::Pin,
@@ -1910,7 +1910,7 @@ mod task18_r1_stream_tests {
         }))
     }
     #[tokio::test]
-    async fn task18_r1_archive_pending_body_cancels_without_new_phase() {
+    async fn archive_pending_body_cancels_without_new_phase() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("archive");
         let mut file = tokio::fs::File::create(&path).await.unwrap();
@@ -1935,7 +1935,7 @@ mod task18_r1_stream_tests {
         assert!(std::fs::read(path).unwrap().is_empty());
     }
     #[tokio::test]
-    async fn task18_r1_archive_cancel_awaits_entered_real_write_and_flush() {
+    async fn archive_cancel_awaits_entered_real_write_and_flush() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("archive");
         let file = tokio::fs::File::create(&path).await.unwrap();
@@ -1973,7 +1973,7 @@ mod task18_r1_stream_tests {
         assert_eq!(std::fs::read(path).unwrap(), b"entered archive bytes");
     }
     #[tokio::test]
-    async fn task18_r1_archive_healthy_completion_retains_bytes_and_progress() {
+    async fn archive_healthy_completion_retains_bytes_and_progress() {
         let root = tempfile::tempdir().unwrap();
         let path = root.path().join("archive");
         let mut file = tokio::fs::File::create(&path).await.unwrap();
@@ -2044,7 +2044,7 @@ where
 }
 
 #[cfg(test)]
-mod task18_r2_phase_tests {
+mod phase_tests {
     use super::*;
     use crate::managers::runtime_lifecycle::{
         ActivityPolicy, RuntimeLifecycle, ShutdownPurpose, run_owned_phase, spawn_retained,
@@ -2167,15 +2167,15 @@ mod task18_r2_phase_tests {
         }
     }
     #[tokio::test]
-    async fn task18_r2_cancel_during_hash_refuses_next_extraction() {
+    async fn cancel_during_hash_refuses_next_extraction() {
         phase_case(true, true).await;
     }
     #[tokio::test]
-    async fn task18_r2_cancel_during_directory_io_refuses_next_extraction() {
+    async fn cancel_during_directory_io_refuses_next_extraction() {
         phase_case(false, true).await;
     }
     #[tokio::test]
-    async fn task18_r2_healthy_hash_directory_and_extraction_complete() {
+    async fn healthy_hash_directory_and_extraction_complete() {
         phase_case(true, false).await;
         phase_case(false, false).await;
     }
@@ -2220,10 +2220,10 @@ impl<'a> ArchiveProgress<'a> {
     }
 }
 #[cfg(test)]
-mod task21_stream_tests {
+mod stream_progress_tests {
     use super::*;
     #[tokio::test]
-    async fn task21_stream_progress_native_width_final_flush_and_opaque() {
+    async fn stream_progress_native_width_final_flush_and_opaque() {
         let task = VisualTask::new(Translation::Test);
         let download = task.subtask(Translation::Test);
         let mut progress = ArchiveProgress::new(&download, Some(5_368_709_120));

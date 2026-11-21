@@ -472,9 +472,9 @@ async fn group_by_name_and_default_first_ordering() {
     );
 }
 
-// Task43: production migrated transactions, durable coordinates and refusal.
+// Production migrated transactions, durable coordinates and refusal.
 #[tokio::test]
-async fn task43_unlink_prepend_and_sparse_coordinates_survive_reopen() {
+async fn unlink_prepend_and_sparse_coordinates_survive_reopen() {
     for (root_indices, root_positions, source_indices, first_index, first_position) in [
         (vec![0], vec![None], vec![0, -1], 1, 121),
         (vec![4, 90], vec![Some(80), Some(-7)], vec![0, -1], 91, 121),
@@ -578,7 +578,7 @@ async fn task43_unlink_prepend_and_sparse_coordinates_survive_reopen() {
         // Optional owned artifact compares these actual committed rows with
         // the existing TS folders-first renderer, not a mirrored SQL model.
         if first_position == 501 {
-            if let Ok(path) = std::env::var("TASK43_SERVER_PROJECTION") {
+            if let Ok(path) = std::env::var("SERVER_PROJECTION_FIXTURE") {
                 let groups = s::get_all_server_groups(&db).await.unwrap();
                 let mut projection = vec![format!("D\t{def}")];
                 for group in groups {
@@ -618,7 +618,7 @@ async fn task43_unlink_prepend_and_sparse_coordinates_survive_reopen() {
 }
 
 #[tokio::test]
-async fn task43_unlink_coordinate_overflow_is_atomic_after_partial_move() {
+async fn unlink_coordinate_overflow_is_atomic_after_partial_move() {
     for (index, position) in [(i32::MAX - 1, Some(0)), (0, Some(i32::MAX - 1))] {
         let (dir, db) = migrated_db().await;
         let def = s::find_server_group_by_name(&db, "Default")
@@ -643,7 +643,7 @@ async fn task43_unlink_coordinate_overflow_is_atomic_after_partial_move() {
 }
 
 #[tokio::test]
-async fn task43_unlink_late_delete_failure_rolls_back_and_empty_folder_works() {
+async fn unlink_late_delete_failure_rolls_back_and_empty_folder_works() {
     let (dir, db) = migrated_db().await;
     let def = s::find_server_group_by_name(&db, "Default")
         .await

@@ -849,7 +849,7 @@ mod test {
 }
 
 #[cfg(test)]
-mod task18_tests {
+mod tests {
     use super::*;
 
     struct OutcomeChecker(&'static str);
@@ -974,15 +974,15 @@ mod task18_tests {
         }
     }
     #[tokio::test]
-    async fn task18_r1_local_scan_preserves_inconclusive_and_invalidates_proven_failure() {
+    async fn local_scan_preserves_inconclusive_and_invalidates_proven_failure() {
         uncertain_scan(JavaComponentType::Local).await;
     }
     #[tokio::test]
-    async fn task18_r1_custom_scan_preserves_inconclusive_and_invalidates_proven_failure() {
+    async fn custom_scan_preserves_inconclusive_and_invalidates_proven_failure() {
         uncertain_scan(JavaComponentType::Custom).await;
     }
     #[tokio::test]
-    async fn task18_r1_managed_scan_preserves_inconclusive_and_invalidates_proven_failure() {
+    async fn managed_scan_preserves_inconclusive_and_invalidates_proven_failure() {
         uncertain_scan(JavaComponentType::Managed).await;
     }
 
@@ -1024,7 +1024,7 @@ mod task18_tests {
         (dir, db)
     }
     #[tokio::test]
-    async fn task18_custom_java_refresh_preserves_identity_and_custom_link() {
+    async fn custom_java_refresh_preserves_identity_and_custom_link() {
         let (_root, db) = fixture().await;
         let component = JavaComponent {
             path: "fixture-java".into(),
@@ -1101,7 +1101,7 @@ mod task18_tests {
         );
     }
     #[tokio::test]
-    async fn task18_custom_java_reconsiders_only_incompatible_system_links() {
+    async fn custom_java_reconsiders_only_incompatible_system_links() {
         let (_root, db) = fixture().await;
         for profile in SystemJavaProfileName::iter() {
             java_repo::upsert_profile(&db, &profile.to_string(), true)
@@ -1193,7 +1193,7 @@ mod task18_tests {
         }
     }
     #[tokio::test]
-    async fn task18_java_auto_management_off_preserves_assignment_and_compatible_control() {
+    async fn java_auto_management_off_preserves_assignment_and_compatible_control() {
         let (_root, db) = fixture().await;
         for profile in SystemJavaProfileName::iter() {
             java_repo::upsert_profile(&db, &profile.to_string(), true)

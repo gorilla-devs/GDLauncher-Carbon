@@ -54,7 +54,7 @@ it.each([
   "absent-app",
   "already-stopped"
 ])("connected cleanup physical effects: %s", async (mode) => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "task43-game-cleanup-"))
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-game-cleanup-"))
   const runtime = path.join(root, "runtime")
   const appResource = path.join(root, "app")
   const coreResource = path.join(root, "core")

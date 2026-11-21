@@ -52,7 +52,7 @@ fn mr(filename: &str, bytes: &[u8]) -> ModrinthModInstaller {
 }
 
 #[tokio::test]
-async fn task05_replace_modrinth_checks_real_artifact_and_kind() {
+async fn replace_modrinth_checks_real_artifact_and_kind() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, path) = super::super::mods::tests::addon_fixture(
         &app,
@@ -237,7 +237,7 @@ fn zip(path: &std::path::Path, entries: &[(&str, &[u8])]) {
 }
 
 #[tokio::test]
-async fn task05_replace_same_filename_distinct_artifact_is_not_satisfied() {
+async fn replace_same_filename_distinct_artifact_is_not_satisfied() {
     let app = crate::setup_managers_for_test().await;
     let (id, _, _) = super::super::mods::tests::addon_fixture(
         &app,
@@ -252,7 +252,7 @@ async fn task05_replace_same_filename_distinct_artifact_is_not_satisfied() {
 }
 
 #[tokio::test]
-async fn task05_replace_disabled_different_filename_stays_disabled() {
+async fn replace_disabled_different_filename_stays_disabled() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, path) = super::super::mods::tests::addon_fixture(
         &app,
@@ -300,7 +300,7 @@ async fn task05_replace_disabled_different_filename_stays_disabled() {
 }
 
 #[tokio::test]
-async fn task05_shader_explicit_intent_enables_exact_disabled_artifact() {
+async fn shader_explicit_intent_enables_exact_disabled_artifact() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, path) = super::super::mods::tests::addon_fixture(
         &app,
@@ -365,7 +365,7 @@ async fn task05_shader_explicit_intent_enables_exact_disabled_artifact() {
 }
 
 #[tokio::test]
-async fn task05_replace_late_destination_keeps_foreign_bytes_and_backup() {
+async fn replace_late_destination_keeps_foreign_bytes_and_backup() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, old) = super::super::mods::tests::addon_fixture(
         &app,
@@ -409,7 +409,7 @@ async fn task05_replace_late_destination_keeps_foreign_bytes_and_backup() {
 }
 
 #[tokio::test]
-async fn task05_replace_scanner_finishes_before_owned_publication_and_refresh() {
+async fn replace_scanner_finishes_before_owned_publication_and_refresh() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, old) = super::super::mods::tests::addon_fixture(
         &app,
@@ -480,7 +480,7 @@ async fn task05_replace_scanner_finishes_before_owned_publication_and_refresh() 
 }
 
 #[tokio::test]
-async fn task05_world_scanner_waits_for_reservation_and_skips_owned_incomplete_marker() {
+async fn world_scanner_waits_for_reservation_and_skips_owned_incomplete_marker() {
     let app = crate::setup_managers_for_test().await;
     let (id, _, _) = super::super::mods::tests::addon_fixture(
         &app,
@@ -545,7 +545,7 @@ async fn task05_world_scanner_waits_for_reservation_and_skips_owned_incomplete_m
 }
 
 #[tokio::test]
-async fn task05_world_late_arrival_and_partial_failure_are_preserved() {
+async fn world_late_arrival_and_partial_failure_are_preserved() {
     let dir = tempfile::tempdir().unwrap();
     let archive = dir.path().join("archive.zip");
     zip(
@@ -696,7 +696,7 @@ async fn copied_world_files_land_where_the_drive_refuses_a_full_flush() {
 }
 
 #[tokio::test]
-async fn task05_world_download_filename_never_occupies_a_save_path() {
+async fn world_download_filename_never_occupies_a_save_path() {
     let app = crate::setup_managers_for_test().await;
     let (id, _, existing) = super::super::mods::tests::addon_fixture(
         &app,
@@ -738,7 +738,7 @@ async fn task05_world_download_filename_never_occupies_a_save_path() {
 }
 
 #[tokio::test]
-async fn task05_replace_locked_refuses_before_mutation() {
+async fn replace_locked_refuses_before_mutation() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, path) = super::super::mods::tests::addon_fixture(
         &app,
@@ -784,7 +784,7 @@ async fn task05_replace_locked_refuses_before_mutation() {
 /// pack) are left out now, and a world at the archive's root is no longer
 /// spilled into the saves folder.
 #[tokio::test]
-async fn task05_world_root_and_wrapper_layouts_and_invalid_archives() {
+async fn world_root_and_wrapper_layouts_and_invalid_archives() {
     type Files<'a> = Vec<(&'a str, &'a [u8])>;
     let cases: Vec<(Files, Vec<&str>, Files)> = vec![
         (
@@ -887,7 +887,7 @@ async fn task05_world_root_and_wrapper_layouts_and_invalid_archives() {
 }
 
 #[tokio::test]
-async fn task05_replace_same_path_keeps_new_bytes_and_row_id() {
+async fn replace_same_path_keeps_new_bytes_and_row_id() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, old) = super::super::mods::tests::addon_fixture(
         &app,
@@ -925,7 +925,7 @@ async fn task05_replace_same_path_keeps_new_bytes_and_row_id() {
 }
 
 #[tokio::test]
-async fn task05_replace_rechecks_bytes_toggle_and_collision() {
+async fn replace_rechecks_bytes_toggle_and_collision() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, old) = super::super::mods::tests::addon_fixture(
         &app,
@@ -981,7 +981,7 @@ async fn task05_replace_rechecks_bytes_toggle_and_collision() {
 }
 
 #[tokio::test]
-async fn task05_replace_ordinary_identical_disabled_install_preserves_intent() {
+async fn replace_ordinary_identical_disabled_install_preserves_intent() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, path) = super::super::mods::tests::addon_fixture(
         &app,
@@ -1013,7 +1013,7 @@ async fn task05_replace_ordinary_identical_disabled_install_preserves_intent() {
 /// reset it or for its next release, or any map called "New World") installs
 /// it beside the existing save, which stays as it is.
 #[tokio::test]
-async fn task05_world_collision_preserves_existing_save() {
+async fn world_collision_preserves_existing_save() {
     let dir = tempfile::tempdir().unwrap();
     let instance = InstancePath::new(dir.path().to_path_buf());
     let saves = instance.get_saves_path();
@@ -1385,7 +1385,7 @@ async fn a_world_unpacks_without_holding_the_instance() {
 }
 
 #[tokio::test]
-async fn task05_normal_enabled_identical_artifact_is_a_real_noop() {
+async fn normal_enabled_identical_artifact_is_a_real_noop() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, path) = super::super::mods::tests::addon_fixture(
         &app,
@@ -1681,7 +1681,7 @@ async fn a_copy_spelled_otherwise_on_a_case_insensitive_drive_gets_no_second_row
 }
 
 #[tokio::test]
-async fn task05_normal_disabled_zip_remains_disabled_after_real_scan() {
+async fn normal_disabled_zip_remains_disabled_after_real_scan() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, path) = super::super::mods::tests::addon_fixture(
         &app,
@@ -1717,7 +1717,7 @@ async fn task05_normal_disabled_zip_remains_disabled_after_real_scan() {
 }
 
 #[tokio::test]
-async fn task05_round1_scanner_ignores_saves_files_and_refreshes_changed_mod() {
+async fn scanner_ignores_saves_files_and_refreshes_changed_mod() {
     let app = crate::setup_managers_for_test().await;
     let (id, _, old) = super::super::mods::tests::addon_fixture(
         &app,
@@ -1923,7 +1923,7 @@ async fn wait_for_install(installer: &Installer, app: &Arc<AppInner>, task_id: V
 }
 
 #[tokio::test]
-async fn task05_round1_world_version_installs_separate_copy_keeps_original_row() {
+async fn world_version_installs_separate_copy_keeps_original_row() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, old) = super::super::mods::tests::addon_fixture(
         &app,
@@ -1957,7 +1957,7 @@ async fn task05_round1_world_version_installs_separate_copy_keeps_original_row()
 }
 
 #[tokio::test]
-async fn task05_round1_enabled_original_replacement_remains_enabled() {
+async fn enabled_original_replacement_remains_enabled() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, old) = super::super::mods::tests::addon_fixture(
         &app,
@@ -1990,7 +1990,7 @@ async fn task05_round1_enabled_original_replacement_remains_enabled() {
 }
 
 #[tokio::test]
-async fn task05_round1_world_copy_revalidates_owner_row_and_original_directory() {
+async fn world_copy_revalidates_owner_row_and_original_directory() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, original) = super::super::mods::tests::addon_fixture(
         &app,
@@ -2059,7 +2059,7 @@ async fn task05_round1_world_copy_revalidates_owner_row_and_original_directory()
 }
 
 #[tokio::test]
-async fn task05_round1_world_copy_reserves_past_occupied_and_late_destinations() {
+async fn world_copy_reserves_past_occupied_and_late_destinations() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, old) = super::super::mods::tests::addon_fixture(
         &app,
@@ -2128,7 +2128,7 @@ async fn task05_round1_world_copy_reserves_past_occupied_and_late_destinations()
 }
 
 #[tokio::test]
-async fn task05_round1_world_copy_suffix_limit_retains_all_occupants() {
+async fn world_copy_suffix_limit_retains_all_occupants() {
     let root = tempfile::tempdir().unwrap();
     let archive = root.path().join("world.zip");
     zip(&archive, &[("World/level.dat", b"copy")]);
@@ -2158,7 +2158,7 @@ async fn task05_round1_world_copy_suffix_limit_retains_all_occupants() {
 }
 
 #[tokio::test]
-async fn task05_round1_world_copy_accepts_distinct_archive_root() {
+async fn world_copy_accepts_distinct_archive_root() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, old) = super::super::mods::tests::addon_fixture(
         &app,
@@ -2197,7 +2197,7 @@ async fn task05_round1_world_copy_accepts_distinct_archive_root() {
 }
 
 #[tokio::test]
-async fn task06_installer_abort_awaits_owned_file_work() {
+async fn installer_abort_awaits_owned_file_work() {
     let installer =
         Arc::new(cf("fixture.jar", b"test", curseforge::ClassId::Mods).into_installer());
     let directory = tempfile::tempdir().unwrap();
@@ -2236,14 +2236,14 @@ async fn task06_installer_abort_awaits_owned_file_work() {
 }
 
 #[tokio::test]
-async fn task06_installer_missing_ack_does_not_certify_settlement() {
+async fn installer_missing_ack_does_not_certify_settlement() {
     let (sender, receiver) = watch::channel(false);
     drop(sender);
     assert!(wait_install_completion(Some(receiver)).await.is_err());
 }
 
 #[tokio::test]
-async fn task06_installer_abort_settles_admission_before_return() {
+async fn installer_abort_settles_admission_before_return() {
     let installer =
         Arc::new(cf("fixture.jar", b"test", curseforge::ClassId::Mods).into_installer());
     let admission = installer.admission.lock().await;
@@ -2261,7 +2261,7 @@ async fn task06_installer_abort_settles_admission_before_return() {
     abort.await.unwrap();
 }
 
-mod round1_graph {
+mod dependency_graph_tests {
     use super::*;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::sync::{Notify, Semaphore, oneshot};
@@ -2402,7 +2402,7 @@ mod round1_graph {
         let app = crate::setup_managers_for_test().await;
         let (id, _, _) = crate::managers::instance::mods::tests::addon_fixture(
             &app,
-            &format!("round1-{mode}"),
+            &format!("dependency-{mode}"),
             instance::AddonType::Mods,
             "existing.jar",
             b"existing",
@@ -2704,43 +2704,43 @@ mod round1_graph {
     // carbon_scheduler::cpu_block, whose WaitFuture calls block_in_place when
     // dropped mid-hash, and that panics while a current_thread runtime shuts down.
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn task06_round1_graph_dropped_error_cleanup_remains_unknown() {
+    async fn graph_dropped_error_cleanup_remains_unknown() {
         run("cleanup-drop").await;
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn task06_round1_graph_concurrent_abort_waits_for_error_cleanup() {
+    async fn graph_concurrent_abort_waits_for_error_cleanup() {
         run("cleanup-complete").await;
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn task06_round1_graph_missing_worker_ack_forbids_rollback() {
+    async fn graph_missing_worker_ack_forbids_rollback() {
         run("missing-ack").await;
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn task06_round1_graph_dropped_admission_reports_unknown() {
+    async fn graph_dropped_admission_reports_unknown() {
         run("drop-admission").await;
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn task06_round1_graph_required_dependency_success() {
+    async fn graph_required_dependency_success() {
         run("success").await;
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn task06_round1_graph_finished_middle_settles_leaf() {
+    async fn graph_finished_middle_settles_leaf() {
         run("finished-mid").await;
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn task06_round1_graph_satisfied_middle_settles_leaf() {
+    async fn graph_satisfied_middle_settles_leaf() {
         run("satisfied-mid").await;
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn task06_round1_graph_post_dependency_error_settles_leaf() {
+    async fn graph_post_dependency_error_settles_leaf() {
         run("post-error").await;
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn task06_round1_graph_failed_child_admission_retains_leaf() {
+    async fn graph_failed_child_admission_retains_leaf() {
         run("mid-error").await;
     }
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn task06_round1_graph_dependency_error_is_not_satisfied_success() {
+    async fn graph_dependency_error_is_not_satisfied_success() {
         run("dependency-error").await;
     }
 
@@ -3348,7 +3348,7 @@ mod round1_graph {
 }
 
 #[tokio::test]
-async fn task10_required_disabled_project_is_not_satisfied() {
+async fn required_disabled_project_is_not_satisfied() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, path) = super::super::mods::tests::addon_fixture(
         &app,
@@ -3410,12 +3410,12 @@ async fn task10_required_disabled_project_is_not_satisfied() {
     );
 }
 
-struct Task10ReplacementResource {
+struct ReplacementResource {
     resource: CurseforgeModInstaller,
     discovered: Arc<std::sync::atomic::AtomicBool>,
 }
 #[async_trait::async_trait]
-impl ResourceInstaller for Task10ReplacementResource {
+impl ResourceInstaller for ReplacementResource {
     fn id(&self) -> String {
         self.resource.id()
     }
@@ -3462,7 +3462,7 @@ impl ResourceInstaller for Task10ReplacementResource {
 }
 
 #[tokio::test]
-async fn task10_replacement_preserves_old_on_required_resolution_failure() {
+async fn replacement_preserves_old_on_required_resolution_failure() {
     let app = crate::setup_managers_for_test().await;
     assert!(
         app.settings_manager()
@@ -3480,7 +3480,7 @@ async fn task10_replacement_preserves_old_on_required_resolution_failure() {
     )
     .await;
     let discovered = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let mut installer = Installer::new(Box::new(Task10ReplacementResource {
+    let mut installer = Installer::new(Box::new(ReplacementResource {
         resource: cf("parent.jar", b"new", curseforge::ClassId::Mods),
         discovered: discovered.clone(),
     }));
@@ -3506,7 +3506,7 @@ async fn task10_replacement_preserves_old_on_required_resolution_failure() {
 }
 
 #[test]
-fn task10_required_catalogue_rejects_incompatible_and_accepts_later_match() {
+fn required_catalogue_rejects_incompatible_and_accepts_later_match() {
     use domain::instance::info::{ModLoader, ModLoaderType};
     let target = (
         "1.20.1".into(),
@@ -3535,7 +3535,7 @@ fn task10_required_catalogue_rejects_incompatible_and_accepts_later_match() {
 }
 
 #[test]
-fn task10_loader_independent_pack_selects_matching_game() {
+fn loader_independent_pack_selects_matching_game() {
     let target = ("1.20.1".into(), std::collections::HashSet::new());
     let mut wrong = mr("wrong.zip", b"wrong").version;
     wrong.game_versions = vec!["1.21".into()];
@@ -3552,7 +3552,7 @@ fn task10_loader_independent_pack_selects_matching_game() {
 }
 
 #[tokio::test]
-async fn task10_streamed_progress_arrives_before_transfer_eof() {
+async fn streamed_progress_arrives_before_transfer_eof() {
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     let app = crate::setup_managers_for_test().await;
     let (id, _, _) = super::super::mods::tests::addon_fixture(
@@ -3609,7 +3609,7 @@ async fn task10_streamed_progress_arrives_before_transfer_eof() {
 }
 
 #[tokio::test]
-async fn task10_receipt_rollback_restores_old_and_preserves_later_edits() {
+async fn receipt_rollback_restores_old_and_preserves_later_edits() {
     for mode in ["owned", "edited", "equal-later-occupant"] {
         let app = crate::setup_managers_for_test().await;
         let (id, row, old) = super::super::mods::tests::addon_fixture(
@@ -3694,7 +3694,7 @@ async fn task10_receipt_rollback_restores_old_and_preserves_later_edits() {
 }
 
 #[tokio::test]
-async fn task10_setup_policy_preserves_initial_and_imported_but_refuses_pending() {
+async fn setup_policy_preserves_initial_and_imported_but_refuses_pending() {
     use super::super::modpack::session::{Kind, Phase, Producer, Session};
     let app = crate::setup_managers_for_test().await;
     let (id, _, _) = super::super::mods::tests::addon_fixture(
@@ -4039,7 +4039,7 @@ async fn rollback_that_cannot_put_the_old_version_back_keeps_the_new_one() {
 }
 
 #[tokio::test]
-async fn task10_current_future_sizes_are_bounded() {
+async fn current_future_sizes_are_bounded() {
     let app = crate::setup_managers_for_test().await;
     let resource = cf("test.jar", b"new", curseforge::ClassId::Mods);
     let stage = tempfile::NamedTempFile::new().unwrap();
@@ -4056,7 +4056,7 @@ async fn task10_current_future_sizes_are_bounded() {
     assert!(installer_size < 262144);
 }
 
-mod task10_graph {
+mod graph {
     use super::*;
     use std::collections::HashMap;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -4157,7 +4157,7 @@ mod task10_graph {
             DependencyIterator::new(children.into_iter())
         }
     }
-    async fn round1(mode: &str) {
+    async fn satisfied_dependency_case(mode: &str) {
         let app = crate::setup_managers_for_test().await;
         let satisfied = mode.starts_with("satisfied");
         let (id, row, old) = super::super::super::mods::tests::addon_fixture(
@@ -4352,32 +4352,32 @@ mod task10_graph {
         }
     }
     #[tokio::test]
-    async fn task10_r1_satisfied_root_finalizer_commits_usable_children() {
-        round1("satisfied-success").await;
+    async fn satisfied_root_finalizer_commits_usable_children() {
+        satisfied_dependency_case("satisfied-success").await;
     }
     #[tokio::test]
-    async fn task10_r1_satisfied_root_unknown_forbids_sibling_rollback() {
-        round1("satisfied-unknown").await;
+    async fn satisfied_root_unknown_forbids_sibling_rollback() {
+        satisfied_dependency_case("satisfied-unknown").await;
     }
     #[tokio::test]
-    async fn task10_r1_satisfied_root_rolls_back_completed_sibling() {
-        round1("satisfied").await;
+    async fn satisfied_root_rolls_back_completed_sibling() {
+        satisfied_dependency_case("satisfied").await;
     }
     #[tokio::test]
-    async fn task10_r1_satisfied_root_retains_edited_sibling() {
-        round1("satisfied-edited").await;
+    async fn satisfied_root_retains_edited_sibling() {
+        satisfied_dependency_case("satisfied-edited").await;
     }
     #[tokio::test]
-    async fn task10_r1_exact_root_self_cycle_completes() {
-        round1("self-exact").await;
+    async fn exact_root_self_cycle_completes() {
+        satisfied_dependency_case("self-exact").await;
     }
     #[tokio::test]
-    async fn task10_r1_unpinned_root_self_cycle_completes() {
-        round1("self-unpinned").await;
+    async fn unpinned_root_self_cycle_completes() {
+        satisfied_dependency_case("self-unpinned").await;
     }
     #[tokio::test]
-    async fn task10_r1_root_self_cycle_cancellation_settles() {
-        round1("self-cancel").await;
+    async fn root_self_cycle_cancellation_settles() {
+        satisfied_dependency_case("self-cancel").await;
     }
 
     async fn run(mode: &str) {
@@ -4614,39 +4614,39 @@ mod task10_graph {
         }
     }
     #[tokio::test]
-    async fn task10_graph_late_root_failure_rolls_back_published_descendants() {
+    async fn graph_late_root_failure_rolls_back_published_descendants() {
         run("published-rollback").await;
     }
     #[tokio::test]
-    async fn task10_graph_late_root_failure_retains_edited_descendant() {
+    async fn graph_late_root_failure_retains_edited_descendant() {
         run("edited-dependency").await;
     }
     #[tokio::test]
-    async fn task10_graph_unpinned_then_exact_replans() {
+    async fn graph_unpinned_then_exact_replans() {
         run("late-pin").await;
     }
     #[tokio::test]
-    async fn task10_graph_exact_then_unpinned_reuses_pin() {
+    async fn graph_exact_then_unpinned_reuses_pin() {
         run("early-pin").await;
     }
     #[tokio::test]
-    async fn task10_graph_unpinned_cycle_reuses_older_root() {
+    async fn graph_unpinned_cycle_reuses_older_root() {
         run("older-cycle").await;
     }
     #[tokio::test]
-    async fn task10_graph_cycle_completes_all_artifacts() {
+    async fn graph_cycle_completes_all_artifacts() {
         run("cycle").await;
     }
     #[tokio::test]
-    async fn task10_graph_diamond_deduplicates_verified_artifacts() {
+    async fn graph_diamond_deduplicates_verified_artifacts() {
         run("diamond").await;
     }
     #[tokio::test]
-    async fn task10_graph_nested_failure_preserves_old_before_publication() {
+    async fn graph_nested_failure_preserves_old_before_publication() {
         run("nested-failure").await;
     }
     #[tokio::test]
-    async fn task10_graph_conflicting_pins_install_one_version_and_say_so() {
+    async fn graph_conflicting_pins_install_one_version_and_say_so() {
         run("conflict").await;
     }
 
@@ -4778,7 +4778,7 @@ mod task10_graph {
 }
 
 #[tokio::test]
-async fn task10_owned_world_receipt_retains_edits_and_only_removes_new_copy() {
+async fn owned_world_receipt_retains_edits_and_only_removes_new_copy() {
     for mode in ["owned", "edited", "extra", "equal-later-world"] {
         let app = crate::setup_managers_for_test().await;
         let (id, _, original) = super::super::mods::tests::addon_fixture(
@@ -4842,7 +4842,7 @@ async fn task10_owned_world_receipt_retains_edits_and_only_removes_new_copy() {
 }
 
 #[tokio::test]
-async fn task10_different_filename_rollback_restores_original_cache_identity() {
+async fn different_filename_rollback_restores_original_cache_identity() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, old) = super::super::mods::tests::addon_fixture(
         &app,
@@ -4887,7 +4887,7 @@ async fn task10_different_filename_rollback_restores_original_cache_identity() {
 }
 
 #[tokio::test]
-async fn task10_required_exact_pin_matches_physical_enabled_artifact() {
+async fn required_exact_pin_matches_physical_enabled_artifact() {
     let app = crate::setup_managers_for_test().await;
     let (id, row, path) = super::super::mods::tests::addon_fixture(
         &app,
@@ -5032,7 +5032,7 @@ async fn a_dependency_linked_to_another_version_of_the_same_jar_is_kept() {
 }
 
 #[tokio::test]
-async fn task10_explicit_dependency_setting_false_keeps_replacement_opt_out() {
+async fn explicit_dependency_setting_false_keeps_replacement_opt_out() {
     let app = crate::setup_managers_for_test().await;
     app.settings_manager()
         .set_settings(
@@ -5050,7 +5050,7 @@ async fn task10_explicit_dependency_setting_false_keeps_replacement_opt_out() {
     )
     .await;
     let discovered = Arc::new(std::sync::atomic::AtomicBool::new(false));
-    let mut installer = Installer::new(Box::new(Task10ReplacementResource {
+    let mut installer = Installer::new(Box::new(ReplacementResource {
         resource: cf("parent.jar", b"new", curseforge::ClassId::Mods),
         discovered: discovered.clone(),
     }));
@@ -5070,12 +5070,12 @@ async fn task10_explicit_dependency_setting_false_keeps_replacement_opt_out() {
     assert!(app.task_manager().get_task(task).await.is_none());
 }
 
-struct Task10PlanningResource {
+struct PlanningResource {
     entered: Arc<tokio::sync::Notify>,
     dropped: Arc<std::sync::atomic::AtomicBool>,
 }
 #[async_trait::async_trait]
-impl ResourceInstaller for Task10PlanningResource {
+impl ResourceInstaller for PlanningResource {
     fn id(&self) -> String {
         "planning:root:1".into()
     }
@@ -5131,7 +5131,7 @@ impl ResourceInstaller for Task10PlanningResource {
 /// - "drop-admission": dropping the admission future itself drops the planning
 ///   and leaves its settlement unknown, so abort refuses to certify it.
 #[tokio::test]
-async fn task10_planning_uses_existing_admission_settlement_and_unknown() {
+async fn planning_uses_existing_admission_settlement_and_unknown() {
     use crate::managers::runtime_lifecycle::{ShutdownPhase, ShutdownPurpose};
     use std::sync::atomic::Ordering::SeqCst;
     for mode in [
@@ -5151,7 +5151,7 @@ async fn task10_planning_uses_existing_admission_settlement_and_unknown() {
         .await;
         let entered = Arc::new(tokio::sync::Notify::new());
         let dropped = Arc::new(std::sync::atomic::AtomicBool::new(false));
-        let installer = Arc::new(Installer::new(Box::new(Task10PlanningResource {
+        let installer = Arc::new(Installer::new(Box::new(PlanningResource {
             entered: entered.clone(),
             dropped: dropped.clone(),
         })));
@@ -5220,7 +5220,7 @@ async fn task10_planning_uses_existing_admission_settlement_and_unknown() {
 }
 
 #[tokio::test]
-async fn task10_staged_datapack_update_keeps_existing_world_copy_independent() {
+async fn staged_datapack_update_keeps_existing_world_copy_independent() {
     use super::super::datapacks::CopyDatapack;
     let app = crate::setup_managers_for_test().await;
     let archive = tempfile::NamedTempFile::new().unwrap();
@@ -5290,7 +5290,7 @@ async fn task10_staged_datapack_update_keeps_existing_world_copy_independent() {
 }
 
 #[tokio::test]
-async fn task10_publication_rechecks_repair_admitted_after_acquisition() {
+async fn publication_rechecks_repair_admitted_after_acquisition() {
     use super::super::modpack::session::{Producer, Session};
     let app = crate::setup_managers_for_test().await;
     let (id, row, original) = super::super::mods::tests::addon_fixture(
@@ -5339,7 +5339,7 @@ async fn task10_publication_rechecks_repair_admitted_after_acquisition() {
 }
 
 #[test]
-fn task10_required_catalogue_normal_loader_empty_and_unknown_controls() {
+fn required_catalogue_normal_loader_empty_and_unknown_controls() {
     use domain::instance::info::{ModLoader, ModLoaderType};
     let target = (
         "1.20.1".into(),
@@ -5383,7 +5383,7 @@ fn task10_required_catalogue_normal_loader_empty_and_unknown_controls() {
 }
 
 #[tokio::test]
-async fn task18_addon_runtime_cancel_waits_for_tree_io_and_preserves_normal_completion() {
+async fn addon_runtime_cancel_waits_for_tree_io_and_preserves_normal_completion() {
     use crate::managers::runtime_lifecycle::{
         ActivityPolicy, RuntimeLifecycle, ShutdownPhase, ShutdownPurpose, spawn_retained,
     };
@@ -5461,7 +5461,7 @@ async fn task18_addon_runtime_cancel_waits_for_tree_io_and_preserves_normal_comp
 }
 
 #[tokio::test]
-async fn task18_addon_lost_tree_ack_retains_runtime_unknown() {
+async fn addon_lost_tree_ack_retains_runtime_unknown() {
     use crate::managers::runtime_lifecycle::{
         ActivityPolicy, RuntimeLifecycle, ShutdownPhase, ShutdownPurpose, spawn_retained,
     };
@@ -6490,7 +6490,7 @@ mod dependency_rule {
 
     #[test]
     fn forge_only_file_for_another_release_is_still_rejected_on_fabric() {
-        // GPT-0071: never fall back to an incompatible artifact.
+        // Never fall back to an incompatible artifact.
         let files = [
             cf_file(1, 1, "lib-forge-1.21.jar", &["1.21", "Forge"], true),
             cf_file(1, 2, "lib-forge-1.20.1.jar", &["1.20.1", "Forge"], true),
@@ -7487,7 +7487,7 @@ mod dependency_rule {
         assert_eq!(planned_ids(&resolution).await, vec![(root_id, vec![])]);
         assert!(resolution.skipped.is_empty());
         assert_eq!(catalogue.calls(), vec!["mr_version:parent-1".to_owned()]);
-        // A requirement new in this version is still added (GPT-0022).
+        // A requirement new in this version is still added.
         let mut fixture = sodium_fixture(&[("OihdIimA", &["1.20.1"])]);
         old_parent(&mut fixture, serde_json::json!([]));
         let catalogue = Arc::new(fixture);
@@ -7962,7 +7962,7 @@ mod dependency_rule {
         // Iris gets Sodium with the update; a disabled one stays as it was, so
         // the game is not handed a library that may break what runs instead.
         let app = crate::setup_managers_for_test().await;
-        let base = super::round1_graph::serve_artifacts().await;
+        let base = super::dependency_graph_tests::serve_artifacts().await;
         for enabled in [false, true] {
             for install_deps in [false, true] {
                 update_to_a_new_requirement(&app, &base, enabled, enabled, install_deps).await;
@@ -8019,7 +8019,7 @@ mod dependency_rule {
         // Iris whose row still says disabled, none next to a disabled one
         // whose row still says enabled.
         let app = crate::setup_managers_for_test().await;
-        let base = super::round1_graph::serve_artifacts().await;
+        let base = super::dependency_graph_tests::serve_artifacts().await;
         for file_enabled in [true, false] {
             update_to_a_new_requirement(&app, &base, !file_enabled, file_enabled, false).await;
         }

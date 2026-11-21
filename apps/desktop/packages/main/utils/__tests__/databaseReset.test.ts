@@ -16,7 +16,7 @@ const names = [
   "gdl_conf.pre-downgrade.db"
 ]
 async function fixture() {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(), "task24-reset-"))
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), "gdl-reset-"))
   for (const [i, name] of names.entries())
     await fs.writeFile(path.join(root, name), `synthetic metadata ${i}`)
   await fs.mkdir(path.join(root, "instances"))
@@ -487,7 +487,7 @@ it("Reset now after a refused stop still waits for the observed core exit before
 
 it("reset works through a data folder that is a link or junction", async () => {
   const root = await fixture(),
-    holder = await fs.mkdtemp(path.join(os.tmpdir(), "task24-link-")),
+    holder = await fs.mkdtemp(path.join(os.tmpdir(), "gdl-link-")),
     link = path.join(holder, "data"),
     restart = vi.fn()
   await fs.symlink(root, link, "junction")
@@ -511,7 +511,7 @@ it("reset works through a data folder that is a link or junction", async () => {
   expect(restart).toHaveBeenCalledOnce()
 })
 it("reset names a linked data folder whose target is gone, and how to fix it", async () => {
-  const holder = await fs.mkdtemp(path.join(os.tmpdir(), "task24-link-")),
+  const holder = await fs.mkdtemp(path.join(os.tmpdir(), "gdl-link-")),
     link = path.join(holder, "data"),
     restart = vi.fn()
   await fs.symlink(path.join(holder, "unplugged"), link)
@@ -704,7 +704,7 @@ describe("old recovery copies", () => {
   })
   it("stay when the name is only a link to a folder", async () => {
     const root = await fixture()
-    const elsewhere = await fs.mkdtemp(path.join(os.tmpdir(), "task24-away-"))
+    const elsewhere = await fs.mkdtemp(path.join(os.tmpdir(), "gdl-away-"))
     await fs.writeFile(path.join(elsewhere, "gdl_conf.db"), "elsewhere")
     await fs.symlink(elsewhere, path.join(root, RESET_A), "junction")
     expect(await pruneRecoveryCopies(root, now + 365 * DAY)).toEqual([])

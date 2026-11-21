@@ -217,7 +217,7 @@ it("installer pending outcome remains visible and retry keeps its ID", async () 
         status: {
           ...body,
           phase: "unresolved",
-          blockers: ["Installer participant pending Task18"]
+          blockers: ["Installer participant pending"]
         }
       })
     }
@@ -229,7 +229,7 @@ it("installer pending outcome remains visible and retry keeps its ID", async () 
         "quit",
         transport as any
       )
-    ).rejects.toThrow(/Task18/)
+    ).rejects.toThrow(/Installer participant pending/)
   expect(new Set(ids).size).toBe(1)
   expect(child.kill).not.toHaveBeenCalled()
 })

@@ -486,7 +486,7 @@ mod test {
     use super::*;
 
     #[tokio::test]
-    async fn task05_shader_preflight_requires_real_enabled_loader_of_current_kind() {
+    async fn shader_preflight_requires_real_enabled_loader_of_current_kind() {
         use crate::domain::instance::{AddonType, info};
         use carbon_repos::{
             dbtypes::DbDateTime,

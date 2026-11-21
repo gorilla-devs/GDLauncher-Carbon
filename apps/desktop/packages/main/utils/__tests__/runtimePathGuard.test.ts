@@ -53,7 +53,7 @@ describe("assertSafeRuntimeTarget", () => {
   })
 })
 
-// Task 4 component and platform controls.
+// Path component and platform controls.
 it("rejects literal two-dot child in both directions", () => {
   expect(() =>
     assertSafeRuntimeTarget("/tmp/source/..nested", "/tmp/source", "linux")
