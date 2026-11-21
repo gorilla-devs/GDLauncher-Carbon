@@ -15,10 +15,11 @@ import { Trans } from "@gd/i18n"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { getWorldDatapackImageUrl } from "@/utils/instances"
-
-/** Why changes are refused: a locked modpack, or a game that is queued,
- *  preparing or running. */
-export type WorldsBlocked = "locked" | "busy" | null
+import {
+  BlockedText,
+  type ChangesBlocked
+} from "@/pages/Library/shared/addons/components/ChangesBlocked"
+import { UpdateCopiesMenu } from "@/pages/Library/shared/addons/components/UpdateCopiesMenu"
 
 export interface WorldDatapacksActions {
   openFolder: () => void
@@ -40,20 +41,11 @@ export interface WorldDatapacksProps {
   world: FEWorld
   /** The world's row in the instance's addon list, once that has loaded. */
   worldRow: Mod | undefined
-  blocked: WorldsBlocked
+  blocked: ChangesBlocked
   copiesWithUpdate: (_pack: FEWorldDatapack) => number
   isPending: (_packId: string) => boolean
   actions: WorldDatapacksActions
 }
-
-const BlockedText = (props: { blocked: WorldsBlocked }) => (
-  <Show
-    when={props.blocked === "locked"}
-    fallback={<Trans key="content:_trn_worlds.busy" />}
-  >
-    <Trans key="instances:_trn_locked_cannot_apply_changes" />
-  </Show>
-)
 
 /** A row or header action drawn as an icon, as the Addons table draws them. */
 const IconAction = (props: {
@@ -61,7 +53,7 @@ const IconAction = (props: {
   label: JSX.Element
   onClick: () => void
   disabled?: boolean
-  blocked?: WorldsBlocked
+  blocked?: ChangesBlocked
   danger?: boolean
   testId: string
 }) => (
@@ -101,7 +93,7 @@ const packImage = (instanceId: number, pack: FEWorldDatapack) => {
 const UpdateCell = (props: {
   pack: FEWorldDatapack
   pending: boolean
-  blocked: WorldsBlocked
+  blocked: ChangesBlocked
   copies: number
   actions: WorldDatapacksActions
 }) => {
@@ -143,28 +135,16 @@ const UpdateCell = (props: {
             </Tooltip>
           }
         >
-          <DropdownMenu placement="bottom-start">
-            <DropdownMenuTrigger class="b-0 bg-transparent p-0">
-              {arrow()}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem
-                data-testid="world-datapack-update-here"
-                onSelect={() => props.actions.updateHere(props.pack)}
-              >
-                <Trans key="content:_trn_worlds.update_here" />
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                data-testid="world-datapack-update-everywhere"
-                onSelect={() => props.actions.updateEverywhere(props.pack)}
-              >
-                <div class="flex flex-1 items-center justify-between gap-4">
-                  <Trans key="content:_trn_worlds.update_everywhere" />
-                  <span class="text-lightSlate-600">{props.copies}</span>
-                </div>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <UpdateCopiesMenu
+            copies={props.copies}
+            testId="world-datapack-update"
+            onUpdateHere={() => props.actions.updateHere(props.pack)}
+            onUpdateEverywhere={() =>
+              props.actions.updateEverywhere(props.pack)
+            }
+          >
+            {arrow()}
+          </UpdateCopiesMenu>
         </Show>
       </Show>
     </Show>

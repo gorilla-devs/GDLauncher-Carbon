@@ -7,18 +7,24 @@ import { useAddonTableState } from "@/pages/Library/shared/addons/hooks"
 
 type PlatformFilter = "all" | "curseforge" | "modrinth" | "local"
 
+/** The addon types this tab lists: worlds have their own tab. */
+export type ListedAddonType = Exclude<AddonType, "worlds">
+
+/** The rows of the instance's addon list this tab shows. */
+const listedRows = (rows: readonly Mod[]) =>
+  rows.filter((row) => row.addon_type !== "worlds")
+
 interface FilterCacheEntry {
-  enabledAddonTypes: Record<AddonType, boolean>
+  enabledAddonTypes: Record<ListedAddonType, boolean>
   platformFilter: PlatformFilter
   searchQuery: string
 }
 
-const DEFAULT_ADDON_TYPES: Record<AddonType, boolean> = {
+const DEFAULT_ADDON_TYPES: Record<ListedAddonType, boolean> = {
   mods: true,
   shaders: true,
   resourcepacks: true,
-  datapacks: true,
-  worlds: true
+  datapacks: true
 }
 
 // Module-level cache for filter state across component mounts
@@ -31,7 +37,7 @@ export const useAddonData = () => {
   // Create fresh signals/store each mount
   const [searchQuery, _setSearchQuery] = createSignal(cached?.searchQuery ?? "")
   const [enabledAddonTypes, _setEnabledAddonTypes] = createStore<
-    Record<AddonType, boolean>
+    Record<ListedAddonType, boolean>
   >({ ...DEFAULT_ADDON_TYPES })
   const [platformFilter, _setPlatformFilter] = createSignal<PlatformFilter>(
     cached?.platformFilter ?? "all"
@@ -39,7 +45,9 @@ export const useAddonData = () => {
 
   // Restore addon types from cache after store creation
   if (cached) {
-    for (const type of Object.keys(cached.enabledAddonTypes) as AddonType[]) {
+    for (const type of Object.keys(
+      cached.enabledAddonTypes
+    ) as ListedAddonType[]) {
       _setEnabledAddonTypes(type, cached.enabledAddonTypes[type])
     }
   }
@@ -64,7 +72,7 @@ export const useAddonData = () => {
     getCache().searchQuery = query
   }
 
-  const setEnabledAddonTypes = (type: AddonType, enabled: boolean) => {
+  const setEnabledAddonTypes = (type: ListedAddonType, enabled: boolean) => {
     _setEnabledAddonTypes(type, enabled)
     getCache().enabledAddonTypes[type] = enabled
   }
@@ -120,14 +128,16 @@ export const useAddonData = () => {
       const currentlyUpdating = updatingModIds()
 
       // Map the data to preserve optimistic updates for mods being updated
-      const dataWithOptimisticUpdates = allAddons.data.map((addon) => {
-        if (currentlyUpdating.has(addon.id)) {
-          // For mods being updated, keep showing them as not having updates
-          // This prevents the button from reappearing during the update
-          return { ...addon, has_update: false }
+      const dataWithOptimisticUpdates = listedRows(allAddons.data).map(
+        (addon) => {
+          if (currentlyUpdating.has(addon.id)) {
+            // For mods being updated, keep showing them as not having updates
+            // This prevents the button from reappearing during the update
+            return { ...addon, has_update: false }
+          }
+          return addon
         }
-        return addon
-      })
+      )
 
       setAddonsStore(reconcile(dataWithOptimisticUpdates, { key: "id" }))
 
@@ -182,7 +192,7 @@ export const useAddonData = () => {
       const updating = updatingModIds()
       setAddonsStore(
         reconcile(
-          allAddons.data.map((addon) =>
+          listedRows(allAddons.data).map((addon) =>
             updating.has(addon.id) ? { ...addon, has_update: false } : addon
           ),
           { key: "id" }
@@ -195,7 +205,7 @@ export const useAddonData = () => {
   const filteredAddons = createMemo(() => {
     return addonsStore.filter((addon) => {
       // Filter by addon type
-      const typeEnabled = enabledAddonTypes[addon.addon_type]
+      const typeEnabled = enabledAddonTypes[addon.addon_type as ListedAddonType]
       if (!typeEnabled) return false
 
       // Filter by platform

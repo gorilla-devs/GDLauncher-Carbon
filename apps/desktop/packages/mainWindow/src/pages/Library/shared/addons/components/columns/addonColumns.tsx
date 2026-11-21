@@ -1,7 +1,7 @@
 import { Tooltip, TooltipContent, TooltipTrigger, Spinner } from "@gd/ui"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import { Show } from "solid-js"
+import { JSX, Show } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { getPlatformKey } from "@gd/i18n/helpers"
 import { createColumnHelper } from "@tanstack/solid-table"
@@ -13,6 +13,8 @@ import {
   createDeleteColumn
 } from "./index"
 import { supportsEnableToggle } from "../../addonCapabilities"
+import { BlockedText, type ChangesBlocked } from "../ChangesBlocked"
+import { UpdateCopiesMenu } from "../UpdateCopiesMenu"
 
 /**
  * Unified column config for both Instance and Server addon tables.
@@ -51,8 +53,18 @@ export interface AddonColumnConfig {
   onUpdateMod?: (row: any) => void
   isModUpdating?: (rowId: string) => boolean
 
+  // Update everywhere (optional): when more than one copy of a row's project
+  // has an update, its arrow opens "Update here" / "Update everywhere".
+  copiesWithUpdate?: (row: any) => number
+  onUpdateEverywhere?: (row: any) => void
+  /** Why the actions only some rows offer are refused right now. */
+  isBlocked?: () => ChangesBlocked
+
   // Switch version (optional — needs onSwitchVersion + hasPlatformData)
   onSwitchVersion?: (row: any) => void
+
+  /** Icon actions of a row, shown before its switch version icon. */
+  rowActions?: (row: any) => JSX.Element
 }
 
 export const createAddonColumns = (config: AddonColumnConfig) => {
@@ -252,53 +264,94 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
           if (isDisabled()) return
           config.onUpdateMod?.(row)
         }
+        const copies = () =>
+          config.onUpdateEverywhere ? (config.copiesWithUpdate?.(row) ?? 0) : 0
+        const blocked = () => config.isBlocked?.() ?? null
 
         return (
           <Show
             when={hasUpd || isUpdating()}
             fallback={<span class="text-lightSlate-600 text-center">-</span>}
           >
-            <Tooltip>
-              <TooltipTrigger>
-                <Show
-                  when={!isUpdating()}
-                  fallback={<Spinner class="h-5 w-5 text-blue-400" />}
-                >
-                  <div
-                    data-testid="mod-row-update"
-                    class="i-hugeicons:download-02 cursor-pointer text-lg transition-colors"
-                    classList={{
-                      "text-green-500 hover:text-green-400": !isDisabled(),
-                      "text-gray-400 cursor-not-allowed": isDisabled()
-                    }}
-                    onMouseDown={(e) => e.stopPropagation()}
-                    onClick={handleUpdate}
-                  />
-                </Show>
-              </TooltipTrigger>
-              <TooltipContent>
-                <Show
-                  when={config.isLocked?.()}
-                  fallback={
+            <Show
+              when={!isUpdating() && copies() > 1}
+              fallback={
+                <Tooltip>
+                  <TooltipTrigger>
                     <Show
-                      when={isUpdating()}
+                      when={!isUpdating()}
+                      fallback={<Spinner class="h-5 w-5 text-blue-400" />}
+                    >
+                      <div
+                        data-testid="mod-row-update"
+                        class="i-hugeicons:download-02 cursor-pointer text-lg transition-colors"
+                        classList={{
+                          "text-green-500 hover:text-green-400": !isDisabled(),
+                          "text-gray-400 cursor-not-allowed": isDisabled()
+                        }}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onClick={handleUpdate}
+                      />
+                    </Show>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <Show
+                      when={config.isLocked?.()}
                       fallback={
                         <Show
-                          when={config.isStaged?.(row)}
-                          fallback={<Trans key="content:_trn_update_mod" />}
+                          when={isUpdating()}
+                          fallback={
+                            <Show
+                              when={config.isStaged?.(row)}
+                              fallback={<Trans key="content:_trn_update_mod" />}
+                            >
+                              <Trans key="content:_trn_datapack_update_hint" />
+                            </Show>
+                          }
                         >
-                          <Trans key="content:_trn_datapack_update_hint" />
+                          <Trans key="general:_trn_updating" />
                         </Show>
                       }
                     >
-                      <Trans key="general:_trn_updating" />
+                      <Trans key="instances:_trn_locked_cannot_apply_changes" />
                     </Show>
-                  }
-                >
-                  <Trans key="instances:_trn_locked_cannot_apply_changes" />
-                </Show>
-              </TooltipContent>
-            </Tooltip>
+                  </TooltipContent>
+                </Tooltip>
+              }
+            >
+              <Show
+                when={!blocked()}
+                fallback={
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <div
+                        data-testid="mod-row-update"
+                        data-disabled="true"
+                        class="i-hugeicons:download-02 cursor-not-allowed text-lg text-gray-400"
+                        onMouseDown={(e) => e.stopPropagation()}
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <BlockedText blocked={blocked()} />
+                    </TooltipContent>
+                  </Tooltip>
+                }
+              >
+                <div onMouseDown={(e) => e.stopPropagation()}>
+                  <UpdateCopiesMenu
+                    copies={copies()}
+                    testId="mod-row-update"
+                    onUpdateHere={() => config.onUpdateMod?.(row)}
+                    onUpdateEverywhere={() => config.onUpdateEverywhere?.(row)}
+                  >
+                    <div
+                      data-testid="mod-row-update"
+                      class="i-hugeicons:download-02 cursor-pointer text-lg text-green-500 transition-colors hover:text-green-400"
+                    />
+                  </UpdateCopiesMenu>
+                </div>
+              </Show>
+            </Show>
           </Show>
         )
       }
@@ -321,7 +374,7 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
       disabledTooltip: lockedTooltip
     }),
 
-    // 9. Switch version
+    // 9. Row actions, then switch version
     columnHelper.display({
       id: "actions",
       header: () => (
@@ -336,27 +389,34 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
           : false
 
         return (
-          <Show when={hasPlatformData && config.onSwitchVersion}>
+          <Show
+            when={
+              (hasPlatformData && config.onSwitchVersion) || config.rowActions
+            }
+          >
             <div
-              class="hidden items-center justify-center lg:flex"
+              class="hidden items-center justify-center gap-3 lg:flex"
               onMouseDown={(e) => e.stopPropagation()}
             >
-              <Tooltip>
-                <TooltipTrigger>
-                  <div
-                    class="i-hugeicons:arrow-left-right text-lightSlate-400 hover:text-lightSlate-200 h-5 w-5 cursor-pointer transition-colors"
-                    onClick={() => config.onSwitchVersion!(row)}
-                  />
-                </TooltipTrigger>
-                <TooltipContent>
-                  <Show
-                    when={config.isStaged?.(row)}
-                    fallback={<Trans key="instances:_trn_switch_version" />}
-                  >
-                    <Trans key="content:_trn_datapack_switch_hint" />
-                  </Show>
-                </TooltipContent>
-              </Tooltip>
+              {config.rowActions?.(row)}
+              <Show when={hasPlatformData && config.onSwitchVersion}>
+                <Tooltip>
+                  <TooltipTrigger>
+                    <div
+                      class="i-hugeicons:arrow-left-right text-lightSlate-400 hover:text-lightSlate-200 h-5 w-5 cursor-pointer transition-colors"
+                      onClick={() => config.onSwitchVersion!(row)}
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <Show
+                      when={config.isStaged?.(row)}
+                      fallback={<Trans key="instances:_trn_switch_version" />}
+                    >
+                      <Trans key="content:_trn_datapack_switch_hint" />
+                    </Show>
+                  </TooltipContent>
+                </Tooltip>
+              </Show>
             </div>
           </Show>
         )

@@ -6,11 +6,7 @@ import {
 import { useParams } from "@solidjs/router"
 import { queryClient, rspc } from "@/utils/rspcClient"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import {
-  Mod as ModType,
-  AddonType,
-  FEKeptAddonCopy
-} from "@gd/core_module/bindings"
+import { Mod as ModType, FEKeptAddonCopy } from "@gd/core_module/bindings"
 import { i18n } from "@gd/i18n"
 import type { BrowsableAddonType } from "@/utils/browsableAddonType"
 import { useModal } from "@/managers/ModalsManager"
@@ -19,6 +15,7 @@ import { createEffect, on, onCleanup } from "solid-js"
 import { resolveBooleanPreference } from "./resolveBooleanPreference"
 import { asksBeforeDeletingAddons } from "@/utils/addonDeletion"
 import { deletionTarget } from "@/utils/deletionTarget"
+import type { ListedAddonType } from "./useAddonData"
 
 type AddonDeletionTarget = Pick<ModType, "id" | "filename" | "addon_type"> & {
   /** Known on CurseForge or Modrinth, so it can be installed again. */
@@ -350,36 +347,11 @@ export const useAddonMutations = (
     }
   }
 
+  // Worlds are not listed in the Addons tab, so a selection holds none.
   const handleDeleteSelected = async (selectedMods: ModType[]) => {
     const instanceId = parseInt(params.id, 10)
     const targets = selectedMods.map(snapshotDeletionTarget)
-    const worldsSelected = targets.filter((mod) =>
-      requiresDeletionConfirmation(mod.addon_type)
-    )
-
-    if (worldsSelected.length > 0 && !(await isWorldWarningDismissed())) {
-      modalsContext?.openModal(
-        { name: "confirmWorldDeletion" },
-        {
-          worldName: worldsSelected[0].filename,
-          worldCount: worldsSelected.length,
-          // Confirming deletes the whole selection, not only the worlds in
-          // it — the dialog is raised *because* a world is among them, but
-          // `performDeleteSelected` below removes every selected addon. The
-          // dialog names that total so it describes what the button does.
-          totalCount: targets.length,
-          onConfirm: () => void performDeleteSelected(instanceId, targets)
-        }
-      )
-      return
-    }
-    const onlyWorld =
-      targets.length === 1 &&
-      requiresDeletionConfirmation(targets[0].addon_type)
-    if (
-      !onlyWorld &&
-      asksBeforeDeletingAddons(asQuestion(targets), whereDeleted())
-    ) {
+    if (asksBeforeDeletingAddons(asQuestion(targets), whereDeleted())) {
       modalsContext?.openModal(
         { name: "confirmAddonDeletion" },
         {
@@ -400,13 +372,12 @@ export const useAddonMutations = (
     })
   }
 
-  const gotoSearchPage = (type?: AddonType) => {
-    const searchTypes: Record<AddonType, BrowsableAddonType> = {
+  const gotoSearchPage = (type?: ListedAddonType) => {
+    const searchTypes: Record<ListedAddonType, BrowsableAddonType> = {
       mods: "mod",
       shaders: "shader",
       resourcepacks: "resourcePack",
-      datapacks: "datapack",
-      worlds: "world"
+      datapacks: "datapack"
     }
     const searchParam = type ? searchTypes[type] : undefined
     navigator.navigate(`/search/${searchParam ?? ""}?instanceId=${params.id}`)

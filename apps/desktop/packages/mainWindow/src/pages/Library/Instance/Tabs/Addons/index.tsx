@@ -1,4 +1,3 @@
-import { DatapackStaging } from "./components/DatapackStaging"
 import { Show, createMemo } from "solid-js"
 import {
   ContextMenuItem,
@@ -21,12 +20,11 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { getViewOnKey } from "@gd/i18n/helpers"
 import { toast } from "@gd/ui"
 import { useParams } from "@solidjs/router"
-import { AddonType, Mod as ModType } from "@gd/core_module/bindings"
 import {
   AddonsPageLayout,
   createAddonColumns
 } from "@/pages/Library/shared/addons/components"
-import { supportsEnableToggle } from "@/pages/Library/shared/addons/addonCapabilities"
+import { changesBlocked } from "@/pages/Library/shared/addons/components/ChangesBlocked"
 import { useModal } from "@/managers/ModalsManager"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { getModImageUrl } from "@/utils/instances"
@@ -34,13 +32,15 @@ import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import useInstanceData from "../../instance.data"
 import { useAddonData, useAddonMutations } from "./hooks"
+import type { ListedAddonType } from "./hooks/useAddonData"
+import { copiesToWorld, useDatapackWorlds } from "./hooks/useDatapackWorlds"
+import { AddToWorldMenu } from "./components/AddToWorldMenu"
 
-const ADDON_TYPES: AddonType[] = [
+const ADDON_TYPES: ListedAddonType[] = [
   "mods",
   "shaders",
   "resourcepacks",
-  "datapacks",
-  "worlds"
+  "datapacks"
 ]
 
 const Addons = () => {
@@ -69,19 +69,7 @@ const Addons = () => {
 
   const isInstanceLocked = () =>
     !!routeData.instanceDetails.data?.modpack?.locked
-
-  /**
-   * Whether this row's addon type can be enabled/disabled at all.
-   *
-   * Worlds cannot (`supportsEnableToggle`): disabling renames the addon to
-   * `<name>.disabled`, and for a save — a directory — that neither hides it
-   * from Minecraft nor from our own scanner, which re-reports the renamed
-   * directory as a *new, enabled* world. Every route to the toggle has to
-   * respect that, not just the table's own column: a world dragged into a
-   * multi-selection would otherwise be swept up by "Disable all", and the
-   * row's own context menu offered it outright.
-   */
-  const canToggle = (addon: ModType) => supportsEnableToggle(addon.addon_type)
+  const blocked = () => changesBlocked(routeData.instanceDetails.data)
 
   const hasModloaders = () =>
     (routeData.instanceDetails.data?.modloaders?.length || 0) > 0
@@ -116,15 +104,23 @@ const Addons = () => {
 
   const instanceId = () => parseInt(params.id, 10)
 
+  const datapackWorlds = useDatapackWorlds({
+    instanceId,
+    rows: () => addonData.addonsStore,
+    refetchAddons: addonData.allAddons.refetch,
+    startUpdatingMod: addonData.startUpdatingMod,
+    stopUpdatingMod: addonData.stopUpdatingMod
+  })
+
   // If the user has filtered the view to exactly one addon type, that's
   // the type they're interested in adding next; otherwise default to
   // "mods" — the most common case across instances. Without an explicit
   // type, gotoSearchPage emits an empty :type segment in the URL and the
   // search page falls through to whatever projectType the search context
   // last held (often "modpack"), which is the bug we're fixing.
-  const defaultSearchType = (): AddonType => {
+  const defaultSearchType = (): ListedAddonType => {
     const enabled = (
-      Object.keys(addonData.enabledAddonTypes) as AddonType[]
+      Object.keys(addonData.enabledAddonTypes) as ListedAddonType[]
     ).filter((t) => addonData.enabledAddonTypes[t])
     if (enabled.length === 1) return enabled[0]
     // `hasModloaders()` reads a field off `instanceDetails.data`, so it is
@@ -154,15 +150,16 @@ const Addons = () => {
     onToggleMod: addonMutations.handleToggleMod,
     onDeleteMod: addonMutations.handleDeleteMod,
     getDisplayName: (row) => row.metadata?.name || row.filename,
-    getSubtitle: (row) =>
-      row.addon_type === "datapacks"
-        ? t("content:_trn_datapack_row_subtitle", {
-            filename: row.filename,
-            interpolation: { escapeValue: false }
-          })
-        : row.metadata?.name
-          ? row.filename
-          : null,
+    getSubtitle: (row) => {
+      if (row.addon_type !== "datapacks")
+        return row.metadata?.name ? row.filename : null
+      const worlds = datapackWorlds.holders(row)
+      if (worlds.length > 0) return worlds.join(", ")
+      return t("content:_trn_datapack_row_subtitle", {
+        filename: row.filename,
+        interpolation: { escapeValue: false }
+      })
+    },
     getAddonType: (row) => row.addon_type,
     isLocked: isInstanceLocked,
     isStaged: (row) => row.addon_type === "datapacks",
@@ -184,18 +181,27 @@ const Addons = () => {
     hasUpdate: (row) => !!row.has_update,
     onUpdateMod: addonMutations.handleUpdateMod,
     isModUpdating: addonData.isModUpdating,
-    onSwitchVersion: addonMutations.handleSwitchVersion
+    copiesWithUpdate: (row) =>
+      row.addon_type === "datapacks" ? datapackWorlds.copiesWithUpdate(row) : 0,
+    onUpdateEverywhere: (row) => void datapackWorlds.updateEverywhere(row),
+    isBlocked: blocked,
+    onSwitchVersion: addonMutations.handleSwitchVersion,
+    rowActions: (row) => (
+      <Show when={copiesToWorld(row)}>
+        <AddToWorldMenu
+          worlds={datapackWorlds.readableWorlds()}
+          loading={datapackWorlds.worlds.isLoading}
+          failed={datapackWorlds.worlds.isError}
+          blocked={blocked()}
+          pending={datapackWorlds.isCopying(row.id)}
+          onChoose={(world) => void datapackWorlds.addToWorld(row, world)}
+        />
+      </Show>
+    )
   })
 
   return (
     <>
-      <DatapackStaging
-        instanceId={instanceId()}
-        packs={addonData.addonsStore.filter(
-          (row) => row.addon_type === "datapacks"
-        )}
-        locked={isInstanceLocked()}
-      />
       <AddonsPageLayout
         isLoading={addonData.allAddons.isLoading}
         filteredAddons={addonData.filteredAddons}
@@ -366,23 +372,13 @@ const Addons = () => {
                   })}
                 </ContextMenuItem>
                 <ContextMenuSeparator />
-                {/* Both sweeps filter on `canToggle` as well as on `enabled`,
-                  and so do the `Show`s that offer them. A world is always
-                  reported enabled (the scanner hardcodes it — worlds have no
-                  disabled spelling), so an unfiltered "Disable all" would
-                  drag every world in a mixed selection into a rename that
-                  cannot disable it and that no control can undo. */}
-                <Show
-                  when={selectedAddons().some(
-                    (a) => !a.enabled && canToggle(a)
-                  )}
-                >
+                <Show when={selectedAddons().some((a) => !a.enabled)}>
                   <ContextMenuItem
                     disabled={isInstanceLocked()}
                     onSelect={() => {
                       Promise.all(
                         selectedAddons()
-                          .filter((a) => !a.enabled && canToggle(a))
+                          .filter((a) => !a.enabled)
                           .map((a) => addonMutations.handleToggleMod(a))
                       )
                     }}
@@ -391,15 +387,13 @@ const Addons = () => {
                     {t("content:_trn_enable_all")}
                   </ContextMenuItem>
                 </Show>
-                <Show
-                  when={selectedAddons().some((a) => a.enabled && canToggle(a))}
-                >
+                <Show when={selectedAddons().some((a) => a.enabled)}>
                   <ContextMenuItem
                     disabled={isInstanceLocked()}
                     onSelect={() => {
                       Promise.all(
                         selectedAddons()
-                          .filter((a) => a.enabled && canToggle(a))
+                          .filter((a) => a.enabled)
                           .map((a) => addonMutations.handleToggleMod(a))
                       )
                     }}
@@ -451,18 +445,16 @@ const Addons = () => {
                       {t("content:_trn_copy_name")}
                     </ContextMenuItem>
                     <ContextMenuSeparator />
-                    <Show when={canToggle(mod())}>
-                      <ContextMenuItem
-                        data-testid="addon-context-toggle"
-                        disabled={isInstanceLocked()}
-                        onSelect={() => addonMutations.handleToggleMod(mod())}
-                      >
-                        <div class="i-hugeicons:toggle-off mr-2" />
-                        {mod().enabled
-                          ? t("content:_trn_disable_mod")
-                          : t("content:_trn_enable_mod")}
-                      </ContextMenuItem>
-                    </Show>
+                    <ContextMenuItem
+                      data-testid="addon-context-toggle"
+                      disabled={isInstanceLocked()}
+                      onSelect={() => addonMutations.handleToggleMod(mod())}
+                    >
+                      <div class="i-hugeicons:toggle-off mr-2" />
+                      {mod().enabled
+                        ? t("content:_trn_disable_mod")
+                        : t("content:_trn_enable_mod")}
+                    </ContextMenuItem>
                     <Show when={mod().has_update}>
                       <ContextMenuItem
                         disabled={isInstanceLocked()}

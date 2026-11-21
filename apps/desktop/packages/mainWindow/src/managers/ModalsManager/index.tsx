@@ -271,6 +271,10 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/ConfirmWorldDeletion")),
     title: t("instances:_trn_confirm_world_deletion_title")
   },
+  // Its title comes with the question, in the modal's data.
+  confirmChoice: {
+    component: lazy(() => import("./modals/ConfirmChoice"))
+  },
   serverCreation: {
     component: lazy(() => import("./modals/ServerCreation")),
     title: "New Server"

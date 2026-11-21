@@ -21,8 +21,10 @@ import {
 import useInstanceData from "../../instance.data"
 import { useAddonMutations } from "../Addons/hooks/useAddonMutations"
 import WorldsSidebar from "./WorldsSidebar"
-import WorldDatapacks, { type WorldsBlocked } from "./WorldDatapacks"
+import WorldDatapacks from "./WorldDatapacks"
 import { datapackCopies, sameDatapackProject } from "./datapackCopies"
+import { toastUpdateFailures } from "./updateFailures"
+import { changesBlocked } from "@/pages/Library/shared/addons/components/ChangesBlocked"
 
 const noop = () => {}
 
@@ -100,14 +102,7 @@ const Worlds = () => {
   const worldRow = (world: FEWorld) =>
     (instanceMods.data ?? []).find((row) => row.id === world.addon_id)
 
-  const blocked = (): WorldsBlocked => {
-    const details = routeData.instanceDetails.data
-    if (details?.modpack?.locked) return "locked"
-    const state = details?.state?.state
-    if (state === "queued" || state === "preparing" || state === "running")
-      return "busy"
-    return null
-  }
+  const blocked = () => changesBlocked(routeData.instanceDetails.data)
 
   const [pending, setPending] = createSignal<ReadonlySet<string>>(new Set())
   const isPending = (id: string) => pending().has(id)
@@ -190,9 +185,6 @@ const Worlds = () => {
     }
   }
 
-  const placeName = (place: string | null) =>
-    place ?? t("content:_trn_worlds.instance_copy")
-
   const updateEverywhereFrom = async (pack: FEWorldDatapack) => {
     const id = instanceId()
     // Every world copy that is about to be updated shows as pending.
@@ -210,15 +202,7 @@ const Worlds = () => {
         instance_id: id,
         origin: { World: pack.id }
       })
-      const failed = results.filter((result) => !result.ok)
-      if (failed.length > 0)
-        toast.error(
-          t("content:_trn_worlds.update_failed_in", {
-            places: failed.map((result) => placeName(result.place)).join(", "),
-            interpolation: { escapeValue: false }
-          }),
-          { description: failed[0].error ?? undefined }
-        )
+      toastUpdateFailures(results)
     } catch {
       /* The global handler shows the refusal. */
     } finally {

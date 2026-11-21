@@ -26,7 +26,8 @@ export const createFilenameColumn = (config: FilenameColumnConfig) => {
     cell: (info) => {
       const row = info.row.original
       const displayName = config.getDisplayName(row)
-      const subtitle = config.getSubtitle?.(row) ?? null
+      // Read in place: a subtitle can follow data other than the row's own.
+      const subtitle = () => config.getSubtitle?.(row) ?? null
       const [showCopy, setShowCopy] = createSignal(false)
 
       return (
@@ -53,10 +54,10 @@ export const createFilenameColumn = (config: FilenameColumnConfig) => {
                     <CopyIcon text={displayName} />
                   </div>
                 </div>
-                <Show when={subtitle}>
+                <Show when={subtitle()}>
                   <div class="flex min-w-0 items-center gap-2">
                     <div class="text-lightSlate-600 min-w-0 flex-1 truncate text-left text-sm">
-                      {subtitle}
+                      {subtitle()}
                     </div>
                     <div class="w-4 shrink-0" />
                   </div>
@@ -66,8 +67,8 @@ export const createFilenameColumn = (config: FilenameColumnConfig) => {
             <TooltipContent>
               <div class="flex flex-col gap-1">
                 <div class="font-medium">{displayName}</div>
-                <Show when={subtitle}>
-                  <div class="text-lightSlate-400 text-xs">{subtitle}</div>
+                <Show when={subtitle()}>
+                  <div class="text-lightSlate-400 text-xs">{subtitle()}</div>
                 </Show>
               </div>
             </TooltipContent>

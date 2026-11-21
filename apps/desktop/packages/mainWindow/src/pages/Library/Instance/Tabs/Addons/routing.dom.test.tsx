@@ -3,6 +3,7 @@ import { createRoot } from "solid-js"
 import { render } from "solid-js/web"
 import { createStore } from "solid-js/store"
 import type { AddonType, Mod } from "@gd/core_module/bindings"
+import type { ListedAddonType } from "./hooks/useAddonData"
 
 const io = vi.hoisted(() => ({
   params: null as any,
@@ -30,16 +31,20 @@ vi.mock("@/utils/rspcClient", () => ({
   queryClient: { ensureQueryData: vi.fn() },
   rspc: {
     useContext: () => ({ client: { query: vi.fn() } }),
-    createQuery: (options: any) =>
-      options().queryKey[0] === "instance.getInstanceMods"
-        ? {
-            get data() {
-              return io.state.rows
-            },
-            isLoading: false,
-            refetch: vi.fn()
-          }
-        : { data: true, isLoading: false },
+    createQuery: (options: any) => {
+      const key = options().queryKey[0]
+      if (key === "instance.getInstanceMods")
+        return {
+          get data() {
+            return io.state.rows
+          },
+          isLoading: false,
+          refetch: vi.fn()
+        }
+      if (key === "instance.getWorlds")
+        return { data: [], isLoading: false, refetch: vi.fn() }
+      return { data: true, isLoading: false }
+    },
     createMutation: () => ({ mutate: io.mutation, mutateAsync: vi.fn() })
   }
 }))
@@ -54,9 +59,6 @@ vi.mock("@/utils/instances", () => ({
 }))
 vi.mock("@/components/PlaceholderGorilla", () => ({
   PlaceholderGorilla: () => <span />
-}))
-vi.mock("./components/DatapackStaging", () => ({
-  DatapackStaging: () => <span />
 }))
 vi.mock("@/pages/Library/shared/addons/components/AddonTable", () => ({
   AddonTable: () => <div data-table />
@@ -78,14 +80,13 @@ vi.mock("@gd/ui", async () => ({
 import Addons from "./index"
 import { useAddonMutations } from "./hooks/useAddonMutations"
 
-const kinds: AddonType[] = [
+const kinds: ListedAddonType[] = [
   "mods",
   "shaders",
   "resourcepacks",
-  "datapacks",
-  "worlds"
+  "datapacks"
 ]
-const routes = ["mod", "shader", "resourcePack", "datapack", "world"]
+const routes = ["mod", "shader", "resourcePack", "datapack"]
 const addon = (kind: AddonType): Mod => ({
   id: kind,
   addon_type: kind,
@@ -134,12 +135,14 @@ function fixture(
   dispose = render(() => <Addons />, root)
   return root
 }
-function filter(root: HTMLElement, kind: AddonType) {
-  const badge = [...root.querySelectorAll<HTMLElement>("[class]")].find(
+const typeBadge = (root: HTMLElement, kind: AddonType) =>
+  [...root.querySelectorAll<HTMLElement>("[class]")].find(
     (el) =>
       el.classList.contains("cursor-pointer") &&
       el.textContent === `content:_trn_tabs.${kind}`
   )
+function filter(root: HTMLElement, kind: AddonType) {
+  const badge = typeBadge(root, kind)
   expect(badge, `filter ${kind}`).toBeDefined()
   badge!.click()
 }
@@ -237,7 +240,20 @@ it.each(kinds.map((kind, i) => [kind, routes[i]] as const))(
     )
   }
 )
-it("all five stored keys choose mod even when only Resource packs is visible", async () => {
+it("worlds from the core get no type filter, even when nothing else is listed", async () => {
+  let root = fixture(undefined, [...kinds.map(addon), addon("worlds")])
+  await flush()
+  for (const kind of kinds) expect(typeBadge(root, kind)).toBeDefined()
+  expect(typeBadge(root, "worlds")).toBeUndefined()
+  dispose!()
+  root.remove()
+  root = fixture(undefined, [addon("worlds")])
+  await flush()
+  expect(typeBadge(root, "worlds")).toBeUndefined()
+  // An instance holding only a world shows the empty Addons list.
+  expect(root.querySelector("[data-table]")).toBeNull()
+})
+it("all four stored keys choose mod even when only Resource packs is visible", async () => {
   const id = String(++sequence),
     root = fixture(id, [addon("resourcepacks")])
   await flush()

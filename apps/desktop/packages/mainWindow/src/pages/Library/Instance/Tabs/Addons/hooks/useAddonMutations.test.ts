@@ -167,52 +167,30 @@ describe("addon deletion target identity", () => {
     })
   })
 
-  it("snapshots bulk targets before waiting or changing the selection", async () => {
-    const resolve = pendingPreference()
+  it("snapshots bulk targets before changing the selection", async () => {
     const { actions, refetch, optimistic, selection } = setup()
-    const selected = [addon("world-a"), addon("mod-a", "mods")]
+    const selected = [addon("pack-a", "datapacks"), addon("mod-a", "mods")]
     const pending = actions.handleDeleteSelected(selected)
     state.params.id = "2"
-    selected[0].id = "world-b"
+    selected[0].id = "pack-b"
     selected.splice(1, 1, addon("mod-b", "mods"))
-    resolve(true)
     await pending
-    // The world warning is off, so the selection asks its own question.
     const [modal, question] = state.openModal.mock.calls[0]
     expect(modal).toEqual({ name: "confirmAddonDeletion" })
     expect(question.addons.map((a: { name: string }) => a.name)).toEqual([
-      "name-world-a",
+      "name-pack-a",
       "name-mod-a"
     ])
     await question.onConfirm()
     await Promise.resolve()
 
     expect(state.deleteMods.mock.calls.map(([target]) => target)).toEqual([
-      { instance_id: 1, mod_ids: ["world-a", "mod-a"] }
+      { instance_id: 1, mod_ids: ["pack-a", "mod-a"] }
     ])
     expect(state.deleteMod).not.toHaveBeenCalled()
     expect(refetch).not.toHaveBeenCalled()
     expect(optimistic.optimisticDeleteAddons).not.toHaveBeenCalled()
     expect(selection).not.toHaveBeenCalled()
-  })
-
-  it("keeps bulk confirmation counts and the original target set", async () => {
-    state.preference.isLoading = false
-    state.preference.data = false
-    const { actions } = setup()
-    const selected = [addon("world-a"), addon("mod-a", "mods")]
-    await actions.handleDeleteSelected(selected)
-    const confirmation = state.openModal.mock.calls[0][1]
-    expect(confirmation).toMatchObject({ worldCount: 1, totalCount: 2 })
-    state.params.id = "2"
-    selected.length = 0
-    confirmation.onConfirm()
-
-    // One request for the whole selection, asked once by the world dialog.
-    expect(state.openModal).toHaveBeenCalledOnce()
-    expect(state.deleteMods.mock.calls.map(([target]) => target)).toEqual([
-      { instance_id: 1, mod_ids: ["world-a", "mod-a"] }
-    ])
   })
 
   it("still updates selection, optimistic state and the original list", async () => {
@@ -436,10 +414,8 @@ describe("asking before addons are deleted", () => {
     state.settings.data = { deletionThroughRecycleBin: false }
     const { actions } = setup()
     await actions.handleDeleteMod(addon("world-a"))
-    await actions.handleDeleteSelected([addon("world-b")])
     expect(state.openModal).not.toHaveBeenCalled()
     expect(state.deleteMod).toHaveBeenCalledOnce()
-    expect(state.deleteMods).toHaveBeenCalledOnce()
   })
 
   it("says so when part of a selection could not be deleted and shows those rows again", async () => {
