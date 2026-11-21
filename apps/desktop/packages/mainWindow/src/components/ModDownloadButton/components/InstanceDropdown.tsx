@@ -29,6 +29,7 @@ import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
 import {
   asksWhichWorld,
   installPlaces,
+  instanceInstallIsDatapack,
   ReadableWorld,
   WORLDS_STALE_TIME
 } from "@/utils/worldTarget"
@@ -77,12 +78,10 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     !!props.handleWorldSelection &&
     asksWhichWorld(props.addon, searchContext?.searchQuery().projectType)
 
-  // Installed into the instance itself, a project Modrinth types as a mod
-  // lands in `mods`: a zip the game never reads there or, for a project that
-  // also ships as a mod, possibly its jar. An instance without a mod loader
-  // takes such a project into its worlds only.
-  const worldsOnly = (instance: DropdownInstance) =>
-    instance.modloader === "vanilla" && props.addon?.type === "mod"
+  // What a project that also ships as a mod installs as into the instance
+  // itself depends on whether the instance has a mod loader to run the mod.
+  const stagedIn = (instance: DropdownInstance) =>
+    instanceInstallIsDatapack(props.addon, instance.modloader !== "vanilla")
 
   const handleOpenChange = (isOpen: boolean) => {
     setIsDropdownOpen(isOpen)
@@ -128,10 +127,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
   createEffect(() => {
     const picked = pickedInstance()
     const places = pickedPlaces()
-    if (!picked || !places) return
-    // Its worlds are all the step has: it lists them, or says why not.
-    if (worldsOnly(picked)) return
-    if (places.offers === "choice") return
+    if (!picked || !places || places.offers === "choice") return
     untrack(() => {
       setPickedInstance(undefined)
       if (places.offers === "instance") props.handleInstanceSelection(picked.id)
@@ -213,7 +209,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         // Installed once its worlds are known means no world is left to take
         // the pack, so "add it to a world" would point nowhere.
         staged={
-          props.addon?.type === "datapack" &&
+          stagedIn(instance) &&
           !(asksForWorld() && worldsSettled() && isInstalled())
         }
         instance={instance}
@@ -222,9 +218,8 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         linkedFileMismatch={props.linkedFileMismatch?.(instance.id)}
         hoveredInstanceId={props.hoveredInstanceId()}
         onSelect={(id) =>
-          worldsOnly(instance) ||
-          (asksForWorld() &&
-            !(worldsSettled() && rowPlaces().worlds.length === 0))
+          asksForWorld() &&
+          !(worldsSettled() && rowPlaces().worlds.length === 0)
             ? setPickedInstance(instance)
             : props.handleInstanceSelection(id)
         }
@@ -335,7 +330,6 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
                   <DropdownMenuSeparator class="-mx-1" />
                 </>
               }
-              offersInstance={!worldsOnly(picked())}
               onWorld={(world) => {
                 const id = picked().id
                 setPickedInstance(undefined)
@@ -346,17 +340,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
                 setPickedInstance(undefined)
                 props.handleInstanceSelection(id)
               }}
-            >
-              <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
-                <Trans
-                  key={
-                    pickedWorlds.data?.length === 0
-                      ? "content:_trn_worlds.none"
-                      : "content:_trn_worlds.load_failed"
-                  }
-                />
-              </div>
-            </InstallPlacesStep>
+            />
           )}
         </Show>
       </DropdownMenuContent>

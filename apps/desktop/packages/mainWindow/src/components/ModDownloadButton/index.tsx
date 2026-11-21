@@ -97,7 +97,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const [acceptedTask, setAcceptedTask] = createSignal<{
     taskId: number
     title: string
-    type: FEUnifiedSearchResult["type"]
+    /** A data pack that lands in the instance, to be added to a world there. */
+    staged: boolean
     server: boolean
     copy: ReturnType<typeof worldVersionCopy>
     world?: string
@@ -177,6 +178,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     handleServerInstall,
     clearInstanceLoadingState,
     captureInstallAttempt,
+    resolveInstallAttempt,
+    installsAsDatapack,
     maybeOpenShaderWizard
   } = useModInstallation(props, { instanceTarget, serverTarget })
 
@@ -271,7 +274,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
             : addonInstallCompletion(
                 t,
                 accepted.title || t("notifications:_trn_addon_fallback_name"),
-                accepted.type,
+                accepted.staged,
                 accepted.server,
                 accepted.world
               ),
@@ -358,7 +361,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       if (loading() && serverRequest === request) return
       const presentation = {
         title: props.addon.title,
-        type: props.addon.type,
+        staged: false,
         server: true,
         copy: undefined
       }
@@ -394,7 +397,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       if (!world || loading()) return
       const presentation = {
         title: props.addon.title,
-        type: props.addon.type,
+        staged: false,
         server: false,
         copy: undefined,
         world: world.name
@@ -429,17 +432,19 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     const current = beginRequest()
     try {
       if ((await maybeOpenShaderWizard(attempt)) !== "direct") return
+      const sent = await resolveInstallAttempt(attempt)
+      if (!sent) return
       let taskId: number
-      if (attempt.installLatest) {
+      if (sent.installLatest) {
         taskId = await installLatestModMutation.mutateAsync({
           instance_id: instanceId,
-          mod_source: attempt.latestModSource!
+          mod_source: sent.latestModSource!
         })
       } else {
-        const replacesMod = attempt.replacesMod
+        const replacesMod = sent.replacesMod
 
         taskId = await installModMutation.mutateAsync({
-          mod_source: attempt.modSource!,
+          mod_source: sent.modSource!,
           instance_id: instanceId,
           install_deps: true,
           replaces_mod: replacesMod
@@ -447,7 +452,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       }
       accept(current, taskId, {
         title: attempt.title,
-        type: attempt.addonType,
+        staged: attempt.staged,
         server: false,
         copy
       })
@@ -494,7 +499,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       // Installed once its worlds are known means no world is left to take
       // the pack, so "add it to a world" would point nowhere.
       staged={
-        props.addon?.type === "datapack" &&
+        installsAsDatapack(props.selectedInstanceId) &&
         worldName() === undefined &&
         !(places() && isInstalled())
       }

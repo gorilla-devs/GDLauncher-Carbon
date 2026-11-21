@@ -42,9 +42,7 @@ it.each(["Failed", "Dismissed", "Unavailable", "Succeeded"] as const)(
         }
       }
     })
-    const ids = new Map([
-      [1, { taskId: 73, title: "Pack", type: "datapack" as const }]
-    ])
+    const ids = new Map([[1, { taskId: 73, title: "Pack", staged: true }]])
     const clear = vi.fn((id: number) => {
       ids.delete(id)
     })
@@ -66,7 +64,7 @@ it("unmounting before an old read finishes neither acknowledges nor reports succ
   })
   const clear = vi.fn()
   useTaskProgress(
-    () => new Map([[1, { taskId: 73, title: "Pack", type: "datapack" }]]),
+    () => new Map([[1, { taskId: 73, title: "Pack", staged: true }]]),
     clear
   )
   await new Promise((resolve) => setTimeout(resolve, 0))

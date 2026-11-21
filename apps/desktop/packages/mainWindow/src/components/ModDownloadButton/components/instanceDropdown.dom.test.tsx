@@ -83,7 +83,8 @@ function mount(
   loaders?: string[],
   searched?: string,
   modloader = instance.modloader,
-  platform = "modrinth"
+  platform = "modrinth",
+  loading = false
 ) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
@@ -108,7 +109,7 @@ function mount(
             setSearchQuery={setQuery}
             hoveredInstanceId={() => null}
             setHoveredInstanceId={() => {}}
-            instanceLoadingStates={() => new Map()}
+            instanceLoadingStates={() => new Map([[instance.id, loading]])}
             clearInstanceLoadingState={() => {}}
             handleInstanceSelection={selectInstance}
             handleWorldSelection={selectWorld}
@@ -172,26 +173,25 @@ it("names the worlds as a group and sets the instance entry apart from them", as
     "content:_trn_worlds.download_to_instance"
   ])
 })
-it("shows neither the worlds group nor a second line when the step has no world to list", async () => {
-  c.query.mockImplementation(async () => [])
-  const d = mount("mod", ["datapack"], "datapack", "vanilla")
-  await flush()
-  d.click("Addon test")
-  await flush()
-  expect(d.root.textContent).toContain("content:_trn_worlds.none")
-  expect(d.root.querySelector("[data-group-name]")).toBeNull()
-  expect(d.root.querySelectorAll("[data-separator]")).toHaveLength(1)
-})
-it("draws no line under the worlds when the instance entry is not offered", async () => {
-  c.query.mockImplementation(async ([key]: any) =>
-    key === "instance.getWorlds" ? [world("My World")] : []
+it("shows only its header while its lists are read, then installs into an instance that has no world", async () => {
+  let answer!: (mods: any[]) => void
+  c.query.mockImplementation(([key]: any) =>
+    key === "instance.getWorlds"
+      ? Promise.resolve([])
+      : new Promise((resolve) => {
+          answer = resolve
+        })
   )
   const d = mount("mod", ["datapack"], "datapack", "vanilla")
   await flush()
   d.click("Addon test")
   await flush()
-  expect(d.items()).toEqual(["My World"])
+  expect(d.root.textContent).toContain("spinner")
+  expect(d.root.querySelector("[data-group-name]")).toBeNull()
   expect(d.root.querySelectorAll("[data-separator]")).toHaveLength(1)
+  answer([])
+  await flush()
+  expect(d.selectInstance).toHaveBeenCalledWith(4)
 })
 it("for a data pack, picking Instance installs into the instance as before", async () => {
   c.query.mockImplementation(async ([key]: any) =>
@@ -325,44 +325,43 @@ it("a plain mod never asks where, even while data packs are searched", async () 
   expect(worldsRead()).toBe(false)
 })
 
-// On an instance without a mod loader, an install into the instance itself
-// would put a Modrinth project (typed "mod") in `mods`: its zip, or for a
-// project that also ships as a mod possibly its jar.
+// The core installs a Modrinth data pack build into the instance's data
+// packs with or without a mod loader, so such an instance is offered like
+// any other.
 const withoutLoader = [
   ["that is only a data pack", ["datapack"], "mod"],
   ["that also ships as a mod, in a data pack search", hybridLoaders, "datapack"]
 ] as const
 it.each(withoutLoader)(
-  "an instance without a mod loader takes a Modrinth project %s into a world only",
+  "an instance without a mod loader offers its worlds and Download to instance for a Modrinth project %s",
   async (_, loaders, searched) => {
     serveWorld()
     const d = mount("mod", [...loaders], searched, "vanilla")
     await flush()
     d.click("Addon test")
     await flush()
-    expect(d.items()).toEqual(["My World"])
-    d.click("My World")
-    expect(d.selectWorld).toHaveBeenCalledWith(4, world("My World"))
-    expect(d.selectInstance).not.toHaveBeenCalled()
+    expect(d.items()).toEqual([
+      "My World",
+      "content:_trn_worlds.download_to_instance"
+    ])
+    expect(d.root.querySelectorAll("[data-separator]")).toHaveLength(2)
+    d.click("content:_trn_worlds.download_to_instance")
+    expect(d.selectInstance).toHaveBeenCalledWith(4)
+    expect(d.selectWorld).not.toHaveBeenCalled()
   }
 )
 it.each([
-  ["no world", async () => [], "content:_trn_worlds.none"],
-  [
-    "only unreadable worlds",
-    async () => [world("Broken", null)],
-    "content:_trn_worlds.load_failed"
-  ],
+  ["no world", async () => []],
+  ["only unreadable worlds", async () => [world("Broken", null)]],
   [
     "worlds that cannot be read",
     async () => {
       throw new Error("unreadable")
-    },
-    "content:_trn_worlds.load_failed"
+    }
   ]
 ])(
-  "an instance without a mod loader and with %s never gets a Modrinth data pack at instance level",
-  async (_, worlds, text) => {
+  "an instance without a mod loader and with %s gets a Modrinth data pack at instance level without asking",
+  async (_, worlds) => {
     for (const [, loaders, searched] of withoutLoader) {
       c.query.mockReset()
       c.query.mockImplementation(async ([key]: any) =>
@@ -372,10 +371,12 @@ it.each([
       await flush()
       d.click("Addon test")
       await flush()
-      expect(d.selectInstance).not.toHaveBeenCalled()
+      expect(d.selectInstance).toHaveBeenCalledWith(4)
       expect(d.selectWorld).not.toHaveBeenCalled()
-      expect(d.items()).toEqual([])
-      expect(d.root.textContent).toContain(text)
+      expect(d.root.textContent).not.toContain("content:_trn_worlds.none")
+      expect(d.root.textContent).not.toContain(
+        "content:_trn_worlds.load_failed"
+      )
       dispose?.()
       document.body.replaceChildren()
     }
@@ -402,11 +403,31 @@ it("an instance without a mod loader and without a world gets a CurseForge data 
   await flush()
   expect(d.selectInstance).toHaveBeenCalledWith(4)
 })
-it("a mod is never sent to an instance without a mod loader", async () => {
-  serveWorld()
-  const d = mount("mod", ["fabric"], "mod", "vanilla")
-  await flush()
-  d.click("Addon test")
-  await flush()
-  expect(d.selectInstance).not.toHaveBeenCalled()
-})
+// What the row says while its install runs, by where the file lands.
+it.each([
+  ["a CurseForge data pack", "datapack", [], "fabric", "downloading"],
+  ["a Modrinth data pack", "mod", ["datapack"], "fabric", "downloading"],
+  [
+    "a Modrinth data pack that also ships as a mod, without a mod loader",
+    "mod",
+    hybridLoaders,
+    "vanilla",
+    "downloading"
+  ],
+  [
+    "a Modrinth data pack that also ships as a mod, with a mod loader",
+    "mod",
+    hybridLoaders,
+    "fabric",
+    "installing"
+  ],
+  ["a mod", "mod", ["fabric"], "fabric", "installing"]
+] as const)(
+  "the row of %s reads as its install does",
+  async (_, type, loaders, modloader, status) => {
+    c.query.mockImplementation(async () => [])
+    const d = mount(type, [...loaders], "datapack", modloader, "modrinth", true)
+    await flush()
+    expect(d.root.textContent).toContain(`instances:_trn_status_${status}`)
+  }
+)

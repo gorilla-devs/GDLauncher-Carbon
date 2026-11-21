@@ -208,6 +208,20 @@ it("a Modrinth data pack typed as a mod going into the instance is not told to b
   await tick()
   expect(c.staged).toBe(false)
 })
+it("a Modrinth project that is only a data pack going into the instance is told to be added to a world", async () => {
+  c.query.mockImplementation(async ([key]: any) =>
+    key === "instance.getWorlds" ? [world] : running
+  )
+  mount(() => (
+    <ModDownloadButton
+      addon={{ ...pack, type: "mod", loaders: ["datapack"] } as any}
+      selectedInstanceId={7}
+      selectedInstanceMods={[]}
+    />
+  ))
+  await tick()
+  expect(c.staged).toBe(true)
+})
 it("a world picked in the instance dropdown installs there and its completion names it", async () => {
   c.query.mockImplementation(async ([key]: any) =>
     key === "vtask.getTaskOutcome" ? { type: "Succeeded" } : undefined

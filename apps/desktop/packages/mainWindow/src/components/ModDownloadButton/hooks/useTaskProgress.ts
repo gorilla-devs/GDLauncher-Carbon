@@ -25,7 +25,7 @@ export const useTaskProgress = (
 
   createEffect(() => {
     instanceTasks().forEach((accepted, instanceId) => {
-      const { taskId, type, world } = accepted
+      const { taskId, staged, world } = accepted
       if (watched.get(instanceId) === taskId) return
       watched.set(instanceId, taskId)
       const title =
@@ -58,7 +58,7 @@ export const useTaskProgress = (
             if (action.kind === "completed") {
               clearInstanceLoadingState(instanceId)
               toast.success(
-                addonInstallCompletion(t, title, type, false, world),
+                addonInstallCompletion(t, title, staged, false, world),
                 {
                   duration: 2000
                 }

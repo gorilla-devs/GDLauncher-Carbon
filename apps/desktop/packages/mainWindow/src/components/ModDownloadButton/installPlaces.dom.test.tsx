@@ -163,19 +163,20 @@ async function mount(
   const search = searched
     ? ({ searchQuery: () => ({ projectType: searched }) } as any)
     : undefined
+  // Instance 7 unless the test names another target, or none.
+  const target = {
+    selectedInstanceId: 7,
+    selectedInstanceMods: [],
+    testId: "download",
+    ...props
+  }
   const root = document.createElement("div")
   document.body.append(root)
   const dispose = render(
     () => (
       <QueryClientProvider client={client}>
         <SearchInputContext.Provider value={search}>
-          <ModDownloadButton
-            addon={addon as any}
-            selectedInstanceId={7}
-            selectedInstanceMods={[]}
-            testId="download"
-            {...props}
-          />
+          <ModDownloadButton addon={addon as any} {...target} />
         </SearchInputContext.Provider>
       </QueryClientProvider>
     ),
@@ -433,4 +434,263 @@ it("the menu opened before the worlds are read installs into the instance once t
   await flush()
   expect(isOpen()).toBe(false)
   expect(requests()).toEqual(["instance.installLatestMod"])
+})
+
+// An install into the instance itself. Modrinth lists the data pack builds
+// of a project for a game version; the newest release is the one installed.
+const builds = [
+  {
+    id: "V-beta",
+    version_type: "beta",
+    date_published: "2026-02-01T00:00:00Z",
+    files: [{ filename: "pack-beta.zip", primary: true }]
+  },
+  {
+    id: "V-release",
+    version_type: "release",
+    date_published: "2026-01-01T00:00:00Z",
+    files: [{ filename: "pack.zip", primary: true }]
+  }
+]
+function serveBuilds(worlds: any[], versions: any[] | (() => never) = builds) {
+  c.query.mockImplementation(async ([key]: any) =>
+    key === "instance.getWorlds"
+      ? worlds
+      : key === "modplatforms.modrinth.getProjectVersions"
+        ? typeof versions === "function"
+          ? versions()
+          : versions
+        : key === "instance.getInstanceMods"
+          ? []
+          : running
+  )
+  c.mutate.mockResolvedValue(61)
+}
+const buildReads = () =>
+  c.query.mock.calls
+    .map(([key]) => key)
+    .filter((key) => key[0] === "modplatforms.modrinth.getProjectVersions")
+const buildsAsked = [
+  [
+    "modplatforms.modrinth.getProjectVersions",
+    { project_id: "P", game_versions: ["1.21.1"], loaders: ["datapack"] }
+  ]
+]
+const buildInstall = (instance: number) => [
+  "instance.installMod",
+  {
+    instance_id: instance,
+    mod_source: { Modrinth: { project_id: "P", version_id: "V-release" } },
+    install_deps: true,
+    replaces_mod: null
+  }
+]
+it.each([
+  ["a Modrinth data pack on an instance with a mod loader", modrinthPack, 7],
+  ["a Modrinth data pack on an instance without one", modrinthPack, 8],
+  [
+    "a Modrinth data pack that also ships as a mod on an instance without a mod loader",
+    modrinthHybrid,
+    8
+  ]
+])(
+  "Download to instance of %s installs its newest data pack build as a data pack",
+  async (_, addon, instance) => {
+    serveBuilds([world("My World")])
+    const client = await mount(
+      addon,
+      { selectedInstanceId: instance },
+      "datapack"
+    )
+    await download()
+    await pick("content:_trn_worlds.download_to_instance")
+    expect(buildReads()).toEqual(buildsAsked)
+    expect(c.mutate.mock.calls).toEqual([buildInstall(instance)])
+    client.setQueryData(["vtask.getTaskOutcome", 61], { type: "Succeeded" })
+    await flush()
+    expect(c.success).toHaveBeenCalledWith(
+      "notifications:_trn_datapack_downloaded:Pack",
+      { duration: 2000 }
+    )
+  }
+)
+it("Download to instance of a Modrinth data pack that also ships as a mod installs its mod where a mod loader runs it", async () => {
+  serveBuilds([world("My World")])
+  const client = await mount(modrinthHybrid, {}, "datapack")
+  await download()
+  await pick("content:_trn_worlds.download_to_instance")
+  expect(buildReads()).toEqual([])
+  expect(c.mutate.mock.calls).toEqual([
+    [
+      "instance.installLatestMod",
+      { instance_id: 7, mod_source: { Modrinth: "P" } }
+    ]
+  ])
+  client.setQueryData(["vtask.getTaskOutcome", 61], { type: "Succeeded" })
+  await flush()
+  expect(c.success).toHaveBeenCalledWith(
+    "notifications:_trn_addon_installed:Pack",
+    { duration: 2000 }
+  )
+})
+it("an instance without a mod loader and without a world gets a Modrinth data pack build at once", async () => {
+  serveBuilds([])
+  await mount(modrinthPack, { selectedInstanceId: 8 }, "datapack")
+  await download()
+  expect(isOpen()).toBe(false)
+  expect(buildReads()).toEqual(buildsAsked)
+  expect(c.mutate.mock.calls).toEqual([buildInstall(8)])
+})
+it.each([
+  ["no version", []],
+  [
+    "only a jar",
+    [{ ...builds[1], files: [{ filename: "mod.jar", primary: true }] }]
+  ]
+])(
+  "says the project has no data pack for the instance's Minecraft when Modrinth lists %s",
+  async (_, versions) => {
+    serveBuilds([], versions)
+    await mount(modrinthPack, { selectedInstanceId: 8 }, "datapack")
+    await download()
+    expect(requests()).toEqual([])
+    expect(c.error.mock.calls).toEqual([
+      ["content:_trn_worlds.no_datapack_for_version:1.21.1"]
+    ])
+    expect(button().textContent).toContain("instances:_trn_download")
+  }
+)
+it("says once that the install failed when the builds cannot be listed", async () => {
+  serveBuilds([], () => {
+    throw new Error("Modrinth is unreachable")
+  })
+  await mount(modrinthPack, { selectedInstanceId: 8 }, "datapack")
+  await download()
+  expect(requests()).toEqual([])
+  expect(c.error.mock.calls).toEqual([
+    [
+      "notifications:_trn_addon_install_failed:Pack",
+      { description: "Modrinth is unreachable" }
+    ]
+  ])
+  expect(button().textContent).toContain("instances:_trn_download")
+})
+it("a Modrinth data pack build the instance holds reads as downloaded, to add to a world", async () => {
+  serveBuilds([])
+  await mount(modrinthPack, {
+    fileId: "V1",
+    pickedVersion: true,
+    selectedInstanceMods: [
+      {
+        id: "copy",
+        addon_type: "datapacks",
+        modrinth: { project_id: "P", version_id: "V1" },
+        curseforge: null
+      }
+    ]
+  })
+  expect(button().textContent).toContain("content:_trn_datapack_downloaded")
+})
+it("ticks Download to instance for a Modrinth data pack build the instance holds", async () => {
+  serveBuilds([world("My World")])
+  await mount(
+    modrinthPack,
+    {
+      selectedInstanceMods: [
+        {
+          id: "copy",
+          addon_type: "datapacks",
+          modrinth: { project_id: "P", version_id: "V1" },
+          curseforge: null
+        }
+      ]
+    },
+    "datapack"
+  )
+  await download()
+  expect(
+    menuItems()
+      .filter((item) => item.hasAttribute("data-disabled"))
+      .map((item) => item.textContent?.trim())
+  ).toEqual(["content:_trn_worlds.download_to_instance"])
+})
+
+// The instance picker, with no instance chosen yet.
+async function openPicker() {
+  const trigger = [
+    ...document.querySelectorAll<HTMLElement>("[aria-haspopup]")
+  ].find((item) => item.textContent?.includes("_trn_add_to_an_instance"))!
+  trigger.dispatchEvent(
+    new MouseEvent("pointerdown", { button: 0, bubbles: true })
+  )
+  trigger.click()
+  await flush()
+}
+const pickerRow = (name: string) =>
+  [...document.querySelectorAll<HTMLElement>('[role="menuitemradio"]')].find(
+    (item) => item.textContent?.includes(name)
+  )!
+async function pickRow(name: string) {
+  pickerRow(name).dispatchEvent(
+    new MouseEvent("pointerup", { button: 0, bubbles: true })
+  )
+  await flush()
+}
+it.each([
+  ["that is only a data pack", modrinthPack],
+  ["that also ships as a mod", modrinthHybrid]
+])(
+  "the picker offers Download to instance for a Modrinth project %s on an instance without a mod loader, and installs its data pack build",
+  async (_, addon) => {
+    serveBuilds([world("My World")])
+    await mount(addon, { selectedInstanceId: undefined }, "datapack")
+    await openPicker()
+    await pickRow("Vanilla")
+    expect(items()).toEqual([
+      "My World",
+      "content:_trn_worlds.download_to_instance"
+    ])
+    await pick("content:_trn_worlds.download_to_instance")
+    expect(buildReads()).toEqual(buildsAsked)
+    expect(c.mutate.mock.calls).toEqual([buildInstall(8)])
+    expect(pickerRow("Vanilla").textContent).toContain(
+      "instances:_trn_status_downloading"
+    )
+  }
+)
+it("the picker installs a Modrinth data pack build at once into an instance without a mod loader and without a world", async () => {
+  serveBuilds([])
+  await mount(modrinthPack, { selectedInstanceId: undefined }, "datapack")
+  await openPicker()
+  await pickRow("Vanilla")
+  expect(buildReads()).toEqual(buildsAsked)
+  expect(c.mutate.mock.calls).toEqual([buildInstall(8)])
+})
+it("the picker installs the mod of a Modrinth data pack that also ships as a mod on an instance with a mod loader", async () => {
+  serveBuilds([world("My World")])
+  await mount(modrinthHybrid, { selectedInstanceId: undefined }, "datapack")
+  await openPicker()
+  await pickRow("Fabric")
+  await pick("content:_trn_worlds.download_to_instance")
+  expect(buildReads()).toEqual([])
+  expect(c.mutate.mock.calls).toEqual([
+    [
+      "instance.installLatestMod",
+      { instance_id: 7, mod_source: { Modrinth: "P" } }
+    ]
+  ])
+  expect(pickerRow("Fabric").textContent).toContain(
+    "instances:_trn_status_installing"
+  )
+})
+it("the picker says the project has no data pack for the instance's Minecraft and frees the row", async () => {
+  serveBuilds([], [])
+  await mount(modrinthPack, { selectedInstanceId: undefined }, "datapack")
+  await openPicker()
+  await pickRow("Vanilla")
+  expect(requests()).toEqual([])
+  expect(c.error.mock.calls).toEqual([
+    ["content:_trn_worlds.no_datapack_for_version:1.21.1"]
+  ])
+  expect(pickerRow("Vanilla").textContent).not.toContain("_trn_status_")
 })

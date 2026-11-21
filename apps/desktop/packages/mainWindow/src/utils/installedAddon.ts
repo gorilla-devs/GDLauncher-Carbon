@@ -56,12 +56,17 @@ export function findInstalledAddon(
   if (!kind) return undefined
   const projectId = addon.id.toString()
   if (target.kind === "instance" || target.kind === "world") {
+    // Modrinth types a data pack "mod", and its data pack build is a row of
+    // the instance's data packs.
+    const kinds: readonly AddonType[] = canBeDatapack(addon)
+      ? [kind, "datapacks"]
+      : [kind]
     const rows: readonly Pick<Mod, "id" | "curseforge" | "modrinth">[] =
       target.kind === "world"
         ? canBeDatapack(addon)
           ? target.datapacks
           : []
-        : target.addons.filter((mod) => mod.addon_type === kind)
+        : target.addons.filter((mod) => kinds.includes(mod.addon_type))
     const matches = rows
       .filter((mod) =>
         addon.platform === "curseforge"

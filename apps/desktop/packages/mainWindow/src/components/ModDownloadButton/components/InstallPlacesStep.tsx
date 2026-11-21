@@ -8,10 +8,6 @@ interface InstallPlacesStepProps {
   places: InstallPlaces | undefined
   /** Shown above the choices: the picker's way back, naming the instance. */
   header?: JSX.Element
-  /** False where the instance itself cannot take the project; `children`
-   *  then say why nothing is listed when it has no world either. */
-  offersInstance?: boolean
-  children?: JSX.Element
   onWorld: (world: ReadableWorld) => void
   onInstance: () => void
 }
@@ -60,30 +56,23 @@ export const InstallPlacesStep = (props: InstallPlacesStepProps) => (
               )}
             </For>
           </div>
-          <Show
-            when={props.offersInstance ?? true}
-            fallback={
-              <Show when={places().worlds.length === 0}>{props.children}</Show>
-            }
-          >
-            <Show when={places().worlds.length > 0}>
-              <DropdownMenuSeparator class="-mx-1" />
-            </Show>
-            <DropdownMenuItem
-              class="gap-2"
-              disabled={places().instanceHolds}
-              closeOnSelect={false}
-              onSelect={() => props.onInstance()}
-            >
-              <div class="i-hugeicons:folder-01 h-4 w-4 shrink-0" />
-              <span class="min-w-0 flex-1 truncate">
-                <Trans key="content:_trn_worlds.download_to_instance" />
-              </span>
-              <Show when={places().instanceHolds}>
-                <div class="i-hugeicons:tick-02 h-4 w-4 shrink-0 text-green-400" />
-              </Show>
-            </DropdownMenuItem>
+          <Show when={places().worlds.length > 0}>
+            <DropdownMenuSeparator class="-mx-1" />
           </Show>
+          <DropdownMenuItem
+            class="gap-2"
+            disabled={places().instanceHolds}
+            closeOnSelect={false}
+            onSelect={() => props.onInstance()}
+          >
+            <div class="i-hugeicons:folder-01 h-4 w-4 shrink-0" />
+            <span class="min-w-0 flex-1 truncate">
+              <Trans key="content:_trn_worlds.download_to_instance" />
+            </span>
+            <Show when={places().instanceHolds}>
+              <div class="i-hugeicons:tick-02 h-4 w-4 shrink-0 text-green-400" />
+            </Show>
+          </DropdownMenuItem>
         </>
       )}
     </Show>

@@ -4,7 +4,9 @@ import {
   asksWhichWorld,
   canBeDatapack,
   installPlaces,
+  instanceInstallIsDatapack,
   isOnlyDatapack,
+  newestDatapackBuild,
   readableWorld,
   withoutWorldParam,
   worldDatapackInstall,
@@ -99,6 +101,92 @@ describe("data pack projects", () => {
     expect(asksWhichWorld(modrinthHybrid, "datapack")).toBe(true)
     expect(asksWhichWorld(modrinthHybrid, "mod")).toBe(false)
     expect(asksWhichWorld(modrinthHybrid, undefined)).toBe(false)
+  })
+})
+
+describe("what an install into the instance itself is", () => {
+  it("is the data pack build of a project that is only a data pack, with or without a mod loader", () => {
+    for (const hasModLoader of [true, false]) {
+      expect(instanceInstallIsDatapack(curseforgePack, hasModLoader)).toBe(true)
+      expect(instanceInstallIsDatapack(modrinthPack, hasModLoader)).toBe(true)
+    }
+  })
+  it("is the data pack build of a project that also ships as a mod only without a mod loader", () => {
+    expect(instanceInstallIsDatapack(modrinthHybrid, false)).toBe(true)
+    expect(instanceInstallIsDatapack(modrinthHybrid, true)).toBe(false)
+  })
+  it("is never a data pack for a mod or another addon", () => {
+    for (const hasModLoader of [true, false]) {
+      expect(instanceInstallIsDatapack(plainMod, hasModLoader)).toBe(false)
+      expect(
+        instanceInstallIsDatapack({ type: "shader", loaders: [] }, hasModLoader)
+      ).toBe(false)
+      expect(instanceInstallIsDatapack(undefined, hasModLoader)).toBe(false)
+    }
+  })
+})
+
+describe("the data pack build an instance gets from Modrinth", () => {
+  const build = (
+    id: string,
+    day: number,
+    type: "release" | "beta" | "alpha",
+    files: [string, boolean?][]
+  ) => ({
+    id,
+    version_type: type,
+    date_published: `2026-01-${String(day).padStart(2, "0")}T00:00:00Z`,
+    files: files.map(([filename, primary = false]) => ({ filename, primary }))
+  })
+  it("is the newest release, even under a newer beta or alpha", () => {
+    expect(
+      newestDatapackBuild([
+        build("alpha", 9, "alpha", [["a.zip", true]]),
+        build("beta", 8, "beta", [["b.zip", true]]),
+        build("new", 7, "release", [["new.zip", true]]),
+        build("old", 2, "release", [["old.zip", true]])
+      ])?.id
+    ).toBe("new")
+  })
+  it("is the newest whatever order the versions come in", () => {
+    expect(
+      newestDatapackBuild([
+        build("old", 2, "release", [["old.zip", true]]),
+        build("new", 7, "release", [["new.zip", true]])
+      ])?.id
+    ).toBe("new")
+  })
+  it("is the newest beta without a release, and the newest alpha without either", () => {
+    expect(
+      newestDatapackBuild([
+        build("alpha", 9, "alpha", [["a.zip", true]]),
+        build("beta", 8, "beta", [["b.zip", true]])
+      ])?.id
+    ).toBe("beta")
+    expect(
+      newestDatapackBuild([
+        build("alpha-new", 9, "alpha", [["a.zip", true]]),
+        build("alpha-old", 3, "alpha", [["a.zip", true]])
+      ])?.id
+    ).toBe("alpha-new")
+  })
+  it("judges a version by its primary file, or its first without one", () => {
+    expect(
+      newestDatapackBuild([
+        build("jar", 9, "release", [["extra.zip"], ["mod.jar", true]]),
+        build("first-zip", 8, "release", [["Pack.ZIP"], ["mod.jar"]]),
+        build("zip", 7, "release", [["mod.jar"], ["pack.zip", true]])
+      ])?.id
+    ).toBe("first-zip")
+    expect(
+      newestDatapackBuild([
+        build("first-jar", 9, "release", [["mod.jar"], ["pack.zip"]]),
+        build("no-file", 8, "release", [])
+      ])
+    ).toBeUndefined()
+  })
+  it("is none when the project has no version", () => {
+    expect(newestDatapackBuild([])).toBeUndefined()
   })
 })
 

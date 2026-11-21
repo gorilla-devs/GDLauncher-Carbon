@@ -7,14 +7,13 @@ const titleOptions = (title: string) => ({
   interpolation: { escapeValue: false }
 })
 
-/** Completion text for the selected installation destination. A single-player
- *  datapack lands in the instance, so its toast says where to add it next,
- *  unless it was installed straight into `world`: only a data pack is, and
- *  Modrinth types those "mod". */
+/** Completion text for the selected installation destination. A data pack
+ *  that lands in the instance (`staged`) says where to add it next, unless it
+ *  was installed straight into `world`. */
 export function addonInstallCompletion(
   t: TypedTFunction,
   title: string,
-  type?: string,
+  staged = false,
   server = false,
   world?: string
 ): string {
@@ -25,7 +24,7 @@ export function addonInstallCompletion(
       world,
       interpolation: { escapeValue: false }
     })
-  if (!server && type === "datapack")
+  if (!server && staged)
     return t("notifications:_trn_datapack_downloaded", options)
   return t("notifications:_trn_addon_installed", options)
 }

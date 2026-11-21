@@ -23,17 +23,15 @@ const t = ((key: string, options?: Record<string, unknown>) =>
 
 describe("single-player datapack completion scope", () => {
   it("says the datapack is in the instance and where to add it to a world", () => {
-    expect(addonInstallCompletion(t, "Pack", "datapack")).toBe(
+    expect(addonInstallCompletion(t, "Pack", true)).toBe(
       "Pack downloaded. Add it to a world from the instance's Addons tab."
     )
   })
   it("retains actual server and instance-level addon completion", () => {
-    expect(addonInstallCompletion(t, "Pack", "datapack", true)).toBe(
+    expect(addonInstallCompletion(t, "Pack", true, true)).toBe(
       "Pack installed successfully"
     )
-    expect(addonInstallCompletion(t, "Mod", "mod")).toBe(
-      "Mod installed successfully"
-    )
+    expect(addonInstallCompletion(t, "Mod")).toBe("Mod installed successfully")
   })
   it("says a pack installed into a world was added to that world", () => {
     const seen: unknown[] = []
@@ -41,7 +39,7 @@ describe("single-player datapack completion scope", () => {
       seen.push([key, options])
       return key
     }) as TypedTFunction
-    addonInstallCompletion(spy, "Pack & Co", "datapack", false, "My World")
+    addonInstallCompletion(spy, "Pack & Co", true, false, "My World")
     expect(seen).toEqual([
       [
         "content:_trn_worlds.added_to_world",
@@ -53,13 +51,13 @@ describe("single-player datapack completion scope", () => {
       ]
     ])
   })
-  it("says so for a Modrinth data pack too, which is typed as a mod", () => {
+  it("says so whether or not it would otherwise wait in the instance", () => {
     const keys: string[] = []
     const spy = ((key: string) => {
       keys.push(key)
       return key
     }) as TypedTFunction
-    addonInstallCompletion(spy, "Terralith", "mod", false, "New World")
+    addonInstallCompletion(spy, "Terralith", false, false, "New World")
     expect(keys).toEqual(["content:_trn_worlds.added_to_world"])
   })
   it("keeps names verbatim instead of HTML-escaping them", () => {
@@ -68,7 +66,7 @@ describe("single-player datapack completion scope", () => {
       seen.push(options)
       return key
     }) as TypedTFunction
-    addonInstallCompletion(spy, "Tom & Jerry <3", "mod")
+    addonInstallCompletion(spy, "Tom & Jerry <3")
     expect(seen).toEqual([
       { title: "Tom & Jerry <3", interpolation: { escapeValue: false } }
     ])
@@ -82,7 +80,7 @@ describe("single-player datapack completion scope", () => {
     expect(addonDownloadingToServer(real, name)).toBe(
       `${name} downloading to server`
     )
-    expect(addonInstallCompletion(real, name, "mod")).toBe(
+    expect(addonInstallCompletion(real, name)).toBe(
       `${name} installed successfully`
     )
   })
@@ -91,7 +89,7 @@ describe("single-player datapack completion scope", () => {
     await i18n.init(createI18nOptions("english", { notifications, content }))
     const real = i18n.t.bind(i18n) as unknown as TypedTFunction
     expect(
-      addonInstallCompletion(real, "Tom & Jerry", "datapack", false, "My World")
+      addonInstallCompletion(real, "Tom & Jerry", true, false, "My World")
     ).toBe("“Tom & Jerry” was added to the world “My World”.")
   })
 })

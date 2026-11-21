@@ -30,6 +30,7 @@ vi.mock("@/utils/instances", () => ({ getInstanceImageUrl: () => "icon" }))
 
 import { useInstanceSearch } from "./useInstanceSearch"
 import { SearchInputContext } from "@/components/SearchInputContext"
+import { instanceInstallIsDatapack } from "@/utils/worldTarget"
 
 // The four shapes a search row comes in. Modrinth has no data pack type: it
 // types a data pack "mod" and lists "datapack" among its loaders.
@@ -162,4 +163,21 @@ it("follows the project when another one is shown", () => {
   expect(names()).toEqual(ALL)
   setAddon(plainMod)
   expect(names()).toEqual(WITH_LOADER)
+})
+
+// An instance without a mod loader is only listed for a project typed "mod"
+// when an install into the instance itself is that project's data pack build.
+it("lists an instance without a mod loader for a project typed as a mod only where it gets the data pack build", () => {
+  for (const shape of [modrinthOnlyDatapack, modrinthHybrid, plainMod])
+    for (const searched of ["datapack", "mod", undefined]) {
+      const names = listed(
+        () => shape,
+        () => searched
+      )()
+      if (names.includes("Vanilla"))
+        expect(instanceInstallIsDatapack(shape, false)).toBe(true)
+      dispose?.()
+      dispose = undefined
+    }
+  expect(instanceInstallIsDatapack(plainMod, false)).toBe(false)
 })

@@ -149,7 +149,7 @@ describe("targetDefaults", () => {
     ).toEqual(scope("datapack", "1.21.1"))
   })
 
-  it("keeps the server's or a compatible loader when a datapack also declares it, and leaves instances and vanilla servers alone", () => {
+  it("keeps the server's or a compatible loader when a datapack also declares it, and leaves vanilla servers alone", () => {
     expect(
       targetDefaults(
         "server",
@@ -170,19 +170,41 @@ describe("targetDefaults", () => {
     ).toEqual(scope("forge", "1.20.1"))
     expect(
       targetDefaults(
-        "instance",
-        "loader",
-        { loader: "fabric", gameVersion: "1.20.1" },
-        { loaders: ["datapack"] }
-      )
-    ).toEqual(scope(undefined, "1.20.1"))
-    expect(
-      targetDefaults(
         "server",
         "loader",
         { loader: null, gameVersion: "1.20.1" },
         { loaders: ["datapack"] }
       )
+    ).toEqual(scope(undefined, "1.20.1"))
+  })
+
+  it("lists the datapack builds for an instance that gets the project's data pack build", () => {
+    const fabric = { loader: "fabric", gameVersion: "1.20.1" }
+    const vanilla = { gameVersion: "1.20.1" }
+    const onlyDatapack = { loaders: ["datapack"], gameVersions: ["1.20.1"] }
+    const hybrid = {
+      loaders: ["datapack", "fabric", "forge", "neoforge", "quilt"],
+      gameVersions: ["1.20.1"]
+    }
+    // A Modrinth project that is only a data pack, whatever the instance runs.
+    for (const facts of [fabric, vanilla])
+      expect(targetDefaults("instance", "loader", facts, onlyDatapack)).toEqual(
+        scope("datapack", "1.20.1")
+      )
+    // One that also ships as a mod: its data pack build without a mod loader,
+    // its mod with one.
+    expect(targetDefaults("instance", "loader", vanilla, hybrid)).toEqual(
+      scope("datapack", "1.20.1")
+    )
+    expect(targetDefaults("instance", "loader", fabric, hybrid)).toEqual(
+      scope("fabric", "1.20.1")
+    )
+    // A plain mod and a CurseForge data pack are scoped as before.
+    expect(
+      targetDefaults("instance", "loader", vanilla, { loaders: ["fabric"] })
+    ).toEqual(scope(undefined, "1.20.1"))
+    expect(
+      targetDefaults("instance", "gameOnly", fabric, { loaders: [] })
     ).toEqual(scope(undefined, "1.20.1"))
   })
 

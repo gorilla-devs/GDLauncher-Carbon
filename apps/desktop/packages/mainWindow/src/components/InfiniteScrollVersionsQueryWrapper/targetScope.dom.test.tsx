@@ -367,6 +367,30 @@ it("without a world the same project lists the builds for the instance's own loa
   expect(f.context.target.world).toBeUndefined()
 })
 
+it.each([
+  [
+    "an instance without a mod loader lists the datapack builds of a Modrinth data pack that also ships as a mod",
+    null,
+    hybridLoaders
+  ],
+  [
+    "an instance with a mod loader lists the datapack builds of a Modrinth project that is only a data pack",
+    "fabric",
+    ["datapack"]
+  ]
+])("%s", async (_, loader, loaders) => {
+  backend({ loader, gameVersion: "1.20.1" }, [datapackVersion])
+  const f = mount(
+    { instanceId: "3" },
+    { addonType: "mod", loaders, gameVersions: ["1.20.1"] }
+  )
+  await settle()
+  expect(versionCalls()).toEqual([
+    { project_id: "project", game_versions: ["1.20.1"], loaders: ["datapack"] }
+  ])
+  expect(f.context.target.world).toBeUndefined()
+})
+
 it("a plain mod ignores a world in its link", async () => {
   backend({ loader: "fabric", gameVersion: "1.20.1" })
   const f = mount(

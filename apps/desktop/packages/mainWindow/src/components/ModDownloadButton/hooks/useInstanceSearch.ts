@@ -50,8 +50,8 @@ export const useInstanceSearch = (options?: UseInstanceSearchOptions) => {
       .filter((instance) => {
         const addon = options?.addon?.()
         // For mods, only show instances with modloaders. A data pack Modrinth
-        // types as a mod goes into a world, which any instance can have: the
-        // pick then asks which one.
+        // types as a mod goes into a world or the instance's data packs,
+        // which any instance has: the pick then asks where.
         if (
           addon?.type === "mod" &&
           !asksWhichWorld(addon, searchContext?.searchQuery().projectType)

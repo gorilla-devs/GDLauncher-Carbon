@@ -2,6 +2,7 @@ import type {
   FEUnifiedSearchResult,
   FEWorld,
   InstallWorldDatapack,
+  MRFEVersion,
   WorldDatapackSource
 } from "@gd/core_module/bindings"
 import { findInstalledAddon } from "./installedAddon"
@@ -41,6 +42,41 @@ export function asksWhichWorld(
     isOnlyDatapack(project) ||
     (searchedType === "datapack" && canBeDatapack(project))
   )
+}
+
+/** Whether an install into the instance itself is the project's data pack
+ *  build, which goes to its `datapacks` folder. A project that also ships as
+ *  a mod installs its mod wherever a mod loader can run it. */
+export function instanceInstallIsDatapack(
+  project: ProjectKind,
+  hasModLoader: boolean
+): boolean {
+  return isOnlyDatapack(project) || (!hasModLoader && canBeDatapack(project))
+}
+
+const STABILITY = ["release", "beta", "alpha"] as const
+
+/** The build an instance gets among the data pack builds Modrinth lists for
+ *  its game version: the newest release whose primary file (or first, when
+ *  none is primary) is a zip, else the newest beta, else the newest alpha.
+ *  The core picks the same one for a world. */
+export function newestDatapackBuild<
+  Version extends Pick<MRFEVersion, "version_type" | "date_published"> & {
+    files: readonly Pick<MRFEVersion["files"][number], "filename" | "primary">[]
+  }
+>(versions: readonly Version[]): Version | undefined {
+  const builds = versions
+    .filter((version) =>
+      (version.files.find((file) => file.primary) ?? version.files[0])?.filename
+        .toLowerCase()
+        .endsWith(".zip")
+    )
+    .sort((a, b) => b.date_published.localeCompare(a.date_published))
+  for (const stability of STABILITY) {
+    const build = builds.find((version) => version.version_type === stability)
+    if (build) return build
+  }
+  return undefined
 }
 
 /** The world an install goes to. The `world` search param counts only beside

@@ -9,7 +9,14 @@ import {
   createModInstallObj
 } from "../utils/modInstallObjects"
 import { effectiveFileId, LinkedFile, LinkTarget } from "@/utils/linkedFile"
-import { ReadableWorld, worldDatapackInstall } from "@/utils/worldTarget"
+import { extractErrorDisplay } from "@/utils/rspcErrorText"
+import { addonInstallFailure } from "../addonInstallScope"
+import {
+  instanceInstallIsDatapack,
+  newestDatapackBuild,
+  ReadableWorld,
+  worldDatapackInstall
+} from "@/utils/worldTarget"
 
 interface UseModInstallationProps {
   addon: FEUnifiedSearchResult | undefined
@@ -28,7 +35,8 @@ interface UseModInstallationOptions {
 export interface InstanceInstallTask {
   taskId: number
   title: string
-  type: FEUnifiedSearchResult["type"]
+  /** A data pack that lands in the instance, to be added to a world there. */
+  staged: boolean
   /** Set when the data pack went straight into this world. */
   world?: string
 }
@@ -82,6 +90,17 @@ export const useModInstallation = (
     mutationKey: "server.installServerMod"
   }))
 
+  /** Whether an install into the instance itself is the project's data pack
+   *  build. Until the instance's loader is known it counts as having one, so
+   *  a project that also ships as a mod keeps installing its mod. */
+  const installsAsDatapack = (instanceId: number | undefined) => {
+    const target =
+      instanceId === undefined
+        ? undefined
+        : options.instanceTarget?.(instanceId)
+    return instanceInstallIsDatapack(props.addon, !target || !!target.modloader)
+  }
+
   // Build both wire variants before requirements yields to reactive selection.
   const captureInstallAttempt = (
     instanceId: number,
@@ -89,14 +108,16 @@ export const useModInstallation = (
   ) => {
     const addon = props.addon
     if (!addon) return undefined
+    const target = options.instanceTarget?.(instanceId)
     // A link's file that does not fit this instance installs the instance's
     // own version instead (2.0.40's path), and never replaces an installed copy.
     const fileId = effectiveFileId(
       props.fileId,
       props.linkedFile,
       addon.type,
-      options.instanceTarget?.(instanceId)
+      target
     )
+    const staged = installsAsDatapack(instanceId)
     const owner = Symbol()
     attempts.set(instanceId, owner)
     return {
@@ -105,6 +126,14 @@ export const useModInstallation = (
       fileId,
       addonType: addon.type,
       title: addon.title,
+      staged,
+      // The core's own pick of a latest version takes a Modrinth project for
+      // the mod it is typed as, so its data pack build is picked here, for
+      // the instance's game version once that is known.
+      datapackBuild:
+        !fileId && staged && addon.platform === "modrinth" && target?.mc_version
+          ? { projectId: addon.id.toString(), gameVersion: target.mc_version }
+          : undefined,
       installLatest: !fileId,
       modSource: fileId ? createModInstallObj(addon, fileId) : undefined,
       latestModSource: !fileId ? createLatestModInstallObj(addon) : undefined,
@@ -114,6 +143,57 @@ export const useModInstallation = (
   type InstallAttempt = NonNullable<ReturnType<typeof captureInstallAttempt>>
   const current = (attempt: InstallAttempt) =>
     active && attempts.get(attempt.instanceId) === attempt.owner
+
+  /** `attempt` as it is sent to the core: one for a Modrinth data pack build
+   *  names the newest such build for the game version. Undefined, after
+   *  saying why, when the project has none or they could not be listed. */
+  const resolveInstallAttempt = async (
+    attempt: InstallAttempt
+  ): Promise<InstallAttempt | undefined> => {
+    const wanted = attempt.datapackBuild
+    if (!wanted) return attempt
+    let build
+    try {
+      build = newestDatapackBuild(
+        await ctx.client.query([
+          "modplatforms.modrinth.getProjectVersions",
+          {
+            project_id: wanted.projectId,
+            game_versions: [wanted.gameVersion],
+            loaders: ["datapack"]
+          }
+        ])
+      )
+    } catch (error) {
+      toast.error(
+        addonInstallFailure(
+          t,
+          attempt.title || t("notifications:_trn_addon_fallback_name")
+        ),
+        { description: extractErrorDisplay(error) }
+      )
+      return undefined
+    }
+    if (!build) {
+      toast.error(
+        t("content:_trn_worlds.no_datapack_for_version", {
+          version: wanted.gameVersion,
+          interpolation: { escapeValue: false }
+        })
+      )
+      return undefined
+    }
+    return {
+      ...attempt,
+      fileId: build.id,
+      datapackBuild: undefined,
+      installLatest: false,
+      modSource: {
+        Modrinth: { project_id: wanted.projectId, version_id: build.id }
+      },
+      latestModSource: undefined
+    }
+  }
 
   const maybeOpenShaderWizard = async (
     attempt: InstallAttempt
@@ -148,7 +228,7 @@ export const useModInstallation = (
                 newMap.set(instanceId, {
                   taskId,
                   title: attempt.title,
-                  type: attempt.addonType
+                  staged: attempt.staged
                 })
                 return newMap
               })
@@ -191,18 +271,24 @@ export const useModInstallation = (
         return
       }
 
+      const sent = await resolveInstallAttempt(attempt)
+      if (!sent) {
+        if (current(attempt)) clearInstanceLoadingState(instanceId)
+        return
+      }
+
       let taskId: number
 
-      if (attempt.installLatest) {
+      if (sent.installLatest) {
         taskId = await perInstanceInstallLatestMutation.mutateAsync({
           instance_id: instanceId,
-          mod_source: attempt.latestModSource!
+          mod_source: sent.latestModSource!
         })
       } else {
-        const replacesMod = attempt.replacesMod
+        const replacesMod = sent.replacesMod
 
         taskId = await perInstanceInstallMutation.mutateAsync({
-          mod_source: attempt.modSource!,
+          mod_source: sent.modSource!,
           instance_id: instanceId,
           install_deps: !replacesMod,
           replaces_mod: replacesMod
@@ -215,7 +301,7 @@ export const useModInstallation = (
         newMap.set(instanceId, {
           taskId,
           title: attempt.title,
-          type: attempt.addonType
+          staged: attempt.staged
         })
         return newMap
       })
@@ -255,7 +341,7 @@ export const useModInstallation = (
         new Map(prev).set(instanceId, {
           taskId,
           title: addon.title,
-          type: addon.type,
+          staged: false,
           world: world.name
         })
       )
@@ -318,6 +404,8 @@ export const useModInstallation = (
     handleServerInstall,
     clearInstanceLoadingState,
     captureInstallAttempt,
+    resolveInstallAttempt,
+    installsAsDatapack,
     maybeOpenShaderWizard
   }
 }
