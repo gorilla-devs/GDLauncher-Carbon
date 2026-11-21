@@ -11,6 +11,7 @@ pub mod modpack_cache;
 pub mod server;
 pub mod skin;
 pub mod version_meta;
+pub mod world_datapack_cache;
 
 /// Every registered `QueryCheck` across every repo module above — the single
 /// shared source of truth for "every query the checker must validate".
@@ -39,5 +40,6 @@ pub fn all_queries() -> Vec<crate::registry::QueryCheck> {
     all.extend(server::all_queries());
     all.extend(skin::all_queries());
     all.extend(version_meta::all_queries());
+    all.extend(world_datapack_cache::all_queries());
     all
 }

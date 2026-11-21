@@ -202,19 +202,19 @@ queries! {
     fn update_local_modloaders(id: &str, modloaders: &str, updated_at: DbDateTime) -> usize =
         "UPDATE ModMetadata SET modloaders = :modloaders, lastUpdatedAt = :updated_at WHERE id = :id";
     fn gc_local_images() -> usize =
-        "DELETE FROM LocalModImageCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL))";
+        "DELETE FROM LocalModImageCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM WorldDatapackCache WHERE metadataId IS NOT NULL))";
     fn gc_cf_images() -> usize =
-        "DELETE FROM CurseForgeModImageCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL)) OR metadataId NOT IN (SELECT metadataId FROM CurseForgeModCache)";
+        "DELETE FROM CurseForgeModImageCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM WorldDatapackCache WHERE metadataId IS NOT NULL)) OR metadataId NOT IN (SELECT metadataId FROM CurseForgeModCache)";
     fn gc_mr_images() -> usize =
-        "DELETE FROM ModrinthModImageCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL)) OR metadataId NOT IN (SELECT metadataId FROM ModrinthModCache)";
+        "DELETE FROM ModrinthModImageCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM WorldDatapackCache WHERE metadataId IS NOT NULL)) OR metadataId NOT IN (SELECT metadataId FROM ModrinthModCache)";
     fn gc_mr_contexts() -> usize =
-        "DELETE FROM ModrinthUpdateCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL))";
+        "DELETE FROM ModrinthUpdateCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM WorldDatapackCache WHERE metadataId IS NOT NULL))";
     fn gc_cf_cache() -> usize =
-        "DELETE FROM CurseForgeModCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL))";
+        "DELETE FROM CurseForgeModCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM WorldDatapackCache WHERE metadataId IS NOT NULL))";
     fn gc_mr_cache() -> usize =
-        "DELETE FROM ModrinthModCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL))";
+        "DELETE FROM ModrinthModCache WHERE metadataId NOT IN (SELECT id FROM ModMetadata WHERE id IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM WorldDatapackCache WHERE metadataId IS NOT NULL))";
     fn gc_orphan_metadata_rows() -> usize =
-        "DELETE FROM ModMetadata WHERE id NOT IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL)";
+        "DELETE FROM ModMetadata WHERE id NOT IN (SELECT metadataId FROM ModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM ServerModFileCache WHERE metadataId IS NOT NULL UNION SELECT metadataId FROM WorldDatapackCache WHERE metadataId IS NOT NULL)";
 
     // --- LocalModImageCache ---------------------------------------------------
     fn insert_local_image(metadata_id: &str, data: &[u8]) -> usize =

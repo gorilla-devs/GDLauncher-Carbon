@@ -113,7 +113,12 @@ fn a_2_0_40_database_upgrades_with_empty_stamps_and_down_restores_the_old_schema
     conn.execute_batch(down).unwrap();
     let reference = {
         let mut fresh = Connection::open(dir.path().join("reference.db")).unwrap();
-        before_stamp().to_latest(&mut fresh).unwrap();
+        // Every migration but this one: later additive tables stay in place.
+        let (mut without, _) = carbon_repos::get_migrations();
+        without
+            .migrations
+            .retain(|migration| migration.name != "20261026164859_server_addon_file_stamp");
+        without.to_latest(&mut fresh).unwrap();
         dump_schema(&fresh).unwrap()
     };
     assert_eq!(dump_schema(&conn).unwrap(), reference);

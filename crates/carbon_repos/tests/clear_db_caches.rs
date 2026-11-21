@@ -8,6 +8,7 @@ const HELPER: &str = include_str!("../../../clear_db_caches.sql");
 const CACHES: &[&str] = &[
     "ModFileCache",
     "ServerModFileCache",
+    "WorldDatapackCache",
     "LocalModImageCache",
     "CurseForgeModImageCache",
     "ModrinthModImageCache",
@@ -56,7 +57,8 @@ impl Fixture {
                 INSERT INTO ModrinthModImageCache VALUES('physical','fixture',x'03',1);
                 INSERT INTO ModrinthUpdateCache VALUES('physical','mods:forge:1.20.1','paths',1);").unwrap();
             if instance {
-                conn.execute_batch("INSERT INTO ModFileCache(id,instanceId,filename,filesize,enabled,addonType,metadataId,fileStamp) VALUES('instance-file',11,'renamed.jar',4,0,'mods','physical','marker');").unwrap();
+                conn.execute_batch("INSERT INTO WorldDatapackCache(id,instanceId,world,filename,filesize,isFolder,metadataId,fileStamp) VALUES('world-pack',11,'world','pack.zip',4,0,'physical','marker');
+                    INSERT INTO ModFileCache(id,instanceId,filename,filesize,enabled,addonType,metadataId,fileStamp) VALUES('instance-file',11,'renamed.jar',4,0,'mods','physical','marker');").unwrap();
             }
             if server {
                 conn.execute_batch("INSERT INTO ServerModFileCache(id,serverId,filename,location,filesize,enabled,addonType,metadataId,sourcePlatform,sourceProjectId,sourceVersionId,sourceSha512) VALUES('server-file',12,'renamed.jar','mods/renamed.jar',4,0,'mods','physical','mr','project','version',x'01');").unwrap();
@@ -274,6 +276,7 @@ fn current_cache_fk_graph_is_covered_by_populated_fixture() {
             ("ModrinthModImageCache", "ModrinthModCache"),
             ("ModrinthUpdateCache", "ModMetadata"),
             ("ServerModFileCache", "ModMetadata"),
+            ("WorldDatapackCache", "ModMetadata"),
         ]
         .map(|(child, parent)| (child.to_owned(), parent.to_owned()))
     );

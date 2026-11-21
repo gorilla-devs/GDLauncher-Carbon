@@ -122,6 +122,13 @@ pub fn get_migrations() -> (MigrationSet, i32) {
             kind: MigrationKind::Additive,
             data_down: "full",
         },
+        MigrationDef {
+            name: "20261121015016_world_datapack_cache",
+            up_sql: include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/prisma/migrations/20261121015016_world_datapack_cache/migration.sql")),
+            down_sql: Some(include_str!(concat!(env!("CARGO_MANIFEST_DIR"), "/prisma/migrations/20261121015016_world_datapack_cache/down.sql"))),
+            kind: MigrationKind::Additive,
+            data_down: "full",
+        },
         // new-migration:anchor — the tool inserts new MigrationDef entries directly above this line
     ];
     let count = migrations.len() as i32;

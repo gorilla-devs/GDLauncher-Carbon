@@ -435,6 +435,7 @@ impl std::error::Error for CleanupFailures {}
 /// from starting offline. They hold one small row per version launched.
 const CLEANUP_TABLES: &[&str] = &[
     "HTTPCache",
+    "WorldDatapackCache",
     "ModrinthUpdateCache",
     "CurseForgeModImageCache",
     "ModrinthModImageCache",

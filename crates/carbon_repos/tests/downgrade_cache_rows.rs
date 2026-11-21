@@ -72,10 +72,11 @@ fn an_older_build_opens_a_migrated_database_and_drops_only_the_cache_rows_it_can
     );
     seed_current(&conn);
 
-    // Every older build with the compat runner opens a copy: 28 overlays the
-    // additive 29, 26 and 27 run the downs above them.
-    assert_eq!(count, 29);
+    // Every older build with the compat runner opens a copy: 28 and 29 overlay
+    // the additive 30, 26 and 27 run the downs above them.
+    assert_eq!(count, 30);
     for (older, verdict) in [
+        (29, OpenVerdict::Proceed),
         (28, OpenVerdict::Proceed),
         (27, OpenVerdict::Downgraded),
         (26, OpenVerdict::Downgraded),

@@ -146,6 +146,20 @@ pub const EDGES: &[FkEdge] = &[
         parent_cols: &["id"],
         class: RepairClass::CacheDelete,
     },
+    FkEdge {
+        child: "WorldDatapackCache",
+        child_cols: &["metadataId"],
+        parent: "ModMetadata",
+        parent_cols: &["id"],
+        class: RepairClass::CacheDelete,
+    },
+    FkEdge {
+        child: "WorldDatapackCache",
+        child_cols: &["instanceId"],
+        parent: "Instance",
+        parent_cols: &["id"],
+        class: RepairClass::CacheDelete,
+    },
     // Image caches hanging off the mod caches above.
     FkEdge {
         child: "CurseForgeModImageCache",

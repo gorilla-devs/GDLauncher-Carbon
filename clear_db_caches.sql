@@ -8,6 +8,7 @@ BEGIN IMMEDIATE;
 
 DELETE FROM ModFileCache;
 DELETE FROM ServerModFileCache;
+DELETE FROM WorldDatapackCache;
 DELETE FROM LocalModImageCache;
 DELETE FROM CurseForgeModImageCache;
 DELETE FROM ModrinthModImageCache;

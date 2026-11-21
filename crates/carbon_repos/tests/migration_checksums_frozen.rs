@@ -148,6 +148,10 @@ const FROZEN: &[(&str, &str)] = &[
         "20261026164859_server_addon_file_stamp",
         "ab02177aa258cc1df32df3b3fe56788e81f5c828e58a239bba1754398abaf779",
     ),
+    (
+        "20261121015016_world_datapack_cache",
+        "24d58f080e3b264db809885063b6b4fcc8a8dc1a3de69d0d1436816b5fd03323",
+    ),
     // new-migration:anchor — new_migration appends the new (name, checksum) tuple directly above this line
 ];
 
