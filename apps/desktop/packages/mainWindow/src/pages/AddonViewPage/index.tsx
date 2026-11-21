@@ -135,6 +135,7 @@ const AddonExplore = (props: { children?: any }) => {
     instanceId: string
     serverId: string
     requestedVersionId: string
+    world: string
   }>()
 
   const selectedInstanceId = () => {
@@ -607,6 +608,7 @@ const AddonExplore = (props: { children?: any }) => {
                               serverAddons.data ?? undefined
                             }
                             selectedServerId={selectedServerId()}
+                            selectedWorld={searchParams.world}
                             testId="addon-install-button"
                           />
                         </Match>
@@ -741,6 +743,7 @@ const AddonExplore = (props: { children?: any }) => {
                           selectedInstanceId={selectedInstanceId()}
                           selectedInstanceMods={instanceMods.data ?? undefined}
                           selectedServerId={selectedServerId()}
+                          selectedWorld={searchParams.world}
                           size="small"
                           selectedServerAddons={serverAddons.data ?? undefined}
                           iconOnly

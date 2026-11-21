@@ -46,6 +46,9 @@ export function Grid() {
   const serverId = () => searchContext?.selectedServerId() || NaN
   const serverAddons = () => searchContext?.selectedServerAddons
   const isServer = () => !isNaN(serverId()) && serverId() > 0
+  // Data pack rows of a world search are judged against that world's packs.
+  const worldName = (row: LinkedSearchResult) =>
+    row.type === "datapack" ? searchContext?.selectedWorld?.name : undefined
   const globalStore = useGlobalStore()
   // A link row whose linked file does not fit the instance or server installs
   // that target's own version, so any installed copy counts as installed. On
@@ -235,6 +238,7 @@ export function Grid() {
                           serverAddons={serverAddons()?.data ?? undefined}
                           instanceId={instanceId()}
                           serverId={serverId()}
+                          world={worldName(item.value!)}
                           result={item.value!}
                           isInstalled={isAddonInstalled(
                             item.value!,
@@ -243,10 +247,17 @@ export function Grid() {
                                   kind: "server",
                                   addons: serverAddons()?.data ?? []
                                 }
-                              : {
-                                  kind: "instance",
-                                  addons: installedMods.data ?? []
-                                },
+                              : worldName(item.value!) !== undefined
+                                ? {
+                                    kind: "world",
+                                    datapacks:
+                                      searchContext?.selectedWorld.data
+                                        ?.datapacks ?? []
+                                  }
+                                : {
+                                    kind: "instance",
+                                    addons: installedMods.data ?? []
+                                  },
                             rowRequested(item.value!),
                             item.value!.linkedFile
                           )}
@@ -257,8 +268,12 @@ export function Grid() {
                               !isNaN(sid) && sid > 0
                                 ? `serverId=${sid}`
                                 : `instanceId=${iid}`
+                            const world = worldName(item.value!)
+                            const worldParam = world
+                              ? `&world=${encodeURIComponent(world)}`
+                              : ""
                             navigator.navigate(
-                              `/addon/${item.value!.id}/${item.value!.platform}?${idParam}${item.value!.requestedVersionId ? `&requestedVersionId=${encodeURIComponent(item.value!.requestedVersionId)}` : ""}`
+                              `/addon/${item.value!.id}/${item.value!.platform}?${idParam}${worldParam}${item.value!.requestedVersionId ? `&requestedVersionId=${encodeURIComponent(item.value!.requestedVersionId)}` : ""}`
                             )
                           }}
                         />

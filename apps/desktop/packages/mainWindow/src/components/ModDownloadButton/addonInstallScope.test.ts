@@ -34,6 +34,24 @@ describe("single-player datapack completion scope", () => {
       "Mod installed successfully"
     )
   })
+  it("says a pack installed into a world was added to that world", () => {
+    const seen: unknown[] = []
+    const spy = ((key: string, options?: unknown) => {
+      seen.push([key, options])
+      return key
+    }) as TypedTFunction
+    addonInstallCompletion(spy, "Pack & Co", "datapack", false, "My World")
+    expect(seen).toEqual([
+      [
+        "content:_trn_datapack_staging.added",
+        {
+          name: "Pack & Co",
+          world: "My World",
+          interpolation: { escapeValue: false }
+        }
+      ]
+    ])
+  })
   it("keeps names verbatim instead of HTML-escaping them", () => {
     const seen: unknown[] = []
     const spy = ((key: string, options?: unknown) => {

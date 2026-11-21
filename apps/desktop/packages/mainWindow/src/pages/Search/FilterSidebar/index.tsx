@@ -1,4 +1,12 @@
-import { createSignal, createEffect, on, onCleanup, Show } from "solid-js"
+import {
+  createSignal,
+  createEffect,
+  on,
+  onCleanup,
+  Match,
+  Show,
+  Switch
+} from "solid-js"
 import { Button } from "@gd/ui"
 import { Trans } from "@gd/i18n"
 import useSearchContext from "@/components/SearchInputContext"
@@ -33,10 +41,18 @@ function ExpandedPanel(props: {
   const hasContext = () =>
     !!(searchContext?.selectedInstanceId() || searchContext?.selectedServerId())
 
+  const instanceName = () => searchContext?.selectedInstance?.data?.name
+  // A world target names the world over its instance; one that is gone or
+  // unreadable shows as a target still loading.
+  const worldTarget = () => searchContext?.selectedWorld?.name !== undefined
+  const worldName = () => {
+    const world = searchContext?.selectedWorld?.data
+    return world?.identity != null ? world.name : "..."
+  }
   const contextName = () =>
-    searchContext?.selectedServer?.data?.name ||
-    searchContext?.selectedInstance?.data?.name ||
-    "..."
+    worldTarget()
+      ? worldName()
+      : searchContext?.selectedServer?.data?.name || instanceName() || "..."
 
   const contextImageUrl = () => {
     const serverId = searchContext?.selectedServerId()
@@ -61,7 +77,7 @@ function ExpandedPanel(props: {
       )
     } else if (searchContext?.selectedInstanceId()) {
       navigator.navigate(
-        `/library/${searchContext?.selectedInstanceId()}/addons`
+        `/library/${searchContext?.selectedInstanceId()}/${worldTarget() ? "worlds" : "addons"}`
       )
     }
   }
@@ -99,12 +115,12 @@ function ExpandedPanel(props: {
                 {contextName()}
               </span>
               <span class="text-lightSlate-500 text-xs">
-                <Show
-                  when={searchContext?.selectedServerId()}
-                  fallback={<Trans key="search:_trn_context_instance" />}
-                >
-                  <Trans key="search:_trn_context_server" />
-                </Show>
+                <Switch fallback={<Trans key="search:_trn_context_instance" />}>
+                  <Match when={searchContext?.selectedServerId()}>
+                    <Trans key="search:_trn_context_server" />
+                  </Match>
+                  <Match when={worldTarget()}>{instanceName() || "..."}</Match>
+                </Switch>
               </span>
             </div>
             <button

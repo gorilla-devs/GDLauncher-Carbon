@@ -25,6 +25,7 @@ import { searchSidebarApplies } from "./searchSidebar"
 import { validatedCurseForgeFile } from "./requestedVersion"
 import { i18n } from "@gd/i18n"
 import { LinkedSearchResult, toLinkedFile } from "./linkedFile"
+import { worldTargetName } from "./worldTarget"
 
 const effectivePageSize = (params: FEUnifiedSearchParameters) =>
   params.searchApi ? 20 : params.pageSize || 15
@@ -174,6 +175,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const [searchParams, _setSearchParams] = useSearchParams<{
     instanceId: string
     serverId: string
+    world: string
     q: string
   }>()
 
@@ -183,10 +185,12 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     return isNaN(id) ? undefined : id
   }
 
+  // A world belongs to its instance: any change of target drops it.
   const setSelectedInstanceId = (instanceId: number | undefined) => {
     _setSearchParams({
       ...searchParams,
-      instanceId: instanceId !== undefined ? String(instanceId) : undefined
+      instanceId: instanceId !== undefined ? String(instanceId) : undefined,
+      world: undefined
     })
   }
 
@@ -199,7 +203,8 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
   const setSelectedServerId = (serverId: number | undefined) => {
     _setSearchParams({
       ...searchParams,
-      serverId: serverId !== undefined ? String(serverId) : undefined
+      serverId: serverId !== undefined ? String(serverId) : undefined,
+      world: undefined
     })
   }
 
@@ -288,6 +293,35 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     virtualizer?.scrollTo(0)
 
     _setSearchQuery(value)
+  }
+
+  const selectedWorldName = () =>
+    selectedServerId()
+      ? undefined
+      : worldTargetName(
+          selectedInstanceId(),
+          searchQuery().projectType,
+          searchParams.world
+        )
+
+  const selectedWorldQuery = rspc.createQuery(() => ({
+    queryKey: ["instance.getWorlds", selectedInstanceId() ?? 0],
+    enabled: selectedWorldName() !== undefined
+  }))
+
+  /** The world of the selected instance that data packs install into (from
+   *  its Worlds tab), only while data packs are searched. `data` is undefined
+   *  while loading or when the world is gone. */
+  const selectedWorld = {
+    get name() {
+      return selectedWorldName()
+    },
+    get data() {
+      const name = selectedWorldName()
+      return name === undefined
+        ? undefined
+        : selectedWorldQuery.data?.find((world) => world.name === name)
+    }
   }
 
   // Router values are decoded already. Track only the one-use routed input,
@@ -826,6 +860,7 @@ export const getSearchResults = (_opts?: SearchResultsOpts) => {
     setSelectedServerId,
     selectedServer,
     selectedServerAddons,
+    selectedWorld,
     sidebarReady,
     sidebarApplies,
     // Direct search mode

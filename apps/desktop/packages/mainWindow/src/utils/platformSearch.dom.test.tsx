@@ -779,3 +779,50 @@ it("provider category/sort invalidation remains independent and combined mode re
   expect(f.search.mrInfiniteResults.data?.pages[0].data).toHaveLength(15)
   expect(f.search.hasNextPage()).toBe(true)
 })
+function worldFixture(initial: string) {
+  defaults()
+  const original = c.query.getMockImplementation()!
+  c.query.mockImplementation(async (args: any) =>
+    args[0] === "instance.getWorlds"
+      ? [{ name: "My World", addon_id: "w", identity: "id", datapacks: [] }]
+      : original(args)
+  )
+  return fixture(initial)
+}
+it("a world beside an instance targets that world for data packs only", async () => {
+  const f = worldFixture("/search?instanceId=3&world=My%20World")
+  f.search.setSearchQuery((prev) => ({ ...prev, projectType: "datapack" }))
+  await flush()
+  expect(f.search.selectedWorld.name).toBe("My World")
+  expect(f.search.selectedWorld.data?.identity).toBe("id")
+  expect(c.query).toHaveBeenCalledWith(["instance.getWorlds", 3])
+  f.search.setSearchQuery((prev) => ({ ...prev, projectType: "mod" }))
+  await flush()
+  expect(f.search.selectedWorld.name).toBeUndefined()
+  expect(f.search.selectedWorld.data).toBeUndefined()
+})
+it("a world without an instance is ignored", async () => {
+  const f = worldFixture("/search?world=My%20World")
+  f.search.setSearchQuery((prev) => ({ ...prev, projectType: "datapack" }))
+  await flush()
+  expect(f.search.selectedWorld.name).toBeUndefined()
+  expect(c.query).not.toHaveBeenCalledWith(["instance.getWorlds", 0])
+})
+it.each([undefined, 5])(
+  "changing the instance to %s drops the world",
+  async (next) => {
+    const f = worldFixture("/search?instanceId=3&world=My%20World")
+    await flush()
+    f.search.setSelectedInstanceId(next)
+    await flush()
+    expect(f.params.world).toBeUndefined()
+    expect(f.params.instanceId).toBe(next === undefined ? undefined : "5")
+  }
+)
+it("choosing a server drops the world", async () => {
+  const f = worldFixture("/search?instanceId=3&world=My%20World")
+  await flush()
+  f.search.setSelectedServerId(9)
+  await flush()
+  expect(f.params.world).toBeUndefined()
+})

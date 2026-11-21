@@ -19,6 +19,8 @@ interface GridItemProps {
   instanceMods?: Mod[]
   serverAddons?: ServerAddon[]
   serverId?: number
+  /** The instance's world a data pack installs into. */
+  world?: string
 }
 
 export function GridItem(props: GridItemProps) {
@@ -182,6 +184,7 @@ export function GridItem(props: GridItemProps) {
                 selectedInstanceMods={props.instanceMods}
                 selectedServerAddons={props.serverAddons}
                 selectedServerId={props.serverId}
+                selectedWorld={props.world}
                 addon={props.result}
                 fileId={props.result.requestedVersionId ?? undefined}
                 linkedFile={props.result.linkedFile}

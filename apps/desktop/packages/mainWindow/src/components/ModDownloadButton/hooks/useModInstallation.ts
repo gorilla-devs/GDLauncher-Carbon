@@ -9,6 +9,7 @@ import {
   createModInstallObj
 } from "../utils/modInstallObjects"
 import { effectiveFileId, LinkedFile, LinkTarget } from "@/utils/linkedFile"
+import { ReadableWorld, worldDatapackInstall } from "@/utils/worldTarget"
 
 interface UseModInstallationProps {
   addon: FEUnifiedSearchResult | undefined
@@ -28,6 +29,8 @@ export interface InstanceInstallTask {
   taskId: number
   title: string
   type: FEUnifiedSearchResult["type"]
+  /** Set when the data pack went straight into this world. */
+  world?: string
 }
 
 export const useModInstallation = (
@@ -64,6 +67,10 @@ export const useModInstallation = (
 
   const installModMutation = rspc.createMutation(() => ({
     mutationKey: "instance.installMod"
+  }))
+
+  const installWorldDatapackMutation = rspc.createMutation(() => ({
+    mutationKey: "instance.installWorldDatapack"
   }))
 
   // Server mutations
@@ -222,6 +229,42 @@ export const useModInstallation = (
     }
   }
 
+  /** A data pack picked for one world of an instance in the dropdown. */
+  const handleWorldSelection = async (
+    instanceId: number,
+    world: ReadableWorld
+  ) => {
+    const addon = props.addon
+    if (!addon) return
+    const fileId = effectiveFileId(
+      props.fileId,
+      props.linkedFile,
+      addon.type,
+      options.instanceTarget?.(instanceId)
+    )
+    const owner = Symbol()
+    attempts.set(instanceId, owner)
+    const isCurrent = () => active && attempts.get(instanceId) === owner
+    setInstanceLoadingStates((prev) => new Map(prev).set(instanceId, true))
+    try {
+      const taskId = await installWorldDatapackMutation.mutateAsync(
+        worldDatapackInstall(addon, fileId, instanceId, world)
+      )
+      if (!isCurrent()) return
+      setInstanceTasks((prev) =>
+        new Map(prev).set(instanceId, {
+          taskId,
+          title: addon.title,
+          type: addon.type,
+          world: world.name
+        })
+      )
+    } catch {
+      // The core's refusal is shown by the global MutationCache.onError.
+      if (isCurrent()) clearInstanceLoadingState(instanceId)
+    }
+  }
+
   const clearInstanceLoadingState = (instanceId: number) => {
     setInstanceLoadingStates((prev) => {
       const newMap = new Map(prev)
@@ -269,7 +312,9 @@ export const useModInstallation = (
     installModMutation,
     installLatestServerModMutation,
     installServerModMutation,
+    installWorldDatapackMutation,
     handleInstanceSelection,
+    handleWorldSelection,
     handleServerInstall,
     clearInstanceLoadingState,
     captureInstallAttempt,

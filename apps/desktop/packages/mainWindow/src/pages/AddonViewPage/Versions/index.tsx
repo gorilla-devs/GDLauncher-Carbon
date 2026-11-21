@@ -11,6 +11,7 @@ import { createVirtualizer } from "@tanstack/solid-virtual"
 import { getModloaderDisplayName } from "@/utils/helpers"
 import { extractErrorDisplay } from "@/utils/rspcErrorText"
 import { TranslatedError } from "@/utils/translatedError"
+import { worldTargetName } from "@/utils/worldTarget"
 
 // Instance and server names render as text, so skip HTML escaping.
 const noEscape = { escapeValue: false }
@@ -19,6 +20,7 @@ const Versions = () => {
   const [searchParams] = useSearchParams<{
     instanceId: string
     serverId: string
+    world: string
   }>()
   const mod = useContext(AddonContext)
   const stickyHeaderHeight = useContext(StickyHeaderHeightContext)
@@ -97,10 +99,23 @@ const Versions = () => {
     enabled: instanceId() !== undefined && instanceId()! > 0
   }))
 
+  const world = () =>
+    worldTargetName(instanceId(), mod?.data?.type, searchParams.world)
+  const worlds = rspc.createQuery(() => ({
+    queryKey: ["instance.getWorlds", instanceId() ?? 0],
+    enabled: world() !== undefined
+  }))
+  // A world target marks the version that world holds, not the instance's.
+  const installedCopies = () =>
+    world() !== undefined
+      ? worlds.data?.find((entry) => entry.name === world())?.datapacks
+      : instanceMods.data
+
   const installedMod = () => {
     for (const version of rows()) {
-      if (instanceMods.data) {
-        for (const mod of instanceMods.data) {
+      const copies = installedCopies()
+      if (copies) {
+        for (const mod of copies) {
           if (
             mod.curseforge?.file_id.toString() === version?.fileId ||
             mod.modrinth?.version_id === version?.fileId
@@ -317,6 +332,7 @@ const Versions = () => {
                       installedFile={installedMod()}
                       instanceId={instanceId()}
                       serverId={serverId()}
+                      world={world()}
                       type={mod?.data?.type}
                       instanceMods={instanceMods.data || undefined}
                       instanceDetails={instanceDetails.data || undefined}

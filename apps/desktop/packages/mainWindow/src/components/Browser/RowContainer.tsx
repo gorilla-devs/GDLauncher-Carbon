@@ -19,6 +19,8 @@ export interface Props {
   isCurseforge?: boolean
   instanceId?: number | null
   serverId?: number
+  /** The instance's world a data pack installs into. */
+  world?: string
   instanceDetails?: InstanceDetails
   instanceMods?: Mod[]
   installedFile:
@@ -178,6 +180,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                   selectedInstanceId={props.instanceId ?? undefined}
                   selectedInstanceMods={props.instanceMods}
                   selectedServerId={props.serverId}
+                  selectedWorld={props.world}
                   addon={props.project}
                   fileId={fileId()}
                   size="small"

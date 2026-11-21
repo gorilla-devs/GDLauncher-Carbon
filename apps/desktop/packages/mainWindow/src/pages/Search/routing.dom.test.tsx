@@ -366,3 +366,24 @@ it.each(["grid", "list"] as const)(
     ).toBe(true)
   }
 )
+it("changing the addon type away from data packs drops the world", async () => {
+  const original = io.query.getMockImplementation()!
+  io.query.mockImplementation(async (args: any) =>
+    args[0] === "instance.getWorlds" ? [] : original(args)
+  )
+  const f = fixture("list", "/search/datapack?instanceId=7&world=My%20World")
+  await expectType(f, "datapack", "Data packs")
+  expect(f.search.selectedWorld.name).toBe("My World")
+  const trigger = f.root.querySelector<HTMLElement>(
+    '[data-testid="addon-type-dropdown-trigger"]'
+  )!
+  trigger.dispatchEvent(
+    new MouseEvent("pointerdown", { button: 0, bubbles: true })
+  )
+  trigger.click()
+  await flush()
+  document.querySelector<HTMLElement>('[data-addon-type="shader"]')!.click()
+  await expectType(f, "shader", "Shaders")
+  expect(f.location.search).toBe("?instanceId=7")
+  expect(f.search.selectedWorld.name).toBeUndefined()
+})

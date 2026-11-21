@@ -34,6 +34,9 @@ export function List() {
   const serverId = () => searchContext?.selectedServerId() || NaN
   const serverAddons = () => searchContext?.selectedServerAddons
   const isServer = () => !isNaN(serverId()) && serverId() > 0
+  // Data pack rows of a world search are judged against that world's packs.
+  const worldName = (row: LinkedSearchResult) =>
+    row.type === "datapack" ? searchContext?.selectedWorld?.name : undefined
   const globalStore = useGlobalStore()
   // A link row whose linked file does not fit the instance or server installs
   // that target's own version, so any installed copy counts as installed. On
@@ -179,6 +182,7 @@ export function List() {
                           serverAddons={serverAddons()?.data ?? undefined}
                           instanceId={instanceId()}
                           serverId={serverId()}
+                          world={worldName(result.value!)}
                           result={result.value!}
                           isInstalled={isAddonInstalled(
                             result.value!,
@@ -187,10 +191,17 @@ export function List() {
                                   kind: "server",
                                   addons: serverAddons()?.data ?? []
                                 }
-                              : {
-                                  kind: "instance",
-                                  addons: installedMods.data ?? []
-                                },
+                              : worldName(result.value!) !== undefined
+                                ? {
+                                    kind: "world",
+                                    datapacks:
+                                      searchContext?.selectedWorld.data
+                                        ?.datapacks ?? []
+                                  }
+                                : {
+                                    kind: "instance",
+                                    addons: installedMods.data ?? []
+                                  },
                             rowRequested(result.value!),
                             result.value!.linkedFile
                           )}
@@ -201,8 +212,12 @@ export function List() {
                               !isNaN(sid) && sid > 0
                                 ? `serverId=${sid}`
                                 : `instanceId=${iid}`
+                            const world = worldName(result.value!)
+                            const worldParam = world
+                              ? `&world=${encodeURIComponent(world)}`
+                              : ""
                             navigator.navigate(
-                              `/addon/${result.value!.id}/${result.value!.platform}?${idParam}${result.value!.requestedVersionId ? `&requestedVersionId=${encodeURIComponent(result.value!.requestedVersionId)}` : ""}`
+                              `/addon/${result.value!.id}/${result.value!.platform}?${idParam}${worldParam}${result.value!.requestedVersionId ? `&requestedVersionId=${encodeURIComponent(result.value!.requestedVersionId)}` : ""}`
                             )
                           }}
                         />

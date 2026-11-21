@@ -15,6 +15,7 @@ import {
   addonTypeLabelKeys,
   resolveBrowsableAddonType
 } from "@/utils/browsableAddonType"
+import { withoutWorldParam } from "@/utils/worldTarget"
 
 interface AddonTypeOption {
   label: string
@@ -53,7 +54,8 @@ export function AddonTypeDropdown() {
   const handleTypeChange = (option: AddonTypeOption) => {
     if (option.value === currentType()) return
 
-    navigator.navigate(`${option.path}${location.search}`)
+    // A world target is for data packs only.
+    navigator.navigate(`${option.path}${withoutWorldParam(location.search)}`)
 
     queueMicrotask(() => {
       searchContext?.setSearchQuery((prev) => ({

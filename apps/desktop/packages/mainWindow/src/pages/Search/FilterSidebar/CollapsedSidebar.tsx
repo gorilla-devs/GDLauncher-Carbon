@@ -46,8 +46,10 @@ export function CollapsedSidebar(props: {
         `/library/server/${searchResults?.selectedServerId()}/addons`
       )
     } else if (searchResults?.selectedInstanceId()) {
+      const tab =
+        searchResults?.selectedWorld?.name !== undefined ? "worlds" : "addons"
       navigator.navigate(
-        `/library/${searchResults?.selectedInstanceId()}/addons`
+        `/library/${searchResults?.selectedInstanceId()}/${tab}`
       )
     }
   }

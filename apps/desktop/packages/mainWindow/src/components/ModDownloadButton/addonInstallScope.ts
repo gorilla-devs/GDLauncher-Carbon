@@ -8,14 +8,22 @@ const titleOptions = (title: string) => ({
 })
 
 /** Completion text for the selected installation destination. A single-player
- *  datapack lands in the instance, so its toast says where to add it next. */
+ *  datapack lands in the instance, so its toast says where to add it next,
+ *  unless it was installed straight into `world`. */
 export function addonInstallCompletion(
   t: TypedTFunction,
   title: string,
   type?: string,
-  server = false
+  server = false,
+  world?: string
 ): string {
   const options = titleOptions(title)
+  if (!server && type === "datapack" && world)
+    return t("content:_trn_datapack_staging.added", {
+      name: title,
+      world,
+      interpolation: { escapeValue: false }
+    })
   if (!server && type === "datapack")
     return t("notifications:_trn_datapack_downloaded", options)
   return t("notifications:_trn_addon_installed", options)

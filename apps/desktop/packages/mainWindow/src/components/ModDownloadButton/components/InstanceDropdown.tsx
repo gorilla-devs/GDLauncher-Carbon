@@ -5,6 +5,7 @@ import {
   createMemo,
   createSignal,
   onCleanup,
+  untrack,
   Accessor
 } from "solid-js"
 import { Trans } from "@gd/i18n"
@@ -12,15 +13,30 @@ import {
   Button,
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuRadioGroup,
   DropdownMenuTrigger,
-  Input
+  Input,
+  Spinner
 } from "@gd/ui"
 import { VList } from "@/components/VirtuaWrapper"
 import { InstanceItem } from "./InstanceItem"
 import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 import { rspc } from "@/utils/rspcClient"
 import { isModInstalledInInstance } from "../utils/instanceHelpers"
+import { findInstalledAddon } from "@/utils/installedAddon"
+import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
+import type { ReadableWorld } from "@/utils/worldTarget"
+
+interface DropdownInstance {
+  id: number
+  name: string
+  gameVersion: string
+  modloader: string
+  locked: boolean
+  iconRevision: number | null
+  iconUrl: string | null
+}
 
 interface InstanceDropdownProps {
   addon: FEUnifiedSearchResult | undefined
@@ -33,6 +49,9 @@ interface InstanceDropdownProps {
   instanceLoadingStates: Accessor<Map<number, boolean>>
   clearInstanceLoadingState: (instanceId: number) => void
   handleInstanceSelection: (instanceId: number) => void
+  /** Installs a data pack into one world of the instance. When set, a data
+   *  pack's instance pick is followed by a choice of its worlds. */
+  handleWorldSelection?: (instanceId: number, world: ReadableWorld) => void
   /** The game versions a link's file lists when it does not fit the
    *  instance (that instance then gets its own version); undefined where the
    *  pin is kept. */
@@ -45,6 +64,56 @@ interface InstanceDropdownProps {
 export const InstanceDropdown = (props: InstanceDropdownProps) => {
   let inputRef: HTMLInputElement | undefined
   const [isDropdownOpen, setIsDropdownOpen] = createSignal(false)
+  // A data pack's picked instance: the menu then asks where in it.
+  const [pickedInstance, setPickedInstance] = createSignal<DropdownInstance>()
+  const asksForWorld = () =>
+    props.addon?.type === "datapack" && !!props.handleWorldSelection
+
+  const handleOpenChange = (isOpen: boolean) => {
+    setIsDropdownOpen(isOpen)
+    props.onDropdownOpenChange?.(isOpen)
+    if (!isOpen) {
+      setPickedInstance(undefined)
+      props.setSearchQuery("")
+      props.setHoveredInstanceId(null)
+    }
+  }
+
+  // Unreadable worlds cannot take a data pack; a failed read falls back to
+  // the instance below, so it needs no toast.
+  const pickedWorlds = rspc.createQuery(() => ({
+    queryKey: ["instance.getWorlds", pickedInstance()?.id ?? 0],
+    enabled: pickedInstance() !== undefined,
+    meta: LOCAL_ERROR_TOAST
+  }))
+  const pickedMods = rspc.createQuery(() => ({
+    queryKey: ["instance.getInstanceMods", pickedInstance()?.id ?? 0],
+    enabled: pickedInstance() !== undefined
+  }))
+  const readableWorlds = () =>
+    (pickedWorlds.data ?? []).filter(
+      (world): world is ReadableWorld => world.identity !== null
+    )
+  const holdsAddon = (rows: Parameters<typeof findInstalledAddon>[1]) =>
+    !!props.addon && !!findInstalledAddon(props.addon, rows)
+  const instanceHolds = () =>
+    holdsAddon({ kind: "instance", addons: pickedMods.data ?? [] })
+
+  const pickedSettled = () =>
+    (pickedWorlds.isError || pickedWorlds.data !== undefined) &&
+    (pickedMods.isError || pickedMods.data !== undefined)
+
+  // With no readable world there is nothing to ask: the pack goes into the
+  // instance, as it always did, unless the instance already holds it.
+  createEffect(() => {
+    const picked = pickedInstance()
+    if (!picked || !pickedSettled()) return
+    if (readableWorlds().length > 0 || instanceHolds()) return
+    untrack(() => {
+      handleOpenChange(false)
+      props.handleInstanceSelection(picked.id)
+    })
+  })
 
   // Create a helper function to get instance mods for a specific instance
   const getInstanceModsQuery = (instanceId: number) => {
@@ -69,15 +138,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     onCleanup(() => clearTimeout(timer))
   })
 
-  const renderInstance = (instance: {
-    id: number
-    name: string
-    gameVersion: string
-    modloader: string
-    locked: boolean
-    iconRevision: number | null
-    iconUrl: string | null
-  }) => {
+  const renderInstance = (instance: DropdownInstance) => {
     // Create memos inside render function for proper reactivity (critical for SolidJS)
     const isLoading = createMemo(
       () => props.instanceLoadingStates().get(instance.id) || false
@@ -87,7 +148,8 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     const instanceQuery = getInstanceModsQuery(instance.id)
 
     const isInstalled = createMemo(() => {
-      if (!instanceQuery || !props.addon) {
+      // Whether the instance itself holds the pack is asked in the next step.
+      if (!instanceQuery || !props.addon || asksForWorld()) {
         return false
       }
 
@@ -110,7 +172,12 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         isInstalled={isInstalled()}
         linkedFileMismatch={props.linkedFileMismatch?.(instance.id)}
         hoveredInstanceId={props.hoveredInstanceId()}
-        onSelect={props.handleInstanceSelection}
+        keepOpen={asksForWorld()}
+        onSelect={(id) =>
+          asksForWorld()
+            ? setPickedInstance(instance)
+            : props.handleInstanceSelection(id)
+        }
         onMouseEnter={props.setHoveredInstanceId}
         onMouseLeave={() => props.setHoveredInstanceId(null)}
       />
@@ -118,16 +185,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
   }
 
   return (
-    <DropdownMenu
-      onOpenChange={(isOpen) => {
-        setIsDropdownOpen(isOpen)
-        props.onDropdownOpenChange?.(isOpen)
-        if (!isOpen) {
-          props.setSearchQuery("")
-          props.setHoveredInstanceId(null)
-        }
-      }}
-    >
+    <DropdownMenu open={isDropdownOpen()} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger>
         <Button
           class={props.iconOnly ? "" : "w-60"}
@@ -141,64 +199,133 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent class="w-80 p-0">
-        <div
-          class="border-darkSlate-600 border-b p-2"
-          onClick={(e) => {
-            e.stopPropagation()
-            if (inputRef) {
-              inputRef.focus()
-            }
-          }}
-          onKeyDown={(e) => e.stopPropagation()}
-          onKeyUp={(e) => e.stopPropagation()}
-        >
-          <div style={{ height: "32px" }}>
-            <Input
-              ref={inputRef}
-              placeholder="Search instances..."
-              value={props.searchQuery()}
-              onInput={(e) => props.setSearchQuery(e.target.value)}
-              onClick={(e) => {
-                e.stopPropagation()
-                if (inputRef) {
-                  inputRef.focus()
-                }
-              }}
-              onKeyDown={(e) => e.stopPropagation()}
-              onKeyUp={(e) => e.stopPropagation()}
-              icon={<div class="i-hugeicons:search-01 h-4 w-4" />}
-              variant="transparent"
-              class="h-full"
-            />
-          </div>
-        </div>
-
         <Show
-          when={props.filteredInstances().length > 0}
+          when={pickedInstance()}
           fallback={
-            <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
-              <Trans key="content:_trn_common.no_instances_found" />
-            </div>
+            <>
+              <div
+                class="border-darkSlate-600 border-b p-2"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (inputRef) {
+                    inputRef.focus()
+                  }
+                }}
+                onKeyDown={(e) => e.stopPropagation()}
+                onKeyUp={(e) => e.stopPropagation()}
+              >
+                <div style={{ height: "32px" }}>
+                  <Input
+                    ref={inputRef}
+                    placeholder="Search instances..."
+                    value={props.searchQuery()}
+                    onInput={(e) => props.setSearchQuery(e.target.value)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      if (inputRef) {
+                        inputRef.focus()
+                      }
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
+                    onKeyUp={(e) => e.stopPropagation()}
+                    icon={<div class="i-hugeicons:search-01 h-4 w-4" />}
+                    variant="transparent"
+                    class="h-full"
+                  />
+                </div>
+              </div>
+
+              <Show
+                when={props.filteredInstances().length > 0}
+                fallback={
+                  <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
+                    <Trans key="content:_trn_common.no_instances_found" />
+                  </div>
+                }
+              >
+                <DropdownMenuRadioGroup>
+                  <Show
+                    when={props.shouldVirtualize()}
+                    fallback={
+                      <div class="max-h-[300px] overflow-y-auto">
+                        <For each={props.filteredInstances()}>
+                          {(instance) => renderInstance(instance)}
+                        </For>
+                      </div>
+                    }
+                  >
+                    <div class="h-[300px] overflow-hidden">
+                      <VList
+                        data={props.filteredInstances()}
+                        class="h-full w-full"
+                      >
+                        {(item) => renderInstance(item)}
+                      </VList>
+                    </div>
+                  </Show>
+                </DropdownMenuRadioGroup>
+              </Show>
+            </>
           }
         >
-          <DropdownMenuRadioGroup>
-            <Show
-              when={props.shouldVirtualize()}
-              fallback={
+          {(picked) => (
+            <div class="p-1">
+              <button
+                class="text-lightSlate-400 hover:text-lightSlate-100 flex w-full cursor-pointer items-center gap-2 border-none bg-transparent px-2 py-1.5 text-sm font-medium"
+                onClick={() => setPickedInstance(undefined)}
+              >
+                <div class="i-hugeicons:arrow-left-01 h-4 w-4 shrink-0" />
+                <span class="truncate">{picked().name}</span>
+              </button>
+              <Show
+                when={pickedSettled()}
+                fallback={
+                  <div class="flex justify-center py-3">
+                    <Spinner class="h-4 w-4" />
+                  </div>
+                }
+              >
                 <div class="max-h-[300px] overflow-y-auto">
-                  <For each={props.filteredInstances()}>
-                    {(instance) => renderInstance(instance)}
+                  <For each={readableWorlds()}>
+                    {(world) => {
+                      const holds = () =>
+                        holdsAddon({
+                          kind: "world",
+                          datapacks: world.datapacks
+                        })
+                      return (
+                        <DropdownMenuItem
+                          disabled={holds()}
+                          onSelect={() =>
+                            props.handleWorldSelection?.(picked().id, world)
+                          }
+                        >
+                          <span class="min-w-0 flex-1 truncate">
+                            {world.name}
+                          </span>
+                          <Show when={holds()}>
+                            <div class="i-hugeicons:tick-02 h-4 w-4 shrink-0 text-green-400" />
+                          </Show>
+                        </DropdownMenuItem>
+                      )
+                    }}
                   </For>
                 </div>
-              }
-            >
-              <div class="h-[300px] overflow-hidden">
-                <VList data={props.filteredInstances()} class="h-full w-full">
-                  {(item) => renderInstance(item)}
-                </VList>
-              </div>
-            </Show>
-          </DropdownMenuRadioGroup>
+                <DropdownMenuItem
+                  class="text-lightSlate-500"
+                  disabled={instanceHolds()}
+                  onSelect={() => props.handleInstanceSelection(picked().id)}
+                >
+                  <span class="min-w-0 flex-1 truncate">
+                    <Trans key="content:_trn_worlds.instance_copy" />
+                  </span>
+                  <Show when={instanceHolds()}>
+                    <div class="i-hugeicons:tick-02 h-4 w-4 shrink-0 text-green-400" />
+                  </Show>
+                </DropdownMenuItem>
+              </Show>
+            </div>
+          )}
         </Show>
       </DropdownMenuContent>
     </DropdownMenu>

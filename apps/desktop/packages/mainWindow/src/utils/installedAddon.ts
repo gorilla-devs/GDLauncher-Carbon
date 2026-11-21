@@ -1,6 +1,7 @@
 import type {
   AddonType,
   FEUnifiedSearchResult,
+  FEWorldDatapack,
   Mod,
   ServerAddon
 } from "@gd/core_module/bindings"
@@ -14,6 +15,8 @@ export interface InstalledArtifact {
 export type InstalledAddonTarget =
   | { kind: "instance"; addons: readonly Mod[] }
   | { kind: "server"; addons: readonly ServerAddon[] }
+  /** The data packs inside one world: only data packs can match. */
+  | { kind: "world"; datapacks: readonly FEWorldDatapack[] }
 
 const addonKinds: Partial<Record<FEUnifiedSearchResult["type"], AddonType>> = {
   mod: "mods",
@@ -51,14 +54,18 @@ export function findInstalledAddon(
   const kind = addonKinds[addon.type]
   if (!kind) return undefined
   const projectId = addon.id.toString()
-  if (target.kind === "instance") {
-    const matches = target.addons
-      .filter(
-        (mod) =>
-          mod.addon_type === kind &&
-          (addon.platform === "curseforge"
-            ? mod.curseforge?.project_id === parseInt(projectId, 10)
-            : mod.modrinth?.project_id === projectId)
+  if (target.kind === "instance" || target.kind === "world") {
+    const rows: readonly Pick<Mod, "id" | "curseforge" | "modrinth">[] =
+      target.kind === "world"
+        ? kind === "datapacks"
+          ? target.datapacks
+          : []
+        : target.addons.filter((mod) => mod.addon_type === kind)
+    const matches = rows
+      .filter((mod) =>
+        addon.platform === "curseforge"
+          ? mod.curseforge?.project_id === parseInt(projectId, 10)
+          : mod.modrinth?.project_id === projectId
       )
       .map((mod) => {
         const versionId =

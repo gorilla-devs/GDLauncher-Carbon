@@ -20,6 +20,8 @@ interface SearchResultItemProps {
   instanceMods?: Mod[]
   serverAddons?: ServerAddon[]
   serverId?: number
+  /** The instance's world a data pack installs into. */
+  world?: string
 }
 
 export function ListItem(props: SearchResultItemProps) {
@@ -165,6 +167,7 @@ export function ListItem(props: SearchResultItemProps) {
                       selectedInstanceMods={props.instanceMods}
                       selectedServerAddons={props.serverAddons}
                       selectedServerId={props.serverId}
+                      selectedWorld={props.world}
                       addon={props.result}
                       fileId={props.result.requestedVersionId ?? undefined}
                       linkedFile={props.result.linkedFile}

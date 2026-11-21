@@ -31,6 +31,11 @@ import { worldVersionCopy } from "./worldVersionCopy"
 import { findInstalledAddon, isInstalledArtifact } from "@/utils/installedAddon"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import {
+  readableWorld,
+  worldDatapackInstall,
+  worldTargetName
+} from "@/utils/worldTarget"
+import {
   effectiveFileId,
   instanceLinkTarget,
   LinkedFile,
@@ -54,6 +59,9 @@ interface ModDownloadButtonProps {
   selectedServerAddons?: ServerAddon[]
   instanceLocked?: boolean
   selectedServerId?: number
+  /** A world of the selected instance (its folder name) that a data pack
+   *  installs into instead of the instance. Ignored for any other addon. */
+  selectedWorld?: string
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
   /** Opt-in anchor for the rendered install/download button, forwarded to
@@ -74,6 +82,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     type: FEUnifiedSearchResult["type"]
     server: boolean
     copy: ReturnType<typeof worldVersionCopy>
+    world?: string
   }>()
   const [pendingRequest, setPendingRequest] = createSignal(false)
   const [progress, setProgress] = createSignal<number | null>(null)
@@ -102,12 +111,37 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
   const serverTarget = () =>
     props.selectedServerId ? serverLinkTarget(serverDetails.data) : undefined
 
+  const worldName = () =>
+    props.selectedServerId
+      ? undefined
+      : worldTargetName(
+          props.selectedInstanceId,
+          props.addon?.type,
+          props.selectedWorld
+        )
+  // Search rows share this query, and the identity it carries lets the core
+  // refuse an install into a world that changed since it was read.
+  const worlds = rspc.createQuery(() => ({
+    queryKey: ["instance.getWorlds", props.selectedInstanceId ?? 0],
+    enabled: worldName() !== undefined
+  }))
+  const targetWorld = createMemo(() => {
+    const name = worldName()
+    return name === undefined
+      ? undefined
+      : (worlds.data ?? []).find((world) => world.name === name)
+  })
+  const worldUnavailable = () =>
+    worldName() !== undefined && !readableWorld(targetWorld())
+
   const {
     instanceLoadingStates,
     instanceTasks,
     installLatestModMutation,
     installModMutation,
+    installWorldDatapackMutation,
     handleInstanceSelection,
+    handleWorldSelection,
     handleServerInstall,
     clearInstanceLoadingState,
     captureInstallAttempt,
@@ -206,7 +240,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
                 t,
                 accepted.title || t("notifications:_trn_addon_fallback_name"),
                 accepted.type,
-                accepted.server
+                accepted.server,
+                accepted.world
               ),
           { duration: 2000 }
         )
@@ -225,7 +260,9 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           props.addon,
           props.selectedServerId
             ? { kind: "server", addons: props.selectedServerAddons ?? [] }
-            : { kind: "instance", addons: props.selectedInstanceMods ?? [] },
+            : worldName() !== undefined
+              ? { kind: "world", datapacks: targetWorld()?.datapacks ?? [] }
+              : { kind: "instance", addons: props.selectedInstanceMods ?? [] },
           scopedFileId(),
           props.linkedFile
         )
@@ -304,6 +341,35 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     // Instance install path
     const instanceId = props.selectedInstanceId
     if (!instanceId || isInstalled()) return
+
+    // World install path: never falls back to the instance.
+    if (worldName() !== undefined) {
+      const world = readableWorld(targetWorld())
+      if (!world || loading()) return
+      const presentation = {
+        title: props.addon.title,
+        type: props.addon.type,
+        server: false,
+        copy: undefined,
+        world: world.name
+      }
+      const request = worldDatapackInstall(
+        props.addon,
+        instanceFileId(),
+        instanceId,
+        world
+      )
+      const current = beginRequest()
+      try {
+        const taskId = await installWorldDatapackMutation.mutateAsync(request)
+        accept(current, taskId, presentation)
+      } catch {
+        // Error surfaced via global MutationCache.onError
+      } finally {
+        if (current()) setPendingRequest(false)
+      }
+      return
+    }
     const attempt = captureInstallAttempt(
       instanceId,
       installedMod()?.id || null
@@ -376,6 +442,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           instanceLoadingStates={instanceLoadingStates}
           clearInstanceLoadingState={clearInstanceLoadingState}
           handleInstanceSelection={handleInstanceSelection}
+          handleWorldSelection={handleWorldSelection}
           onDropdownOpenChange={props.onDropdownOpenChange}
           size={props.size}
           iconOnly={props.iconOnly}
@@ -387,7 +454,8 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           progress={progress}
           isInstalled={isInstalled}
           instanceLocked={() => props.instanceLocked ?? false}
-          staged={props.addon?.type === "datapack"}
+          unavailable={worldUnavailable()}
+          staged={props.addon?.type === "datapack" && worldName() === undefined}
           copyPresentation={worldVersionCopy(
             props.addon?.type,
             instanceFileId(),

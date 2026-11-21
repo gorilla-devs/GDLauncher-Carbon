@@ -29,6 +29,9 @@ interface InstallButtonProps {
    *  none). The instance's own version is installed instead, and the tooltip
    *  says so. */
   linkedFileMismatch?: readonly string[]
+  /** The target cannot take an install now (a world that is gone or could
+   *  not be read): the button is disabled and installs nothing. */
+  unavailable?: boolean
   testId?: string
 }
 
@@ -40,7 +43,10 @@ export const InstallButton = (props: InstallButtonProps) => {
           data-testid={props.testId}
           uppercase={!props.iconOnly}
           variant={props.isInstalled() ? "green" : "primary"}
-          disabled={props.instanceLocked() && !props.isInstalled()}
+          disabled={
+            (props.instanceLocked() || !!props.unavailable) &&
+            !props.isInstalled()
+          }
           size={props.size || "medium"}
           onClick={props.onDownload}
         >
