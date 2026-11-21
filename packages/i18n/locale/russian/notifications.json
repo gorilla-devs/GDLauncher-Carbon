@@ -61,7 +61,7 @@
   "_trn_world_saved_as_copy": "{{title}} установлен как отдельное сохранение",
   "_trn_world_saved_as_copy_in_instance": "{{title}} установлен в {{instance}} как отдельное сохранение",
   "_trn_world_name_taken": "Сохранение с именем «{{name}}» уже существует, поэтому этот мир сохранён как «{{saved_as}}»",
-  "_trn_world_saved_as_copy_hint": "Существующее сохранение не изменено. Оба сохранения видны на вкладке «Дополнения» экземпляра и в Minecraft.",
+  "_trn_world_saved_as_copy_hint": "Существующее сохранение не изменено. Оба сохранения видны на вкладке «Миры» экземпляра и в Minecraft.",
   "_trn_modpack_update_kept_files": "Модпак обновлён, но файлы его предыдущей версии сохранены",
   "_trn_modpack_update_kept_files_in_instance": "Экземпляр {{instance}} обновлён, но файлы его предыдущей версии сохранены",
   "_trn_modpack_previous_version_unavailable": "Предыдущая версия больше недоступна на {{platform}}, поэтому GDLauncher не смог отличить её файлы от ваших и сохранил их все.",

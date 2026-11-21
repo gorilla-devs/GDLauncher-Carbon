@@ -380,7 +380,7 @@ describe("describeTaskWarnings", () => {
       lines: [
         'A save named "Parkour Paradise" already exists, so this world was saved as "Parkour Paradise (copy 1)"'
       ],
-      hint: "Your existing save was not changed. Both saves are listed in the instance's Addons tab and in Minecraft."
+      hint: "Your existing save was not changed. Both saves are listed in the instance's Worlds tab and in Minecraft."
     })
   })
   it("says which files a modpack update kept, why, and where to review them", async () => {

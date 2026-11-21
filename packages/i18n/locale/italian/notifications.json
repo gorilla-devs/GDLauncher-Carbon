@@ -61,7 +61,7 @@
   "_trn_world_saved_as_copy": "{{title}} è stato installato come salvataggio separato",
   "_trn_world_saved_as_copy_in_instance": "{{title}} è stato installato in {{instance}} come salvataggio separato",
   "_trn_world_name_taken": "Esiste già un salvataggio chiamato “{{name}}”, quindi questo mondo è stato salvato come “{{saved_as}}”",
-  "_trn_world_saved_as_copy_hint": "Il salvataggio esistente non è stato modificato. Entrambi i salvataggi compaiono nella scheda Addons dell’istanza e in Minecraft.",
+  "_trn_world_saved_as_copy_hint": "Il salvataggio esistente non è stato modificato. Entrambi i salvataggi compaiono nella scheda Mondi dell’istanza e in Minecraft.",
   "_trn_modpack_update_kept_files": "Il modpack è stato aggiornato, ma i file della sua versione precedente sono stati conservati",
   "_trn_modpack_update_kept_files_in_instance": "L’istanza {{instance}} è stata aggiornata, ma i file della sua versione precedente sono stati conservati",
   "_trn_modpack_previous_version_unavailable": "La sua versione precedente non è più disponibile su {{platform}}, quindi GDLauncher non ha potuto distinguere i file di quella versione dai tuoi e li ha conservati tutti.",

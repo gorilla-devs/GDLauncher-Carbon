@@ -87,7 +87,8 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_server_pack_unavailable",
     "_trn_server_pack_file_invalid",
     "_trn_curseforge_file_unavailable",
-    "_trn_curseforge_file_invalid"
+    "_trn_curseforge_file_invalid",
+    "_trn_world_saved_as_copy_hint"
   ],
   instances: [
     "_trn_server_legacy_datapack",
@@ -322,6 +323,19 @@ describe("addon and account copy is translated", () => {
           content[`_trn_worlds.datapack_count_${category}`],
           `${language} ${category}`
         ).toBeTypeOf("string")
+    }
+  )
+
+  it.each(LANGUAGES)(
+    "%s says a world saved as a copy is listed in the Worlds tab, by the tab's name",
+    (language) => {
+      const hint = bundle(
+        language,
+        "notifications"
+      )._trn_world_saved_as_copy_hint
+      const tabs = bundle(language, "ui")
+      expect(hint).toContain(tabs._trn_worlds)
+      expect(hint).not.toContain(tabs._trn_addons)
     }
   )
 

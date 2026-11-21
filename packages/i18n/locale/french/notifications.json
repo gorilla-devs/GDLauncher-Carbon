@@ -61,7 +61,7 @@
   "_trn_world_saved_as_copy": "{{title}} a été installé comme sauvegarde séparée",
   "_trn_world_saved_as_copy_in_instance": "{{title}} a été installé dans {{instance}} comme sauvegarde séparée",
   "_trn_world_name_taken": "Une sauvegarde nommée « {{name}} » existe déjà, ce monde a donc été enregistré sous « {{saved_as}} »",
-  "_trn_world_saved_as_copy_hint": "Votre sauvegarde existante n’a pas été modifiée. Les deux sauvegardes apparaissent dans l’onglet Addons de l’instance et dans Minecraft.",
+  "_trn_world_saved_as_copy_hint": "Votre sauvegarde existante n’a pas été modifiée. Les deux sauvegardes apparaissent dans l’onglet Mondes de l’instance et dans Minecraft.",
   "_trn_modpack_update_kept_files": "Le modpack a été mis à jour, mais des fichiers de sa version précédente ont été conservés",
   "_trn_modpack_update_kept_files_in_instance": "L’instance {{instance}} a été mise à jour, mais des fichiers de sa version précédente ont été conservés",
   "_trn_modpack_previous_version_unavailable": "Sa version précédente n’est plus disponible sur {{platform}} : GDLauncher n’a donc pas pu distinguer les fichiers de cette version des vôtres et les a tous conservés.",

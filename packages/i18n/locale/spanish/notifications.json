@@ -61,7 +61,7 @@
   "_trn_world_saved_as_copy": "{{title}} se instaló como partida separada",
   "_trn_world_saved_as_copy_in_instance": "{{title}} se instaló en {{instance}} como partida separada",
   "_trn_world_name_taken": "Ya existe una partida llamada «{{name}}», así que este mundo se guardó como «{{saved_as}}»",
-  "_trn_world_saved_as_copy_hint": "Tu partida existente no se modificó. Ambas partidas aparecen en la pestaña Complementos de la instancia y en Minecraft.",
+  "_trn_world_saved_as_copy_hint": "Tu partida existente no se modificó. Ambas partidas aparecen en la pestaña Mundos de la instancia y en Minecraft.",
   "_trn_modpack_update_kept_files": "El modpack se actualizó, pero se conservaron archivos de su versión anterior",
   "_trn_modpack_update_kept_files_in_instance": "La instancia {{instance}} se actualizó, pero se conservaron archivos de su versión anterior",
   "_trn_modpack_previous_version_unavailable": "Su versión anterior ya no está disponible en {{platform}}, así que GDLauncher no pudo distinguir los archivos de esa versión de los tuyos y los conservó todos.",

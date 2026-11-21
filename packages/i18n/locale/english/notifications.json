@@ -61,7 +61,7 @@
   "_trn_world_saved_as_copy": "{{title}} was installed as a separate save",
   "_trn_world_saved_as_copy_in_instance": "{{title}} was installed in {{instance}} as a separate save",
   "_trn_world_name_taken": "A save named \"{{name}}\" already exists, so this world was saved as \"{{saved_as}}\"",
-  "_trn_world_saved_as_copy_hint": "Your existing save was not changed. Both saves are listed in the instance's Addons tab and in Minecraft.",
+  "_trn_world_saved_as_copy_hint": "Your existing save was not changed. Both saves are listed in the instance's Worlds tab and in Minecraft.",
   "_trn_modpack_update_kept_files": "The modpack was updated, but files from its previous version were kept",
   "_trn_modpack_update_kept_files_in_instance": "{{instance}} was updated, but files from its previous version were kept",
   "_trn_modpack_previous_version_unavailable": "Its previous version is no longer available on {{platform}}, so GDLauncher could not tell that version's files from yours and kept them all.",

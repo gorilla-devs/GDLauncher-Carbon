@@ -61,7 +61,7 @@
   "_trn_world_saved_as_copy": "{{title}} 已安装为独立存档",
   "_trn_world_saved_as_copy_in_instance": "{{title}} 已作为独立存档安装到 {{instance}}",
   "_trn_world_name_taken": "已存在名为“{{name}}”的存档，因此此世界已保存为“{{saved_as}}”",
-  "_trn_world_saved_as_copy_hint": "你现有的存档未被更改。两个存档都会显示在实例的“附加组件”标签页和 Minecraft 中。",
+  "_trn_world_saved_as_copy_hint": "你现有的存档未被更改。两个存档都会显示在实例的“存档”标签页和 Minecraft 中。",
   "_trn_modpack_update_kept_files": "整合包已更新，但保留了其上一版本的文件",
   "_trn_modpack_update_kept_files_in_instance": "{{instance}} 已更新，但保留了其上一版本的文件",
   "_trn_modpack_previous_version_unavailable": "其上一版本已无法在 {{platform}} 上获取，因此 GDLauncher 无法区分该版本的文件和你的文件，已将它们全部保留。",

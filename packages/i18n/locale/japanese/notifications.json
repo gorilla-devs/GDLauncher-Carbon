@@ -61,7 +61,7 @@
   "_trn_world_saved_as_copy": "{{title}} を別のセーブデータとしてインストールしました",
   "_trn_world_saved_as_copy_in_instance": "{{title}} を {{instance}} に別のセーブデータとしてインストールしました",
   "_trn_world_name_taken": "「{{name}}」という名前のセーブデータがすでにあるため、このワールドは「{{saved_as}}」として保存されました",
-  "_trn_world_saved_as_copy_hint": "既存のセーブデータは変更されていません。どちらのセーブデータもインスタンスのアドオンタブと Minecraft に表示されます。",
+  "_trn_world_saved_as_copy_hint": "既存のセーブデータは変更されていません。どちらのセーブデータもインスタンスのワールドタブと Minecraft に表示されます。",
   "_trn_modpack_update_kept_files": "Modパックを更新しましたが、以前のバージョンのファイルは残してあります",
   "_trn_modpack_update_kept_files_in_instance": "{{instance}} を更新しましたが、以前のバージョンのファイルは残してあります",
   "_trn_modpack_previous_version_unavailable": "以前のバージョンは {{platform}} で入手できなくなったため、GDLauncher はそのバージョンのファイルとあなたのファイルを区別できず、すべて残しました。",
