@@ -193,7 +193,7 @@ impl ManagerRef<'_, InstanceManager> {
         let staging = publication::checked_folder(&path, AddonType::DataPacks).await?;
         let (source, _) = publication::selected_file(&staging, &row.filename)
             .await?
-            .context("Staged datapack is missing")?;
+            .context(WorldRefusal::InstancePackGone)?;
         let source_digest = publication::file_digest(&source).await?;
         let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
         let world = saves.join(&request.world.name);
@@ -261,7 +261,7 @@ impl ManagerRef<'_, InstanceManager> {
         if publication::file_digest(temporary.path()).await? != source_digest
             || publication::file_digest(&source).await? != source_digest
         {
-            bail!("Staged datapack changed during copying; retry with the current artifact");
+            bail!(WorldRefusal::InstancePackChanged);
         }
         self.publish_into_world_replacing(
             id,
@@ -353,7 +353,7 @@ impl ManagerRef<'_, InstanceManager> {
         }
         let folder = world.join("datapacks");
         if !publication::followed_folder(&folder).await? {
-            bail!("The world's datapacks folder disappeared during copying; no datapack published");
+            bail!(WorldRefusal::WorldChangedDuringCopy);
         }
         if publication::selected_file(&folder, filename)
             .await?

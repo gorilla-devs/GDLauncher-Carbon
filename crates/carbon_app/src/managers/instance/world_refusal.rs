@@ -43,6 +43,13 @@ pub enum WorldRefusal {
     /// it is not tagged as a data pack, or its file is no zip.
     #[error("This version is not a data pack")]
     NotADatapackVersion,
+    /// The instance's copy to put into a world is no longer in the
+    /// instance's data pack folder.
+    #[error("Staged datapack is missing")]
+    InstancePackGone,
+    /// The instance's copy was rewritten while it was copied into a world.
+    #[error("Staged datapack changed during copying; retry with the current artifact")]
+    InstancePackChanged,
     /// Only a zip is copied from the instance into a world.
     #[error("Select a ZIP datapack for this world")]
     NotAZip,
@@ -100,6 +107,8 @@ impl FeErrorCode for WorldRefusal {
             Self::OtherWorld => "DATAPACK_IN_OTHER_WORLD",
             Self::FolderNotReplaced => "DATAPACK_FOLDER_NOT_REPLACED",
             Self::NotADatapackVersion => "NOT_A_DATAPACK_VERSION",
+            Self::InstancePackGone => "INSTANCE_DATAPACK_GONE",
+            Self::InstancePackChanged => "INSTANCE_DATAPACK_CHANGED",
             Self::NotAZip => "DATAPACK_NOT_A_ZIP",
             Self::InvalidPack(_) => "DATAPACK_INVALID",
             Self::NotDownloadable => "DATAPACK_NOT_DOWNLOADABLE",
@@ -154,6 +163,8 @@ mod tests {
             WorldRefusal::OtherWorld,
             WorldRefusal::FolderNotReplaced,
             WorldRefusal::NotADatapackVersion,
+            WorldRefusal::InstancePackGone,
+            WorldRefusal::InstancePackChanged,
             WorldRefusal::NotAZip,
             WorldRefusal::NotDownloadable,
             WorldRefusal::DownloadFailed {
