@@ -5,7 +5,13 @@ use super::{
     installer::publication,
     mods::{InvalidInstanceModIdError, addon_metadata, validate_addon_basename},
 };
-use crate::{domain::instance::AddonType, managers::ManagerRef};
+use crate::{
+    domain::instance::AddonType,
+    managers::{
+        ManagerRef,
+        runtime_lifecycle::{ActivityPolicy, spawn_retained},
+    },
+};
 use anyhow::{Context, bail};
 use carbon_repos::repos::{
     mod_file_cache as mfcdb,
@@ -42,7 +48,7 @@ pub struct AlreadyInWorld {
 
 impl crate::error::FeErrorCode for AlreadyInWorld {
     fn error_code(&self) -> &'static str {
-        "already_in_world"
+        "ALREADY_IN_WORLD"
     }
 
     fn error_data(&self) -> Option<serde_json::Value> {
@@ -137,11 +143,23 @@ impl ManagerRef<'_, InstanceManager> {
     /// as the "Deletion through Recycle Bin" setting asks once the copy is
     /// in place, or put back when it cannot be. Returns the world's name.
     pub async fn copy_datapack(self, request: CopyDatapack) -> anyhow::Result<String> {
+        let activity = self.app.runtime_lifecycle.admit_owned(
+            "copy staged datapack into selected save",
+            ActivityPolicy::CoreWork,
+        )?;
+        // Its own task, so a request dropped midway (the window closed)
+        // never stops a replace that set old packs aside; a quit waits.
+        let app = self.app.clone();
+        spawn_retained(activity, move |_| {
+            Box::pin(async move { app.instance_manager().copy_datapack_owned(request).await })
+        })
+        .await
+        .map_err(|error| anyhow::anyhow!("The data pack copy stopped: {error}"))?
+    }
+
+    /// [`Self::copy_datapack`]'s work, in the task that owns its activity.
+    async fn copy_datapack_owned(self, request: CopyDatapack) -> anyhow::Result<String> {
         let id = InstanceId(request.instance_id);
-        let _activity = self
-            .app
-            .runtime_lifecycle
-            .admit("copy staged datapack into selected save")?;
         // The rows tell which files in the world are copies of this pack.
         self.scan_world_datapacks(id).await?;
         #[cfg(test)]
@@ -1014,7 +1032,7 @@ mod tests {
         fn already_in_world(error: &anyhow::Error) -> Vec<String> {
             let sent = serde_json::to_value(crate::error::FeError::from_anyhow(error)).unwrap();
             let cause = &sent["cause"][0];
-            assert_eq!(cause["code"], "already_in_world", "{sent}");
+            assert_eq!(cause["code"], "ALREADY_IN_WORLD", "{sent}");
             serde_json::from_value(cause["data"]["filenames"].clone()).unwrap()
         }
 
@@ -1268,6 +1286,46 @@ mod tests {
                 vec![("pack-1.zip".to_owned(), b"the user's own build".to_vec())]
             );
             assert!(staging_folders(&root_of(&app, id).await).is_empty());
+        }
+
+        /// The request is dropped (its window closed) once the old copy is
+        /// set aside: the replace still runs to its end, leaving the new
+        /// file alone and the old one removed by the removal setting.
+        #[tokio::test]
+        async fn a_replace_whose_request_is_dropped_midway_still_settles() {
+            let app = crate::setup_managers_for_test().await;
+            without_recycle_bin(&app).await;
+            let new = pack_zip("new");
+            let (id, mod_id, world, selected) = staged(&app, "copy-dropped", &new).await;
+            older_build(&app, id, &world).await;
+            let root = root_of(&app, id).await;
+            let pause = app
+                .instance_manager()
+                .test_hooks
+                .arm("world_datapack_taken_away", id);
+            let request = {
+                let app = app.clone();
+                tokio::spawn(async move { copy(&app, id, &mod_id, &selected, true).await })
+            };
+            tokio::time::timeout(std::time::Duration::from_secs(10), pause.entered.notified())
+                .await
+                .unwrap();
+
+            request.abort();
+            assert!(request.await.unwrap_err().is_cancelled());
+            pause.release.notify_one();
+
+            let settled = || {
+                entries(&world.join("datapacks")) == vec![("pack.zip".to_owned(), new.clone())]
+                    && staging_folders(&root).is_empty()
+            };
+            tokio::time::timeout(std::time::Duration::from_secs(10), async {
+                while !settled() {
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                }
+            })
+            .await
+            .expect("the replace ends with the new file alone");
         }
     }
 }

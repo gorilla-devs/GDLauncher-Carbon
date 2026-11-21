@@ -107,7 +107,6 @@ pub struct DeleteWorldDatapack {
 /// When one cannot return, `keep` is set, so the folder it waits in stays
 /// and the warning names it.
 pub(super) struct TakenAway {
-    entries: Vec<Aside>,
     removal: Removal,
     /// Held while a publication, removal or put-back runs on the blocking
     /// pool, so a drop waits for that step and then sees what it did.
@@ -125,6 +124,10 @@ struct Aside {
 #[derive(Default)]
 struct Settlement {
     settled: bool,
+    /// Each entry is moved aside and recorded here in one step under the
+    /// lock: a drop meanwhile waits for that step, and so never misses an
+    /// entry waiting in a private folder that is then removed whole.
+    entries: Vec<Aside>,
     /// The replacement, once it is in place.
     published: Option<PathBuf>,
     /// How many entries, from the first, were removed already.
@@ -158,19 +161,23 @@ pub(super) async fn take_away_all(
     removal: Removal,
     keep: Arc<AtomicBool>,
 ) -> anyhow::Result<TakenAway> {
-    let mut taken = TakenAway {
-        entries: Vec::new(),
+    let taken = TakenAway {
         removal,
         settlement: Default::default(),
         keep,
     };
     for path in paths {
         let (original, folder) = (path.clone(), aside_folder.to_owned());
-        let aside = tokio::task::spawn_blocking(move || set_aside(&original, &folder)).await??;
-        taken.entries.push(Aside {
-            original: path.clone(),
-            aside,
-        });
+        // A drop that went first settled the entries: this one stays put.
+        taken
+            .settle(move |settlement| {
+                let aside = set_aside(&original, &folder)?;
+                #[cfg(test)]
+                set_aside_pause::pause(&original);
+                settlement.entries.push(Aside { original, aside });
+                Ok(())
+            })
+            .await?;
     }
     Ok(taken)
 }
@@ -205,6 +212,41 @@ fn set_aside(path: &Path, folder: &Path) -> anyhow::Result<PathBuf> {
         }
     }
     bail!("Could not find a free name to set {} aside", path.display())
+}
+
+/// Holds a set-aside right after its rename, for tests that drop what
+/// awaits it at that moment.
+#[cfg(test)]
+pub(crate) mod set_aside_pause {
+    use std::path::{Path, PathBuf};
+    use std::sync::mpsc::{Receiver, SyncSender, sync_channel};
+
+    type Pause = (PathBuf, SyncSender<()>, Receiver<()>);
+    static PAUSES: std::sync::Mutex<Vec<Pause>> = std::sync::Mutex::new(Vec::new());
+
+    /// The next set-aside of `path` tells `entered` once renamed, then
+    /// waits for `release`.
+    pub(crate) fn arm(path: &Path) -> (Receiver<()>, SyncSender<()>) {
+        let (entered_tx, entered) = sync_channel(1);
+        let (release, release_rx) = sync_channel(1);
+        PAUSES
+            .lock()
+            .unwrap()
+            .push((path.to_owned(), entered_tx, release_rx));
+        (entered, release)
+    }
+
+    pub(super) fn pause(path: &Path) {
+        let pause = {
+            let mut pauses = PAUSES.lock().unwrap();
+            let index = pauses.iter().position(|(armed, ..)| armed == path);
+            index.map(|index| pauses.remove(index))
+        };
+        if let Some((_, entered, release)) = pause {
+            let _ = entered.send(());
+            let _ = release.recv();
+        }
+    }
 }
 
 impl TakenAway {
@@ -248,10 +290,10 @@ impl TakenAway {
     /// the replacement cannot be withdrawn (two builds of one pack would
     /// then be in the world) they all do; `keep` is set then.
     pub(super) async fn put_back(self) -> anyhow::Result<()> {
-        let (entries, keep) = (self.entries.clone(), self.keep.clone());
+        let keep = self.keep.clone();
         self.settle(move |settlement| {
             settlement.settled = true;
-            Ok(settle_back(settlement, &entries, &keep))
+            Ok(settle_back(settlement, &keep))
         })
         .await?
         .into_result()
@@ -261,9 +303,9 @@ impl TakenAway {
     /// asked, in order. On failure, the entries not removed yet are still
     /// where they waited and can be put back.
     pub(super) async fn send_on(&mut self) -> anyhow::Result<()> {
-        let (entries, removal) = (self.entries.clone(), self.removal);
+        let removal = self.removal;
         self.settle(move |settlement| {
-            while let Some(entry) = entries.get(settlement.sent) {
+            while let Some(entry) = settlement.entries.get(settlement.sent) {
                 remove_set_aside(&entry.aside, removal)?;
                 settlement.sent += 1;
             }
@@ -361,8 +403,12 @@ impl Returned {
 /// not removed yet to their original names. The replacement is this
 /// install's own download; while it stays, the entries stay aside, so one
 /// build of the pack is in the world. Sets `keep` when an entry stays aside.
-fn settle_back(settlement: &mut Settlement, entries: &[Aside], keep: &AtomicBool) -> Returned {
-    let waiting = entries.get(settlement.sent..).unwrap_or_default();
+fn settle_back(settlement: &mut Settlement, keep: &AtomicBool) -> Returned {
+    let waiting = settlement
+        .entries
+        .get(settlement.sent..)
+        .unwrap_or_default()
+        .to_vec();
     if let Some(published) = settlement.published.take()
         && let Err(error) = std::fs::remove_file(&published)
         && error.kind() != std::io::ErrorKind::NotFound
@@ -371,7 +417,7 @@ fn settle_back(settlement: &mut Settlement, entries: &[Aside], keep: &AtomicBool
         return Returned::NotWithdrawn {
             published,
             error,
-            waiting: waiting.to_vec(),
+            waiting,
         };
     }
     let stuck: Vec<_> = waiting
@@ -398,7 +444,7 @@ impl Drop for TakenAway {
             return;
         }
         settlement.settled = true;
-        if let Err(error) = settle_back(&mut settlement, &self.entries, &self.keep).into_result() {
+        if let Err(error) = settle_back(&mut settlement, &self.keep).into_result() {
             warn!("{error:#}");
         }
     }
@@ -3051,7 +3097,7 @@ pub(crate) mod tests {
         )
         .await
         .unwrap();
-        let waiting = taken.entries[0].aside.clone();
+        let waiting = taken.settlement.lock().unwrap().entries[0].aside.clone();
         std::fs::write(&pack, b"another file").unwrap();
 
         drop(taken);
@@ -3125,6 +3171,45 @@ pub(crate) mod tests {
                 .unwrap(),
         );
         assert_eq!(std::fs::read(&pack).unwrap(), b"old");
+    }
+
+    /// What awaits the set-aside is dropped right after the rename, before
+    /// the set-aside returned (a request whose window closed): the pack is
+    /// back under its name, not erased with the private folder it waited in.
+    #[tokio::test]
+    async fn a_set_aside_whose_caller_is_dropped_after_the_rename_comes_back() {
+        let dir = tempfile::tempdir().unwrap();
+        let pack = dir.path().join("saves/World/datapacks/pack.zip");
+        std::fs::create_dir_all(pack.parent().unwrap()).unwrap();
+        std::fs::write(&pack, b"old").unwrap();
+        let root = dir.path().join("root");
+        std::fs::create_dir_all(&root).unwrap();
+        let staging = Staging::new(&root).unwrap();
+        let (entered, release) = set_aside_pause::arm(&pack);
+        let caller = {
+            let (pack, aside, keep) = (
+                pack.clone(),
+                staging.path().join(REPLACED),
+                staging.keeper(),
+            );
+            tokio::spawn(async move {
+                take_away(&pack, &aside, Removal::Permanent, keep)
+                    .await
+                    .map(drop)
+            })
+        };
+        tokio::task::spawn_blocking(move || entered.recv().unwrap())
+            .await
+            .unwrap();
+        assert!(!pack.exists(), "the pack was moved aside");
+
+        caller.abort();
+        release.send(()).unwrap();
+
+        assert!(caller.await.unwrap_err().is_cancelled());
+        drop(staging);
+        assert_eq!(std::fs::read(&pack).unwrap(), b"old");
+        assert!(std::fs::read_dir(&root).unwrap().next().is_none());
     }
 
     #[tokio::test]
