@@ -234,7 +234,7 @@
   "_trn_datapack_delete_hint": "Deletes the copy in this instance. Copies already added to worlds are kept.",
   "_trn_worlds.none": "This instance has no worlds yet. Create one in Minecraft.",
   "_trn_worlds.load_failed": "Couldn't read this instance's worlds.",
-  "_trn_worlds.unreadable": "GDLauncher can't read this world, so its data packs aren't shown.",
+  "_trn_worlds.unreadable": "GDLauncher can't read this world.",
   "_trn_worlds.datapack_count_one": "{{count}} data pack",
   "_trn_worlds.datapack_count_other": "{{count}} data packs",
   "_trn_worlds.no_datapacks": "No data packs",

@@ -13,7 +13,9 @@ const io = vi.hoisted(() => ({
   navigate: vi.fn(),
   openModal: vi.fn(),
   deleteWorld: vi.fn(),
+  updateWorld: vi.fn(),
   toastError: vi.fn(),
+  toastSuccess: vi.fn(),
   refetchWorlds: vi.fn(),
   queryOptions: {} as Record<string, any>,
   mutate: {} as Record<string, ReturnType<typeof vi.fn>>,
@@ -29,7 +31,10 @@ vi.mock("@/managers/ModalsManager", () => ({
   useModal: () => ({ openModal: io.openModal })
 }))
 vi.mock("../Addons/hooks/useAddonMutations", () => ({
-  useAddonMutations: () => ({ handleDeleteMod: io.deleteWorld })
+  useAddonMutations: () => ({
+    handleDeleteMod: io.deleteWorld,
+    handleUpdateMod: io.updateWorld
+  })
 }))
 vi.mock("@/pages/Library/Instance/instance.data", () => ({
   default: () => ({
@@ -104,11 +109,16 @@ vi.mock("@gd/ui", async () => {
       </button>
     ),
     DropdownMenuItem: (p: any) => (
-      <button data-testid={p["data-testid"]} onClick={() => p.onSelect?.()}>
+      <button
+        data-menu-item
+        data-testid={p["data-testid"]}
+        disabled={p.disabled}
+        onClick={() => p.onSelect?.()}
+      >
         {p.children}
       </button>
     ),
-    toast: { error: io.toastError }
+    toast: { error: io.toastError, success: io.toastSuccess }
   }
 })
 
@@ -441,12 +451,16 @@ it("opens the search and the versions page for this world", async () => {
   )
 })
 
-it("has a more menu only for a world downloaded from a platform", async () => {
+it("offers only Copy name in the more menu of a world not downloaded from a platform", async () => {
   const root = mount([world("Alpha", []), world("Beta", [])], {
     mods: [worldRow("Alpha"), worldRow("Beta", { curseforge: curseforge(77) })]
   })
   await flush()
-  expect(one(root, "world-view-details")).toBeNull()
+  expect(
+    [...root.querySelectorAll("[data-menu-item]")].map((item) =>
+      item.getAttribute("data-testid")
+    )
+  ).toEqual(["world-copy-name"])
   select(root, "Beta")
   await flush()
   one(root, "world-view-details")!.click()
@@ -454,6 +468,47 @@ it("has a more menu only for a world downloaded from a platform", async () => {
     { name: "modDetails" },
     expect.objectContaining({ instanceId: 5 })
   )
+})
+
+it("copies the world's name", async () => {
+  const writeText = vi.fn(async () => {})
+  vi.stubGlobal("navigator", { ...window.navigator, clipboard: { writeText } })
+  try {
+    const root = mount([world("My World", [], null)])
+    await flush()
+    one(root, "world-copy-name")!.click()
+    expect(writeText).toHaveBeenCalledExactlyOnceWith("My World")
+    expect(io.toastSuccess).toHaveBeenCalled()
+  } finally {
+    vi.unstubAllGlobals()
+  }
+})
+
+it("offers Update only for a world with an update, through the addon update", async () => {
+  const row = worldRow("Beta", { modrinth: modrinth("w"), has_update: true })
+  io.updateWorld.mockResolvedValue(undefined)
+  const root = mount([world("Alpha", []), world("Beta", [])], {
+    mods: [worldRow("Alpha", { modrinth: modrinth("v") }), row]
+  })
+  await flush()
+  expect(one(root, "world-update")).toBeNull()
+  select(root, "Beta")
+  await flush()
+  one(root, "world-update")!.click()
+  expect(io.updateWorld).toHaveBeenCalledExactlyOnceWith(row)
+})
+
+it("disables a world's Update while the game runs", async () => {
+  const row = worldRow("Alpha", { modrinth: modrinth("w"), has_update: true })
+  const root = mount([world("Alpha", [])], {
+    mods: [row],
+    details: { modpack: null, state: { state: "running", value: {} } }
+  })
+  await flush()
+  const update = one(root, "world-update") as HTMLButtonElement
+  expect(update.disabled).toBe(true)
+  update.click()
+  expect(io.updateWorld).not.toHaveBeenCalled()
 })
 
 it("counts each world's data packs and marks the ones with an update", async () => {

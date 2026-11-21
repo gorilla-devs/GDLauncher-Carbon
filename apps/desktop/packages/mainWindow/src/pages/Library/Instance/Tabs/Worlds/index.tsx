@@ -339,6 +339,19 @@ const Worlds = () => {
                   folder: "Saves"
                 }),
               deleteWorld: () => deleteWorld(world()),
+              copyName: () => {
+                const row = worldRow(world())
+                void window.navigator.clipboard.writeText(
+                  row?.metadata?.name || world().name
+                )
+                toast.success(t("notifications:_trn_copied_to_clipboard"))
+              },
+              updateWorld: (row) => {
+                if (blocked()) return
+                // Its failure is told by the global handler; the arrow comes
+                // back after the refetch.
+                addonMutations.handleUpdateMod(row).catch(noop)
+              },
               addDatapacks: () =>
                 navigator.navigate(
                   `/search/datapack?instanceId=${params.id}&world=${worldParam(world())}`

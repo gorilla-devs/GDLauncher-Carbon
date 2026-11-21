@@ -24,6 +24,8 @@ export interface WorldDatapacksActions {
   openFolder: () => void
   deleteWorld: () => void
   addDatapacks: () => void
+  copyName: () => void
+  updateWorld: (_row: Mod) => void
   viewDetails: (_row: Mod) => void
   openInApp: (_platform: "curseforge" | "modrinth") => void
   openInBrowser: (_platform: "curseforge" | "modrinth") => void
@@ -198,72 +200,97 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
           blocked={props.blocked}
           danger
         />
-        <Show when={downloaded() && props.worldRow}>
-          {(row) => (
-            <DropdownMenu placement="bottom-end">
-              <Tooltip>
-                <TooltipTrigger as="div">
-                  <DropdownMenuTrigger
-                    data-testid="world-more"
-                    class="b-0 bg-transparent p-0"
-                  >
-                    <div class="i-hugeicons:more-horizontal text-lightSlate-500 hover:text-lightSlate-200 h-5 w-5 cursor-pointer transition-colors" />
-                  </DropdownMenuTrigger>
-                </TooltipTrigger>
-                <TooltipContent>
-                  <Trans key="instances:_trn_more_actions" />
-                </TooltipContent>
-              </Tooltip>
-              <DropdownMenuContent>
+        <DropdownMenu placement="bottom-end">
+          <Tooltip>
+            <TooltipTrigger as="div">
+              <DropdownMenuTrigger
+                data-testid="world-more"
+                class="b-0 bg-transparent p-0"
+              >
+                <div class="i-hugeicons:more-horizontal text-lightSlate-500 hover:text-lightSlate-200 h-5 w-5 cursor-pointer transition-colors" />
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>
+              <Trans key="instances:_trn_more_actions" />
+            </TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent>
+            <DropdownMenuItem
+              data-testid="world-copy-name"
+              onSelect={props.actions.copyName}
+            >
+              <div class="flex items-center gap-2">
+                <div class="i-hugeicons:clipboard" />
+                <Trans key="content:_trn_copy_name" />
+              </div>
+            </DropdownMenuItem>
+            <Show when={props.worldRow?.has_update && props.worldRow}>
+              {(row) => (
                 <DropdownMenuItem
-                  data-testid="world-view-details"
-                  onSelect={() => props.actions.viewDetails(row())}
+                  data-testid="world-update"
+                  disabled={!!props.blocked}
+                  onSelect={() => props.actions.updateWorld(row())}
                 >
                   <div class="flex items-center gap-2">
-                    <div class="i-hugeicons:information-circle" />
-                    <Trans key="content:_trn_view_details" />
+                    <div class="i-hugeicons:download-02" />
+                    <Trans key="content:_trn_update_mod" />
                   </div>
                 </DropdownMenuItem>
-                <Show when={row().curseforge}>
+              )}
+            </Show>
+            <Show when={downloaded() && props.worldRow}>
+              {(row) => (
+                <>
                   <DropdownMenuItem
-                    onSelect={() => props.actions.openInApp("curseforge")}
+                    data-testid="world-view-details"
+                    onSelect={() => props.actions.viewDetails(row())}
                   >
                     <div class="flex items-center gap-2">
-                      <img src={CurseforgeLogo} class="h-4 w-4" alt="" />
-                      <Trans key="content:_trn_curseforge_open_in_app" />
+                      <div class="i-hugeicons:information-circle" />
+                      <Trans key="content:_trn_view_details" />
                     </div>
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => props.actions.openInBrowser("curseforge")}
-                  >
-                    <div class="flex items-center gap-2">
-                      <img src={CurseforgeLogo} class="h-4 w-4" alt="" />
-                      <Trans key="content:_trn_curseforge_open_in_browser" />
-                    </div>
-                  </DropdownMenuItem>
-                </Show>
-                <Show when={row().modrinth}>
-                  <DropdownMenuItem
-                    onSelect={() => props.actions.openInApp("modrinth")}
-                  >
-                    <div class="flex items-center gap-2">
-                      <img src={ModrinthLogo} class="h-4 w-4" alt="" />
-                      <Trans key="content:_trn_modrinth_open_in_app" />
-                    </div>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={() => props.actions.openInBrowser("modrinth")}
-                  >
-                    <div class="flex items-center gap-2">
-                      <img src={ModrinthLogo} class="h-4 w-4" alt="" />
-                      <Trans key="content:_trn_modrinth_open_in_browser" />
-                    </div>
-                  </DropdownMenuItem>
-                </Show>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
-        </Show>
+                  <Show when={row().curseforge}>
+                    <DropdownMenuItem
+                      onSelect={() => props.actions.openInApp("curseforge")}
+                    >
+                      <div class="flex items-center gap-2">
+                        <img src={CurseforgeLogo} class="h-4 w-4" alt="" />
+                        <Trans key="content:_trn_curseforge_open_in_app" />
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => props.actions.openInBrowser("curseforge")}
+                    >
+                      <div class="flex items-center gap-2">
+                        <img src={CurseforgeLogo} class="h-4 w-4" alt="" />
+                        <Trans key="content:_trn_curseforge_open_in_browser" />
+                      </div>
+                    </DropdownMenuItem>
+                  </Show>
+                  <Show when={row().modrinth}>
+                    <DropdownMenuItem
+                      onSelect={() => props.actions.openInApp("modrinth")}
+                    >
+                      <div class="flex items-center gap-2">
+                        <img src={ModrinthLogo} class="h-4 w-4" alt="" />
+                        <Trans key="content:_trn_modrinth_open_in_app" />
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onSelect={() => props.actions.openInBrowser("modrinth")}
+                    >
+                      <div class="flex items-center gap-2">
+                        <img src={ModrinthLogo} class="h-4 w-4" alt="" />
+                        <Trans key="content:_trn_modrinth_open_in_browser" />
+                      </div>
+                    </DropdownMenuItem>
+                  </Show>
+                </>
+              )}
+            </Show>
+          </DropdownMenuContent>
+        </DropdownMenu>
         <Show when={readable()}>
           <Tooltip>
             <TooltipTrigger as="div">
