@@ -315,7 +315,7 @@ export type FEServerDetails = { id: FEServerId; name: string; favorite: boolean;
 /**
  * What a delete of a selection did with one addon.
  */
-export type FEDeletedMod = { mod_id: string; kept: FEKeptAddonCopy | null; error: string | null }
+export type FEDeletedMod = { mod_id: string; kept: FEKeptAddonCopy | null; error: string | null; error_code?: string | null; error_data?: any | null }
 
 export type ExploreQuery = { instance_id: FEInstanceId; path: string[] }
 
@@ -687,7 +687,7 @@ export type DeleteWorldDatapack = { instance_id: number; id: string }
 export type UpdateWorldDatapack = { instance_id: number; id: string }
 export type UpdateDatapackEverywhere = { instance_id: number; origin: DatapackOrigin }
 export type DatapackOrigin = { World: string } | { Instance: string }
-export type FEDatapackUpdateResult = { place: string | null; ok: boolean; error: string | null }
+export type FEDatapackUpdateResult = { place: string | null; ok: boolean; error: string | null; error_code?: string | null; error_data?: any | null }
 export type WorldDatapackSource = { Modrinth: { project_id: string; version_id: string | null } } | { Curseforge: { project_id: number; file_id: number | null } }
 
 export type AddOpRequest = { serverId: FEServerId; username: string; level: number }

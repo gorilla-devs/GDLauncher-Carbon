@@ -4,7 +4,7 @@
 //! installer and the addon scanner are not involved.
 use super::{
     InstanceId, InstanceManager, InstanceRootGuard, InvalidInstanceIdError,
-    datapacks::{NAME_TAKEN, WORLD_CHANGED, world_identity},
+    datapacks::world_identity,
     installer::{
         dependency::{LoaderFit, best_candidate},
         publication,
@@ -12,6 +12,7 @@ use super::{
     mods::{addon_metadata, remove_addon_entry, validate_addon_basename},
     run::LaunchState,
     world_datapacks::world_datapacks_folder,
+    world_refusal::WorldRefusal,
 };
 use crate::{
     api::{
@@ -81,19 +82,6 @@ pub struct InstallWorldDatapack {
     /// The id of the world data pack the install replaces.
     pub replaces: Option<String>,
 }
-
-/// The refusal when the row asked for is not one of the instance's world
-/// data packs (any more).
-pub(super) const PACK_GONE: &str =
-    "This data pack is no longer in the world. Refresh the world list and try again";
-/// The refusal when what is on disk is not the kind of entry the row lists.
-pub(super) const PACK_CHANGED: &str =
-    "This data pack changed since the world list was read. Refresh it and try again";
-/// The refusal of a change to a world while the instance's game is queued,
-/// preparing or running.
-pub(super) const GAME_ACTIVE: &str = "This instance is running or being installed. Close the game or wait for it to finish, then try again.";
-const OTHER_WORLD: &str = "A data pack can only be replaced by one installed into its own world";
-const FOLDER_NOT_REPLACED: &str = "A data pack folder cannot be replaced; remove it instead";
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 pub struct DeleteWorldDatapack {
@@ -476,7 +464,7 @@ async fn ensure_listed_kind(
         kind.is_file()
     };
     if !listed {
-        bail!(PACK_CHANGED);
+        bail!(WorldRefusal::PackChanged);
     }
     Ok(())
 }
@@ -498,10 +486,6 @@ impl crate::error::FeErrorCode for NoDatapackForVersion {
         Some(serde_json::json!({ "version": self.version }))
     }
 }
-
-/// The refusal of a version the user picked that the game would not load
-/// from a world: it is not tagged as a data pack, or its file is no zip.
-const NOT_A_DATAPACK_VERSION: &str = "This version is not a data pack";
 
 fn no_data_pack(game: &str) -> anyhow::Error {
     NoDatapackForVersion {
@@ -657,7 +641,7 @@ async fn resolve_modrinth(
             // The user's own pick may list another game version.
             let file = modrinth_datapack_file(&version)
                 .cloned()
-                .context(NOT_A_DATAPACK_VERSION)?;
+                .ok_or(WorldRefusal::NotADatapackVersion)?;
             (version, file)
         }
         None => {
@@ -716,7 +700,7 @@ async fn resolve_curseforge(
             }
             // The user's own pick may list another game version.
             if !is_curseforge_datapack_file(&project, &file) {
-                bail!(NOT_A_DATAPACK_VERSION);
+                bail!(WorldRefusal::NotADatapackVersion);
             }
             file
         }
@@ -725,7 +709,7 @@ async fn resolve_curseforge(
     let url = file
         .download_url
         .clone()
-        .context("mod cannot be downloaded without privileged api key")?;
+        .ok_or(WorldRefusal::NotDownloadable)?;
     let sha1 = file
         .hashes
         .iter()
@@ -801,7 +785,8 @@ impl ManagerRef<'_, InstanceManager> {
                     .await;
                 match &result {
                     Ok(_) => task.complete(),
-                    Err(error) => task.clone().fail(anyhow!("{error:#}")).await,
+                    // One line, with the code of a refusal in it.
+                    Err(error) => task.clone().fail(crate::error::flattened(error)).await,
                 }
                 result
             })
@@ -825,7 +810,7 @@ impl ManagerRef<'_, InstanceManager> {
             let row = self
                 .instance_world_datapack(id, &request.id)
                 .await?
-                .context(PACK_GONE)?;
+                .ok_or(WorldRefusal::PackGone)?;
             let removal = self.addon_removal().await?;
             // None: the `datapacks` folder is gone, and the pack with it.
             if let Some(path) = self.world_datapack_entry(id, &row).await?
@@ -835,7 +820,7 @@ impl ManagerRef<'_, InstanceManager> {
                 // A link is removed by itself, never what it points to.
                 let is_directory = row.is_folder && !meta.file_type().is_symlink();
                 if !remove_addon_entry(&path, &meta, is_directory, removal).await? {
-                    bail!(PACK_CHANGED);
+                    bail!(WorldRefusal::PackChanged);
                 }
             }
             wdb::delete_world_datapack_by_id(&self.app.db, &row.id).await?;
@@ -890,10 +875,10 @@ impl ManagerRef<'_, InstanceManager> {
             return Ok(None);
         };
         if row.world != world {
-            bail!(OTHER_WORLD);
+            bail!(WorldRefusal::OtherWorld);
         }
         if row.is_folder {
-            bail!(FOLDER_NOT_REPLACED);
+            bail!(WorldRefusal::FolderNotReplaced);
         }
         Ok(Some(row))
     }
@@ -920,7 +905,7 @@ impl ManagerRef<'_, InstanceManager> {
         };
         ensure_listed_kind(&path, &meta, false).await?;
         if !self.holds_recorded_file(id, &row).await? {
-            bail!(PACK_CHANGED);
+            bail!(WorldRefusal::PackChanged);
         }
         Ok(Some(path))
     }
@@ -980,7 +965,7 @@ impl ManagerRef<'_, InstanceManager> {
             Some(row_id) => Some(
                 self.replaceable_row(id, &request.world, row_id)
                     .await?
-                    .context(PACK_GONE)?,
+                    .ok_or(WorldRefusal::PackGone)?,
             ),
             None => None,
         };
@@ -989,7 +974,7 @@ impl ManagerRef<'_, InstanceManager> {
         let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
         let world = saves.join(&request.world);
         if world_identity(id, &root, &world).await? != request.identity {
-            bail!(WORLD_CHANGED);
+            bail!(WorldRefusal::WorldChanged);
         }
         let folder = world_datapacks_folder(&saves, &request.world);
         // An update keeps the file name: the name is its own, not taken.
@@ -1002,7 +987,9 @@ impl ManagerRef<'_, InstanceManager> {
                 .await?
                 .is_some()
         {
-            bail!(NAME_TAKEN);
+            bail!(WorldRefusal::NameTaken {
+                filename: build.filename.clone(),
+            });
         }
         // A private folder in the instance root: the download and what the
         // downloader keeps beside it go when it is dropped.
@@ -1056,7 +1043,7 @@ impl ManagerRef<'_, InstanceManager> {
             LaunchState::Inactive { .. }
         );
         if !inactive {
-            bail!(GAME_ACTIVE);
+            bail!(WorldRefusal::GameActive);
         }
         Ok(())
     }
@@ -1102,7 +1089,10 @@ impl ManagerRef<'_, InstanceManager> {
             _ = cancel.cancelled() => bail!(CLOSING),
             done = async { tokio::join!(transfer, progress) } => done,
         };
-        result.with_context(|| format!("Failed to download data pack {}", build.filename))?;
+        result.map_err(|error| WorldRefusal::DownloadFailed {
+            filename: build.filename.clone(),
+            cause: format!("{:#}", anyhow::Error::from(error)),
+        })?;
         subtask.complete_download();
 
         #[cfg(test)]
@@ -1171,7 +1161,7 @@ impl ManagerRef<'_, InstanceManager> {
         // Before the folder is made: never in a save put in its place.
         // A moved root also gives the save another identity.
         if world_identity(id, &root, &world).await? != request.identity {
-            bail!("Selected world changed during copying; no datapack published");
+            bail!(WorldRefusal::WorldChangedDuringCopy);
         }
         let artifact = staging.path().join(ARTIFACT);
         let temporary = tempfile::NamedTempFile::from_parts(
@@ -1729,7 +1719,10 @@ pub(crate) mod tests {
         .await
         .unwrap_err();
         // The project may hold a data pack beside the build that was picked.
-        assert_eq!(error.to_string(), NOT_A_DATAPACK_VERSION);
+        assert_eq!(
+            error.downcast_ref(),
+            Some(&WorldRefusal::NotADatapackVersion)
+        );
         assert_eq!(snapshot(&root, &world), before);
 
         // Asked for its newest build, the project has none for the world.
@@ -1773,7 +1766,10 @@ pub(crate) mod tests {
         let error = install(&app, &api, request(id, &identity, modrinth(Some("jar"))))
             .await
             .unwrap_err();
-        assert_eq!(error.to_string(), NOT_A_DATAPACK_VERSION);
+        assert_eq!(
+            error.downcast_ref(),
+            Some(&WorldRefusal::NotADatapackVersion)
+        );
         assert_eq!(snapshot(&root, &world), before);
     }
 
@@ -1865,7 +1861,10 @@ pub(crate) mod tests {
         let error = install(&app, &api, request(id, &identity, curseforge(Some(21))))
             .await
             .unwrap_err();
-        assert_eq!(error.to_string(), NOT_A_DATAPACK_VERSION);
+        assert_eq!(
+            error.downcast_ref(),
+            Some(&WorldRefusal::NotADatapackVersion)
+        );
         assert!(entries(&world.join("datapacks")).is_empty());
 
         install(&app, &api, request(id, &identity, curseforge(Some(20))))
@@ -1951,10 +1950,21 @@ pub(crate) mod tests {
             format!("{error:#}").to_lowercase().contains("checksum"),
             "{error:#}"
         );
-        assert!(matches!(
-            app.task_manager().get_task_outcome(task).await,
-            crate::managers::vtask::TaskOutcome::Failed(_)
-        ));
+        // The failed task shows the same line, and says what failed by its
+        // code, so the desktop can word it.
+        let crate::managers::vtask::TaskOutcome::Failed(failed) =
+            app.task_manager().get_task_outcome(task).await
+        else {
+            panic!("the task failed");
+        };
+        let crate::domain::vtask::Progress::Failed(shown) = &failed.progress else {
+            panic!("a failed task shows its error");
+        };
+        let sent = serde_json::to_value(crate::error::FeError::from_anyhow(shown)).unwrap();
+        let cause = &sent["cause"][0];
+        assert_eq!(cause["display"], format!("{error:#}"), "{sent}");
+        assert_eq!(cause["code"], "DATAPACK_DOWNLOAD_FAILED", "{sent}");
+        assert_eq!(cause["data"]["filename"], "pack.zip", "{sent}");
         assert_eq!(snapshot(&root, &world), before);
         assert!(
             wdb::get_world_datapacks_by_instance(&app.db, *id)
@@ -2048,7 +2058,7 @@ pub(crate) mod tests {
                 ..request(id, &identity, modrinth(None))
             })
             .await,
-            PACK_GONE
+            WorldRefusal::PackGone.to_string()
         );
         assert_eq!(snapshot(&root, &world), before);
 
@@ -2738,7 +2748,7 @@ pub(crate) mod tests {
 
         let error = delete(&app, id, &rows[0].id).await.unwrap_err();
 
-        assert_eq!(error.to_string(), PACK_GONE);
+        assert_eq!(error.downcast_ref(), Some(&WorldRefusal::PackGone));
         assert!(path.exists());
         assert!(row_exists(&app, &rows[0].id).await);
     }
@@ -2784,7 +2794,7 @@ pub(crate) mod tests {
 
         let error = delete(&app, id, &rows[0].id).await.unwrap_err();
 
-        assert_eq!(error.to_string(), PACK_CHANGED);
+        assert_eq!(error.downcast_ref(), Some(&WorldRefusal::PackChanged));
         assert_eq!(tree(&world), before);
     }
 
@@ -2950,7 +2960,12 @@ pub(crate) mod tests {
         .await
         .unwrap_err();
 
-        assert_eq!(error.to_string(), NAME_TAKEN);
+        assert_eq!(
+            error.downcast_ref(),
+            Some(&WorldRefusal::NameTaken {
+                filename: "pack-2.zip".into()
+            })
+        );
         assert_eq!(snapshot(&root, &world), before);
     }
 
@@ -2984,7 +2999,7 @@ pub(crate) mod tests {
         )
         .await
         .unwrap_err();
-        assert_eq!(error.to_string(), OTHER_WORLD);
+        assert_eq!(error.downcast_ref(), Some(&WorldRefusal::OtherWorld));
         assert_eq!(tree(&saves), before);
 
         let error = install(
@@ -2999,7 +3014,7 @@ pub(crate) mod tests {
         )
         .await
         .unwrap_err();
-        assert_eq!(error.to_string(), FOLDER_NOT_REPLACED);
+        assert_eq!(error.downcast_ref(), Some(&WorldRefusal::FolderNotReplaced));
         assert_eq!(tree(&saves), before);
     }
 
@@ -3097,7 +3112,7 @@ pub(crate) mod tests {
 
         let error = work.await.unwrap().unwrap_err();
 
-        assert_eq!(error.to_string(), PACK_CHANGED);
+        assert_eq!(error.downcast_ref(), Some(&WorldRefusal::PackChanged));
         assert_eq!(
             entries(&world.join("datapacks")),
             vec![("pack.zip".to_owned(), b"the user's own build".to_vec())]

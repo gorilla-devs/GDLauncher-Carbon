@@ -45,6 +45,7 @@ fn extract_fe_error(
     use crate::managers::instance::modpack::ChangeVersionRefusal;
     use crate::managers::instance::run::InsufficientMemoryError;
     use crate::managers::instance::world_datapack_changes::NoDatapackForVersion;
+    use crate::managers::instance::world_refusal::WorldRefusal;
     use crate::managers::server::{EulaNotAcceptedError, RecoveredServerError};
 
     macro_rules! try_downcast {
@@ -67,11 +68,54 @@ fn extract_fe_error(
         EulaNotAcceptedError,
         RecoveredServerError,
         AlreadyInWorld,
-        NoDatapackForVersion
+        NoDatapackForVersion,
+        WorldRefusal
     );
+
+    if let Some(coded) = entry.downcast_ref::<CodedLine>() {
+        return (Some(coded.code.clone()), coded.data.clone());
+    }
 
     (None, None)
 }
+
+/// The code and data of the first cause of `error` that has a code.
+pub fn coded_cause(error: &anyhow::Error) -> Option<(String, Option<serde_json::Value>)> {
+    error
+        .chain()
+        .find_map(|entry| match extract_fe_error(entry) {
+            (Some(code), data) => Some((code, data)),
+            (None, _) => None,
+        })
+}
+
+/// `error` as the one line a failed task shows (`{error:#}`), still carrying
+/// the code and data of its first coded cause, so the desktop can word a
+/// failed task as it words a refused request.
+pub fn flattened(error: &anyhow::Error) -> anyhow::Error {
+    let line = format!("{error:#}");
+    match coded_cause(error) {
+        Some((code, data)) => anyhow::Error::new(CodedLine { line, code, data }),
+        None => anyhow::anyhow!(line),
+    }
+}
+
+/// An error flattened to one line by [`flattened`], with the code and data
+/// of the cause that had one.
+#[derive(Debug)]
+struct CodedLine {
+    line: String,
+    code: String,
+    data: Option<serde_json::Value>,
+}
+
+impl Display for CodedLine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(&self.line)
+    }
+}
+
+impl std::error::Error for CodedLine {}
 
 impl FeError {
     pub fn from_anyhow(error: &anyhow::Error) -> Self {

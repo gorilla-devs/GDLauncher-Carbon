@@ -8,9 +8,10 @@ use super::{
     installer::publication,
     mods::{InvalidInstanceModIdError, resolve_mod_update_where},
     world_datapack_changes::{
-        DeleteWorldDatapack, InstallWorldDatapack, PACK_CHANGED, PACK_GONE, WorldDatapackSource,
-        is_curseforge_world_file, modrinth_world_file,
+        DeleteWorldDatapack, InstallWorldDatapack, WorldDatapackSource, is_curseforge_world_file,
+        modrinth_world_file,
     },
+    world_refusal::WorldRefusal,
 };
 use crate::{
     api::translation::Translation,
@@ -39,8 +40,6 @@ use std::future::Future;
 use std::path::PathBuf;
 use std::pin::Pin;
 
-/// The answer when no newer build may replace a pack, as for any addon.
-const NO_UPDATE: &str = "unable to find newer mod version in available update channels";
 const NOT_A_DATAPACK: &str = "Only a data pack can be updated in every place it is in";
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
@@ -72,6 +71,32 @@ pub struct DatapackUpdateResult {
     pub place: Option<String>,
     pub ok: bool,
     pub error: Option<String>,
+    /// The code and data of the refusal behind `error`, when it has one.
+    pub code: Option<String>,
+    pub data: Option<serde_json::Value>,
+}
+
+impl DatapackUpdateResult {
+    fn updated(place: Option<String>) -> Self {
+        Self {
+            place,
+            ok: true,
+            error: None,
+            code: None,
+            data: None,
+        }
+    }
+
+    fn failed(place: Option<String>, error: &anyhow::Error) -> Self {
+        let (code, data) = crate::error::coded_cause(error).unzip();
+        Self {
+            place,
+            ok: false,
+            error: Some(format!("{error:#}")),
+            code,
+            data: data.flatten(),
+        }
+    }
 }
 
 /// An update of a world's pack once it started.
@@ -180,16 +205,8 @@ impl ManagerRef<'_, InstanceManager> {
             };
             match outcome {
                 Ok(false) => {}
-                Ok(true) => results.push(DatapackUpdateResult {
-                    place,
-                    ok: true,
-                    error: None,
-                }),
-                Err(error) => results.push(DatapackUpdateResult {
-                    place,
-                    ok: false,
-                    error: Some(format!("{error:#}")),
-                }),
+                Ok(true) => results.push(DatapackUpdateResult::updated(place)),
+                Err(error) => results.push(DatapackUpdateResult::failed(place, &error)),
             }
         }
         Ok(results)
@@ -210,7 +227,7 @@ impl ManagerRef<'_, InstanceManager> {
                 let row = worlds
                     .iter()
                     .find(|row| &row.id == row_id)
-                    .context(PACK_GONE)?;
+                    .ok_or(WorldRefusal::PackGone)?;
                 (row.mr_project_id.clone(), row.cf_project_id)
             }
             DatapackOrigin::Instance(mod_id) => {
@@ -309,7 +326,9 @@ impl ManagerRef<'_, InstanceManager> {
                 TaskOutcome::Succeeded => return Ok(()),
                 TaskOutcome::Failed(failed) => {
                     return Err(match failed.progress {
-                        crate::domain::vtask::Progress::Failed(error) => anyhow!("{error:#}"),
+                        crate::domain::vtask::Progress::Failed(error) => {
+                            crate::error::flattened(&error)
+                        }
                         _ => anyhow!("The update failed"),
                     });
                 }
@@ -331,7 +350,7 @@ impl ManagerRef<'_, InstanceManager> {
         let (row, update) = self
             .resolve_world_datapack_update(curseforge, modrinth, id, row_id)
             .await?
-            .context(NO_UPDATE)?;
+            .ok_or(WorldRefusal::NoUpdate)?;
         self.apply_world_datapack_update(curseforge, modrinth, id, row, update)
             .await
     }
@@ -350,7 +369,7 @@ impl ManagerRef<'_, InstanceManager> {
         let row = self
             .instance_world_datapack(id, row_id)
             .await?
-            .context(PACK_GONE)?;
+            .ok_or(WorldRefusal::PackGone)?;
         let Some(ids) = wdb::get_world_datapack_update_ids(&self.app.db, row_id).await? else {
             return Ok(None);
         };
@@ -419,7 +438,7 @@ impl ManagerRef<'_, InstanceManager> {
         // The list may be older than the disk: the pack is replaced or
         // removed only while it holds what the list showed.
         if !self.holds_recorded_file(id, &row).await? {
-            bail!(PACK_CHANGED);
+            bail!(WorldRefusal::PackChanged);
         }
         let mut present = false;
         for other in wdb::get_world_datapacks_full(&self.app.db, *id).await? {
@@ -517,7 +536,7 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .into_iter()
             .find(|row| row.id == row_id)
-            .context(PACK_GONE)?;
+            .ok_or(WorldRefusal::PackGone)?;
         Ok(row.cf_name.or(row.mr_title).unwrap_or(row.filename))
     }
 
@@ -801,11 +820,7 @@ pub(crate) mod tests {
     }
 
     fn updated(place: Option<&str>) -> DatapackUpdateResult {
-        DatapackUpdateResult {
-            place: place.map(str::to_owned),
-            ok: true,
-            error: None,
-        }
+        DatapackUpdateResult::updated(place.map(str::to_owned))
     }
 
     fn only(folder: &Path, filename: &str, bytes: &[u8]) {
@@ -909,7 +924,7 @@ pub(crate) mod tests {
 
         let error = update(&app, &api, id, &rows[0].id).await.unwrap_err();
 
-        assert_eq!(error.to_string(), NO_UPDATE);
+        assert_eq!(error.downcast_ref(), Some(&WorldRefusal::NoUpdate));
         assert_eq!(snapshot(&root, &world), before);
         assert_eq!(scanned_rows(&app, id).await, rows);
     }
@@ -1201,7 +1216,14 @@ pub(crate) mod tests {
         assert_eq!(results[0], updated(Some("A")));
         assert_eq!(results[1].place.as_deref(), Some("B"));
         assert!(!results[1].ok);
-        assert!(results[1].error.is_some(), "{results:?}");
+        // In words, and by its code and data for the desktop to word.
+        assert_eq!(
+            results[1].error,
+            Some(WorldRefusal::PackGone.to_string()),
+            "{results:?}"
+        );
+        assert_eq!(results[1].code.as_deref(), Some("DATAPACK_GONE"));
+        assert_eq!(results[1].data, None);
         assert_eq!(results[2], updated(Some("C")));
         only(&saves.join("A/datapacks"), "pack-2.zip", &new);
         only(&saves.join("C/datapacks"), "pack-2.zip", &new);
@@ -1471,7 +1493,7 @@ pub(crate) mod tests {
 
         assert!(!update_arrow(&app, id).await);
         let error = update(&app, &api, id, &row.id).await.unwrap_err();
-        assert_eq!(error.to_string(), NO_UPDATE);
+        assert_eq!(error.downcast_ref(), Some(&WorldRefusal::NoUpdate));
         let instance_updates = InstanceUpdates::new(&app);
         let results = everywhere(
             &app,
@@ -1600,7 +1622,7 @@ pub(crate) mod tests {
 
         let error = update(&app, &api, id, &row.id).await.unwrap_err();
 
-        assert_eq!(error.to_string(), PACK_CHANGED);
+        assert_eq!(error.downcast_ref(), Some(&WorldRefusal::PackChanged));
         assert_eq!(snapshot(&root, &world), before);
         only(&world.join("datapacks"), "pack-1.zip", &swapped);
     }
@@ -1620,7 +1642,7 @@ pub(crate) mod tests {
 
         let error = update(&app, &api, id, &row.id).await.unwrap_err();
 
-        assert_eq!(error.to_string(), PACK_CHANGED);
+        assert_eq!(error.downcast_ref(), Some(&WorldRefusal::PackChanged));
         assert_eq!(tree(&saves), before);
     }
 

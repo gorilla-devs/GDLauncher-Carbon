@@ -2131,7 +2131,8 @@ pub(crate) mod tests {
     async fn a_world_is_not_deleted_while_its_instance_starts_or_runs() {
         use crate::domain::vtask::VisualTaskId;
         use crate::managers::instance::run::{LaunchState, RunningInstance};
-        use crate::managers::instance::world_datapack_changes::{GAME_ACTIVE, tests::tree};
+        use crate::managers::instance::world_datapack_changes::tests::tree;
+        use crate::managers::instance::world_refusal::WorldRefusal;
         let app = crate::setup_managers_for_test().await;
         let (id, world_row, world) =
             addon_fixture(&app, "world-in-use", AddonType::Worlds, "World", b"level").await;
@@ -2215,7 +2216,15 @@ pub(crate) mod tests {
                 .delete_mod(id, world_row.id.clone())
                 .await
                 .expect_err(&name);
-            assert_eq!(error.to_string(), GAME_ACTIVE, "{name}");
+            assert_eq!(
+                error.downcast_ref(),
+                Some(&WorldRefusal::GameActive),
+                "{name}"
+            );
+            // The desktop words it from its code, as it does when a data
+            // pack of the world is changed meanwhile.
+            let sent = serde_json::to_value(crate::error::FeError::from_anyhow(&error)).unwrap();
+            assert_eq!(sent["cause"][0]["code"], "INSTANCE_GAME_ACTIVE", "{name}");
             assert_eq!(tree(&root), before, "{name}");
             assert!(
                 mfcdb::get_mod_file_cache_by_id(&app.db, &world_row.id)

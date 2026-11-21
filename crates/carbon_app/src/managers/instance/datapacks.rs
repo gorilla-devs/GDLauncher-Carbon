@@ -4,6 +4,7 @@ use super::{
     InstanceId, InstanceManager,
     installer::publication,
     mods::{InvalidInstanceModIdError, addon_metadata, validate_addon_basename},
+    world_refusal::{PackFault, SaveFault, WorldRefusal},
 };
 use crate::{
     domain::instance::AddonType,
@@ -68,19 +69,19 @@ pub(super) async fn world_identity(
 ) -> anyhow::Result<String> {
     let directory = addon_metadata(world)
         .await?
-        .context("Selected world no longer exists")?;
+        .ok_or(WorldRefusal::WorldGone)?;
     if !directory.is_dir() || directory.file_type().is_symlink() {
-        bail!("Selected world is not an owned save directory");
+        bail!(WorldRefusal::NotASave(SaveFault::NotAFolder));
     }
     if publication::world_install_incomplete(world).await? {
-        bail!("Selected world installation is incomplete");
+        bail!(WorldRefusal::NotASave(SaveFault::InstallIncomplete));
     }
     let level = world.join("level.dat");
     let metadata = addon_metadata(&level)
         .await?
-        .context("Selected directory is not an existing Minecraft save")?;
+        .ok_or(WorldRefusal::NotASave(SaveFault::NoLevelDat))?;
     if !metadata.is_file() || metadata.file_type().is_symlink() {
-        bail!("World metadata is not a regular file");
+        bail!(WorldRefusal::NotASave(SaveFault::LevelDatNotAFile));
     }
     let mut digest = Sha512::new();
     digest.update(format!(
@@ -186,7 +187,7 @@ impl ManagerRef<'_, InstanceManager> {
         }
         validate_addon_basename(&row.filename)?;
         if !row.filename.to_ascii_lowercase().ends_with(".zip") {
-            bail!("Select a ZIP datapack for this world");
+            bail!(WorldRefusal::NotAZip);
         }
         let path = publication::current_path(&self.app, id).await?;
         let staging = publication::checked_folder(&path, AddonType::DataPacks).await?;
@@ -197,7 +198,7 @@ impl ManagerRef<'_, InstanceManager> {
         let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
         let world = saves.join(&request.world.name);
         if world_identity(id, &path.get_root(), &world).await? != request.world.identity {
-            bail!(WORLD_CHANGED);
+            bail!(WorldRefusal::WorldChanged);
         }
         // The world's datapacks folder may be linked to a shared one, as an
         // addon folder may (`publication::followed_folder`).
@@ -216,7 +217,9 @@ impl ManagerRef<'_, InstanceManager> {
             .is_some()
             || (!named_copy && addon_metadata(&folder.join(&row.filename)).await?.is_some())
         {
-            bail!(NAME_TAKEN);
+            bail!(WorldRefusal::NameTaken {
+                filename: row.filename.clone(),
+            });
         }
         if !copies.is_empty() && !request.replace {
             bail!(AlreadyInWorld {
@@ -346,7 +349,7 @@ impl ManagerRef<'_, InstanceManager> {
             .pause("datapack_before_copy", instance)
             .await;
         if world_identity(instance, root, world).await? != identity {
-            bail!("Selected world changed during copying; no datapack published");
+            bail!(WorldRefusal::WorldChangedDuringCopy);
         }
         let folder = world.join("datapacks");
         if !publication::followed_folder(&folder).await? {
@@ -356,27 +359,22 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .is_some()
         {
-            bail!("Datapack destination became occupied; existing content retained");
+            bail!(WorldRefusal::NameTaken {
+                filename: filename.to_owned(),
+            });
         }
         Ok(folder.join(filename))
     }
 }
-
-/// The refusal when the save the user selected is no longer there as it was.
-pub(super) const WORLD_CHANGED: &str =
-    "Selected world changed. Refresh the world list and select it again";
-/// The refusal when the world already holds a file of that name.
-pub(super) const NAME_TAKEN: &str =
-    "This world already contains that datapack filename; existing content was retained";
 
 pub(super) fn validate_pack_zip(path: &Path) -> anyhow::Result<()> {
     use std::io::Read;
     let mut archive = zip::ZipArchive::new(std::fs::File::open(path)?)?;
     let metadata = archive
         .by_name("pack.mcmeta")
-        .context("Datapack ZIP must contain pack.mcmeta at its root")?;
+        .map_err(|_| WorldRefusal::InvalidPack(PackFault::NoPackMcmeta))?;
     if metadata.size() > 1024 * 1024 {
-        bail!("Datapack metadata is too large");
+        bail!(WorldRefusal::InvalidPack(PackFault::MetadataTooLarge));
     }
     let mut bytes = Vec::new();
     metadata.take(1024 * 1024 + 1).read_to_end(&mut bytes)?;
@@ -385,10 +383,10 @@ pub(super) fn validate_pack_zip(path: &Path) -> anyhow::Result<()> {
     // leading byte order mark, which Notepad and PowerShell 5.1 write.
     let text = String::from_utf8_lossy(&bytes);
     let text = text.strip_prefix('\u{feff}').unwrap_or(&text);
-    let value: serde_json::Value =
-        serde_json::from_str(text).context("Datapack pack.mcmeta is not valid JSON")?;
+    let value: serde_json::Value = serde_json::from_str(text)
+        .map_err(|_| WorldRefusal::InvalidPack(PackFault::MetadataNotJson))?;
     if !value.get("pack").is_some_and(serde_json::Value::is_object) {
-        bail!("Invalid datapack metadata");
+        bail!(WorldRefusal::InvalidPack(PackFault::NoPackSection));
     }
     Ok(())
 }
@@ -967,12 +965,9 @@ mod tests {
     mod replacing {
         use super::*;
         use crate::managers::App;
-        use crate::managers::instance::world_datapack_changes::{
-            PACK_CHANGED,
-            tests::{
-                entries, pack_zip, put_pack, row_of, scanned_rows, snapshot, staging_folders, tree,
-                without_recycle_bin,
-            },
+        use crate::managers::instance::world_datapack_changes::tests::{
+            entries, pack_zip, put_pack, row_of, scanned_rows, snapshot, staging_folders, tree,
+            without_recycle_bin,
         };
         use crate::managers::instance::world_datapack_updates::tests::on_modrinth;
 
@@ -1179,7 +1174,13 @@ mod tests {
                 let error = copy(&app, id, &mod_id, &selected, replace)
                     .await
                     .unwrap_err();
-                assert_eq!(error.to_string(), NAME_TAKEN, "replace: {replace}");
+                assert_eq!(
+                    error.downcast_ref(),
+                    Some(&WorldRefusal::NameTaken {
+                        filename: "pack.zip".into()
+                    }),
+                    "replace: {replace}"
+                );
                 assert_eq!(tree(&world), before, "replace: {replace}");
             }
         }
@@ -1280,7 +1281,7 @@ mod tests {
 
             let error = worker.await.unwrap().unwrap_err();
 
-            assert_eq!(error.to_string(), PACK_CHANGED);
+            assert_eq!(error.downcast_ref(), Some(&WorldRefusal::PackChanged));
             assert_eq!(
                 entries(&world.join("datapacks")),
                 vec![("pack-1.zip".to_owned(), b"the user's own build".to_vec())]

@@ -558,18 +558,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
                 .delete_mods(request.instance_id.into(), request.mod_ids)
                 .await?
                 .into_iter()
-                .map(|(mod_id, deleted)| match deleted {
-                    Ok(kept) => FEDeletedMod {
-                        mod_id,
-                        kept: kept.map(FEKeptAddonCopy::from),
-                        error: None,
-                    },
-                    Err(error) => FEDeletedMod {
-                        mod_id,
-                        kept: None,
-                        error: Some(format!("{error:#}")),
-                    },
-                })
+                .map(FEDeletedMod::from)
                 .collect::<Vec<_>>())
         }
 
@@ -1836,6 +1825,38 @@ struct FEDeletedMod {
     kept: Option<FEKeptAddonCopy>,
     /// Why this addon was not deleted.
     error: Option<String>,
+    /// The code and data of the refusal behind `error`, when it has one
+    /// (see [`crate::error::FeErrorCode`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    error_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    error_data: Option<serde_json::Value>,
+}
+
+impl From<(String, anyhow::Result<Option<manager::KeptAddonCopy>>)> for FEDeletedMod {
+    fn from((mod_id, deleted): (String, anyhow::Result<Option<manager::KeptAddonCopy>>)) -> Self {
+        match deleted {
+            Ok(kept) => Self {
+                mod_id,
+                kept: kept.map(FEKeptAddonCopy::from),
+                error: None,
+                error_code: None,
+                error_data: None,
+            },
+            Err(error) => {
+                let (error_code, error_data) = crate::error::coded_cause(&error).unzip();
+                Self {
+                    mod_id,
+                    kept: None,
+                    error: Some(format!("{error:#}")),
+                    error_code,
+                    error_data: error_data.flatten(),
+                }
+            }
+        }
+    }
 }
 
 #[derive(Type, Debug, Deserialize)]
@@ -2211,6 +2232,14 @@ struct FEDatapackUpdateResult {
     place: Option<String>,
     ok: bool,
     error: Option<String>,
+    /// The code and data of the refusal behind `error`, when it has one
+    /// (see [`crate::error::FeErrorCode`]).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    error_code: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[specta(optional)]
+    error_data: Option<serde_json::Value>,
 }
 
 impl From<crate::managers::instance::world_datapack_updates::DatapackUpdateResult>
@@ -2223,6 +2252,8 @@ impl From<crate::managers::instance::world_datapack_updates::DatapackUpdateResul
             place: value.place,
             ok: value.ok,
             error: value.error,
+            error_code: value.code,
+            error_data: value.data,
         }
     }
 }
@@ -3631,6 +3662,41 @@ impl From<manager::KeptAddonCopy> for FEKeptAddonCopy {
             deleted: value.deleted,
             kept: value.kept,
         }
+    }
+}
+
+#[cfg(test)]
+mod deleted_mod_wire_tests {
+    use super::*;
+    use crate::managers::instance::world_refusal::WorldRefusal;
+
+    /// One addon of a selection that was refused is sent in words and, when
+    /// the refusal has one, with its code for the desktop to word it.
+    #[test]
+    fn a_refused_delete_of_a_selection_is_sent_with_its_code() {
+        let refused = FEDeletedMod::from((
+            "world".to_owned(),
+            Err(anyhow::Error::new(WorldRefusal::GameActive)),
+        ));
+        assert_eq!(
+            serde_json::to_value(refused).unwrap(),
+            serde_json::json!({
+                "mod_id": "world",
+                "kept": null,
+                "error": WorldRefusal::GameActive.to_string(),
+                "error_code": "INSTANCE_GAME_ACTIVE",
+            })
+        );
+        let plain = FEDeletedMod::from(("mod".to_owned(), Err(anyhow::anyhow!("in use"))));
+        assert_eq!(
+            serde_json::to_value(plain).unwrap(),
+            serde_json::json!({ "mod_id": "mod", "kept": null, "error": "in use" })
+        );
+        let deleted = FEDeletedMod::from(("mod".to_owned(), Ok(None)));
+        assert_eq!(
+            serde_json::to_value(deleted).unwrap(),
+            serde_json::json!({ "mod_id": "mod", "kept": null, "error": null })
+        );
     }
 }
 
