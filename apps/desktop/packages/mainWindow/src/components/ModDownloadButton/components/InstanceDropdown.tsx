@@ -29,6 +29,10 @@ import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
 import type { ReadableWorld } from "@/utils/worldTarget"
 import type { FEWorld } from "@gd/core_module/bindings"
 
+// The core invalidates a world list when its packs change, so a read can be
+// reused across reopenings of the menu for this long.
+const WORLDS_STALE_TIME = 5 * 60 * 1000
+
 const readable = (worlds: readonly FEWorld[] | undefined) =>
   (worlds ?? []).filter(
     (world): world is ReadableWorld => world.identity !== null
@@ -90,6 +94,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
   const pickedWorlds = rspc.createQuery(() => ({
     queryKey: ["instance.getWorlds", pickedInstance()?.id ?? 0],
     enabled: pickedInstance() !== undefined,
+    staleTime: WORLDS_STALE_TIME,
     meta: LOCAL_ERROR_TOAST
   }))
   const pickedMods = rspc.createQuery(() => ({
@@ -155,19 +160,6 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     // Get the query for this specific instance
     const instanceQuery = getInstanceModsQuery(instance.id)
 
-    // A data pack's row also needs the instance's worlds, read on open.
-    const worldsQuery = rspc.createQuery(() => ({
-      queryKey: ["instance.getWorlds", instance.id],
-      enabled:
-        asksForWorld() &&
-        isDropdownOpen() &&
-        props.filteredInstances().some((inst) => inst.id === instance.id),
-      meta: LOCAL_ERROR_TOAST
-    }))
-    const worldsSettled = () =>
-      worldsQuery.isError || worldsQuery.data !== undefined
-    const rowWorlds = () => readable(worldsQuery.data)
-
     const holdsInInstance = createMemo(() => {
       if (!instanceQuery || !props.addon) {
         return false
@@ -183,6 +175,22 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
 
       return !!isModInstalledInInstance(mods, props.addon)
     })
+    // Only a row whose instance already holds the pack needs its worlds
+    // before a pick: they decide whether anything is left to offer. Every
+    // other row reads them when picked. Each read is a scan of the saves.
+    const worldsQuery = rspc.createQuery(() => ({
+      queryKey: ["instance.getWorlds", instance.id],
+      enabled:
+        asksForWorld() &&
+        isDropdownOpen() &&
+        holdsInInstance() &&
+        props.filteredInstances().some((inst) => inst.id === instance.id),
+      staleTime: WORLDS_STALE_TIME,
+      meta: LOCAL_ERROR_TOAST
+    }))
+    const worldsSettled = () =>
+      worldsQuery.isError || worldsQuery.data !== undefined
+    const rowWorlds = () => readable(worldsQuery.data)
     // A data pack the instance holds stays installed until a world is known
     // that could still take it.
     const isInstalled = () =>

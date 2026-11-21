@@ -47,7 +47,7 @@ const flush = async () => {
     await new Promise((r) => setTimeout(r, 0))
   }
 }
-function mount(type: string) {
+function mount(type: string, instances = [instance]) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   })
@@ -62,7 +62,7 @@ function mount(type: string) {
       <QueryClientProvider client={client}>
         <InstanceDropdown
           addon={{ id: "P", platform: "modrinth", type } as any}
-          filteredInstances={() => [instance]}
+          filteredInstances={() => instances}
           shouldVirtualize={() => false}
           searchQuery={query}
           setSearchQuery={setQuery}
@@ -220,4 +220,53 @@ it("a world pick installs there and keeps the menu open on the list", async () =
   expect(d.selectInstance).not.toHaveBeenCalled()
   expect(isOpen()).toBe(true)
   expect(instanceItem()).toBeDefined()
+})
+const others = [5, 6, 7].map((id) => ({
+  ...instance,
+  id,
+  name: `Other ${id}`
+}))
+const worldReads = () =>
+  c.query.mock.calls
+    .map(([key]) => key)
+    .filter((key) => key[0] === "instance.getWorlds")
+async function close() {
+  document.activeElement!.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+  )
+  await flush()
+}
+it("opening the picker reads no worlds when no instance holds the pack", async () => {
+  serve([world("My World")], [])
+  const d = mount("datapack", [instance, ...others])
+  await open(d.root)
+  expect(isOpen()).toBe(true)
+  expect(worldReads()).toEqual([])
+})
+it("opening the picker reads worlds only for the instance holding the pack, once while fresh", async () => {
+  c.query.mockImplementation(async ([key, id]: any) =>
+    key === "instance.getWorlds"
+      ? [world("My World")]
+      : key === "instance.getInstanceMods" && id === 6
+        ? [heldCopy]
+        : []
+  )
+  const d = mount("datapack", [instance, ...others])
+  await open(d.root)
+  expect(worldReads()).toEqual([["instance.getWorlds", 6]])
+  await close()
+  expect(isOpen()).toBe(false)
+  await open(d.root)
+  expect(isOpen()).toBe(true)
+  expect(worldReads()).toEqual([["instance.getWorlds", 6]])
+})
+it("picking an instance that does not hold the pack reads its worlds then", async () => {
+  serve([world("My World")], [])
+  const d = mount("datapack", [instance, ...others])
+  await open(d.root)
+  expect(worldReads()).toEqual([])
+  pick(instanceItem()!)
+  await flush()
+  expect(worldReads()).toEqual([["instance.getWorlds", 4]])
+  expect(items()).toEqual(["My World", "content:_trn_worlds.instance_copy"])
 })
