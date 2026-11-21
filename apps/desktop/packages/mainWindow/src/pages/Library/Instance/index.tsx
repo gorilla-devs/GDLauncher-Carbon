@@ -183,6 +183,15 @@ const Instance = (props: { children?: any }) => {
     {
       label: (
         <div class="flex items-center gap-2">
+          <div class="i-hugeicons:globe text-lg" />
+          <Trans key="ui:_trn_worlds" />
+        </div>
+      ),
+      path: `/library/${params.id}/worlds`
+    },
+    {
+      label: (
+        <div class="flex items-center gap-2">
           <div class="i-hugeicons:settings-01 text-lg" />
           <Trans key="ui:_trn_settings" />
         </div>
@@ -830,7 +839,7 @@ const Instance = (props: { children?: any }) => {
           </TooltipContent>
         </Tooltip>
       }
-      noPaddingPaths={["/addons", "/logs"]}
+      noPaddingPaths={["/addons", "/worlds", "/logs"]}
       isFullScreen={isFullScreen}
     >
       <Show when={duplicatedMods().length > 0}>

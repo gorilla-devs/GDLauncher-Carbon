@@ -79,6 +79,21 @@ export const routes = [
                 )
               },
               {
+                path: "/worlds",
+                component: lazy(
+                  () =>
+                    import("@/pages/Library/Instance/Tabs/Worlds/WorldsRouteWrapper")
+                ),
+                children: [
+                  {
+                    path: "/",
+                    component: lazy(
+                      () => import("@/pages/Library/Instance/Tabs/Worlds")
+                    )
+                  }
+                ]
+              },
+              {
                 path: "/settings",
                 component: lazy(
                   () => import("@/pages/Library/Instance/Tabs/Settings")

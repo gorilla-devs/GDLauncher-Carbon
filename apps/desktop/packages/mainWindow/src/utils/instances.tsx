@@ -112,6 +112,17 @@ export const getModImageUrl = (
   )
 }
 
+/** The icon of a data pack inside a world, by its row in `instance.getWorlds`. */
+export const getWorldDatapackImageUrl = (
+  instanceId: number,
+  id: string,
+  platform: "curseforge" | "modrinth"
+) => {
+  return apiUrl(
+    `/instance/worldDatapackIcon?instance_id=${instanceId}&id=${id}&platform=${platform}`
+  )
+}
+
 export const getServerModImageUrl = (
   serverId: string,
   modId: string,
