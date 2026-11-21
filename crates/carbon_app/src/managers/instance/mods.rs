@@ -801,7 +801,7 @@ impl ManagerRef<'_, InstanceManager> {
 
     /// What `instance_id` runs, for choosing the build of a project to
     /// install on it.
-    async fn runs(&self, instance_id: InstanceId) -> anyhow::Result<dependency::Runs> {
+    pub(super) async fn runs(&self, instance_id: InstanceId) -> anyhow::Result<dependency::Runs> {
         let instances = self.instances.read().await;
         let version = instances
             .get(&instance_id)

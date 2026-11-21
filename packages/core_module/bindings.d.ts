@@ -165,6 +165,7 @@ export type Procedures = {
         { key: "instance.installFabricLoaderDefault", input: FEInstanceId, result: FETaskId } | 
         { key: "instance.installLatestMod", input: InstallLatestMod, result: FETaskId } | 
         { key: "instance.installMod", input: InstallMod, result: FETaskId } | 
+        { key: "instance.installWorldDatapack", input: InstallWorldDatapack, result: FETaskId } | 
         { key: "instance.killInstance", input: FEInstanceId, result: null } | 
         { key: "instance.launchInstance", input: FELaunchInstanceArgs, result: null } | 
         { key: "instance.loadIconUrl", input: string, result: null } | 
@@ -678,6 +679,8 @@ export type FinalizeEnrollmentOutcome = "complete" | "obsolete"
 export type CFFEModLinks = { websiteUrl: string | null; wikiUrl: string | null; issuesUrl: string | null; sourceUrl: string | null }
 
 export type InstallMod = { instance_id: FEInstanceId; mod_source: ModSource; install_deps: boolean; replaces_mod: string | null }
+export type InstallWorldDatapack = { instance_id: number; world: string; identity: string; source: WorldDatapackSource; replaces: string | null }
+export type WorldDatapackSource = { Modrinth: { project_id: string; version_id: string | null } } | { Curseforge: { project_id: number; file_id: number | null } }
 
 export type AddOpRequest = { serverId: FEServerId; username: string; level: number }
 

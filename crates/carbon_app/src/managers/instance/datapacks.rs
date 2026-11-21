@@ -130,7 +130,7 @@ impl ManagerRef<'_, InstanceManager> {
         let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
         let world = saves.join(&request.world.name);
         if world_identity(id, &path.get_root(), &world).await? != request.world.identity {
-            bail!("Selected world changed. Refresh the world list and select it again");
+            bail!(WORLD_CHANGED);
         }
         // The world's datapacks folder may be linked to a shared one, as an
         // addon folder may (`publication::followed_folder`).
@@ -142,9 +142,7 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .is_some()
         {
-            bail!(
-                "This world already contains that datapack filename; existing content was retained"
-            );
+            bail!(NAME_TAKEN);
         }
         let destination = folder.join(&row.filename);
         // Not std's copy: it always copies the mode and fails where the drive
@@ -174,26 +172,64 @@ impl ManagerRef<'_, InstanceManager> {
         {
             bail!("Staged datapack changed during copying; retry with the current artifact");
         }
+        self.publish_into_world(
+            id,
+            &path.get_root(),
+            temporary,
+            &world,
+            &request.world.identity,
+            &row.filename,
+        )
+        .await?;
+        Ok(request.world.name)
+    }
+
+    /// Publishes `temporary`, a private file in the instance root, as
+    /// `filename` in the `datapacks` folder of `world`, a save of `instance`
+    /// whose identity the user selected. Refused, leaving the world as it is,
+    /// when the file is no data pack, the save is no longer the selected one,
+    /// its `datapacks` folder is gone or `filename` is taken there. Call with
+    /// the instance gate held. Returns the published file.
+    pub(super) async fn publish_into_world(
+        self,
+        instance: InstanceId,
+        root: &Path,
+        temporary: tempfile::NamedTempFile,
+        world: &Path,
+        identity: &str,
+        filename: &str,
+    ) -> anyhow::Result<PathBuf> {
         validate_pack_zip(temporary.path())?;
         #[cfg(test)]
-        self.test_hooks.pause("datapack_before_copy", id).await;
-        if world_identity(id, &path.get_root(), &world).await? != request.world.identity {
+        self.test_hooks
+            .pause("datapack_before_copy", instance)
+            .await;
+        if world_identity(instance, root, world).await? != identity {
             bail!("Selected world changed during copying; no datapack published");
         }
+        let folder = world.join("datapacks");
         if !publication::followed_folder(&folder).await? {
             bail!("The world's datapacks folder disappeared during copying; no datapack published");
         }
-        if publication::selected_file(&folder, &row.filename)
+        if publication::selected_file(&folder, filename)
             .await?
             .is_some()
         {
             bail!("Datapack destination became occupied; existing content retained");
         }
+        let destination = folder.join(filename);
         // Off the runtime: a world folder on another drive makes this a copy.
         crate::util::publish::persist_noclobber_async(temporary, &destination).await?;
-        Ok(request.world.name)
+        Ok(destination)
     }
 }
+
+/// The refusal when the save the user selected is no longer there as it was.
+pub(super) const WORLD_CHANGED: &str =
+    "Selected world changed. Refresh the world list and select it again";
+/// The refusal when the world already holds a file of that name.
+pub(super) const NAME_TAKEN: &str =
+    "This world already contains that datapack filename; existing content was retained";
 
 pub(super) fn validate_pack_zip(path: &Path) -> anyhow::Result<()> {
     use std::io::Read;
