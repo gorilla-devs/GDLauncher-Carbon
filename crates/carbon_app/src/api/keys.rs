@@ -143,6 +143,7 @@ keys! {
         DELETE_LOG                                  = "deleteLog";
         OPEN_LOG_IN_FOLDER                          = "openLogInFolder";
         OPEN_INSTANCE_FOLDER                        = "openInstanceFolder";
+        OPEN_WORLD_FOLDER                           = "openWorldFolder";
         ENABLE_MOD                                  = "enableMod";
         DISABLE_MOD                                 = "disableMod";
         DELETE_MOD                                  = "deleteMod";

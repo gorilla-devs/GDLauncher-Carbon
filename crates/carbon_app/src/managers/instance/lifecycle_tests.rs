@@ -12111,3 +12111,79 @@ async fn nothing_is_deleted_around_an_instance_the_library_has_not_loaded_yet() 
     assert!(instance_repo::get_group(&app.db, group.0).await?.is_none());
     Ok(())
 }
+
+#[tokio::test]
+async fn a_worlds_own_folder_is_the_one_opened() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "open-world").await?;
+    let saves = root.join("instance").join("saves");
+    std::fs::create_dir_all(saves.join("Plain"))?;
+    std::fs::create_dir_all(saves.join("Full"))?;
+    std::fs::write(saves.join("Full").join("level.dat"), b"save")?;
+    let manager = app.instance_manager();
+    for name in ["Plain", "Full"] {
+        assert_eq!(
+            manager.world_folder_to_open(id, name).await?,
+            saves.join(name)
+        );
+    }
+    manager
+        .instances
+        .write()
+        .await
+        .get_mut(&id)
+        .unwrap()
+        .data_mut()?
+        .state = LaunchState::Running(RunningInstance::adopted(
+        u32::MAX,
+        1,
+        Utc::now(),
+        Utc::now(),
+    ));
+    assert_eq!(
+        manager.world_folder_to_open(id, "Full").await?,
+        saves.join("Full")
+    );
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_world_that_is_gone_is_refused_with_its_code() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "open-gone-world").await?;
+    let saves = root.join("instance").join("saves");
+    std::fs::create_dir_all(&saves)?;
+    std::fs::write(saves.join("File"), b"not a world")?;
+    for name in ["Missing", "File"] {
+        let error = app
+            .instance_manager()
+            .world_folder_to_open(id, name)
+            .await
+            .unwrap_err();
+        assert_eq!(
+            crate::error::coded_cause(&error).map(|(code, _)| code),
+            Some("WORLD_GONE".to_owned()),
+            "{name}"
+        );
+    }
+    assert!(!saves.join("Missing").exists());
+    Ok(())
+}
+
+#[tokio::test]
+async fn a_name_that_leaves_saves_is_refused() -> anyhow::Result<()> {
+    let app = crate::setup_managers_for_test().await;
+    let (id, root) = fixture(&app, "open-escaping-world").await?;
+    std::fs::create_dir_all(root.join("instance").join("saves"))?;
+    std::fs::create_dir_all(root.join("instance").join("mods"))?;
+    for name in ["../mods", "a/b", ""] {
+        assert!(
+            app.instance_manager()
+                .world_folder_to_open(id, name)
+                .await
+                .is_err(),
+            "{name:?}"
+        );
+    }
+    Ok(())
+}

@@ -174,6 +174,7 @@ export type Procedures = {
         { key: "instance.moveInstance", input: MoveInstance, result: null } | 
         { key: "instance.openInstanceFolder", input: OpenInstanceFolder, result: null } | 
         { key: "instance.openLogInFolder", input: OpenLogInFolder, result: string } | 
+        { key: "instance.openWorldFolder", input: WorldFolder, result: null } | 
         { key: "instance.prepareInstance", input: FEPrepareInstanceArgs, result: FETaskId } | 
         { key: "instance.prioritizeInstanceCache", input: FEInstanceId | null, result: null } | 
         { key: "instance.regenerateShareCode", input: string, result: FERegenerateShareCodeResponse } | 
@@ -778,6 +779,7 @@ export type FEDependencyPlatform = "Curseforge" | "Modrinth"
 export type FERepairEntry = { path: string; action: FERepairAction; reason: FERepairReason }
 
 export type OpenInstanceFolder = { instance_id: FEInstanceId; folder: InstanceFolder }
+export type WorldFolder = { instance_id: FEInstanceId; world: string }
 
 export type Or<T> = T[]
 

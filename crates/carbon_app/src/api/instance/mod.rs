@@ -699,6 +699,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
             .await
         }
 
+        mutation OPEN_WORLD_FOLDER[app, folder: WorldFolder] {
+            app.instance_manager().open_world_folder(
+                folder.instance_id.into(),
+                folder.world,
+            )
+            .await
+        }
+
         query VALIDATE_SHARE_CODE[app, share_code: String] {
             app.account_manager()
                 .validate_share_code(share_code)
@@ -2115,6 +2123,12 @@ pub struct MemoryRange {
 struct OpenInstanceFolder {
     instance_id: FEInstanceId,
     folder: InstanceFolder,
+}
+
+#[derive(Type, Debug, Deserialize)]
+struct WorldFolder {
+    instance_id: FEInstanceId,
+    world: String,
 }
 
 #[derive(Type, Debug, Deserialize)]

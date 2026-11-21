@@ -3689,6 +3689,41 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         Ok(())
     }
 
+    /// The folder of one save, for the file manager. Read-only: it takes no
+    /// gate (the player may look at a world while the game runs) and creates
+    /// nothing, so a world that is gone is refused instead of recreated.
+    pub(super) async fn world_folder_to_open(
+        self,
+        id: InstanceId,
+        world: &str,
+    ) -> anyhow::Result<PathBuf> {
+        mods::validate_addon_basename(world)?;
+        let path = installer::publication::current_path(&self.app, id).await?;
+        let saves = installer::publication::checked_folder(
+            &path,
+            crate::domain::instance::AddonType::Worlds,
+        )
+        .await?;
+        let folder = saves.join(world);
+        // `metadata` follows links, so a link to a folder counts as a world,
+        // as it does in the game; a file or a dangling link does not.
+        let is_folder = match tokio::fs::metadata(&folder).await {
+            Ok(metadata) => metadata.is_dir(),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => false,
+            Err(error) => return Err(error.into()),
+        };
+        if !is_folder {
+            return Err(world_refusal::WorldRefusal::WorldGone.into());
+        }
+        Ok(folder)
+    }
+
+    pub async fn open_world_folder(self, id: InstanceId, world: String) -> anyhow::Result<()> {
+        let folder = self.world_folder_to_open(id, &world).await?;
+        opener::open(folder)?;
+        Ok(())
+    }
+
     /// Delete an instance group and move all contained instances into the default group.
     pub async fn delete_group(self, group: GroupId) -> anyhow::Result<()> {
         // lock indexes before checking for instances to make sure none can be moved or created.
