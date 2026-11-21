@@ -74,6 +74,7 @@ pub mod shader_loader;
 pub(crate) mod world_datapack_changes;
 pub(crate) mod world_datapack_updates;
 pub(crate) mod world_datapacks;
+mod world_folder_name;
 mod world_level;
 pub(crate) mod world_refusal;
 
