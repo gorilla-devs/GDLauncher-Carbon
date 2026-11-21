@@ -20,7 +20,7 @@ use carbon_repos::{
 use chrono::Utc;
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use tracing::warn;
+use tracing::{debug, warn};
 
 pub(super) fn world_datapacks_folder(saves: &Path, world: &str) -> PathBuf {
     saves.join(world).join("datapacks")
@@ -39,6 +39,15 @@ enum Pack {
 /// gone, an unreadable folder) means the folder could not be listed.
 async fn listed_packs(folder: &Path) -> anyhow::Result<HashMap<String, Pack>> {
     let mut packs = HashMap::new();
+    // A file in place of the folder holds no packs; a warning would come
+    // back on every pass.
+    if tokio::fs::metadata(folder)
+        .await
+        .is_ok_and(|metadata| !metadata.is_dir())
+    {
+        debug!("{} is a file, not a data pack folder", folder.display());
+        return Ok(packs);
+    }
     if !publication::followed_folder(folder).await? {
         return Ok(packs);
     }
@@ -76,12 +85,23 @@ impl ManagerRef<'_, InstanceManager> {
     /// Bring the instance's world data pack rows in line with its worlds'
     /// `datapacks` folders. Returns whether any row was added, changed or
     /// removed. Does nothing while the game is starting or running, as the
-    /// addon scan does not.
+    /// addon scan does not. Stops when the launcher closes.
     pub async fn scan_world_datapacks(self, instance_id: InstanceId) -> anyhow::Result<bool> {
-        let _activity = self
+        let activity = self
             .app
             .runtime_lifecycle
             .admit("scan the data packs in an instance's worlds")?;
+        let cancel = activity.cancellation();
+        tokio::select! {
+            biased;
+            _ = cancel.cancelled() => Err(anyhow::anyhow!(
+                "Data pack scan of the worlds of instance {instance_id} stopped because the launcher is closing"
+            )),
+            result = self.scan_worlds(instance_id) => result,
+        }
+    }
+
+    async fn scan_worlds(self, instance_id: InstanceId) -> anyhow::Result<bool> {
         let _operation = self.lock_instance(instance_id).await;
         {
             let instances = self.instances.read().await;
@@ -511,8 +531,129 @@ mod tests {
             .override_caching_and_wait(CacheEntityId::Instance(id), false, false)
             .await
             .unwrap();
+        app.meta_cache_manager().world_scans_settled(id).await;
         let rows = rows(&app, id).await;
         assert_eq!(rows.len(), 1, "{rows:?}");
         assert_eq!(rows[0].filename, "pack.zip");
+    }
+
+    #[tokio::test]
+    async fn a_datapacks_file_holds_no_packs() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = instance_with_world(&app, "datapacks-file", "World").await;
+        let folder = world_datapacks_folder(&saves, "World");
+        std::fs::remove_dir(&folder).unwrap();
+        std::fs::write(&folder, b"not a folder").unwrap();
+        assert!(listed_packs(&folder).await.unwrap().is_empty());
+        assert!(!scan(&app, id).await);
+        assert!(rows(&app, id).await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn shutdown_stops_a_world_scan() {
+        use crate::managers::runtime_lifecycle::ShutdownPurpose;
+        use std::time::Duration;
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = instance_with_world(&app, "world-scan-quit", "World").await;
+        let pack = world_datapacks_folder(&saves, "World").join("pack.zip");
+        std::fs::write(&pack, pack_zip("held")).unwrap();
+        let pause = app.meta_cache_manager().arm_scan_pause(&pack, "hash");
+        let scan_app = app.clone();
+        let scan =
+            tokio::spawn(async move { scan_app.instance_manager().scan_world_datapacks(id).await });
+        tokio::time::timeout(Duration::from_secs(5), pause.entered.notified())
+            .await
+            .expect("the scan reaches the pack");
+        app.runtime_lifecycle
+            .prepare_shutdown("world-scan-quit", ShutdownPurpose::Quit, async { Ok(()) })
+            .unwrap();
+        let result = tokio::time::timeout(Duration::from_secs(1), scan)
+            .await
+            .expect("a cancelled scan returns promptly")
+            .unwrap();
+        assert!(result.is_err());
+        assert!(rows(&app, id).await.is_empty());
+    }
+
+    /// The world scan runs after the instance pass is released: a pause that
+    /// comes while it runs neither discards the finished pass nor runs it
+    /// again.
+    #[tokio::test]
+    async fn a_pause_during_the_world_scan_does_not_run_the_instance_pass_again() {
+        use std::time::Duration;
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = instance_with_world(&app, "paused-world-scan", "World").await;
+        let mcm = app.meta_cache_manager();
+        let entity = CacheEntityId::Instance(id);
+        mcm.override_caching_and_wait(entity, false, false)
+            .await
+            .unwrap();
+        mcm.world_scans_settled(id).await;
+        let passes =
+            || mcm.scan_observations(Path::new(&format!("instance-{}", *id)), "cache-read");
+        let before = passes();
+
+        let pack = world_datapacks_folder(&saves, "World").join("pack.zip");
+        std::fs::write(&pack, pack_zip("paused")).unwrap();
+        let pause = mcm.arm_scan_pause(&pack, "hash");
+        mcm.queue_caching(entity, false).await;
+        tokio::time::timeout(Duration::from_secs(5), pause.entered.notified())
+            .await
+            .expect("the world scan reaches the pack");
+        assert_eq!(passes(), before + 1);
+
+        let running = &app.instance_manager().any_instance_running;
+        running.send_replace(true);
+        mcm.wait_scans_paused().await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        running.send_replace(false);
+        pause.release.notify_one();
+        tokio::time::timeout(Duration::from_secs(5), async {
+            while rows(&app, id).await.is_empty() {
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+        })
+        .await
+        .expect("the world scan finishes");
+        mcm.world_scans_settled(id).await;
+        assert_eq!(passes(), before + 1, "the instance pass ran once");
+    }
+
+    /// The platform passes of an instance wait for its world scan, so they
+    /// ask about the packs it finds.
+    #[tokio::test]
+    async fn a_pending_world_scan_holds_the_platform_passes() {
+        use std::time::Duration;
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = instance_with_world(&app, "held-platform-passes", "World").await;
+        let mcm = app.meta_cache_manager();
+        mcm.override_caching_and_wait(CacheEntityId::Instance(id), false, false)
+            .await
+            .unwrap();
+        mcm.world_scans_settled(id).await;
+        let pack = world_datapacks_folder(&saves, "World").join("pack.zip");
+        std::fs::write(&pack, pack_zip("held")).unwrap();
+        let pause = mcm.arm_scan_pause(&pack, "hash");
+        tokio::time::timeout(
+            Duration::from_secs(5),
+            mcm.override_caching_and_wait(CacheEntityId::Instance(id), false, false),
+        )
+        .await
+        .expect("the instance pass does not wait for the world scan")
+        .unwrap();
+        tokio::time::timeout(Duration::from_secs(5), pause.entered.notified())
+            .await
+            .expect("the world scan reaches the pack");
+        assert!(
+            tokio::time::timeout(Duration::from_millis(100), mcm.world_scans_settled(id))
+                .await
+                .is_err(),
+            "the platform passes wait while the world scan runs"
+        );
+        pause.release.notify_one();
+        tokio::time::timeout(Duration::from_secs(5), mcm.world_scans_settled(id))
+            .await
+            .expect("and go on once it is done");
+        assert_eq!(rows(&app, id).await.len(), 1);
     }
 }

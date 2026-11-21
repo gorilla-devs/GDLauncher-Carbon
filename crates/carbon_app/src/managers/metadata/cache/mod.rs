@@ -266,6 +266,10 @@ pub struct MetaCacheManager {
     image_download_semaphore: Semaphore,
     watched_entity: watch::Sender<Option<CacheEntityId>>,
     pause_caching: watch::Sender<bool>,
+    /// Per instance, the world data pack scans started after its local pass
+    /// that have not finished. Its platform passes wait for them, so they
+    /// ask about the packs they find.
+    pending_world_scans: watch::Sender<HashMap<InstanceId, usize>>,
     pub(crate) modrinth_throttle: ModrinthCacheThrottle,
     /// Serializes `ensure_mod_metadata` per content hash. Without it two
     /// concurrent scans of the same jar both miss the lookup and each insert a
@@ -299,6 +303,7 @@ impl MetaCacheManager {
             image_download_semaphore: Semaphore::new(10),
             watched_entity: watch::channel(None).0,
             pause_caching: watch::channel(false).0,
+            pending_world_scans: watch::channel(HashMap::new()).0,
             modrinth_throttle: ModrinthCacheThrottle::new(210, std::time::Duration::from_secs(60)),
             metadata_hash_locks: dashmap::DashMap::new(),
         }
@@ -1126,6 +1131,10 @@ fn cache_modplatform<C: ModplatformCacher>(
                     };
 
                     let do_caching = async {
+                        if let CacheEntityId::Instance(instance_id) = entity_id {
+                            app.meta_cache_manager().world_scans_settled(instance_id).await;
+                        }
+
                         let entity_name = match entity_id {
                             CacheEntityId::Instance(instance_id) => {
                                 let instance_manager = app.instance_manager();
@@ -1408,6 +1417,16 @@ impl ManagerRef<'_, MetaCacheManager> {
                 let _ = self.watched_entity.send(entity_id);
             }
         }
+    }
+
+    /// Returns once no world data pack scan of `instance_id` started by a
+    /// local pass is still to finish.
+    pub(crate) async fn world_scans_settled(self, instance_id: InstanceId) {
+        let mut pending = self.pending_world_scans.subscribe();
+        // The sender lives as long as the manager.
+        let _ = pending
+            .wait_for(|pending| !pending.contains_key(&instance_id))
+            .await;
     }
 
     pub async fn queue_caching(self, entity_id: CacheEntityId, force: bool) {
@@ -3457,19 +3476,68 @@ async fn cache_instance(
         result = scan_instance(app, update_notifier, instance_id, verify) => result,
     };
     drop(activity);
-    // Here and not in `scan_instance`: the world scan takes the instance gate.
-    if result.is_ok()
-        && let Err(error) = app
+    if result.is_ok() {
+        spawn_world_datapack_scan(app, instance_id);
+    }
+    result
+}
+
+/// Scan the data packs in the worlds of `instance_id` as a step of its own
+/// after its local pass: the pass is released to its waiters as soon as it is
+/// done, and a pause or a newer request while the world scan runs neither
+/// discards nor repeats it. The scan is pending from this call on, so the
+/// platform passes this pass starts wait for it (see
+/// `MetaCacheManager::world_scans_settled`).
+fn spawn_world_datapack_scan(app: &App, instance_id: InstanceId) {
+    let pending = PendingWorldScan::start(app, instance_id);
+    tokio::spawn(async move {
+        if let Err(error) = pending
+            .app
             .instance_manager()
             .scan_world_datapacks(instance_id)
             .await
-    {
-        warn!(
-            ?error,
-            "Instance {instance_id}: could not scan the data packs in its worlds"
-        );
+        {
+            warn!(
+                ?error,
+                "Instance {instance_id}: could not scan the data packs in its worlds"
+            );
+        }
+    });
+}
+
+/// A world scan counted in `pending_world_scans` until it is dropped.
+struct PendingWorldScan {
+    app: App,
+    instance_id: InstanceId,
+}
+
+impl PendingWorldScan {
+    fn start(app: &App, instance_id: InstanceId) -> Self {
+        app.meta_cache_manager()
+            .pending_world_scans
+            .send_modify(|pending| *pending.entry(instance_id).or_default() += 1);
+        Self {
+            app: app.clone(),
+            instance_id,
+        }
     }
-    result
+}
+
+impl Drop for PendingWorldScan {
+    fn drop(&mut self) {
+        let instance_id = self.instance_id;
+        self.app
+            .meta_cache_manager()
+            .pending_world_scans
+            .send_modify(|pending| {
+                if let Some(count) = pending.get_mut(&instance_id) {
+                    *count -= 1;
+                    if *count == 0 {
+                        pending.remove(&instance_id);
+                    }
+                }
+            });
+    }
 }
 
 async fn snapshot_instance(
