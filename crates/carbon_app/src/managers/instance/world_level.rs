@@ -40,7 +40,6 @@ pub(super) fn read_level_name(world: &Path) -> anyhow::Result<Option<String>> {
     )
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn write_level_name(world: &Path, name: &str) -> anyhow::Result<()> {
     let target = world.join("level.dat");
     let mut root = read_tree(&target)?;

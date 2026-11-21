@@ -20,6 +20,7 @@ const LANGUAGES = [
 
 // A name i18next would HTML-escape unless told not to.
 const FILENAME = "Tom & Jerry's <pack>.zip"
+const FOLDER = "Tom & Jerry's <world> (2)"
 
 // Every refusal the core codes for a change to a world or its data packs,
 // with the data it sends.
@@ -47,7 +48,10 @@ const REFUSALS: [code: string, data?: Record<string, string>][] = [
   ["DATAPACK_DOWNLOAD_FAILED", { filename: FILENAME, cause: "timed out" }],
   ["NO_DATAPACK_UPDATE"],
   ["INSTANCE_DATAPACK_GONE"],
-  ["INSTANCE_DATAPACK_CHANGED"]
+  ["INSTANCE_DATAPACK_CHANGED"],
+  ["WORLD_NAME_UNREADABLE"],
+  ["WORLD_NAME_INVALID"],
+  ["WORLD_RENAME_INCOMPLETE", { folder: FOLDER }]
 ]
 const CORE_TEXT = "The core's English sentence"
 
@@ -77,6 +81,7 @@ describe("a refusal in the player's language", () => {
       expect(text, where).not.toContain("_trn_")
       expect(text, where).not.toContain("{{")
       if (data?.filename) expect(text, where).toContain(FILENAME)
+      if (data?.folder) expect(text, where).toContain(FOLDER)
       if (language !== "english") expect(text, where).not.toBe(english[index])
     })
   })
@@ -128,6 +133,15 @@ describe("a refusal in the player's language", () => {
     )
     expect(said("NO_DATAPACK_FOR_VERSION", { version: "1.20.1" })).toBe(
       "This project has no data pack for Minecraft 1.20.1."
+    )
+    expect(said("WORLD_NAME_UNREADABLE")).toBe(
+      "GDLauncher can't read this world."
+    )
+    expect(said("WORLD_NAME_INVALID")).toBe(
+      "Enter a name of up to 64 characters."
+    )
+    expect(said("WORLD_RENAME_INCOMPLETE", { folder: FOLDER })).toBe(
+      `The world could not be fully renamed. It is now in the folder “${FOLDER}”.`
     )
   })
 

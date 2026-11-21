@@ -65,6 +65,15 @@ pub enum WorldRefusal {
     /// No newer build may replace the pack, as for any addon.
     #[error("unable to find newer mod version in available update channels")]
     NoUpdate,
+    /// The world's `level.dat` holds no name the launcher can read or change.
+    #[error("The world's level.dat cannot be read")]
+    NameUnreadable,
+    /// A world's in-game name is empty or too long after trimming.
+    #[error("A world name has 1 to 64 characters")]
+    InvalidName,
+    /// A rename failed and could not be undone: the world is in `folder`.
+    #[error("The world could not be fully renamed and is now in the folder {folder}")]
+    RenameIncomplete { folder: String },
 }
 
 /// What makes a folder in `saves` no save the launcher can change.
@@ -114,6 +123,9 @@ impl FeErrorCode for WorldRefusal {
             Self::NotDownloadable => "DATAPACK_NOT_DOWNLOADABLE",
             Self::DownloadFailed { .. } => "DATAPACK_DOWNLOAD_FAILED",
             Self::NoUpdate => "NO_DATAPACK_UPDATE",
+            Self::NameUnreadable => "WORLD_NAME_UNREADABLE",
+            Self::InvalidName => "WORLD_NAME_INVALID",
+            Self::RenameIncomplete { .. } => "WORLD_RENAME_INCOMPLETE",
         }
     }
 
@@ -139,6 +151,7 @@ impl FeErrorCode for WorldRefusal {
             Self::DownloadFailed { filename, cause } => {
                 Some(json!({ "filename": filename, "cause": cause }))
             }
+            Self::RenameIncomplete { folder } => Some(json!({ "folder": folder })),
             _ => None,
         }
     }
@@ -172,6 +185,11 @@ mod tests {
                 cause: "connection reset".into(),
             },
             WorldRefusal::NoUpdate,
+            WorldRefusal::NameUnreadable,
+            WorldRefusal::InvalidName,
+            WorldRefusal::RenameIncomplete {
+                folder: "Skyblock (2)".into(),
+            },
         ];
         all.extend(
             [

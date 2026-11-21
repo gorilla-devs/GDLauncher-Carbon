@@ -81,7 +81,9 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_worlds.refusal.not_downloadable",
     "_trn_worlds.refusal.download_failed",
     "_trn_worlds.refusal.no_update",
-    "_trn_worlds.refusal.instance_datapack_gone"
+    "_trn_worlds.refusal.instance_datapack_gone",
+    "_trn_worlds.refusal.name_invalid",
+    "_trn_worlds.refusal.rename_incomplete"
   ],
   ui: ["_trn_worlds"],
   notifications: [

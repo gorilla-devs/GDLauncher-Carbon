@@ -582,6 +582,9 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation DELETE_WORLD_DATAPACK[app, request: crate::managers::instance::world_datapack_changes::DeleteWorldDatapack] {
             app.instance_manager().delete_world_datapack(request).await
         }
+        mutation RENAME_WORLD[app, request: crate::managers::instance::world_rename::RenameWorld] {
+            app.instance_manager().rename_world(request).await
+        }
         mutation UPDATE_WORLD_DATAPACK[app, request: crate::managers::instance::world_datapack_updates::UpdateWorldDatapack] {
             Ok(FETaskId::from(app.instance_manager().update_world_datapack(request).await?))
         }

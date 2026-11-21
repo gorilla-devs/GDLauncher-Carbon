@@ -68,7 +68,14 @@ const REFUSALS: Record<string, Refusal> = {
   INSTANCE_DATAPACK_GONE: {
     key: "content:_trn_worlds.refusal.instance_datapack_gone"
   },
-  INSTANCE_DATAPACK_CHANGED: { key: datapackChanged }
+  INSTANCE_DATAPACK_CHANGED: { key: datapackChanged },
+  WORLD_NAME_UNREADABLE: { key: "content:_trn_worlds.unreadable" },
+  WORLD_NAME_INVALID: { key: "content:_trn_worlds.refusal.name_invalid" },
+  WORLD_RENAME_INCOMPLETE: {
+    key: "content:_trn_worlds.refusal.rename_incomplete",
+    names: ["folder"],
+    outdatesWorlds: true
+  }
 }
 
 const refusal = (code: string | null | undefined): Refusal | undefined =>

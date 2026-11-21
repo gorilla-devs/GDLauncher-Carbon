@@ -258,6 +258,8 @@
   "_trn_worlds.refusal.download_failed": "Не удалось скачать «{{filename}}».",
   "_trn_worlds.refusal.no_update": "Более новой версии нет.",
   "_trn_worlds.refusal.instance_datapack_gone": "Этого датапака больше нет в экземпляре.",
+  "_trn_worlds.refusal.name_invalid": "Введите имя длиной не более 64 символов.",
+  "_trn_worlds.refusal.rename_incomplete": "Не удалось полностью переименовать мир. Сейчас он находится в папке «{{folder}}».",
   "_trn_table.filename": "Имя файла",
   "_trn_table.type": "Тип",
   "_trn_table.platform": "Платформа",

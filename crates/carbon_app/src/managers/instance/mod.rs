@@ -77,6 +77,7 @@ pub(crate) mod world_datapacks;
 mod world_folder_name;
 mod world_level;
 pub(crate) mod world_refusal;
+pub(crate) mod world_rename;
 
 #[derive(Debug)]
 pub struct InstanceManager {

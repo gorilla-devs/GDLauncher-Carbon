@@ -256,6 +256,8 @@
   "_trn_worlds.refusal.download_failed": "No se pudo descargar «{{filename}}».",
   "_trn_worlds.refusal.no_update": "No hay una versión más reciente disponible.",
   "_trn_worlds.refusal.instance_datapack_gone": "Este paquete de datos ya no está en la instancia.",
+  "_trn_worlds.refusal.name_invalid": "Escribe un nombre de hasta 64 caracteres.",
+  "_trn_worlds.refusal.rename_incomplete": "No se pudo cambiar el nombre del mundo por completo. Ahora está en la carpeta «{{folder}}».",
   "_trn_table.filename": "Nombre del archivo",
   "_trn_table.type": "Tipo",
   "_trn_table.platform": "Plataforma",

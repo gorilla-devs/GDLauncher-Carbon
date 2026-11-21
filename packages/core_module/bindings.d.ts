@@ -179,6 +179,7 @@ export type Procedures = {
         { key: "instance.prioritizeInstanceCache", input: FEInstanceId | null, result: null } | 
         { key: "instance.regenerateShareCode", input: string, result: FERegenerateShareCodeResponse } | 
         { key: "instance.renameGroup", input: RenameGroup, result: null } | 
+        { key: "instance.renameWorld", input: RenameWorld, result: string } | 
         { key: "instance.repairModpack", input: RepairModpack, result: FETaskId } | 
         { key: "instance.reportShare", input: FEReportShareArgs, result: null } | 
         { key: "instance.setFavorite", input: SetFavorite, result: null } | 
@@ -684,6 +685,7 @@ export type CFFEModLinks = { websiteUrl: string | null; wikiUrl: string | null; 
 
 export type InstallMod = { instance_id: FEInstanceId; mod_source: ModSource; install_deps: boolean; replaces_mod: string | null }
 export type InstallWorldDatapack = { instance_id: number; world: string; identity: string; source: WorldDatapackSource; replaces: string | null }
+export type RenameWorld = { instance_id: number; world: string; identity: string; name: string }
 export type DeleteWorldDatapack = { instance_id: number; id: string }
 export type UpdateWorldDatapack = { instance_id: number; id: string }
 export type UpdateDatapackEverywhere = { instance_id: number; origin: DatapackOrigin }

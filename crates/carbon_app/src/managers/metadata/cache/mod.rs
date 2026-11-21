@@ -1708,7 +1708,7 @@ impl ManagerRef<'_, MetaCacheManager> {
     /// Build a parse result for a world directory. Worlds are directories, not
     /// archives, so they get stable name-derived hashes instead of content
     /// hashes, letting rescans dedupe to the same metadata row.
-    async fn world_dir_parse_result(
+    pub(crate) async fn world_dir_parse_result(
         &self,
         worlds_dir_path: &Path,
         dir_name: &str,

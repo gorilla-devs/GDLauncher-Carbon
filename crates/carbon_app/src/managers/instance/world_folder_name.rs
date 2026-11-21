@@ -26,7 +26,6 @@ fn cut_to_bytes(s: &str, max: usize) -> &str {
     &s[..end]
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn safe_folder_name(name: &str) -> String {
     let replaced: String = name
         .chars()
@@ -71,7 +70,6 @@ pub(super) fn safe_folder_name(name: &str) -> String {
 ///
 /// `wanted` is expected to be a `safe_folder_name` result, so at most
 /// `MAX_BYTES` bytes.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn free_folder_name(wanted: &str, taken: &[String], current: Option<&str>) -> String {
     debug_assert!(
         wanted.len() <= MAX_BYTES,
