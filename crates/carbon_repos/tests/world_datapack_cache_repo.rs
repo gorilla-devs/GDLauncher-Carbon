@@ -268,3 +268,197 @@ fn full_rows_keep_unpacked_folders_and_carry_platform_data() {
         .unwrap();
     assert_eq!(icon.cf_data, Some(vec![1]));
 }
+
+use carbon_repos::db_exec::test_support::rg;
+use carbon_repos::repos::mod_file_cache as mfc;
+
+/// The zip `a.zip` of metadata `m1` in two worlds, and a folder pack that
+/// has no metadata.
+fn world_pack(conn: &mut Connection) {
+    insert_metadata(conn, "m1");
+    for (world, filename, is_folder, metadata) in [
+        ("World", "a.zip", false, Some("m1")),
+        ("Other", "a.zip", false, Some("m1")),
+        ("World", "folder", true, None),
+    ] {
+        wdc::upsert_world_datapack_conn(
+            &wg(conn),
+            7,
+            world,
+            filename,
+            10,
+            is_folder,
+            metadata,
+            None,
+            ts(1),
+        )
+        .unwrap();
+    }
+}
+
+fn cached_on_both_platforms(conn: &mut Connection, cached_at: i64) {
+    mm::upsert_cf_mod_cache_conn(
+        &wg(conn),
+        1,
+        5,
+        6,
+        "CF",
+        "v",
+        "slug",
+        "s",
+        "a",
+        1,
+        "",
+        ts(cached_at),
+        "m1",
+    )
+    .unwrap();
+    mm::upsert_mr_mod_cache_conn(
+        &wg(conn),
+        &hex::encode("m1"),
+        "p",
+        "v",
+        "MR",
+        "v",
+        "slug",
+        "d",
+        "a",
+        1,
+        "",
+        "a.zip",
+        "https://fixture.invalid/a.zip",
+        ts(cached_at),
+        "m1",
+    )
+    .unwrap();
+}
+
+#[test]
+fn a_world_pack_without_platform_data_is_due_for_both_lookups() {
+    let (_d, mut conn) = migrated_db();
+    world_pack(&mut conn);
+    let cf = mfc::instance_mods_needing_cf_refresh_conn(&rg(&conn), 7, ts(5_000)).unwrap();
+    assert_eq!(
+        cf.iter()
+            .map(|r| r.metadata_id.as_str())
+            .collect::<Vec<_>>(),
+        ["m1"]
+    );
+    let mr =
+        mfc::instance_mods_needing_mr_context_conn(&rg(&conn), 7, "instance", "world", ts(5_000))
+            .unwrap();
+    assert_eq!(
+        mr.iter()
+            .map(|r| (r.metadata_id.as_str(), r.addon_type.as_str()))
+            .collect::<Vec<_>>(),
+        [("m1", "world_datapacks")]
+    );
+}
+
+#[test]
+fn a_world_pack_with_fresh_platform_data_is_not_due() {
+    let (_d, mut conn) = migrated_db();
+    world_pack(&mut conn);
+    cached_on_both_platforms(&mut conn, 10_000);
+    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "world:datapacks", "", ts(10_000))
+        .unwrap();
+    assert!(
+        mfc::instance_mods_needing_cf_refresh_conn(&rg(&conn), 7, ts(5_000))
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        mfc::instance_mods_needing_mr_context_conn(&rg(&conn), 7, "instance", "world", ts(5_000))
+            .unwrap()
+            .is_empty()
+    );
+    // Update paths stored under the instance's key do not answer for a world.
+    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "world:datapacks", "", ts(1)).unwrap();
+    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "instance:datapacks", "", ts(10_000))
+        .unwrap();
+    assert_eq!(
+        mfc::instance_mods_needing_mr_context_conn(&rg(&conn), 7, "instance", "world", ts(5_000))
+            .unwrap()
+            .len(),
+        1
+    );
+}
+
+#[test]
+fn an_addon_that_is_also_a_world_pack_is_due_under_each_context() {
+    let (_d, mut conn) = migrated_db();
+    world_pack(&mut conn);
+    cached_on_both_platforms(&mut conn, 10_000);
+    mfc::upsert_mod_file_cache_conn(
+        &wg(&mut conn),
+        7,
+        "a.zip",
+        10,
+        true,
+        "datapacks",
+        "m1",
+        ts(1),
+    )
+    .unwrap();
+    let due = |conn: &Connection| {
+        let mut due: Vec<String> = mfc::instance_mods_needing_mr_context_conn(
+            &rg(conn),
+            7,
+            "instance",
+            "world",
+            ts(5_000),
+        )
+        .unwrap()
+        .into_iter()
+        .map(|r| r.addon_type)
+        .collect();
+        due.sort();
+        due
+    };
+    assert_eq!(due(&conn), ["datapacks", "world_datapacks"]);
+    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "instance:datapacks", "", ts(10_000))
+        .unwrap();
+    assert_eq!(due(&conn), ["world_datapacks"]);
+    mm::upsert_mr_update_context_conn(&wg(&mut conn), "m1", "world:datapacks", "", ts(10_000))
+        .unwrap();
+    assert!(due(&conn).is_empty());
+}
+
+#[test]
+fn stale_logos_of_world_packs_are_refreshed() {
+    let (_d, mut conn) = migrated_db();
+    world_pack(&mut conn);
+    cached_on_both_platforms(&mut conn, 10_000);
+    mm::upsert_cf_image_conn(&wg(&mut conn), "m1", "https://fixture.invalid/cf.png").unwrap();
+    mm::upsert_mr_image_conn(&wg(&mut conn), "m1", "https://fixture.invalid/mr.png").unwrap();
+    let cf = mfc::instance_mods_stale_cf_logo_conn(&rg(&conn), 7).unwrap();
+    assert_eq!(
+        cf.iter()
+            .map(|r| (r.filename.as_str(), r.metadata_id.as_str(), r.project_id))
+            .collect::<Vec<_>>(),
+        [("a.zip", "m1", 5)]
+    );
+    let mr = mfc::instance_mods_stale_mr_logo_conn(&rg(&conn), 7).unwrap();
+    assert_eq!(
+        mr.iter()
+            .map(|r| (
+                r.filename.as_str(),
+                r.metadata_id.as_str(),
+                r.project_id.as_str()
+            ))
+            .collect::<Vec<_>>(),
+        [("a.zip", "m1", "p")]
+    );
+    mm::mark_cf_image_downloaded_conn(&wg(&mut conn), "m1", &[1]).unwrap();
+    mm::mark_mr_image_downloaded_conn(&wg(&mut conn), "m1", &[1]).unwrap();
+    assert!(
+        mfc::instance_mods_stale_cf_logo_conn(&rg(&conn), 7)
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        mfc::instance_mods_stale_mr_logo_conn(&rg(&conn), 7)
+            .unwrap()
+            .is_empty()
+    );
+}

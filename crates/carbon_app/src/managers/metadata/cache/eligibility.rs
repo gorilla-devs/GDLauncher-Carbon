@@ -246,6 +246,19 @@ pub(crate) struct UpdateContext {
     pub shader_engines: Vec<String>,
 }
 
+/// What a data pack inside one of an instance's worlds is updated for: the
+/// instance's game version and no loaders. The game loads only zips and
+/// folders from a world's `datapacks` folder, so a build for a mod loader
+/// must never be offered there.
+pub(crate) fn world_context(game: &str) -> UpdateContext {
+    UpdateContext {
+        game: game.to_owned(),
+        loaders: Vec::new(),
+        also_loads: Vec::new(),
+        shader_engines: Vec::new(),
+    }
+}
+
 /// The loaders an installed jar says it is built for, from the comma
 /// separated list its metadata is cached with. Empty for a jar that names
 /// none.
@@ -420,6 +433,22 @@ mod tests {
     }
     fn names(names: &[&str]) -> Vec<String> {
         names.iter().map(|name| name.to_string()).collect()
+    }
+
+    #[test]
+    fn a_world_asks_for_data_pack_builds_only() {
+        let world = world_context("1.20.1");
+        assert_eq!(
+            world.request_loaders("datapacks"),
+            ["datapack", "minecraft"]
+        );
+        assert_eq!(
+            world.lookup_loaders("datapacks"),
+            [["datapack", "minecraft"]]
+        );
+        assert!(!world.compatible("datapacks", &names(&["1.20.1"]), &names(&["fabric"])));
+        assert!(world.compatible("datapacks", &names(&["1.20.1"]), &names(&["datapack"])));
+        assert_ne!(world.key("datapacks"), quilt().key("datapacks"));
     }
 
     #[test]

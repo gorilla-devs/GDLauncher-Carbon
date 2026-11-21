@@ -157,7 +157,7 @@ fn context_cache_keeps_foreign_keys_and_negative_freshness() {
     .unwrap();
     for context in ["A", "B"] {
         assert_eq!(
-            files::instance_mods_needing_mr_context_conn(&rg(&conn), 1, context, now)
+            files::instance_mods_needing_mr_context_conn(&rg(&conn), 1, context, "W", now)
                 .unwrap()
                 .len(),
             1
@@ -167,12 +167,12 @@ fn context_cache_keeps_foreign_keys_and_negative_freshness() {
         .unwrap();
     let cutoff = DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset());
     assert!(
-        files::instance_mods_needing_mr_context_conn(&rg(&conn), 1, "A", cutoff)
+        files::instance_mods_needing_mr_context_conn(&rg(&conn), 1, "A", "W", cutoff)
             .unwrap()
             .is_empty()
     );
     assert_eq!(
-        files::instance_mods_needing_mr_context_conn(&rg(&conn), 1, "B", cutoff)
+        files::instance_mods_needing_mr_context_conn(&rg(&conn), 1, "B", "W", cutoff)
             .unwrap()
             .len(),
         1

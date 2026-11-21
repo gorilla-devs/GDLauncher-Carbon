@@ -1,4 +1,4 @@
-use super::eligibility::UpdateContext;
+use super::eligibility::{UpdateContext, world_context};
 use super::{BundleSender, CacheEntityId, ModplatformCacher, UpdateNotifier};
 use crate::domain::instance::InstanceId;
 use crate::domain::instance::info::{GameVersion, ModLoaderType};
@@ -145,30 +145,52 @@ fn build_update_paths(installed: &Version, project_id: &str, candidates: &[Versi
         .join(";")
 }
 
+/// The kind `instance_mods_needing_mr_context` reports the data packs inside
+/// an instance's worlds with. It is never stored: such a file is looked up
+/// and its update paths are kept as a `datapacks` file of the world context.
+const WORLD_DATAPACKS: &str = "world_datapacks";
+
+/// The context and kind a due file of `kind` is looked up and stored under.
+fn lookup_context<'a>(context: &UpdateContext, kind: &'a str) -> (UpdateContext, &'a str) {
+    if kind == WORLD_DATAPACKS {
+        (world_context(&context.game), "datapacks")
+    } else {
+        (context.clone(), kind)
+    }
+}
+
 /// The files of `entity_id` a Modrinth lookup is due for, keyed by hash, each
 /// with its metadata id, hash and addon kind. A file is due when its metadata
 /// has no Modrinth cache row, one cached more than a day ago, or no fresh
-/// update context for what the entity runs (`context`), unless a lookup found
-/// no match for it within [`super::IGNORED_HASH_TTL`]. Worlds are directories
-/// with name-derived pseudo-hashes, so there is nothing to match on the
-/// platform (the instance query excludes them).
+/// update context for what the entity runs (`context`; `world_context` for
+/// the data packs in an instance's worlds, reported as [`WORLD_DATAPACKS`]),
+/// unless a lookup found no match for it within [`super::IGNORED_HASH_TTL`].
+/// Worlds are directories with name-derived pseudo-hashes, so there is
+/// nothing to match on the platform (the instance query excludes them).
 async fn due_for_lookup(
     app: &App,
     entity_id: CacheEntityId,
     context: &str,
+    world_context: &str,
 ) -> anyhow::Result<VecDeque<(String, (String, String, String))>> {
     let cutoff = DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset());
     let modlist = match entity_id {
         CacheEntityId::Instance(instance_id) => {
             let instance_id_val = *instance_id;
-            mfcdb::instance_mods_needing_mr_context(&app.db, instance_id_val, context, cutoff)
-                .await?
-                .into_iter()
-                .map(|m| {
-                    let sha512 = hex::encode(&m.sha512);
-                    (sha512.clone(), (m.metadata_id, sha512, m.addon_type))
-                })
-                .collect::<Vec<_>>()
+            mfcdb::instance_mods_needing_mr_context(
+                &app.db,
+                instance_id_val,
+                context,
+                world_context,
+                cutoff,
+            )
+            .await?
+            .into_iter()
+            .map(|m| {
+                let sha512 = hex::encode(&m.sha512);
+                (sha512.clone(), (m.metadata_id, sha512, m.addon_type))
+            })
+            .collect::<Vec<_>>()
         }
         CacheEntityId::Server(server_id) => {
             mfcdb::server_mods_needing_mr_context(&app.db, server_id, context, cutoff)
@@ -217,7 +239,11 @@ impl ModplatformCacher for ModrinthModCacher {
             .as_ref()
             .map(UpdateContext::base_key)
             .unwrap_or_default();
-        let mut modlist = due_for_lookup(app, entity_id, &context).await?;
+        let world = target_compat
+            .as_ref()
+            .map(|context| world_context(&context.game).base_key())
+            .unwrap_or_default();
+        let mut modlist = due_for_lookup(app, entity_id, &context, &world).await?;
 
         if modlist.is_empty() {
             return Ok(());
@@ -307,6 +333,7 @@ impl ModplatformCacher for ModrinthModCacher {
                             .filter(|(_, _, k)| k == kind)
                             .map(|(_, hash, _)| hash.clone())
                             .collect::<Vec<_>>();
+                        let (context, kind) = lookup_context(context, kind);
                         for loaders in context.lookup_loaders(kind) {
                             for version_type in
                                 [VersionType::Release, VersionType::Beta, VersionType::Alpha]
@@ -434,9 +461,10 @@ impl ModplatformCacher for ModrinthModCacher {
                     .join(", ");
 
                 if let Some(context) = context {
-                    let candidates = combined_versions.iter().filter(|v| context.compatible(&kind, &v.game_versions, &v.loaders)).cloned().collect::<Vec<_>>();
+                    let (context, kind) = lookup_context(context, &kind);
+                    let candidates = combined_versions.iter().filter(|v| context.compatible(kind, &v.game_versions, &v.loaders)).cloned().collect::<Vec<_>>();
                     let paths = build_update_paths(version, &project.id, &candidates);
-                    if let Err(error) = metarepo::upsert_mr_update_context(&app.db, &metadata_id, &context.key(&kind), &paths,
+                    if let Err(error) = metarepo::upsert_mr_update_context(&app.db, &metadata_id, &context.key(kind), &paths,
                         DbDateTime(chrono::Utc::now().fixed_offset())).await {
                         error!(?error, "Could not store Modrinth update context");
                     }
@@ -788,6 +816,7 @@ mod test {
                 &app.db,
                 **id,
                 &context.base_key(),
+                &world_context(&context.game).base_key(),
                 DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset()),
             )
             .await
@@ -831,6 +860,7 @@ mod test {
                     &app.db,
                     **id,
                     &context.base_key(),
+                    &world_context(&context.game).base_key(),
                     DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset())
                 )
                 .await
@@ -865,6 +895,7 @@ mod test {
                 &app.db,
                 **id,
                 &context.base_key(),
+                &world_context(&context.game).base_key(),
                 DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset())
             )
             .await
@@ -885,6 +916,7 @@ mod test {
                 &app.db,
                 **id,
                 &context.base_key(),
+                &world_context(&context.game).base_key(),
                 DbDateTime((chrono::Utc::now() - chrono::Duration::days(1)).fixed_offset())
             )
             .await
@@ -988,6 +1020,139 @@ mod test {
         }
     }
 
+    /// A data pack in a world of a Fabric instance is looked up for data pack
+    /// builds, and its update paths are kept under the world's key, apart
+    /// from those of the same file as one of the instance's own data packs.
+    #[tokio::test]
+    async fn a_world_data_pack_keeps_its_update_paths_under_the_world_key() {
+        use crate::domain::instance::{
+            AddonType,
+            info::{ModLoader, StandardVersion},
+        };
+        use carbon_repos::repos::world_datapack_cache as wdb;
+        use std::io::Write;
+        let app = crate::setup_managers_for_test().await;
+        let (id, _) = super::super::tests::addon_fixture_version(
+            &app,
+            "fabric-world-pack",
+            AddonType::Mods,
+            "mod.jar",
+            b"fabric mod",
+            StandardVersion {
+                release: "1.20.1".into(),
+                modloaders: [ModLoader {
+                    type_: ModLoaderType::Fabric,
+                    version: "fixture".into(),
+                }]
+                .into_iter()
+                .collect(),
+            },
+        )
+        .await;
+        let entity = CacheEntityId::Instance(id);
+        app.meta_cache_manager()
+            .override_caching_and_wait(entity, false, false)
+            .await
+            .unwrap();
+        let saves = crate::managers::instance::installer::publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_saves_path();
+        std::fs::create_dir_all(saves.join("World").join("datapacks")).unwrap();
+        std::fs::write(saves.join("World").join("level.dat"), b"save").unwrap();
+        let mut zip = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        zip.start_file("pack.mcmeta", zip::write::SimpleFileOptions::default())
+            .unwrap();
+        zip.write_all(br#"{"pack":{"pack_format":15,"description":"world"}}"#)
+            .unwrap();
+        std::fs::write(
+            saves.join("World").join("datapacks").join("pack.zip"),
+            zip.finish().unwrap().into_inner(),
+        )
+        .unwrap();
+        app.instance_manager()
+            .scan_world_datapacks(id)
+            .await
+            .unwrap();
+        let metadata = wdb::get_world_datapacks_by_instance(&app.db, *id)
+            .await
+            .unwrap()
+            .remove(0)
+            .metadata_id
+            .unwrap();
+
+        let context = target_compatibility(&app, entity).await.unwrap();
+        let world = world_context(&context.game);
+        let due = || async {
+            due_for_lookup(&app, entity, &context.base_key(), &world.base_key())
+                .await
+                .unwrap()
+                .into_iter()
+                .filter(|(_, (due, _, _))| *due == metadata)
+                .map(|(_, (_, _, kind))| kind)
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(due().await, [WORLD_DATAPACKS]);
+
+        let meta = metarepo::get_metadata_by_id(&app.db, &metadata)
+            .await
+            .unwrap()
+            .unwrap();
+        let hash = hex::encode(meta.sha512);
+        let mut installed = version("installed", "project", 10, VersionType::Release);
+        installed.loaders = vec!["datapack".into()];
+        installed.files = vec![file(&hash)];
+        let mut for_worlds = version("for-worlds", "project", 20, VersionType::Release);
+        for_worlds.loaders = vec!["datapack".into()];
+        let mut for_fabric = version("for-fabric", "project", 30, VersionType::Beta);
+        for_fabric.loaders = vec!["fabric".into()];
+        ModrinthModCacher::save_batch(
+            &app,
+            entity,
+            (
+                vec![hash.clone()],
+                vec![
+                    (metadata.clone(), hash.clone(), "datapacks".into()),
+                    (metadata.clone(), hash.clone(), WORLD_DATAPACKS.into()),
+                ],
+                VersionHashesResponse([(hash.clone(), installed)].into_iter().collect()),
+                ProjectsResponse(vec![project("project")]),
+                vec![team("project")],
+                vec![for_worlds, for_fabric],
+                Some(context.clone()),
+            ),
+        )
+        .await;
+
+        let stored = |key: String| {
+            let app = app.clone();
+            let metadata = metadata.clone();
+            async move {
+                metarepo::get_mr_update_context(&app.db, &metadata, &key)
+                    .await
+                    .unwrap()
+                    .map(|row| row.update_paths)
+            }
+        };
+        assert_eq!(
+            stored(world.key("datapacks")).await.as_deref(),
+            Some("1.20.1,datapack,stable")
+        );
+        let mut instance_paths = stored(context.key("datapacks"))
+            .await
+            .unwrap()
+            .split(';')
+            .map(str::to_owned)
+            .collect::<Vec<_>>();
+        instance_paths.sort();
+        assert_eq!(
+            instance_paths,
+            ["1.20.1,datapack,stable", "1.20.1,fabric,beta"]
+        );
+        assert_eq!(stored(context.key(WORLD_DATAPACKS)).await, None);
+        assert!(due().await.is_empty(), "a fresh world row is not due");
+    }
+
     /// A miss leaves the file out of lookups for `IGNORED_HASH_TTL`, not for
     /// the rest of the session: a lookup can answer without a file Modrinth
     /// serves, and the file then had no identity and no update checks until
@@ -1014,14 +1179,14 @@ mod test {
             .map(|context| context.base_key())
             .unwrap_or_default();
         async fn due(app: &App, entity: CacheEntityId, context: &str) -> Vec<String> {
-            due_for_lookup(app, entity, context)
+            due_for_lookup(app, entity, context, "")
                 .await
                 .unwrap()
                 .into_iter()
                 .map(|(hash, _)| hash)
                 .collect()
         }
-        let (hash, metadata) = due_for_lookup(&app, entity, &context)
+        let (hash, metadata) = due_for_lookup(&app, entity, &context, "")
             .await
             .unwrap()
             .pop_front()
@@ -1151,7 +1316,7 @@ mod test {
         );
         let context = target_compatibility(&app, entity).await.unwrap();
         assert!(
-            due_for_lookup(&app, entity, &context.base_key())
+            due_for_lookup(&app, entity, &context.base_key(), "")
                 .await
                 .unwrap()
                 .iter()

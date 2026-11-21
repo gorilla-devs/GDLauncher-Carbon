@@ -423,13 +423,21 @@ queries! {
          WHERE f.id = :id";
 
     // --- CurseForge refresh: files whose CF cache is missing/stale ------------
-    // (instance variant excludes worlds; server variant has no addonType filter)
+    // (instance variant excludes worlds but takes the data packs inside them;
+    // server variant has no addonType filter)
     fn instance_mods_needing_cf_refresh(instance_id: i32, cutoff: DbDateTime) -> Vec<RefreshMetaRow> =
         "SELECT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512
          FROM ModFileCache f
          JOIN ModMetadata m ON m.id = f.metadataId
          LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id
          WHERE f.instanceId = :instance_id AND f.addonType <> 'worlds'
+           AND (c.metadataId IS NULL OR c.cachedAt <= :cutoff)
+         UNION ALL
+         SELECT DISTINCT m.id, m.murmur2, m.sha512
+         FROM WorldDatapackCache w
+         JOIN ModMetadata m ON m.id = w.metadataId
+         LEFT JOIN CurseForgeModCache c ON c.metadataId = m.id
+         WHERE w.instanceId = :instance_id
            AND (c.metadataId IS NULL OR c.cachedAt <= :cutoff)";
     fn server_mods_needing_cf_refresh(server_id: i32, cutoff: DbDateTime) -> Vec<RefreshMetaRow> =
         "SELECT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512
@@ -455,12 +463,21 @@ queries! {
          WHERE f.serverId = :server_id
            AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff)";
 
-    fn instance_mods_needing_mr_context(instance_id: i32, context: &str, cutoff: DbDateTime) -> Vec<RefreshContextRow> =
+    // World data packs are judged against `world_context` and reported as
+    // 'world_datapacks', a kind only the Modrinth cacher reads.
+    fn instance_mods_needing_mr_context(instance_id: i32, context: &str, world_context: &str, cutoff: DbDateTime) -> Vec<RefreshContextRow> =
         "SELECT DISTINCT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512, f.addonType AS addonType
          FROM ModFileCache f JOIN ModMetadata m ON m.id=f.metadataId
          LEFT JOIN ModrinthModCache r ON r.metadataId=m.id AND lower(r.sha512)=lower(hex(m.sha512))
          LEFT JOIN ModrinthUpdateCache u ON u.metadataId=m.id AND u.context=:context || ':' || f.addonType
          WHERE f.instanceId=:instance_id AND f.addonType <> 'worlds'
+         AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff OR u.metadataId IS NULL OR u.cachedAt <= :cutoff)
+         UNION
+         SELECT DISTINCT m.id, m.murmur2, m.sha512, 'world_datapacks'
+         FROM WorldDatapackCache w JOIN ModMetadata m ON m.id=w.metadataId
+         LEFT JOIN ModrinthModCache r ON r.metadataId=m.id AND lower(r.sha512)=lower(hex(m.sha512))
+         LEFT JOIN ModrinthUpdateCache u ON u.metadataId=m.id AND u.context=:world_context || ':datapacks'
+         WHERE w.instanceId=:instance_id
          AND (r.metadataId IS NULL OR r.cachedAt <= :cutoff OR u.metadataId IS NULL OR u.cachedAt <= :cutoff)";
     fn server_mods_needing_mr_context(server_id: i32, context: &str, cutoff: DbDateTime) -> Vec<RefreshContextRow> =
         "SELECT DISTINCT m.id AS metadataId, m.murmur2 AS murmur2, m.sha512 AS sha512, f.addonType AS addonType
@@ -478,7 +495,14 @@ queries! {
          JOIN ModMetadata m ON m.id = f.metadataId
          JOIN CurseForgeModCache c ON c.metadataId = m.id
          JOIN CurseForgeModImageCache ci ON ci.metadataId = c.metadataId
-         WHERE f.instanceId = :instance_id AND ci.upToDate = 0";
+         WHERE f.instanceId = :instance_id AND ci.upToDate = 0
+         UNION ALL
+         SELECT DISTINCT w.filename, c.projectId, c.fileId, ci.metadataId, ci.url
+         FROM WorldDatapackCache w
+         JOIN ModMetadata m ON m.id = w.metadataId
+         JOIN CurseForgeModCache c ON c.metadataId = m.id
+         JOIN CurseForgeModImageCache ci ON ci.metadataId = c.metadataId
+         WHERE w.instanceId = :instance_id AND ci.upToDate = 0";
     fn server_mods_stale_cf_logo(server_id: i32) -> Vec<CfLogoRefreshRow> =
         "SELECT f.filename AS filename, c.projectId AS projectId, c.fileId AS fileId,
                 ci.metadataId AS metadataId, ci.url AS url
@@ -496,7 +520,14 @@ queries! {
          JOIN ModMetadata m ON m.id = f.metadataId
          JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
          JOIN ModrinthModImageCache ri ON ri.metadataId = r.metadataId
-         WHERE f.instanceId = :instance_id AND ri.upToDate = 0";
+         WHERE f.instanceId = :instance_id AND ri.upToDate = 0
+         UNION ALL
+         SELECT DISTINCT w.filename, r.projectId, r.versionId, ri.metadataId, ri.url
+         FROM WorldDatapackCache w
+         JOIN ModMetadata m ON m.id = w.metadataId
+         JOIN ModrinthModCache r ON r.metadataId = m.id AND lower(r.sha512) = lower(hex(m.sha512))
+         JOIN ModrinthModImageCache ri ON ri.metadataId = r.metadataId
+         WHERE w.instanceId = :instance_id AND ri.upToDate = 0";
     fn server_mods_stale_mr_logo(server_id: i32) -> Vec<MrLogoRefreshRow> =
         "SELECT f.filename AS filename, r.projectId AS projectId, r.versionId AS versionId,
                 ri.metadataId AS metadataId, ri.url AS url

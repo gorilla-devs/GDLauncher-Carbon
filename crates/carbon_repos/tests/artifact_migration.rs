@@ -229,6 +229,7 @@ fn legacy_fresh_mismatch_is_unusable_but_reversibly_preserved() {
             &wg(&mut c),
             1,
             "context",
+            "world-context",
             DbDateTime(from_millis(1).unwrap())
         )
         .unwrap()
