@@ -5256,6 +5256,7 @@ async fn staged_datapack_update_keeps_existing_world_copy_independent() {
             instance_id: *id,
             mod_id: row.id.clone(),
             world: selected,
+            replace: false,
         })
         .await
         .unwrap();

@@ -41,6 +41,7 @@ fn extract_fe_error(
 ) -> (Option<String>, Option<serde_json::Value>) {
     use crate::managers::account::SignInExpiredError;
     use crate::managers::account::gdl_account::{AvatarUploadError, InstanceShareError};
+    use crate::managers::instance::datapacks::AlreadyInWorld;
     use crate::managers::instance::modpack::ChangeVersionRefusal;
     use crate::managers::instance::run::InsufficientMemoryError;
     use crate::managers::server::{EulaNotAcceptedError, RecoveredServerError};
@@ -63,7 +64,8 @@ fn extract_fe_error(
         SignInExpiredError,
         ChangeVersionRefusal,
         EulaNotAcceptedError,
-        RecoveredServerError
+        RecoveredServerError,
+        AlreadyInWorld
     );
 
     (None, None)

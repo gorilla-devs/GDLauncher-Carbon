@@ -3,10 +3,14 @@
 use super::{
     InstanceId, InstanceManager,
     installer::publication,
-    mods::{addon_metadata, validate_addon_basename},
+    mods::{InvalidInstanceModIdError, addon_metadata, validate_addon_basename},
 };
 use crate::{domain::instance::AddonType, managers::ManagerRef};
 use anyhow::{Context, bail};
+use carbon_repos::repos::{
+    mod_file_cache as mfcdb,
+    world_datapack_cache::{self as wdb, WorldDatapackFullRow},
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha512};
 use std::path::{Path, PathBuf};
@@ -21,6 +25,29 @@ pub struct CopyDatapack {
     pub instance_id: i32,
     pub mod_id: String,
     pub world: DatapackWorld,
+    /// Put the copy in place of what the world holds of this data pack
+    /// (see [`AlreadyInWorld`]).
+    #[serde(default)]
+    pub replace: bool,
+}
+
+/// The refusal of a copy into a world that already has the data pack: a
+/// file of its name, or a copy of the same project under any name. Nothing
+/// changed; asked again with `replace`, the copy takes their place.
+#[derive(Debug, thiserror::Error)]
+#[error("This world already has this data pack: {}", .filenames.join(", "))]
+pub struct AlreadyInWorld {
+    pub filenames: Vec<String>,
+}
+
+impl crate::error::FeErrorCode for AlreadyInWorld {
+    fn error_code(&self) -> &'static str {
+        "already_in_world"
+    }
+
+    fn error_data(&self) -> Option<serde_json::Value> {
+        Some(serde_json::json!({ "filenames": self.filenames }))
+    }
 }
 
 /// Which save folder the user picked: its instance, path and the folder
@@ -104,14 +131,36 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(result)
     }
 
+    /// Copies an instance-level data pack into a world. Refused with
+    /// [`AlreadyInWorld`] when the world already has it, unless `replace`
+    /// asks to put the copy in their place: they are set aside, and removed
+    /// as the "Deletion through Recycle Bin" setting asks once the copy is
+    /// in place, or put back when it cannot be. Returns the world's name.
     pub async fn copy_datapack(self, request: CopyDatapack) -> anyhow::Result<String> {
         let id = InstanceId(request.instance_id);
         let _activity = self
             .app
             .runtime_lifecycle
             .admit("copy staged datapack into selected save")?;
-        let _operation = self.lock_instance(id).await;
-        self.ensure_modpack_not_locked(id).await?;
+        // The rows tell which files in the world are copies of this pack.
+        self.scan_world_datapacks(id).await?;
+        #[cfg(test)]
+        self.test_hooks.pause("datapack_copy_scanned", id).await;
+        {
+            let _operation = self.lock_instance(id).await;
+            self.copy_datapack_gated(id, &request).await?;
+        }
+        self.refresh_worlds(id, "a copy").await;
+        Ok(request.world.name)
+    }
+
+    /// [`Self::copy_datapack`] under the instance gate.
+    async fn copy_datapack_gated(
+        self,
+        id: InstanceId,
+        request: &CopyDatapack,
+    ) -> anyhow::Result<()> {
+        self.ensure_world_datapacks_may_change(id).await?;
         validate_addon_basename(&request.world.name)?;
         let row = self.get_owned_mod_file(id, &request.mod_id).await?;
         if row.addon_type != AddonType::DataPacks.to_db_string() {
@@ -138,11 +187,32 @@ impl ManagerRef<'_, InstanceManager> {
         if !publication::followed_folder(&folder).await? {
             tokio::fs::create_dir(&folder).await?;
         }
-        if publication::selected_file(&folder, &row.filename)
+        let copies = self
+            .copies_in_world(id, &request.mod_id, &request.world.name, &row.filename)
+            .await?;
+        // An entry under the name with no row of a file (a folder, a file
+        // the scan does not list) is not a copy, so not replaced either.
+        let named_copy = copies.iter().any(|copy| copy.filename == row.filename);
+        if addon_metadata(&folder.join(format!("{}.disabled", row.filename)))
             .await?
             .is_some()
+            || (!named_copy && addon_metadata(&folder.join(&row.filename)).await?.is_some())
         {
             bail!(NAME_TAKEN);
+        }
+        if !copies.is_empty() && !request.replace {
+            bail!(AlreadyInWorld {
+                filenames: copies.into_iter().map(|copy| copy.filename).collect(),
+            });
+        }
+        let mut replaced = Vec::new();
+        for copy in &copies {
+            if let Some(entry) = self
+                .replaced_entry(id, &request.world.name, &copy.id)
+                .await?
+            {
+                replaced.push(entry);
+            }
         }
         let destination = folder.join(&row.filename);
         // Not std's copy: it always copies the mode and fails where the drive
@@ -172,16 +242,50 @@ impl ManagerRef<'_, InstanceManager> {
         {
             bail!("Staged datapack changed during copying; retry with the current artifact");
         }
-        self.publish_into_world(
+        self.publish_into_world_replacing(
             id,
             &path.get_root(),
             temporary,
             &world,
             &request.world.identity,
             &row.filename,
+            replaced,
         )
         .await?;
-        Ok(request.world.name)
+        Ok(())
+    }
+
+    /// The world data packs of `world` that are copies of the instance-level
+    /// data pack `mod_id`, named `filename`: the file of that name, and
+    /// every file of the same Modrinth or CurseForge project. Sorted by name.
+    async fn copies_in_world(
+        self,
+        id: InstanceId,
+        mod_id: &str,
+        world: &str,
+        filename: &str,
+    ) -> anyhow::Result<Vec<WorldDatapackFullRow>> {
+        let pack = mfcdb::get_instance_mods_full(&self.app.db, *id)
+            .await?
+            .into_iter()
+            .find(|row| row.id == mod_id)
+            .ok_or_else(|| InvalidInstanceModIdError(id, mod_id.to_owned()))?;
+        // A project no platform knows names no other copy.
+        let same_project = |row: &WorldDatapackFullRow| {
+            (pack.mr_project_id.is_some() && row.mr_project_id == pack.mr_project_id)
+                || (pack.cf_project_id.is_some() && row.cf_project_id == pack.cf_project_id)
+        };
+        let mut copies: Vec<_> = wdb::get_world_datapacks_full(&self.app.db, *id)
+            .await?
+            .into_iter()
+            .filter(|row| {
+                row.world == world
+                    && !row.is_folder
+                    && (row.filename == filename || same_project(row))
+            })
+            .collect();
+        copies.sort_by(|a, b| a.filename.cmp(&b.filename));
+        Ok(copies)
     }
 
     /// Publishes `temporary`, a private file in the instance root, as
@@ -321,6 +425,7 @@ mod tests {
                         instance_id: *id,
                         mod_id: row.id,
                         world: selected,
+                        replace: false,
                     })
                     .await
                     .unwrap(),
@@ -391,6 +496,7 @@ mod tests {
             instance_id: *id,
             mod_id: row.id.clone(),
             world: selected.clone(),
+            replace: false,
         };
         assert_eq!(
             app.instance_manager()
@@ -467,7 +573,8 @@ mod tests {
                 .copy_datapack(CopyDatapack {
                     instance_id: *id,
                     mod_id: row.id.clone(),
-                    world: selected
+                    world: selected,
+                    replace: false,
                 })
                 .await
                 .is_err()
@@ -487,7 +594,8 @@ mod tests {
                 .copy_datapack(CopyDatapack {
                     instance_id: *id,
                     mod_id: row.id.clone(),
-                    world: selected
+                    world: selected,
+                    replace: false,
                 })
                 .await
                 .is_err()
@@ -512,6 +620,7 @@ mod tests {
                     instance_id: *id,
                     mod_id: row.id,
                     world: selected,
+                    replace: false,
                 })
                 .await
                 .unwrap_err();
@@ -558,6 +667,7 @@ mod tests {
                 instance_id: *id,
                 mod_id: row.id,
                 world: selected,
+                replace: false,
             })
             .await
             .unwrap();
@@ -619,6 +729,7 @@ mod tests {
                     instance_id: *id,
                     mod_id: row.id.clone(),
                     world: selected,
+                    replace: false,
                 })
                 .await
                 .unwrap();
@@ -708,6 +819,7 @@ mod tests {
                 instance_id: *id,
                 mod_id: row.id,
                 world: selected,
+                replace: false,
             })
             .await
             .expect_err("adding waits for the pack setup");
@@ -752,6 +864,7 @@ mod tests {
                 instance_id: *id,
                 mod_id: row.id,
                 world: selected,
+                replace: false,
             })
             .await
             .unwrap();
@@ -778,6 +891,7 @@ mod tests {
                 instance_id: *id,
                 mod_id: row.id.clone(),
                 world: selected,
+                replace: false,
             };
             if mode == "foreign-row" {
                 let (other, _, _) = addon_fixture(
@@ -828,6 +942,332 @@ mod tests {
                     b"later world pack"
                 );
             }
+        }
+    }
+
+    /// What the world already holds of a data pack, for the replace tests.
+    mod replacing {
+        use super::*;
+        use crate::managers::App;
+        use crate::managers::instance::world_datapack_changes::{
+            PACK_CHANGED,
+            tests::{
+                entries, pack_zip, put_pack, row_of, scanned_rows, snapshot, staging_folders, tree,
+                without_recycle_bin,
+            },
+        };
+        use crate::managers::instance::world_datapack_updates::tests::on_modrinth;
+
+        /// An instance whose instance-level data pack `pack.zip` holds
+        /// `bytes` and is version `newer` of Modrinth project `project`,
+        /// with the save `World`. Returns the instance, the pack's row id,
+        /// the world and its selection.
+        async fn staged(
+            app: &App,
+            name: &str,
+            bytes: &[u8],
+        ) -> (InstanceId, String, PathBuf, DatapackWorld) {
+            let (id, row, _) =
+                addon_fixture(app, name, AddonType::DataPacks, "pack.zip", bytes).await;
+            on_modrinth(app, &row.metadata_id, "project", "newer").await;
+            let path = publication::current_path(app, id).await.unwrap();
+            let world = path.get_saves_path().join("World");
+            std::fs::create_dir_all(world.join("datapacks")).unwrap();
+            std::fs::write(world.join("level.dat"), b"save").unwrap();
+            let selected = app
+                .instance_manager()
+                .datapack_worlds(id)
+                .await
+                .unwrap()
+                .pop()
+                .unwrap();
+            (id, row.id, world, selected)
+        }
+
+        /// `pack-1.zip` in the world, an older version of the same project.
+        async fn older_build(app: &App, id: InstanceId, world: &Path) -> PathBuf {
+            let path = put_pack(world, "pack-1.zip", &pack_zip("older"));
+            let rows = scanned_rows(app, id).await;
+            let row = row_of(&rows, "World", "pack-1.zip");
+            on_modrinth(app, row.metadata_id.as_deref().unwrap(), "project", "older").await;
+            path
+        }
+
+        async fn copy(
+            app: &App,
+            id: InstanceId,
+            mod_id: &str,
+            world: &DatapackWorld,
+            replace: bool,
+        ) -> anyhow::Result<String> {
+            app.instance_manager()
+                .copy_datapack(CopyDatapack {
+                    instance_id: *id,
+                    mod_id: mod_id.to_owned(),
+                    world: world.clone(),
+                    replace,
+                })
+                .await
+        }
+
+        /// The refusal as the frontend reads it: its code and file names.
+        fn already_in_world(error: &anyhow::Error) -> Vec<String> {
+            let sent = serde_json::to_value(crate::error::FeError::from_anyhow(error)).unwrap();
+            let cause = &sent["cause"][0];
+            assert_eq!(cause["code"], "already_in_world", "{sent}");
+            serde_json::from_value(cause["data"]["filenames"].clone()).unwrap()
+        }
+
+        async fn root_of(app: &App, id: InstanceId) -> PathBuf {
+            publication::current_path(app, id).await.unwrap().get_root()
+        }
+
+        #[tokio::test]
+        async fn a_name_the_world_holds_is_refused_with_its_name_and_kept() {
+            let app = crate::setup_managers_for_test().await;
+            let new = pack_zip("new");
+            let (id, mod_id, world, selected) = staged(&app, "copy-same-name", &new).await;
+            put_pack(&world, "pack.zip", b"the user's own");
+            let root = root_of(&app, id).await;
+            let before = snapshot(&root, &world);
+
+            let error = copy(&app, id, &mod_id, &selected, false).await.unwrap_err();
+
+            assert_eq!(already_in_world(&error), vec!["pack.zip".to_owned()]);
+            assert_eq!(
+                error.to_string(),
+                "This world already has this data pack: pack.zip"
+            );
+            assert_eq!(snapshot(&root, &world), before);
+        }
+
+        #[tokio::test]
+        async fn with_replace_the_world_holds_the_new_bytes() {
+            let app = crate::setup_managers_for_test().await;
+            let new = pack_zip("new");
+            let (id, mod_id, world, selected) = staged(&app, "copy-replace-same", &new).await;
+            put_pack(&world, "pack.zip", &pack_zip("old"));
+            scanned_rows(&app, id).await;
+            let root = root_of(&app, id).await;
+
+            copy(&app, id, &mod_id, &selected, true).await.unwrap();
+
+            assert_eq!(
+                entries(&world.join("datapacks")),
+                vec![("pack.zip".to_owned(), new)]
+            );
+            assert!(staging_folders(&root).is_empty());
+            let rows = scanned_rows(&app, id).await;
+            assert_eq!(rows.len(), 1);
+            assert_eq!(rows[0].filename, "pack.zip");
+        }
+
+        /// The update case the copy fixes: a newer build of the project has
+        /// another file name; the older one in the world gives way to it.
+        #[tokio::test]
+        async fn another_version_of_the_project_is_replaced_not_joined() {
+            let app = crate::setup_managers_for_test().await;
+            without_recycle_bin(&app).await;
+            let new = pack_zip("new");
+            let (id, mod_id, world, selected) = staged(&app, "copy-other-name", &new).await;
+            older_build(&app, id, &world).await;
+            let root = root_of(&app, id).await;
+            let before = snapshot(&root, &world);
+
+            let error = copy(&app, id, &mod_id, &selected, false).await.unwrap_err();
+            assert_eq!(already_in_world(&error), vec!["pack-1.zip".to_owned()]);
+            assert_eq!(snapshot(&root, &world), before);
+
+            copy(&app, id, &mod_id, &selected, true).await.unwrap();
+
+            assert_eq!(
+                entries(&world.join("datapacks")),
+                vec![("pack.zip".to_owned(), new)]
+            );
+            assert!(staging_folders(&root).is_empty());
+        }
+
+        /// A file of the name and another version under another name: both
+        /// are the copies, listed together and replaced by the one new file.
+        #[tokio::test]
+        async fn the_same_name_and_another_version_both_give_way() {
+            let app = crate::setup_managers_for_test().await;
+            without_recycle_bin(&app).await;
+            let new = pack_zip("new");
+            let (id, mod_id, world, selected) = staged(&app, "copy-two-copies", &new).await;
+            put_pack(&world, "pack.zip", b"the user's own");
+            older_build(&app, id, &world).await;
+            let root = root_of(&app, id).await;
+
+            let error = copy(&app, id, &mod_id, &selected, false).await.unwrap_err();
+            assert_eq!(
+                already_in_world(&error),
+                vec!["pack-1.zip".to_owned(), "pack.zip".to_owned()]
+            );
+
+            assert_eq!(
+                copy(&app, id, &mod_id, &selected, true).await.unwrap(),
+                "World"
+            );
+
+            assert_eq!(
+                entries(&world.join("datapacks")),
+                vec![("pack.zip".to_owned(), new)]
+            );
+            assert!(staging_folders(&root).is_empty());
+        }
+
+        /// The new file cannot be published: both old ones are back under
+        /// their names with their bytes, and nothing is left aside.
+        #[tokio::test]
+        async fn a_failed_publish_puts_every_old_copy_back() {
+            use crate::util::publish::fault::{IN_USE, Step, inject, pending};
+            let app = crate::setup_managers_for_test().await;
+            let (id, mod_id, world, selected) =
+                staged(&app, "copy-put-back", &pack_zip("new")).await;
+            let same_name = put_pack(&world, "pack.zip", b"the user's own");
+            older_build(&app, id, &world).await;
+            let root = root_of(&app, id).await;
+            let before = snapshot(&root, &world);
+            inject(Step::NoReplace, &same_name, IN_USE);
+
+            copy(&app, id, &mod_id, &selected, true)
+                .await
+                .expect_err("the publication fails");
+
+            assert!(!pending(Step::NoReplace, &same_name), "publication tried");
+            assert_eq!(snapshot(&root, &world), before);
+        }
+
+        /// An unpacked pack folder named like the zip is no copy: the copy
+        /// is refused with the occupied-name text, with or without replace.
+        #[tokio::test]
+        async fn an_unpacked_folder_named_like_the_zip_is_not_replaced() {
+            let app = crate::setup_managers_for_test().await;
+            let (id, mod_id, world, selected) =
+                staged(&app, "copy-folder-name", &pack_zip("new")).await;
+            let folder = world.join("datapacks/pack.zip");
+            std::fs::create_dir_all(&folder).unwrap();
+            std::fs::write(
+                folder.join("pack.mcmeta"),
+                br#"{"pack":{"pack_format":15}}"#,
+            )
+            .unwrap();
+            let rows = scanned_rows(&app, id).await;
+            assert!(row_of(&rows, "World", "pack.zip").is_folder);
+            let before = tree(&world);
+
+            for replace in [true, false] {
+                let error = copy(&app, id, &mod_id, &selected, replace)
+                    .await
+                    .unwrap_err();
+                assert_eq!(error.to_string(), NAME_TAKEN, "replace: {replace}");
+                assert_eq!(tree(&world), before, "replace: {replace}");
+            }
+        }
+
+        /// As for an install into a world: refused while the game is queued,
+        /// preparing or running, and nothing changes.
+        #[tokio::test]
+        async fn a_copy_while_the_game_runs_is_refused_and_changes_nothing() {
+            use crate::domain::vtask::VisualTaskId;
+            use crate::managers::instance::run::{LaunchState, RunningInstance};
+            let app = crate::setup_managers_for_test().await;
+            let (id, mod_id, world, selected) =
+                staged(&app, "copy-running", &pack_zip("new")).await;
+            older_build(&app, id, &world).await;
+            let root = root_of(&app, id).await;
+            let before = snapshot(&root, &world);
+            for state in [
+                LaunchState::Queued(VisualTaskId(900)),
+                LaunchState::Preparing(VisualTaskId(900)),
+                LaunchState::Running(RunningInstance::adopted(
+                    u32::MAX,
+                    1,
+                    chrono::Utc::now(),
+                    chrono::Utc::now(),
+                )),
+            ] {
+                let name = format!("{state:?}");
+                app.instance_manager()
+                    .instances
+                    .write()
+                    .await
+                    .get_mut(&id)
+                    .unwrap()
+                    .data_mut()
+                    .unwrap()
+                    .state = state;
+                for replace in [false, true] {
+                    let error = copy(&app, id, &mod_id, &selected, replace)
+                        .await
+                        .unwrap_err();
+                    assert!(
+                        error.to_string().contains("running or being installed"),
+                        "{name}: {error:#}"
+                    );
+                    assert_eq!(snapshot(&root, &world), before, "{name}");
+                }
+            }
+        }
+
+        /// An older frontend sends no `replace`: the copy does not replace.
+        #[tokio::test]
+        async fn a_request_without_replace_does_not_replace() {
+            let app = crate::setup_managers_for_test().await;
+            let (id, mod_id, world, selected) =
+                staged(&app, "copy-older-frontend", &pack_zip("new")).await;
+            older_build(&app, id, &world).await;
+            let root = root_of(&app, id).await;
+            let before = snapshot(&root, &world);
+            let request: CopyDatapack = serde_json::from_value(serde_json::json!({
+                "instance_id": *id,
+                "mod_id": mod_id,
+                "world": { "name": selected.name, "identity": selected.identity },
+            }))
+            .unwrap();
+            assert!(!request.replace);
+
+            let error = app
+                .instance_manager()
+                .copy_datapack(request)
+                .await
+                .unwrap_err();
+
+            assert_eq!(already_in_world(&error), vec!["pack-1.zip".to_owned()]);
+            assert_eq!(snapshot(&root, &world), before);
+        }
+
+        /// The user puts their own build under the old copy's name after the
+        /// copy read the world's rows: that file is not taken away.
+        #[tokio::test]
+        async fn a_file_put_under_the_old_name_after_the_rows_were_read_is_kept() {
+            let app = crate::setup_managers_for_test().await;
+            let (id, mod_id, world, selected) =
+                staged(&app, "copy-swapped", &pack_zip("new")).await;
+            let older = older_build(&app, id, &world).await;
+            let pause = app
+                .instance_manager()
+                .test_hooks
+                .arm("datapack_copy_scanned", id);
+            let worker = {
+                let (app, mod_id, selected) = (app.clone(), mod_id.clone(), selected.clone());
+                tokio::spawn(async move { copy(&app, id, &mod_id, &selected, true).await })
+            };
+            tokio::time::timeout(std::time::Duration::from_secs(10), pause.entered.notified())
+                .await
+                .unwrap();
+            std::fs::write(&older, b"the user's own build").unwrap();
+            pause.release.notify_one();
+
+            let error = worker.await.unwrap().unwrap_err();
+
+            assert_eq!(error.to_string(), PACK_CHANGED);
+            assert_eq!(
+                entries(&world.join("datapacks")),
+                vec![("pack-1.zip".to_owned(), b"the user's own build".to_vec())]
+            );
+            assert!(staging_folders(&root_of(&app, id).await).is_empty());
         }
     }
 }

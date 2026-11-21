@@ -415,7 +415,7 @@ export type FEUnifiedModLoaderType = "forge" | "neoforge" | "fabric" | "quilt" |
  */
 export type MRFEGalleryItem = { url: string; featured: boolean; title: string | null; description: string | null; created: string; ordering: string | null }
 
-export type CopyDatapack = { instance_id: number; mod_id: string; world: DatapackWorld }
+export type CopyDatapack = { instance_id: number; mod_id: string; world: DatapackWorld; replace?: boolean }
 
 export type MRFEDonationLink = { id: string; platform: string; url: string }
 

@@ -99,15 +99,15 @@ pub struct DeleteWorldDatapack {
     pub id: String,
 }
 
-/// A pack moved out of the game's sight until its replacement is in place:
-/// then [`TakenAway::send_on`] removes it as the user's Delete would, or
-/// [`TakenAway::put_back`] returns it under its name. Dropped unsettled, the
-/// world is put back as it was: the replacement [`TakenAway::publish`] put
-/// in place is withdrawn and the pack returns. When it cannot return, `keep`
-/// is set, so the folder it waits in stays and the warning names it.
+/// Packs moved out of the game's sight until their replacement is in place:
+/// then [`TakenAway::send_on`] removes them as the user's Delete would, or
+/// [`TakenAway::put_back`] returns them under their names. Dropped
+/// unsettled, the world is put back as it was: the replacement
+/// [`TakenAway::publish`] put in place is withdrawn and the packs return.
+/// When one cannot return, `keep` is set, so the folder it waits in stays
+/// and the warning names it.
 pub(super) struct TakenAway {
-    original: PathBuf,
-    aside: PathBuf,
+    entries: Vec<Aside>,
     removal: Removal,
     /// Held while a publication, removal or put-back runs on the blocking
     /// pool, so a drop waits for that step and then sees what it did.
@@ -115,11 +115,20 @@ pub(super) struct TakenAway {
     keep: Arc<AtomicBool>,
 }
 
+/// Where a pack taken away was, and where it waits.
+#[derive(Clone)]
+struct Aside {
+    original: PathBuf,
+    aside: PathBuf,
+}
+
 #[derive(Default)]
 struct Settlement {
     settled: bool,
     /// The replacement, once it is in place.
     published: Option<PathBuf>,
+    /// How many entries, from the first, were removed already.
+    sent: usize,
 }
 
 /// The name a pack waits under beside itself when the private folder is on
@@ -138,15 +147,32 @@ pub(super) async fn take_away(
     removal: Removal,
     keep: Arc<AtomicBool>,
 ) -> anyhow::Result<TakenAway> {
-    let (original, folder) = (path.to_owned(), aside_folder.to_owned());
-    let aside = tokio::task::spawn_blocking(move || set_aside(&original, &folder)).await??;
-    Ok(TakenAway {
-        original: path.to_owned(),
-        aside,
+    take_away_all(&[path.to_owned()], aside_folder, removal, keep).await
+}
+
+/// [`take_away`] for several entries, settled together. When one cannot be
+/// moved, those moved before it are put back.
+pub(super) async fn take_away_all(
+    paths: &[PathBuf],
+    aside_folder: &Path,
+    removal: Removal,
+    keep: Arc<AtomicBool>,
+) -> anyhow::Result<TakenAway> {
+    let mut taken = TakenAway {
+        entries: Vec::new(),
         removal,
         settlement: Default::default(),
         keep,
-    })
+    };
+    for path in paths {
+        let (original, folder) = (path.clone(), aside_folder.to_owned());
+        let aside = tokio::task::spawn_blocking(move || set_aside(&original, &folder)).await??;
+        taken.entries.push(Aside {
+            original: path.clone(),
+            aside,
+        });
+    }
+    Ok(taken)
 }
 
 fn set_aside(path: &Path, folder: &Path) -> anyhow::Result<PathBuf> {
@@ -182,16 +208,8 @@ fn set_aside(path: &Path, folder: &Path) -> anyhow::Result<PathBuf> {
 }
 
 impl TakenAway {
-    fn put_back_failure(&self, error: &dyn std::fmt::Display) -> anyhow::Error {
-        anyhow!(
-            "{} could not be put back and is kept at {}: {error}",
-            self.original.display(),
-            self.aside.display()
-        )
-    }
-
     /// Runs `step` on the blocking pool with the settlement held, unless
-    /// the entry is settled already.
+    /// the entries are settled already.
     async fn settle<T: Send + 'static>(
         &self,
         step: impl FnOnce(&mut Settlement) -> anyhow::Result<T> + Send + 'static,
@@ -208,7 +226,7 @@ impl TakenAway {
     }
 
     /// Publishes `file` at `destination` without replacing anything, as
-    /// the replacement of the entry taken away.
+    /// the replacement of the entries taken away.
     pub(super) async fn publish(
         &self,
         file: tempfile::NamedTempFile,
@@ -224,37 +242,31 @@ impl TakenAway {
     }
 
     /// Withdraws the replacement when one was published (it is this
-    /// install's own download), then returns the entry under its original
-    /// name, never over something that took that name meanwhile. When it
-    /// cannot return, or the replacement cannot be withdrawn (two builds
-    /// of one pack would then be in the world), it stays where it waits and
-    /// `keep` is set.
+    /// install's own download), then returns the entries not removed yet
+    /// under their original names, never over something that took a name
+    /// meanwhile. An entry that cannot return stays where it waits, and when
+    /// the replacement cannot be withdrawn (two builds of one pack would
+    /// then be in the world) they all do; `keep` is set then.
     pub(super) async fn put_back(self) -> anyhow::Result<()> {
-        let (aside, original, keep) =
-            (self.aside.clone(), self.original.clone(), self.keep.clone());
-        let returned = self
-            .settle(move |settlement| {
-                settlement.settled = true;
-                Ok(settle_back(settlement, &aside, &original, &keep))
-            })
-            .await?;
-        match returned {
-            Returned::Back => Ok(()),
-            Returned::Stuck(error) => Err(self.put_back_failure(&error)),
-            Returned::NotWithdrawn { published, error } => Err(anyhow!(
-                "{} could not be removed: {error}. {:#}",
-                published.display(),
-                self.put_back_failure(&"the replacement is still in its place")
-            )),
-        }
+        let (entries, keep) = (self.entries.clone(), self.keep.clone());
+        self.settle(move |settlement| {
+            settlement.settled = true;
+            Ok(settle_back(settlement, &entries, &keep))
+        })
+        .await?
+        .into_result()
     }
 
-    /// Removes the entry as the "Deletion through Recycle Bin" setting
-    /// asked. On failure it is still where it waited and can be put back.
+    /// Removes the entries as the "Deletion through Recycle Bin" setting
+    /// asked, in order. On failure, the entries not removed yet are still
+    /// where they waited and can be put back.
     pub(super) async fn send_on(&mut self) -> anyhow::Result<()> {
-        let (aside, removal) = (self.aside.clone(), self.removal);
+        let (entries, removal) = (self.entries.clone(), self.removal);
         self.settle(move |settlement| {
-            remove_set_aside(&aside, removal)?;
+            while let Some(entry) = entries.get(settlement.sent) {
+                remove_set_aside(&entry.aside, removal)?;
+                settlement.sent += 1;
+            }
             settlement.settled = true;
             Ok(())
         })
@@ -294,41 +306,87 @@ fn remove_set_aside(path: &Path, removal: Removal) -> anyhow::Result<()> {
     }
 }
 
-/// How an entry taken away ended when it was put back.
+/// How entries taken away ended when they were put back.
 enum Returned {
     Back,
-    /// It could not return under its name.
-    Stuck(std::io::Error),
-    /// The replacement could not be withdrawn, so it was not put back.
+    /// These could not return under their names.
+    Stuck(Vec<(Aside, std::io::Error)>),
+    /// The replacement could not be withdrawn, so none was put back.
     NotWithdrawn {
         published: PathBuf,
         error: std::io::Error,
+        waiting: Vec<Aside>,
     },
 }
 
-/// Withdraws the published replacement, if any, then returns the entry at
-/// `aside` to `original`. The replacement is this install's own download;
-/// while it stays, the entry stays aside, so one build of the pack is in the
-/// world. Sets `keep` when the entry stays aside.
-fn settle_back(
-    settlement: &mut Settlement,
-    aside: &Path,
-    original: &Path,
-    keep: &AtomicBool,
-) -> Returned {
+/// That `entry` waits at its place aside, and why it is not back.
+fn kept_at(entry: &Aside, error: &dyn std::fmt::Display) -> String {
+    format!(
+        "{} could not be put back and is kept at {}: {error}",
+        entry.original.display(),
+        entry.aside.display()
+    )
+}
+
+impl Returned {
+    fn into_result(self) -> anyhow::Result<()> {
+        match self {
+            Returned::Back => Ok(()),
+            Returned::Stuck(stuck) => Err(anyhow!(
+                "{}",
+                stuck
+                    .iter()
+                    .map(|(entry, error)| kept_at(entry, error))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            )),
+            Returned::NotWithdrawn {
+                published,
+                error,
+                waiting,
+            } => Err(anyhow!(
+                "{} could not be removed: {error}. {}",
+                published.display(),
+                waiting
+                    .iter()
+                    .map(|entry| kept_at(entry, &"the replacement is still in its place"))
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            )),
+        }
+    }
+}
+
+/// Withdraws the published replacement, if any, then returns the entries
+/// not removed yet to their original names. The replacement is this
+/// install's own download; while it stays, the entries stay aside, so one
+/// build of the pack is in the world. Sets `keep` when an entry stays aside.
+fn settle_back(settlement: &mut Settlement, entries: &[Aside], keep: &AtomicBool) -> Returned {
+    let waiting = entries.get(settlement.sent..).unwrap_or_default();
     if let Some(published) = settlement.published.take()
         && let Err(error) = std::fs::remove_file(&published)
         && error.kind() != std::io::ErrorKind::NotFound
     {
         keep.store(true, Ordering::SeqCst);
-        return Returned::NotWithdrawn { published, error };
+        return Returned::NotWithdrawn {
+            published,
+            error,
+            waiting: waiting.to_vec(),
+        };
     }
-    match rename_noclobber(aside, original) {
-        Ok(()) => Returned::Back,
-        Err(error) => {
-            keep.store(true, Ordering::SeqCst);
-            Returned::Stuck(error)
-        }
+    let stuck: Vec<_> = waiting
+        .iter()
+        .filter_map(|entry| {
+            rename_noclobber(&entry.aside, &entry.original)
+                .err()
+                .map(|error| (entry.clone(), error))
+        })
+        .collect();
+    if stuck.is_empty() {
+        Returned::Back
+    } else {
+        keep.store(true, Ordering::SeqCst);
+        Returned::Stuck(stuck)
     }
 }
 
@@ -340,15 +398,8 @@ impl Drop for TakenAway {
             return;
         }
         settlement.settled = true;
-        match settle_back(&mut settlement, &self.aside, &self.original, &self.keep) {
-            Returned::Back => {}
-            Returned::Stuck(error) => warn!("{}", self.put_back_failure(&error)),
-            Returned::NotWithdrawn { published, error } => warn!(
-                ?error,
-                "{} could not be removed. {}",
-                published.display(),
-                self.put_back_failure(&"the replacement is still in its place")
-            ),
+        if let Err(error) = settle_back(&mut settlement, &self.entries, &self.keep).into_result() {
+            warn!("{error:#}");
         }
     }
 }
@@ -737,9 +788,12 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(Some(row))
     }
 
-    /// The file an install replaces, as it is now under the gate. `None`
-    /// when it went since the install was admitted: nothing to take away.
-    async fn replaced_entry(
+    /// The file a change of `world` replaces, as it is now under the gate.
+    /// `None` when it went since the row was read: nothing to take away.
+    /// Refused when the file there is no longer the one the row recorded:
+    /// one put under that name since (the user's own build, say) is not the
+    /// launcher's to remove.
+    pub(super) async fn replaced_entry(
         self,
         id: InstanceId,
         world: &str,
@@ -755,11 +809,14 @@ impl ManagerRef<'_, InstanceManager> {
             return Ok(None);
         };
         ensure_listed_kind(&path, &meta, false).await?;
+        if !self.holds_recorded_file(id, &row).await? {
+            bail!(PACK_CHANGED);
+        }
         Ok(Some(path))
     }
 
     /// Rescans the worlds after a change by `what`, and tells the frontend.
-    async fn refresh_worlds(self, id: InstanceId, what: &str) {
+    pub(super) async fn refresh_worlds(self, id: InstanceId, what: &str) {
         match self.scan_world_datapacks(id).await {
             Ok(true) => {
                 self.app
@@ -1013,8 +1070,12 @@ impl ManagerRef<'_, InstanceManager> {
             tokio::fs::create_dir(&folder).await?;
         }
         let replaced = match &request.replaces {
-            Some(row_id) => self.replaced_entry(id, &request.world, row_id).await?,
-            None => None,
+            Some(row_id) => self
+                .replaced_entry(id, &request.world, row_id)
+                .await?
+                .into_iter()
+                .collect(),
+            None => Vec::new(),
         };
         let removal = self.addon_removal().await?;
         let published = self
@@ -1035,12 +1096,39 @@ impl ManagerRef<'_, InstanceManager> {
         published
     }
 
-    /// [`Self::publish_into_world`], after taking `replaced` away when
-    /// there is one. The old pack is sent on its way with `removal` only
-    /// once the new one is in place; when publishing fails, or the Recycle
-    /// Bin refuses the old pack, the world is put back as it was. When the
-    /// old pack cannot go back, the error says where it is, and `staging`
-    /// is kept so it stays there.
+    /// [`Self::publish_replacing`] for a copy into a world, which has no
+    /// private folder of its own yet: the old packs wait in one made for
+    /// it. Call with the instance gate held.
+    #[allow(clippy::too_many_arguments)]
+    pub(super) async fn publish_into_world_replacing(
+        self,
+        id: InstanceId,
+        root: &Path,
+        temporary: tempfile::NamedTempFile,
+        world: &Path,
+        identity: &str,
+        filename: &str,
+        replaced: Vec<PathBuf>,
+    ) -> anyhow::Result<PathBuf> {
+        if replaced.is_empty() {
+            return self
+                .publish_into_world(id, root, temporary, world, identity, filename)
+                .await;
+        }
+        let removal = self.addon_removal().await?;
+        let staging = Staging::new(root)?;
+        self.publish_replacing(
+            id, root, temporary, world, identity, filename, replaced, &staging, removal,
+        )
+        .await
+    }
+
+    /// [`Self::publish_into_world`], after taking `replaced` away. The old
+    /// packs are sent on their way with `removal` only once the new one is
+    /// in place; when publishing fails, or the Recycle Bin refuses an old
+    /// pack, the world is put back as it was, but for old packs the Recycle
+    /// Bin already took. When an old pack cannot go back, the error says
+    /// where it is, and `staging` is kept so it stays there.
     #[allow(clippy::too_many_arguments)]
     async fn publish_replacing(
         self,
@@ -1050,17 +1138,17 @@ impl ManagerRef<'_, InstanceManager> {
         world: &Path,
         identity: &str,
         filename: &str,
-        replaced: Option<PathBuf>,
+        replaced: Vec<PathBuf>,
         staging: &Staging,
         removal: Removal,
     ) -> anyhow::Result<PathBuf> {
-        let Some(old) = replaced else {
+        if replaced.is_empty() {
             return self
                 .publish_into_world(id, root, temporary, world, identity, filename)
                 .await;
-        };
-        let mut taken = take_away(
-            &old,
+        }
+        let mut taken = take_away_all(
+            &replaced,
             &staging.path().join(REPLACED),
             removal,
             staging.keeper(),
@@ -2720,6 +2808,47 @@ pub(crate) mod tests {
         assert_eq!(identity(&after), identity(&rows));
     }
 
+    /// The user puts their own build under the replaced pack's name while
+    /// the download runs: under the gate it is no longer the file the row
+    /// recorded, so it is neither set aside nor removed.
+    #[tokio::test]
+    async fn a_file_put_under_the_replaced_name_during_the_download_is_kept() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, identity, world) = world_instance(&app, "replace-swapped").await;
+        let path = put_pack(&world, "pack.zip", &pack_zip("old"));
+        let rows = scanned_rows(&app, id).await;
+        let mut api = api().await;
+        serving(&mut api, "pack.zip", &pack_zip("new")).await;
+        let root = instance_root(&app, id).await;
+        let pause = app
+            .instance_manager()
+            .test_hooks
+            .arm("world_datapack_downloaded", id);
+        let (_, work) = app
+            .instance_manager()
+            .install_world_datapack_from(
+                &api.curseforge,
+                &api.modrinth,
+                replacing(id, &identity, "World", &rows[0].id),
+            )
+            .await
+            .unwrap();
+        tokio::time::timeout(std::time::Duration::from_secs(10), pause.entered.notified())
+            .await
+            .unwrap();
+        std::fs::write(&path, b"the user's own build").unwrap();
+        pause.release.notify_one();
+
+        let error = work.await.unwrap().unwrap_err();
+
+        assert_eq!(error.to_string(), PACK_CHANGED);
+        assert_eq!(
+            entries(&world.join("datapacks")),
+            vec![("pack.zip".to_owned(), b"the user's own build".to_vec())]
+        );
+        assert!(staging_folders(&root).is_empty());
+    }
+
     /// The Recycle Bin refuses the old pack once the new one is in place:
     /// the new one is withdrawn and the old one is back, as before.
     #[tokio::test]
@@ -2922,7 +3051,7 @@ pub(crate) mod tests {
         )
         .await
         .unwrap();
-        let waiting = taken.aside.clone();
+        let waiting = taken.entries[0].aside.clone();
         std::fs::write(&pack, b"another file").unwrap();
 
         drop(taken);

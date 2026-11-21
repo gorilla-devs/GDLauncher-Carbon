@@ -480,7 +480,7 @@ impl ManagerRef<'_, InstanceManager> {
     /// Whether the entry `row` lists is still the file the scan recorded:
     /// the same stamp, as the scan judges "unchanged", or else the same
     /// bytes as the row's metadata. `false` when it is gone or no file.
-    async fn holds_recorded_file(
+    pub(super) async fn holds_recorded_file(
         self,
         id: InstanceId,
         row: &WorldDatapackRow,
@@ -534,7 +534,7 @@ impl ManagerRef<'_, InstanceManager> {
 }
 
 #[cfg(test)]
-mod tests {
+pub(crate) mod tests {
     use super::*;
     use crate::managers::App;
     use crate::managers::instance::world_datapack_changes::tests::{
@@ -589,7 +589,7 @@ mod tests {
 
     /// Modrinth knows the file of `metadata_id` as version `version_id` of
     /// `project`, a Release.
-    async fn on_modrinth(app: &App, metadata_id: &str, project: &str, version_id: &str) {
+    pub(crate) async fn on_modrinth(app: &App, metadata_id: &str, project: &str, version_id: &str) {
         let sha512 = metarepo::get_metadata_by_id(&app.db, metadata_id)
             .await
             .unwrap()
@@ -1195,43 +1195,64 @@ mod tests {
         assert_eq!(tree(&saves.join("B")), before);
     }
 
-    /// `update_mod`, as the Addons tab's updates call it, on the
-    /// instance-level copy of a project a world also holds. Its installer
-    /// always asks the real platforms, which do not know this project, so
-    /// the update fails or finds nothing: this shows that the call leaves
-    /// the world's copy and its rows alone, not what a finished
-    /// instance-level install does. A world copy's id is refused outright.
+    /// The instance-level copy of a project a world also holds, updated
+    /// as `update_mod` does it, against stand-in platforms: the update is
+    /// found with `find_mod_update_from` and installed by the installer
+    /// `update_mod` starts, replacing that addon. The newer build lands in
+    /// the instance's own `datapacks` folder; the world's copy, its file
+    /// and its row stay as they were. Asked with the world copy's id,
+    /// `update_mod` is refused before any platform is asked.
     #[tokio::test]
     async fn an_instance_level_update_never_reaches_a_world_copy() {
+        use crate::managers::instance::installer::{IntoInstaller, ModrinthModInstaller};
+        use carbon_platforms::modrinth::search::ProjectID;
         let app = crate::setup_managers_for_test().await;
         let (id, saves) = fabric_instance(&app, "update-mod-only-instance", &["A"]).await;
         let old = pack_zip("old");
         let world_file = put_pack(&saves.join("A"), "pack-1.zip", &old);
-        let (instance_id, instance_metadata, _) = instance_pack(&app, id, "pack-1.zip", &old).await;
+        let (instance_id, instance_metadata, instance_file) =
+            instance_pack(&app, id, "pack-1.zip", &old).await;
         let rows = scanned_rows(&app, id).await;
-        let project = "gdl-test-no-such-project-4f1c9a";
         for meta in [metadata(&rows[0]), &instance_metadata] {
-            on_modrinth(&app, meta, project, "gdl-test-no-such-version-4f1c9a").await;
+            on_modrinth(&app, meta, "project", "installed").await;
         }
+        let mut api = api().await;
+        let new = newer_on_modrinth(&mut api, &old).await;
 
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_secs(60),
-            app.instance_manager().update_mod(id, instance_id),
-        )
-        .await;
+        let Some(RemoteVersion::Modrinth(version)) = app
+            .instance_manager()
+            .find_mod_update_from(&api.curseforge, &api.modrinth, id, instance_id.clone())
+            .await
+            .unwrap()
+        else {
+            panic!("the newer Modrinth build is the update");
+        };
+        let project = api
+            .modrinth
+            .get_project(ProjectID(version.project_id.clone()))
+            .await
+            .unwrap();
+        let task = ModrinthModInstaller::from_version(version, project)
+            .unwrap()
+            .into_installer()
+            .install(&app, id, false, Some(instance_id))
+            .await
+            .unwrap();
+        app.instance_manager().task_ended(task).await.unwrap();
+
+        only(instance_file.parent().unwrap(), "pack-2.zip", &new);
+        assert_eq!(std::fs::read(&world_file).unwrap(), old);
+        assert_eq!(entries(&saves.join("A/datapacks")).len(), 1);
+        assert_eq!(scanned_rows(&app, id).await, rows);
         let error = app
             .instance_manager()
             .update_mod(id, rows[0].id.clone())
             .await
             .unwrap_err();
-
         assert!(
             error.downcast_ref::<InvalidInstanceModIdError>().is_some(),
             "{error:#}"
         );
-        assert_eq!(std::fs::read(&world_file).unwrap(), old);
-        assert_eq!(entries(&saves.join("A/datapacks")).len(), 1);
-        assert_eq!(scanned_rows(&app, id).await, rows);
     }
 
     /// The newer build's row is there but its file was deleted outside the
