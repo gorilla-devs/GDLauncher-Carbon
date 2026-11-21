@@ -36,6 +36,7 @@ export type Procedures = {
         { key: "instance.getSharePreview", input: string, result: FESharePreview } | 
         { key: "instance.getUserQuota", input: never, result: FEQuotaInfo } | 
         { key: "instance.getUserShares", input: FEGetUserSharesArgs, result: FEPaginatedShares } | 
+        { key: "instance.getWorlds", input: FEInstanceId, result: FEWorld[] } | 
         { key: "instance.searchLogs", input: SearchLogsQuery, result: FESearchResults } | 
         { key: "instance.validateShareCode", input: string, result: boolean } | 
         { key: "instance.verifyShaderLoader", input: ShaderLoaderVerification, result: boolean } | 
@@ -949,6 +950,10 @@ export type FEUnifiedPagination = { index: number; pageSize: number; resultCount
 export type SetServerIcon = { id: FEServerId; base64Data: string }
 
 export type DatapackWorld = { name: string; identity: string }
+
+export type FEWorld = { name: string; addon_id: string; identity: string | null; datapacks: FEWorldDatapack[] }
+
+export type FEWorldDatapack = { id: string; filename: string; file_size: number; is_folder: boolean; name: string | null; version: string | null; curseforge: CurseForgeModMetadata | null; modrinth: ModrinthModMetadata | null; has_update: boolean }
 
 export type CFFEFileStatus = "processing" | "changesRequired" | "underReview" | "approved" | "rejected" | "malwareDetected" | "deleted" | "archived" | "testing" | "released" | "readyForReview" | "deprecated" | "baking" | "awaitingPublishing" | "failedPublishing"
 

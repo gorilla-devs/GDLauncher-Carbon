@@ -317,14 +317,6 @@ impl ManagerRef<'_, InstanceManager> {
         )
         .await;
         let mod_sources = self.instance_cfg_mod_sources(&config).await?;
-        // The installed jar's cached channel sets the update floor, so a
-        // Release is only badged for a newer Release under the default policy.
-        let has_update_for_paths =
-            |kind: &str, paths: &str, installed: ModChannel, built_for: &[String]| {
-                context.as_ref().is_some_and(|context| {
-                    context.has_path(kind, paths, &mod_sources, installed, built_for)
-                })
-            };
 
         let instance_id_val = *instance_id;
         let mut mods = mfcdb::get_instance_mods_full(&self.app.db, instance_id_val).await?;
@@ -332,14 +324,8 @@ impl ManagerRef<'_, InstanceManager> {
         // Legacy artifact paths are not evidence for a context we never queried.
         for row in &mut mods {
             row.mr_update_paths = if let Some(context) = &context {
-                carbon_repos::repos::mod_metadata::get_mr_update_context(
-                    &self.app.db,
-                    &row.meta_id,
-                    &context.key(&row.addon_type),
-                )
-                .await?
-                .filter(|v| v.cached_at > chrono::Utc::now() - chrono::Duration::days(1))
-                .map(|v| v.update_paths)
+                fresh_mr_update_paths(&self.app.db, &row.meta_id, &context.key(&row.addon_type))
+                    .await?
             } else {
                 None
             };
@@ -373,38 +359,20 @@ impl ManagerRef<'_, InstanceManager> {
             .collect();
 
         let mods = mods.into_iter().map(|m| {
-            // Both platforms' badges hold the jar to its most stable label, so
-            // a file one platform calls a Release is not badged for the other
-            // platform's betas.
-            let installed = installed_channel([
-                m.cf_project_id
-                    .and_then(|_| cached_channel("curseforge", &m.meta_id, m.cf_release_type)),
-                m.mr_project_id
-                    .as_ref()
-                    .and_then(|_| cached_channel("modrinth", &m.meta_id, m.mr_release_type)),
-            ]);
-            let built_for = jar_loaders(&m.modloaders);
-            let has_update_on = |platform: ModPlatform, listed: bool, paths: &Option<String>| {
-                listed
-                    && !mod_sources.platform_blacklist.contains(&platform)
-                    && installed.is_some_and(|installed| {
-                        has_update_for_paths(
-                            &m.addon_type,
-                            paths.as_deref().unwrap_or(""),
-                            installed,
-                            &built_for,
-                        )
-                    })
-            };
-            let has_curseforge_update = has_update_on(
-                ModPlatform::Curseforge,
-                m.cf_project_id.is_some(),
-                &m.cf_update_paths,
-            );
-            let has_modrinth_update = has_update_on(
-                ModPlatform::Modrinth,
-                m.mr_project_id.is_some(),
-                &m.mr_update_paths,
+            let has_update = has_cached_update(
+                context.as_ref(),
+                &mod_sources,
+                &m.addon_type,
+                &m.meta_id,
+                m.cf_project_id.map(|_| CachedListing {
+                    release_type: m.cf_release_type,
+                    update_paths: m.cf_update_paths.as_deref(),
+                }),
+                m.mr_project_id.as_ref().map(|_| CachedListing {
+                    release_type: m.mr_release_type,
+                    update_paths: m.mr_update_paths.as_deref(),
+                }),
+                &jar_loaders(&m.modloaders),
             );
 
             let is_duplicate = m.enabled
@@ -466,7 +434,7 @@ impl ManagerRef<'_, InstanceManager> {
                 }),
                 curseforge,
                 modrinth,
-                has_update: has_curseforge_update || has_modrinth_update,
+                has_update,
                 is_duplicate,
                 file_size: m.filesize as u64,
             }
@@ -475,7 +443,7 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(mods.collect::<Vec<_>>())
     }
 
-    async fn instance_cfg_mod_sources(
+    pub(super) async fn instance_cfg_mod_sources(
         self,
         config: &info::Instance,
     ) -> anyhow::Result<Cow<ModSources>> {
@@ -1515,6 +1483,70 @@ fn installed_states(
         .map(|version| Installed::Present { version, channel })
         .chain(gone.into_iter().map(|id| Installed::Gone { id, channel }))
         .collect())
+}
+
+/// An installed file as one platform's cache lists it.
+pub(super) struct CachedListing<'a> {
+    pub release_type: Option<i32>,
+    pub update_paths: Option<&'a str>,
+}
+
+/// Whether the cache holds an update for an installed file of `kind`: a
+/// platform lists it, is not blacklisted, and has a path `context` takes at
+/// or above the file's channel. Both platforms hold the file to its most
+/// stable label, so a file one platform calls a Release is not badged for the
+/// other platform's betas, and a Release only for a newer Release under the
+/// default policy.
+pub(super) fn has_cached_update(
+    context: Option<&UpdateContext>,
+    sources: &ModSources,
+    kind: &str,
+    meta_id: &str,
+    curseforge: Option<CachedListing<'_>>,
+    modrinth: Option<CachedListing<'_>>,
+    built_for: &[String],
+) -> bool {
+    let installed = installed_channel([
+        curseforge
+            .as_ref()
+            .and_then(|listing| cached_channel("curseforge", meta_id, listing.release_type)),
+        modrinth
+            .as_ref()
+            .and_then(|listing| cached_channel("modrinth", meta_id, listing.release_type)),
+    ]);
+    let has_update_on = |platform: ModPlatform, listing: Option<&CachedListing<'_>>| {
+        listing.is_some_and(|listing| {
+            !sources.platform_blacklist.contains(&platform)
+                && installed.is_some_and(|installed| {
+                    context.is_some_and(|context| {
+                        context.has_path(
+                            kind,
+                            listing.update_paths.unwrap_or(""),
+                            sources,
+                            installed,
+                            built_for,
+                        )
+                    })
+                })
+        })
+    };
+    has_update_on(ModPlatform::Curseforge, curseforge.as_ref())
+        || has_update_on(ModPlatform::Modrinth, modrinth.as_ref())
+}
+
+/// The Modrinth update paths cached for `meta_id` under the context `key`,
+/// when they are less than a day old.
+pub(super) async fn fresh_mr_update_paths(
+    db: &carbon_repos::db_exec::Db,
+    meta_id: &str,
+    key: &str,
+) -> anyhow::Result<Option<String>> {
+    Ok(
+        carbon_repos::repos::mod_metadata::get_mr_update_context(db, meta_id, key)
+            .await?
+            .filter(|v| v.cached_at > chrono::Utc::now() - chrono::Duration::days(1))
+            .map(|v| v.update_paths),
+    )
 }
 
 /// A platform's cached channel for an installed file, or `None` (logged) if

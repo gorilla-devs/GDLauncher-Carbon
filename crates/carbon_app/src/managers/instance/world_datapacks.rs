@@ -6,16 +6,30 @@ use super::{
     InstanceId, InstanceManager, InvalidInstanceIdError,
     datapacks::world_identity,
     installer::publication,
-    mods::{addon_metadata, validate_addon_basename},
+    mods::{
+        CachedListing, InvalidInstanceModIdError, addon_metadata, fresh_mr_update_paths,
+        has_cached_update, validate_addon_basename,
+    },
     run::LaunchState,
 };
 use crate::{
-    domain::instance::AddonType,
-    managers::{ManagerRef, metadata::cache::current_file_stamp},
+    api::keys::instance::GET_WORLDS,
+    domain::instance::{self as domain, AddonType},
+    managers::{
+        ManagerRef,
+        metadata::cache::{
+            CacheEntityId, current_file_stamp, eligibility::world_context,
+            modrinth::target_compatibility,
+        },
+    },
 };
+use anyhow::bail;
 use carbon_repos::{
     dbtypes::DbDateTime,
-    repos::world_datapack_cache::{self as wdb, WorldDatapackRow},
+    repos::{
+        mod_file_cache as mfcdb,
+        world_datapack_cache::{self as wdb, WorldDatapackFullRow, WorldDatapackRow},
+    },
 };
 use chrono::Utc;
 use std::collections::{HashMap, HashSet};
@@ -24,6 +38,38 @@ use tracing::{debug, warn};
 
 pub(super) fn world_datapacks_folder(saves: &Path, world: &str) -> PathBuf {
     saves.join(world).join("datapacks")
+}
+
+/// A world of an instance, as the Worlds tab lists it.
+#[derive(Debug, Clone, PartialEq)]
+pub struct World {
+    /// The save's folder name.
+    pub name: String,
+    /// The id of the world's addon row.
+    pub addon_id: String,
+    /// `None` when the folder is not a save the launcher may change.
+    pub identity: Option<String>,
+    pub datapacks: Vec<WorldDatapack>,
+}
+
+/// A data pack in a world's `datapacks` folder.
+#[derive(Debug, Clone, PartialEq)]
+pub struct WorldDatapack {
+    pub id: String,
+    pub filename: String,
+    pub file_size: u64,
+    pub is_folder: bool,
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub curseforge: Option<domain::CurseForgeModMetadata>,
+    pub modrinth: Option<domain::ModrinthModMetadata>,
+    pub has_update: bool,
+}
+
+impl WorldDatapack {
+    fn display_name(&self) -> &str {
+        self.name.as_deref().unwrap_or(&self.filename)
+    }
 }
 
 /// An entry of a world's `datapacks` folder that the game loads.
@@ -93,6 +139,21 @@ impl ManagerRef<'_, InstanceManager> {
     /// [`Self::scan_world_datapacks`], calling `started` once the scan holds
     /// the instance gate: what changes on disk after that may be missed.
     pub(crate) async fn scan_world_datapacks_started(
+        self,
+        instance_id: InstanceId,
+        started: impl FnOnce() + Send,
+    ) -> anyhow::Result<bool> {
+        let changed = self
+            .scan_world_datapacks_unannounced(instance_id, started)
+            .await?;
+        if changed {
+            self.app.invalidate(GET_WORLDS, Some((*instance_id).into()));
+        }
+        Ok(changed)
+    }
+
+    /// The scan without telling the frontend that the worlds changed.
+    async fn scan_world_datapacks_unannounced(
         self,
         instance_id: InstanceId,
         started: impl FnOnce() + Send,
@@ -260,6 +321,229 @@ impl ManagerRef<'_, InstanceManager> {
         )
         .await?;
         Ok(true)
+    }
+
+    /// The instance's worlds, one per `worlds` addon row, each with the data
+    /// packs found in it, after scanning them. Sorted by name, packs by the
+    /// name they show. Only cached platform data is read, so the list does not
+    /// wait for CurseForge or Modrinth. A failed scan is logged and the rows
+    /// there are are listed.
+    pub async fn list_worlds(self, instance_id: InstanceId) -> anyhow::Result<Vec<World>> {
+        // Not announced: this answer already holds what it changed, and an
+        // invalidation would only make the frontend ask again. Packs it finds
+        // are asked about as those of a background scan are.
+        match self
+            .scan_world_datapacks_unannounced(instance_id, || {})
+            .await
+        {
+            Ok(true) => {
+                self.app
+                    .meta_cache_manager()
+                    .queue_platform_passes(CacheEntityId::Instance(instance_id))
+                    .await;
+            }
+            Ok(false) => {}
+            Err(error) => warn!(
+                ?error,
+                "Instance {instance_id}: could not scan the data packs in its worlds before listing them"
+            ),
+        }
+
+        let config = {
+            let instances = self.instances.read().await;
+            instances
+                .get(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?
+                .data()?
+                .config
+                .clone()
+        };
+        let context = target_compatibility(self.app, CacheEntityId::Instance(instance_id))
+            .await
+            .map(|context| world_context(&context.game));
+        let sources = self.instance_cfg_mod_sources(&config).await?;
+        let path = publication::current_path(&self.app, instance_id).await?;
+        let root = path.get_root();
+        // Worlds behind a saves folder that fails its checks get no identity.
+        let saves = publication::checked_folder(&path, AddonType::Worlds)
+            .await
+            .ok();
+
+        let mut packs: HashMap<String, Vec<WorldDatapack>> = HashMap::new();
+        for row in wdb::get_world_datapacks_full(&self.app.db, *instance_id).await? {
+            let world = row.world.clone();
+            let pack = self
+                .listed_world_datapack(row, context.as_ref(), &sources)
+                .await?;
+            packs.entry(world).or_default().push(pack);
+        }
+
+        let mut worlds = Vec::new();
+        for row in mfcdb::get_mod_files_by_instance(&self.app.db, *instance_id).await? {
+            if row.addon_type != AddonType::Worlds.to_db_string() {
+                continue;
+            }
+            let identity = match &saves {
+                Some(saves) => world_identity(instance_id, &root, &saves.join(&row.filename))
+                    .await
+                    .ok(),
+                None => None,
+            };
+            let mut datapacks = match identity {
+                Some(_) => packs.remove(&row.filename).unwrap_or_default(),
+                None => Vec::new(),
+            };
+            datapacks.sort_by_cached_key(|pack| pack.display_name().to_lowercase());
+            worlds.push(World {
+                name: row.filename,
+                addon_id: row.id,
+                identity,
+                datapacks,
+            });
+        }
+        worlds.sort_by_cached_key(|world| world.name.to_lowercase());
+        Ok(worlds)
+    }
+
+    async fn listed_world_datapack(
+        self,
+        row: WorldDatapackFullRow,
+        context: Option<&crate::managers::metadata::cache::eligibility::UpdateContext>,
+        sources: &carbon_platforms::ModSources,
+    ) -> anyhow::Result<WorldDatapack> {
+        // The world context has its own key: paths cached for the instance
+        // may name builds for its mod loaders, which a world never loads.
+        let mr_update_paths = match (&row.meta_id, context) {
+            (Some(meta_id), Some(context)) => {
+                fresh_mr_update_paths(&self.app.db, meta_id, &context.key("datapacks")).await?
+            }
+            _ => None,
+        };
+        let has_update = row.meta_id.as_deref().is_some_and(|meta_id| {
+            has_cached_update(
+                context,
+                sources,
+                "datapacks",
+                meta_id,
+                row.cf_project_id.map(|_| CachedListing {
+                    release_type: row.cf_release_type,
+                    update_paths: row.cf_update_paths.as_deref(),
+                }),
+                row.mr_project_id.as_ref().map(|_| CachedListing {
+                    release_type: row.mr_release_type,
+                    update_paths: mr_update_paths.as_deref(),
+                }),
+                &[],
+            )
+        });
+        let curseforge = match (
+            row.cf_project_id,
+            row.cf_file_id,
+            row.cf_name,
+            row.cf_version,
+            row.cf_urlslug,
+            row.cf_summary,
+            row.cf_authors,
+        ) {
+            (
+                Some(project_id),
+                Some(file_id),
+                Some(name),
+                Some(version),
+                Some(urlslug),
+                Some(summary),
+                Some(authors),
+            ) => Some(domain::CurseForgeModMetadata {
+                project_id: project_id as u32,
+                file_id: file_id as u32,
+                name,
+                version,
+                urlslug,
+                summary,
+                authors,
+                has_image: row.has_cf_image,
+            }),
+            _ => None,
+        };
+        let modrinth = match (
+            row.mr_project_id,
+            row.mr_version_id,
+            row.mr_title,
+            row.mr_version,
+            row.mr_urlslug,
+            row.mr_description,
+            row.mr_authors,
+        ) {
+            (
+                Some(project_id),
+                Some(version_id),
+                Some(title),
+                Some(version),
+                Some(urlslug),
+                Some(description),
+                Some(authors),
+            ) => Some(domain::ModrinthModMetadata {
+                project_id,
+                version_id,
+                title,
+                version,
+                urlslug,
+                description,
+                authors,
+                has_image: row.has_mr_image,
+            }),
+            _ => None,
+        };
+        let name = curseforge
+            .as_ref()
+            .map(|cf| cf.name.clone())
+            .or_else(|| modrinth.as_ref().map(|mr| mr.title.clone()))
+            .or(row.meta_name);
+        let version = curseforge
+            .as_ref()
+            .map(|cf| cf.version.clone())
+            .or_else(|| modrinth.as_ref().map(|mr| mr.version.clone()))
+            .or(row.meta_version);
+        Ok(WorldDatapack {
+            id: row.id,
+            filename: row.filename,
+            file_size: row.filesize.max(0) as u64,
+            is_folder: row.is_folder,
+            name,
+            version,
+            curseforge,
+            modrinth,
+            has_update,
+        })
+    }
+
+    /// The icon of a world data pack of `instance_id` from `platformid`'s
+    /// image cache (0 local, 1 CurseForge, 2 Modrinth), as
+    /// `get_mod_icon` serves an addon's. `None` when there is none, as for a
+    /// folder pack.
+    pub async fn get_world_datapack_icon(
+        self,
+        instance_id: InstanceId,
+        id: String,
+        platformid: i32,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        if !(0..=2).contains(&platformid) {
+            bail!("unsupported platform");
+        }
+        let owned = wdb::get_world_datapack_by_id(&self.app.db, &id)
+            .await?
+            .is_some_and(|row| row.instance_id == *instance_id);
+        if !owned {
+            bail!(InvalidInstanceModIdError(instance_id, id));
+        }
+        let Some(icons) = wdb::get_world_datapack_icon_data(&self.app.db, &id).await? else {
+            return Ok(None);
+        };
+        Ok(match platformid {
+            0 => icons.local_data,
+            1 => icons.cf_data,
+            _ => icons.mr_data,
+        })
     }
 }
 
@@ -740,5 +1024,561 @@ mod tests {
         mcm.world_scans_settled(id).await;
         tokio::time::sleep(Duration::from_millis(50)).await;
         assert_eq!(mcm.platform_requests(entity).await, (cf + 1, mr + 1));
+    }
+
+    /// An instance at 1.20.1 running `loaders`, with its `saves` folder.
+    async fn listing_instance(
+        app: &App,
+        name: &str,
+        loaders: &[crate::domain::instance::info::ModLoaderType],
+    ) -> (InstanceId, PathBuf) {
+        use crate::domain::instance::info::{GameVersion, ModLoader, StandardVersion};
+        use crate::managers::instance::InstanceVersionSource;
+        let group = app.instance_manager().get_default_group().await.unwrap();
+        let id = app
+            .instance_manager()
+            .create_instance(
+                group,
+                name.to_owned(),
+                false,
+                InstanceVersionSource::Version(GameVersion::Standard(StandardVersion {
+                    release: "1.20.1".into(),
+                    modloaders: loaders
+                        .iter()
+                        .map(|type_| ModLoader {
+                            type_: *type_,
+                            version: "fixture".into(),
+                        })
+                        .collect(),
+                })),
+                String::new(),
+            )
+            .await
+            .unwrap();
+        let saves = publication::current_path(app, id)
+            .await
+            .unwrap()
+            .get_saves_path();
+        std::fs::create_dir_all(&saves).unwrap();
+        (id, saves)
+    }
+
+    /// The `worlds` addon row of `world`, as the local pass keeps one for
+    /// every folder in `saves`. Returns its id.
+    async fn world_row(app: &App, id: InstanceId, world: &str) -> String {
+        use carbon_repos::repos::{mod_file_cache as mfcdb, mod_metadata as metarepo};
+        let metadata_id = format!("{}-{world}-metadata", *id);
+        let now = DbDateTime(Utc::now().fixed_offset());
+        metarepo::insert_metadata(
+            &app.db,
+            &metadata_id,
+            0,
+            metadata_id.as_bytes(),
+            metadata_id.as_bytes(),
+            "",
+            None,
+            None,
+            None,
+            None,
+            None,
+            now,
+        )
+        .await
+        .unwrap();
+        mfcdb::upsert_mod_file_cache(
+            &app.db,
+            *id,
+            world.to_owned(),
+            0,
+            true,
+            AddonType::Worlds.to_db_string().to_owned(),
+            metadata_id,
+            now,
+        )
+        .await
+        .unwrap();
+        mfcdb::get_mod_file_cache_by_instance_kind_filename(
+            &app.db,
+            *id,
+            AddonType::Worlds.to_db_string(),
+            world,
+        )
+        .await
+        .unwrap()
+        .unwrap()
+        .id
+    }
+
+    /// A save `world` with its addon row and the zips `packs` (file name,
+    /// pack description) in its `datapacks` folder.
+    async fn listed_world(
+        app: &App,
+        id: InstanceId,
+        saves: &Path,
+        world: &str,
+        packs: &[(&str, &str)],
+    ) -> String {
+        add_world(saves, world);
+        for (filename, description) in packs {
+            std::fs::write(
+                world_datapacks_folder(saves, world).join(filename),
+                pack_zip(description),
+            )
+            .unwrap();
+        }
+        world_row(app, id, world).await
+    }
+
+    async fn list(app: &App, id: InstanceId) -> Vec<World> {
+        app.instance_manager().list_worlds(id).await.unwrap()
+    }
+
+    async fn pack_metadata(app: &App, id: InstanceId, world: &str, filename: &str) -> String {
+        rows(app, id)
+            .await
+            .into_iter()
+            .find(|row| row.world == world && row.filename == filename)
+            .and_then(|row| row.metadata_id)
+            .expect("the pack was scanned")
+    }
+
+    /// Modrinth knows the pack as a Release of project `project`.
+    async fn known_on_modrinth(app: &App, metadata_id: &str, project: &str) {
+        use carbon_repos::repos::mod_metadata as metarepo;
+        let sha512 = metarepo::get_metadata_by_id(&app.db, metadata_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .sha512;
+        metarepo::upsert_mr_mod_cache(
+            &app.db,
+            hex::encode(sha512),
+            project.into(),
+            format!("{project}-installed"),
+            format!("{project} title"),
+            "1.0".into(),
+            project.into(),
+            String::new(),
+            "someone".into(),
+            carbon_platforms::ModChannel::Stable as i32,
+            String::new(),
+            "pack.zip".into(),
+            "https://cdn.invalid/pack.zip".into(),
+            DbDateTime(Utc::now().fixed_offset()),
+            metadata_id.into(),
+        )
+        .await
+        .unwrap();
+    }
+
+    /// CurseForge knows the pack as a Release with `update_paths`.
+    async fn known_on_curseforge(app: &App, metadata_id: &str, name: &str, update_paths: &str) {
+        carbon_repos::repos::mod_metadata::upsert_cf_mod_cache(
+            &app.db,
+            0,
+            7,
+            70,
+            name.into(),
+            "2.0".into(),
+            "slug".into(),
+            String::new(),
+            "someone".into(),
+            carbon_platforms::ModChannel::Stable as i32,
+            update_paths.into(),
+            DbDateTime(Utc::now().fixed_offset()),
+            metadata_id.into(),
+        )
+        .await
+        .unwrap();
+    }
+
+    /// The Modrinth update paths of the pack under the context key `key`.
+    async fn modrinth_paths(app: &App, metadata_id: &str, key: &str, paths: &str) {
+        carbon_repos::repos::mod_metadata::upsert_mr_update_context(
+            &app.db,
+            metadata_id,
+            key,
+            paths,
+            DbDateTime(Utc::now().fixed_offset()),
+        )
+        .await
+        .unwrap();
+    }
+
+    const NEWER_DATA_PACK: &str = "1.20.1,datapack,stable";
+
+    fn world_key() -> String {
+        crate::managers::metadata::cache::eligibility::world_context("1.20.1").key("datapacks")
+    }
+
+    #[tokio::test]
+    async fn a_world_without_packs_is_listed() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-empty-world", &[]).await;
+        let addon_id = listed_world(&app, id, &saves, "World", &[]).await;
+        let worlds = list(&app, id).await;
+        assert_eq!(worlds.len(), 1, "{worlds:?}");
+        assert_eq!(worlds[0].name, "World");
+        assert_eq!(worlds[0].addon_id, addon_id);
+        assert!(worlds[0].identity.is_some());
+        assert!(worlds[0].datapacks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn an_unrecognised_pack_has_no_name_and_no_update() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-unrecognised", &[]).await;
+        listed_world(&app, id, &saves, "World", &[("pack.zip", "plain")]).await;
+        let folder = world_datapacks_folder(&saves, "World").join("folder-pack");
+        std::fs::create_dir(&folder).unwrap();
+        std::fs::write(folder.join("pack.mcmeta"), b"{}").unwrap();
+        let worlds = list(&app, id).await;
+        let packs = &worlds[0].datapacks;
+        assert_eq!(packs.len(), 2, "{packs:?}");
+        for pack in packs {
+            assert_eq!(pack.name, None, "{pack:?}");
+            assert_eq!(pack.version, None, "{pack:?}");
+            assert!(pack.curseforge.is_none() && pack.modrinth.is_none());
+            assert!(!pack.has_update, "{pack:?}");
+        }
+        let folder = packs.iter().find(|pack| pack.is_folder).unwrap();
+        assert_eq!(folder.filename, "folder-pack");
+        let zip = packs.iter().find(|pack| !pack.is_folder).unwrap();
+        assert_eq!(zip.file_size as usize, pack_zip("plain").len());
+    }
+
+    #[tokio::test]
+    async fn a_recognised_pack_with_a_newer_cached_build_has_an_update() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-recognised", &[]).await;
+        listed_world(
+            &app,
+            id,
+            &saves,
+            "World",
+            &[
+                ("modrinth.zip", "on modrinth"),
+                ("curseforge.zip", "on curseforge"),
+            ],
+        )
+        .await;
+        assert!(
+            app.instance_manager()
+                .scan_world_datapacks(id)
+                .await
+                .unwrap()
+        );
+        let on_modrinth = pack_metadata(&app, id, "World", "modrinth.zip").await;
+        known_on_modrinth(&app, &on_modrinth, "listed").await;
+        let on_curseforge = pack_metadata(&app, id, "World", "curseforge.zip").await;
+        known_on_curseforge(&app, &on_curseforge, "Listed on CurseForge", "").await;
+        let packs = list(&app, id).await.remove(0).datapacks;
+        let modrinth = packs.iter().find(|p| p.filename == "modrinth.zip").unwrap();
+        assert_eq!(modrinth.name.as_deref(), Some("listed title"));
+        assert_eq!(modrinth.version.as_deref(), Some("1.0"));
+        assert_eq!(modrinth.modrinth.as_ref().unwrap().project_id, "listed");
+        assert!(!modrinth.has_update, "no newer build is cached yet");
+        let curseforge = packs
+            .iter()
+            .find(|p| p.filename == "curseforge.zip")
+            .unwrap();
+        assert_eq!(curseforge.curseforge.as_ref().unwrap().project_id, 7);
+        assert!(!curseforge.has_update);
+
+        modrinth_paths(&app, &on_modrinth, &world_key(), NEWER_DATA_PACK).await;
+        known_on_curseforge(
+            &app,
+            &on_curseforge,
+            "Listed on CurseForge",
+            "1.20.1,datapacks,stable",
+        )
+        .await;
+        let packs = list(&app, id).await.remove(0).datapacks;
+        assert!(packs.iter().all(|pack| pack.has_update), "{packs:?}");
+
+        // An answer more than a day old is not trusted.
+        carbon_repos::repos::mod_metadata::upsert_mr_update_context(
+            &app.db,
+            &on_modrinth,
+            &world_key(),
+            NEWER_DATA_PACK,
+            DbDateTime((Utc::now() - chrono::Duration::days(2)).fixed_offset()),
+        )
+        .await
+        .unwrap();
+        let packs = list(&app, id).await.remove(0).datapacks;
+        let modrinth = packs.iter().find(|p| p.filename == "modrinth.zip").unwrap();
+        assert!(!modrinth.has_update);
+    }
+
+    #[tokio::test]
+    async fn a_path_cached_for_the_instance_context_only_is_no_update() {
+        use crate::domain::instance::info::ModLoaderType;
+        use crate::managers::metadata::cache::modrinth::target_compatibility;
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) =
+            listing_instance(&app, "list-instance-context", &[ModLoaderType::Fabric]).await;
+        listed_world(&app, id, &saves, "World", &[("pack.zip", "fabric")]).await;
+        assert!(
+            app.instance_manager()
+                .scan_world_datapacks(id)
+                .await
+                .unwrap()
+        );
+        let metadata = pack_metadata(&app, id, "World", "pack.zip").await;
+        known_on_modrinth(&app, &metadata, "loader-build").await;
+        let instance_key = target_compatibility(&app, CacheEntityId::Instance(id))
+            .await
+            .unwrap()
+            .key("datapacks");
+        assert_ne!(instance_key, world_key());
+        // A build for the instance's loader, which a world never loads.
+        modrinth_paths(&app, &metadata, &instance_key, "1.20.1,fabric,stable").await;
+        modrinth_paths(&app, &metadata, &world_key(), "").await;
+        let packs = list(&app, id).await.remove(0).datapacks;
+        assert!(!packs[0].has_update, "{packs:?}");
+        // A data pack build under the world key is one.
+        modrinth_paths(&app, &metadata, &world_key(), NEWER_DATA_PACK).await;
+        assert!(list(&app, id).await[0].datapacks[0].has_update);
+    }
+
+    #[tokio::test]
+    async fn a_blacklisted_platform_gives_no_update() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-blacklist", &[]).await;
+        listed_world(&app, id, &saves, "World", &[("pack.zip", "blacklisted")]).await;
+        assert!(
+            app.instance_manager()
+                .scan_world_datapacks(id)
+                .await
+                .unwrap()
+        );
+        let metadata = pack_metadata(&app, id, "World", "pack.zip").await;
+        known_on_modrinth(&app, &metadata, "blacklisted").await;
+        modrinth_paths(&app, &metadata, &world_key(), NEWER_DATA_PACK).await;
+        assert!(list(&app, id).await[0].datapacks[0].has_update);
+        app.settings_manager()
+            .set(
+                carbon_repos::repos::app_configuration::AppConfigurationPatch {
+                    mod_platform_blacklist: Some("modrinth".into()),
+                    ..Default::default()
+                },
+            )
+            .await
+            .unwrap();
+        let pack = list(&app, id).await.remove(0).datapacks.remove(0);
+        assert!(pack.modrinth.is_some(), "still shown as known");
+        assert!(!pack.has_update);
+    }
+
+    #[tokio::test]
+    async fn a_folder_without_level_dat_is_listed_without_identity_or_packs() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-no-level-dat", &[]).await;
+        let folder = world_datapacks_folder(&saves, "NotASave");
+        std::fs::create_dir_all(&folder).unwrap();
+        std::fs::write(folder.join("pack.zip"), pack_zip("orphan")).unwrap();
+        let addon_id = world_row(&app, id, "NotASave").await;
+        let worlds = list(&app, id).await;
+        assert_eq!(worlds.len(), 1, "{worlds:?}");
+        assert_eq!(worlds[0].addon_id, addon_id);
+        assert_eq!(worlds[0].identity, None);
+        assert!(worlds[0].datapacks.is_empty());
+    }
+
+    #[tokio::test]
+    async fn worlds_and_packs_are_sorted_by_the_name_they_show() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-sorted", &[]).await;
+        listed_world(&app, id, &saves, "beta", &[]).await;
+        listed_world(
+            &app,
+            id,
+            &saves,
+            "Alpha",
+            &[("b.zip", "b"), ("Zulu.zip", "z"), ("a-known.zip", "known")],
+        )
+        .await;
+        assert!(
+            app.instance_manager()
+                .scan_world_datapacks(id)
+                .await
+                .unwrap()
+        );
+        // Shown as "Middle", between "b.zip" and "Zulu.zip".
+        let known = pack_metadata(&app, id, "Alpha", "a-known.zip").await;
+        known_on_curseforge(&app, &known, "Middle", "").await;
+        let worlds = list(&app, id).await;
+        let names: Vec<_> = worlds.iter().map(|world| world.name.as_str()).collect();
+        assert_eq!(names, ["Alpha", "beta"]);
+        let packs: Vec<_> = worlds[0]
+            .datapacks
+            .iter()
+            .map(|pack| pack.filename.as_str())
+            .collect();
+        assert_eq!(packs, ["b.zip", "a-known.zip", "Zulu.zip"]);
+    }
+
+    /// The list reads the cache only: it asks no platform, so it is
+    /// answered whether they can be reached or not.
+    #[tokio::test]
+    async fn the_list_asks_no_platform() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-offline", &[]).await;
+        listed_world(&app, id, &saves, "World", &[("pack.zip", "offline")]).await;
+        assert!(
+            app.instance_manager()
+                .scan_world_datapacks(id)
+                .await
+                .unwrap()
+        );
+        let entity = CacheEntityId::Instance(id);
+        let requests = app.meta_cache_manager().platform_requests(entity).await;
+        let worlds = tokio::time::timeout(
+            std::time::Duration::from_secs(5),
+            app.instance_manager().list_worlds(id),
+        )
+        .await
+        .expect("the list does not wait for a platform")
+        .unwrap();
+        assert_eq!(worlds[0].datapacks.len(), 1);
+        assert_eq!(
+            app.meta_cache_manager().platform_requests(entity).await,
+            requests
+        );
+    }
+
+    #[tokio::test]
+    async fn packs_the_list_finds_are_asked_about_by_the_platform_passes() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-queues-passes", &[]).await;
+        listed_world(&app, id, &saves, "World", &[]).await;
+        let entity = CacheEntityId::Instance(id);
+        let mcm = app.meta_cache_manager();
+        let (cf, mr) = mcm.platform_requests(entity).await;
+        list(&app, id).await;
+        assert_eq!(mcm.platform_requests(entity).await, (cf, mr), "nothing new");
+        std::fs::write(
+            world_datapacks_folder(&saves, "World").join("new.zip"),
+            pack_zip("new"),
+        )
+        .unwrap();
+        assert_eq!(list(&app, id).await[0].datapacks.len(), 1);
+        assert_eq!(mcm.platform_requests(entity).await, (cf + 1, mr + 1));
+    }
+
+    fn worlds_invalidated(
+        events: &mut tokio::sync::broadcast::Receiver<crate::api::InvalidationEvent>,
+        id: InstanceId,
+    ) -> bool {
+        let mut seen = false;
+        while let Ok(event) = events.try_recv() {
+            seen |= event.key == GET_WORLDS.full && event.args == Some((*id).into());
+        }
+        seen
+    }
+
+    #[tokio::test]
+    async fn a_scan_that_changes_rows_invalidates_the_worlds_but_the_list_does_not() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "list-invalidation", &[]).await;
+        listed_world(&app, id, &saves, "World", &[]).await;
+        let mut events = app.invalidation_channel.subscribe();
+        assert!(
+            !app.instance_manager()
+                .scan_world_datapacks(id)
+                .await
+                .unwrap()
+        );
+        assert!(!worlds_invalidated(&mut events, id));
+
+        let folder = world_datapacks_folder(&saves, "World");
+        std::fs::write(folder.join("one.zip"), pack_zip("one")).unwrap();
+        assert!(
+            app.instance_manager()
+                .scan_world_datapacks(id)
+                .await
+                .unwrap()
+        );
+        assert!(worlds_invalidated(&mut events, id));
+
+        // The list's own scan finds the new pack and says nothing: its
+        // answer holds it, so the frontend need not ask again.
+        std::fs::write(folder.join("two.zip"), pack_zip("two")).unwrap();
+        assert_eq!(list(&app, id).await[0].datapacks.len(), 2);
+        assert!(!worlds_invalidated(&mut events, id));
+    }
+
+    #[tokio::test]
+    async fn a_world_pack_icon_is_served_for_its_own_instance_only() {
+        use carbon_repos::repos::mod_metadata as metarepo;
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = listing_instance(&app, "icon-owner", &[]).await;
+        let (other, _) = listing_instance(&app, "icon-other", &[]).await;
+        listed_world(&app, id, &saves, "World", &[("pack.zip", "icon")]).await;
+        let folder = world_datapacks_folder(&saves, "World").join("folder-pack");
+        std::fs::create_dir(&folder).unwrap();
+        std::fs::write(folder.join("pack.mcmeta"), b"{}").unwrap();
+        assert!(
+            app.instance_manager()
+                .scan_world_datapacks(id)
+                .await
+                .unwrap()
+        );
+        let metadata = pack_metadata(&app, id, "World", "pack.zip").await;
+        known_on_modrinth(&app, &metadata, "icon").await;
+        metarepo::upsert_mr_image(&app.db, &metadata, "https://cdn.invalid/icon.png")
+            .await
+            .unwrap();
+        metarepo::mark_mr_image_downloaded(&app.db, &metadata, b"png")
+            .await
+            .unwrap();
+        let packs = list(&app, id).await.remove(0).datapacks;
+        let zip = packs.iter().find(|pack| !pack.is_folder).unwrap();
+        let folder = packs.iter().find(|pack| pack.is_folder).unwrap();
+        assert!(zip.modrinth.as_ref().unwrap().has_image);
+
+        let manager = app.instance_manager();
+        assert_eq!(
+            manager
+                .get_world_datapack_icon(id, zip.id.clone(), 2)
+                .await
+                .unwrap()
+                .as_deref(),
+            Some(&b"png"[..])
+        );
+        assert_eq!(
+            manager
+                .get_world_datapack_icon(id, zip.id.clone(), 1)
+                .await
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            manager
+                .get_world_datapack_icon(id, folder.id.clone(), 2)
+                .await
+                .unwrap(),
+            None
+        );
+        assert!(
+            manager
+                .get_world_datapack_icon(other, zip.id.clone(), 2)
+                .await
+                .is_err(),
+            "a pack of another instance is refused"
+        );
+        assert!(
+            manager
+                .get_world_datapack_icon(id, "missing".into(), 2)
+                .await
+                .is_err()
+        );
+        assert!(
+            manager
+                .get_world_datapack_icon(id, zip.id.clone(), 3)
+                .await
+                .is_err()
+        );
     }
 }

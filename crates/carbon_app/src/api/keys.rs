@@ -103,6 +103,7 @@ keys! {
         REPAIR_MODPACK                              = "repairModpack";
         GET_REPAIR_PREVIEW                          = "getRepairPreview";
         GET_DATAPACK_WORLDS                        = "getDatapackWorlds";
+        GET_WORLDS                                  = "getWorlds";
         COPY_DATAPACK                             = "copyDatapack";
         GET_PENDING_SETUP                          = "getPendingSetup";
         CANCEL_PENDING_SETUP                       = "cancelPendingSetup";

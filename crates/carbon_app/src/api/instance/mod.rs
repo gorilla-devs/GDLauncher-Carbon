@@ -576,6 +576,14 @@ pub(super) fn mount() -> RouterBuilder<App> {
         query GET_DATAPACK_WORLDS[app, id: FEInstanceId] {
             app.instance_manager().datapack_worlds(id.into()).await
         }
+        query GET_WORLDS[app, instance_id: FEInstanceId] {
+            Ok(app.instance_manager()
+                .list_worlds(instance_id.into())
+                .await?
+                .into_iter()
+                .map(FEWorld::from)
+                .collect::<Vec<_>>())
+        }
         mutation COPY_DATAPACK[app, request: crate::managers::instance::datapacks::CopyDatapack] {
             app.instance_manager().copy_datapack(request).await
         }
@@ -926,6 +934,13 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
     }
 
     #[derive(Deserialize)]
+    struct WorldDatapackIconQuery {
+        instance_id: i32,
+        id: String,
+        platform: String,
+    }
+
+    #[derive(Deserialize)]
     struct IconPathQuery {
         path: String,
     }
@@ -1194,6 +1209,31 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
 
                     let icon = app.instance_manager()
                         .get_mod_icon(domain::InstanceId(query.instance_id), query.mod_id, platformid)
+                        .await
+                        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+
+                    let res = match icon {
+                        Some(icon) => (StatusCode::OK, icon),
+                        None => (StatusCode::NO_CONTENT, Vec::new()),
+                    };
+
+                    Ok(res)
+                }
+            )
+        )
+        .route(
+            "/worldDatapackIcon",
+            axum::routing::get(
+                |State(app): State<Arc<AppInner>>, Query(query): Query<WorldDatapackIconQuery>| async move {
+                    let platformid = match &query.platform as &str {
+                        "metadata" => 0,
+                        "curseforge" => 1,
+                        "modrinth" => 2,
+                        _ => return Err(FeError::from_anyhow(&anyhow::anyhow!("unsupported platform")).make_axum()),
+                    };
+
+                    let icon = app.instance_manager()
+                        .get_world_datapack_icon(domain::InstanceId(query.instance_id), query.id, platformid)
                         .await
                         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
 
@@ -2123,6 +2163,55 @@ struct ModFileMetadata {
     sha_512: String,
     murmur_2: String,
     has_image: bool,
+}
+
+/// A world of an instance with the data packs in it.
+#[derive(Type, Serialize, Debug)]
+struct FEWorld {
+    name: String,
+    addon_id: String,
+    identity: Option<String>,
+    datapacks: Vec<FEWorldDatapack>,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct FEWorldDatapack {
+    id: String,
+    filename: String,
+    file_size: f64,
+    is_folder: bool,
+    name: Option<String>,
+    version: Option<String>,
+    curseforge: Option<CurseForgeModMetadata>,
+    modrinth: Option<ModrinthModMetadata>,
+    has_update: bool,
+}
+
+impl From<crate::managers::instance::world_datapacks::World> for FEWorld {
+    fn from(value: crate::managers::instance::world_datapacks::World) -> Self {
+        Self {
+            name: value.name,
+            addon_id: value.addon_id,
+            identity: value.identity,
+            datapacks: value.datapacks.into_iter().map(Into::into).collect(),
+        }
+    }
+}
+
+impl From<crate::managers::instance::world_datapacks::WorldDatapack> for FEWorldDatapack {
+    fn from(value: crate::managers::instance::world_datapacks::WorldDatapack) -> Self {
+        Self {
+            id: value.id,
+            filename: value.filename,
+            file_size: value.file_size as f64,
+            is_folder: value.is_folder,
+            name: value.name,
+            version: value.version,
+            curseforge: value.curseforge.map(Into::into),
+            modrinth: value.modrinth.map(Into::into),
+            has_update: value.has_update,
+        }
+    }
 }
 
 #[derive(Type, Serialize, Debug)]

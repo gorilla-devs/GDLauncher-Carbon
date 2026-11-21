@@ -1,4 +1,4 @@
-use crate::api::keys::instance::{INSTANCE_DETAILS, INSTANCE_MODS};
+use crate::api::keys::instance::{GET_WORLDS, INSTANCE_DETAILS, INSTANCE_MODS};
 use crate::api::keys::server::GET_SERVER_ADDONS;
 use crate::api::translation::Translation;
 use crate::domain::instance::InstanceId;
@@ -1471,6 +1471,16 @@ impl ManagerRef<'_, MetaCacheManager> {
             .await;
     }
 
+    /// Queue the CurseForge and Modrinth passes of `entity_id`.
+    pub(crate) async fn queue_platform_passes(self, entity_id: CacheEntityId) {
+        join!(
+            self.curseforge_targets
+                .send_modify_always(|targets| targets.queue(entity_id)),
+            self.modrinth_targets
+                .send_modify_always(|targets| targets.queue(entity_id)),
+        );
+    }
+
     pub async fn launch_background_tasks(self) {
         let app_pause = self.app.clone();
         tokio::spawn(async move {
@@ -1536,7 +1546,12 @@ impl ManagerRef<'_, MetaCacheManager> {
                 tokio::select! {
                     _ = list_debounce_rx.changed() => {
                         match watched {
-                            CacheEntityId::Instance(id) => app_debounce.invalidate(INSTANCE_MODS, Some(id.0.into())),
+                            CacheEntityId::Instance(id) => {
+                                app_debounce.invalidate(INSTANCE_MODS, Some(id.0.into()));
+                                // The passes also save what they find for the
+                                // packs in the instance's worlds.
+                                app_debounce.invalidate(GET_WORLDS, Some(id.0.into()));
+                            }
                             CacheEntityId::Server(id) => app_debounce.invalidate(GET_SERVER_ADDONS, Some(id.into())),
                         }
 
@@ -3541,14 +3556,9 @@ fn spawn_world_datapack_scan(app: &App, instance_id: InstanceId) {
         drop(pending);
         match result {
             Ok(true) => {
-                let entity_id = CacheEntityId::Instance(instance_id);
-                let mcm = app.meta_cache_manager();
-                join!(
-                    mcm.curseforge_targets
-                        .send_modify_always(|targets| targets.queue(entity_id)),
-                    mcm.modrinth_targets
-                        .send_modify_always(|targets| targets.queue(entity_id)),
-                );
+                app.meta_cache_manager()
+                    .queue_platform_passes(CacheEntityId::Instance(instance_id))
+                    .await;
             }
             Ok(false) => {}
             Err(error) => warn!(
