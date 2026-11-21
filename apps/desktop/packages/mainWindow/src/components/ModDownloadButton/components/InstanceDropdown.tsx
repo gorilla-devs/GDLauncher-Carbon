@@ -29,9 +29,10 @@ import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
 import type { ReadableWorld } from "@/utils/worldTarget"
 import type { FEWorld } from "@gd/core_module/bindings"
 
-// The core invalidates a world list when its packs change, so a read can be
-// reused across reopenings of the menu for this long.
-const WORLDS_STALE_TIME = 5 * 60 * 1000
+// The core invalidates a world list when the packs in its worlds change, but
+// not when the game creates a world, so a read is reused only long enough to
+// cover closing and reopening the menu.
+const WORLDS_STALE_TIME = 30 * 1000
 
 const readable = (worlds: readonly FEWorld[] | undefined) =>
   (worlds ?? []).filter(
