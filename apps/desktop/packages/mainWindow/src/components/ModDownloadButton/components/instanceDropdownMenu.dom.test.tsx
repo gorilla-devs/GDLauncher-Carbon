@@ -22,11 +22,12 @@ vi.mock("@gd/i18n", () => ({ Trans: (p: any) => <span>{p.key}</span> }))
 vi.mock("@/components/VirtuaWrapper", () => ({ VList: () => null }))
 import { InstanceDropdown } from "./InstanceDropdown"
 
+// A mod is only ever listed with an instance that has a mod loader.
 const instance = {
   id: 4,
   name: "Addon test",
   gameVersion: "1.21.1",
-  modloader: "vanilla",
+  modloader: "fabric",
   locked: false,
   iconRevision: null,
   iconUrl: null

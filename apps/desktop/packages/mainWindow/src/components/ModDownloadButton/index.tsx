@@ -192,7 +192,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     setHoveredInstanceId,
     filteredInstances,
     shouldVirtualize
-  } = useInstanceSearch({ addonType: props.addon?.type })
+  } = useInstanceSearch({ addon: () => props.addon })
 
   useTaskProgress(instanceTasks, clearInstanceLoadingState)
 

@@ -83,6 +83,13 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     !!props.handleWorldSelection &&
     asksWhichWorld(props.addon, searchContext?.searchQuery().projectType)
 
+  // Installed into the instance itself, a project Modrinth types as a mod
+  // lands in `mods`: a zip the game never reads there or, for a project that
+  // also ships as a mod, possibly its jar. An instance without a mod loader
+  // takes such a project into its worlds only.
+  const worldsOnly = (instance: DropdownInstance) =>
+    instance.modloader === "vanilla" && props.addon?.type === "mod"
+
   const handleOpenChange = (isOpen: boolean) => {
     setIsDropdownOpen(isOpen)
     props.onDropdownOpenChange?.(isOpen)
@@ -123,6 +130,8 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
   createEffect(() => {
     const picked = pickedInstance()
     if (!picked || !pickedSettled()) return
+    // Its worlds are all the step has: it lists them, or says why not.
+    if (worldsOnly(picked)) return
     if (readableWorlds().some((world) => !worldHolds(world))) return
     if (readableWorlds().length > 0 && !instanceHolds()) return
     untrack(() => {
@@ -217,7 +226,8 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         linkedFileMismatch={props.linkedFileMismatch?.(instance.id)}
         hoveredInstanceId={props.hoveredInstanceId()}
         onSelect={(id) =>
-          asksForWorld() && !(worldsSettled() && rowWorlds().length === 0)
+          worldsOnly(instance) ||
+          (asksForWorld() && !(worldsSettled() && rowWorlds().length === 0))
             ? setPickedInstance(instance)
             : props.handleInstanceSelection(id)
         }
@@ -355,23 +365,40 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
                     }}
                   </For>
                 </div>
-                <DropdownMenuItem
-                  class="text-lightSlate-500"
-                  disabled={instanceHolds()}
-                  closeOnSelect={false}
-                  onSelect={() => {
-                    const id = picked().id
-                    setPickedInstance(undefined)
-                    props.handleInstanceSelection(id)
-                  }}
+                <Show
+                  when={!worldsOnly(picked())}
+                  fallback={
+                    <Show when={readableWorlds().length === 0}>
+                      <div class="text-lightSlate-400 px-2 py-3 text-center text-sm">
+                        <Trans
+                          key={
+                            pickedWorlds.data?.length === 0
+                              ? "content:_trn_worlds.none"
+                              : "content:_trn_worlds.load_failed"
+                          }
+                        />
+                      </div>
+                    </Show>
+                  }
                 >
-                  <span class="min-w-0 flex-1 truncate">
-                    <Trans key="content:_trn_worlds.instance_copy" />
-                  </span>
-                  <Show when={instanceHolds()}>
-                    <div class="i-hugeicons:tick-02 h-4 w-4 shrink-0 text-green-400" />
-                  </Show>
-                </DropdownMenuItem>
+                  <DropdownMenuItem
+                    class="text-lightSlate-500"
+                    disabled={instanceHolds()}
+                    closeOnSelect={false}
+                    onSelect={() => {
+                      const id = picked().id
+                      setPickedInstance(undefined)
+                      props.handleInstanceSelection(id)
+                    }}
+                  >
+                    <span class="min-w-0 flex-1 truncate">
+                      <Trans key="content:_trn_worlds.instance_copy" />
+                    </span>
+                    <Show when={instanceHolds()}>
+                      <div class="i-hugeicons:tick-02 h-4 w-4 shrink-0 text-green-400" />
+                    </Show>
+                  </DropdownMenuItem>
+                </Show>
               </Show>
             </div>
           )}

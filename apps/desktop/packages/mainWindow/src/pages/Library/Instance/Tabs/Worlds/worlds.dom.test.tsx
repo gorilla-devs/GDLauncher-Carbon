@@ -64,6 +64,12 @@ vi.mock("@/utils/rspcClient", () => ({
           },
           refetch: io.refetchWorlds
         }
+      if (key === "settings.getSettings")
+        return {
+          get data() {
+            return io.state.settings
+          }
+        }
       return {
         get data() {
           return io.state.mods
@@ -198,15 +204,26 @@ afterEach(() => {
   document.body.textContent = ""
 })
 
+/** `recycleBin`: the "Deletion through Recycle Bin" setting, on unless given;
+ *  `null` while the settings have not loaded. */
 function mount(
   worlds: FEWorld[],
-  options: { mods?: Mod[]; details?: any; worldsError?: boolean } = {}
+  options: {
+    mods?: Mod[]
+    details?: any
+    worldsError?: boolean
+    recycleBin?: boolean | null
+  } = {}
 ) {
   const [state, set] = createStore({
     worlds,
     mods: options.mods ?? [],
     details: options.details ?? { modpack: null, state: { state: "inactive" } },
-    worldsError: options.worldsError ?? false
+    worldsError: options.worldsError ?? false,
+    settings:
+      options.recycleBin === null
+        ? undefined
+        : { deletionThroughRecycleBin: options.recycleBin ?? true }
   })
   io.state = state
   setState = set
@@ -363,6 +380,54 @@ it("removes a pack through deleteWorldDatapack and shows it pending meanwhile", 
   expect(one(root, "world-datapack")!.dataset.pending).toBe("false")
 })
 
+const removalQuestion = () =>
+  io.openModal.mock.calls.find(
+    ([modal]) => modal.name === "confirmAddonDeletion"
+  )?.[1]
+
+it.each([
+  ["a zip no platform knows", pack("loose"), false],
+  ["a zip no platform knows, before the setting is known", pack("loose"), null],
+  ["a folder", pack("folder", { filename: "folder", is_folder: true }), false]
+])(
+  "asks before removing %s when it would not go to the Recycle Bin",
+  async (_, target, recycleBin) => {
+    const root = mount([world("Alpha", [target])], { recycleBin })
+    await flush()
+    io.mutateAsync["instance.deleteWorldDatapack"].mockResolvedValue(null)
+    one(root, "world-datapack-remove")!.click()
+    await flush()
+    expect(
+      io.mutateAsync["instance.deleteWorldDatapack"]
+    ).not.toHaveBeenCalled()
+    const question = removalQuestion()
+    expect(question.addons).toEqual([
+      { name: target.filename, downloadable: false }
+    ])
+
+    question.onConfirm()
+    await flush()
+    expect(
+      io.mutateAsync["instance.deleteWorldDatapack"]
+    ).toHaveBeenCalledExactlyOnceWith({ instance_id: 5, id: target.id })
+  }
+)
+
+it.each([
+  ["a zip no platform knows that goes to the Recycle Bin", pack("loose"), true],
+  ["a pack that can be downloaded again", known("terra", "terra"), false]
+])("removes %s without asking", async (_, target, recycleBin) => {
+  const root = mount([world("Alpha", [target])], { recycleBin })
+  await flush()
+  io.mutateAsync["instance.deleteWorldDatapack"].mockResolvedValue(null)
+  one(root, "world-datapack-remove")!.click()
+  await flush()
+  expect(removalQuestion()).toBeUndefined()
+  expect(
+    io.mutateAsync["instance.deleteWorldDatapack"]
+  ).toHaveBeenCalledExactlyOnceWith({ instance_id: 5, id: target.id })
+})
+
 it("says the instance has no worlds", async () => {
   const root = mount([])
   await flush()
@@ -375,7 +440,7 @@ it.each([
   ["queued", { modpack: null, state: { state: "queued", value: 0 } }],
   ["locked", { modpack: { locked: true }, state: { state: "inactive" } }]
 ])(
-  "disables the world's changes while the instance is %s",
+  "disables the data pack changes while the instance is %s",
   async (_, details) => {
     const root = mount([world("Alpha", [known("a", "terra", true)])], {
       details
@@ -384,7 +449,6 @@ it.each([
     one(root, "world-datapack-update")!.click()
     one(root, "world-datapack-remove")!.click()
     one(root, "world-datapack-switch")!.click()
-    one(root, "world-delete")!.click()
     await flush()
     expect(
       (one(root, "world-add-datapacks") as HTMLButtonElement).disabled
@@ -396,7 +460,6 @@ it.each([
       io.mutateAsync["instance.deleteWorldDatapack"]
     ).not.toHaveBeenCalled()
     expect(io.navigate).not.toHaveBeenCalled()
-    expect(io.deleteWorld).not.toHaveBeenCalled()
     one(root, "world-open-folder")!.click()
     expect(io.mutate["instance.openInstanceFolder"]).toHaveBeenCalledWith({
       instance_id: 5,
@@ -404,6 +467,30 @@ it.each([
     })
   }
 )
+
+it.each([
+  ["running", { modpack: null, state: { state: "running", value: {} } }],
+  ["preparing", { modpack: null, state: { state: "preparing", value: 0 } }],
+  ["queued", { modpack: null, state: { state: "queued", value: 0 } }]
+])("deletes a world while the game is %s", async (_, details) => {
+  const row = worldRow("Alpha")
+  const root = mount([world("Alpha", [])], { mods: [row], details })
+  await flush()
+  expect(one(root, "world-delete")!.dataset.disabled).toBe("false")
+  one(root, "world-delete")!.click()
+  expect(io.deleteWorld).toHaveBeenCalledExactlyOnceWith(row)
+})
+
+it("does not delete a world of a locked modpack", async () => {
+  const root = mount([world("Alpha", [])], {
+    mods: [worldRow("Alpha")],
+    details: { modpack: { locked: true }, state: { state: "inactive" } }
+  })
+  await flush()
+  expect(one(root, "world-delete")!.dataset.disabled).toBe("true")
+  one(root, "world-delete")!.click()
+  expect(io.deleteWorld).not.toHaveBeenCalled()
+})
 
 it("shows a failed world list in place with a retry, not as a toast", async () => {
   const root = mount([], { worldsError: true })
@@ -467,6 +554,45 @@ it("offers only Copy name in the more menu of a world not downloaded from a plat
   expect(io.openModal).toHaveBeenCalledWith(
     { name: "modDetails" },
     expect.objectContaining({ instanceId: 5 })
+  )
+})
+
+it("opens the versions of a world downloaded from a platform, for the instance and no world", async () => {
+  const root = mount([world("Alpha", []), world("Beta", [])], {
+    mods: [worldRow("Alpha"), worldRow("Beta", { curseforge: curseforge(77) })],
+    // Another version is a save of its own: the game may be running.
+    details: { modpack: null, state: { state: "running", value: {} } }
+  })
+  await flush()
+  expect(one(root, "world-switch-version")).toBeNull()
+  select(root, "Beta")
+  await flush()
+  const item = one(root, "world-switch-version")!
+  expect(item.textContent).toContain("instances:_trn_switch_version")
+  item.click()
+  expect(io.navigate).toHaveBeenCalledExactlyOnceWith(
+    "/addon/77/curseforge/versions?instanceId=5"
+  )
+})
+
+it("asks which platform's versions to open for a world both know", async () => {
+  const root = mount([world("Alpha", [])], {
+    mods: [
+      worldRow("Alpha", {
+        curseforge: curseforge(77),
+        modrinth: modrinth("w")
+      })
+    ]
+  })
+  await flush()
+  one(root, "world-switch-version")!.click()
+  expect(io.navigate).not.toHaveBeenCalled()
+  const [modal, data] = io.openModal.mock.calls[0]
+  expect(modal).toEqual({ name: "platformSelection" })
+  expect(data.modName).toBe("Alpha")
+  data.onSelectPlatform("modrinth")
+  expect(io.navigate).toHaveBeenCalledExactlyOnceWith(
+    "/addon/w/modrinth/versions?instanceId=5"
   )
 })
 

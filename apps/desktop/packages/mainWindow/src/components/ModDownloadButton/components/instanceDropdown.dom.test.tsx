@@ -45,11 +45,12 @@ vi.mock("@/components/VirtuaWrapper", () => ({ VList: () => null }))
 import { InstanceDropdown } from "./InstanceDropdown"
 import { SearchInputContext } from "@/components/SearchInputContext"
 
+// A mod is only ever listed with an instance that has a mod loader.
 const instance = {
   id: 4,
   name: "Addon test",
   gameVersion: "1.21.1",
-  modloader: "vanilla",
+  modloader: "fabric",
   locked: false,
   iconRevision: null,
   iconUrl: null
@@ -74,8 +75,15 @@ const flush = async () => {
     await new Promise((r) => setTimeout(r, 0))
   }
 }
-/** `searched` is the addon type the search the row sits in is showing. */
-function mount(type: string, loaders?: string[], searched?: string) {
+/** `searched` is the addon type the search the row sits in is showing;
+ *  `modloader` what the listed instance runs ("vanilla": no mod loader). */
+function mount(
+  type: string,
+  loaders?: string[],
+  searched?: string,
+  modloader = instance.modloader,
+  platform = "modrinth"
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } }
   })
@@ -92,8 +100,8 @@ function mount(type: string, loaders?: string[], searched?: string) {
       <QueryClientProvider client={client}>
         <SearchInputContext.Provider value={search}>
           <InstanceDropdown
-            addon={{ id: "P", platform: "modrinth", type, loaders } as any}
-            filteredInstances={() => [instance]}
+            addon={{ id: "P", platform, type, loaders } as any}
+            filteredInstances={() => [{ ...instance, modloader }]}
             shouldVirtualize={() => false}
             searchQuery={query}
             setSearchQuery={setQuery}
@@ -264,4 +272,87 @@ it("a plain mod never asks where, even while data packs are searched", async () 
   expect(d.selectInstance).toHaveBeenCalledWith(4)
   await flush()
   expect(worldsRead()).toBe(false)
+})
+
+// On an instance without a mod loader, an install into the instance itself
+// would put a Modrinth project (typed "mod") in `mods`: its zip, or for a
+// project that also ships as a mod possibly its jar.
+const withoutLoader = [
+  ["that is only a data pack", ["datapack"], "mod"],
+  ["that also ships as a mod, in a data pack search", hybridLoaders, "datapack"]
+] as const
+it.each(withoutLoader)(
+  "an instance without a mod loader takes a Modrinth project %s into a world only",
+  async (_, loaders, searched) => {
+    serveWorld()
+    const d = mount("mod", [...loaders], searched, "vanilla")
+    await flush()
+    d.click("Addon test")
+    await flush()
+    expect(d.items()).toEqual(["My World"])
+    d.click("My World")
+    expect(d.selectWorld).toHaveBeenCalledWith(4, world("My World"))
+    expect(d.selectInstance).not.toHaveBeenCalled()
+  }
+)
+it.each([
+  ["no world", async () => [], "content:_trn_worlds.none"],
+  [
+    "only unreadable worlds",
+    async () => [world("Broken", null)],
+    "content:_trn_worlds.load_failed"
+  ],
+  [
+    "worlds that cannot be read",
+    async () => {
+      throw new Error("unreadable")
+    },
+    "content:_trn_worlds.load_failed"
+  ]
+])(
+  "an instance without a mod loader and with %s never gets a Modrinth data pack at instance level",
+  async (_, worlds, text) => {
+    for (const [, loaders, searched] of withoutLoader) {
+      c.query.mockReset()
+      c.query.mockImplementation(async ([key]: any) =>
+        key === "instance.getWorlds" ? worlds() : []
+      )
+      const d = mount("mod", [...loaders], searched, "vanilla")
+      await flush()
+      d.click("Addon test")
+      await flush()
+      expect(d.selectInstance).not.toHaveBeenCalled()
+      expect(d.selectWorld).not.toHaveBeenCalled()
+      expect(d.items()).toEqual([])
+      expect(d.root.textContent).toContain(text)
+      dispose?.()
+      document.body.replaceChildren()
+    }
+  }
+)
+it("an instance without a mod loader keeps the Instance choice for a CurseForge data pack", async () => {
+  serveWorld()
+  const d = mount("datapack", [], "datapack", "vanilla", "curseforge")
+  await flush()
+  d.click("Addon test")
+  await flush()
+  expect(d.items()).toEqual(["My World", "content:_trn_worlds.instance_copy"])
+  d.click("content:_trn_worlds.instance_copy")
+  expect(d.selectInstance).toHaveBeenCalledWith(4)
+})
+it("an instance without a mod loader and without a world gets a CurseForge data pack at instance level", async () => {
+  c.query.mockImplementation(async () => [])
+  const d = mount("datapack", [], "datapack", "vanilla", "curseforge")
+  await flush()
+  d.click("Addon test")
+  await flush()
+  expect(d.selectInstance).toHaveBeenCalledWith(4)
+})
+it("a mod is never sent to an instance without a mod loader", async () => {
+  serveWorld()
+  const d = mount("mod", ["fabric"], "mod", "vanilla")
+  await flush()
+  d.click("Addon test")
+  await flush()
+  expect(d.selectInstance).not.toHaveBeenCalled()
 })

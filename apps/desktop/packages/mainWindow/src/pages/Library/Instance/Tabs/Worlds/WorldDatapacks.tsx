@@ -28,6 +28,7 @@ export interface WorldDatapacksActions {
   copyName: () => void
   updateWorld: (_row: Mod) => void
   viewDetails: (_row: Mod) => void
+  switchWorldVersion: (_row: Mod) => void
   openInApp: (_platform: "curseforge" | "modrinth") => void
   openInBrowser: (_platform: "curseforge" | "modrinth") => void
   updateHere: (_pack: FEWorldDatapack) => void
@@ -176,7 +177,8 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
           icon="i-hugeicons:delete-02"
           label={<Trans key="content:_trn_delete_mod" />}
           onClick={props.actions.deleteWorld}
-          disabled={!!props.blocked}
+          // A save can go while the game is busy, as any addon's file can.
+          disabled={props.blocked === "locked"}
           blocked={props.blocked}
           danger
         />
@@ -228,6 +230,15 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
                     <div class="flex items-center gap-2">
                       <div class="i-hugeicons:information-circle" />
                       <Trans key="content:_trn_view_details" />
+                    </div>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    data-testid="world-switch-version"
+                    onSelect={() => props.actions.switchWorldVersion(row())}
+                  >
+                    <div class="flex items-center gap-2">
+                      <div class="i-hugeicons:arrow-left-right" />
+                      <Trans key="instances:_trn_switch_version" />
                     </div>
                   </DropdownMenuItem>
                   <Show when={row().curseforge}>

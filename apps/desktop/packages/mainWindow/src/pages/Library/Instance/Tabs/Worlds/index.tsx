@@ -25,6 +25,8 @@ import WorldDatapacks from "./WorldDatapacks"
 import { datapackCopies, sameDatapackProject } from "./datapackCopies"
 import { toastUpdateFailures } from "./updateFailures"
 import { changesBlocked } from "@/pages/Library/shared/addons/components/ChangesBlocked"
+import { asksBeforeDeletingAddons } from "@/utils/addonDeletion"
+import { deletionTarget } from "@/utils/deletionTarget"
 
 const noop = () => {}
 
@@ -44,6 +46,9 @@ const Worlds = () => {
   }))
   const instanceMods = rspc.createQuery(() => ({
     queryKey: ["instance.getInstanceMods", instanceId()]
+  }))
+  const settings = rspc.createQuery(() => ({
+    queryKey: ["settings.getSettings"]
   }))
 
   // The core refreshes names and update arrows of the watched instance only.
@@ -213,7 +218,27 @@ const Worlds = () => {
     }
   }
 
-  const remove = async (pack: FEWorldDatapack) => {
+  const remove = (pack: FEWorldDatapack) => {
+    // As for any addon: only a pack that would be gone for good asks first.
+    // A folder is the user's own, and no platform holds an unknown zip.
+    const question = [
+      {
+        name: pack.filename,
+        downloadable: !!(pack.curseforge || pack.modrinth) && !pack.is_folder
+      }
+    ]
+    const where = deletionTarget(settings.data?.deletionThroughRecycleBin)
+    if (asksBeforeDeletingAddons(question, where)) {
+      modalsContext?.openModal(
+        { name: "confirmAddonDeletion" },
+        { addons: question, onConfirm: () => void performRemove(pack) }
+      )
+      return
+    }
+    void performRemove(pack)
+  }
+
+  const performRemove = async (pack: FEWorldDatapack) => {
     const id = instanceId()
     markPending([pack.id], true)
     try {
@@ -230,27 +255,35 @@ const Worlds = () => {
 
   const worldParam = (world: FEWorld) => encodeURIComponent(world.name)
 
-  const switchVersion = (world: FEWorld, pack: FEWorldDatapack) => {
+  /** Opens the versions of what `source` names on its platform, asking
+   *  which one when both know it. With `world`, a version picked there goes
+   *  into that world. */
+  const openVersions = (
+    name: string,
+    source: Pick<Mod, "curseforge" | "modrinth">,
+    world?: FEWorld
+  ) => {
     const go = (platform: "curseforge" | "modrinth") => {
       const project =
         platform === "curseforge"
-          ? pack.curseforge!.project_id
-          : pack.modrinth!.project_id
+          ? source.curseforge!.project_id
+          : source.modrinth!.project_id
+      const into = world ? `&world=${worldParam(world)}` : ""
       navigator.navigate(
-        `/addon/${project}/${platform}/versions?instanceId=${params.id}&world=${worldParam(world)}`
+        `/addon/${project}/${platform}/versions?instanceId=${params.id}${into}`
       )
     }
-    if (pack.curseforge && pack.modrinth) {
+    if (source.curseforge && source.modrinth) {
       modalsContext?.openModal(
         { name: "platformSelection" },
-        {
-          modName: pack.name ?? pack.filename,
-          onSelectPlatform: go
-        }
+        { modName: name, onSelectPlatform: go }
       )
-    } else if (pack.curseforge) go("curseforge")
-    else if (pack.modrinth) go("modrinth")
+    } else if (source.curseforge) go("curseforge")
+    else if (source.modrinth) go("modrinth")
   }
+
+  const switchVersion = (world: FEWorld, pack: FEWorldDatapack) =>
+    openVersions(pack.name ?? pack.filename, pack, world)
 
   const deleteWorld = (world: FEWorld) => {
     const row = worldRow(world)
@@ -345,13 +378,16 @@ const Worlds = () => {
                   { name: "modDetails" },
                   { mod: row, instanceId: instanceId() }
                 ),
+              // Another version of a downloaded world is a save of its own.
+              switchWorldVersion: (row) =>
+                openVersions(row.metadata?.name || row.filename, row),
               openInApp: (platform) => openOnPlatform(world(), platform, "app"),
               openInBrowser: (platform) =>
                 openOnPlatform(world(), platform, "browser"),
               updateHere: (pack) => void updateHere(pack),
               updateEverywhere: (pack) => void updateEverywhereFrom(pack),
               switchVersion: (pack) => switchVersion(world(), pack),
-              remove: (pack) => void remove(pack)
+              remove: (pack) => remove(pack)
             }}
           />
         )}

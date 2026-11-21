@@ -1,9 +1,13 @@
 import { createSignal, createMemo, createEffect, onCleanup } from "solid-js"
+import type { FEUnifiedSearchResult } from "@gd/core_module/bindings"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import useSearchContext from "@/components/SearchInputContext"
 import { getInstanceImageUrl } from "@/utils/instances"
+import { asksWhichWorld } from "@/utils/worldTarget"
 
 interface UseInstanceSearchOptions {
-  addonType?: string
+  /** The project a picked instance gets. */
+  addon?: () => Pick<FEUnifiedSearchResult, "type" | "loaders"> | undefined
 }
 
 export const useInstanceSearch = (options?: UseInstanceSearchOptions) => {
@@ -13,6 +17,7 @@ export const useInstanceSearch = (options?: UseInstanceSearchOptions) => {
     null
   )
   const globalStore = useGlobalStore()
+  const searchContext = useSearchContext()
 
   createEffect(() => {
     const query = searchQuery()
@@ -43,8 +48,14 @@ export const useInstanceSearch = (options?: UseInstanceSearchOptions) => {
         }
       })
       .filter((instance) => {
-        // For mods, only show instances with modloaders
-        if (options?.addonType === "mod") {
+        const addon = options?.addon?.()
+        // For mods, only show instances with modloaders. A data pack Modrinth
+        // types as a mod goes into a world, which any instance can have: the
+        // pick then asks which one.
+        if (
+          addon?.type === "mod" &&
+          !asksWhichWorld(addon, searchContext?.searchQuery().projectType)
+        ) {
           return instance.modloader !== "vanilla"
         }
         // For all other addon types, show all instances
