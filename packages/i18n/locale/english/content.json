@@ -249,6 +249,7 @@
   "_trn_worlds.replace_title": "Replace the data pack in “{{world}}”?",
   "_trn_worlds.replace_files": "{{files}} will be replaced.",
   "_trn_worlds.replace": "Replace",
+  "_trn_worlds.added_to_world": "“{{name}}” was added to the world “{{world}}”.",
   "_trn_table.filename": "Filename",
   "_trn_table.type": "Type",
   "_trn_table.platform": "Platform",

@@ -20,8 +20,6 @@ interface InstanceItemProps {
   /** Set when a link's file does not fit this instance: the game versions it
    *  lists. */
   linkedFileMismatch?: readonly string[]
-  /** The menu stays open on select, for a question that follows the pick. */
-  keepOpen?: boolean
   hoveredInstanceId: number | null
   onSelect: (instanceId: number) => void
   onMouseEnter: (instanceId: number) => void
@@ -37,7 +35,6 @@ export const InstanceItem = (props: InstanceItemProps) => {
     <DropdownMenuRadioItem
       value={props.instance.id.toString()}
       disabled={isDisabled()}
-      closeOnSelect={!props.keepOpen}
       onSelect={() => !isDisabled() && props.onSelect(props.instance.id)}
       classList={{
         "bg-darkSlate-700":

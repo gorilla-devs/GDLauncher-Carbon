@@ -27,6 +27,12 @@ import { isModInstalledInInstance } from "../utils/instanceHelpers"
 import { findInstalledAddon } from "@/utils/installedAddon"
 import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
 import type { ReadableWorld } from "@/utils/worldTarget"
+import type { FEWorld } from "@gd/core_module/bindings"
+
+const readable = (worlds: readonly FEWorld[] | undefined) =>
+  (worlds ?? []).filter(
+    (world): world is ReadableWorld => world.identity !== null
+  )
 
 interface DropdownInstance {
   id: number
@@ -90,12 +96,11 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     queryKey: ["instance.getInstanceMods", pickedInstance()?.id ?? 0],
     enabled: pickedInstance() !== undefined
   }))
-  const readableWorlds = () =>
-    (pickedWorlds.data ?? []).filter(
-      (world): world is ReadableWorld => world.identity !== null
-    )
   const holdsAddon = (rows: Parameters<typeof findInstalledAddon>[1]) =>
     !!props.addon && !!findInstalledAddon(props.addon, rows)
+  const worldHolds = (world: FEWorld) =>
+    holdsAddon({ kind: "world", datapacks: world.datapacks })
+  const readableWorlds = () => readable(pickedWorlds.data)
   const instanceHolds = () =>
     holdsAddon({ kind: "instance", addons: pickedMods.data ?? [] })
 
@@ -103,15 +108,18 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     (pickedWorlds.isError || pickedWorlds.data !== undefined) &&
     (pickedMods.isError || pickedMods.data !== undefined)
 
-  // With no readable world there is nothing to ask: the pack goes into the
-  // instance, as it always did, unless the instance already holds it.
+  // The step only stays while it offers something. With no readable world
+  // the pack goes into the instance, as it always did; the menu stays open
+  // on the list, which shows the row's progress.
   createEffect(() => {
     const picked = pickedInstance()
     if (!picked || !pickedSettled()) return
-    if (readableWorlds().length > 0 || instanceHolds()) return
+    if (readableWorlds().some((world) => !worldHolds(world))) return
+    if (readableWorlds().length > 0 && !instanceHolds()) return
     untrack(() => {
-      handleOpenChange(false)
-      props.handleInstanceSelection(picked.id)
+      setPickedInstance(undefined)
+      if (readableWorlds().length === 0 && !instanceHolds())
+        props.handleInstanceSelection(picked.id)
     })
   })
 
@@ -147,9 +155,21 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     // Get the query for this specific instance
     const instanceQuery = getInstanceModsQuery(instance.id)
 
-    const isInstalled = createMemo(() => {
-      // Whether the instance itself holds the pack is asked in the next step.
-      if (!instanceQuery || !props.addon || asksForWorld()) {
+    // A data pack's row also needs the instance's worlds, read on open.
+    const worldsQuery = rspc.createQuery(() => ({
+      queryKey: ["instance.getWorlds", instance.id],
+      enabled:
+        asksForWorld() &&
+        isDropdownOpen() &&
+        props.filteredInstances().some((inst) => inst.id === instance.id),
+      meta: LOCAL_ERROR_TOAST
+    }))
+    const worldsSettled = () =>
+      worldsQuery.isError || worldsQuery.data !== undefined
+    const rowWorlds = () => readable(worldsQuery.data)
+
+    const holdsInInstance = createMemo(() => {
+      if (!instanceQuery || !props.addon) {
         return false
       }
 
@@ -163,6 +183,13 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
 
       return !!isModInstalledInInstance(mods, props.addon)
     })
+    // A data pack the instance holds stays installed until a world is known
+    // that could still take it.
+    const isInstalled = () =>
+      holdsInInstance() &&
+      (!asksForWorld() ||
+        !worldsSettled() ||
+        rowWorlds().every((world) => worldHolds(world)))
 
     return (
       <InstanceItem
@@ -172,9 +199,8 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         isInstalled={isInstalled()}
         linkedFileMismatch={props.linkedFileMismatch?.(instance.id)}
         hoveredInstanceId={props.hoveredInstanceId()}
-        keepOpen={asksForWorld()}
         onSelect={(id) =>
-          asksForWorld()
+          asksForWorld() && !(worldsSettled() && rowWorlds().length === 0)
             ? setPickedInstance(instance)
             : props.handleInstanceSelection(id)
         }
@@ -185,7 +211,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
   }
 
   return (
-    <DropdownMenu open={isDropdownOpen()} onOpenChange={handleOpenChange}>
+    <DropdownMenu onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger>
         <Button
           class={props.iconOnly ? "" : "w-60"}
@@ -199,6 +225,8 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent class="w-80 p-0">
+        {/* A choice in the "where" step, like an instance pick, keeps the
+            menu open on the list, where the row shows the progress. */}
         <Show
           when={pickedInstance()}
           fallback={
@@ -288,17 +316,16 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
                 <div class="max-h-[300px] overflow-y-auto">
                   <For each={readableWorlds()}>
                     {(world) => {
-                      const holds = () =>
-                        holdsAddon({
-                          kind: "world",
-                          datapacks: world.datapacks
-                        })
+                      const holds = () => worldHolds(world)
                       return (
                         <DropdownMenuItem
                           disabled={holds()}
-                          onSelect={() =>
-                            props.handleWorldSelection?.(picked().id, world)
-                          }
+                          closeOnSelect={false}
+                          onSelect={() => {
+                            const id = picked().id
+                            setPickedInstance(undefined)
+                            props.handleWorldSelection?.(id, world)
+                          }}
                         >
                           <span class="min-w-0 flex-1 truncate">
                             {world.name}
@@ -314,7 +341,12 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
                 <DropdownMenuItem
                   class="text-lightSlate-500"
                   disabled={instanceHolds()}
-                  onSelect={() => props.handleInstanceSelection(picked().id)}
+                  closeOnSelect={false}
+                  onSelect={() => {
+                    const id = picked().id
+                    setPickedInstance(undefined)
+                    props.handleInstanceSelection(id)
+                  }}
                 >
                   <span class="min-w-0 flex-1 truncate">
                     <Trans key="content:_trn_worlds.instance_copy" />

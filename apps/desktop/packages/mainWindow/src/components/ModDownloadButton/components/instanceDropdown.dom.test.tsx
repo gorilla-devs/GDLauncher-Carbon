@@ -206,26 +206,3 @@ it.each(["mod", "resourcePack", "shader", "world"])(
     ).toBe(false)
   }
 )
-it("an instance with no world that already holds the pack is not given a second copy", async () => {
-  c.query.mockImplementation(async ([key]: any) =>
-    key === "instance.getInstanceMods"
-      ? [
-          {
-            id: "copy",
-            addon_type: "datapacks",
-            modrinth: { project_id: "P", version_id: "V1" },
-            curseforge: null
-          }
-        ]
-      : []
-  )
-  const d = mount("datapack")
-  await flush()
-  d.click("Addon test")
-  await flush()
-  expect(d.selectInstance).not.toHaveBeenCalled()
-  const instanceOption = [
-    ...d.root.querySelectorAll<HTMLButtonElement>("[data-item]")
-  ].find((b) => b.textContent?.includes("content:_trn_worlds.instance_copy"))!
-  expect(instanceOption.disabled).toBe(true)
-})

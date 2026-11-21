@@ -3,6 +3,7 @@ import i18next from "i18next"
 import type { TypedTFunction } from "@gd/i18n"
 import { createI18nOptions } from "../../../../../../../packages/i18n/index"
 import notifications from "../../../../../../../packages/i18n/locale/english/notifications.json"
+import content from "../../../../../../../packages/i18n/locale/english/content.json"
 import {
   addonDownloadingToServer,
   addonInstallCompletion,
@@ -43,7 +44,7 @@ describe("single-player datapack completion scope", () => {
     addonInstallCompletion(spy, "Pack & Co", "datapack", false, "My World")
     expect(seen).toEqual([
       [
-        "content:_trn_datapack_staging.added",
+        "content:_trn_worlds.added_to_world",
         {
           name: "Pack & Co",
           world: "My World",
@@ -75,5 +76,13 @@ describe("single-player datapack completion scope", () => {
     expect(addonInstallCompletion(real, name, "mod")).toBe(
       `${name} installed successfully`
     )
+  })
+  it("tells a direct world install only that the pack is in the world", async () => {
+    const i18n = i18next.createInstance()
+    await i18n.init(createI18nOptions("english", { notifications, content }))
+    const real = i18n.t.bind(i18n) as unknown as TypedTFunction
+    expect(
+      addonInstallCompletion(real, "Tom & Jerry", "datapack", false, "My World")
+    ).toBe("“Tom & Jerry” was added to the world “My World”.")
   })
 })

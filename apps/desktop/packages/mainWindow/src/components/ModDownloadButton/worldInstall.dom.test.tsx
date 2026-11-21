@@ -142,7 +142,7 @@ it("a world install's completion says the pack was added to that world", async (
   client.setQueryData(["vtask.getTaskOutcome", 61], { type: "Succeeded" })
   await tick()
   expect(c.success).toHaveBeenCalledWith(
-    "content:_trn_datapack_staging.added:Pack@My World",
+    "content:_trn_worlds.added_to_world:Pack@My World",
     { duration: 2000 }
   )
   expect(c.success).not.toHaveBeenCalledWith(
@@ -168,7 +168,7 @@ it("a world picked in the instance dropdown installs there and its completion na
   })
   await tick()
   expect(c.success).toHaveBeenCalledWith(
-    "content:_trn_datapack_staging.added:Pack@My World",
+    "content:_trn_worlds.added_to_world:Pack@My World",
     { duration: 2000 }
   )
 })

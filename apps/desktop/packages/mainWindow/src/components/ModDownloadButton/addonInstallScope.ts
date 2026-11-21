@@ -19,7 +19,7 @@ export function addonInstallCompletion(
 ): string {
   const options = titleOptions(title)
   if (!server && type === "datapack" && world)
-    return t("content:_trn_datapack_staging.added", {
+    return t("content:_trn_worlds.added_to_world", {
       name: title,
       world,
       interpolation: { escapeValue: false }
