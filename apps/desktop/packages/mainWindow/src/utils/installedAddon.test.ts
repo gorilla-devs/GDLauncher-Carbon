@@ -89,39 +89,68 @@ describe("installed in an instance", () => {
       modrinth: { project_id: "P", version_id },
       curseforge: null
     }) as any
-  const instance = (...addons: any[]) => ({ kind: "instance" as const, addons })
+  const instance = (
+    install: "datapack" | "addon" | "unknown",
+    ...addons: any[]
+  ) => ({ kind: "instance" as const, addons, install })
   // Modrinth types a data pack "mod" and lists "datapack" among its loaders.
   const modrinthPack = {
     ...result("modrinth", "P", "pack"),
     loaders: ["datapack"]
-  }
+  } as any
   const modrinthHybrid = {
     ...result("modrinth", "P", "pack"),
     loaders: ["datapack", "fabric", "forge", "neoforge", "quilt"]
-  }
-  const plainMod = { ...result("modrinth", "P", "mod"), loaders: ["fabric"] }
+  } as any
+  const plainMod = {
+    ...result("modrinth", "P", "mod"),
+    loaders: ["fabric"]
+  } as any
 
   it.each([
     ["that is only a data pack", modrinthPack],
     ["that also ships as a mod", modrinthHybrid]
   ])(
-    "finds the data pack build of a Modrinth project %s among the instance's data packs",
+    "an install of the data pack build of a Modrinth project %s is compared with the instance's data packs only",
     (_, addon) => {
-      const target = instance(row("datapacks"))
-      expect(findInstalledAddon(addon as any, target)?.id).toBe("row-datapacks")
-      expect(isAddonInstalled(addon as any, target, "V1")).toBe(true)
-      expect(isAddonInstalled(addon as any, target, "V2")).toBe(false)
+      const held = instance("datapack", row("mods", "J1"), row("datapacks"))
+      expect(findInstalledAddon(addon, held)?.id).toBe("row-datapacks")
+      expect(isAddonInstalled(addon, held, "V1")).toBe(true)
+      expect(isAddonInstalled(addon, held, "V2")).toBe(false)
+      const jarOnly = instance("datapack", row("mods"))
+      expect(findInstalledAddon(addon, jarOnly)).toBeUndefined()
+      expect(findInstalledAddon(addon, jarOnly, "V1")).toBeUndefined()
+      expect(isAddonInstalled(addon, jarOnly, null)).toBe(false)
     }
   )
-  it("still finds the mod jar of a project that also ships as a mod", () => {
-    expect(
-      findInstalledAddon(modrinthHybrid as any, instance(row("mods")))?.id
-    ).toBe("row-mods")
+  it("an install of the mod of a project that also ships as a mod is compared with the instance's mods only", () => {
+    const held = instance("addon", row("datapacks", "Z1"), row("mods"))
+    expect(findInstalledAddon(modrinthHybrid, held)?.id).toBe("row-mods")
+    expect(isAddonInstalled(modrinthHybrid, held, "V1")).toBe(true)
+    const packOnly = instance("addon", row("datapacks"))
+    expect(findInstalledAddon(modrinthHybrid, packOnly)).toBeUndefined()
+    expect(findInstalledAddon(modrinthHybrid, packOnly, "V1")).toBeUndefined()
+    expect(isAddonInstalled(modrinthHybrid, packOnly, null)).toBe(false)
+  })
+  it("a picked version that could be either is only the row of that very version", () => {
+    const held = instance("unknown", row("mods", "J1"), row("datapacks", "Z1"))
+    expect(findInstalledAddon(modrinthHybrid, held, "J1")?.id).toBe("row-mods")
+    expect(findInstalledAddon(modrinthHybrid, held, "Z1")?.id).toBe(
+      "row-datapacks"
+    )
+    expect(isAddonInstalled(modrinthHybrid, held, "Z1")).toBe(true)
+    // Another version replaces neither row, and no version names none.
+    expect(findInstalledAddon(modrinthHybrid, held, "J2")).toBeUndefined()
+    expect(findInstalledAddon(modrinthHybrid, held)).toBeUndefined()
+    expect(isAddonInstalled(modrinthHybrid, held, null)).toBe(false)
   })
   it("never takes a data pack row for a plain mod", () => {
     expect(
-      findInstalledAddon(plainMod as any, instance(row("datapacks")))
+      findInstalledAddon(plainMod, instance("addon", row("datapacks")))
     ).toBeUndefined()
+    expect(
+      findInstalledAddon(plainMod, instance("addon", row("mods")))?.id
+    ).toBe("row-mods")
   })
   it("finds a CurseForge data pack among the instance's data packs only", () => {
     const addon = {
@@ -135,11 +164,13 @@ describe("installed in an instance", () => {
       curseforge: { project_id: 12, file_id: 3 },
       modrinth: null
     })
-    expect(
-      findInstalledAddon(addon, instance(copy("datapacks")) as any)?.id
-    ).toBe("datapacks")
-    expect(
-      findInstalledAddon(addon, instance(copy("mods")) as any)
-    ).toBeUndefined()
+    for (const install of ["datapack", "addon"] as const) {
+      expect(
+        findInstalledAddon(addon, instance(install, copy("datapacks")))?.id
+      ).toBe("datapacks")
+      expect(
+        findInstalledAddon(addon, instance(install, copy("mods")))
+      ).toBeUndefined()
+    }
   })
 })

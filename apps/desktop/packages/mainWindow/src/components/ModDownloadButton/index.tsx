@@ -43,7 +43,9 @@ import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
 import { refreshWorldsAfter } from "@/utils/refusalText"
 import {
   asksWhichWorld,
+  canBeDatapack,
   installPlaces,
+  isDatapackBuild,
   ReadableWorld,
   readableWorld,
   worldDatapackInstall,
@@ -81,6 +83,11 @@ interface ModDownloadButtonProps {
   /** `fileId` is a version picked from the Versions tab's list: it installs
    *  into the selected instance at once, never asking which world. */
   pickedVersion?: boolean
+  /** Whether the Modrinth version `fileId` names is a data pack build (a zip
+   *  tagged "datapack") rather than a mod jar, when the caller has that
+   *  version at hand. Left unset, the button reads the version where the
+   *  project ships both. */
+  fileIsDatapackBuild?: boolean
   size?: "small" | "medium" | "large"
   iconOnly?: boolean
   /** Opt-in anchor for the rendered install/download button, forwarded to
@@ -141,13 +148,57 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           props.addon,
           props.selectedWorld
         )
+  // The file an install into the selected instance or server uses: the
+  // link's file only where it fits that target.
+  const instanceFileId = createMemo(() =>
+    effectiveFileId(
+      props.fileId,
+      props.linkedFile,
+      props.addon?.type,
+      instanceTarget(props.selectedInstanceId)
+    )
+  )
+  const serverFileId = createMemo(() =>
+    effectiveFileId(
+      props.fileId,
+      props.linkedFile,
+      props.addon?.type,
+      serverTarget()
+    )
+  )
+  const scopedFileId = () =>
+    props.selectedServerId ? serverFileId() : instanceFileId()
+  // A Modrinth project that ships a data pack lists its mod jars beside its
+  // data pack builds: a version of it picked by hand is one or the other by
+  // itself. A link only names the version, so it is read here.
+  const readsVersion = () =>
+    props.fileIsDatapackBuild === undefined &&
+    props.fileId !== undefined &&
+    props.fileId !== "" &&
+    props.addon?.platform === "modrinth" &&
+    props.addon.type !== "datapack" &&
+    canBeDatapack(props.addon)
+  const linkedVersion = rspc.createQuery(() => ({
+    queryKey: ["modplatforms.modrinth.getVersion", String(props.fileId ?? "")],
+    enabled: readsVersion(),
+    // Unread, the version replaces no installed copy; nothing to tell.
+    meta: LOCAL_ERROR_TOAST
+  }))
+  const fileIsDatapackBuild = () =>
+    props.fileIsDatapackBuild ??
+    (readsVersion() && linkedVersion.data
+      ? isDatapackBuild(linkedVersion.data)
+      : undefined)
+
   const searchContext = useSearchContext()
-  // A data pack for an instance with no world chosen asks where in it.
+  // A data pack for an instance with no world chosen asks where in it. A
+  // picked mod jar does not: no world can take it.
   const asksWhere = () =>
     !props.selectedServerId &&
     !!props.selectedInstanceId &&
     !props.pickedVersion &&
     worldName() === undefined &&
+    !(instanceFileId() !== undefined && fileIsDatapackBuild() === false) &&
     asksWhichWorld(props.addon, searchContext?.searchQuery().projectType)
   // Search rows share this query, and the identity it carries lets the core
   // refuse an install into a world that changed since it was read. Read only
@@ -182,30 +233,14 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     clearInstanceLoadingState,
     captureInstallAttempt,
     resolveInstallAttempt,
-    installsAsDatapack,
+    instanceInstallFor,
     maybeOpenShaderWizard
-  } = useModInstallation(props, { instanceTarget, serverTarget })
+  } = useModInstallation(props, {
+    instanceTarget,
+    serverTarget,
+    fileIsDatapackBuild
+  })
 
-  // The file an install into the selected instance or server uses: the
-  // link's file only where it fits that target.
-  const instanceFileId = createMemo(() =>
-    effectiveFileId(
-      props.fileId,
-      props.linkedFile,
-      props.addon?.type,
-      instanceTarget(props.selectedInstanceId)
-    )
-  )
-  const serverFileId = createMemo(() =>
-    effectiveFileId(
-      props.fileId,
-      props.linkedFile,
-      props.addon?.type,
-      serverTarget()
-    )
-  )
-  const scopedFileId = () =>
-    props.selectedServerId ? serverFileId() : instanceFileId()
   // The game versions the link's file lists, for a target that gets its own
   // version instead; undefined where the pin is kept. Same rule as the install.
   const mismatchFor = (target: LinkTarget | undefined) =>
@@ -301,7 +336,11 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
             ? { kind: "server", addons: props.selectedServerAddons ?? [] }
             : worldName() !== undefined
               ? { kind: "world", datapacks: targetWorld()?.datapacks ?? [] }
-              : { kind: "instance", addons: props.selectedInstanceMods ?? [] },
+              : {
+                  kind: "instance",
+                  addons: props.selectedInstanceMods ?? [],
+                  install: instanceInstallFor(props.selectedInstanceId)
+                },
           scopedFileId(),
           props.linkedFile
         )
@@ -504,7 +543,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
       // Installed once its worlds are known means no world is left to take
       // the pack, so "add it to a world" would point nowhere.
       staged={
-        installsAsDatapack(props.selectedInstanceId) &&
+        instanceInstallFor(props.selectedInstanceId) === "datapack" &&
         worldName() === undefined &&
         !(places() && isInstalled())
       }
@@ -554,6 +593,11 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
           clearInstanceLoadingState={clearInstanceLoadingState}
           handleInstanceSelection={handleInstanceSelection}
           handleWorldSelection={handleWorldSelection}
+          picked={
+            props.fileId !== undefined && props.fileId !== ""
+              ? { datapackBuild: fileIsDatapackBuild() }
+              : undefined
+          }
           onDropdownOpenChange={props.onDropdownOpenChange}
           size={props.size}
           iconOnly={props.iconOnly}

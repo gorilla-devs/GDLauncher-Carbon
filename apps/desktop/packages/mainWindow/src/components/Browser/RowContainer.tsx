@@ -184,6 +184,7 @@ const RowContainer = (props: Props & AdditionalProps) => {
                   addon={props.project}
                   fileId={fileId()}
                   pickedVersion
+                  fileIsDatapackBuild={props.modVersion.datapackBuild}
                   size="small"
                 />
               </Match>

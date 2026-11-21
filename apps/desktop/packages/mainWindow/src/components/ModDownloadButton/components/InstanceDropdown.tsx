@@ -21,15 +21,17 @@ import {
 import { VList } from "@/components/VirtuaWrapper"
 import { InstanceItem } from "./InstanceItem"
 import { InstallPlacesStep } from "./InstallPlacesStep"
-import { FEUnifiedSearchResult } from "@gd/core_module/bindings"
+import { FEUnifiedSearchResult, Mod } from "@gd/core_module/bindings"
 import { rspc } from "@/utils/rspcClient"
 import { isModInstalledInInstance } from "../utils/instanceHelpers"
 import { findInstalledAddon } from "@/utils/installedAddon"
 import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
 import {
   asksWhichWorld,
+  canBeDatapack,
   installPlaces,
-  instanceInstallIsDatapack,
+  instanceInstall,
+  PickedVersion,
   ReadableWorld,
   WORLDS_STALE_TIME
 } from "@/utils/worldTarget"
@@ -59,6 +61,9 @@ interface InstanceDropdownProps {
   /** Installs a data pack into one world of the instance. When set, a data
    *  pack's instance pick is followed by a choice of its worlds. */
   handleWorldSelection?: (instanceId: number, world: ReadableWorld) => void
+  /** Set when a pick installs a version chosen by hand rather than the one
+   *  resolved for the instance. */
+  picked?: PickedVersion
   /** The game versions a link's file lists when it does not fit the
    *  instance (that instance then gets its own version); undefined where the
    *  pin is kept. */
@@ -74,17 +79,36 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
   // A data pack's picked instance: the menu then asks where in it.
   const [pickedInstance, setPickedInstance] = createSignal<DropdownInstance>()
   const searchContext = useSearchContext()
+  // A picked mod jar never asks: no world can take it.
   const asksForWorld = () =>
     !!props.handleWorldSelection &&
+    props.picked?.datapackBuild !== false &&
     asksWhichWorld(props.addon, searchContext?.searchQuery().projectType)
 
   // What a project that also ships as a mod installs as into the instance
   // itself depends on whether the instance runs one of the mod's loaders.
+  const installIn = (instance: DropdownInstance) =>
+    instanceInstall(
+      props.addon,
+      {
+        modloader: instance.modloader === "vanilla" ? null : instance.modloader,
+        mc_version: instance.gameVersion || null
+      },
+      props.picked
+    )
   const stagedIn = (instance: DropdownInstance) =>
-    instanceInstallIsDatapack(props.addon, {
-      modloader: instance.modloader === "vanilla" ? null : instance.modloader,
-      mc_version: instance.gameVersion || null
-    })
+    installIn(instance) === "datapack"
+  // A project that ships a mod and a data pack is held as the one a pick
+  // would install. Any other is held as any copy of it, as it always was.
+  const holds = (instance: DropdownInstance, mods: readonly Mod[]) =>
+    !!props.addon &&
+    (canBeDatapack(props.addon)
+      ? !!findInstalledAddon(props.addon, {
+          kind: "instance",
+          addons: mods,
+          install: installIn(instance)
+        })
+      : !!isModInstalledInInstance([...mods], props.addon))
 
   const handleOpenChange = (isOpen: boolean) => {
     setIsDropdownOpen(isOpen)
@@ -109,20 +133,18 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
     enabled: pickedInstance() !== undefined
   }))
   // Undefined until both lists are read; a failed read counts as empty.
-  const pickedPlaces = createMemo(() =>
-    (pickedWorlds.isError || pickedWorlds.data !== undefined) &&
-    (pickedMods.isError || pickedMods.data !== undefined)
+  const pickedPlaces = createMemo(() => {
+    const picked = pickedInstance()
+    return picked &&
+      (pickedWorlds.isError || pickedWorlds.data !== undefined) &&
+      (pickedMods.isError || pickedMods.data !== undefined)
       ? installPlaces(
           props.addon,
           pickedWorlds.data,
-          !!props.addon &&
-            !!findInstalledAddon(props.addon, {
-              kind: "instance",
-              addons: pickedMods.data ?? []
-            })
+          holds(picked, pickedMods.data ?? [])
         )
       : undefined
-  )
+  })
 
   // The step only stays while it offers something. With no readable world
   // the pack goes into the instance, as it always did; the menu stays open
@@ -182,7 +204,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         return false
       }
 
-      return !!isModInstalledInInstance(mods, props.addon)
+      return holds(instance, mods)
     })
     // Only a row whose instance already holds the pack needs its worlds
     // before a pick: they decide whether anything is left to offer. Every

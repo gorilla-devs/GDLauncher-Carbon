@@ -611,6 +611,7 @@ it("a Modrinth data pack build the instance holds reads as downloaded, to add to
   await mount(modrinthPack, {
     fileId: "V1",
     pickedVersion: true,
+    fileIsDatapackBuild: true,
     selectedInstanceMods: [
       {
         id: "copy",
@@ -777,4 +778,387 @@ it("a world install that failed is told in the player's language and has the wor
     ]
   ])
   expect(worldReads()).toBe(before + 1)
+})
+
+// A project that ships both a mod jar and a data pack build: the instance
+// holds each as a row of its own kind, and they are two installed things.
+const jarRow = {
+  id: "row-mods",
+  addon_type: "mods",
+  filename: "Pack.jar",
+  modrinth: { project_id: "P", version_id: "JAR1" },
+  curseforge: null
+}
+const packRow = {
+  id: "row-datapacks",
+  addon_type: "datapacks",
+  filename: "Pack.zip",
+  modrinth: { project_id: "P", version_id: "ZIP1" },
+  curseforge: null
+}
+const disabledItems = () =>
+  menuItems()
+    .filter((item) => item.hasAttribute("data-disabled"))
+    .map((item) => item.textContent?.trim())
+const latestMod = (instance: number) => [
+  "instance.installLatestMod",
+  { instance_id: instance, mod_source: { Modrinth: "P" } }
+]
+const versionInstall = (version: string, replaces: string | null) => [
+  "instance.installMod",
+  {
+    instance_id: 7,
+    mod_source: { Modrinth: { project_id: "P", version_id: version } },
+    install_deps: true,
+    replaces_mod: replaces
+  }
+]
+it.each([
+  ["only its mod jar", [jarRow]],
+  ["its mod jar and its data pack build", [jarRow, packRow]]
+])(
+  "a mod search shows the project as installed on an instance holding %s, and installs nothing",
+  async (_, rows) => {
+    serve([world("My World")])
+    await mount(modrinthHybrid, { selectedInstanceMods: rows }, "mod")
+    expect(button().textContent).toContain("content:_trn_mod.downloaded")
+    await download()
+    expect(requests()).toEqual([])
+  }
+)
+it("a mod search still installs the mod of a project whose data pack build only the instance holds", async () => {
+  serve([world("My World")])
+  await mount(modrinthHybrid, { selectedInstanceMods: [packRow] }, "mod")
+  expect(button().textContent).toContain("instances:_trn_download")
+  expect(button().textContent).not.toContain("downloaded")
+  await download()
+  expect(c.mutate.mock.calls).toEqual([latestMod(7)])
+})
+it("Download to instance is ticked in a data pack search by the mod jar it would install", async () => {
+  serve([world("My World")])
+  await mount(modrinthHybrid, { selectedInstanceMods: [jarRow] }, "datapack")
+  await download()
+  expect(items()).toEqual([
+    "My World",
+    "content:_trn_worlds.download_to_instance"
+  ])
+  expect(disabledItems()).toEqual(["content:_trn_worlds.download_to_instance"])
+})
+it("Download to instance is not ticked in a data pack search by the data pack build, and installs the mod jar", async () => {
+  serve([world("My World")])
+  await mount(modrinthHybrid, { selectedInstanceMods: [packRow] }, "datapack")
+  await download()
+  expect(disabledItems()).toEqual([])
+  await pick("content:_trn_worlds.download_to_instance")
+  expect(c.mutate.mock.calls).toEqual([latestMod(7)])
+})
+it("on an instance without a mod loader Download to instance is ticked by the data pack build", async () => {
+  serveBuilds([world("My World")])
+  await mount(
+    modrinthHybrid,
+    { selectedInstanceId: 8, selectedInstanceMods: [packRow] },
+    "datapack"
+  )
+  await download()
+  expect(disabledItems()).toEqual(["content:_trn_worlds.download_to_instance"])
+})
+it("on an instance without a mod loader Download to instance is not ticked by a mod jar, and installs the data pack build", async () => {
+  serveBuilds([world("My World")])
+  await mount(
+    modrinthHybrid,
+    { selectedInstanceId: 8, selectedInstanceMods: [jarRow] },
+    "datapack"
+  )
+  await download()
+  expect(disabledItems()).toEqual([])
+  await pick("content:_trn_worlds.download_to_instance")
+  expect(c.mutate.mock.calls).toEqual([buildInstall(8)])
+})
+
+// A version picked in the Versions tab is a mod jar or a data pack build by
+// itself, whatever the project installs as on that instance.
+const pickVersion = (fileId: string, datapackBuild: boolean, rows: object[]) =>
+  mount(
+    modrinthHybrid,
+    {
+      fileId,
+      pickedVersion: true,
+      fileIsDatapackBuild: datapackBuild,
+      selectedInstanceMods: rows
+    },
+    "mod"
+  )
+it.each([
+  ["a mod jar", "its data pack build", "JAR2", false, [packRow]],
+  ["a data pack build", "its mod jar", "ZIP2", true, [jarRow]]
+])(
+  "%s picked in the Versions tab is a plain download on an instance holding only %s",
+  async (_, __, fileId, datapackBuild, rows) => {
+    serve([])
+    await pickVersion(fileId, datapackBuild, rows)
+    expect(button().textContent).toContain("instances:_trn_download_version")
+    await download()
+    expect(c.mutate.mock.calls).toEqual([versionInstall(fileId, null)])
+  }
+)
+it.each([
+  ["a mod jar", "JAR2", false, "row-mods"],
+  ["a data pack build", "ZIP2", true, "row-datapacks"]
+])(
+  "%s picked in the Versions tab replaces the copy of its own kind on an instance holding both",
+  async (_, fileId, datapackBuild, replaced) => {
+    serve([])
+    await pickVersion(fileId, datapackBuild, [jarRow, packRow])
+    expect(button().textContent).toContain("instances:_trn_switch_version")
+    await download()
+    expect(c.mutate.mock.calls).toEqual([versionInstall(fileId, replaced)])
+  }
+)
+it.each([
+  ["mod jar", "JAR1", false, "content:_trn_mod.downloaded"],
+  ["data pack build", "ZIP1", true, "content:_trn_datapack_downloaded"]
+])(
+  "the very %s the instance holds reads as installed in the Versions tab",
+  async (_, fileId, datapackBuild, label) => {
+    serve([])
+    await pickVersion(fileId, datapackBuild, [jarRow, packRow])
+    expect(button().textContent).toContain(label)
+    await download()
+    expect(requests()).toEqual([])
+  }
+)
+it("a data pack build picked in the Versions tab is told to be added to a world, also where the project installs as a mod", async () => {
+  serve([])
+  const client = await pickVersion("ZIP2", true, [])
+  await download()
+  client.setQueryData(["vtask.getTaskOutcome", 61], { type: "Succeeded" })
+  await flush()
+  expect(c.success).toHaveBeenCalledWith(
+    "notifications:_trn_datapack_downloaded:Pack",
+    { duration: 2000 }
+  )
+})
+
+// A Modrinth version that comes from a link is read once to tell which of
+// the two it is.
+const jarVersion = {
+  id: "JAR2",
+  loaders: ["fabric"],
+  files: [{ filename: "pack.jar", primary: true }]
+}
+const zipVersion = {
+  id: "ZIP2",
+  loaders: ["datapack"],
+  files: [{ filename: "pack.zip", primary: true }]
+}
+function serveVersion(version: object | (() => never), worlds: any[] = []) {
+  c.query.mockImplementation(async ([key]: any) =>
+    key === "instance.getWorlds"
+      ? worlds
+      : key === "modplatforms.modrinth.getVersion"
+        ? typeof version === "function"
+          ? version()
+          : version
+        : running
+  )
+  c.mutate.mockResolvedValue(61)
+}
+const versionReads = () =>
+  c.query.mock.calls
+    .map(([key]) => key)
+    .filter((key) => key[0] === "modplatforms.modrinth.getVersion")
+it.each([
+  ["a mod jar", jarVersion, "row-mods"],
+  ["a data pack build", zipVersion, "row-datapacks"]
+])(
+  "a linked version that is %s replaces the copy of its own kind",
+  async (_, version, replaced) => {
+    serveVersion(version)
+    await mount(
+      modrinthHybrid,
+      { fileId: version.id, selectedInstanceMods: [jarRow, packRow] },
+      "mod"
+    )
+    expect(versionReads()).toEqual([
+      ["modplatforms.modrinth.getVersion", version.id]
+    ])
+    expect(button().textContent).toContain("instances:_trn_switch_version")
+    await download()
+    expect(c.mutate.mock.calls).toEqual([versionInstall(version.id, replaced)])
+  }
+)
+it("a linked version that cannot be read replaces no copy", async () => {
+  serveVersion(() => {
+    throw new Error("Modrinth is unreachable")
+  })
+  await mount(
+    modrinthHybrid,
+    { fileId: "JAR2", selectedInstanceMods: [jarRow, packRow] },
+    "mod"
+  )
+  expect(button().textContent).toContain("instances:_trn_download_version")
+  await download()
+  expect(c.mutate.mock.calls).toEqual([versionInstall("JAR2", null)])
+})
+it("a linked version that cannot be read is installed only as that very version", async () => {
+  serveVersion(() => {
+    throw new Error("Modrinth is unreachable")
+  })
+  await mount(
+    modrinthHybrid,
+    { fileId: "ZIP1", selectedInstanceMods: [jarRow, packRow] },
+    "mod"
+  )
+  expect(button().textContent).toContain("content:_trn_mod.downloaded")
+  await download()
+  expect(requests()).toEqual([])
+})
+it("a linked mod jar installs at once in a data pack search: no world can take it", async () => {
+  serveVersion(jarVersion, [world("My World")])
+  await mount(modrinthHybrid, { fileId: "JAR2" }, "datapack")
+  await download()
+  expect(isOpen()).toBe(false)
+  expect(c.mutate.mock.calls).toEqual([versionInstall("JAR2", null)])
+})
+it("a linked data pack build still asks where in a data pack search", async () => {
+  serveVersion(zipVersion, [world("My World")])
+  await mount(modrinthHybrid, { fileId: "ZIP2" }, "datapack")
+  await download()
+  expect(items()).toEqual([
+    "My World",
+    "content:_trn_worlds.download_to_instance"
+  ])
+})
+it.each([
+  ["a plain mod", plainMod, {}],
+  ["a CurseForge data pack", curseforgePack, {}],
+  [
+    "a version the Versions tab told apart",
+    modrinthHybrid,
+    { pickedVersion: true, fileIsDatapackBuild: false }
+  ]
+])("the version of %s is not read", async (_, addon, props) => {
+  serveVersion(jarVersion)
+  await mount(addon, { fileId: "34", ...props }, "mod")
+  expect(versionReads()).toEqual([])
+})
+
+it("a Modrinth data pack an earlier version put among the mods is not its data pack build", async () => {
+  serveBuilds([])
+  await mount(
+    modrinthPack,
+    { selectedInstanceMods: [{ ...jarRow, filename: "Pack.zip" }] },
+    "datapack"
+  )
+  expect(button().textContent).toContain("instances:_trn_download")
+  await download()
+  expect(c.mutate.mock.calls).toEqual([buildInstall(7)])
+})
+it("another file of a CurseForge data pack the instance holds still replaces that copy", async () => {
+  serve([])
+  await mount(
+    curseforgePack,
+    {
+      fileId: "34",
+      pickedVersion: true,
+      selectedInstanceMods: [curseforgeCopy("in-instance")]
+    },
+    "datapack"
+  )
+  expect(button().textContent).toContain("instances:_trn_switch_version")
+  await download()
+  expect(c.mutate.mock.calls).toEqual([
+    [
+      "instance.installMod",
+      {
+        instance_id: 7,
+        mod_source: { Curseforge: { project_id: 12, file_id: 34 } },
+        install_deps: true,
+        replaces_mod: "in-instance"
+      }
+    ]
+  ])
+})
+it("another version of a plain mod still replaces its jar", async () => {
+  serve([])
+  await mount(
+    plainMod,
+    {
+      fileId: "M2",
+      pickedVersion: true,
+      selectedInstanceMods: [
+        { ...jarRow, modrinth: { project_id: "M", version_id: "M1" } }
+      ]
+    },
+    "mod"
+  )
+  expect(button().textContent).toContain("instances:_trn_switch_version")
+  await download()
+  expect(c.mutate.mock.calls).toEqual([
+    [
+      "instance.installMod",
+      {
+        instance_id: 7,
+        mod_source: { Modrinth: { project_id: "M", version_id: "M2" } },
+        install_deps: true,
+        replaces_mod: "row-mods"
+      }
+    ]
+  ])
+})
+
+// The picker judges each instance by what a pick would install there.
+function servePicker(worlds: any[], held: Record<number, object[]>) {
+  c.query.mockImplementation(async ([key, id]: any) =>
+    key === "instance.getWorlds"
+      ? worlds
+      : key === "instance.getInstanceMods"
+        ? (held[id] ?? [])
+        : key === "modplatforms.modrinth.getProjectVersions"
+          ? builds
+          : running
+  )
+  c.mutate.mockResolvedValue(61)
+}
+it("the picker still installs the mod into an instance holding only the data pack build", async () => {
+  servePicker([world("My World")], { 7: [packRow] })
+  await mount(modrinthHybrid, { selectedInstanceId: undefined }, "mod")
+  await openPicker()
+  expect(pickerRow("Fabric").textContent).not.toContain("_trn_status_installed")
+  await pickRow("Fabric")
+  expect(c.mutate.mock.calls).toEqual([latestMod(7)])
+})
+it("the picker shows the mod as installed in an instance holding its jar", async () => {
+  servePicker([], { 7: [jarRow] })
+  await mount(modrinthHybrid, { selectedInstanceId: undefined }, "mod")
+  await openPicker()
+  expect(pickerRow("Fabric").textContent).toContain(
+    "instances:_trn_status_installed"
+  )
+})
+it.each([
+  [
+    "ticks Download to instance by the mod jar on an instance that runs the mod",
+    7,
+    [jarRow],
+    ["content:_trn_worlds.download_to_instance"]
+  ],
+  ["does not tick it there by the data pack build", 7, [packRow], []],
+  [
+    "ticks it by the data pack build on an instance without a mod loader",
+    8,
+    [packRow],
+    ["content:_trn_worlds.download_to_instance"]
+  ],
+  ["does not tick it there by a mod jar", 8, [jarRow], []]
+])("the picker %s", async (_, instance, rows, ticked) => {
+  servePicker([world("My World")], { [instance]: rows })
+  await mount(modrinthHybrid, { selectedInstanceId: undefined }, "datapack")
+  await openPicker()
+  await pickRow(instance === 7 ? "Fabric" : "Vanilla")
+  expect(items()).toEqual([
+    "My World",
+    "content:_trn_worlds.download_to_instance"
+  ])
+  expect(disabledItems()).toEqual(ticked)
 })

@@ -4,7 +4,9 @@ import {
   asksWhichWorld,
   canBeDatapack,
   installPlaces,
+  instanceInstall,
   instanceInstallIsDatapack,
+  isDatapackBuild,
   isOnlyDatapack,
   newestDatapackBuild,
   readableWorld,
@@ -181,6 +183,79 @@ describe("what an install into the instance itself is", () => {
       ).toBe(false)
       expect(instanceInstallIsDatapack(undefined, target)).toBe(false)
     }
+  })
+})
+
+describe("the rows an install into the instance is compared with", () => {
+  const jar = { datapackBuild: false }
+  const zip = { datapackBuild: true }
+  const untold = { datapackBuild: undefined }
+  it("follows what the project installs as on that instance when no version is picked", () => {
+    expect(instanceInstall(modrinthHybrid, instance("fabric"))).toBe("addon")
+    expect(instanceInstall(modrinthHybrid, instance(null))).toBe("datapack")
+    expect(instanceInstall(modrinthHybrid, undefined)).toBe("addon")
+    expect(instanceInstall(modrinthPack, instance("fabric"))).toBe("datapack")
+    expect(instanceInstall(resourceAndDataPack, instance("fabric"))).toBe(
+      "datapack"
+    )
+    expect(instanceInstall(curseforgePack, instance("fabric"))).toBe("datapack")
+  })
+  it("follows a picked version of a Modrinth project, not the project", () => {
+    for (const project of [modrinthHybrid, modrinthPack, resourceAndDataPack])
+      for (const target of [instance("fabric"), instance(null), undefined]) {
+        expect(instanceInstall(project, target, jar)).toBe("addon")
+        expect(instanceInstall(project, target, zip)).toBe("datapack")
+        expect(instanceInstall(project, target, untold)).toBe("unknown")
+      }
+  })
+  it("is the addon the project is typed as wherever no data pack is in play", () => {
+    for (const picked of [undefined, jar, zip, untold]) {
+      expect(instanceInstall(plainMod, instance("fabric"), picked)).toBe(
+        "addon"
+      )
+      expect(
+        instanceInstall({ type: "shader", loaders: [] }, instance(null), picked)
+      ).toBe("addon")
+      // Every file of a CurseForge data pack project is a data pack.
+      expect(instanceInstall(curseforgePack, instance("fabric"), picked)).toBe(
+        "datapack"
+      )
+    }
+  })
+})
+
+describe("a Modrinth version that is a data pack build", () => {
+  const version = (loaders: string[], files: [string, boolean?][]) => ({
+    loaders,
+    files: files.map(([filename, primary = false]) => ({ filename, primary }))
+  })
+  it("is tagged datapack and has a zip as its primary file, or its first without one", () => {
+    expect(isDatapackBuild(version(["datapack"], [["pack.zip", true]]))).toBe(
+      true
+    )
+    expect(
+      isDatapackBuild(
+        version(["datapack", "fabric"], [["mod.jar"], ["Pack.ZIP", true]])
+      )
+    ).toBe(true)
+    expect(
+      isDatapackBuild(version(["datapack"], [["pack.zip"], ["mod.jar"]]))
+    ).toBe(true)
+  })
+  it("is not a jar, a zip without the tag, or a version without a file", () => {
+    expect(
+      isDatapackBuild(version(["datapack", "fabric"], [["mod.jar", true]]))
+    ).toBe(false)
+    expect(
+      isDatapackBuild(version(["datapack"], [["pack.zip"], ["mod.jar", true]]))
+    ).toBe(false)
+    expect(isDatapackBuild(version(["minecraft"], [["pack.zip", true]]))).toBe(
+      false
+    )
+    expect(isDatapackBuild(version(["fabric"], [["mod.jar", true]]))).toBe(
+      false
+    )
+    expect(isDatapackBuild(version(["datapack"], []))).toBe(false)
   })
 })
 

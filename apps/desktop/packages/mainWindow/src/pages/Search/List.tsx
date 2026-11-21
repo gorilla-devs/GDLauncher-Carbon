@@ -6,22 +6,13 @@ import useSearchContext from "@/components/SearchInputContext"
 import { Skeleton } from "@gd/ui"
 import { Show, Match, Switch } from "solid-js"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { rspc } from "@/utils/rspcClient"
 import { Trans, useTransContext } from "@gd/i18n"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { Grid } from "./Grid"
 import SharePreviewContent from "@/components/SharePreviewContent"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
-import { isAddonInstalled } from "@/utils/installedAddon"
-import { canBeDatapack } from "@/utils/worldTarget"
-import { useGlobalStore } from "@/components/GlobalStoreContext"
-import {
-  effectiveFileId,
-  instanceLinkTarget,
-  LinkedSearchResult,
-  serverLinkTarget
-} from "@/utils/linkedFile"
+import { useRowInstalled } from "./useRowInstalled"
 
 export function List() {
   const [t] = useTransContext()
@@ -34,33 +25,12 @@ export function List() {
   const instanceMods = () => searchContext?.selectedInstanceMods
   const serverId = () => searchContext?.selectedServerId() || NaN
   const serverAddons = () => searchContext?.selectedServerAddons
-  const isServer = () => !isNaN(serverId()) && serverId() > 0
-  // Data pack rows of a world search are judged against that world's packs.
-  const worldName = (row: LinkedSearchResult) =>
-    canBeDatapack(row) ? searchContext?.selectedWorld?.name : undefined
-  const globalStore = useGlobalStore()
-  // A link row whose linked file does not fit the instance or server installs
-  // that target's own version, so any installed copy counts as installed. On
-  // a server it fits, a copy named like the linked file is that file.
-  const rowRequested = (row: LinkedSearchResult) =>
-    effectiveFileId(
-      row.requestedVersionId ?? undefined,
-      row.linkedFile,
-      row.type,
-      isServer()
-        ? serverLinkTarget(searchContext?.selectedServer?.data)
-        : instanceLinkTarget(globalStore?.instances?.data, instanceId())
-    )
+  const { worldName, isInstalled } = useRowInstalled()
 
   const type = useSearchAddonType(searchContext)
 
   // Note: Scroll restoration is handled in VList's ref callback
   // to ensure it works when switching between view modes
-
-  const installedMods = rspc.createQuery(() => ({
-    queryKey: ["instance.getInstanceMods", instanceId()],
-    enabled: !isNaN(instanceId()) && instanceId() > 0
-  }))
 
   return (
     <div class="flex h-full flex-col overflow-hidden">
@@ -185,27 +155,7 @@ export function List() {
                           serverId={serverId()}
                           world={worldName(result.value!)}
                           result={result.value!}
-                          isInstalled={isAddonInstalled(
-                            result.value!,
-                            !isNaN(serverId()) && serverId() > 0
-                              ? {
-                                  kind: "server",
-                                  addons: serverAddons()?.data ?? []
-                                }
-                              : worldName(result.value!) !== undefined
-                                ? {
-                                    kind: "world",
-                                    datapacks:
-                                      searchContext?.selectedWorld.data
-                                        ?.datapacks ?? []
-                                  }
-                                : {
-                                    kind: "instance",
-                                    addons: installedMods.data ?? []
-                                  },
-                            rowRequested(result.value!),
-                            result.value!.linkedFile
-                          )}
+                          isInstalled={isInstalled(result.value!)}
                           onItemClick={() => {
                             const sid = serverId()
                             const iid = instanceId()

@@ -107,6 +107,7 @@ const version = (id = "chosen") => ({
   name: "Synthetic version",
   version_type: "release",
   game_versions: ["1.20.1"],
+  loaders: ["fabric"],
   downloads: 1,
   date_published: "2026-01-01",
   files: [

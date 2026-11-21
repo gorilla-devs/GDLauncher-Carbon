@@ -11,8 +11,9 @@ import {
 import { effectiveFileId, LinkedFile, LinkTarget } from "@/utils/linkedFile"
 import { extractErrorDisplay } from "@/utils/rspcErrorText"
 import { addonInstallFailure } from "../addonInstallScope"
+import type { InstanceInstall } from "@/utils/installedAddon"
 import {
-  instanceInstallIsDatapack,
+  instanceInstall,
   newestDatapackBuild,
   ReadableWorld,
   worldDatapackInstall
@@ -30,6 +31,9 @@ interface UseModInstallationOptions {
   instanceTarget?: (instanceId: number) => LinkTarget | undefined
   /** Release and loader of a server, for checking a linked file. */
   serverTarget?: (serverId: number) => LinkTarget | undefined
+  /** Whether the version `fileId` names is the project's data pack build
+   *  rather than its mod jar; undefined when that is not known. */
+  fileIsDatapackBuild?: () => boolean | undefined
 }
 
 export interface InstanceInstallTask {
@@ -90,15 +94,27 @@ export const useModInstallation = (
     mutationKey: "server.installServerMod"
   }))
 
-  /** Whether an install into the instance itself is the project's data pack
-   *  build. */
-  const installsAsDatapack = (instanceId: number | undefined) =>
-    instanceInstallIsDatapack(
-      props.addon,
+  /** What an install into the instance itself puts there: the version
+   *  `fileId` pins as what it is, else what the project installs as there. */
+  const instanceInstallFor = (
+    instanceId: number | undefined
+  ): InstanceInstall => {
+    const target =
       instanceId === undefined
         ? undefined
         : options.instanceTarget?.(instanceId)
+    const fileId = effectiveFileId(
+      props.fileId,
+      props.linkedFile,
+      props.addon?.type,
+      target
     )
+    return instanceInstall(
+      props.addon,
+      target,
+      fileId ? { datapackBuild: options.fileIsDatapackBuild?.() } : undefined
+    )
+  }
 
   // Build both wire variants before requirements yields to reactive selection.
   const captureInstallAttempt = (
@@ -116,7 +132,7 @@ export const useModInstallation = (
       addon.type,
       target
     )
-    const staged = installsAsDatapack(instanceId)
+    const staged = instanceInstallFor(instanceId) === "datapack"
     const owner = Symbol()
     attempts.set(instanceId, owner)
     return {
@@ -404,7 +420,7 @@ export const useModInstallation = (
     clearInstanceLoadingState,
     captureInstallAttempt,
     resolveInstallAttempt,
-    installsAsDatapack,
+    instanceInstallFor,
     maybeOpenShaderWizard
   }
 }

@@ -5,7 +5,7 @@ import type {
   MRFEVersion,
   WorldDatapackSource
 } from "@gd/core_module/bindings"
-import { findInstalledAddon } from "./installedAddon"
+import { findInstalledAddon, type InstanceInstall } from "./installedAddon"
 import type { LinkTarget } from "./linkedFile"
 import { compatibleLoaders, MOD_LOADERS } from "./modLoaders"
 
@@ -71,6 +71,52 @@ export function instanceInstallIsDatapack(
   ).some((loader) => listed.includes(loader))
 }
 
+/** A version picked by hand, not left to the instance. Whether it is a data
+ *  pack build is its own matter, not the project's; `undefined` when that
+ *  could not be told. */
+export interface PickedVersion {
+  datapackBuild: boolean | undefined
+}
+
+/** What a click that installs into the instance itself puts there: `picked`
+ *  as what it is, else what the project installs as on that instance. */
+export function instanceInstall(
+  project: ProjectKind,
+  instance: LinkTarget | undefined,
+  picked?: PickedVersion
+): InstanceInstall {
+  if (!canBeDatapack(project)) return "addon"
+  // Every file of a project typed as a data pack (CurseForge) is one.
+  if (project?.type === "datapack") return "datapack"
+  if (picked)
+    return picked.datapackBuild === undefined
+      ? "unknown"
+      : picked.datapackBuild
+        ? "datapack"
+        : "addon"
+  return instanceInstallIsDatapack(project, instance) ? "datapack" : "addon"
+}
+
+interface VersionFiles {
+  files: readonly Pick<MRFEVersion["files"][number], "filename" | "primary">[]
+}
+
+/** Whether the file of a Modrinth version an install puts in place, its
+ *  primary file or its first when none is primary, is a zip. */
+const installsZip = (version: VersionFiles) => {
+  const file = version.files.find((file) => file.primary) ?? version.files[0]
+  return !!file?.filename.toLowerCase().endsWith(".zip")
+}
+
+/** Whether a Modrinth version is a data pack build rather than a mod jar:
+ *  tagged "datapack", with a zip to install. The core tells the two apart
+ *  the same way (`modrinth_datapack_file`). */
+export function isDatapackBuild(
+  version: VersionFiles & Pick<MRFEVersion, "loaders">
+): boolean {
+  return version.loaders.includes("datapack") && installsZip(version)
+}
+
 const STABILITY = ["release", "beta", "alpha"] as const
 
 /** The build an instance gets among the data pack builds Modrinth lists for
@@ -78,16 +124,11 @@ const STABILITY = ["release", "beta", "alpha"] as const
  *  none is primary) is a zip, else the newest beta, else the newest alpha.
  *  The core picks the same one for a world. */
 export function newestDatapackBuild<
-  Version extends Pick<MRFEVersion, "version_type" | "date_published"> & {
-    files: readonly Pick<MRFEVersion["files"][number], "filename" | "primary">[]
-  }
+  Version extends Pick<MRFEVersion, "version_type" | "date_published"> &
+    VersionFiles
 >(versions: readonly Version[]): Version | undefined {
   const builds = versions
-    .filter((version) =>
-      (version.files.find((file) => file.primary) ?? version.files[0])?.filename
-        .toLowerCase()
-        .endsWith(".zip")
-    )
+    .filter(installsZip)
     .sort((a, b) => b.date_published.localeCompare(a.date_published))
   for (const stability of STABILITY) {
     const build = builds.find((version) => version.version_type === stability)

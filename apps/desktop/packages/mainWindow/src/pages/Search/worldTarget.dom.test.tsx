@@ -241,7 +241,8 @@ function search(
   view: string,
   requested: (string | undefined)[],
   target: string | null = "My World",
-  shape: object = {}
+  shape: object = {},
+  searched = "datapack"
 ) {
   const worldName = target ?? undefined
   control.params = { type: "datapack" }
@@ -263,8 +264,8 @@ function search(
         return control.worlds.find((w) => w.name === worldName)
       }
     },
-    defaultAddonType: () => "datapack",
-    searchQuery: () => ({ projectType: "datapack" }),
+    defaultAddonType: () => searched,
+    searchQuery: () => ({ projectType: searched }),
     setSearchQuery: vi.fn(),
     directErrors: () => [],
     viewMode: () => view,
@@ -417,6 +418,40 @@ it("with an instance only and no world, a data pack still downloads into the ins
     }
   ])
 })
+// The mod jar and the data pack build of one project are two installed
+// things: a mod search judges the row by the jar alone.
+const instanceJar = {
+  id: "instance-jar",
+  addon_type: "mods",
+  enabled: true,
+  modrinth: { project_id: "P", version_id: "J1" },
+  curseforge: null
+}
+it.each(["list", "grid"])(
+  "%s of a mod search still offers Download for a project whose data pack build only the instance holds",
+  async (view) => {
+    control.mods = [instancePack()]
+    const root = search(view, [undefined], null, hybrid, "mod")
+    expect(root.textContent).not.toContain("status_installed")
+    installButtons(root)[0].click()
+    await flush()
+    expect(control.mutations).toEqual([
+      {
+        key: "instance.installLatestMod",
+        input: { instance_id: 1, mod_source: { Modrinth: "P" } }
+      }
+    ])
+  }
+)
+it.each(["list", "grid"])(
+  "%s of a mod search shows a project whose mod jar the instance holds as installed",
+  (view) => {
+    control.mods = [instanceJar, instancePack()]
+    const root = search(view, [undefined], null, hybrid, "mod")
+    expect(installButtons(root)).toHaveLength(0)
+    expect(root.textContent).toContain("status_installed")
+  }
+)
 it("opening a data pack from a world search keeps the world on the addon page", () => {
   control.worlds = [world("My World")]
   const root = search("list", [undefined])

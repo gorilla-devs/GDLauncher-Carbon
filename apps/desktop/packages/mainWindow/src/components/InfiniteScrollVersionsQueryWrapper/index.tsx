@@ -20,7 +20,7 @@ import useSearchContext from "../SearchInputContext"
 import { VirtualizerHandle } from "virtua/lib/solid"
 import { FEUnifiedSearchType } from "@gd/core_module/bindings"
 import { TranslatedError } from "@/utils/translatedError"
-import { worldTargetName } from "@/utils/worldTarget"
+import { isDatapackBuild, worldTargetName } from "@/utils/worldTarget"
 import {
   AddonSupport,
   ScopeMode,
@@ -62,6 +62,9 @@ export interface VersionRowTypeData {
   status: string
   mainThumbnail?: string
   serverPackFileId?: string | null
+  /** Modrinth only: whether the version is a data pack build rather than a
+   *  mod jar of the same project. */
+  datapackBuild?: boolean
 }
 
 type VersionsQuery = ReturnType<typeof useVersionsQuery>[0]
@@ -311,6 +314,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
               hash: v.files[0].hashes.sha512,
               status: v.status || "",
               mainThumbnail: project.icon_url || undefined,
+              datapackBuild: isDatapackBuild(v),
               serverPackFileId:
                 project.project_type === "modpack" &&
                 project.server_side !== "unsupported"
@@ -534,7 +538,7 @@ const InfiniteScrollVersionsQueryWrapper = (props: Props) => {
 
   const allRows = () =>
     targetReady() && infiniteQuery.data
-      ? infiniteQuery.data.pages.flatMap((d) => d.data)
+      ? infiniteQuery.data.pages.flatMap((d): VersionRowTypeData[] => d.data)
       : []
 
   const context = {

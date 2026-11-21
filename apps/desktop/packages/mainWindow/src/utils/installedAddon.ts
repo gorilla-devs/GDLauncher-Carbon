@@ -13,8 +13,18 @@ export interface InstalledArtifact {
   version: { kind: "known"; id: string | number } | { kind: "unknown" }
 }
 
+/** What an install into an instance itself puts there, and so which of the
+ *  instance's rows is an installed copy of it:
+ *  - "datapack": the project's data pack build, a row of its data packs;
+ *  - "addon": the addon the project is typed as. For a Modrinth project that
+ *    ships a mod and a data pack, its mod jar;
+ *  - "unknown": a picked version that could be either. Only a row of that
+ *    very version is a copy of it.
+ *  `instanceInstall` in utils/worldTarget.ts decides it. */
+export type InstanceInstall = "datapack" | "addon" | "unknown"
+
 export type InstalledAddonTarget =
-  | { kind: "instance"; addons: readonly Mod[] }
+  | { kind: "instance"; addons: readonly Mod[]; install: InstanceInstall }
   | { kind: "server"; addons: readonly ServerAddon[] }
   /** The data packs inside one world: only data packs can match. */
   | { kind: "world"; datapacks: readonly FEWorldDatapack[] }
@@ -39,6 +49,16 @@ export function isInstalledArtifact(
     : artifact.version.id === requested.toString()
 }
 
+/** A project's mod jar and its data pack build are two installed things,
+ *  each a row of its own kind. */
+const rowKinds = (
+  typed: AddonType,
+  install: InstanceInstall
+): readonly AddonType[] =>
+  install === "unknown"
+    ? [typed, "datapacks"]
+    : [install === "datapack" ? "datapacks" : typed]
+
 /** A server addon's file name without its `.disabled` suffix. */
 const serverFileName = (addon: ServerAddon) =>
   addon.filename.replace(/\.disabled$/, "")
@@ -56,17 +76,14 @@ export function findInstalledAddon(
   if (!kind) return undefined
   const projectId = addon.id.toString()
   if (target.kind === "instance" || target.kind === "world") {
-    // Modrinth types a data pack "mod", and its data pack build is a row of
-    // the instance's data packs.
-    const kinds: readonly AddonType[] = canBeDatapack(addon)
-      ? [kind, "datapacks"]
-      : [kind]
     const rows: readonly Pick<Mod, "id" | "curseforge" | "modrinth">[] =
       target.kind === "world"
         ? canBeDatapack(addon)
           ? target.datapacks
           : []
-        : target.addons.filter((mod) => kinds.includes(mod.addon_type))
+        : target.addons.filter((mod) =>
+            rowKinds(kind, target.install).includes(mod.addon_type)
+          )
     const matches = rows
       .filter((mod) =>
         addon.platform === "curseforge"
@@ -87,10 +104,12 @@ export function findInstalledAddon(
         }
       })
     // Separate saves/duplicates can expose more than one artifact of a project.
-    return (
-      matches.find((artifact) => isInstalledArtifact(artifact, requested)) ??
-      matches[0]
+    const exact = matches.find((artifact) =>
+      isInstalledArtifact(artifact, requested)
     )
+    if (target.kind === "instance" && target.install === "unknown")
+      return requested == null || requested === "" ? undefined : exact
+    return exact ?? matches[0]
   }
   const candidates = target.addons.filter((cached) => cached.addonType === kind)
   const ofProject = candidates.filter((cached) =>

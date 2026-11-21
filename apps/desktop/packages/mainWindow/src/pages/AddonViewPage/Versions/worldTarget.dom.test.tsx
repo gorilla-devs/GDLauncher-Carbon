@@ -26,6 +26,9 @@ const build = (id: string, name: string, file: string) => ({
   name,
   version_type: "release",
   game_versions: ["1.20.1"],
+  loaders: file.endsWith(".zip")
+    ? ["datapack"]
+    : ["fabric", "forge", "neoforge", "quilt"],
   downloads: 1,
   date_published: "2024-01-01T00:00:00Z",
   files: [{ filename: file, size: 1, hashes: { sha512: "hash" } }],
