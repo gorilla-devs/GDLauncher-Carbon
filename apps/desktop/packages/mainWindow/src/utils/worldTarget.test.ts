@@ -3,6 +3,7 @@ import type { FEWorld, FEWorldDatapack } from "@gd/core_module/bindings"
 import {
   asksWhichWorld,
   canBeDatapack,
+  installedInInstance,
   installPlaces,
   instanceInstall,
   instanceInstallIsDatapack,
@@ -10,6 +11,7 @@ import {
   isOnlyDatapack,
   newestDatapackBuild,
   readableWorld,
+  readInstallPlaces,
   withoutWorldParam,
   worldDatapackInstall,
   worldDatapackSource,
@@ -485,6 +487,38 @@ describe("where a data pack install can go", () => {
         false
       ).worlds[0].holds
     ).toBe(true)
+  })
+})
+
+describe("whether a Download for an instance shows as installed", () => {
+  const held = [pack("copy", "modrinth", "P", "V1")]
+  const project = { ...addon("mod"), loaders: modrinthPack.loaders }
+  const read = (worlds: FEWorld[] | undefined, isError = false) =>
+    readInstallPlaces(project, { data: worlds, isError }, true)
+  it("knows no place until the worlds are read, and the instance alone when they cannot be", () => {
+    expect(read(undefined)).toBeUndefined()
+    expect(read(undefined, true)?.offers).toBe("nothing")
+    expect(read([world("A")])?.offers).toBe("choice")
+  })
+  it("is what the instance holds wherever nothing is asked", () => {
+    expect(installedInInstance(true, false, undefined)).toBe(true)
+    expect(installedInInstance(false, false, undefined)).toBe(false)
+  })
+  it("stays installed where it asks until a world is known that can take it", () => {
+    expect(installedInInstance(true, true, read(undefined))).toBe(true)
+    expect(installedInInstance(true, true, read([world("A")]))).toBe(false)
+    expect(installedInInstance(true, true, read([world("A", held)]))).toBe(true)
+    expect(installedInInstance(true, true, read([]))).toBe(true)
+    expect(installedInInstance(true, true, read(undefined, true))).toBe(true)
+  })
+  it("is never installed by its worlds alone", () => {
+    expect(
+      installedInInstance(
+        false,
+        true,
+        readInstallPlaces(project, { data: [world("A", held)] }, false)
+      )
+    ).toBe(false)
   })
 })
 

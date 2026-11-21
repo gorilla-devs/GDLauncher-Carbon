@@ -418,8 +418,6 @@ it("with an instance only and no world, a data pack still downloads into the ins
     }
   ])
 })
-// The mod jar and the data pack build of one project are two installed
-// things: a mod search judges the row by the jar alone.
 const instanceJar = {
   id: "instance-jar",
   addon_type: "mods",
@@ -427,6 +425,87 @@ const instanceJar = {
   modrinth: { project_id: "P", version_id: "J1" },
   curseforge: null
 }
+// A data pack the instance holds can still go into its worlds: the row keeps
+// its Download, as the picker and the addon page do, until none can take it.
+const modrinthPack = { type: "mod", loaders: ["datapack"] }
+const curseforgeInstanceCopy = {
+  id: "instance-copy",
+  addon_type: "datapacks",
+  enabled: true,
+  curseforge: { project_id: 12, file_id: 3 },
+  modrinth: null
+}
+const curseforgeWorldCopy = {
+  ...worldPack(),
+  modrinth: null,
+  curseforge: { project_id: 12, file_id: 3 }
+}
+const heldShapes = [
+  [
+    "a CurseForge data pack",
+    curseforgePack,
+    curseforgeInstanceCopy,
+    curseforgeWorldCopy
+  ],
+  ["a Modrinth data pack", modrinthPack, instancePack(), worldPack()]
+] as const
+for (const view of ["list", "grid"]) {
+  it.each(heldShapes)(
+    `${view} still asks where for %s the instance holds while a world can take it, Download to instance ticked`,
+    async (_, shape, inInstance, inWorld) => {
+      control.mods = [inInstance]
+      control.worlds = [world("Holder", [inWorld]), world("My World")]
+      const root = search(view, [undefined], null, shape)
+      expect(root.textContent).not.toContain("status_installed")
+      installButtons(root)[0].click()
+      await flush()
+      expect(menuItem(root, "Holder").disabled).toBe(true)
+      expect(menuItem(root, "download_to_instance").disabled).toBe(true)
+      menuItem(root, "My World").click()
+      await flush()
+      expect(control.mutations.map((m) => [m.key, m.input.world])).toEqual([
+        ["instance.installWorldDatapack", "My World"]
+      ])
+    }
+  )
+  it.each(heldShapes)(
+    `${view} shows %s as installed once the instance and every world hold it`,
+    (_, shape, inInstance, inWorld) => {
+      control.mods = [inInstance]
+      control.worlds = [world("My World", [inWorld]), world("Broken", [], null)]
+      const root = search(view, [undefined], null, shape)
+      expect(installButtons(root)).toHaveLength(0)
+      expect(root.textContent).toContain("status_installed")
+    }
+  )
+  it.each(heldShapes)(
+    `${view} shows %s the instance holds as installed when it has no world`,
+    (_, shape, inInstance) => {
+      control.mods = [inInstance]
+      const root = search(view, [undefined], null, shape)
+      expect(installButtons(root)).toHaveLength(0)
+      expect(root.textContent).toContain("status_installed")
+    }
+  )
+  it(`${view} keeps a mod the instance holds as installed whatever its worlds hold`, () => {
+    control.mods = [instanceJar]
+    control.worlds = [world("My World")]
+    for (const [shape, searched] of [
+      [plainMod, "mod"],
+      [plainMod, "datapack"],
+      [hybrid, "mod"]
+    ] as const) {
+      const root = search(view, [undefined], null, shape, searched)
+      expect(installButtons(root)).toHaveLength(0)
+      expect(root.textContent).toContain("status_installed")
+      dispose?.()
+      document.body.textContent = ""
+    }
+  })
+}
+
+// The mod jar and the data pack build of one project are two installed
+// things: a mod search judges the row by the jar alone.
 it.each(["list", "grid"])(
   "%s of a mod search still offers Download for a project whose data pack build only the instance holds",
   async (view) => {

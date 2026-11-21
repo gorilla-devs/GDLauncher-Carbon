@@ -44,8 +44,9 @@ import { refreshWorldsAfter } from "@/utils/refusalText"
 import {
   asksWhichWorld,
   canBeDatapack,
-  installPlaces,
+  installedInInstance,
   isDatapackBuild,
+  readInstallPlaces,
   ReadableWorld,
   readableWorld,
   worldDatapackInstall,
@@ -351,16 +352,12 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
     isInstalledArtifact(installedMod(), scopedFileId())
   // What the "where" step offers; undefined while the worlds are read.
   const places = createMemo(() =>
-    asksWhere() && (worlds.isError || worlds.data !== undefined)
-      ? installPlaces(props.addon, worlds.data, holdsRequested())
+    asksWhere()
+      ? readInstallPlaces(props.addon, worlds, holdsRequested())
       : undefined
   )
-  // A data pack the instance holds stays installed until a world is known
-  // that could still take it.
-  const isInstalled = createMemo(
-    () =>
-      holdsRequested() &&
-      (!asksWhere() || !places() || places()!.offers === "nothing")
+  const isInstalled = createMemo(() =>
+    installedInInstance(holdsRequested(), asksWhere(), places())
   )
 
   /** Installs into the selected target: the server, the world of the search,

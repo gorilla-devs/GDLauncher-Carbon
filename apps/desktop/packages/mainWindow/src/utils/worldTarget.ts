@@ -195,6 +195,29 @@ export function installPlaces(
   return { worlds: listed, instanceHolds, offers }
 }
 
+/** The "where" step once the instance's worlds are read; undefined until
+ *  then. Worlds that could not be read leave the instance to install into. */
+export function readInstallPlaces(
+  addon: FEUnifiedSearchResult | undefined,
+  worlds: { data: readonly FEWorld[] | undefined; isError?: boolean },
+  instanceHolds: boolean
+): InstallPlaces | undefined {
+  return worlds.isError || worlds.data !== undefined
+    ? installPlaces(addon, worlds.data, instanceHolds)
+    : undefined
+}
+
+/** Whether a Download for an instance shows as installed. Where it asks
+ *  where (`asks`), a data pack the instance holds stays installed until a
+ *  world is known that could still take it. */
+export function installedInInstance(
+  instanceHolds: boolean,
+  asks: boolean,
+  places: InstallPlaces | undefined
+): boolean {
+  return instanceHolds && (!asks || !places || places.offers === "nothing")
+}
+
 /** `null` asks the core for the newest data pack build for the game version. */
 export function worldDatapackSource(
   addon: Pick<FEUnifiedSearchResult, "id" | "platform">,

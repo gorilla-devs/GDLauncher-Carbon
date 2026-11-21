@@ -29,10 +29,12 @@ import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
 import {
   asksWhichWorld,
   canBeDatapack,
+  installedInInstance,
   installPlaces,
   instanceInstall,
   PickedVersion,
   ReadableWorld,
+  readInstallPlaces,
   WORLDS_STALE_TIME
 } from "@/utils/worldTarget"
 import useSearchContext from "@/components/SearchInputContext"
@@ -219,15 +221,11 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
       staleTime: WORLDS_STALE_TIME,
       meta: LOCAL_ERROR_TOAST
     }))
-    const worldsSettled = () =>
-      worldsQuery.isError || worldsQuery.data !== undefined
     const rowPlaces = () =>
-      installPlaces(props.addon, worldsQuery.data, holdsInInstance())
-    // A data pack the instance holds stays installed until a world is known
-    // that could still take it.
+      readInstallPlaces(props.addon, worldsQuery, holdsInInstance())
+    const worldsSettled = () => rowPlaces() !== undefined
     const isInstalled = () =>
-      holdsInInstance() &&
-      (!asksForWorld() || !worldsSettled() || rowPlaces().offers === "nothing")
+      installedInInstance(holdsInInstance(), asksForWorld(), rowPlaces())
 
     return (
       <InstanceItem
@@ -243,8 +241,7 @@ export const InstanceDropdown = (props: InstanceDropdownProps) => {
         linkedFileMismatch={props.linkedFileMismatch?.(instance.id)}
         hoveredInstanceId={props.hoveredInstanceId()}
         onSelect={(id) =>
-          asksForWorld() &&
-          !(worldsSettled() && rowPlaces().worlds.length === 0)
+          asksForWorld() && rowPlaces()?.worlds.length !== 0
             ? setPickedInstance(instance)
             : props.handleInstanceSelection(id)
         }

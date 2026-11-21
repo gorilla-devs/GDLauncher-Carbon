@@ -2,7 +2,15 @@ import { rspc } from "@/utils/rspcClient"
 import useSearchContext from "@/components/SearchInputContext"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { isAddonInstalled } from "@/utils/installedAddon"
-import { canBeDatapack, instanceInstall } from "@/utils/worldTarget"
+import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
+import {
+  asksWhichWorld,
+  canBeDatapack,
+  installedInInstance,
+  instanceInstall,
+  readInstallPlaces,
+  WORLDS_STALE_TIME
+} from "@/utils/worldTarget"
 import {
   effectiveFileId,
   instanceLinkTarget,
@@ -44,9 +52,27 @@ export function useRowInstalled() {
         : instanceTarget()
     )
 
+  // A data pack row of an instance with no world chosen asks where on
+  // Download, as its button does.
+  const asksWhere = (row: LinkedSearchResult) =>
+    !isServer() &&
+    instanceId() > 0 &&
+    worldName(row) === undefined &&
+    asksWhichWorld(row, searchContext?.searchQuery().projectType)
+  // The query the buttons of those rows read too: a row shown as installed
+  // has no button to read it.
+  const worlds = rspc.createQuery(() => ({
+    queryKey: ["instance.getWorlds", instanceId()],
+    enabled: (searchContext?.allRows() ?? []).some(
+      (row) => row.type === "value" && !!row.value && asksWhere(row.value)
+    ),
+    staleTime: WORLDS_STALE_TIME,
+    meta: LOCAL_ERROR_TOAST
+  }))
+
   const isInstalled = (row: LinkedSearchResult) => {
     const requested = rowRequested(row)
-    return isAddonInstalled(
+    const held = isAddonInstalled(
       row,
       isServer()
         ? {
@@ -72,6 +98,9 @@ export function useRowInstalled() {
       requested,
       row.linkedFile
     )
+    return asksWhere(row)
+      ? installedInInstance(held, true, readInstallPlaces(row, worlds, held))
+      : held
   }
 
   return { worldName, isInstalled }
