@@ -4,5 +4,7 @@
   "_trn_window_close_text_2": "Puoi anche <0>personalizzare il comportamento di avvio del gioco predefinito</0>.",
   "_trn_window_close_never_show": "Non mostrare più questo messaggio",
   "_trn_window_close_quit_app": "Esci dall'app",
-  "_trn_view_logs": "Visualizza Log"
+  "_trn_view_logs": "Visualizza Log",
+  "_trn_menu_view": "Visualizza",
+  "_trn_menu_reset_theme": "Ripristina tema"
 }

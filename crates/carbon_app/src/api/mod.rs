@@ -25,6 +25,7 @@ pub mod router;
 pub mod server;
 pub mod settings;
 mod system_info;
+pub mod themes;
 pub mod translation;
 mod vtask;
 
@@ -183,6 +184,7 @@ pub fn build_rspc_router(gdl_base_api: String) -> RouterBuilder<App> {
         .merge(keys::modplatforms::GROUP_PREFIX, modplatforms::mount())
         .merge(keys::settings::GROUP_PREFIX, settings::mount())
         .merge(keys::metrics::GROUP_PREFIX, metrics::mount())
+        .merge(keys::themes::GROUP_PREFIX, themes::mount())
         .merge(keys::systeminfo::GROUP_PREFIX, system_info::mount())
 }
 
@@ -236,6 +238,7 @@ pub fn build_axum_vanilla_router() -> axum::Router<Arc<AppInner>> {
         .nest("/account", account::mount_axum_router())
         .nest("/instance", instance::mount_axum_router())
         .nest("/server", server::mount_axum_router())
+        .nest("/theme", themes::mount_axum_router())
 }
 
 async fn invalidation_ws_handler(

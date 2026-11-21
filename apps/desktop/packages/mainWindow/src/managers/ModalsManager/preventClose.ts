@@ -17,3 +17,13 @@ export function resolvePreventClose(
       : registryPreventClose === true
   return registryPrevents || entry.preventCloseAccessor?.() === true
 }
+
+/** Whether the top modal of the stack currently blocks closing (see
+ *  `resolvePreventClose`); false when no modal is open. */
+export function topModalBlocksClose(
+  stack: readonly { name: string; preventCloseAccessor?: () => boolean }[],
+  registryFor: (name: string) => boolean | (() => boolean) | undefined
+): boolean {
+  const top = stack[stack.length - 1]
+  return top !== undefined && resolvePreventClose(registryFor(top.name), top)
+}

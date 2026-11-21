@@ -790,6 +790,7 @@ const Console = (props: ConsoleProps) => {
 
       {/* Log content */}
       <div
+        data-gdl="server.console"
         class="relative box-border w-full flex-1 overflow-auto bg-darkSlate-900 py-2 pl-4 pr-2"
         id="server_console_container"
       >
@@ -842,6 +843,7 @@ const Console = (props: ConsoleProps) => {
 
                 return (
                   <div
+                    data-gdl="server.console.line"
                     class="border-b-solid border-darkSlate-600 relative w-full break-words border-b px-3"
                     classList={{
                       "py-3": logsDensity() === "low",

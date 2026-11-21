@@ -1,6 +1,7 @@
 import { Button, Tabs, TabsList, TabsTrigger, TabsIndicator } from "@gd/ui"
 import { useLocation } from "@solidjs/router"
 import { Index, JSX, Show, createSignal, onMount, onCleanup } from "solid-js"
+import { DecorationSlot, isDecorated } from "@/themes/DecorationSlot"
 
 export interface DetailPageTab {
   id: string
@@ -23,6 +24,8 @@ interface DetailPageLayoutProps {
   stickyRightButton: JSX.Element
   noPaddingPaths: string[]
   isFullScreen?: () => boolean
+  hookPrefix: "instance" | "server"
+  decorationKey: string
 }
 
 const DetailPageLayout = (props: DetailPageLayoutProps) => {
@@ -55,6 +58,7 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
 
   return (
     <main
+      data-gdl="page"
       id={props.containerId}
       class="bg-darkSlate-800 relative flex h-full flex-col overflow-x-hidden"
       classList={{
@@ -66,16 +70,22 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
       }}
     >
       <header
+        data-gdl={`${props.hookPrefix}.header`}
         ref={(el) => {
           headerRef = el
         }}
         class="transition-100 ease-spring relative flex flex-col items-stretch justify-between overflow-hidden transition-all"
         classList={{
+          isolate: isDecorated(
+            `${props.hookPrefix}.header`,
+            props.decorationKey
+          ),
           "min-h-0 h-0": props.isFullScreen?.(),
           "min-h-60": !props.isFullScreen?.()
         }}
       >
         <img
+          data-gdl={`${props.hookPrefix}.cover`}
           src={props.headerImage}
           alt="Cover"
           class="absolute h-full w-full object-cover"
@@ -84,10 +94,18 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
             "will-change": "transform"
           }}
         />
-        <div class="from-darkSlate-800 relative z-10 h-full bg-gradient-to-t">
+        <DecorationSlot
+          anchor={`${props.hookPrefix}.header`}
+          itemKey={props.decorationKey}
+        />
+        <div
+          data-gdl={`${props.hookPrefix}.header.fade`}
+          class="from-darkSlate-800 relative z-10 h-full bg-gradient-to-t"
+        >
           <div class="sticky left-5 top-5 z-50 w-fit">
             <Button
               rounded
+              data-gdl={`${props.hookPrefix}.back`}
               onClick={props.onBackClick}
               size="small"
               type="transparent"
@@ -96,15 +114,22 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
             </Button>
           </div>
           <Show when={props.headerTopRight}>
-            <div class="absolute right-5 top-5 z-50 flex w-fit gap-2">
+            <div
+              data-gdl={`${props.hookPrefix}.corner`}
+              class="absolute right-5 top-5 z-50 flex w-fit gap-2"
+            >
               {props.headerTopRight}
             </div>
           </Show>
-          <div class="from-darkSlate-800 sticky top-52 z-20 box-border flex h-24 w-full justify-center bg-gradient-to-t px-6 pb-2">
+          <div
+            data-gdl={`${props.hookPrefix}.header.fade`}
+            class="from-darkSlate-800 sticky top-52 z-20 box-border flex h-24 w-full justify-center bg-gradient-to-t px-6 pb-2"
+          >
             <div class="flex w-full justify-start">
               <div class="flex w-full items-end justify-between">
                 <div class="flex flex-1 flex-row justify-end gap-4">
                   <img
+                    data-gdl={`${props.hookPrefix}.icon`}
                     src={props.icon}
                     alt="Icon"
                     class="h-16 w-16 rounded-xl object-cover"
@@ -118,11 +143,17 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
                         : {}
                     }
                   />
-                  <div class="flex flex-1 flex-col">
+                  <div
+                    data-gdl={`${props.hookPrefix}.info`}
+                    class="flex flex-1 flex-col"
+                  >
                     {props.headerInfoContent}
                     <div class="flex cursor-default flex-row justify-between">
                       <div class="flex-1" />
-                      <div class="flex items-center gap-2">
+                      <div
+                        data-gdl={`${props.hookPrefix}.actions`}
+                        class="flex items-center gap-2"
+                      >
                         {props.headerActions}
                       </div>
                     </div>
@@ -135,6 +166,7 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
       </header>
 
       <div
+        data-gdl="page.body"
         class="bg-darkSlate-800"
         classList={{
           "flex-1 flex flex-col min-h-0": props.isFullScreen?.(),
@@ -149,12 +181,14 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
           }}
         >
           <div
+            data-gdl="page.body"
             class="bg-darkSlate-800 w-full"
             classList={{
               "flex flex-col min-h-0": props.isFullScreen?.()
             }}
           >
             <div
+              data-gdl={`${props.hookPrefix}.tabs`}
               class="bg-darkSlate-800 sticky top-0 z-30 flex h-14 items-center justify-between py-10"
               classList={{
                 "px-6": isNoPaddingPath()
@@ -173,6 +207,7 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
                   }}
                 >
                   <Button
+                    data-gdl={`${props.hookPrefix}.tabs.back`}
                     onClick={props.onBackClick}
                     size="small"
                     type="secondary"
@@ -199,6 +234,7 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
                 </div>
               </div>
               <div
+                data-gdl={`${props.hookPrefix}.tabs.play`}
                 class="ease-spring flex items-center justify-end overflow-hidden transition-all duration-150"
                 classList={{
                   "w-14 ml-4 opacity-100": isSticky() || props.isFullScreen?.(),
@@ -209,6 +245,7 @@ const DetailPageLayout = (props: DetailPageLayoutProps) => {
               </div>
             </div>
             <div
+              data-gdl={`${props.hookPrefix}.content`}
               class="px-0"
               classList={{
                 "flex-1 min-h-0 pt-4 px-4": !!props.isFullScreen?.(),

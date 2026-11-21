@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: transparent;
+        overflow: hidden;
+        font-family: system-ui, sans-serif;
+      }
+      #col {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 8px;
+      }
+      #links {
+        display: flex;
+        flex-direction: row;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+      #dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: rgba(223, 227, 236, 0.6);
+      }
+      #dot[hidden] {
+        display: none;
+      }
+      #why,
+      #remove-ads {
+        background: rgba(18, 20, 28, 0.78);
+        color: #dfe3ec;
+        border: none;
+        border-radius: 14px;
+        padding: 5px 14px;
+        font: 500 14px system-ui;
+        cursor: pointer;
+      }
+      #remove-ads[hidden] {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="col"></div>
+    <script>
+      ;(() => {
+        const q = new URLSearchParams(location.search)
+        const w = Number(q.get("w"))
+        const h = Number(q.get("h"))
+        const bw = Number(q.get("bw"))
+        const bh = Number(q.get("bh"))
+        const placeholder = q.get("placeholder") === "1"
+        const col = document.getElementById("col")
+        const api = window.gdlAdView
+
+        const slot = (width, height, cid, adstyle) => {
+          const box = document.createElement("div")
+          box.style.width = `${width}px`
+          box.style.height = `${height}px`
+          box.style.background = "transparent"
+          if (placeholder) {
+            box.dataset.adPlaceholder = ""
+            box.style.background = "rgb(64 64 64 / .7)"
+            box.style.display = "flex"
+            box.style.alignItems = "center"
+            box.style.justifyContent = "center"
+            box.style.font = "12px system-ui, sans-serif"
+            box.style.color = "#ddd"
+            box.textContent = "AD"
+            col.appendChild(box)
+            return
+          }
+          const ad = document.createElement("owadview")
+          ad.setAttribute("cid", cid)
+          if (adstyle) ad.setAttribute("adstyle", adstyle)
+          box.appendChild(ad)
+          col.appendChild(box)
+        }
+
+        if (q.get("banner") === "1") {
+          slot(bw, bh, "gdlauncher_horizontal_400_60")
+        }
+        const highImpact = w === 440
+        slot(
+          w,
+          h,
+          `gdlauncher_rectangle_${w}_${h}${highImpact ? "_high_impact" : ""}`,
+          highImpact ? "high-impact-ad" : undefined
+        )
+
+        const button = (id, text, onClick) => {
+          const b = document.createElement("button")
+          b.id = id
+          b.type = "button"
+          b.textContent = text
+          b.addEventListener("click", () => api && onClick())
+          return b
+        }
+
+        let why = null
+        let remove = null
+        let dot = null
+        if (q.get("hideText") !== "1") {
+          const links = document.createElement("div")
+          links.id = "links"
+          why = button("why", "Why are ads needed?", () => api.openWhyAds())
+          dot = document.createElement("span")
+          dot.id = "dot"
+          dot.hidden = true
+          remove = button("remove-ads", "", () => api.openRemoveAds())
+          remove.hidden = true
+          links.append(why, dot, remove)
+          col.appendChild(links)
+        }
+
+        if (api) {
+          api.onState((s) => {
+            if (!why) return
+            why.textContent = s.whyAds
+            if (s.removeAds) {
+              remove.textContent = s.removeAds
+            }
+            remove.hidden = !s.removeAds
+            dot.hidden = !s.removeAds
+          })
+        }
+      })()
+    </script>
+  </body>
+</html>

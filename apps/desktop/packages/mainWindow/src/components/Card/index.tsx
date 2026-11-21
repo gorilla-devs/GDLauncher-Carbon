@@ -39,18 +39,29 @@ const Card = (props: Props) => {
 
   return (
     <div
+      data-gdl="instance.overview.card"
       class={`h-23 bg-darkSlate-700 box-border flex min-w-max items-center gap-2 rounded-xl p-5 ${
         props.class || ""
       }`}
     >
       <div class="h-13 w-13 flex items-center justify-center rounded-lg">
-        <img src={getIcon(props.icon || "vanilla")} class="h-10 w-10" />
+        <img
+          data-gdl="instance.overview.card.icon"
+          src={getIcon(props.icon || "vanilla")}
+          class="h-10 w-10"
+        />
       </div>
       <div>
-        <p class="text-lightSlate-50 m-0 whitespace-nowrap text-xl font-bold">
+        <p
+          data-gdl="instance.overview.card.value"
+          class="text-lightSlate-50 m-0 whitespace-nowrap text-xl font-bold"
+        >
           {mergedProps.text}
         </p>
-        <h5 class="text-lightSlate-700 m-0 font-medium uppercase">
+        <h5
+          data-gdl="instance.overview.card.label"
+          class="text-lightSlate-700 m-0 font-medium uppercase"
+        >
           {mergedProps.title}
         </h5>
       </div>

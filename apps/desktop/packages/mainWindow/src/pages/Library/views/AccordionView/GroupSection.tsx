@@ -15,6 +15,7 @@ import {
   Accessor
 } from "solid-js"
 import { Collapsable } from "@gd/ui"
+import { DecorationSlot } from "@/themes/DecorationSlot"
 import { ListInstance, ListServer } from "@gd/core_module/bindings"
 import InstanceTile from "@/components/InstanceTile"
 import ServerTile from "@/components/Server/Tile"
@@ -25,7 +26,7 @@ import { EndOfGroupDropZone } from "../../components/EndOfGroupDropZone"
 import DropPreviewTile from "../../components/DropPreviewTile"
 import { VirtualGroup, SelectionState, LibraryMode } from "../../types"
 import { parseServerIds } from "../../utils/selectionIds"
-import { ANIMATION, TILE_SIZES, TileSize } from "../../constants"
+import { ANIMATION, TILE_GRID_CLASSES, tileGridStyle } from "../../constants"
 
 interface GroupSectionProps {
   group: VirtualGroup<ListInstance | ListServer>
@@ -88,8 +89,22 @@ export function GroupSection(props: GroupSectionProps) {
   return (
     <Show when={shouldShowGroup()}>
       <Collapsable
+        data-gdl="library.group"
+        headerGdl="section-title"
+        headerSlot={
+          <DecorationSlot
+            anchor="section-title"
+            itemKey={`group:${props.group.id}`}
+          />
+        }
+        slot={
+          <DecorationSlot
+            anchor="library.group"
+            itemKey={`group:${props.group.id}`}
+          />
+        }
         noPadding
-        title={<span>{props.group.name}</span>}
+        title={<span data-gdl="section-title.text">{props.group.name}</span>}
         size="standard"
         customHeader={
           isDbGroup()
@@ -106,7 +121,8 @@ export function GroupSection(props: GroupSectionProps) {
         }
       >
         <div
-          class="mt-4 pl-0.5"
+          data-gdl="library.grid"
+          class={`${TILE_GRID_CLASSES} mt-4 pl-0.5`}
           classList={{
             "gap-y-4": props.tileSize() === 1,
             "gap-y-6": props.tileSize() === 2,
@@ -114,12 +130,7 @@ export function GroupSection(props: GroupSectionProps) {
             "gap-y-10": props.tileSize() === 4,
             "gap-y-12": props.tileSize() === 5
           }}
-          style={{
-            display: "grid",
-            "grid-template-columns": `repeat(auto-fill, ${TILE_SIZES[props.tileSize() as TileSize]?.widthPx ?? 184}px)`,
-            "justify-content": "space-evenly",
-            "column-gap": "16px"
-          }}
+          style={tileGridStyle(props.tileSize())}
         >
           <For each={props.group.instances}>
             {(item, j) => (

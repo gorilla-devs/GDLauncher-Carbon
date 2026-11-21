@@ -214,6 +214,11 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
     // Electron renderer can hardcode the same value.
     let api_token = generate_api_token();
     crate::api::auth::set_expected_token(api_token.clone());
+    let port = listener
+        .local_addr()
+        .expect("Failed to get local address from TCP listener")
+        .port();
+    crate::api::auth::set_local_port(port);
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router(base_api_override.clone())
         .build()
@@ -241,6 +246,11 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         "[startup-timing] AppInner::new completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
+
+    // Before the server answers, so a stale seasonal theme never flashes.
+    if let Err(e) = app.theme_manager().check_season().await {
+        tracing::warn!("the theme season check failed: {e:#}");
+    }
 
     // Detached: a full instance scan must not hold up the rest of startup.
     tokio::spawn({
@@ -336,11 +346,6 @@ async fn start_router(runtime_path: PathBuf, base_api_override: String, listener
         .layer(axum::middleware::from_fn(crate::api::auth::require_token))
         .layer(cors)
         .with_state(app1);
-
-    let port = listener
-        .local_addr()
-        .expect("Failed to get local address from TCP listener")
-        .port();
 
     debug!(
         "[startup-timing] reached axum::serve in {:.2}s total",

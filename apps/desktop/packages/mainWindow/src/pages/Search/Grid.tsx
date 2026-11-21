@@ -18,8 +18,7 @@ import { rspc } from "@/utils/rspcClient"
 import { Trans } from "@gd/i18n"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { SearchResultItem } from "@/utils/platformSearch"
-import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 const ITEM_WIDTH = 320 // Approximate width of each grid item in pixels (larger for better visuals)
 const GAP = 24 // Gap between items in pixels
@@ -185,9 +184,9 @@ export function Grid() {
       {/* Image area skeleton with platform icon */}
       <div class="skeleton-shimmer bg-darkSlate-500 flex h-full w-full items-center justify-center">
         <Show when={props.platform}>
-          <img
-            src={
-              props.platform === "curseforge" ? CurseforgeLogo : ModrinthLogo
+          <PlatformLogo
+            platform={
+              props.platform === "curseforge" ? "curseforge" : "modrinth"
             }
             class="h-8 w-8 opacity-40"
             alt={`${props.platform} logo`}
@@ -219,7 +218,11 @@ export function Grid() {
   )
 
   return (
-    <div ref={containerRef} class="flex h-full flex-col overflow-hidden">
+    <div
+      ref={containerRef}
+      data-gdl="search.results"
+      class="flex h-full flex-col overflow-hidden"
+    >
       <div class="flex-1 overflow-hidden">
         <Show
           when={
@@ -231,7 +234,10 @@ export function Grid() {
           <Show
             when={allRows().length > 0}
             fallback={
-              <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
+              <div
+                data-gdl="search.empty"
+                class="flex flex-col items-center justify-center px-6 py-16 text-center"
+              >
                 <PlaceholderGorilla
                   size={12}
                   variant="Searching Gorilla - Magnifying Glass"
@@ -262,7 +268,7 @@ export function Grid() {
               }}
               onScroll={gridScrollHandler}
             >
-              {(row) => (
+              {(row, rowIndex) => (
                 <div
                   class="mb-6 grid gap-6"
                   style={{
@@ -270,13 +276,14 @@ export function Grid() {
                   }}
                 >
                   <For each={row}>
-                    {(item) => {
+                    {(item, column) => {
                       if (item.type === "loader" || item.type === "skeleton") {
                         return <GridItemSkeleton platform={item.platform} />
                       }
 
                       return (
                         <GridItem
+                          position={rowIndex() * itemsPerRow() + column() + 1}
                           instanceMods={instanceMods()?.data ?? undefined}
                           serverAddons={serverAddons()?.data ?? undefined}
                           instanceId={instanceId()}

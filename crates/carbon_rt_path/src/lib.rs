@@ -260,6 +260,15 @@ impl InstancePath {
 }
 
 #[derive(Debug)]
+pub struct ThemesPath(PathBuf);
+
+impl ThemesPath {
+    pub fn to_path(&self) -> PathBuf {
+        self.0.clone()
+    }
+}
+
+#[derive(Debug)]
 pub struct TempPath(PathBuf);
 
 impl TempPath {
@@ -510,6 +519,10 @@ impl RuntimePath {
 
     pub fn get_temp(&self) -> TempPath {
         TempPath(self.0.join("temp"))
+    }
+
+    pub fn get_themes(&self) -> ThemesPath {
+        ThemesPath(self.0.join("themes"))
     }
 
     pub fn get_download(&self) -> DownloadPath {

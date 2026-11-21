@@ -2,9 +2,9 @@ import { ModalProps, useModal } from ".."
 import { CancelLink, DialogFooter } from "../DialogFooter"
 import ModalLayout from "../ModalLayout"
 import { Trans, useTransContext } from "@gd/i18n"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { FEUnifiedPlatform } from "@gd/core_module/bindings"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 interface Props {
   onSelectPlatform: (platform: FEUnifiedPlatform) => void
@@ -42,7 +42,11 @@ const PlatformSelection = (props: ModalProps) => {
             class="bg-darkSlate-700 hover:bg-darkSlate-600 border-darkSlate-500 flex items-center gap-4 rounded-lg border p-4 transition-colors"
             onClick={() => handleSelectPlatform("curseforge")}
           >
-            <img src={CurseforgeLogo} class="h-8 w-8" alt="CurseForge" />
+            <PlatformLogo
+              platform="curseforge"
+              class="h-8 w-8"
+              alt="CurseForge"
+            />
             <div class="flex flex-col items-start">
               <span class="font-medium">{t("enums:_trn_curseforge")}</span>
               <span class="text-lightSlate-500 text-sm">

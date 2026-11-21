@@ -1,0 +1,134 @@
+/*
+ * The app's own styles that a theme must be able to override with a plain
+ * `[data-gdl~="..."]` rule. Imported after the utilities and the CSS reset
+ * (main.tsx), so these beat both by coming later at no more than one
+ * attribute's or class's weight; theme CSS is added after all of them, so a
+ * theme's rule of the same weight still wins, as the guide promises.
+ */
+
+/* The select box (`select`), unless it's the unstyled variant. It weighs one
+   class to beat the reset's `[type="button"]` rule, which would clear it. */
+.gdl-select-fill {
+  background-color: rgb(var(--darkSlate-800));
+}
+
+/* Caption tiles: the name and details sit on the panel, not on the picture. */
+:where(html[data-gdl-tiles="caption"]) [data-gdl~="library.tile.name"] {
+  color: rgb(var(--lightSlate-50));
+}
+:where(html[data-gdl-tiles="caption"]) [data-gdl~="library.tile.meta"] {
+  color: rgb(var(--lightSlate-700));
+}
+
+/* With a background picture, the frame around the panel lets it show, as the
+   window's own backdrop does. */
+:where(html[data-gdl-background]) [data-gdl~="panel-frame"] {
+  background-color: transparent;
+}
+
+/* Log and console lines use the mono font. No weight at all, so it only beats
+   the app-wide `* { font-family: var(--font) }` by coming later. */
+:where(#instance_logs_container, #server_console_container) * {
+  font-family: var(--font-mono);
+}
+
+/* White on a dark palette, the palette's text colour on a light one: for
+   things the app drew in plain white, like the CurseForge logo and the
+   search box's filter button, which vanished on a light theme. A dark
+   palette's text colour is light, so they stay pure white there. One class's
+   weight, so a theme's hook rule still wins. */
+.gdl-white-text,
+.gdl-white-text-hover:hover {
+  color: rgb(
+    from rgb(var(--lightSlate-50))
+      calc(r + (255 - r) * clamp(0, ((r + g + b) / 765 - 0.5) * 1000, 1))
+      calc(g + (255 - g) * clamp(0, ((r + g + b) / 765 - 0.5) * 1000, 1))
+      calc(b + (255 - b) * clamp(0, ((r + g + b) / 765 - 0.5) * 1000, 1))
+  );
+}
+
+/* A tile's rounding: the frame, the picture box (and, inheriting it, the
+   picture and the layers over it) and the selection outline all follow
+   `--gdl-tile-radius`, so one variable changes them together. One hook's
+   weight, so a theme's rule on any of them still wins. */
+[data-gdl~="library.tile.frame"],
+[data-gdl~="library.tile.image"] {
+  border-radius: var(--gdl-tile-radius, calc(1rem * var(--radius-scale, 1)));
+}
+
+/* A library group clips what spills out of it, so it can fold shut. While it
+   is open it lets things spill as far as `--gdl-group-bleed` (0 by default):
+   shadows, hover lifts and stickers, and always 4 px, so the focus outlines
+   of tiles at its edge show. `overflow: clip` isn't a scroll container, so
+   the folding row needs `min-height: 0` to close. */
+:where([data-gdl~="library.group"] > div) > [data-gdl~="collapsable.body"] {
+  overflow: clip;
+  overflow-clip-margin: max(4px, var(--gdl-group-bleed, 0px));
+  min-height: 0;
+}
+:where([data-gdl~="library.group"]:not([data-gdl~="collapsable.open"]) > div)
+  > [data-gdl~="collapsable.body"] {
+  overflow-clip-margin: 0px;
+}
+
+/* The lines between Settings rows. No weight, so a plain `settings.row` rule
+   (a `border-top`, or `border: none`) replaces them. */
+:where([data-gdl~="settings.rows"] > :not([hidden]) ~ :not([hidden])) {
+  border-top-width: 1px;
+  border-bottom-width: 0;
+  border-color: rgb(var(--darkSlate-600));
+}
+/* A table among the rows (the Minecraft accounts on Accounts) gets the same
+   line. This rule weighs (0,1,1), enough to beat the reset's `table` rule,
+   which would recolour it; a theme reaches the line with
+   `[data-gdl~="settings.rows"] > table`. */
+:where([data-gdl~="settings.rows"] > :not([hidden])) ~ table:not([hidden]) {
+  border-top-width: 1px;
+  border-bottom-width: 0;
+  border-color: rgb(var(--darkSlate-600));
+}
+
+/* The News slideshow's words sit on a fixed dark veil over the story's
+   picture. A dark palette keeps its own text colours there. When the main
+   text colour is darker than 70% (`--gdl-text-lightness`, set with the
+   palette), the title and the summary and date switch to the default
+   theme's light ones together, so they stay readable. No weight, so a
+   theme's hook rule wins. */
+:where(
+  [data-gdl~="news.slide.title"],
+  [data-gdl~="news.slide.text"],
+  [data-gdl~="news.slide.date"]
+) {
+  --gdl-news-light-words: clamp(
+    0,
+    (0.7 - var(--gdl-text-lightness, 1)) * 1000,
+    1
+  );
+}
+:where([data-gdl~="news.slide.title"]) {
+  color: rgb(
+    from rgb(var(--lightSlate-50))
+      calc(r + (255 - r) * var(--gdl-news-light-words))
+      calc(g + (255 - g) * var(--gdl-news-light-words))
+      calc(b + (255 - b) * var(--gdl-news-light-words))
+  );
+}
+:where([data-gdl~="news.slide.text"], [data-gdl~="news.slide.date"]) {
+  color: rgb(
+    from rgb(var(--lightSlate-200))
+      calc(r + (231 - r) * var(--gdl-news-light-words))
+      calc(g + (233 - g) * var(--gdl-news-light-words))
+      calc(b + (238 - b) * var(--gdl-news-light-words))
+  );
+}
+
+/* Keyboard focus on the account button and in its menu: a ring in the accent
+   colour instead of the browser's own. No weight, so a theme's
+   `[data-gdl~="account-menu.button"]:focus-visible` rule wins. */
+:where(
+  [data-gdl~="account-menu.button"]:focus-visible,
+  [data-gdl~="account-menu.popup"] :focus-visible
+) {
+  outline: 2px solid rgb(var(--primary-500));
+  outline-offset: 2px;
+}

@@ -14,7 +14,12 @@ import {
 } from "../../components/EndOfGroupDropZone"
 import { LibraryItem, SelectionState, FLIPAnimation } from "../../types"
 import { EntranceAnimationReturn } from "../../hooks/useFLIPAnimation"
-import { TILE_SIZES, TileSize } from "../../constants"
+import {
+  TILE_GRID_CLASSES,
+  TILE_SIZES,
+  TileSize,
+  tileGridStyle
+} from "../../constants"
 import { useDragLayoutAnimation } from "../../hooks/useDragLayoutAnimation"
 
 interface LibraryGridProps {
@@ -48,13 +53,9 @@ export function LibraryGrid(props: LibraryGridProps) {
   return (
     <div
       ref={gridEl}
-      class={`relative content-start ${TILE_SIZES[props.tileSize() as TileSize]?.gapY ?? "gap-y-6"}`}
-      style={{
-        display: "grid",
-        "grid-template-columns": `repeat(auto-fill, ${TILE_SIZES[props.tileSize() as TileSize]?.widthPx ?? 184}px)`,
-        "justify-content": "space-evenly",
-        "column-gap": "16px"
-      }}
+      data-gdl="library.grid"
+      class={`${TILE_GRID_CLASSES} relative content-start ${TILE_SIZES[props.tileSize() as TileSize]?.gapY ?? "gap-y-6"}`}
+      style={tileGridStyle(props.tileSize())}
     >
       <For each={props.libraryItems}>
         {(item, itemIndex) => (

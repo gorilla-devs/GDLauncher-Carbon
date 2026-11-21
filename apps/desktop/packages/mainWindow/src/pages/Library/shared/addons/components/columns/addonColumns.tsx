@@ -1,5 +1,4 @@
 import { Tooltip, TooltipContent, TooltipTrigger, Spinner } from "@gd/ui"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { Show } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -13,6 +12,7 @@ import {
   createDeleteColumn
 } from "./index"
 import { supportsEnableToggle } from "../../addonCapabilities"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 /**
  * Unified column config for both Instance and Server addon tables.
@@ -194,8 +194,8 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
                 <Tooltip>
                   <TooltipTrigger>
                     <div class="bg-darkSlate-800 absolute -left-0.5 -top-0.5 h-4 w-4 rounded-full p-0.5">
-                      <img
-                        src={CurseforgeLogo}
+                      <PlatformLogo
+                        platform="curseforge"
                         class="h-full w-full"
                         alt={t("enums:_trn_curseforge")}
                       />
@@ -220,12 +220,11 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
           }
 
           const platform = hasCurseforge ? "curseforge" : "modrinth"
-          const logo = hasCurseforge ? CurseforgeLogo : ModrinthLogo
           return (
             <Tooltip>
               <TooltipTrigger>
-                <img
-                  src={logo}
+                <PlatformLogo
+                  platform={platform}
                   class="hidden h-4 w-4 md:block"
                   alt={t(getPlatformKey(platform))}
                 />

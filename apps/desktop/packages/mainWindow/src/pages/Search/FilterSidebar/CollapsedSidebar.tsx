@@ -16,7 +16,10 @@ function FilterIcon(props: {
     >
       <div class={`${props.icon} h-5 w-5`} />
       <Show when={props.hasActive}>
-        <div class="bg-primary-500 absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[9px] font-bold leading-none text-white">
+        <div
+          data-gdl="badge badge.default"
+          class="bg-primary-500 absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full px-0.5 text-[9px] font-bold leading-none text-white"
+        >
           <Show
             when={props.activeCount !== undefined && props.activeCount > 0}
             fallback={<div class="h-1.5 w-1.5 rounded-full bg-white" />}
@@ -53,7 +56,10 @@ export function CollapsedSidebar(props: {
   }
 
   return (
-    <div class="flex w-12 flex-col items-center gap-1 py-2">
+    <div
+      data-gdl="search.sidebar.collapsed"
+      class="flex w-12 flex-col items-center gap-1 py-2"
+    >
       <Show when={hasContext()}>
         <FilterIcon
           icon="i-hugeicons:arrow-left-01"

@@ -30,7 +30,11 @@ import {
   injectFolderTransitionCSS,
   removeFolderTransitionCSS
 } from "@/pages/Library/utils/folderViewTransition"
-import { TILE_SIZES } from "@/pages/Library/constants"
+import {
+  TILE_GRID_CLASSES,
+  TILE_SIZES,
+  tileGridStyle
+} from "@/pages/Library/constants"
 import { useDragLayoutAnimation } from "@/pages/Library/hooks/useDragLayoutAnimation"
 import { getInstanceImageUrl, getServerImageUrl } from "@/utils/instances"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
@@ -490,13 +494,9 @@ const ExpandedFolderContent = (props: ExpandedFolderContentProps) => {
               <ContextMenuTrigger class="flex-1">
                 <div
                   ref={folderGridEl}
-                  class={`min-h-[100px] overflow-visible ${TILE_SIZES[props.tileSize]?.gapY ?? "gap-y-6"}`}
-                  style={{
-                    display: "grid",
-                    "grid-template-columns": `repeat(auto-fill, ${TILE_SIZES[props.tileSize]?.widthPx ?? 184}px)`,
-                    "justify-content": "space-evenly",
-                    "column-gap": "16px"
-                  }}
+                  data-gdl="library.grid"
+                  class={`${TILE_GRID_CLASSES} min-h-[100px] overflow-visible ${TILE_SIZES[props.tileSize]?.gapY ?? "gap-y-6"}`}
+                  style={tileGridStyle(props.tileSize)}
                 >
                   <For each={safeInstances()}>
                     {(instance, index) => {

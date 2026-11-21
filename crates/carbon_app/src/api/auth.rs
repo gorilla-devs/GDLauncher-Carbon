@@ -17,6 +17,20 @@ pub fn set_expected_token(token: String) {
         .expect("API token already initialized");
 }
 
+static LOCAL_PORT: OnceLock<u16> = OnceLock::new();
+
+/// Records the port the local server listens on. A second call is ignored.
+pub fn set_local_port(port: u16) {
+    let _ = LOCAL_PORT.set(port);
+}
+
+/// The origin the renderer reaches the local server on, once it is known.
+pub fn local_origin() -> Option<String> {
+    LOCAL_PORT
+        .get()
+        .map(|port| format!("http://127.0.0.1:{port}"))
+}
+
 pub fn expected_token() -> Option<&'static str> {
     EXPECTED_TOKEN.get().map(|s| s.as_str())
 }

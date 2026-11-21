@@ -69,3 +69,16 @@ export const TILE_SIZES = {
 } as const
 
 export type TileSize = keyof typeof TILE_SIZES
+
+/**
+ * A tile grid's layout (the `library.grid` hook), as classes rather than an
+ * inline style so a theme's hook rule can change the columns and spacing.
+ * The column width comes from `--gdl-tile-width`.
+ */
+export const TILE_GRID_CLASSES =
+  "grid justify-evenly gap-x-[16px] grid-cols-[repeat(auto-fill,var(--gdl-tile-width))]"
+
+/** The inline part of a tile grid: the tile size's width, as a variable. */
+export const tileGridStyle = (size: number) => ({
+  "--gdl-tile-width": `${TILE_SIZES[size as TileSize]?.widthPx ?? 184}px`
+})

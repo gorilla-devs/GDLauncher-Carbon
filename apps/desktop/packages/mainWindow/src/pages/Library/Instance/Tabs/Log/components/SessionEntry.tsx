@@ -5,6 +5,7 @@ import { Show } from "solid-js"
 import formatDateTime from "../formatDateTime"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@gd/ui"
 import { Trans } from "@gd/i18n"
+import { withStates } from "@gd/ui"
 
 export interface SessionEntryProps {
   log: GameLogEntry
@@ -35,6 +36,7 @@ const SessionEntry = (props: SessionEntryProps) => {
 
   return (
     <div
+      data-gdl={withStates("logs.session", { selected: props.isSelected })}
       class={`group relative box-border flex items-center gap-2 w-full rounded-md px-3 py-2 cursor-pointer ${PRESS_CLASSES} ${props.isSelected ? "bg-darkSlate-600" : "hover:bg-darkSlate-700"}`}
       onClick={props.onClick}
     >

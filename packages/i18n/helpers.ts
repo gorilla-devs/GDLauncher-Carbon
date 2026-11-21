@@ -131,25 +131,34 @@ export function getEnrollmentErrorKey(
 
 /**
  * Maps theme IDs to settings:theme_* translation keys
- * @param themeId - The theme identifier (main, pixelato, win95, inferno, aether, frost)
+ * @param themeId - The theme identifier (main, pixelato, win95, inferno, aether, frost, silent-night)
  * @returns The fully qualified translation key
  */
 export function getThemeKey(
-  themeId: "main" | "pixelato" | "win95" | "inferno" | "aether" | "frost"
+  themeId:
+    | "main"
+    | "pixelato"
+    | "win95"
+    | "inferno"
+    | "aether"
+    | "frost"
+    | "silent-night"
 ):
   | "settings:_trn_theme_main"
   | "settings:_trn_theme_pixelato"
   | "settings:_trn_theme_win95"
   | "settings:_trn_theme_inferno"
   | "settings:_trn_theme_aether"
-  | "settings:_trn_theme_frost" {
+  | "settings:_trn_theme_frost"
+  | "settings:_trn_theme_silent_night" {
   const keyMap: Record<string, any> = {
     main: "settings:_trn_theme_main",
     pixelato: "settings:_trn_theme_pixelato",
     win95: "settings:_trn_theme_win95",
     inferno: "settings:_trn_theme_inferno",
     aether: "settings:_trn_theme_aether",
-    frost: "settings:_trn_theme_frost"
+    frost: "settings:_trn_theme_frost",
+    "silent-night": "settings:_trn_theme_silent_night"
   } as const
 
   return keyMap[themeId] ?? ("settings:_trn_theme_main" as const)
@@ -184,65 +193,106 @@ export function getLanguageNativeKey(
  * @param taskType - The task type identifier from Translation enum
  * @returns The fully qualified translation key with _trn_ prefix
  */
-export function getTaskTranslationKey(taskType: string): NamespacedTranslationKey {
+export function getTaskTranslationKey(
+  taskType: string
+): NamespacedTranslationKey {
   const mapping: Record<string, NamespacedTranslationKey> = {
     // Instance tasks - only include ones with actual translations
-    'InstanceTaskLaunch': 'tasks:_trn_instance_task_launch',
-    'InstanceTaskPrepare': 'tasks:_trn_instance_task_prepare',
-    'InstanceTaskCheckPackOrigin': 'tasks:_trn_instance_task_check_pack_origin',
-    'InstanceTaskCheckPackOriginVersions': 'tasks:_trn_instance_task_check_pack_origin_versions',
-    'InstanceTaskLaunchRequestVersions': 'tasks:_trn_instance_task_launch_request_versions',
-    'InstanceTaskLaunchRequestModpack': 'tasks:_trn_instance_task_launch_request_modpack',
-    'InstanceTaskLaunchDownloadModpack': 'tasks:_trn_instance_task_launch_download_modpack',
-    'InstanceTaskLaunchDownloadModpackFiles': 'tasks:_trn_instance_task_launch_download_modpack_files',
-    'InstanceTaskLaunchExtractModpackFiles': 'tasks:_trn_instance_task_launch_extract_modpack_files',
-    'InstanceTaskLaunchRequestAddonMetadata': 'tasks:_trn_instance_task_launch_request_addon_metadata',
-    'InstanceTaskLaunchApplyStagedPatches': 'tasks:_trn_instance_task_launch_apply_staged_patches',
-    'InstanceTaskLaunchDownloadJava': 'tasks:_trn_instance_task_launch_download_java',
-    'InstanceTaskLaunchExtractJava': 'tasks:_trn_instance_task_launch_extract_java',
-    'InstanceTaskRequestModloaderInfo': 'tasks:_trn_instance_task_request_modloader_info',
-    'InstanceTaskRequestMinecraftFiles': 'tasks:_trn_instance_task_request_minecraft_files',
-    'InstanceTaskLaunchCheckingFiles': 'tasks:_trn_instance_task_launch_checking_files',
-    'InstanceTaskLaunchDownloadFiles': 'tasks:_trn_instance_task_launch_download_files',
-    'InstanceTaskGeneratingPackInfo': 'tasks:_trn_instance_task_generating_pack_info',
-    'InstanceTaskFillCache': 'tasks:_trn_instance_task_fill_cache',
-    'InstanceTaskLaunchExtractNatives': 'tasks:_trn_instance_task_launch_extract_natives',
-    'InstanceTaskReconstructAssets': 'tasks:_trn_instance_task_reconstruct_assets',
-    'InstanceTaskLaunchRunForgeProcessors': 'tasks:_trn_instance_task_launch_run_forge_processors',
-    'InstanceTaskLaunchRunNeoforgeProcessors': 'tasks:_trn_instance_task_launch_run_neoforge_processors',
-    'InstanceTaskInstallMod': 'tasks:_trn_instance_task_install_mod',
-    'InstanceTaskLaunchInstallJava': 'tasks:_trn_instance_task_launch_install_java',
-    'FinalizingImport': 'tasks:_trn_finalizing_import',
-    'InstanceTaskLaunchWaiting': 'tasks:_trn_instance_task_launch_waiting',
-    'ServerTaskInstall': 'tasks:_trn_server_task_install',
-    'ServerTaskInstallFromModpack': 'tasks:_trn_server_task_install_from_modpack',
-    'ServerTaskDownloadServerPack': 'tasks:_trn_server_task_download_server_pack',
-    'ServerTaskExtractServerPack': 'tasks:_trn_server_task_extract_server_pack',
-    'ServerTaskDownloadModpackFiles': 'tasks:_trn_server_task_download_modpack_files',
-    'ServerTaskExtractModpackOverrides': 'tasks:_trn_server_task_extract_modpack_overrides',
-    'ServerTaskDownloadServerJar': 'tasks:_trn_server_task_download_server_jar',
-    'ServerTaskInstallModloader': 'tasks:_trn_server_task_install_modloader',
+    InstanceTaskLaunch: "tasks:_trn_instance_task_launch",
+    InstanceTaskPrepare: "tasks:_trn_instance_task_prepare",
+    InstanceTaskCheckPackOrigin: "tasks:_trn_instance_task_check_pack_origin",
+    InstanceTaskCheckPackOriginVersions:
+      "tasks:_trn_instance_task_check_pack_origin_versions",
+    InstanceTaskLaunchRequestVersions:
+      "tasks:_trn_instance_task_launch_request_versions",
+    InstanceTaskLaunchRequestModpack:
+      "tasks:_trn_instance_task_launch_request_modpack",
+    InstanceTaskLaunchDownloadModpack:
+      "tasks:_trn_instance_task_launch_download_modpack",
+    InstanceTaskLaunchDownloadModpackFiles:
+      "tasks:_trn_instance_task_launch_download_modpack_files",
+    InstanceTaskLaunchExtractModpackFiles:
+      "tasks:_trn_instance_task_launch_extract_modpack_files",
+    InstanceTaskLaunchRequestAddonMetadata:
+      "tasks:_trn_instance_task_launch_request_addon_metadata",
+    InstanceTaskLaunchApplyStagedPatches:
+      "tasks:_trn_instance_task_launch_apply_staged_patches",
+    InstanceTaskLaunchDownloadJava:
+      "tasks:_trn_instance_task_launch_download_java",
+    InstanceTaskLaunchExtractJava:
+      "tasks:_trn_instance_task_launch_extract_java",
+    InstanceTaskRequestModloaderInfo:
+      "tasks:_trn_instance_task_request_modloader_info",
+    InstanceTaskRequestMinecraftFiles:
+      "tasks:_trn_instance_task_request_minecraft_files",
+    InstanceTaskLaunchCheckingFiles:
+      "tasks:_trn_instance_task_launch_checking_files",
+    InstanceTaskLaunchDownloadFiles:
+      "tasks:_trn_instance_task_launch_download_files",
+    InstanceTaskGeneratingPackInfo:
+      "tasks:_trn_instance_task_generating_pack_info",
+    InstanceTaskFillCache: "tasks:_trn_instance_task_fill_cache",
+    InstanceTaskLaunchExtractNatives:
+      "tasks:_trn_instance_task_launch_extract_natives",
+    InstanceTaskReconstructAssets:
+      "tasks:_trn_instance_task_reconstruct_assets",
+    InstanceTaskLaunchRunForgeProcessors:
+      "tasks:_trn_instance_task_launch_run_forge_processors",
+    InstanceTaskLaunchRunNeoforgeProcessors:
+      "tasks:_trn_instance_task_launch_run_neoforge_processors",
+    InstanceTaskInstallMod: "tasks:_trn_instance_task_install_mod",
+    InstanceTaskLaunchInstallJava:
+      "tasks:_trn_instance_task_launch_install_java",
+    FinalizingImport: "tasks:_trn_finalizing_import",
+    InstanceTaskLaunchWaiting: "tasks:_trn_instance_task_launch_waiting",
+    ServerTaskInstall: "tasks:_trn_server_task_install",
+    ServerTaskInstallFromModpack: "tasks:_trn_server_task_install_from_modpack",
+    ServerTaskDownloadServerPack: "tasks:_trn_server_task_download_server_pack",
+    ServerTaskExtractServerPack: "tasks:_trn_server_task_extract_server_pack",
+    ServerTaskDownloadModpackFiles:
+      "tasks:_trn_server_task_download_modpack_files",
+    ServerTaskExtractModpackOverrides:
+      "tasks:_trn_server_task_extract_modpack_overrides",
+    ServerTaskDownloadServerJar: "tasks:_trn_server_task_download_server_jar",
+    ServerTaskInstallModloader: "tasks:_trn_server_task_install_modloader"
   }
   // Default to a valid key if type isn't mapped
-  return mapping[taskType] ?? ('tasks:_trn_instance_task_prepare' as NamespacedTranslationKey)
+  return (
+    mapping[taskType] ??
+    ("tasks:_trn_instance_task_prepare" as NamespacedTranslationKey)
+  )
 }
 
 /** Maps an invalid import entry's reason (a Translation variant) to a translation key */
-export function getImportErrorTranslationKey(reason: string): NamespacedTranslationKey {
+export function getImportErrorTranslationKey(
+  reason: string
+): NamespacedTranslationKey {
   const mapping: Record<string, NamespacedTranslationKey> = {
-    'InstanceImportLegacyBadConfigFile': 'instances:_trn_import_error_bad_config',
-    'InstanceImportCfZipMalformed': 'instances:_trn_import_error_archive_malformed',
-    'InstanceImportMrpackMalformed': 'instances:_trn_import_error_archive_malformed',
-    'InstanceImportGdlpackMalformed': 'instances:_trn_import_error_archive_malformed',
-    'InstanceImportMmcZipMalformed': 'instances:_trn_import_error_archive_malformed',
-    'InstanceImportCfZipMissingManifest': 'instances:_trn_import_error_archive_missing_manifest',
-    'InstanceImportMrpackMissingManifest': 'instances:_trn_import_error_archive_missing_manifest',
-    'InstanceImportGdlpackMissingManifest': 'instances:_trn_import_error_archive_missing_manifest',
-    'InstanceImportMmcZipMissingConfig': 'instances:_trn_import_error_archive_missing_manifest',
-    'InstanceImportCfZipMalformedManifest': 'instances:_trn_import_error_archive_malformed_manifest',
-    'InstanceImportMrpackMalformedManifest': 'instances:_trn_import_error_archive_malformed_manifest',
-    'InstanceImportGdlpackMalformedManifest': 'instances:_trn_import_error_archive_malformed_manifest',
-    'InstanceImportCfZipNotMinecraftModpack': 'instances:_trn_import_error_not_minecraft_modpack',
+    InstanceImportLegacyBadConfigFile: "instances:_trn_import_error_bad_config",
+    InstanceImportCfZipMalformed:
+      "instances:_trn_import_error_archive_malformed",
+    InstanceImportMrpackMalformed:
+      "instances:_trn_import_error_archive_malformed",
+    InstanceImportGdlpackMalformed:
+      "instances:_trn_import_error_archive_malformed",
+    InstanceImportMmcZipMalformed:
+      "instances:_trn_import_error_archive_malformed",
+    InstanceImportCfZipMissingManifest:
+      "instances:_trn_import_error_archive_missing_manifest",
+    InstanceImportMrpackMissingManifest:
+      "instances:_trn_import_error_archive_missing_manifest",
+    InstanceImportGdlpackMissingManifest:
+      "instances:_trn_import_error_archive_missing_manifest",
+    InstanceImportMmcZipMissingConfig:
+      "instances:_trn_import_error_archive_missing_manifest",
+    InstanceImportCfZipMalformedManifest:
+      "instances:_trn_import_error_archive_malformed_manifest",
+    InstanceImportMrpackMalformedManifest:
+      "instances:_trn_import_error_archive_malformed_manifest",
+    InstanceImportGdlpackMalformedManifest:
+      "instances:_trn_import_error_archive_malformed_manifest",
+    InstanceImportCfZipNotMinecraftModpack:
+      "instances:_trn_import_error_not_minecraft_modpack"
   }
-  return mapping[reason] ?? 'instances:_trn_import_error_bad_config'
+  return mapping[reason] ?? "instances:_trn_import_error_bad_config"
 }

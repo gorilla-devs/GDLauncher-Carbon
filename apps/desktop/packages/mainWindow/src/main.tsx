@@ -23,7 +23,9 @@ import { ModalProvider } from "@/managers/ModalsManager"
 import "virtual:uno.css"
 import "@gd/ui/style.css"
 import { ContextMenuProvider, Toaster } from "@gd/ui"
+import BackgroundLayer from "@/themes/BackgroundLayer"
 import "@unocss/reset/tailwind.css"
+import "@/themes/controls.css"
 import { NavigationManager } from "./managers/NavigationManager"
 import RiveAppWapper from "./utils/RiveAppWrapper"
 import GDAnimation from "./gd_logo_animation.riv"
@@ -158,6 +160,7 @@ render(() => {
                 isBackendReady={true}
               />
               <Toaster />
+              <BackgroundLayer />
             </Match>
             <Match when={!isReady()}>
               <AuthLoadingOverlay

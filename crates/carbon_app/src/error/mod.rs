@@ -43,6 +43,7 @@ fn extract_fe_error(
     use crate::managers::instance::run::InsufficientMemoryError;
     use crate::managers::instance::run::java_issue::JavaMismatchError;
     use crate::managers::server::EulaNotAcceptedError;
+    use crate::managers::themes::error::ThemeError;
 
     macro_rules! try_downcast {
         ($entry:expr, $($ty:ty),+ $(,)?) => {
@@ -60,7 +61,8 @@ fn extract_fe_error(
         AvatarUploadError,
         InsufficientMemoryError,
         JavaMismatchError,
-        EulaNotAcceptedError
+        EulaNotAcceptedError,
+        ThemeError
     );
 
     (None, None)

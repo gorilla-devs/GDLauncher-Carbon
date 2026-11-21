@@ -1,6 +1,7 @@
 import { builtinModules } from "module"
 import { resolve } from "path"
 import os from "os"
+import { copyFileSync, mkdirSync } from "fs"
 import { defineConfig, loadEnv } from "vite"
 import { sentryVitePlugin } from "@sentry/vite-plugin"
 import { appVersion } from "@gd/config"
@@ -37,6 +38,18 @@ export default defineConfig(({ mode }) => {
   return {
     root: __dirname,
     plugins: [
+      {
+        // The ad page is loaded from disk by the ad WebContentsView.
+        name: "copy-adview-page",
+        writeBundle() {
+          const out = resolve(__dirname, "../../dist/main/adview")
+          mkdirSync(out, { recursive: true })
+          copyFileSync(
+            resolve(__dirname, "adView/page/index.html"),
+            resolve(out, "index.html")
+          )
+        }
+      },
       // Put the Sentry vite plugin after all other plugins
       sentryVitePlugin({
         org: "gorilladevs-inc",

@@ -9,6 +9,7 @@ import {
 } from "solid-js"
 import { Button } from "../Button"
 import { PRESS_CLASSES_LIGHT } from "../Clickable"
+import { withStates } from "../hooks"
 
 interface Props {
   value: string | number | string[] | undefined
@@ -48,6 +49,7 @@ export const RadioIndicator = (props: {
   class?: string
 }) => (
   <div
+    data-gdl="radio.dot"
     // One ring colour at a time: with both classes the later rule in the
     // stylesheet wins, whichever the state.
     class={`flex justify-center items-center box-border transition-colors w-5 h-5 min-w-5 min-h-5 rounded-full shrink-0 ${
@@ -75,6 +77,7 @@ const Radio = (props: Props) => {
 
   return (
     <label
+      data-gdl={withStates("radio", { checked: props.checked })}
       // From the radio only, not a button in the label (a known-issue icon),
       // which has its own. Inset: lists of radios scroll, and their edge
       // clips.

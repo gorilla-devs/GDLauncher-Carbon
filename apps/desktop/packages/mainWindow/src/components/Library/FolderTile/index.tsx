@@ -30,6 +30,7 @@ import {
 } from "@/pages/Library/utils/folderViewTransition"
 import { DropOverlayIndicator } from "@/pages/Library/components/DropOverlayIndicator"
 import type { ListInstance, ListServer } from "@gd/core_module/bindings"
+import { DecorationSlot } from "@/themes/DecorationSlot"
 
 interface FolderTileProps {
   groupId: number
@@ -218,12 +219,17 @@ const FolderTile = (props: FolderTileProps) => {
       </ContextMenuContent>
 
       <ContextMenuTrigger>
-        <div class="relative">
+        <div class="relative isolate" data-gdl="library.tile library.folder">
+          {/* Sized to the picture: the frame below is as wide as the grid
+              cell, so filling it would make the outline narrower. */}
           <SelectionBorder
             isSelected={props.isSelected ?? false}
             size={props.size}
           />
-          <div class="box-border overflow-hidden rounded-2xl p-[2px]">
+          <div
+            data-gdl="library.tile.frame"
+            class="box-border overflow-hidden p-[2px]"
+          >
             <div
               ref={ref}
               onMouseEnter={() => setIsHovering(true)}
@@ -243,7 +249,7 @@ const FolderTile = (props: FolderTileProps) => {
                 handleDragStart(e)
               }}
               data-folder-tile
-              class={`bg-darkSlate-700 hover:bg-darkSlate-600 group relative flex cursor-pointer flex-col overflow-hidden rounded-2xl transition-all duration-200 ${sizeClasses()}`}
+              class={`bg-darkSlate-700 hover:bg-darkSlate-600 group relative flex cursor-pointer flex-col overflow-hidden rounded-[inherit] transition-all duration-200 ${sizeClasses()}`}
               classList={{
                 "opacity-0": isBeingDragged() || props.isOpen,
                 "!bg-darkSlate-600": isMenuOpen()
@@ -308,7 +314,7 @@ const FolderTile = (props: FolderTileProps) => {
 
                 {/* Folder name overlay */}
                 <div
-                  class="z-4 absolute bottom-0 left-0 right-0 rounded-b-2xl bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-6 pt-3"
+                  class="z-4 absolute bottom-0 left-0 right-0 rounded-b-[var(--gdl-tile-radius,calc(1rem*var(--radius-scale,1)))] bg-gradient-to-t from-black/80 via-black/40 to-transparent px-3 pb-6 pt-3"
                   style={
                     shouldSetViewTransition()
                       ? { "view-transition-name": "folder-name" }
@@ -386,6 +392,10 @@ const FolderTile = (props: FolderTileProps) => {
               </Show>
             </div>
           </div>
+          <DecorationSlot
+            anchor="library.tile"
+            itemKey={`folder:${props.groupId}`}
+          />
         </div>
       </ContextMenuTrigger>
     </ContextMenu>

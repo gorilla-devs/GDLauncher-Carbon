@@ -33,6 +33,8 @@ import {
 import { Trans } from "@gd/i18n"
 import { useDragSelect } from "@/hooks/useDragSelect"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import { rspc } from "@/utils/rspcClient"
+import { effectiveTileSize, layout } from "@/themes/layout"
 import { useModal } from "@/managers/ModalsManager"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import UnstableCard from "@/components/UnstableCard"
@@ -140,12 +142,23 @@ const HomeGridInner = () => {
     }
   })
 
-  // Sync tile size from settings (shared across instances and servers)
+  // Sync tile size from settings (shared across instances and servers): the
+  // size the user picked, or else the theme's default. Waits for both queries,
+  // so a picked size doesn't flash the theme's first.
+  const prefs = rspc.createQuery(() => ({
+    queryKey: ["themes.getPreferences"]
+  }))
   createEffect(() => {
     libraryMode()
-    if (globalStore.settings.data?.instancesTileSize) {
-      setTileSize(globalStore.settings.data.instancesTileSize)
-    }
+    const settings = globalStore.settings.data
+    if (!settings || prefs.isPending) return
+    setTileSize(
+      effectiveTileSize(
+        settings.instancesTileSize,
+        prefs.data?.tileSizeChosen,
+        layout().tileSize
+      )
+    )
   })
 
   // Reset animation state when switching view modes
@@ -488,6 +501,7 @@ const HomeGridInner = () => {
   return (
     <div
       data-testid="library-root"
+      data-gdl="library"
       class="box-border flex flex-1 flex-col p-6"
       onMouseDown={(e) => {
         if (!shouldIgnoreClick(e)) {
@@ -529,12 +543,18 @@ const HomeGridInner = () => {
               <Show
                 when={!isEmpty()}
                 fallback={
-                  <div class="mt-12 flex h-full w-full flex-col items-center justify-center gap-6">
+                  <div
+                    data-gdl="library.empty"
+                    class="mt-12 flex h-full w-full flex-col items-center justify-center gap-6"
+                  >
                     <PlaceholderGorilla
                       size={14}
                       variant="Welcoming Gorilla - Open Arms"
                     />
-                    <p class="text-lightSlate-700 max-w-100 text-center">
+                    <p
+                      data-gdl="library.empty.text"
+                      class="text-lightSlate-700 max-w-100 text-center"
+                    >
                       <Trans key="instances:_trn_no_instances_text" />
                     </p>
                   </div>

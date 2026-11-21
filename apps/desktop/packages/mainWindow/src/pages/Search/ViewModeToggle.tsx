@@ -20,6 +20,7 @@ export function ViewModeToggle() {
           "hover:bg-darkSlate-700 text-lightSlate-700":
             searchContext?.viewMode() !== "list"
         }}
+        data-testid="search-view-list"
         onClick={() => switchToMode("list")}
       >
         <div class="i-hugeicons:left-to-right-list-bullet h-4 w-4" />
@@ -31,6 +32,7 @@ export function ViewModeToggle() {
           "hover:bg-darkSlate-700 text-lightSlate-700":
             searchContext?.viewMode() !== "grid"
         }}
+        data-testid="search-view-grid"
         onClick={() => switchToMode("grid")}
       >
         <div class="i-hugeicons:dashboard-square-01 h-4 w-4" />

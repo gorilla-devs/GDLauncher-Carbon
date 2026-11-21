@@ -9,6 +9,10 @@ await build({
   mode: "production"
 })
 await build({
+  configFile: "packages/preload/vite.adview.config.mjs",
+  mode: "production"
+})
+await build({
   configFile: "packages/mainWindow/vite.config.mjs",
   mode: "production",
   optimizeDeps: true

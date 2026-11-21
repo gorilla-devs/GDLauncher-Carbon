@@ -102,6 +102,7 @@ export const SpotlightOverlay = () => {
               {/* Got it button */}
               <div class="mt-4 flex justify-end">
                 <button
+                  data-gdl="button button.primary"
                   class="rounded bg-primary-500 px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-primary-400"
                   onClick={() => onboarding.hideTip()}
                 >

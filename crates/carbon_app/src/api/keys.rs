@@ -215,6 +215,21 @@ keys! {
         CLEANUP_CACHES                              = "cleanupCaches";
     }
 
+    themes {
+        LIST                                        = "list";
+        GET_THEME                                   = "getTheme";
+        INSTALL                                     = "install";
+        REMOVE                                      = "remove";
+        GET_SEASON                                  = "getSeason";
+        CHECK_SEASON                                = "checkSeason";
+        ACK_SEASON_NOTICE                           = "ackSeasonNotice";
+        SEASON_SWITCH_BACK                          = "seasonSwitchBack";
+        INSPECT                                     = "inspect";
+        OPEN_FOLDER                                 = "openFolder";
+        GET_PREFERENCES                             = "getPreferences";
+        SET_PREFERENCES                             = "setPreferences";
+    }
+
     metrics {
         SEND_EVENT                                  = "sendEvent";
         SEND_PAGEVIEW                               = "sendPageview";

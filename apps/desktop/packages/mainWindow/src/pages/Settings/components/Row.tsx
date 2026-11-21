@@ -5,6 +5,8 @@ interface Props {
   children: JSX.Element
   class?: string
   forceContentBelow?: boolean
+  /** More hooks for this row, after `settings.row`. */
+  hooks?: string
 }
 
 function Row(props: Props) {
@@ -12,6 +14,7 @@ function Row(props: Props) {
 
   return (
     <div
+      data-gdl={props.hooks ? `settings.row ${props.hooks}` : "settings.row"}
       class={
         "py-6 flex justify-between items-center " +
           (props.forceContentBelow ? " flex-col items-stretch " : "") +

@@ -1,0 +1,37 @@
+html,
+body {
+  font-size: 16px;
+  color: rgb(var(--lightSlate-50)) !important;
+}
+
+* {
+  border-radius: 0 !important;
+}
+
+button,
+div:has(> input:not([type="checkbox"]):not([type="radio"])) {
+  border: 2px solid !important;
+  border-color: #dfdfdf #000 #000 #dfdfdf !important;
+}
+
+button {
+  color: rgb(var(--darkSlate-50)) !important;
+}
+
+button:hover {
+  color: rgb(var(--darkSlate-50)) !important;
+}
+
+/* The search box's filter button sits on light grey, not on a raised
+   button face: dark words, so its icon reads. */
+[data-gdl~="nav.search.filters"],
+[data-gdl~="nav.search.filters"]:hover {
+  color: rgb(var(--lightSlate-50)) !important;
+}
+
+button:active {
+  border-color: #000 #dfdfdf #dfdfdf #000 !important;
+  box-shadow:
+    -1px -1px 0 #dfdfdf inset,
+    1px 1px 0 #808080 inset !important;
+}

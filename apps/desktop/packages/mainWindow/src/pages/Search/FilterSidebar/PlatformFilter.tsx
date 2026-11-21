@@ -4,7 +4,7 @@ import useSearchContext from "@/components/SearchInputContext"
 import { capitalize } from "@/utils/helpers"
 import { createUniqueId } from "solid-js"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 interface PlatformFilterProps {
   /** Set only by the docked panel instance (see `FilterSidebar/index.tsx`'s
@@ -78,7 +78,7 @@ export function PlatformFilter(props: PlatformFilterProps) {
             allowDeselect
           >
             <div class="flex items-center gap-2">
-              <img src={CurseforgeLogo} class="h-4 w-4" />
+              <PlatformLogo platform="curseforge" class="h-4 w-4" />
               {capitalize("curseforge")}
             </div>
           </Radio>

@@ -29,7 +29,7 @@ export default defineConfig({
     // method will be provided
     server: {
       deps: {
-        inline: [/solid-js/]
+        inline: [/solid-js/, /somoto/]
       }
     }
   },

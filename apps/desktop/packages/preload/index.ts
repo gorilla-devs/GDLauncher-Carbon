@@ -9,6 +9,8 @@ import "./os"
 import "./overwolf"
 import "./runtimePath"
 import "./relaunch"
+import "./adViewHost"
+import "./themeHost"
 
 const skipIntroAnimation =
   process.argv

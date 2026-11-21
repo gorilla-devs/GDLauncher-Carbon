@@ -21,9 +21,10 @@ import { javaMismatchPrompt } from "@/utils/javaIssues"
 import { cleanupRunning } from "./modals/CacheCleanup/state"
 import { shaderInstallRunning } from "./modals/ShaderLoaderSetup/state"
 import { isChangingRuntimePath } from "./modals/ConfirmChangeRuntimePath/state"
-import { resolvePreventClose } from "./preventClose"
+import { resolvePreventClose, topModalBlocksClose } from "./preventClose"
 import { createDialogFocus, type DialogFocusHandle } from "./dialogFocus"
 import { escapeClosesModal } from "./dialogEscape"
+import { MODAL_ROW_CLIP } from "@/themes/decorations"
 
 export interface ModalProps {
   title: string
@@ -214,6 +215,18 @@ const getDefaultModals = (t: TypedTFunction) => ({
     component: lazy(() => import("./modals/BetaPrompt")),
     title: () => t("modals:_trn_beta_prompt_title")
   },
+  seasonalTheme: {
+    component: lazy(() => import("./modals/SeasonalTheme")),
+    noHeader: true
+  },
+  themeRemove: {
+    component: lazy(() => import("./modals/ThemeRemove")),
+    title: () => t("settings:_trn_theme_remove_title")
+  },
+  themeInstall: {
+    component: lazy(() => import("./modals/ThemeInstall")),
+    title: () => t("settings:_trn_install_theme")
+  },
   shareInstance: {
     component: lazy(() => import("./modals/ShareInstance")),
     title: () => t("instances:_trn_instance_share.title")
@@ -280,8 +293,10 @@ interface Modal {
 
 interface Context {
   openModal: (_modal: Modal, _data?: any) => void
-  closeModal: () => void
+  closeModal: (_name?: ModalName) => void
   hasOpenModals: () => boolean
+  /** The top modal can't be closed right now (its `preventClose`). */
+  isTopModalLocked: () => boolean
 }
 
 export interface StackEntry {
@@ -302,6 +317,8 @@ type Stack = StackEntry[]
 const ModalsContext = createContext<Context>()
 
 export interface ModalStackEntryApi {
+  /** The dialog's name, for its identity hook (`modal.<name>`). */
+  name: string
   registerPreventClose: (_accessor: () => boolean) => void
   unregisterPreventClose: () => void
   /** Closes this modal, wherever it is in the stack. For work that ends
@@ -332,6 +349,9 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const [modalStack, setModalStack] = createSignal<Stack>([])
   let modalPortalRef: HTMLDivElement | undefined
   const dialogFocus = createDialogFocus(document)
+  // Hiding the overlay waits for its fade; a modal opened meanwhile (close
+  // one, open the next) cancels it, or the new modal would be hidden.
+  let hideOverlayTimer: ReturnType<typeof setTimeout> | undefined
 
   const [_searchParams, setSearchParams] = useSearchParams()
 
@@ -379,7 +399,8 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
       )
       if (!hasOtherContent) {
         overlay.style.opacity = "0"
-        setTimeout(() => {
+        clearTimeout(hideOverlayTimer)
+        hideOverlayTimer = setTimeout(() => {
           overlay.style.display = "none"
         }, 100) // Wait for transition to complete
       }
@@ -443,6 +464,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
   const manager = {
     openModal: (modal: Modal, data: any) => {
       const overlay = document.getElementById("overlay")!
+      clearTimeout(hideOverlayTimer)
       overlay.style.display = "flex"
       overlay.style.transition = "opacity 100ms ease-spring"
       overlay.style.opacity = "0" // Set initial opacity to 0
@@ -467,7 +489,12 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
       }
     },
     closeModal,
-    hasOpenModals: () => modalStack().length > 0
+    hasOpenModals: () => modalStack().length > 0,
+    isTopModalLocked: () =>
+      topModalBlocksClose(
+        modalStack(),
+        (name) => (defaultModals as Hash)[name]?.preventClose
+      )
   }
 
   return (
@@ -490,6 +517,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
               // item), so the mounted ModalLayout's registration can never
               // land on a different modal instance.
               const stackEntryApi: ModalStackEntryApi = {
+                name: modal.name,
                 registerPreventClose: (accessor) => {
                   modal.preventCloseAccessor = accessor
                 },
@@ -507,6 +535,7 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                 <div class="absolute inset-0 flex h-screen w-screen">
                   <div
                     class="z-999 relative flex h-full grow items-center justify-center"
+                    style={MODAL_ROW_CLIP}
                     onMouseDown={() => {
                       if (!shouldPreventModalClose(modal)) {
                         closeModal()
@@ -536,10 +565,17 @@ export const ModalProvider = (props: { children: JSX.Element }) => {
                         />
                       </ModalStackEntryContext.Provider>
                     </div>
-                    <div class="bg-darkSlate-900 absolute inset-0 opacity-95 transition-opacity duration-100" />
+                    <div
+                      data-gdl="modal.backdrop"
+                      class="bg-darkSlate-900 absolute inset-0 opacity-95 transition-opacity duration-100"
+                    />
                   </div>
 
+                  {/* The dim over the ad column's backdrop, in the same colour
+                      as the page's (`modal.backdrop`). The ad is a separate
+                      layer on top of it. */}
                   <div
+                    data-gdl="modal.column-backdrop"
                     class="text-lightSlate-50 z-999 bg-darkSlate-900 h-screen origin-center place-items-center opacity-95 transition-opacity duration-100"
                     style={{
                       width: `${adSize.width}px`

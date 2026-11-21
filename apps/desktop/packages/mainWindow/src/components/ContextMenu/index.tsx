@@ -8,7 +8,10 @@ import {
   onCleanup
 } from "solid-js"
 import { Portal } from "solid-js/web"
+import { getFloatingRoot } from "@gd/ui"
 import { useContextMenu } from "./ContextMenuContext"
+import { clampMenuX } from "./clamp"
+import { adSize } from "@/utils/adhelper"
 
 interface MenuItem {
   icon?: string
@@ -56,7 +59,13 @@ const ContextMenu = (props: ContextMenuProps) => {
         const menuElement = menuRef()!
         const boundingClientRect = menuElement.getBoundingClientRect()
 
-        const newX = e.clientX // No change to X coordinate
+        const contentRight =
+          window.innerWidth - (adSize.shouldShow ? adSize.width : 0)
+        const newX = clampMenuX(
+          e.clientX,
+          boundingClientRect.width,
+          contentRight
+        )
         let newY = e.clientY - boundingClientRect.height
 
         // If the new y position is less than 0, set it to 0 to prevent the menu from going out of view to the top
@@ -111,7 +120,7 @@ const ContextMenu = (props: ContextMenuProps) => {
     <div ref={setContainerRef}>
       {props.children}
       <Show when={containerRef() == ContextMenu?.openMenu()}>
-        <Portal mount={document.body}>
+        <Portal mount={getFloatingRoot()}>
           <div
             ref={setMenuRef}
             class="bg-darkSlate-900 context-menu w-40 overflow-hidden rounded-lg"

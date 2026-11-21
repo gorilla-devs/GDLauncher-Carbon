@@ -1,21 +1,26 @@
-import ThemePreview from "@/components/ThemePreview"
-import { queryClient, rspc } from "@/utils/rspcClient"
-import { Trans } from "@gd/i18n"
-import { getThemeKey } from "@gd/i18n/helpers"
-import { For } from "solid-js"
+import { extractErrorCode, queryClient, rspc } from "@/utils/rspcClient"
+import { i18n, Trans, useTransContext } from "@gd/i18n"
+import { createMemo, For, Show } from "solid-js"
+import { Button, toast } from "@gd/ui"
+import { getBuiltinTheme } from "@/themes/builtin"
+import { themeRefusalKey } from "@/themes/errors"
+import { installedTileModel, themeCustomization } from "@/themes/installed"
+import { THEME_EXTENSION } from "@/themes/install"
+import { useModal } from "@/managers/ModalsManager"
 import useSettingsGeneralData from "./settings.general.data"
 import LoadingError from "@/components/LoadingError"
-import {
-  applyThemeByName,
-  getAvailableThemes,
-  getThemeColor
-} from "@/utils/theme"
+import { getAvailableThemes, parseThemeKey } from "@/utils/theme"
 import PageTitle from "./components/PageTitle"
 import Row from "./components/Row"
 import Title from "./components/Title"
+import BuiltinThemeTile from "./appearance/BuiltinThemeTile"
+import InstalledThemeTile from "./appearance/InstalledThemeTile"
+import CustomizeTheme from "./appearance/CustomizeTheme"
 
 const Appearance = () => {
   const routeData = useSettingsGeneralData()
+  const modals = useModal()
+  const [t] = useTransContext()
   const themeName = () => routeData?.data?.data?.theme || "main"
 
   const settingsMutation = rspc.createMutation(() => ({
@@ -24,8 +29,68 @@ const Appearance = () => {
       queryClient.setQueryData(["settings.setSettings"], newTheme)
     }
   }))
+  const select = (key: string) => {
+    settingsMutation.mutate({ theme: { Set: key } })
+  }
+  const openFolder = rspc.createMutation(() => ({
+    mutationKey: ["themes.openFolder"],
+    // A refused folder (a link, or one deleted meanwhile) comes back with a
+    // THEME_* code, which the global handler only logs.
+    onError: (error) => {
+      const key = themeRefusalKey(extractErrorCode(error))
+      if (key) toast.error(t(key))
+    }
+  }))
+  const pickThemeFile = async () => {
+    const result = await window.openFileDialog({
+      properties: ["openFile"],
+      filters: [
+        {
+          name: t("settings:_trn_theme_file_filter"),
+          extensions: [THEME_EXTENSION.slice(1)]
+        }
+      ]
+    })
+    const path = result.filePaths?.[0]
+    if (result.canceled || !path) return
+    modals?.openModal({ name: "themeInstall" }, { path })
+  }
 
   const themes = getAvailableThemes()
+
+  const season = rspc.createQuery(() => ({ queryKey: ["themes.getSeason"] }))
+  // Reconciled by id, so a refresh updates each tile in place instead of
+  // remounting it (which reloads its preview and closes its tooltips).
+  const installed = rspc.createQuery(() => ({
+    queryKey: ["themes.list"],
+    reconcile: "id"
+  }))
+  const language = () => i18n.language || "english"
+  const mainColors = getBuiltinTheme("main").colors
+
+  // The saved theme, never the hover preview, so Customize doesn't flicker.
+  // A user theme's query is the one initThemes keeps. Reading it from the
+  // cache (no refetch on mount) keeps opening this page from re-applying it;
+  // the core's invalidation still refreshes it.
+  const saved = createMemo(() => parseThemeKey(themeName()))
+  const savedUserId = () => {
+    const parsed = saved()
+    return parsed.kind === "user" ? parsed.id : null
+  }
+  const savedUserTheme = rspc.createQuery(() => ({
+    queryKey: ["themes.getTheme", { id: savedUserId() ?? "" }],
+    enabled: savedUserId() !== null,
+    staleTime: Infinity
+  }))
+  const customization = createMemo(() => {
+    const parsed = saved()
+    if (parsed.kind === "builtin") {
+      return themeCustomization(getBuiltinTheme(parsed.id))
+    }
+    if (parsed.kind === "user") return themeCustomization(savedUserTheme.data)
+    return themeCustomization(null)
+  })
+  const hasCustomization = () => Object.values(customization()).some(Boolean)
 
   return (
     <LoadingError routeData={routeData}>
@@ -41,67 +106,73 @@ const Appearance = () => {
           </Title>
           <div class="flex w-full flex-wrap gap-6">
             <For each={themes}>
+              {(theme) => (
+                <BuiltinThemeTile
+                  theme={theme}
+                  savedKey={themeName()}
+                  season={season.data}
+                  onSelect={select}
+                />
+              )}
+            </For>
+          </div>
+        </Row>
+        <Row forceContentBelow class="border-box w-full max-w-full">
+          <div class="flex items-start justify-between gap-4">
+            <Title
+              description={<Trans key="settings:_trn_custom_themes_text" />}
+            >
+              <Trans key="settings:_trn_custom_themes_title" />
+            </Title>
+            <div class="mt-2 flex shrink-0 items-center gap-2">
+              <Button
+                type="primary"
+                data-testid="theme-install"
+                onClick={() => void pickThemeFile()}
+              >
+                <Trans key="settings:_trn_install_theme" />
+              </Button>
+              <Button
+                type="text"
+                data-testid="themes-open-folder"
+                onClick={() => openFolder.mutate({ id: null })}
+              >
+                <Trans key="settings:_trn_open_themes_folder" />
+              </Button>
+            </div>
+          </div>
+          <div class="flex w-full flex-wrap gap-6">
+            <For each={installed.data ?? []}>
               {(theme) => {
-                const shade1 = getThemeColor(theme, "darkSlate-900")
-                const shade2 = getThemeColor(theme, "darkSlate-700")
-                const shade3 = getThemeColor(theme, "darkSlate-600")
-
+                const model = createMemo(() =>
+                  installedTileModel(theme, themeName(), language(), mainColors)
+                )
                 return (
-                  <div>
-                    <div
-                      class="w-42 relative rounded-md p-2 transition-transform duration-300 ease-spring hover:scale-105"
-                      style={{ "background-color": shade1 }}
-                      classList={{
-                        "scale-105": themeName() === theme
-                      }}
-                      onClick={() => {
-                        settingsMutation.mutate({
-                          theme: {
-                            Set: theme
-                          }
-                        })
-                      }}
-                      onMouseEnter={() => {
-                        applyThemeByName(theme)
-                      }}
-                      onMouseLeave={() => {
-                        applyThemeByName(themeName())
-                      }}
-                    >
-                      <div
-                        class="bg-darkSlate-500 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full p-2 opacity-0 shadow-md transition-opacity duration-300 ease-spring"
-                        classList={{
-                          "opacity-100": themeName() === theme
-                        }}
-                      >
-                        <div class="i-hugeicons:tick-02 h-6 w-6" />
-                      </div>
-
-                      <ThemePreview
-                        shade1={shade1}
-                        shade2={shade2}
-                        shade3={shade3}
-                      />
-                    </div>
-                    <div class="box-border flex w-full items-center justify-start gap-2 px-2 py-4">
-                      <p class="text-lightSlate-700 m-0">
-                        <Trans key={getThemeKey(theme)} />
-                      </p>
-                    </div>
-                  </div>
+                  <InstalledThemeTile
+                    id={theme.id}
+                    model={model()}
+                    savedKey={themeName()}
+                    onSelect={select}
+                    onOpenFolder={() =>
+                      openFolder.mutate({
+                        id: model().removable ? theme.id : null
+                      })
+                    }
+                    onRemove={() =>
+                      modals?.openModal(
+                        { name: "themeRemove" },
+                        { id: theme.id, name: model().name }
+                      )
+                    }
+                  />
                 )
               }}
             </For>
           </div>
         </Row>
-        <Row forceContentBelow class="border-box w-full max-w-full">
-          <Title description={<Trans key="settings:_trn_custom_themes_text" />}>
-            <Trans key="settings:_trn_custom_themes_title" />
-          </Title>
-          <div class="flex w-full flex-wrap gap-6">
-            <Trans key="general:_trn_coming_soon" />
-          </div>
-        </Row>
+        <Show when={hasCustomization()}>
+          <CustomizeTheme customization={customization()} />
+        </Show>
       </div>
     </LoadingError>
   )

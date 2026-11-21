@@ -89,7 +89,10 @@ const LogsSidebar = (props: LogsSidebarProps) => {
   const totalCount = () => props.availableLogEntries.length
 
   return (
-    <div class="w-50 box-border flex h-full flex-col pr-6">
+    <div
+      data-gdl="logs.sidebar"
+      class="w-50 box-border flex h-full flex-col pr-6"
+    >
       {/* Header */}
       <div class="box-border flex h-8 shrink-0 items-center justify-between px-4 py-6">
         <div class="flex items-center gap-1.5">

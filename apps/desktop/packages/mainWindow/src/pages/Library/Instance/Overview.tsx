@@ -1,20 +1,37 @@
 import Card from "@/components/Card"
 import { Trans, useTransContext } from "@gd/i18n"
-import { For, Show } from "solid-js"
+import { For, Show, createEffect, on } from "solid-js"
 import useInstanceData from "./instance.data"
 import { useParams } from "@solidjs/router"
 import { formatLongDate, formatSeconds } from "@/utils/intl"
 import FadedBanner, { FadedBannerSkeleton } from "@/components/FadedBanner"
-import { apiUrl } from "@/utils/rspcClient"
+import { apiUrl, rspc } from "@/utils/rspcClient"
 import { Button } from "@gd/ui"
-import { getModpackPlatformIcon } from "@/utils/instances"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 const Overview = () => {
   const routeData = useInstanceData()
   const params = useParams<{ id: string }>()
   const navigator = useGDNavigate()
   const [t, { getI18next }] = useTransContext()
+
+  // The mods card counts what the core has read from the mods folder. Mods
+  // put there from outside are only read once something asks for this
+  // instance first, as the Addons tab does, so the card would say 0 until
+  // that tab was opened. Ask here too, again whenever the instance changes.
+  const prioritizeCache = rspc.createMutation(() => ({
+    mutationKey: ["instance.prioritizeInstanceCache"]
+  }))
+  createEffect(
+    on(
+      () => params.id,
+      (id) => {
+        const instanceId = parseInt(id, 10)
+        if (!isNaN(instanceId)) prioritizeCache.mutate(instanceId)
+      }
+    )
+  )
 
   const modpackPlatform = () =>
     routeData.instanceDetails.data?.modpack?.modpack.type
@@ -32,7 +49,7 @@ const Overview = () => {
   }
 
   return (
-    <div class="flex flex-col gap-4">
+    <div data-gdl="instance.overview" class="flex flex-col gap-4">
       <div class="flex w-full flex-wrap justify-center gap-4">
         <Show when={routeData.instanceDetails.data?.version}>
           <Card
@@ -114,7 +131,10 @@ const Overview = () => {
             routeData.modpackInfo.data
           }
         >
-          <div class="bg-darkSlate-700 min-h-23 relative box-border flex h-max w-full overflow-hidden rounded-xl p-5">
+          <div
+            data-gdl="instance.overview.modpack"
+            class="bg-darkSlate-700 min-h-23 relative box-border flex h-max w-full overflow-hidden rounded-xl p-5"
+          >
             <FadedBanner
               imageUrl={apiUrl(
                 `/instance/modpackIcon?instance_id=${params.id}`
@@ -134,8 +154,12 @@ const Overview = () => {
                     </div>
                     <div class="text-lightSlate-600 flex gap-3 text-sm">
                       <div class="flex items-center">
-                        <img
-                          src={getModpackPlatformIcon(modpackPlatform())}
+                        <PlatformLogo
+                          platform={
+                            modpackPlatform() === "modrinth"
+                              ? "modrinth"
+                              : "curseforge"
+                          }
                           class="h-3 w-3"
                         />
                       </div>
@@ -193,8 +217,14 @@ const Overview = () => {
       </div>
 
       <Show when={routeData.instanceDetails.data?.notes}>
-        <div class="bg-darkSlate-700 w-59 box-border flex w-full flex-col items-start justify-between gap-2 rounded-xl p-5">
-          <div class="text-lightSlate-700 uppercase">
+        <div
+          data-gdl="instance.overview.notes"
+          class="bg-darkSlate-700 w-59 box-border flex w-full flex-col items-start justify-between gap-2 rounded-xl p-5"
+        >
+          <div
+            data-gdl="instance.overview.notes.label"
+            class="text-lightSlate-700 uppercase"
+          >
             <Trans
               key="instances:_trn_notes"
               options={{
@@ -202,7 +232,10 @@ const Overview = () => {
               }}
             />
           </div>
-          <p class="m-0 text-sm leading-6">
+          <p
+            data-gdl="instance.overview.notes.text"
+            class="m-0 text-sm leading-6"
+          >
             {routeData.instanceDetails.data?.notes}
           </p>
         </div>

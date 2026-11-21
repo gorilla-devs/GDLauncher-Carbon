@@ -14,7 +14,20 @@ interface Theme {
   brands: Record<string, string>
 }
 
+const radius = (value: string) => `calc(${value} * var(--radius-scale, 1))`
+
 const theme = {
+  borderRadius: {
+    DEFAULT: radius("0.25rem"),
+    none: "0",
+    sm: radius("0.125rem"),
+    md: radius("0.375rem"),
+    lg: radius("0.5rem"),
+    xl: radius("0.75rem"),
+    "2xl": radius("1rem"),
+    "3xl": radius("1.5rem"),
+    full: radius("9999px")
+  },
   colors: {
     accent: "rgb(var(--accent) / <alpha-value>)",
     darkSlate: {

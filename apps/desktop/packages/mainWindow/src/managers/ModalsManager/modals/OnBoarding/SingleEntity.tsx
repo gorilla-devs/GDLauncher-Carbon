@@ -24,6 +24,7 @@ import {
 } from "solid-js"
 import { createAsyncEffect } from "@/utils/asyncEffect"
 import { createStore } from "solid-js/store"
+import { PlatformLogo } from "@/components/PlatformLogo"
 import SingleCheckBox from "./SingleCheckBox"
 import { Trans, useTransContext } from "@gd/i18n"
 import { getImportErrorTranslationKey } from "@gd/i18n/helpers"
@@ -209,11 +210,24 @@ const SingleEntity = (props: {
         <div class="flex w-full items-center">
           <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
           <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
-            <img
-              src={ENTITIES[props.entity.entity].icon}
-              alt={props.entity.entity}
-              class="h-4 w-4"
-            />
+            <Show
+              when={ENTITIES[props.entity.entity].platform}
+              fallback={
+                <img
+                  src={ENTITIES[props.entity.entity].icon}
+                  alt={props.entity.entity}
+                  class="h-4 w-4"
+                />
+              }
+            >
+              {(platform) => (
+                <PlatformLogo
+                  platform={platform()}
+                  alt={props.entity.entity}
+                  class="h-4 w-4"
+                />
+              )}
+            </Show>
             <Trans key={ENTITIES[props.entity.entity].translation} />
           </span>
           <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />

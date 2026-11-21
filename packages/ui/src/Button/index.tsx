@@ -10,6 +10,7 @@ import {
 import { Spinner } from "../Spinner"
 import { Dynamic } from "solid-js/web"
 import { getPressEffectClasses } from "../Clickable"
+import { gdlHooks } from "../hooks"
 
 type Size = "small" | "medium" | "large"
 type Type = "primary" | "secondary" | "glow" | "transparent" | "glass" | "text"
@@ -52,6 +53,14 @@ const getVariant = (
   fullWidth?: boolean
 ) => {
   const v = variant || "primary"
+  // Words on the accent fill read `--gdl-on-primary` (style.css), unless the
+  // caller picked its own colours.
+  const onAccent =
+    (type === "primary" || type === "glow") &&
+    v === "primary" &&
+    !backgroundColor &&
+    !textColor &&
+    !isDisabled
   const isLarge = size === "large"
   const isMedium = size === "medium"
   const isSmall = size === "small"
@@ -91,7 +100,8 @@ const getVariant = (
     "border-solid": true,
     "scale-x-100": isLoading,
     "p-0": isLoading,
-    "text-lightSlate-50": !isDisabled,
+    "text-lightSlate-50": !isDisabled && !onAccent,
+    "gdl-on-primary": onAccent,
     "flex-row-reverse": iconRight
   }
 
@@ -100,7 +110,8 @@ const getVariant = (
       ...commonStyle,
       [`${!isDisabled && !backgroundColor ? `bg-${v}-500` : "bg-[#1D2028]"}`]: true,
       [`${!isDisabled && !backgroundColor ? `hover:bg-${v}-700` : ""}`]: true,
-      "text-[#404759]": isDisabled,
+      // `--gdl-on-primary-disabled`, by default the same dark grey.
+      "gdl-on-primary-disabled": isDisabled,
       "disabled-stripes": isDisabled,
       "border-0": true
     },
@@ -126,9 +137,10 @@ const getVariant = (
     },
     transparent: {
       ...commonStyle,
-      "bg-darkSlate-800": true,
+      // A class rather than an inline style, so a theme's hook rule can
+      // restyle it. No stripes when disabled: the fill stays solid.
+      "bg-black/90": true,
       "text-lightSlate-700": isDisabled,
-      "disabled-stripes": isDisabled,
       "border-1": true,
       "border-transparent": true,
       "hover:border-1": !isDisabled,
@@ -220,7 +232,8 @@ function Button(props: Props) {
     "loading",
     "size",
     "children",
-    "disabled"
+    "disabled",
+    "data-gdl" as keyof Props
   ])
 
   const mergedProps = mergeProps(
@@ -245,6 +258,20 @@ function Button(props: Props) {
       // re-fires its click handler on Enter/Space while a mutation is in
       // flight, letting keyboard users double-submit.
       disabled={local.loading || local.disabled}
+      data-gdl={gdlHooks(
+        // `button.tinted`: the colour is overridden (variant or background);
+        // `button.disabled`: disabled by prop, not merely loading;
+        // `button.loading`: showing its spinner or progress instead.
+        `button button.${props.type || "primary"}${
+          (props.variant && props.variant !== "primary") ||
+          props.backgroundColor
+            ? " button.tinted"
+            : ""
+        }${props.disabled ? " button.disabled" : ""}${
+          props.loading ? " button.loading" : ""
+        }`,
+        (local as Record<string, unknown>)["data-gdl"]
+      )}
       classList={{
         ...getVariant(
           props.type || "primary",
@@ -264,12 +291,7 @@ function Button(props: Props) {
         "pointer-events-none": !!props.loading,
         ...props.classList
       }}
-      style={{
-        ...(mergedProps.type === "transparent" && {
-          background: "rgba(0, 0, 0, 0.9)"
-        }),
-        ...props.style
-      }}
+      style={props.style}
     >
       <Show when={props.icon}>{props.icon}</Show>
       <Show

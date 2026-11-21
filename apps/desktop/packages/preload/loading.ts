@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron"
 import { domReady } from "./utils"
+import { AD_VIEW } from "../main/adView/channels"
 
 export interface Log {
   type: "info" | "error"
@@ -23,6 +24,7 @@ function useLoading() {
       moduleName: string,
       snapshotPath?: string
     ) {
+      ipcRenderer.send(AD_VIEW.suppress, { reason: "fatal", on: true })
       const runtimePath = await ipcRenderer.invoke("getRuntimePath")
       const isString = typeof error === "string"
 
@@ -472,6 +474,7 @@ function useLoading() {
     },
 
     async backwardsMigrationError() {
+      ipcRenderer.send(AD_VIEW.suppress, { reason: "fatal", on: true })
       oDiv.classList.add("appFatalCrash")
 
       oDiv.innerHTML = `

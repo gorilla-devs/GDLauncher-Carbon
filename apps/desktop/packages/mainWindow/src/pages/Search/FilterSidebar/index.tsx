@@ -68,19 +68,29 @@ function ExpandedPanel(props: {
 
   return (
     <div
+      data-gdl="page.body search.sidebar"
       class="bg-darkSlate-800 flex h-full flex-col"
       style={{ width: `${SIDEBAR_WIDTH}px`, "min-width": `${SIDEBAR_WIDTH}px` }}
     >
       {/* Instance/Server context */}
       <Show when={hasContext()}>
-        <div class="relative overflow-hidden border-b border-darkSlate-700/50">
+        <div
+          data-gdl="search.context"
+          class="relative overflow-hidden border-b border-darkSlate-700/50"
+        >
           {/* Background image */}
           <div
             class="absolute inset-0 bg-cover bg-center"
             style={{ "background-image": `url("${contextImageUrl()}")` }}
           />
-          <div class="from-darkSlate-800 absolute inset-0 bg-gradient-to-r from-40%" />
-          <div class="from-darkSlate-800/80 absolute inset-0 bg-gradient-to-t" />
+          <div
+            data-gdl="search.context.fade"
+            class="from-darkSlate-800 absolute inset-0 bg-gradient-to-r from-40%"
+          />
+          <div
+            data-gdl="search.context.shade"
+            class="from-darkSlate-800/80 absolute inset-0 bg-gradient-to-t"
+          />
 
           {/* Content */}
           <div class="relative flex items-center gap-2 px-3 py-3">
@@ -130,8 +140,11 @@ function ExpandedPanel(props: {
       </Show>
 
       {/* Header */}
-      <div class="border-darkSlate-700/50 flex items-center justify-between border-b px-4 py-3">
-        <span class="text-sm font-medium">
+      <div
+        data-gdl="search.sidebar.header"
+        class="border-darkSlate-700/50 flex items-center justify-between border-b px-4 py-3"
+      >
+        <span data-gdl="search.sidebar.title" class="text-sm font-medium">
           <Trans key="search:_trn_filters" />
         </span>
         <div class="flex items-center gap-2">
@@ -159,32 +172,53 @@ function ExpandedPanel(props: {
       {/* Scrollable Filter Sections */}
       <div class="relative flex-1 overflow-hidden">
         <div class="h-full overflow-y-auto px-2 pb-4">
-          <div data-filter-section="platform">
+          <div
+            data-filter-section="platform"
+            data-gdl="search.filter search.filter.platform"
+          >
             <PlatformFilter testAnchors={props.testAnchors} />
           </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
-          <div data-filter-section="categories">
+          <div
+            data-filter-section="categories"
+            data-gdl="search.filter search.filter.categories"
+          >
             <CategoriesFilter />
           </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
-          <div data-filter-section="modloaders">
+          <div
+            data-filter-section="modloaders"
+            data-gdl="search.filter search.filter.modloaders"
+          >
             <ModloadersFilter />
           </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
-          <div data-filter-section="gameVersions">
+          <div
+            data-filter-section="gameVersions"
+            data-gdl="search.filter search.filter.game-versions"
+          >
             <GameVersionsFilter />
           </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
-          <div data-filter-section="environment">
+          <div
+            data-filter-section="environment"
+            data-gdl="search.filter search.filter.environment"
+          >
             <EnvironmentFilter />
           </div>
           <div class="bg-darkSlate-700/50 mx-2 my-1 h-px" />
-          <div data-filter-section="sort">
+          <div
+            data-filter-section="sort"
+            data-gdl="search.filter search.filter.sort"
+          >
             <SortFilter />
           </div>
         </div>
         {/* Scroll fade at bottom */}
-        <div class="from-darkSlate-800 pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t to-transparent" />
+        <div
+          data-gdl="search.sidebar.fade"
+          class="from-darkSlate-800 pointer-events-none absolute bottom-0 left-0 right-0 h-6 bg-gradient-to-t to-transparent"
+        />
       </div>
     </div>
   )

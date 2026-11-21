@@ -7,13 +7,17 @@ import {
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
 import {
   Select as SelectPrimitive,
+  useSelectContext,
   type SelectContentProps,
   type SelectItemProps,
   type SelectRootProps,
-  type SelectTriggerProps
+  type SelectTriggerProps,
+  type SelectValueProps
 } from "@kobalte/core/select"
 
 import { cn } from "../util"
+import { gdlHooks, withStates } from "../hooks"
+import { getFloatingRoot } from "../floatingRoot"
 import { PRESS_CLASSES } from "../Clickable"
 import { optionsEqual } from "./optionsEqual"
 
@@ -51,7 +55,18 @@ export const Select = <
   return <SelectPrimitive {...rest} options={stableOptions()} />
 }
 
-export const SelectValue = SelectPrimitive.Value
+// The shown value inside the trigger.
+export const SelectValue = <Option, T extends ValidComponent = "span">(
+  props: PolymorphicProps<T, SelectValueProps<Option, T>>
+) => (
+  <SelectPrimitive.Value<Option, T>
+    {...props}
+    data-gdl={gdlHooks(
+      "select.value",
+      (props as unknown as Record<string, unknown>)["data-gdl"]
+    )}
+  />
+)
 export const SelectDescription = SelectPrimitive.Description
 export const SelectErrorMessage = SelectPrimitive.ErrorMessage
 export const SelectItemDescription = SelectPrimitive.ItemDescription
@@ -68,14 +83,25 @@ export const SelectTrigger = <T extends ValidComponent = "button">(
   const [local, rest] = splitProps(props as selectTriggerProps, [
     "class",
     "children",
-    "variant"
+    "variant",
+    "data-gdl" as keyof selectTriggerProps
   ])
 
   return (
     <SelectPrimitive.Trigger
+      data-gdl={gdlHooks(
+        "select",
+        (local as Record<string, unknown>)["data-gdl"]
+      )}
       class={cn(
         local.variant !== "unstyled" &&
-          "flex h-9 w-full items-center justify-between rounded-md border-0 border-transparent outline-none hover:outline-darkSlate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 !bg-darkSlate-800 px-3 py-2 text-sm text-lightSlate-100 shadow-sm ring-offset-darkSlate-900 placeholder:text-darkSlate-400 disabled:cursor-not-allowed disabled:opacity-50",
+          // The fill comes from `.gdl-select-fill`, which this package
+          // doesn't define: it is in the app's
+          // apps/desktop/packages/mainWindow/src/themes/controls.css, loaded
+          // after the CSS reset. Not an `!important` utility: it has to beat
+          // the reset's [type="button"] rule and still lose to a theme's
+          // hook rule. Without that file the box has no fill.
+          "gdl-select-fill flex h-9 w-full items-center justify-between rounded-md border-0 border-transparent outline-none hover:outline-darkSlate-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 px-3 py-2 text-sm text-lightSlate-100 shadow-sm ring-offset-darkSlate-900 placeholder:text-darkSlate-400 disabled:cursor-not-allowed disabled:opacity-50",
         local.variant === "unstyled" && "flex items-center justify-between",
         PRESS_CLASSES,
         local.class
@@ -85,6 +111,7 @@ export const SelectTrigger = <T extends ValidComponent = "button">(
       {local.children}
       {local.variant !== "unstyled" && (
         <SelectPrimitive.Icon
+          data-gdl="select.icon"
           as="svg"
           xmlns="http://www.w3.org/2000/svg"
           width="1em"
@@ -114,7 +141,10 @@ type selectContentProps<T extends ValidComponent = "div"> =
 export const SelectContent = <T extends ValidComponent = "div">(
   props: PolymorphicProps<T, selectContentProps<T>>
 ) => {
-  const [local, rest] = splitProps(props as selectContentProps, ["class"])
+  const [local, rest] = splitProps(props as selectContentProps, [
+    "class",
+    "data-gdl" as keyof selectContentProps
+  ])
   let listboxRef: HTMLElement | undefined
 
   const handleListboxRef = (el: HTMLElement) => {
@@ -140,8 +170,12 @@ export const SelectContent = <T extends ValidComponent = "div">(
   }
 
   return (
-    <SelectPrimitive.Portal>
+    <SelectPrimitive.Portal mount={getFloatingRoot()}>
       <SelectPrimitive.Content
+        data-gdl={gdlHooks(
+          "dropdown",
+          (local as Record<string, unknown>)["data-gdl"]
+        )}
         class={cn(
           "relative z-[100000] min-w-[8rem] rounded-md border border-darkSlate-500 bg-darkSlate-800 text-lightSlate-100 shadow-md data-[expanded]:animate-selectEnter data-[closed]:animate-selectLeave",
           local.class
@@ -170,6 +204,12 @@ export const SelectItem = <T extends ValidComponent = "li">(
     "class",
     "children"
   ])
+  const context = useSelectContext()
+  const key = () => (props as selectItemProps).item.key
+  const selected = () =>
+    context.listState().selectionManager().isSelected(key())
+  const disabled = () =>
+    context.listState().selectionManager().isDisabled(key())
 
   return (
     <SelectPrimitive.Item
@@ -178,6 +218,13 @@ export const SelectItem = <T extends ValidComponent = "li">(
         local.class
       )}
       {...rest}
+      data-gdl={gdlHooks(
+        withStates("select.item", {
+          selected: selected(),
+          disabled: disabled()
+        }),
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     >
       <SelectPrimitive.ItemIndicator class="absolute right-2 flex h-3.5 w-3.5 items-center justify-center">
         <svg

@@ -1,4 +1,6 @@
 import { cn } from "../util"
+import { gdlHooks } from "../hooks"
+import { getFloatingRoot } from "../floatingRoot"
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
 import type {
   TooltipContentProps,
@@ -29,11 +31,18 @@ type tooltipContentProps<T extends ValidComponent = "div"> =
 export const TooltipContent = <T extends ValidComponent = "div">(
   props: PolymorphicProps<T, tooltipContentProps<T>>
 ) => {
-  const [local, rest] = splitProps(props as tooltipContentProps, ["class"])
+  const [local, rest] = splitProps(props as tooltipContentProps, [
+    "class",
+    "data-gdl" as keyof tooltipContentProps
+  ])
 
   return (
-    <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Portal mount={getFloatingRoot()}>
       <TooltipPrimitive.Content
+        data-gdl={gdlHooks(
+          "tooltip",
+          (local as Record<string, unknown>)["data-gdl"]
+        )}
         class={cn(
           "z-100000 overflow-hidden rounded-md bg-darkSlate-900 px-3 py-1.5 text-xs text-primary-foreground data-[expanded]:animate-in data-[closed]:animate-out data-[closed]:fade-out-0 data-[expanded]:fade-in-0 data-[closed]:zoom-out-95 data-[expanded]:zoom-in-95",
           local.class

@@ -372,6 +372,31 @@ export function byTestId(id: string): string {
   return `[data-testid="${id}"]`
 }
 
+/** An element carrying a stable theme hook, `data-gdl="… name …"`. */
+export function byHook(name: string): string {
+  return `[data-gdl~="${name}"]`
+}
+
+/** A theme tile on the Appearance page, located by the theme id. */
+export function byThemeTile(id: string): string {
+  return byTestId(`theme-tile-${id}`)
+}
+
+/** The warning icon of an installed theme's tile, by the theme's folder name. */
+export function byThemeWarning(id: string): string {
+  return byTestId(`theme-warning-${id}`)
+}
+
+/** The open-folder icon of an installed theme's tile. */
+export function byThemeOpenFolder(id: string): string {
+  return byTestId(`theme-open-folder-${id}`)
+}
+
+/** The remove icon of an installed theme's tile (not on a misnamed folder). */
+export function byThemeRemove(id: string): string {
+  return byTestId(`theme-remove-${id}`)
+}
+
 /** An instance tile located by the name the test gave it. */
 export function byInstanceName(name: string): string {
   return `[data-testid="instance-tile"][data-instance-name="${name}"]`

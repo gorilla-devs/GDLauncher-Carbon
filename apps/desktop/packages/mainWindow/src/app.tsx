@@ -8,6 +8,14 @@ import {
 } from "solid-js"
 import { useLocation } from "@solidjs/router"
 import initThemes from "./utils/theme"
+import initMotion from "./themes/initMotion"
+import initSeason from "./themes/initSeason"
+import initThemeDrop from "./themes/initThemeDrop"
+import initSounds from "./themes/initSounds"
+import {
+  betaPromptChecked,
+  setBetaPromptChecked
+} from "./utils/betaPromptLatch"
 import { rspc } from "@/utils/rspcClient"
 import { useModal } from "./managers/ModalsManager"
 import { useGDNavigate } from "./managers/NavigationManager"
@@ -40,6 +48,10 @@ const App = (props: Props) => {
   })
 
   initThemes()
+  initMotion()
+  initSeason()
+  initThemeDrop()
+  initSounds()
 
   checkForUpdates()
 
@@ -99,7 +111,6 @@ const App = (props: Props) => {
   })
 
   // Beta prompt for stable channel users
-  const [betaPromptChecked, setBetaPromptChecked] = createSignal(false)
   const shouldShowBetaPrompt = rspc.createQuery(() => ({
     queryKey: ["settings.shouldShowBetaPrompt"]
   }))
@@ -116,9 +127,10 @@ const App = (props: Props) => {
   })
 
   return (
-    <div class="relative w-screen">
+    <div class="relative w-screen" data-gdl="app">
       <JavaAdvisoryNotifier />
       <JavaIssueNotifier />
+
       <div class="z-10 flex h-auto w-screen">
         <main class="max-w-screen relative grow">{props.children}</main>
       </div>

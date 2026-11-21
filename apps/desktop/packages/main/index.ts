@@ -42,9 +42,17 @@ import {
 import * as Sentry from "@sentry/electron/main"
 import "./preloadListeners"
 import getAdSize from "./adSize"
+import { attachAdView, type AdViewHandle } from "./adView"
 import handleUncaughtException from "./handleUncaughtException"
 import initAutoUpdater from "./autoUpdater"
-import "./appMenu"
+import {
+  DEFAULT_MENU_LABELS,
+  installAppMenu,
+  isResetThemeShortcut,
+  sanitizeMenuLabels
+} from "./appMenu"
+import { THEME_HOST } from "./themeChannels"
+import { forwardWindowVisibility } from "./windowVisibility"
 import {
   CoreModuleStatus,
   FELauncherActionOnGameLaunch
@@ -97,6 +105,18 @@ const RUNTIME_PATH_DEFAULT_NAME = "data"
 export let CURRENT_RUNTIME_PATH: string | null = null
 
 let win: BrowserWindow | null = null
+let adView: AdViewHandle | null = null
+
+const requestThemeReset = () => {
+  if (win && !win.isDestroyed()) win.webContents.send(THEME_HOST.reset)
+}
+installAppMenu(DEFAULT_MENU_LABELS, requestThemeReset)
+
+ipcMain.on(THEME_HOST.setMenuLabels, (e, v) => {
+  if (e.sender !== win?.webContents) return
+  const labels = sanitizeMenuLabels(v)
+  if (labels) installAppMenu(labels, requestThemeReset)
+})
 let lastCoreModuleProgress: number | null = null
 
 const getWin = () => {
@@ -881,8 +901,25 @@ async function createWindow(): Promise<BrowserWindow> {
     }
   })
 
+  // Same display lookup as the renderer's getAdSize IPC.
+  const { adSize, bannerAdSize, hideAdText } = getAdSize(
+    screen.getDisplayMatching(win.getBounds())
+  )
+  adView = attachAdView(
+    win,
+    { adSize, bannerAdSize, hideAdText },
+    { placeholderAds: __E2E_BUILD__ }
+  )
+
+  // main window only: the ad view never gets this channel
+  forwardWindowVisibility(win, (v) => {
+    if (win && !win.isDestroyed())
+      win.webContents.send(THEME_HOST.windowVisibility, v)
+  })
+
   win.on("closed", () => {
     win = null
+    adView = null
     pendingDisplayChange = false
 
     if (adSizeFallbackTimeout) {
@@ -926,6 +963,7 @@ async function createWindow(): Promise<BrowserWindow> {
       bannerAdSize,
       hideAdText
     })
+    adView?.updateLayout({ adSize, bannerAdSize, hideAdText })
   }
 
   win.on("move", () => {
@@ -1031,6 +1069,11 @@ async function createWindow(): Promise<BrowserWindow> {
   }
 
   win.webContents.on("before-input-event", (event, input) => {
+    if (isResetThemeShortcut(input, process.platform)) {
+      event.preventDefault()
+      requestThemeReset()
+      return
+    }
     if (input.alt && input.shift && input.code === "KeyI") {
       event.preventDefault()
       win?.webContents.toggleDevTools()
@@ -1052,7 +1095,8 @@ async function createWindow(): Promise<BrowserWindow> {
     }
 
     if (import.meta.env.DEV && !__SHOWCASE_MODE__) {
-      win?.webContents.openDevTools()
+      // Detached: the ad view sits above the page and would cover docked tools.
+      win?.webContents.openDevTools({ mode: "detach" })
     }
   })
 
@@ -1578,6 +1622,7 @@ app.whenReady().then(async () => {
           bannerAdSize,
           hideAdText
         })
+        adView?.updateLayout({ adSize, bannerAdSize, hideAdText })
       }
     }
   )

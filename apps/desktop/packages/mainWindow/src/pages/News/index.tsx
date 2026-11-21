@@ -53,21 +53,27 @@ const NewsPage = () => {
   }
 
   return (
-    <div class="flex h-full flex-col">
+    <div data-gdl="news" class="flex h-full flex-col">
       <div class="flex h-full flex-col">
         <Tabs value={selectedTab()} onChange={handleTabChange}>
-          <div class="bg-darkSlate-800 sticky top-0 z-50 shrink-0 px-6 py-4">
+          <div
+            data-gdl="page.body news.tabs"
+            class="bg-darkSlate-800 sticky top-0 z-50 shrink-0 px-6 py-4"
+          >
             <TabsList class="w-fit gap-0">
               <TabsIndicator />
               <TabsTrigger value="news">
                 <div class="flex items-center gap-2 py-1">
-                  <div class="i-hugeicons:news-01 h-5 w-5" />
+                  <div
+                    data-gdl="tab.icon"
+                    class="i-hugeicons:news-01 h-5 w-5"
+                  />
                   <Trans key="news:_trn_minecraft_news">News</Trans>
                 </div>
               </TabsTrigger>
               <TabsTrigger value="patches">
                 <div class="flex items-center gap-2 py-1">
-                  <div class="i-hugeicons:note h-5 w-5" />
+                  <div data-gdl="tab.icon" class="i-hugeicons:note h-5 w-5" />
                   <Trans key="news:_trn_minecraft_patches">Patch Notes</Trans>
                 </div>
               </TabsTrigger>

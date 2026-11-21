@@ -10,6 +10,7 @@ export const DialogFooter = (props: {
   class?: string
 }) => (
   <div
+    data-gdl="modal.footer"
     class={`flex flex-wrap-reverse items-center justify-end gap-x-6 gap-y-3${
       props.class ? ` ${props.class}` : ""
     }`}

@@ -20,6 +20,7 @@ use self::instance::InstanceManager;
 use self::minecraft::MinecraftManager;
 use self::rich_presence::RichPresenceManager;
 use self::server::ServerManager;
+use self::themes::ThemeManager;
 use self::vtask::VisualTaskManager;
 
 pub mod account;
@@ -36,6 +37,7 @@ pub mod rich_presence;
 pub mod server;
 mod settings;
 pub mod system_info;
+pub mod themes;
 pub mod vtask;
 
 pub type App = Arc<AppInner>;
@@ -85,6 +87,7 @@ mod app {
         task_manager: VisualTaskManager,
         system_info_manager: SystemInfoManager,
         rich_presence_manager: rich_presence::RichPresenceManager,
+        theme_manager: ThemeManager,
     }
 
     macro_rules! manager_getter {
@@ -202,6 +205,7 @@ mod app {
                     task_manager: VisualTaskManager::new(),
                     system_info_manager: SystemInfoManager::new(),
                     rich_presence_manager: rich_presence::RichPresenceManager::new(),
+                    theme_manager: ThemeManager::new(),
                 }));
 
                 // SAFETY: This pointer cast is safe because UnsafeCell and MaybeUninit do not
@@ -309,6 +313,8 @@ mod app {
                 t.elapsed().as_secs_f64()
             );
 
+            self.theme_manager().launch_watcher();
+
             debug!(
                 "[startup-timing] all background tasks ready, emitting LaunchBackgroundTasks status (took {:.2}s)",
                 bg_total.elapsed().as_secs_f64()
@@ -329,6 +335,7 @@ mod app {
         manager_getter!(meta_cache_manager: MetaCacheManager);
         manager_getter!(system_info_manager: SystemInfoManager);
         manager_getter!(rich_presence_manager: RichPresenceManager);
+        manager_getter!(theme_manager: ThemeManager);
 
         pub fn invalidate(&self, key: Key, args: Option<serde_json::Value>) {
             self.send_invalidation(key, args);

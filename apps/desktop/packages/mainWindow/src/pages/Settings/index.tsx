@@ -6,6 +6,8 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import FeatureStatusBadge from "@/components/FeatureStatusBadge"
 import { useTransContext } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
+import { DecorationSlot } from "@/themes/DecorationSlot"
+import { identityHook, settingsPageId } from "@/themes/hooks"
 
 export interface settingsItem {
   name: string | JSX.Element
@@ -74,7 +76,11 @@ function Settings(props: { children?: JSX.Element }) {
   return (
     <>
       <ContentWrapper zeroPadding>
-        <div class="sticky top-0 z-50 box-border w-full px-6 pt-6 bg-darkSlate-800">
+        <div
+          data-gdl="settings.nav"
+          class="sticky top-0 z-50 box-border w-full px-6 pt-6 bg-darkSlate-800"
+        >
+          <DecorationSlot anchor="settings.nav" />
           <Tabs value={location.pathname}>
             <div class="overflow-x-auto scrollbar-hide">
               <Show when={settingsQuery.data?.language} keyed>
@@ -85,10 +91,17 @@ function Settings(props: { children?: JSX.Element }) {
                       {(item) => (
                         <TabsTrigger
                           value={item.path}
+                          data-gdl={`settings.nav.item ${identityHook(
+                            "settings.nav.item",
+                            settingsPageId(item.path)
+                          )}`}
                           onClick={() => navigator.navigate(item.path)}
                         >
                           <div class="flex flex-col items-center justify-center gap-2 py-2">
-                            <i class={"w-5 h-5 " + item.icon} />
+                            <i
+                              data-gdl="tab.icon"
+                              class={"w-5 h-5 " + item.icon}
+                            />
                             <div class="whitespace-nowrap text-center">
                               {item.name}
                             </div>

@@ -1,4 +1,6 @@
 import { cn } from "../util"
+import { gdlHooks } from "../hooks"
+import { getFloatingRoot } from "../floatingRoot"
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
 import type {
   PopoverContentProps,
@@ -37,12 +39,17 @@ export const PopoverContent = <T extends ValidComponent = "div">(
   const [local, rest] = splitProps(props as popoverContentProps, [
     "class",
     "children",
-    "hideCloseButton"
+    "hideCloseButton",
+    "data-gdl" as keyof popoverContentProps
   ])
 
   return (
-    <PopoverPrimitive.Portal>
+    <PopoverPrimitive.Portal mount={getFloatingRoot()}>
       <PopoverPrimitive.Content
+        data-gdl={gdlHooks(
+          "dropdown",
+          (local as Record<string, unknown>)["data-gdl"]
+        )}
         class={cn(
           "z-100000 w-72 rounded-md border border-solid border-darkSlate-500 bg-darkSlate-700 p-4 text-lightSlate-200 shadow-lg shadow-darkSlate-900/50 outline-none data-[expanded]:animate-popoverEnter data-[closed]:animate-popoverLeave",
           local.class

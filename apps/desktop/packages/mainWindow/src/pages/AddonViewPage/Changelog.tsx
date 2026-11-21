@@ -470,7 +470,7 @@ const Changelog = () => {
                         </SelectItem>
                       )}
                     >
-                      <SelectTrigger class="bg-darkSlate-700 border-darkSlate-600 hover:border-darkSlate-500 w-full transition-colors">
+                      <SelectTrigger class="border-darkSlate-600 hover:border-darkSlate-500 w-full transition-colors">
                         <SelectValue<string>>
                           {(state) =>
                             optionLabels()[state.selectedOption() || ""] ||

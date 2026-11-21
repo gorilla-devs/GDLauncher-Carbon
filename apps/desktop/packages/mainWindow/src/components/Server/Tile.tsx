@@ -351,6 +351,7 @@ const ServerTile = (props: Props) => {
       <ContextMenuTrigger>
         <BaseTile
           name={props.server.name}
+          decorationKey={`server:${props.server.id}`}
           size={props.size}
           img={serverImageUrl()}
           isLoading={isLoading()}
@@ -380,19 +381,28 @@ const ServerTile = (props: Props) => {
           viewTransitionPrefix="server-tile"
           onPlay={(e) => handlePlayStop(e)}
           isMenuOpen={isMenuOpen()}
+          isFavorite={props.server.favorite}
           waitingText={<Trans key="instances:_trn_server_loading" />}
           playButtonContent={
             <>
               <div
-                class="text-lightSlate-50 h-5 w-5 shrink-0"
+                class="h-5 w-5 shrink-0"
                 classList={{
+                  "text-lightSlate-50": isRunning() || isBusy(),
+                  "gdl-on-primary": !isRunning() && !isBusy(),
                   "i-hugeicons:stop": isRunning(),
                   "i-hugeicons:play": !isRunning() && !isBusy(),
                   "i-hugeicons:loading-03 animate-spin": isBusy()
                 }}
               />
               <Show when={props.size >= 2}>
-                <span class="text-lightSlate-50 text-base font-semibold">
+                <span
+                  class="text-base font-semibold"
+                  classList={{
+                    "text-lightSlate-50": isRunning() || isBusy(),
+                    "gdl-on-primary": !isRunning() && !isBusy()
+                  }}
+                >
                   <Switch>
                     <Match when={isRunning()}>STOP</Match>
                     <Match when={isBusy()}>...</Match>
@@ -406,9 +416,13 @@ const ServerTile = (props: Props) => {
             <>
               <div class="flex items-center gap-2">
                 <Show when={props.server.favorite}>
-                  <div class="i-hugeicons:star h-3 w-3 shrink-0 text-yellow-400" />
+                  <div
+                    data-gdl="library.tile.star"
+                    class="i-hugeicons:star h-3 w-3 shrink-0 text-yellow-400"
+                  />
                 </Show>
                 <h4
+                  data-gdl="library.tile.name"
                   class="m-0 truncate text-left text-sm font-semibold text-white"
                   style={
                     shouldSetViewTransition()
@@ -423,6 +437,7 @@ const ServerTile = (props: Props) => {
                 </h4>
               </div>
               <div
+                data-gdl="library.tile.meta"
                 class="flex items-center gap-2 text-xs text-white/70"
                 style={
                   shouldSetViewTransition()
@@ -440,7 +455,7 @@ const ServerTile = (props: Props) => {
                   />
                 </Show>
                 <span>{props.server.gameVersion}</span>
-                <span class="text-white/40">:{props.server.port}</span>
+                <span class="opacity-60">:{props.server.port}</span>
               </div>
             </>
           }

@@ -14,6 +14,7 @@ import { useDragContext } from "@/pages/Library/DragContext"
 import { rspc } from "@/utils/rspcClient"
 import { useModal } from "@/managers/ModalsManager"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
+import { DecorationSlot, isDecorated } from "@/themes/DecorationSlot"
 
 interface GroupHeaderProps {
   groupId: number
@@ -136,8 +137,13 @@ const GroupHeader = (props: GroupHeaderProps) => {
     <ContextMenu>
       <ContextMenuTrigger>
         <div
+          data-gdl="collapsable.header section-title"
           class="w-fit h-8 flex gap-2 items-center cursor-pointer select-none transition-opacity duration-150"
           classList={{
+            "relative isolate": isDecorated(
+              "section-title",
+              `group:${props.groupId}`
+            ),
             "opacity-50": isBeingDragged()
           }}
           onClick={props.onToggleCollapse}
@@ -153,6 +159,7 @@ const GroupHeader = (props: GroupHeaderProps) => {
 
           {/* Collapse arrow */}
           <div
+            data-gdl="collapsable.chevron"
             class="i-hugeicons:arrow-right-01 min-w-4 min-h-4 transition ease-spring text-lightSlate-700"
             classList={{
               "rotate-90": !props.isCollapsed
@@ -175,12 +182,17 @@ const GroupHeader = (props: GroupHeaderProps) => {
             }
           >
             <p
+              data-gdl="collapsable.title section-title.text"
               class="m-0 text-lightSlate-700 flex items-center uppercase text-ellipsis max-w-full text-left text-md"
               onDblClick={handleDoubleClick}
             >
               {props.name}
             </p>
           </Show>
+          <DecorationSlot
+            anchor="section-title"
+            itemKey={`group:${props.groupId}`}
+          />
         </div>
       </ContextMenuTrigger>
 

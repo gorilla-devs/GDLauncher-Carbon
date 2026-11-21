@@ -7,11 +7,10 @@ import {
   ListInstance,
   ValidListInstance
 } from "@gd/core_module/bindings"
-import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { Switch, Match, createSignal } from "solid-js"
 import { sanitizeSvgIcon } from "@/utils/modplatformDescriptionConverter"
 import { apiUrl } from "./rspcClient"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 export const isListInstanceInvalid = (status: ListInstanceStatus) => {
   return "Invalid" in status
@@ -145,19 +144,6 @@ export type Instance = InvalidInstanceType | ValidInstanceType
 
 export type InstancesStore = Record<string, ListInstance[]>
 
-export const getModpackPlatformIcon = (
-  modpackType: "curseforge" | "modrinth" | null | undefined
-) => {
-  switch (modpackType) {
-    case "curseforge":
-      return CurseforgeLogo
-    case "modrinth":
-      return ModrinthLogo
-    default:
-      return CurseforgeLogo
-  }
-}
-
 export const CategoryIcon = (props: {
   type: "embedded" | "url" | undefined
   value: string | undefined
@@ -165,17 +151,21 @@ export const CategoryIcon = (props: {
   return (
     <Switch>
       <Match when={props.type === "embedded"}>
-        <div class="h-4 w-4" innerHTML={sanitizeSvgIcon(props.value)} />
+        <div
+          data-gdl="category-icon"
+          class="h-4 w-4"
+          innerHTML={sanitizeSvgIcon(props.value)}
+        />
       </Match>
       <Match when={props.type === "url"}>
-        <img class="h-4 w-4" src={props.value} />
+        <img data-gdl="category-icon" class="h-4 w-4" src={props.value} />
       </Match>
     </Switch>
   )
 }
 
 export const PlatformIcon = (props: { modpack: "curseforge" | "modrinth" }) => {
-  return <img class="h-4 w-4" src={getModpackPlatformIcon(props.modpack)} />
+  return <PlatformLogo class="h-4 w-4" platform={props.modpack} />
 }
 
 export const [importedInstances, setImportedInstances] = createSignal<number[]>(

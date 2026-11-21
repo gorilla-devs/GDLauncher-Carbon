@@ -94,7 +94,7 @@ const ServerAddons = () => {
           when={selectionCount() === 1}
           fallback={
             <>
-              <ContextMenuItem disabled>
+              <ContextMenuItem disabled data-gdl="context-menu.label">
                 {t("content:_trn_selected_count", {
                   count: selectionCount()
                 })}

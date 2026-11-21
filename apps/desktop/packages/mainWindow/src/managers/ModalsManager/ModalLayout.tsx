@@ -3,6 +3,8 @@ import { JSX } from "solid-js/jsx-runtime"
 import { useTransContext } from "@gd/i18n"
 import { ModalProps, useModal, useModalStackEntry } from "."
 import adSize from "@/utils/adhelper"
+import { DecorationSlot } from "@/themes/DecorationSlot"
+import { identityHook } from "@/themes/hooks"
 
 interface Props extends ModalProps {
   children: JSX.Element | Element
@@ -61,7 +63,12 @@ const ModalLayout = (props: Props) => {
       }}
     >
       <div
-        class={`bg-darkSlate-700 relative flex h-full origin-center flex-col rounded-2xl duration-100 ease-spring ${
+        data-gdl={
+          stackEntry
+            ? `modal ${identityHook("modal", stackEntry.name)}`
+            : "modal"
+        }
+        class={`bg-darkSlate-700 relative isolate flex h-full origin-center flex-col rounded-2xl duration-100 ease-spring ${
           props.class ?? ""
         }`}
         classList={{
@@ -70,9 +77,13 @@ const ModalLayout = (props: Props) => {
       >
         <Show when={props.background}>{props.background}</Show>
         <Show when={!props.noHeader}>
-          <div class="box-border flex items-center justify-between px-5 pt-3 pb-4">
+          <div
+            data-gdl="modal.header"
+            class="box-border flex items-center justify-between px-5 pt-3 pb-4"
+          >
             <h2
               id={stackEntry?.titleId}
+              data-gdl="modal.title"
               class="text-lg font-bold text-lightSlate-50"
             >
               {props.title}
@@ -80,6 +91,7 @@ const ModalLayout = (props: Props) => {
             <button
               type="button"
               data-testid="modal-close"
+              data-gdl="modal.close"
               aria-label={t("general:_trn_close")}
               class="text-darkSlate-300 hover:text-lightSlate-100 b-0 flex h-5 w-5 shrink-0 cursor-pointer items-center justify-center rounded bg-transparent p-0 press-effect active:scale-90 outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500"
               onClick={() => {
@@ -93,6 +105,7 @@ const ModalLayout = (props: Props) => {
           </div>
         </Show>
         <div
+          data-gdl="modal.body"
           class={`box-border ${
             props.scrollable ? props.scrollable : "overflow-hidden"
           } z-10 h-full`}
@@ -103,6 +116,7 @@ const ModalLayout = (props: Props) => {
         >
           {c()}
         </div>
+        <DecorationSlot anchor="modal" />
       </div>
     </div>
   )

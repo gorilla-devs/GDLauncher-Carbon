@@ -54,19 +54,21 @@ describe("Collapsable", () => {
     expect(isInert(screen.getByText("Inside"))).toBe(false)
   })
 
-  it("leaves room for focus outlines at an open section's edge", () => {
+  it("a closed section can't be tabbed into, an open one can", () => {
     render(() => (
       <Collapsable title="Advanced" defaultOpened={false}>
         <button type="button">Inside</button>
       </Collapsable>
     ))
-    const content = screen.getByText("Inside").parentElement!
-    // Closed: clipped at its edge, so nothing peeks out.
-    expect(content.style.overflow).toBe("hidden")
+    // Its clipping is in style.css, on this hook, so a theme can change it.
+    const content = screen.getByText("Inside").parentElement! as HTMLElement & {
+      inert?: boolean
+    }
+    expect(content.getAttribute("data-gdl")).toBe("collapsable.body")
+    expect(content.inert).toBe(true)
 
     fireEvent.click(screen.getByRole("button", { name: "Advanced" }))
-    expect(content.style.overflow).toBe("clip")
-    expect(content.style.getPropertyValue("overflow-clip-margin")).toBe("4px")
+    expect(content.inert).toBe(false)
   })
 
   it("keeps a custom header as given", () => {

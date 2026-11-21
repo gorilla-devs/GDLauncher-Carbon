@@ -25,7 +25,6 @@ import {
 } from "@gd/ui"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { useModal } from "@/managers/ModalsManager"
-import { getModpackPlatformIcon } from "@/utils/instances"
 import {
   setExportStep,
   setPayload
@@ -36,6 +35,7 @@ import { useGlobalStore } from "../GlobalStoreContext"
 import useSearchContext from "../SearchInputContext"
 import GdlFeatureContextMenuItem from "../GdlFeatureContextMenuItem"
 import { BaseTile } from "../BaseTile"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 interface Props {
   modloader: CFFEModLoaderType | null | undefined
@@ -392,6 +392,7 @@ const Tile = (props: Props) => {
       >
         <BaseTile
           name={props.instance.name}
+          decorationKey={`instance:${props.instance.id}`}
           size={props.size}
           img={props.img}
           isLoading={!!isLoading()}
@@ -422,14 +423,22 @@ const Tile = (props: Props) => {
           onPlay={() => handlePlay()}
           isMenuOpen={isMenuOpen()}
           glowExtraClass={props.isNew ? "instance-tile-new" : undefined}
+          isFavorite={props.instance.favorite}
+          isNew={props.isNew}
           playButtonContent={
             <>
               <div
                 data-testid="instance-play"
-                class={`${props.isRunning ? "i-hugeicons:stop" : "i-hugeicons:play"} text-lightSlate-50 h-5 w-5 shrink-0`}
+                class={`${props.isRunning ? "i-hugeicons:stop text-lightSlate-50" : "i-hugeicons:play gdl-on-primary"} h-5 w-5 shrink-0`}
               />
               <Show when={props.size >= 2}>
-                <span class="text-lightSlate-50 text-base font-semibold">
+                <span
+                  class="text-base font-semibold"
+                  classList={{
+                    "text-lightSlate-50": props.isRunning,
+                    "gdl-on-primary": !props.isRunning
+                  }}
+                >
                   {props.isRunning ? "STOP" : "PLAY"}
                 </span>
               </Show>
@@ -439,6 +448,7 @@ const Tile = (props: Props) => {
           infoContent={
             <>
               <h4
+                data-gdl="library.tile.name"
                 class="m-0 text-left text-sm font-semibold text-white truncate"
                 style={
                   props.shouldSetViewTransition
@@ -452,6 +462,7 @@ const Tile = (props: Props) => {
                 {props.instance.name}
               </h4>
               <div
+                data-gdl="library.tile.meta"
                 class="flex items-center gap-2 text-xs text-white/70"
                 style={
                   props.shouldSetViewTransition
@@ -499,6 +510,7 @@ const Tile = (props: Props) => {
             <>
               <Show when={validInstance()?.modpack}>
                 <div
+                  data-gdl="library.tile.platform"
                   class="border-1 border-darkSlate-600 bg-darkSlate-900 z-3 absolute right-2 top-2 flex items-center justify-center rounded-lg border-solid p-2"
                   style={
                     props.shouldSetViewTransition
@@ -508,14 +520,21 @@ const Tile = (props: Props) => {
                       : {}
                   }
                 >
-                  <img
+                  <PlatformLogo
                     class="h-4 w-4"
-                    src={getModpackPlatformIcon(validInstance()?.modpack?.type)}
+                    platform={
+                      validInstance()?.modpack?.type === "modrinth"
+                        ? "modrinth"
+                        : "curseforge"
+                    }
                   />
                 </div>
               </Show>
               <Show when={props.isNew && !props.onToggleSelection}>
-                <div class="border-1 border-primary-400 bg-primary-500 z-3 absolute left-2 top-2 flex items-center justify-center rounded-lg border-solid px-2 py-0.5 text-xs font-bold text-white uppercase shadow-md">
+                <div
+                  data-gdl="library.tile.new"
+                  class="border-1 border-primary-400 bg-primary-500 z-3 absolute left-2 top-2 flex items-center justify-center rounded-lg border-solid px-2 py-0.5 text-xs font-bold text-white uppercase shadow-md"
+                >
                   NEW
                 </div>
               </Show>

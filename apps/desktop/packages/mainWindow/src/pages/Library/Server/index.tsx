@@ -13,6 +13,7 @@ import DetailPageLayout, {
 } from "@/pages/Library/shared/DetailPageLayout"
 import { useEntityGoneGuard } from "@/pages/Library/shared/useEntityGoneGuard"
 import { isConsoleFullScreen } from "./Tabs/ConsoleTab"
+import { withStates } from "@gd/ui"
 
 interface ServerTab {
   id: string
@@ -143,7 +144,7 @@ const Server = (props: { children?: any }) => {
       id: tab.id,
       label: (
         <div class="flex items-center gap-2">
-          <div class={`h-4 w-4 ${tab.icon}`} />
+          <div data-gdl="tab.icon" class={`h-4 w-4 ${tab.icon}`} />
           <Trans key={tab.translationKey} />
         </div>
       )
@@ -152,12 +153,15 @@ const Server = (props: { children?: any }) => {
   return (
     <DetailPageLayout
       containerId="main-container-server-details"
+      hookPrefix="server"
+      decorationKey={`server:${params.id}`}
       headerImage={iconUrl()}
       icon={iconUrl()}
       iconViewTransitionName="server-tile-image"
       headerInfoContent={
         <>
           <h1
+            data-gdl="page-title"
             class="border-box z-10 m-0 min-h-10 w-fit"
             style={{
               "view-transition-name": "server-tile-title",
@@ -167,7 +171,10 @@ const Server = (props: { children?: any }) => {
             {details()?.name ?? t("instances:_trn_server_loading")}
           </h1>
           <div class="flex cursor-default flex-row justify-between">
-            <div class="text-lightGray-600 ml-2 mt-2 flex flex-row flex-wrap items-start gap-4">
+            <div
+              data-gdl="server.meta"
+              class="text-lightGray-600 ml-2 mt-2 flex flex-row flex-wrap items-start gap-4"
+            >
               <Show when={details()}>
                 <div
                   class="m-0 flex min-h-6 items-center gap-2"
@@ -189,6 +196,11 @@ const Server = (props: { children?: any }) => {
               </Show>
               {/* Status badge */}
               <div
+                data-gdl={withStates("server.status", {
+                  running: isRunning(),
+                  starting: isStarting(),
+                  stopping: isStopping()
+                })}
                 class="flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-medium"
                 classList={{
                   "bg-green-900/30 text-green-400": isRunning(),
@@ -246,6 +258,9 @@ const Server = (props: { children?: any }) => {
                   rounded
                   size="small"
                   type="transparent"
+                  data-gdl={withStates("server.favorite", {
+                    active: details()!.favorite
+                  })}
                   onClick={() =>
                     setFavoriteMutation.mutate({
                       id: serverId(),
@@ -302,6 +317,7 @@ const Server = (props: { children?: any }) => {
           <Button
             uppercase
             size="large"
+            data-gdl="server.play"
             variant={isRunning() ? "red" : undefined}
             loading={isBusy()}
             style={{

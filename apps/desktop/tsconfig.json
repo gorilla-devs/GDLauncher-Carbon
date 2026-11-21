@@ -27,6 +27,7 @@
     "./packages/**/*.d.ts",
     "./packages/mainWindow/src/env.d.ts",
     "packages/preload/vite.config.mjs",
+    "packages/preload/vite.adview.config.mjs",
     "packages/mainWindow/vite.config.mjs",
     "packages/main/vite.config.mjs",
     "./e2e-tests/**/*.ts",

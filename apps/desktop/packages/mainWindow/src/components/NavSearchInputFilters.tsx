@@ -13,7 +13,6 @@ import {
 } from "@gd/ui"
 import { VList } from "./VirtuaWrapper"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import {
   For,
   Match,
@@ -33,6 +32,7 @@ import { useGlobalStore } from "./GlobalStoreContext"
 import useSearchContext from "./SearchInputContext"
 import { useTransContext } from "@gd/i18n"
 import { Trans } from "@gd/i18n"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 interface DropdownProps {}
 
@@ -89,8 +89,10 @@ export function SearchApiDropdown() {
                 }}
               >
                 <div class="flex items-center gap-2">
-                  <img
-                    src={value === "curseforge" ? CurseforgeLogo : ModrinthLogo}
+                  <PlatformLogo
+                    platform={
+                      value === "curseforge" ? "curseforge" : "modrinth"
+                    }
                     class="h-4 w-4"
                   />
                   {capitalize(value)}
@@ -166,7 +168,7 @@ export function SearchCategoryDropdown(_props: DropdownProps) {
               }}
             >
               <div class="flex items-center gap-2">
-                <img src={CurseforgeLogo} class="h-4 w-4" />
+                <PlatformLogo platform="curseforge" class="h-4 w-4" />
                 <Trans key="enums:_trn_curseforge" />
               </div>
             </DropdownMenuSubTrigger>
@@ -952,8 +954,10 @@ export function PlatformSpecificFilters(_props: DropdownProps) {
       <DropdownMenuSeparator />
       <DropdownMenuLabel>
         <div class="flex items-center gap-2">
-          <img
-            src={selectedApi() === "curseforge" ? CurseforgeLogo : ModrinthLogo}
+          <PlatformLogo
+            platform={
+              selectedApi() === "curseforge" ? "curseforge" : "modrinth"
+            }
             class="h-4 w-4"
           />
           <Trans

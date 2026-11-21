@@ -51,6 +51,7 @@ import DetailPageLayout, {
   type DetailPageTab
 } from "@/pages/Library/shared/DetailPageLayout"
 import { useEntityGoneGuard } from "@/pages/Library/shared/useEntityGoneGuard"
+import { withStates } from "@gd/ui"
 
 interface InstancePage {
   label: string | JSX.Element
@@ -157,7 +158,10 @@ const Instance = (props: { children?: any }) => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <div class="i-hugeicons:dashboard-square-01 text-lg" />
+          <div
+            data-gdl="tab.icon"
+            class="i-hugeicons:dashboard-square-01 text-lg"
+          />
           <Trans key="ui:_trn_overview" />
         </div>
       ),
@@ -166,7 +170,7 @@ const Instance = (props: { children?: any }) => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <div class="i-hugeicons:puzzle text-lg" />
+          <div data-gdl="tab.icon" class="i-hugeicons:puzzle text-lg" />
           <Trans key="ui:_trn_addons" />
         </div>
       ),
@@ -176,7 +180,7 @@ const Instance = (props: { children?: any }) => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <div class="i-hugeicons:settings-01 text-lg" />
+          <div data-gdl="tab.icon" class="i-hugeicons:settings-01 text-lg" />
           <Trans key="ui:_trn_settings" />
         </div>
       ),
@@ -185,7 +189,7 @@ const Instance = (props: { children?: any }) => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <div class="i-hugeicons:file-script text-lg" />
+          <div data-gdl="tab.icon" class="i-hugeicons:file-script text-lg" />
           <Trans key="ui:_trn_logs" />
           <FeatureStatusBadge type="beta" />
         </div>
@@ -488,6 +492,8 @@ const Instance = (props: { children?: any }) => {
   return (
     <DetailPageLayout
       containerId="main-container-instance-details"
+      hookPrefix="instance"
+      decorationKey={`instance:${params.id}`}
       headerImage={iconUrl()}
       icon={iconUrl()}
       iconViewTransitionName="instance-tile-image"
@@ -503,7 +509,10 @@ const Instance = (props: { children?: any }) => {
             }}
           >
             <span class="flex cursor-pointer gap-2">
+              {/* The hook is on the element that holds the text, so a
+                  theme's font, colour or gradient reaches it. */}
               <h1
+                data-gdl="page-title"
                 ref={nameRef}
                 onInput={(e) => {
                   // An instance name is plain text; read textContent so pasted
@@ -562,7 +571,10 @@ const Instance = (props: { children?: any }) => {
             </div>
           </div>
           <div class="flex cursor-default flex-row justify-between">
-            <div class="text-lightGray-600 ml-2 mt-2 flex flex-row flex-wrap items-start gap-4">
+            <div
+              data-gdl="instance.meta"
+              class="text-lightGray-600 ml-2 mt-2 flex flex-row flex-wrap items-start gap-4"
+            >
               <div
                 class="m-0 flex min-h-6 items-center gap-2"
                 style={{
@@ -614,6 +626,7 @@ const Instance = (props: { children?: any }) => {
         <Button
           uppercase
           size="large"
+          data-gdl="instance.play"
           variant={isRunning() && "red"}
           loading={isPreparing() !== undefined || isQueued() !== undefined}
           style={{
@@ -643,6 +656,7 @@ const Instance = (props: { children?: any }) => {
                   <Button
                     as="div"
                     data-testid="instance-menu-trigger"
+                    data-gdl="instance.menu"
                     rounded
                     class="h-full w-full"
                     size="small"
@@ -676,6 +690,7 @@ const Instance = (props: { children?: any }) => {
           <Tooltip placement="bottom">
             <TooltipTrigger as="div">
               <Button
+                data-gdl="instance.share"
                 onClick={handleShare}
                 rounded
                 size="small"
@@ -696,6 +711,9 @@ const Instance = (props: { children?: any }) => {
           <Tooltip placement="bottom">
             <TooltipTrigger as="div">
               <Button
+                data-gdl={withStates("instance.favorite", {
+                  active: isFavorite()
+                })}
                 onClick={() =>
                   setFavoriteMutation.mutate({
                     instance: instanceId(),

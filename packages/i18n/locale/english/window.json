@@ -4,5 +4,7 @@
   "_trn_window_close_text_2": "You can also <0>customize the default game launch behavior</0>.",
   "_trn_window_close_never_show": "Never show this again",
   "_trn_window_close_quit_app": "Quit app",
-  "_trn_view_logs": "View Logs"
+  "_trn_view_logs": "View Logs",
+  "_trn_menu_view": "View",
+  "_trn_menu_reset_theme": "Reset theme"
 }

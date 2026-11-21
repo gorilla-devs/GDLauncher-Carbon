@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 
 const toastError = vi.fn()
 const toastSuccess = vi.fn()
@@ -23,12 +23,47 @@ vi.mock("./javaMismatchBridge", () => ({
 }))
 
 const {
+  extractErrorCode,
   extractErrorDisplay,
   handleGlobalError,
   parseInvalidateFrame,
   queryClient,
   rspcErrorCode
 } = await import("./rspcClient")
+
+describe("extractErrorCode", () => {
+  it("reads the first coded cause", () => {
+    const message = JSON.stringify({
+      cause: [{ display: "a" }, { display: "b", code: "THEME_INVALID" }],
+      backtrace: ""
+    })
+    expect(extractErrorCode(new Error(message))).toBe("THEME_INVALID")
+    expect(extractErrorCode(new Error("nope"))).toBeUndefined()
+    expect(extractErrorCode("nope")).toBeUndefined()
+  })
+})
+
+describe("theme errors", () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it("theme errors are logged once as a warning", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {})
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    toastError.mockClear()
+    const message = JSON.stringify({
+      cause: [{ display: "bad manifest", code: "THEME_INVALID" }],
+      backtrace: "stack"
+    })
+    handleGlobalError(new Error(message), "query")
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]).toContain("bad manifest")
+    expect(error).not.toHaveBeenCalled()
+    expect(toastError).not.toHaveBeenCalled()
+
+    handleGlobalError(new Error("a different plain failure"), "query")
+    expect(error).toHaveBeenCalledTimes(1)
+  })
+})
 
 describe("extractErrorDisplay", () => {
   it("falls back to the raw text for a bare JSON literal instead of throwing", () => {

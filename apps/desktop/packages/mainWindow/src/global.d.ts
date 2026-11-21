@@ -103,16 +103,18 @@ declare global {
     ) => void
     getCurrentProgress: () => Promise<number | null>
     onProtocolUrl: (cb: (url: string) => void) => void
-  }
-}
-
-declare module "solid-js" {
-  namespace JSX {
-    interface IntrinsicElements {
-      owadview: {
-        class?: string
-        adstyle?: string
-      }
+    adView: {
+      setLabels: (whyAds: string) => void
+      setRemoveAds: (label: string | null) => void
+      onOpenWhyAds: (cb: () => void) => () => void
+      onOpenRemoveAds: (cb: () => void) => () => void
+    }
+    themeHost: {
+      /** A dropped file's path on disk, or "" when it has none. */
+      pathForFile: (file: File) => string
+      onResetTheme: (cb: () => void) => () => void
+      onWindowVisibility: (cb: (visible: boolean) => void) => () => void
+      setMenuLabels: (labels: { view: string; resetTheme: string }) => void
     }
   }
 }

@@ -8,6 +8,7 @@ import {
 } from "solid-js"
 import { cva, type VariantProps } from "class-variance-authority"
 import { PRESS_CLASSES } from "../Clickable"
+import { withStates } from "../hooks"
 
 const checkboxStyles = cva(
   "box-border flex h-5 min-h-5 w-5 min-w-5 items-center justify-center rounded-md transition-all duration-200 ease-spring",
@@ -69,6 +70,12 @@ function Checkbox(props: Props) {
 
   return (
     <div
+      data-gdl={withStates("checkbox", {
+        checked: checked(),
+        // The dash it draws when it's not ticked.
+        indeterminate: !checked() && props.indeterminate,
+        disabled: props.disabled
+      })}
       class={`relative flex items-center gap-2 rounded-md ${PRESS_CLASSES}`}
       classList={{
         "cursor-pointer": !props.disabled,
@@ -114,6 +121,7 @@ function Checkbox(props: Props) {
         />
       </Show>
       <div
+        data-gdl="checkbox.box"
         class={`${checkboxStyles({
           checked: checked(),
           disabled: props.disabled,
@@ -122,15 +130,20 @@ function Checkbox(props: Props) {
         })} peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary-500`}
       >
         <Show when={!checked() && props.indeterminate}>
-          <div class="bg-primary-500 h-3 min-h-3 w-3 min-w-3 rounded-sm" />
+          <div
+            data-gdl="checkbox.dash"
+            class="bg-primary-500 h-3 min-h-3 w-3 min-w-3 rounded-sm"
+          />
         </Show>
         <Show when={!props.indeterminate || checked()}>
           <div
+            data-gdl="checkbox.mark"
             class="i-hugeicons:tick-02 h-4 w-4 transition-transform duration-200 ease-spring"
             classList={{
               "scale-100": checked(),
               "scale-0": !checked(),
-              "text-lightSlate-50": !props.disabled,
+              // On the accent fill: `--gdl-on-primary` (style.css).
+              "gdl-on-primary": !props.disabled,
               "text-lightSlate-700": props.disabled
             }}
           />

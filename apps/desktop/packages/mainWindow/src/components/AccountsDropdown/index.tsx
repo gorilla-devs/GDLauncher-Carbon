@@ -4,11 +4,12 @@ import { apiUrl, rspc } from "@/utils/rspcClient"
 import { AccountStatus, AccountType } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { Button, Popover, PopoverContent, PopoverTrigger } from "@gd/ui"
-import { For, Switch, Match, createSignal } from "solid-js"
+import { For, Switch, Match, Show, createSignal } from "solid-js"
 import { logoUrl } from "@/utils/logos"
 import defaultInstanceImg from "/assets/images/default-instance-img.png"
 import { useGlobalStore } from "../GlobalStoreContext"
 import { getAccountImageUuid } from "@/utils/showcaseHelpers"
+import { withStates } from "@gd/ui"
 
 export interface Label {
   name: string
@@ -34,12 +35,18 @@ export interface Props {
   disabled?: boolean
   label?: string
   id?: string
+  /** The rail's trigger: just the avatar, and the menu opens to the right. */
+  compact?: boolean
+  /** A 40 px tall trigger, for the 48 px compact top bar. */
+  dense?: boolean
 }
 
 export const AccountsDropdown = (props: Props) => {
   const globalStore = useGlobalStore()
   const navigator = useGDNavigate()
   const [showAccountsDropdown, setShowAccountsDropdown] = createSignal(false)
+  // Whether the menu was opened with a pointer rather than the keyboard.
+  let openedByPointer = false
 
   const setActiveAccountMutation = rspc.createMutation(() => ({
     mutationKey: ["account.setActiveUuid"]
@@ -57,9 +64,15 @@ export const AccountsDropdown = (props: Props) => {
   let mcAccountsRef: HTMLDivElement | undefined
   let settingsButtonRef: HTMLDivElement | undefined
 
+  const selectedAccount = () =>
+    globalStore.accounts.data?.find(
+      (account) =>
+        account.uuid === globalStore.currentlySelectedAccountUuid.data
+    )
+
   return (
     <Popover
-      placement="bottom"
+      placement={props.compact ? "right-end" : "bottom"}
       open={showAccountsDropdown()}
       onOpenChange={(open) => {
         setShowAccountsDropdown(open)
@@ -123,52 +136,76 @@ export const AccountsDropdown = (props: Props) => {
         }
       }}
     >
-      <PopoverTrigger>
+      <PopoverTrigger
+        data-gdl="account-menu.button"
+        onPointerDown={() => {
+          openedByPointer = true
+        }}
+        onKeyDown={() => {
+          openedByPointer = false
+        }}
+      >
         <div
-          class="group relative rounded-lg p-4 transition-all duration-100 ease-spring"
+          data-gdl={withStates("account-menu.trigger", {
+            open: showAccountsDropdown()
+          })}
+          class="group relative rounded-lg transition-all duration-100 ease-spring"
           classList={{
+            "p-4": !props.compact && !props.dense,
+            "px-4 py-2": !props.compact && props.dense,
+            "p-2": props.compact,
             "bg-darkSlate-700": showAccountsDropdown()
           }}
         >
-          <div class="bg-darkSlate-700 -z-1 absolute left-0 top-0 h-full w-full scale-75 rounded-md opacity-0 transition-[transform,opacity] duration-150 ease-[cubic-bezier(.4,0,.2,1)] group-hover:scale-100 group-hover:opacity-100" />
+          <div
+            data-gdl="account-menu.highlight"
+            class="bg-darkSlate-700 -z-1 absolute left-0 top-0 h-full w-full scale-75 rounded-md opacity-0 transition-[transform,opacity] duration-150 ease-[cubic-bezier(.4,0,.2,1)] group-hover:scale-100 group-hover:opacity-100"
+          />
 
           <div class="flex items-center gap-4">
             <img
               src={apiUrl(
                 `/account/headImage?uuid=${(() => {
-                  const account = globalStore.accounts.data?.find(
-                    (account) =>
-                      account.uuid ===
-                      globalStore.currentlySelectedAccountUuid.data
-                  )
+                  const account = selectedAccount()
                   return account ? getAccountImageUuid(account) : ""
                 })()}`
               )}
+              alt={props.compact ? selectedAccount()?.username : undefined}
               class="h-6 w-6 rounded-md"
             />
-            <div class="max-w-30 truncate">
-              {
-                globalStore.accounts.data?.find(
-                  (account) =>
-                    account.uuid ===
-                    globalStore.currentlySelectedAccountUuid.data
-                )?.username
-              }
-            </div>
-            <div class="i-hugeicons:arrow-down-01 h-4 w-4" />
+            <Show when={!props.compact}>
+              <div class="max-w-30 truncate">{selectedAccount()?.username}</div>
+              <div class="i-hugeicons:arrow-down-01 h-4 w-4" />
+            </Show>
           </div>
         </div>
       </PopoverTrigger>
       <PopoverContent
+        data-gdl="account-menu.popup"
         class="w-80 border-none bg-transparent p-0"
         hideCloseButton
+        // Opened with a pointer, it focuses the menu itself, not its first
+        // button, so a click doesn't leave a focus ring on Manage Accounts.
+        // Opened with the keyboard, it focuses the first item as usual, with
+        // its ring (themes/controls.css).
+        onOpenAutoFocus={(e: Event) => {
+          if (!openedByPointer) return
+          e.preventDefault()
+          ;(e.currentTarget as HTMLElement | null)?.focus({
+            preventScroll: true
+          })
+        }}
       >
         <div class="flex flex-col gap-1">
           <div
+            data-gdl="account-menu.section"
             class="bg-darkSlate-700 shadow-darkSlate-900 mr-2 h-auto w-full rounded-lg p-2 opacity-0 shadow-lg transition-opacity"
             ref={gdlAccountRef}
           >
-            <div class="flex items-center gap-4 px-4 py-2 text-xl">
+            <div
+              data-gdl="account-menu.section.title"
+              class="flex items-center gap-4 px-4 py-2 text-xl"
+            >
               <img src={logoUrl} class="h-6 w-6" />
               <div>
                 <Trans key="accounts:_trn_gdlauncher_account" />
@@ -207,10 +244,14 @@ export const AccountsDropdown = (props: Props) => {
             </Switch>
           </div>
           <div
+            data-gdl="account-menu.section"
             class="bg-darkSlate-700 shadow-darkSlate-900 mr-2 h-auto w-full rounded-lg p-2 opacity-0 shadow-lg transition-opacity"
             ref={mcAccountsRef}
           >
-            <div class="flex items-center gap-4 px-4 py-2 text-xl">
+            <div
+              data-gdl="account-menu.section.title"
+              class="flex items-center gap-4 px-4 py-2 text-xl"
+            >
               <img src={defaultInstanceImg} class="h-6 w-6" />
               <div>
                 <Trans key="accounts:_trn_minecraft_accounts" />
@@ -220,6 +261,11 @@ export const AccountsDropdown = (props: Props) => {
             <For each={globalStore.accounts.data || []}>
               {(account) => (
                 <div
+                  data-gdl={withStates("account-menu.item", {
+                    active:
+                      account.uuid ===
+                      globalStore.currentlySelectedAccountUuid.data
+                  })}
                   class="hover:bg-darkSlate-600 flex items-center justify-between gap-4 rounded-lg px-4 py-2"
                   classList={{
                     "bg-darkSlate-600":
@@ -268,11 +314,13 @@ export const AccountsDropdown = (props: Props) => {
             </For>
           </div>
           <div
+            data-gdl="account-menu.section"
             class="bg-darkSlate-700 shadow-darkSlate-900 mr-2 h-auto w-full rounded-lg p-2 opacity-0 shadow-lg transition-opacity"
             ref={settingsButtonRef}
           >
             <Button
               type="secondary"
+              data-gdl="account-menu.manage"
               class="flex items-center justify-center gap-4"
               fullWidth
               onClick={() => {

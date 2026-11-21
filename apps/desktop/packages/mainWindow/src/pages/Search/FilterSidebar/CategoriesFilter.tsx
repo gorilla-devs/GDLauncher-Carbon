@@ -4,10 +4,10 @@ import { Show, createMemo } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import useSearchContext from "@/components/SearchInputContext"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { SearchableCheckboxList } from "./SearchableCheckboxList"
 import { formatModrinthCategory } from "@/utils/modrinthCategories"
 import { sanitizeSvgIcon } from "@/utils/modplatformDescriptionConverter"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 export function CategoriesFilter() {
   const searchResults = useSearchContext()
@@ -21,7 +21,13 @@ export function CategoriesFilter() {
       .map((category) => ({
         label: category.name,
         value: category.id,
-        icon: <img src={category.icon?.value ?? ""} class="h-4 w-4" />
+        icon: (
+          <img
+            data-gdl="category-icon"
+            src={category.icon?.value ?? ""}
+            class="h-4 w-4"
+          />
+        )
       }))
   )
 
@@ -33,6 +39,7 @@ export function CategoriesFilter() {
         value: category.id,
         icon: (
           <div
+            data-gdl="category-icon"
             class="h-4 w-4"
             // eslint-disable-next-line solid/no-innerhtml
             innerHTML={sanitizeSvgIcon(category.icon?.value)}
@@ -84,7 +91,7 @@ export function CategoriesFilter() {
         <Show when={isApiVisible("curseforge")}>
           <div class="flex flex-col gap-1">
             <div class="flex items-center gap-2 px-1 py-1">
-              <img src={CurseforgeLogo} class="h-3.5 w-3.5" />
+              <PlatformLogo platform="curseforge" class="h-3.5 w-3.5" />
               <span class="text-lightSlate-600 text-xs font-medium uppercase">
                 <Trans key="enums:_trn_curseforge" />
               </span>

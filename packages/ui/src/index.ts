@@ -32,4 +32,5 @@ export {
   PRESS_CLASSES_DISABLED,
   getPressEffectClasses
 } from "./Clickable"
-export * from "./themes"
+export { getFloatingRoot } from "./floatingRoot"
+export { gdlHooks, withStates } from "./hooks"

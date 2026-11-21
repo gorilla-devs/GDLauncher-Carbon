@@ -29,6 +29,7 @@ export default function FeatureStatusBadge(props: Props) {
 
   return (
     <div
+      data-gdl={`feature-badge feature-badge.${props.type}`}
       class={`flex items-center justify-center rounded px-1.5 text-center text-[0.55rem] font-bold uppercase ${colors()}`}
     >
       {text()}

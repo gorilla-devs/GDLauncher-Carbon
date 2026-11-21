@@ -16,11 +16,11 @@ import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
 import { Mod as ModType } from "@gd/core_module/bindings"
 import CopyIcon from "@/components/CopyIcon"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { rspc } from "@/utils/rspcClient"
 import { getModImageUrl } from "@/utils/instances"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 interface ModDetailsProps extends ModalProps {
   data: {
@@ -165,8 +165,8 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                     <Show when={mod().curseforge}>
                       <Tooltip>
                         <TooltipTrigger>
-                          <img
-                            src={CurseforgeLogo}
+                          <PlatformLogo
+                            platform="curseforge"
                             class="h-4 w-4"
                             alt={t("enums:_trn_curseforge")}
                           />
@@ -251,8 +251,8 @@ const ModDetails: Component<ModDetailsProps> = (props) => {
                 <Show when={mod().curseforge}>
                   <div class="flex flex-col gap-2">
                     <div class="flex items-center gap-2">
-                      <img
-                        src={CurseforgeLogo}
+                      <PlatformLogo
+                        platform="curseforge"
                         class="h-4 w-4"
                         alt="CurseForge"
                       />

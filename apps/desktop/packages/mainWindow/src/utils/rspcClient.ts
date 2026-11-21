@@ -229,6 +229,19 @@ export function extractErrorDisplay(error: unknown): string {
   )
 }
 
+function firstCodedCause(
+  parsed: ParsedRspcError | undefined
+): RspcErrorCause | undefined {
+  return parsed?.cause?.find((c) => c.code)
+}
+
+/** The code of the first cause that carries one (for example `THEME_INVALID`),
+ *  or undefined when the error has no code or doesn't parse. */
+export function extractErrorCode(error: unknown): string | undefined {
+  const message = error instanceof Error ? error.message : String(error)
+  return firstCodedCause(parseRspcErrorPayload(message))?.code
+}
+
 // ---------------------------------------------------------------------------
 // Global error handler shared by every query and mutation cache entry
 // ---------------------------------------------------------------------------
@@ -254,14 +267,24 @@ function logRspcError(
 // QueryCache/MutationCache `onError` wiring below.
 export function handleGlobalError(error: Error, source: "query" | "mutation") {
   const parsed = parseRspcErrorPayload(error.message)
+  const errorCause = firstCodedCause(parsed)
+  const errorCode = errorCause?.code
+
+  // A theme error is an author's typo, not a bug: one warning with the
+  // detail, no backtrace, no toast (the theme code shows its own translated
+  // one). Nothing picks up a renderer console.error today; theme errors stay
+  // off it so a future renderer SDK or console capture won't count them.
+  if (errorCode?.startsWith("THEME_")) {
+    console.warn("Theme error:", errorCause?.display ?? error.message)
+    return
+  }
+
   logRspcError(error, parsed)
   if (!parsed) {
     showDedupedErrorToast(error.message, source)
     return
   }
 
-  const errorCause = parsed.cause?.find((c) => c.code)
-  const errorCode = errorCause?.code
   const hasCustomCode = !!errorCode
 
   if (errorCode === "ACCOUNT_BANNED") {

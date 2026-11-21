@@ -29,10 +29,10 @@ import { supportsEnableToggle } from "@/pages/Library/shared/addons/addonCapabil
 import { useModal } from "@/managers/ModalsManager"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { getModImageUrl } from "@/utils/instances"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import useInstanceData from "../../instance.data"
 import { useAddonData, useAddonMutations } from "./hooks"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 const ADDON_TYPES: AddonType[] = [
   "mods",
@@ -338,7 +338,7 @@ const Addons = () => {
           when={selectionCount() === 1}
           fallback={
             <>
-              <ContextMenuItem disabled>
+              <ContextMenuItem disabled data-gdl="context-menu.label">
                 {t("content:_trn_selected_count", {
                   count: selectionCount()
                 })}
@@ -484,8 +484,8 @@ const Addons = () => {
                                   />
                                 }
                               >
-                                <img
-                                  src={CurseforgeLogo}
+                                <PlatformLogo
+                                  platform="curseforge"
                                   class="h-4 w-4"
                                   alt="CurseForge"
                                 />
@@ -565,8 +565,8 @@ const Addons = () => {
                               }
                             >
                               <div class="flex items-center gap-2">
-                                <img
-                                  src={CurseforgeLogo}
+                                <PlatformLogo
+                                  platform="curseforge"
                                   class="h-4 w-4"
                                   alt="CurseForge"
                                 />
@@ -583,8 +583,8 @@ const Addons = () => {
                             >
                               <div class="flex flex-1 items-center justify-between gap-2">
                                 <div class="flex items-center gap-2">
-                                  <img
-                                    src={CurseforgeLogo}
+                                  <PlatformLogo
+                                    platform="curseforge"
                                     class="h-4 w-4"
                                     alt="CurseForge"
                                   />

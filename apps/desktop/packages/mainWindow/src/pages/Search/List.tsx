@@ -11,8 +11,7 @@ import { Trans } from "@gd/i18n"
 import { PlaceholderGorilla } from "@/components/PlaceholderGorilla"
 import { Grid } from "./Grid"
 import SharePreviewContent from "@/components/SharePreviewContent"
-import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 export function List() {
   const searchContext = useSearchContext()
@@ -115,7 +114,7 @@ export function List() {
   })
 
   return (
-    <div class="flex h-full flex-col overflow-hidden">
+    <div data-gdl="search.results" class="flex h-full flex-col overflow-hidden">
       <div class="flex-1 overflow-hidden">
         <Show when={searchContext?.isShareMode() && searchContext?.shareCode()}>
           <div class="flex h-full justify-center overflow-auto px-6 pt-6">
@@ -144,7 +143,10 @@ export function List() {
                 <Show
                   when={allRows().length > 0}
                   fallback={
-                    <div class="flex flex-col items-center justify-center px-6 py-16 text-center">
+                    <div
+                      data-gdl="search.empty"
+                      class="flex flex-col items-center justify-center px-6 py-16 text-center"
+                    >
                       <PlaceholderGorilla
                         size={12}
                         variant="Searching Gorilla - Magnifying Glass"
@@ -175,7 +177,7 @@ export function List() {
                     }}
                     onScroll={searchContext?.virtualOnScrollHandler}
                   >
-                    {(result) => {
+                    {(result, index) => {
                       if (result.type === "loader") {
                         return <Skeleton.searchListItem />
                       }
@@ -187,11 +189,11 @@ export function List() {
                               <div class="relative z-10 flex w-full items-center gap-4">
                                 <div class="bg-darkSlate-500 skeleton-shimmer relative flex h-16 w-16 items-center justify-center rounded-md">
                                   <Show when={result.platform}>
-                                    <img
-                                      src={
+                                    <PlatformLogo
+                                      platform={
                                         result.platform === "curseforge"
-                                          ? CurseforgeLogo
-                                          : ModrinthLogo
+                                          ? "curseforge"
+                                          : "modrinth"
                                       }
                                       class="h-6 w-6 opacity-40"
                                       alt={`${result.platform} logo`}
@@ -228,6 +230,7 @@ export function List() {
 
                       return (
                         <ListItem
+                          position={index() + 1}
                           instanceMods={instanceMods()?.data ?? undefined}
                           serverAddons={serverAddons()?.data ?? undefined}
                           instanceId={instanceId()}
