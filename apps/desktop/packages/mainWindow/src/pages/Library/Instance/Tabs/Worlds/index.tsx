@@ -207,6 +207,15 @@ const Worlds = () => {
       }
     }
   })
+  // The game changes the world it plays: the map is read again when it ends.
+  createEffect(
+    on(
+      () => routeData.instanceDetails.data?.state?.state === "running",
+      (running, wasRunning) => {
+        if (wasRunning && !running && mapWanted()) void worldMap.refetch()
+      }
+    )
+  )
   // Right after its key changes the query can still answer the previous
   // key's facts: they are shown only under the key they were read for. A
   // renamed world shows its last facts until the new folder's arrive.

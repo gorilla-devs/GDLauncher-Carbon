@@ -2307,6 +2307,42 @@ it("the lists being read again asks no map that was never on screen", async () =
   expect(io.mapAsked).toEqual([])
 })
 
+it("the game ending reads the map again", async () => {
+  mount([world("Alpha", [])], {
+    details: { modpack: null, state: { state: "running", value: {} } }
+  })
+  await flush()
+  expect(io.mapAsked).toHaveLength(1)
+  setState("details", { modpack: null, state: { state: "inactive" } })
+  await flush()
+  expect(io.mapAsked).toEqual([
+    { instance_id: 5, world: "Alpha" },
+    { instance_id: 5, world: "Alpha" }
+  ])
+})
+
+it("the game starting reads no map", async () => {
+  mount([world("Alpha", [])])
+  await flush()
+  setState("details", {
+    modpack: null,
+    state: { state: "running", value: {} }
+  })
+  await flush()
+  expect(io.mapAsked).toHaveLength(1)
+})
+
+it("the game ending asks no map that was never on screen", async () => {
+  installObserver()
+  mount([world("Alpha", [])], {
+    details: { modpack: null, state: { state: "running", value: {} } }
+  })
+  await flush()
+  setState("details", { modpack: null, state: { state: "inactive" } })
+  await flush()
+  expect(io.mapAsked).toEqual([])
+})
+
 it("the dimension names are translated for the three vanilla ones and shown by id otherwise", async () => {
   answerMaps({
     Alpha: mapOf({
