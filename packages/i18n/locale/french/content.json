@@ -242,6 +242,7 @@
   "_trn_worlds.replace": "Remplacer",
   "_trn_worlds.added_to_world": "« {{name}} » a été ajouté au monde « {{world}} ».",
   "_trn_worlds.no_datapack_for_version": "Ce projet n’a aucun pack de données pour Minecraft {{version}}.",
+  "_trn_worlds.rename": "Renommer",
   "_trn_worlds.refusal.world_gone": "Ce monde n’existe plus.",
   "_trn_worlds.refusal.world_changed": "Ce monde a changé sur le disque. Réessayez.",
   "_trn_worlds.refusal.name_taken": "Ce monde contient déjà un fichier nommé « {{filename}} ».",

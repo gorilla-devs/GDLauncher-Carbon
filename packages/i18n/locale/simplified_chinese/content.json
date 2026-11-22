@@ -240,6 +240,7 @@
   "_trn_worlds.replace": "替换",
   "_trn_worlds.added_to_world": "已将“{{name}}”添加到存档“{{world}}”。",
   "_trn_worlds.no_datapack_for_version": "此项目没有适用于 Minecraft {{version}} 的数据包。",
+  "_trn_worlds.rename": "重命名",
   "_trn_worlds.refusal.world_gone": "此存档已不存在。",
   "_trn_worlds.refusal.world_changed": "此存档在磁盘上已更改。请重试。",
   "_trn_worlds.refusal.name_taken": "此存档中已有名为“{{filename}}”的文件。",

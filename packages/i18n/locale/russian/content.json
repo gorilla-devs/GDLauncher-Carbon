@@ -244,6 +244,7 @@
   "_trn_worlds.replace": "Заменить",
   "_trn_worlds.added_to_world": "«{{name}}» добавлен в мир «{{world}}».",
   "_trn_worlds.no_datapack_for_version": "У этого проекта нет датапака для Minecraft {{version}}.",
+  "_trn_worlds.rename": "Переименовать",
   "_trn_worlds.refusal.world_gone": "Этот мир больше не существует.",
   "_trn_worlds.refusal.world_changed": "Этот мир изменился на диске. Повторите попытку.",
   "_trn_worlds.refusal.name_taken": "В этом мире уже есть файл с именем «{{filename}}».",

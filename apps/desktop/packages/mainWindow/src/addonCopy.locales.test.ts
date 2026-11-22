@@ -68,6 +68,7 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_worlds.replace",
     "_trn_worlds.added_to_world",
     "_trn_worlds.no_datapack_for_version",
+    "_trn_worlds.rename",
     "_trn_worlds.refusal.world_gone",
     "_trn_worlds.refusal.world_changed",
     "_trn_worlds.refusal.name_taken",

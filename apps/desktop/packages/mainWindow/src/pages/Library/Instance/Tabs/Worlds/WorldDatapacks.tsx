@@ -10,20 +10,23 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "@gd/ui"
-import { For, JSX, Show } from "solid-js"
+import { For, Show } from "solid-js"
 import { Trans } from "@gd/i18n"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { getWorldDatapackImageUrl } from "@/utils/instances"
-import { worldLabel } from "@/utils/worldLabel"
 import {
   BlockedText,
   type ChangesBlocked
 } from "@/pages/Library/shared/addons/components/ChangesBlocked"
 import { UpdateCopiesMenu } from "@/pages/Library/shared/addons/components/UpdateCopiesMenu"
+import IconAction from "./IconAction"
+import WorldTitle from "./WorldTitle"
 
 export interface WorldDatapacksActions {
   openFolder: () => void
+  /** Settles when the world is renamed; throws when it was refused. */
+  rename: (_name: string) => Promise<void>
   deleteWorld: () => void
   addDatapacks: () => void
   copyName: () => void
@@ -48,41 +51,6 @@ export interface WorldDatapacksProps {
   isPending: (_packId: string) => boolean
   actions: WorldDatapacksActions
 }
-
-/** A row or header action drawn as an icon, as the Addons table draws them. */
-const IconAction = (props: {
-  icon: string
-  label: JSX.Element
-  onClick: () => void
-  disabled?: boolean
-  blocked?: ChangesBlocked
-  danger?: boolean
-  testId: string
-}) => (
-  <Tooltip>
-    <TooltipTrigger>
-      <div
-        data-testid={props.testId}
-        data-disabled={!!props.disabled}
-        class={`${props.icon} h-5 w-5 transition-colors`}
-        classList={{
-          "text-lightSlate-700 cursor-not-allowed": !!props.disabled,
-          "text-lightSlate-500 cursor-pointer": !props.disabled,
-          "hover:text-red-400": !props.disabled && !!props.danger,
-          "hover:text-lightSlate-200": !props.disabled && !props.danger
-        }}
-        onClick={() => {
-          if (!props.disabled) props.onClick()
-        }}
-      />
-    </TooltipTrigger>
-    <TooltipContent>
-      <Show when={props.disabled && props.blocked} fallback={props.label}>
-        <BlockedText blocked={props.blocked!} />
-      </Show>
-    </TooltipContent>
-  </Tooltip>
-)
 
 const packImage = (instanceId: number, pack: FEWorldDatapack) => {
   if (pack.curseforge?.has_image)
@@ -161,22 +129,11 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
   return (
     <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
       <div class="box-border flex shrink-0 items-center gap-3 px-4 py-3">
-        <div class="flex min-w-0 flex-1 flex-col">
-          <span
-            data-testid="world-title"
-            class="text-lightSlate-50 truncate font-medium"
-          >
-            {worldLabel(props.world)}
-          </span>
-          <Show when={worldLabel(props.world) !== props.world.name}>
-            <span
-              data-testid="world-folder"
-              class="text-lightSlate-700 truncate text-xs"
-            >
-              {props.world.name}
-            </span>
-          </Show>
-        </div>
+        <WorldTitle
+          world={props.world}
+          blocked={props.blocked}
+          onRename={props.actions.rename}
+        />
         <IconAction
           testId="world-open-folder"
           icon="i-hugeicons:folder-open"

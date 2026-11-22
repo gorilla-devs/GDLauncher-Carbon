@@ -60,8 +60,11 @@ const Worlds = () => {
     if (!isNaN(instanceId())) prioritizeCache.mutate(instanceId())
   })
 
-  const openFolder = rspc.createMutation(() => ({
-    mutationKey: ["instance.openInstanceFolder"]
+  const openWorldFolder = rspc.createMutation(() => ({
+    mutationKey: ["instance.openWorldFolder"]
+  }))
+  const renameWorld = rspc.createMutation(() => ({
+    mutationKey: ["instance.renameWorld"]
   }))
   const updateWorldDatapack = rspc.createMutation(() => ({
     mutationKey: ["instance.updateWorldDatapack"]
@@ -254,6 +257,23 @@ const Worlds = () => {
     }
   }
 
+  /** Throws when the core refused, so the name field stays open; the global
+   *  handler shows the refusal. */
+  const rename = async (world: FEWorld, name: string) => {
+    if (world.identity === null) return
+    const id = instanceId()
+    const folder = await renameWorld.mutateAsync({
+      instance_id: id,
+      world: world.name,
+      identity: world.identity,
+      name
+    })
+    if (!isCurrent(id)) return
+    // The folder follows the name, so the selection follows the folder.
+    setSelectedName(folder)
+    await refetchAll()
+  }
+
   const worldParam = (world: FEWorld) => encodeURIComponent(world.name)
 
   /** Opens the versions of what `source` names on its platform, asking
@@ -352,10 +372,11 @@ const Worlds = () => {
             }
             actions={{
               openFolder: () =>
-                openFolder.mutate({
+                openWorldFolder.mutate({
                   instance_id: instanceId(),
-                  folder: "Saves"
+                  world: world().name
                 }),
+              rename: (name) => rename(world(), name),
               deleteWorld: () => deleteWorld(world()),
               copyName: () => {
                 void window.navigator.clipboard.writeText(worldLabel(world()))

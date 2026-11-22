@@ -520,9 +520,9 @@ it.each([
     ).not.toHaveBeenCalled()
     expect(io.navigate).not.toHaveBeenCalled()
     one(root, "world-open-folder")!.click()
-    expect(io.mutate["instance.openInstanceFolder"]).toHaveBeenCalledWith({
+    expect(io.mutate["instance.openWorldFolder"]).toHaveBeenCalledWith({
       instance_id: 5,
-      folder: "Saves"
+      world: "Alpha"
     })
   }
 )
@@ -751,4 +751,239 @@ it("counts each world's data packs and marks the ones with an update", async () 
   expect(one(alpha, "world-entry-update")).not.toBeNull()
   expect(beta.textContent).toContain("content:_trn_worlds.no_datapacks")
   expect(one(beta, "world-entry-update")).toBeNull()
+})
+
+const BUSY = { modpack: null, state: { state: "running", value: {} } }
+const LOCKED = { modpack: { locked: true }, state: { state: "inactive" } }
+
+const field = (root: HTMLElement) =>
+  one(root, "world-rename-input") as HTMLInputElement | null
+const typeInto = (input: HTMLInputElement, value: string) => {
+  input.value = value
+  input.dispatchEvent(new Event("input", { bubbles: true }))
+}
+const press = (input: HTMLInputElement, key: string) =>
+  input.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }))
+/** Mounts the world "New World" titled "Skyblock" after "Alpha", selects it
+ *  and opens its name field. */
+async function renaming(options: { details?: any } = {}) {
+  const root = mount(
+    [world("Alpha", []), world("New World", [], "id-new", "Skyblock")],
+    options
+  )
+  await flush()
+  select(root, "Skyblock")
+  await flush()
+  one(root, "world-rename")!.click()
+  await flush()
+  return root
+}
+
+it.each([
+  ["a readable world", world("Alpha", []), undefined],
+  ["a world it cannot read", world("Alpha", [], null), undefined],
+  ["a world of a busy instance", world("Alpha", []), BUSY]
+])(
+  "open folder opens the world's own folder, for %s",
+  async (_, w, details) => {
+    const root = mount([world("Other", []), w], { details })
+    await flush()
+    select(root, "Alpha")
+    await flush()
+    one(root, "world-open-folder")!.click()
+    expect(
+      io.mutate["instance.openWorldFolder"]
+    ).toHaveBeenCalledExactlyOnceWith({ instance_id: 5, world: "Alpha" })
+    expect(io.mutate["instance.openInstanceFolder"]).toBeUndefined()
+  }
+)
+
+it("the pencil turns the title into a field holding the name", async () => {
+  const root = await renaming()
+  const input = field(root)!
+  expect(input.value).toBe("Skyblock")
+  expect(input.maxLength).toBe(64)
+  expect(document.activeElement).toBe(input)
+  expect([input.selectionStart, input.selectionEnd]).toEqual([0, 8])
+  expect(one(root, "world-title")).toBeNull()
+  expect(one(root, "world-rename-save")).not.toBeNull()
+  expect(one(root, "world-rename-cancel")).not.toBeNull()
+  // The folder line stays beneath it.
+  expect(one(root, "world-folder")!.textContent).toBe("New World")
+})
+
+it("Enter saves the typed name and the renamed world stays selected", async () => {
+  const root = await renaming()
+  io.mutateAsync["instance.renameWorld"].mockResolvedValue("Season 2")
+  io.refetchWorlds.mockImplementation(async () =>
+    setState("worlds", [
+      world("Alpha", []),
+      world("Season 2", [], "id-season", "Season 2")
+    ])
+  )
+  typeInto(field(root)!, "Season 2")
+  press(field(root)!, "Enter")
+  await flush()
+  expect(
+    io.mutateAsync["instance.renameWorld"]
+  ).toHaveBeenCalledExactlyOnceWith({
+    instance_id: 5,
+    world: "New World",
+    identity: "id-new",
+    name: "Season 2"
+  })
+  expect(io.refetchWorlds).toHaveBeenCalled()
+  expect(field(root)).toBeNull()
+  expect(title(root)).toBe("Season 2")
+  expect(one(root, "world-folder")).toBeNull()
+  const selected = all(root, "world-entry").find(
+    (entry) => entry.dataset.selected === "true"
+  )
+  expect(selected!.textContent).toContain("Season 2")
+})
+
+it("the tick saves, the cross and Escape cancel without a request", async () => {
+  const root = await renaming()
+  io.mutateAsync["instance.renameWorld"].mockResolvedValue("New World")
+  typeInto(field(root)!, "Season 2")
+  one(root, "world-rename-cancel")!.click()
+  await flush()
+  expect(field(root)).toBeNull()
+  expect(title(root)).toBe("Skyblock")
+
+  // Escape cancels and reaches nothing around the field.
+  const outer = vi.fn()
+  document.body.addEventListener("keydown", outer)
+  one(root, "world-rename")!.click()
+  await flush()
+  expect(field(root)!.value).toBe("Skyblock")
+  typeInto(field(root)!, "Season 2")
+  press(field(root)!, "Escape")
+  await flush()
+  document.body.removeEventListener("keydown", outer)
+  expect(field(root)).toBeNull()
+  expect(outer).not.toHaveBeenCalled()
+
+  // A click outside the field cancels too.
+  one(root, "world-rename")!.click()
+  await flush()
+  typeInto(field(root)!, "Season 2")
+  document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))
+  await flush()
+  expect(field(root)).toBeNull()
+  expect(io.mutateAsync["instance.renameWorld"]).not.toHaveBeenCalled()
+
+  one(root, "world-rename")!.click()
+  await flush()
+  typeInto(field(root)!, "Season 2")
+  one(root, "world-rename-save")!.click()
+  await flush()
+  expect(
+    io.mutateAsync["instance.renameWorld"]
+  ).toHaveBeenCalledExactlyOnceWith({
+    instance_id: 5,
+    world: "New World",
+    identity: "id-new",
+    name: "Season 2"
+  })
+  expect(field(root)).toBeNull()
+})
+
+it.each([["   "], [" Skyblock "]])(
+  "a blank or unchanged name sends nothing (%j)",
+  async (typed) => {
+    const root = await renaming()
+    typeInto(field(root)!, typed)
+    press(field(root)!, "Enter")
+    await flush()
+    expect(field(root)).toBeNull()
+    expect(io.mutateAsync["instance.renameWorld"]).not.toHaveBeenCalled()
+  }
+)
+
+it("the field is disabled while the rename runs", async () => {
+  const root = await renaming()
+  let answer!: (_folder: string) => void
+  io.mutateAsync["instance.renameWorld"].mockReturnValue(
+    new Promise<string>((resolve) => (answer = resolve))
+  )
+  typeInto(field(root)!, "Season 2")
+  press(field(root)!, "Enter")
+  await flush()
+  expect(field(root)!.disabled).toBe(true)
+  expect(one(root, "world-rename-save")!.dataset.disabled).toBe("true")
+  expect(one(root, "world-rename-cancel")!.dataset.disabled).toBe("true")
+  one(root, "world-rename-save")!.click()
+  one(root, "world-rename-cancel")!.click()
+  document.body.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }))
+  await flush()
+  expect(field(root)).not.toBeNull()
+  expect(io.mutateAsync["instance.renameWorld"]).toHaveBeenCalledTimes(1)
+  answer("New World")
+  await flush()
+  expect(field(root)).toBeNull()
+})
+
+it("a refused rename keeps the field and the typed text", async () => {
+  const root = await renaming()
+  io.mutateAsync["instance.renameWorld"].mockRejectedValue(
+    new Error("WORLD_NOT_RENAMED")
+  )
+  typeInto(field(root)!, "Season 2")
+  press(field(root)!, "Enter")
+  await flush()
+  expect(field(root)!.value).toBe("Season 2")
+  expect(field(root)!.disabled).toBe(false)
+  // The global handler tells the refusal.
+  expect(io.toastError).not.toHaveBeenCalled()
+})
+
+it("selecting another world closes an open name field", async () => {
+  const root = await renaming()
+  typeInto(field(root)!, "Season 2")
+  select(root, "Alpha")
+  await flush()
+  expect(field(root)).toBeNull()
+  expect(title(root)).toBe("Alpha")
+})
+
+it.each([
+  [
+    "while the game is busy",
+    world("Alpha", []),
+    BUSY,
+    "content:_trn_worlds.busy"
+  ],
+  [
+    "on a locked instance",
+    world("Alpha", []),
+    LOCKED,
+    "instances:_trn_locked_cannot_apply_changes"
+  ],
+  [
+    "for a world that cannot be read",
+    world("Alpha", [], null),
+    undefined,
+    "content:_trn_worlds.unreadable"
+  ]
+])("rename is disabled with the reason %s", async (_, w, details, reason) => {
+  const root = mount([w], { details })
+  await flush()
+  const pencil = one(root, "world-rename")!
+  expect(pencil.dataset.disabled).toBe("true")
+  expect(pencil.parentElement!.parentElement!.textContent).toBe(reason)
+  pencil.click()
+  await flush()
+  expect(field(root)).toBeNull()
+  expect(io.mutateAsync["instance.renameWorld"]).not.toHaveBeenCalled()
+})
+
+it("offers Rename as the pencil's tooltip", async () => {
+  const root = mount([world("Alpha", [])])
+  await flush()
+  const pencil = one(root, "world-rename")!
+  expect(pencil.dataset.disabled).toBe("false")
+  expect(pencil.parentElement!.parentElement!.textContent).toBe(
+    "content:_trn_worlds.rename"
+  )
 })
