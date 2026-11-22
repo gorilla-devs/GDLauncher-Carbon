@@ -2,9 +2,10 @@ import type { FEWorld } from "@gd/core_module/bindings"
 
 type Named = Pick<FEWorld, "name" | "title">
 
-/** What the player calls a world: its in-game name, else its folder name. */
+/** What the player calls a world: its in-game name, else (also for a name
+ *  of only spaces) its folder name. */
 export function worldLabel(world: Named): string {
-  return world.title || world.name
+  return world.title?.trim() ? world.title : world.name
 }
 
 export interface WorldName {

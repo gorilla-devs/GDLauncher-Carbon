@@ -11,7 +11,7 @@ import {
   sameDatapackProject
 } from "../../Worlds/datapackCopies"
 import { toastUpdateFailures } from "../../Worlds/updateFailures"
-import { labelOfFolder, worldLabel } from "@/utils/worldLabel"
+import { labelOfFolder, worldLabel, worldNames } from "@/utils/worldLabel"
 
 /** A world the core can copy a data pack into. */
 export type ReadableWorld = FEWorld & { identity: string }
@@ -60,13 +60,21 @@ export const useDatapackWorlds = (options: {
       (world): world is ReadableWorld => world.identity !== null
     )
 
-  /** The worlds holding a copy of the row's project, in the list's order. */
-  const holders = (row: Mod) =>
-    worldList()
+  /** The worlds holding a copy of the row's project, in the list's order;
+   *  a name two worlds share is followed by the folder. */
+  const holders = (row: Mod) => {
+    const names = worldNames(worldList())
+    return worldList()
       .filter((world) =>
         world.datapacks.some((pack) => sameDatapackProject(pack, row))
       )
-      .map(worldLabel)
+      .map((world) => {
+        const name = names.get(world.name)
+        return name?.folder
+          ? `${name.label} (${name.folder})`
+          : (name?.label ?? worldLabel(world))
+      })
+  }
 
   const copiesWithUpdate = (row: Mod) =>
     datapackCopies(worldList(), options.rows(), row).withUpdate

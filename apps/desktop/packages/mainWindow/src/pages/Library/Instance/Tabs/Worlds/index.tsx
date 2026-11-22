@@ -381,14 +381,19 @@ const Worlds = () => {
   }
 
   /** Follows a copy's task until it ends: its percent while it runs, the
-   *  copy selected when it is done, its failure told once. */
+   *  copy selected when it is done, its failure told once. `started` is a
+   *  copy this tab asked for. */
   const followCopy = (
     task: number,
     id: number,
-    copy: { source: string; name: string }
+    copy: { source: string; name: string },
+    started = false
   ) => {
     if (followedCopies.has(task) || endedCopies().has(task)) return
     followedCopies.add(task)
+    // A failure that came while the tab was closed is the failures panel's
+    // to tell: the tab tells only that of a copy it saw run.
+    let seenRunning = started
     // The copy is published only at its end, so the list read now lacks it.
     const folders = () =>
       worlds.data && new Set(worlds.data.map((world) => world.name))
@@ -417,6 +422,7 @@ const Worlds = () => {
       lastProgress = result.nextLastProgress
       const { action } = result
       before ??= folders()
+      if (outcome?.type === "Running") seenRunning = true
       if (action.kind === "progress")
         setCopyPercent({ task, percent: action.percent })
       else if (action.kind === "completed") {
@@ -440,6 +446,10 @@ const Worlds = () => {
         // The refusal of a real failure; an end that cannot be read (the
         // core restarted) is no addon change, so it is told as a copy.
         const failed = outcome?.type === "Failed"
+        if (failed && !seenRunning) {
+          void refetchAll()
+          return
+        }
         toast.error(
           (failed && action.message) ||
             t("instances:_trn_duplicate_failed", {
@@ -500,7 +510,7 @@ const Worlds = () => {
       if (starting() === start) {
         if (isCurrent(id) && !endedCopies().has(task)) {
           setStarting({ ...start, task })
-          followCopy(task, id, { source: world.name, name })
+          followCopy(task, id, { source: world.name, name }, true)
         } else setStarting(undefined)
       }
       // Already named by the query: it holds the world from now on.
@@ -598,9 +608,10 @@ const Worlds = () => {
           runningCopy() && {
             source: runningCopy()!.source,
             name: runningCopy()!.name,
+            // Copied files are still synced and published after 100%.
             percent:
               copyPercent()?.task === runningCopy()!.task
-                ? copyPercent()!.percent
+                ? Math.min(copyPercent()!.percent, 99)
                 : null,
             onCancel: () => cancelWorldCopy.mutate(instanceId())
           }

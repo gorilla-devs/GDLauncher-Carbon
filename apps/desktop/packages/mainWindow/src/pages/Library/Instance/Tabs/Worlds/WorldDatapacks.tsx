@@ -141,6 +141,8 @@ const UpdateCell = (props: {
 
 const WorldDatapacks = (props: WorldDatapacksProps) => {
   const readable = () => props.world.identity !== null
+  // The copy is given a new name, so its old one must be readable.
+  const copyable = () => readable() && props.world.title !== null
   const downloaded = () =>
     !!(props.worldRow?.curseforge || props.worldRow?.modrinth)
   // Changes to this world wait for its copy; `blocked` says its own reason.
@@ -168,10 +170,10 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
           label={<Trans key="instances:_trn_action_duplicate" />}
           onClick={props.actions.duplicate}
           // One copy per instance at a time.
-          disabled={!!props.blocked || !readable() || props.copyRunning}
+          disabled={!!props.blocked || !copyable() || props.copyRunning}
           blocked={props.blocked}
           reason={
-            !readable() ? (
+            !copyable() ? (
               <Trans key="content:_trn_worlds.unreadable" />
             ) : props.beingCopied ? (
               <BeingCopiedText />

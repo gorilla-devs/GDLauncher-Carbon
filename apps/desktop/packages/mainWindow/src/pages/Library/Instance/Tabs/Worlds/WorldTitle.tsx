@@ -27,7 +27,9 @@ export interface WorldTitleProps {
  *  differ, and its inline rename. */
 const WorldTitle = (props: WorldTitleProps) => {
   const label = () => worldLabel(props.world)
-  const unreadable = () => props.world.identity === null
+  // A name that cannot be read cannot be replaced either.
+  const unreadable = () =>
+    props.world.identity === null || props.world.title === null
   const renameDisabled = () =>
     !!props.blocked || unreadable() || props.reason !== undefined
 

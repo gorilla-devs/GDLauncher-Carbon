@@ -195,11 +195,13 @@ const pack = (
 })
 const known = (id: string, project: string, has_update = false) =>
   pack(id, { name: `Pack ${id}`, modrinth: modrinth(project), has_update })
+/** A world named as its folder unless `titled` says otherwise; `null` is a
+ *  world whose name cannot be read. */
 const world = (
   name: string,
   datapacks: FEWorldDatapack[],
   identity: string | null = name,
-  titled: string | null = null
+  titled: string | null = name
 ): FEWorld => ({
   name,
   title: titled,
@@ -1184,6 +1186,23 @@ it.each([
   expect(io.mutateAsync["instance.renameWorld"]).not.toHaveBeenCalled()
 })
 
+it("rename and duplicate are disabled for a world whose name cannot be read", async () => {
+  const root = mount([world("Alpha", [], "id-alpha", null)])
+  await flush()
+  for (const id of ["world-rename", "world-duplicate"]) {
+    const action = one(root, id)!
+    expect(action.dataset.disabled, id).toBe("true")
+    expect(tooltip(action), id).toBe("content:_trn_worlds.unreadable")
+    action.click()
+  }
+  await flush()
+  expect(field(root)).toBeNull()
+  expect(io.mutateAsync["instance.renameWorld"]).not.toHaveBeenCalled()
+  expect(io.mutateAsync["instance.duplicateWorld"]).not.toHaveBeenCalled()
+  // Its packs are still listed: the world itself can be read.
+  expect(one(root, "world-unreadable")).toBeNull()
+})
+
 it("offers Rename as the pencil's tooltip", async () => {
   const root = mount([world("Alpha", [])])
   await flush()
@@ -1527,9 +1546,17 @@ it("a copy whose end cannot be read says the copy failed and reads the lists aga
 })
 
 it("a failed copy shows its refusal once and is dismissed", async () => {
-  copyOutcome(copyFailed("WORLD_CHANGED_WHILE_COPIED"))
-  const root = mount([world("Home", [])], { copy: COPY })
-  await flush()
+  vi.useFakeTimers()
+  let root!: HTMLElement
+  try {
+    copyOutcome(copying(0.5))
+    root = mount([world("Home", [])], { copy: COPY })
+    await flush()
+    copyOutcome(copyFailed("WORLD_CHANGED_WHILE_COPIED"))
+    await vi.advanceTimersByTimeAsync(600)
+  } finally {
+    vi.useRealTimers()
+  }
   await flush()
   expect(io.toastError).toHaveBeenCalledExactlyOnceWith(
     "content:_trn_worlds.refusal.changed_while_copied"
@@ -1542,6 +1569,44 @@ it("a failed copy shows its refusal once and is dismissed", async () => {
   await flush()
   expect(io.toastError).toHaveBeenCalledTimes(1)
   expect(io.toastSuccess).not.toHaveBeenCalled()
+})
+
+it("a failed copy of its own start is told without a running poll", async () => {
+  const root = mount([world("Alpha", []), world("home", [], "id-home", "Home")])
+  await flush()
+  select(root, "Home")
+  await flush()
+  copyOutcome(copyFailed("WORLD_CHANGED_WHILE_COPIED"))
+  io.mutateAsync["instance.duplicateWorld"].mockResolvedValue(7)
+  one(root, "world-duplicate")!.click()
+  await flush()
+  await flush()
+  expect(io.toastError).toHaveBeenCalledExactlyOnceWith(
+    "content:_trn_worlds.refusal.changed_while_copied"
+  )
+  expect(io.mutate["vtask.dismissTask"]).toHaveBeenCalledExactlyOnceWith(7)
+})
+
+it("a copy that failed before the tab saw it run is left to the failures panel", async () => {
+  copyOutcome(copyFailed("WORLD_CHANGED_WHILE_COPIED"))
+  const root = mount([world("Home", [])], { copy: COPY })
+  await flush()
+  await flush()
+  expect(io.toastError).not.toHaveBeenCalled()
+  expect(io.mutate["vtask.dismissTask"]).not.toHaveBeenCalled()
+  expect(io.refetchWorlds).toHaveBeenCalled()
+  expect(one(root, "world-copy")).toBeNull()
+})
+
+it("a copy whose files are all copied reads 99% until it is published", async () => {
+  copyOutcome(copying(1))
+  const root = mount([world("Home", [])], { copy: COPY })
+  await flush()
+  await flush()
+  expect(one(root, "world-copy")!.textContent).toContain(
+    "content:_trn_worlds.copying(99)"
+  )
+  expect(one(root, "progress")!.dataset.value).toBe("99")
 })
 
 it("a cancelled copy shows nothing", async () => {

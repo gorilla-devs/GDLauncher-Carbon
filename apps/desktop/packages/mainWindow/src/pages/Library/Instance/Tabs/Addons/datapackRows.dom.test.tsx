@@ -372,6 +372,31 @@ it("names the worlds of a data pack and of the Add to a world menu by their in-g
   )
 })
 
+it("tells apart two worlds with one name under a data pack by their folders", async () => {
+  const root = mount(
+    [row("terralith", { modrinth: modrinth("TL") })],
+    [
+      world(
+        "Survival",
+        [pack("a", { modrinth: modrinth("TL") })],
+        "id-a",
+        "Survival"
+      ),
+      world(
+        "Survival (2)",
+        [pack("b", { modrinth: modrinth("TL") })],
+        "id-b",
+        "Survival"
+      ),
+      world("Creative", [pack("c", { modrinth: modrinth("TL") })], "id-c")
+    ]
+  )
+  await flush()
+  expect(rowOf(root, "terralith").firstElementChild!.textContent).toContain(
+    "terralith.zipSurvival (Survival), Survival (Survival (2)), Creative"
+  )
+})
+
 it("asks about replacing in a world by its in-game name", async () => {
   mutation("instance.copyDatapack").mockRejectedValueOnce(
     coded("ALREADY_IN_WORLD", { filenames: ["old.zip"] })

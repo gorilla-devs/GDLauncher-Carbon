@@ -13,6 +13,9 @@ describe("worldLabel", () => {
   it("is the folder name for an empty in-game name", () => {
     expect(worldLabel(world("Creative", ""))).toBe("Creative")
   })
+  it("is the folder name for an in-game name of only spaces", () => {
+    expect(worldLabel(world("Creative", "  \t "))).toBe("Creative")
+  })
 })
 
 describe("worldNames", () => {
