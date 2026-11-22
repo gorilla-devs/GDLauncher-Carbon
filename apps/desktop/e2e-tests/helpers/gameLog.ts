@@ -18,7 +18,7 @@
 
 import fs from "node:fs"
 import path from "node:path"
-import { expect } from "@playwright/test"
+import { expect, type TestInfo } from "@playwright/test"
 
 /** Matches one log4j event's message payload, including multi-line ones —
  *  the launcher pretty-prints Rust structs across a dozen lines inside a
@@ -240,4 +240,30 @@ export async function waitForLogQuiescence(
     `the game log under ${logsDir} never stopped growing within ` +
       `${LOG_QUIESCENCE_TIMEOUT}ms — the client never finished loading`
   ).toBeGreaterThanOrEqual(LOG_QUIESCENCE_HOLD_MS)
+}
+
+/**
+ * Attaches the game's own per-launch log to the Playwright report on a
+ * failing run — the game-log analogue of `attachCoreLogOnFailure`, which
+ * only ever covers the core's own tracing log, never the game's. Added
+ * because `stopHarness` deletes the whole runtime path, including
+ * `instances/<shortpath>/logs/`, before any failure diagnosis gets a chance
+ * to read it otherwise — a real gap hit live investigating why the launch
+ * leg's quiescence reading turned out to be premature on one run, with no
+ * way afterward to confirm how far the client actually got.
+ */
+export async function attachGameLogOnFailure(
+  testInfo: TestInfo,
+  runtimePath: string,
+  shortpathToAttach: string | undefined
+): Promise<void> {
+  if (testInfo.status === testInfo.expectedStatus) return
+  if (!shortpathToAttach) return
+
+  const logFile = newestLogFile(instanceLogsDir(runtimePath, shortpathToAttach))
+  if (!logFile) return
+
+  await testInfo
+    .attach("game-log", { path: logFile, contentType: "text/plain" })
+    .catch(() => {})
 }

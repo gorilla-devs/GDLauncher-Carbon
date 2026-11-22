@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
-import { expect, test, type TestInfo } from "@playwright/test"
+import { expect, test } from "@playwright/test"
 import type { ElectronApplication, Page } from "playwright"
 import {
   attachCoreLogOnFailure,
@@ -23,6 +23,7 @@ import {
 import { readInstallAudit } from "./helpers/installAudit.js"
 import { diffTrees, snapshotTree } from "./helpers/instanceTree.js"
 import {
+  attachGameLogOnFailure,
   countMatchedMarkers,
   findFatalSignature,
   instanceLogsDir,
@@ -246,32 +247,6 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
  *      `packinfo.json` at all. Same root cause as the predicted message,
  *      surfacing at the earliest read of the file this test happens to make.
  */
-
-/**
- * Attaches the game's own per-launch log to the Playwright report on a
- * failing run — the game-log analogue of `attachCoreLogOnFailure`, which
- * only ever covers the core's own tracing log, never the game's. Added
- * because `stopHarness` deletes the whole runtime path, including
- * `instances/<shortpath>/logs/`, before any failure diagnosis gets a chance
- * to read it otherwise — a real gap hit live investigating why the launch
- * leg's quiescence reading turned out to be premature on one run, with no
- * way afterward to confirm how far the client actually got.
- */
-async function attachGameLogOnFailure(
-  testInfo: TestInfo,
-  runtimePath: string,
-  shortpathToAttach: string | undefined
-): Promise<void> {
-  if (testInfo.status === testInfo.expectedStatus) return
-  if (!shortpathToAttach) return
-
-  const logFile = newestLogFile(instanceLogsDir(runtimePath, shortpathToAttach))
-  if (!logFile) return
-
-  await testInfo
-    .attach("game-log", { path: logFile, contentType: "text/plain" })
-    .catch(() => {})
-}
 
 test.describe("modpack lifecycle", () => {
   // eslint-disable-next-line no-empty-pattern

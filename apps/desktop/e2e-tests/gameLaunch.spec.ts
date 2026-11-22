@@ -71,6 +71,7 @@ import {
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import {
+  attachGameLogOnFailure,
   countMatchedMarkers,
   findFatalSignature,
   instanceLogsDir,
@@ -111,6 +112,8 @@ test.describe("game launch", () => {
      *  here because `finally` is a different block scope from `try`, and
      *  teardown needs it to tell "still running" from "already died". */
     let closedBeforeLaunch = 0
+    /** The instance's folder, for the game's own log on a failure. */
+    let shortpath: string | undefined
 
     /** Counted rather than searched for: `change_launch_state`
      *  (`run/mod.rs`) prints GAME_CLOSED on every transition to Inactive,
@@ -140,6 +143,7 @@ test.describe("game launch", () => {
         })
 
         const row = readInstanceByName(harness.runtimePath, INSTANCE_NAME)
+        shortpath = row.shortpath
         const logsDir = instanceLogsDir(harness.runtimePath, row.shortpath)
         closedBeforeLaunch = closedCount()
 
@@ -225,6 +229,7 @@ test.describe("game launch", () => {
             )
           }
           await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+          await attachGameLogOnFailure(testInfo, harness.runtimePath, shortpath)
           await current.app.close()
         }
         await stopHarness(harness)

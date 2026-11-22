@@ -58,6 +58,7 @@ import {
   LAUNCH_TIMEOUT
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
+import { attachGameLogOnFailure } from "./helpers/gameLog.js"
 import {
   isPidAlive,
   killProcessTree,
@@ -119,6 +120,8 @@ test.describe("running game outlives the launcher", () => {
       stdout: string[]
     } | null = null
     let gamePid: number | undefined
+    /** The instance's folder, for the game's own log on a failure. */
+    let shortpath: string | undefined
 
     try {
       current = await launchApp(launchOpts)
@@ -137,6 +140,7 @@ test.describe("running game outlives the launcher", () => {
       })
 
       const row = readInstanceByName(harness.runtimePath, INSTANCE_NAME)
+      shortpath = row.shortpath
       const pidFile = path.join(
         harness.runtimePath,
         "instances",
@@ -205,6 +209,7 @@ test.describe("running game outlives the launcher", () => {
       ).toBe(true)
     } finally {
       await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+      await attachGameLogOnFailure(testInfo, harness.runtimePath, shortpath)
       if (current) {
         // `app.close()` never returns while the app still owns a running
         // game, and bounding it alone leaves a launcher the next spec trips on.
