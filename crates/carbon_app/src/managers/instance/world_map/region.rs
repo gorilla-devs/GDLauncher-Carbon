@@ -198,8 +198,8 @@ fn inflate_into(mut reader: impl Read, cap: usize, out: &mut Vec<u8>) -> bool {
 #[cfg(test)]
 pub(super) mod test {
     use super::*;
-    use flate2::write::{GzEncoder, ZlibEncoder};
     use flate2::Compression;
+    use flate2::write::{GzEncoder, ZlibEncoder};
     use std::io::Write;
 
     pub(in super::super) fn zlib(data: &[u8]) -> Vec<u8> {
@@ -420,9 +420,11 @@ pub(super) mod test {
         assert!(Region::read(&short).unwrap().is_none());
 
         assert!(Region::read(dir.path()).unwrap().is_none());
-        assert!(Region::read(&dir.path().join("missing.mca"))
-            .unwrap()
-            .is_none());
+        assert!(
+            Region::read(&dir.path().join("missing.mca"))
+                .unwrap()
+                .is_none()
+        );
 
         let real = dir.path().join("r.0.0.mca");
         std::fs::write(&real, region_bytes(&[(0, 0, 2, zlib(NBT))])).unwrap();
