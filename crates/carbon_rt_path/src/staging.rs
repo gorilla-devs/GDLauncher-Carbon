@@ -277,6 +277,19 @@ mod tests {
         assert!(instances.join("kept/instance").is_dir());
     }
 
+    #[tokio::test]
+    async fn start_up_keeps_the_world_maps() {
+        let data = data_folder("world-maps");
+        let maps = data.get_world_maps();
+        assert!(!maps.starts_with(data.get_temp().to_path()));
+        std::fs::create_dir_all(maps.join("1/77")).unwrap();
+        std::fs::write(maps.join("1/77/0.0.aa.png"), b"png").unwrap();
+
+        data.cleanup_staging().await;
+
+        assert_eq!(std::fs::read(maps.join("1/77/0.0.aa.png")).unwrap(), b"png");
+    }
+
     /// A link named like the staging folder is someone else's: what it leads
     /// to is not ours to empty.
     #[cfg(unix)]

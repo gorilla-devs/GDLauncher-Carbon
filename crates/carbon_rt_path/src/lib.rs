@@ -547,6 +547,11 @@ impl RuntimePath {
         TempPath(self.0.join("temp"))
     }
 
+    /// Finished pieces of world maps. Kept across restarts, unlike `temp`.
+    pub fn get_world_maps(&self) -> PathBuf {
+        self.0.join("world_maps")
+    }
+
     pub fn get_download(&self) -> DownloadPath {
         DownloadPath(self.0.join("download"))
     }

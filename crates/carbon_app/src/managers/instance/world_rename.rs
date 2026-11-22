@@ -83,6 +83,17 @@ impl ManagerRef<'_, InstanceManager> {
         let operation = self.lock_instance(id).await;
         let renamed = self.rename_world_gated(id, &request).await;
         drop(operation);
+        // The map kept under the folder the world left would never be asked for again.
+        let now_in = match &renamed {
+            Ok(folder) => Some(folder),
+            Err(error) => match error.downcast_ref::<WorldRefusal>() {
+                Some(WorldRefusal::RenameIncomplete { folder }) => Some(folder),
+                _ => None,
+            },
+        };
+        if now_in.is_some_and(|folder| *folder != request.world) {
+            self.forget_world_map(id, request.world.clone());
+        }
         match &renamed {
             Ok(_) => self.refresh_worlds(id, "a rename").await,
             Err(error)
@@ -539,6 +550,27 @@ mod tests {
             row.metadata_id,
             cache.ensure_mod_metadata(&parsed, &folder).await.unwrap()
         );
+    }
+
+    /// The map kept under the folder a world left goes; that of a world beside it stays.
+    #[tokio::test]
+    async fn a_renamed_world_loses_the_map_kept_under_its_old_folder() {
+        use crate::managers::instance::mods::tests::add_world_row;
+        use crate::managers::instance::world_map::store::{forgotten_soon, test_piece};
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves, world) = world_instance(&app, "rename-map", "New World", None).await;
+        add_world_row(&app, id, &saves, "Other").await;
+        let store = app.instance_manager().world_map_store();
+        for name in ["New World", "Other"] {
+            store.put(&test_piece(id, name), b"png").unwrap();
+            assert!(store.get(&test_piece(id, name)).is_some());
+        }
+
+        let folder = rename(&app, request(id, &world, "Skyblock")).await.unwrap();
+
+        assert_eq!(folder, "Skyblock");
+        assert!(forgotten_soon(&store, &test_piece(id, "New World")).await);
+        assert!(store.get(&test_piece(id, "Other")).is_some());
     }
 
     #[tokio::test]

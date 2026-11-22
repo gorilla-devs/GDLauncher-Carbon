@@ -136,6 +136,8 @@ pub struct InstanceManager {
     /// repair preview. In-memory only: a restart clears it, same as every
     /// other manager cache in this struct.
     pub(crate) origin_checks: RwLock<HashMap<InstanceId, modpack::origin_check::OriginResults>>,
+    /// Finished map pieces, made on first use (see `world_map_store`).
+    world_map_store: std::sync::OnceLock<Arc<world_map::store::Store>>,
 }
 
 /// Keeps a per-ID gate stable for every holder and queued waiter. Retire an
@@ -322,6 +324,7 @@ impl InstanceManager {
             hook_tests: Default::default(),
             addon_retry_receipts: Default::default(),
             addon_graphs: Default::default(),
+            world_map_store: Default::default(),
         }
     }
 }

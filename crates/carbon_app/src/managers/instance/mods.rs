@@ -664,12 +664,18 @@ impl ManagerRef<'_, InstanceManager> {
         self.test_hooks.pause("addon_removed", instance_id).await;
 
         for ((index, plan), removed) in indexes.into_iter().zip(plans).zip(removed) {
+            let world = plan.is_world().then(|| plan.filename().to_owned());
             let outcome = match removed {
                 Ok(()) => plan.finish(&self.app.db, || async {}).await,
                 Err(error) => Err(error),
             };
             results[index].1 = match outcome {
-                Ok(super::addon_retry::Outcome::Done) => Ok(None),
+                Ok(super::addon_retry::Outcome::Done) => {
+                    if let Some(world) = world {
+                        self.forget_world_map(instance_id, world);
+                    }
+                    Ok(None)
+                }
                 Ok(super::addon_retry::Outcome::KeptTwin(twin)) => {
                     // The row now shows the copy that stayed. Read its own
                     // name, version and size now, under the gate: the queued
@@ -1828,6 +1834,66 @@ pub(crate) mod tests {
             .unwrap()
             .unwrap();
         (instance_id, row, path)
+    }
+
+    /// Adds the save `folder` beside the worlds of `id`, with its row, as a scan would.
+    pub(crate) async fn add_world_row(
+        app: &Arc<AppInner>,
+        id: InstanceId,
+        saves: &std::path::Path,
+        folder: &str,
+    ) -> mfcdb::ModFileCacheRow {
+        let world = saves.join(folder);
+        std::fs::create_dir_all(&world).unwrap();
+        std::fs::write(
+            world.join("level.dat"),
+            crate::managers::instance::world_level::level_dat_bytes(None),
+        )
+        .unwrap();
+        {
+            let operation = app.instance_manager().lock_instance(id).await;
+            app.meta_cache_manager()
+                .refresh_published_addon(
+                    &operation,
+                    &saves.to_path_buf(),
+                    folder.to_owned(),
+                    true,
+                    AddonType::Worlds.to_db_string().to_owned(),
+                )
+                .await
+                .unwrap();
+        }
+        mfcdb::get_mod_file_cache_by_instance_filename(&app.db, *id, folder)
+            .await
+            .unwrap()
+            .unwrap()
+    }
+
+    /// A deleted world's kept map goes with it; the map of a world beside it stays.
+    #[tokio::test]
+    async fn a_deleted_world_loses_its_kept_map() {
+        use crate::managers::instance::world_map::store::{forgotten_soon, test_piece};
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, world) = addon_fixture(
+            &app,
+            "world-map-delete",
+            AddonType::Worlds,
+            "World",
+            b"level",
+        )
+        .await;
+        add_world_row(&app, id, world.parent().unwrap(), "Other").await;
+        let store = app.instance_manager().world_map_store();
+        for name in ["World", "Other"] {
+            store.put(&test_piece(id, name), b"png").unwrap();
+            assert!(store.get(&test_piece(id, name)).is_some());
+        }
+
+        app.instance_manager().delete_mod(id, row.id).await.unwrap();
+
+        assert!(!world.exists());
+        assert!(forgotten_soon(&store, &test_piece(id, "World")).await);
+        assert!(store.get(&test_piece(id, "Other")).is_some());
     }
 
     /// A failed or cancelled version-only install keeps its setup until that

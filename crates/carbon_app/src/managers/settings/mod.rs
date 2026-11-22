@@ -262,7 +262,7 @@ impl ManagerRef<'_, SettingsManager> {
 
     /// Returns the per-scope cache footprint that the cleanup modal exposes:
     /// `gdlauncher` mirrors what the GDLauncher-cache wipe targets (DB files
-    /// + temp/ + __gdl_logs__/); `minecraft` mirrors the Minecraft-cache wipe (assets/ +
+    /// + temp/ + world_maps/ + __gdl_logs__/); `minecraft` mirrors the Minecraft-cache wipe (assets/ +
     /// libraries/ + natives/). Both numbers walk their dirs once on a
     /// blocking thread, so callers should treat this as moderately
     /// expensive — the Settings row and the cleanup modal share the same
@@ -274,6 +274,7 @@ impl ManagerRef<'_, SettingsManager> {
             let gdlauncher = file_len(&runtime_path.join("gdl_conf.db"))
                 + file_len(&runtime_path.join("gdl_conf.db-wal"))
                 + dir_size_blocking(runtime_path.get_temp().to_path())
+                + dir_size_blocking(runtime_path.get_world_maps())
                 + dir_size_blocking(runtime_path.join("__gdl_logs__"));
             let minecraft = dir_size_blocking(runtime_path.get_assets().to_path())
                 + dir_size_blocking(runtime_path.get_libraries().to_path())
@@ -293,7 +294,8 @@ impl ManagerRef<'_, SettingsManager> {
     /// Two-tier cleanup. Spawns a background task that:
     ///
     /// 1. If `gdlauncher`: clears the cache tables, except the version
-    ///    metadata a launch needs offline, wipes `temp/` and `__gdl_logs__/`,
+    ///    metadata a launch needs offline, wipes `temp/`, `world_maps/` and
+    ///    `__gdl_logs__/`,
     ///    then VACUUMs.
     /// 2. If `minecraft`: also wipes `assets/`, `libraries/`, `natives/` —
     ///    these are big and opt-in; the next launch re-downloads them and
@@ -365,6 +367,10 @@ impl ManagerRef<'_, SettingsManager> {
 
             let result =
                 run_cache_cleanup(&app.db, &runtime_path, &selection, work, vacuum_subtask).await;
+            if selection.gdlauncher {
+                // The kept world maps were emptied under the store's count.
+                app.instance_manager().world_map_store().forget_all();
+            }
             // Partial changes are real changes: refresh sizes on every outcome.
             app.invalidate(GET_DB_SIZE, None);
             app.invalidate(GET_CACHE_SIZES, None);
@@ -471,6 +477,7 @@ async fn run_cache_cleanup(
     let mut paths = Vec::new();
     if selection.gdlauncher {
         paths.push(runtime.get_temp().to_path());
+        paths.push(runtime.get_world_maps());
     }
     if selection.minecraft {
         paths.extend([
@@ -1020,6 +1027,55 @@ mod tests {
             assert!(!nested.exists(), "the emptied folder is removed");
             assert_eq!(progress.load(Ordering::Relaxed), 4);
         }
+    }
+
+    /// The kept world maps are a launcher cache: counted with the others and emptied with
+    /// them, after which the store counts again from what is there.
+    #[tokio::test]
+    async fn kept_world_maps_are_counted_and_emptied_with_the_launcher_caches() {
+        use crate::domain::instance::InstanceId;
+        use crate::managers::instance::world_map::store::PieceKey;
+        let app = crate::setup_managers_for_test().await;
+        let store = app.instance_manager().world_map_store();
+        let key = PieceKey {
+            instance: InstanceId(1),
+            world: "World",
+            dimension: "minecraft:overworld",
+            scale: 0,
+            x: 0,
+            z: 0,
+            revision: "aa11",
+        };
+        const BYTES: usize = 3 * 1024 * 1024;
+        let before = app.settings_manager().get_cache_sizes().await;
+
+        store.put(&key, &vec![1; BYTES]).unwrap();
+        let kept = app.settings_manager().get_cache_sizes().await;
+        assert!(
+            kept.gdlauncher >= before.gdlauncher + BYTES as f64,
+            "{} then {}",
+            before.gdlauncher,
+            kept.gdlauncher
+        );
+        assert_eq!(kept.minecraft, before.minecraft);
+        assert!(store.counted_bytes().is_some());
+
+        let task_id = app
+            .settings_manager()
+            .cleanup_caches(CacheCleanupSelection {
+                gdlauncher: true,
+                minecraft: false,
+            })
+            .await
+            .unwrap();
+        wait_for_task(&app, task_id).await;
+
+        assert_eq!(store.get(&key), None);
+        assert_eq!(
+            dir_size_blocking(app.settings_manager().runtime_path.get_world_maps()),
+            0
+        );
+        assert_eq!(store.counted_bytes(), None);
     }
 }
 

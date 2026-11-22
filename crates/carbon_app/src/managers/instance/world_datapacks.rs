@@ -343,7 +343,7 @@ impl ManagerRef<'_, InstanceManager> {
         // Not announced: this answer already holds what it changed, and an
         // invalidation would only make the frontend ask again. Packs it finds
         // are asked about as those of a background scan are.
-        match self
+        let scanned = match self
             .scan_world_datapacks_unannounced(instance_id, || {})
             .await
         {
@@ -352,13 +352,17 @@ impl ManagerRef<'_, InstanceManager> {
                     .meta_cache_manager()
                     .queue_platform_passes(CacheEntityId::Instance(instance_id))
                     .await;
+                true
             }
-            Ok(false) => {}
-            Err(error) => warn!(
-                ?error,
-                "Instance {instance_id}: could not scan the data packs in its worlds before listing them"
-            ),
-        }
+            Ok(false) => true,
+            Err(error) => {
+                warn!(
+                    ?error,
+                    "Instance {instance_id}: could not scan the data packs in its worlds before listing them"
+                );
+                false
+            }
+        };
 
         let config = {
             let instances = self.instances.read().await;
@@ -442,6 +446,12 @@ impl ManagerRef<'_, InstanceManager> {
             });
         }
         worlds.sort_by_cached_key(|world| world.name.to_lowercase());
+        // Only a list read from a readable `saves` says which worlds are gone.
+        if scanned && saves.is_some() {
+            let mut existing: Vec<String> = worlds.iter().map(|world| world.name.clone()).collect();
+            existing.extend(self.world_copy(instance_id).map(|copy| copy.source));
+            self.forget_maps_of_missing_worlds(instance_id, existing);
+        }
         Ok(worlds)
     }
 
@@ -666,6 +676,35 @@ mod tests {
             .scan_world_datapacks(id)
             .await
             .unwrap()
+    }
+
+    /// Listing the worlds drops the maps kept for worlds that are no longer there, but
+    /// not while the `saves` folder cannot be read: its worlds may be there all the same.
+    #[tokio::test]
+    async fn listing_forgets_the_maps_of_worlds_that_are_gone() {
+        use crate::managers::instance::mods::tests::add_world_row;
+        use crate::managers::instance::world_map::store::{forgotten_soon, test_piece};
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves) = instance_with_world(&app, "world-map-listing", "World").await;
+        add_world_row(&app, id, &saves, "World").await;
+        app.instance_manager().list_worlds(id).await.unwrap();
+        let store = app.instance_manager().world_map_store();
+        for name in ["World", "Gone"] {
+            store.put(&test_piece(id, name), b"png").unwrap();
+        }
+
+        let moved = saves.with_file_name("saves-away");
+        std::fs::rename(&saves, &moved).unwrap();
+        std::fs::write(&saves, b"not a folder").unwrap();
+        app.instance_manager().list_worlds(id).await.unwrap();
+        tokio::time::sleep(std::time::Duration::from_millis(300)).await;
+        assert!(store.get(&test_piece(id, "Gone")).is_some());
+
+        std::fs::remove_file(&saves).unwrap();
+        std::fs::rename(&moved, &saves).unwrap();
+        app.instance_manager().list_worlds(id).await.unwrap();
+        assert!(forgotten_soon(&store, &test_piece(id, "Gone")).await);
+        assert!(store.get(&test_piece(id, "World")).is_some());
     }
 
     #[tokio::test]
