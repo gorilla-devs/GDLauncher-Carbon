@@ -161,7 +161,6 @@ fn facts_of(world: &Path) -> WorldMap {
 /// The region folder of `dimension`, when the world lists it: the folder its regions were
 /// listed from. Looked up in the listing itself, so an id is never joined onto a path and
 /// the two cannot disagree (a case-insensitive file system answering `dim7` for `DIM7`).
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn dimension_folder(world: &Path, dimension: &str) -> Option<PathBuf> {
     listed_folders(world)
         .into_iter()
@@ -340,6 +339,21 @@ fn region_entries(folder: &Path) -> impl Iterator<Item = ((i32, i32), Stamp)> {
         })
 }
 
+/// The file of the region at `(x, z)` in the region folder `folder`.
+pub(super) fn region_file(folder: &Path, x: i32, z: i32) -> PathBuf {
+    folder.join(format!("r.{x}.{z}.mca"))
+}
+
+/// The revision of the region at `(x, z)` in `folder` as the listing gives it, asked of that
+/// file and the one to its north alone; `None` when the listing would leave the region out.
+pub(super) fn region_revision_at(folder: &Path, x: i32, z: i32) -> Option<String> {
+    let own = stamp(&region_file(folder, x, z)).filter(|own| own.size >= MIN_REGION_SIZE)?;
+    let north = z
+        .checked_sub(1)
+        .and_then(|north| stamp(&region_file(folder, x, north)));
+    Some(region_revision(&own, north.as_ref()))
+}
+
 /// The place of a region file by its name, only as the game writes it (`r.5.0.mca`, never
 /// `r.+5.0.mca` or `r.05.0.mca`).
 fn region_name(name: &str) -> Option<(i32, i32)> {
@@ -380,11 +394,16 @@ fn dimension(id: String, folder: &Path) -> Option<MapDimension> {
         digest.update(format!("{},{}:{};", region.x, region.z, region.revision));
     }
     Some(MapDimension {
-        ceiling: id == NETHER,
+        ceiling: has_ceiling(&id),
         id,
         revision: short_hex(digest),
         regions,
     })
+}
+
+/// Whether the dimension `id` is known to have a roof over what is to be mapped.
+pub(super) fn has_ceiling(id: &str) -> bool {
+    id == NETHER
 }
 
 /// The revision of a region from its own stamp and that of `r.<x>.<z-1>.mca`, the region to
@@ -399,7 +418,8 @@ pub(super) fn region_revision(own: &Stamp, north: Option<&Stamp>) -> String {
     short_hex(digest)
 }
 
-fn short_hex(digest: Sha256) -> String {
+/// The first eight bytes of `digest` in hex: a revision.
+pub(super) fn short_hex(digest: Sha256) -> String {
     hex::encode(&digest.finalize()[..8])
 }
 

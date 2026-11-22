@@ -49,7 +49,6 @@ impl LegacyIds {
     /// From the uncompressed NBT of the world's `level.dat`: Forge's list of 1.12
     /// (`FML.Registries`) or of 1.7 to 1.11 (`FML.ItemData`). Input that cannot be read may
     /// hold a list, so it is not taken for a world without one.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn from_level_dat(level_nbt: &[u8]) -> LegacyIds {
         let list = match nbt::read_keeping(level_nbt, &keep, LIMITS) {
             Err(_) => List::Untrusted,

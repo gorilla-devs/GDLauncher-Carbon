@@ -1317,9 +1317,58 @@ pub(super) fn mount_axum_router() -> axum::Router<Arc<AppInner>> {
                 }
             )
         )
+        .route("/worldMapPiece", axum::routing::get(world_map_piece))
         .route("/log", axum::routing::get(log::log_handler))
         .route("/shareInstance", axum::routing::get(share_instance))
         .route("/importShareInstance", axum::routing::get(import_share_instance))
+}
+
+#[derive(Deserialize)]
+struct WorldMapPieceQuery {
+    instance_id: i32,
+    world: String,
+    dimension: String,
+    scale: u32,
+    x: i32,
+    z: i32,
+    rev: String,
+}
+
+/// One piece of a world's map as a PNG. Its address changes whenever the piece does, so the
+/// desktop may keep it for good.
+async fn world_map_piece(
+    State(app): State<Arc<AppInner>>,
+    Query(query): Query<WorldMapPieceQuery>,
+) -> Result<axum::response::Response, AxumError> {
+    let request = manager::world_map::service::PieceRequest {
+        instance_id: query.instance_id,
+        world: query.world,
+        dimension: query.dimension,
+        // Any scale above the largest is nothing, however large.
+        scale: u8::try_from(query.scale).unwrap_or(u8::MAX),
+        x: query.x,
+        z: query.z,
+        rev: query.rev,
+    };
+    let piece = app
+        .instance_manager()
+        .world_map_piece(request)
+        .await
+        .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
+    Ok(match piece {
+        Some(png) => (
+            [
+                (axum::http::header::CONTENT_TYPE, "image/png"),
+                (
+                    axum::http::header::CACHE_CONTROL,
+                    "private, max-age=31536000, immutable",
+                ),
+            ],
+            png,
+        )
+            .into_response(),
+        None => StatusCode::NO_CONTENT.into_response(),
+    })
 }
 
 #[derive(Type, Copy, Clone, Debug, Serialize, Deserialize)]
@@ -3794,6 +3843,59 @@ impl From<manager::KeptAddonCopy> for FEKeptAddonCopy {
             deleted: value.deleted,
             kept: value.kept,
         }
+    }
+}
+
+#[cfg(test)]
+mod world_map_piece_route_tests {
+    use super::*;
+    use crate::managers::instance::world_map::service::test_world;
+
+    async fn answer(app: &App, query: &str) -> axum::response::Response {
+        let uri: axum::http::Uri = format!("/worldMapPiece?{query}").parse().unwrap();
+        let query = Query::try_from_uri(&uri).unwrap();
+        world_map_piece(State(app.clone()), query)
+            .await
+            .into_response()
+    }
+
+    #[tokio::test]
+    async fn a_piece_is_a_png_kept_for_good_and_nothing_is_no_content() {
+        let app = crate::setup_managers_for_test().await;
+        let id = test_world(&app, "map-route").await;
+        let at = |scale: u32, x: i32| {
+            format!(
+                "instance_id={}&world=Home&dimension=minecraft%3Aoverworld&scale={scale}&x={x}&z=0&rev=a1",
+                id.0
+            )
+        };
+
+        let found = answer(&app, &at(0, 0)).await;
+        assert_eq!(found.status(), StatusCode::OK);
+        let headers = found.headers();
+        assert_eq!(headers["content-type"], "image/png");
+        assert_eq!(
+            headers["cache-control"],
+            "private, max-age=31536000, immutable"
+        );
+        let body = axum::body::to_bytes(found.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(body.starts_with(b"\x89PNG"));
+
+        for query in [at(0, 7), at(5, 0), at(300, 0)] {
+            let nothing = answer(&app, &query).await;
+            assert_eq!(nothing.status(), StatusCode::NO_CONTENT, "{query}");
+            assert!(nothing.headers().get("content-type").is_none());
+            assert!(nothing.headers().get("cache-control").is_none());
+            let body = axum::body::to_bytes(nothing.into_body(), usize::MAX)
+                .await
+                .unwrap();
+            assert!(body.is_empty());
+        }
+
+        let gone = answer(&app, &at(0, 0).replace("world=Home", "world=Missing")).await;
+        assert_eq!(gone.status(), StatusCode::INTERNAL_SERVER_ERROR);
     }
 }
 

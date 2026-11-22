@@ -9,7 +9,6 @@ use super::legacy::LegacyIds;
 use super::region::Region;
 
 /// The side of a piece in pixels, at every scale.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) const PIECE: u32 = 512;
 
 const SIDE: usize = PIECE as usize;
@@ -20,7 +19,6 @@ const HIGHER: u16 = 255;
 const EQUAL: u16 = 220;
 const LOWER: u16 = 180;
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) struct Painted {
     pub image: RgbaImage,
     /// Every chunk the region lists was read; a piece that is not is painted again later.
@@ -30,7 +28,6 @@ pub(super) struct Painted {
 /// One region at one pixel per block, pixel `(x, z)` being the region's block `(x, z)`;
 /// `north` is the region whose last row lies north of its first. `None` when `cancelled`
 /// says so, which is asked before each chunk.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn paint_region(
     region: &Region,
     north: Option<&Region>,
@@ -105,7 +102,6 @@ fn shade(top: &Top, north: Option<Top>) -> Rgba<u8> {
 /// Four pieces, north-west, north-east, south-west and south-east, as one at half scale.
 /// Each pixel is the mean of the opaque ones of four, so the edge of what was explored is not
 /// darkened; a missing piece is transparent.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn join(children: [Option<&RgbaImage>; 4]) -> RgbaImage {
     let half = PIECE / 2;
     let mut image = RgbaImage::new(PIECE, PIECE);
@@ -139,7 +135,6 @@ pub(super) fn join(children: [Option<&RgbaImage>; 4]) -> RgbaImage {
 }
 
 /// A piece as PNG, compressed little: pieces are kept, so painting them fast matters more.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn png(image: &RgbaImage) -> anyhow::Result<Vec<u8>> {
     let mut bytes = Vec::new();
     PngEncoder::new_with_quality(&mut bytes, CompressionType::Fast, FilterType::Adaptive)

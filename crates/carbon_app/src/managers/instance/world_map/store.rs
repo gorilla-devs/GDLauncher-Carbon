@@ -27,7 +27,6 @@ pub(crate) const STORE_LIMIT: u64 = 512 * 1024 * 1024;
 const LONGEST_PART: usize = 200;
 
 /// What a piece is kept by.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) struct PieceKey<'a> {
     pub instance: InstanceId,
     /// The world's folder in `saves`.
@@ -62,7 +61,6 @@ impl Store {
     }
 
     /// The piece kept for `key`, only for its revision. It is then the most recently used.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn get(&self, key: &PieceKey) -> Option<Vec<u8>> {
         let (folder, name) = self.place(key)?;
         let path = folder.join(name);
@@ -75,7 +73,6 @@ impl Store {
 
     /// Keeps `png` for `key`, in place of any other revision of the same piece, then drops
     /// the least recently used pieces if the store holds more than its limit.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(crate) fn put(&self, key: &PieceKey, png: &[u8]) -> io::Result<()> {
         let (folder, name) = self.place(key).ok_or_else(|| {
             io::Error::new(io::ErrorKind::InvalidInput, "not a revision of a map piece")

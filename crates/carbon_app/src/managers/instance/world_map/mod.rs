@@ -4,6 +4,7 @@ pub(crate) mod facts;
 mod legacy;
 mod paint;
 mod region;
+pub(crate) mod service;
 pub(crate) mod store;
 #[cfg(test)]
 mod test_nbt;

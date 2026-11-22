@@ -24,7 +24,6 @@ pub(super) struct Region {
 impl Region {
     /// `None` for a missing file, a link, anything but a regular file, a file shorter
     /// than the two header sectors or one above `MAX_REGION_BYTES`.
-    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn read(path: &Path) -> std::io::Result<Option<Region>> {
         let meta = match std::fs::symlink_metadata(path) {
             Ok(meta) => meta,
