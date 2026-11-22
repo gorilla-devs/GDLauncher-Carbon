@@ -176,6 +176,11 @@ function sleep(ms: number): Promise<void> {
  * the JVM produced nothing, a different failure from one that started and
  * stopped, worth distinguishing in the message.
  *
+ * Stillness only ends the wait once `LAUNCH_MARKER_QUORUM` of
+ * `LAUNCH_MARKERS` are in the log, so a long pause mid-load is not taken for
+ * the menu. Markers that never come (drifted with a Minecraft version) run
+ * the wait to its timeout, and the caller's own marker check then says so.
+ *
  * A single shared implementation: both `gameLaunch.spec.ts` and
  * `modpackLifecycle.spec.ts` call this rather than each keeping their own
  * copy.
@@ -202,7 +207,18 @@ export async function waitForLogQuiescence(
     if (size !== lastSize) {
       lastSize = size
       steadySince = Date.now()
-    } else if (Date.now() - steadySince >= LOG_QUIESCENCE_HOLD_MS) {
+    } else if (
+      Date.now() - steadySince >= LOG_QUIESCENCE_HOLD_MS &&
+      // Quiet alone can be a pause mid-load: on a slow machine Forge's early
+      // loading stayed silent past the hold right after "Setting user:", and
+      // the wait ended 35s into a launch. So the quiet only counts once the
+      // log shows the startup got as far as the menu; until the timeout, a
+      // pause short of that keeps waiting.
+      countMatchedMarkers(
+        readLogMessages(newestLogFile(logsDir)),
+        LAUNCH_MARKERS
+      ) >= LAUNCH_MARKER_QUORUM
+    ) {
       break
     }
 
