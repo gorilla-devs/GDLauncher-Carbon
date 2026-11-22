@@ -63,7 +63,7 @@ pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, _legacy: Option<&LegacyIds>)
         let Tag::List { items, .. } = sections else {
             return EMPTY;
         };
-        Column::new(items, |section| Section::read(section.get("block_states")))
+        Column::new(items, Section::read)
     } else if let Some(level) = root.tag.get("Level") {
         if !finished(level.get("Status"), FINISHED_LEVEL) {
             return EMPTY;
@@ -97,7 +97,7 @@ const FINISHED: &[&[u8]] = &[b"minecraft:full", b"full"];
 /// The same for 1.13 to 1.17, where 1.13 has names of its own.
 const FINISHED_LEVEL: &[&[u8]] = &[b"minecraft:full", b"full", b"postprocessed", b"fullchunk"];
 
-/// No status at all is a finished chunk: chunks converted by the earliest 1.13 builds lack one.
+/// A chunk of either shape without a status is read as finished.
 fn finished(status: Option<&Tag>, names: &[&[u8]]) -> bool {
     match status {
         None => true,
@@ -217,47 +217,72 @@ fn unpack(palette_len: usize, data: &[i64], packing: Packing) -> Option<Vec<u16>
         .collect()
 }
 
+/// A section that does not hold together. Its whole chunk is left empty: read as air, it would
+/// show the blocks under it as the top.
+struct IllFormed;
+
+/// A section read: `None` when it holds no blocks at all and is air.
+type SectionRead = Result<Option<Section>, IllFormed>;
+
 impl Section {
-    /// The blocks of one section of 1.18 and later; `None` when they do not hold together.
-    fn read(block_states: Option<&Tag>) -> Option<Section> {
-        let Some(Tag::List { items, .. }) = block_states?.get("palette") else {
-            return None;
-        };
-        let palette = palette(items)?;
-        if let [block] = palette[..] {
-            return Some(Section::Uniform(block));
+    /// One section of 1.18 and later. Data longer than its palette needs is read as the game
+    /// would; shorter is ill-formed.
+    fn read(section: &Tag) -> SectionRead {
+        match section.get("block_states") {
+            None => Ok(None),
+            Some(states @ Tag::Compound(_)) => {
+                Section::decode(states.get("palette"), states.get("data"), |_, _| {
+                    Some(Packing::Padded)
+                })
+            }
+            Some(_) => Err(IllFormed),
         }
-        let Some(Tag::LongArray(data)) = block_states?.get("data") else {
-            return None;
-        };
-        let indices = unpack(palette.len(), data, Packing::Padded)?;
-        Some(Section::Mixed { palette, indices })
     }
 
-    /// The blocks of one section of 1.13 to 1.17, whose packing the length of its longs
-    /// tells; `None` (air) for a section with only light or one that does not hold together.
-    fn read_level(section: &Tag) -> Option<Section> {
-        let Some(Tag::List { items, .. }) = section.get("Palette") else {
-            return None;
+    /// One section of 1.13 to 1.17, whose packing the length of its longs tells.
+    fn read_level(section: &Tag) -> SectionRead {
+        Section::decode(
+            section.get("Palette"),
+            section.get("BlockStates"),
+            |bits, len| {
+                // Where 64 is a multiple of `bits` the two lengths are equal and so are the
+                // layouts.
+                if len == SECTION_BLOCKS.div_ceil(64 / bits) {
+                    Some(Packing::Padded)
+                } else if len == (SECTION_BLOCKS * bits).div_ceil(64) {
+                    Some(Packing::Spanning)
+                } else {
+                    None
+                }
+            },
+        )
+    }
+
+    /// A section from its palette and packed longs, either shape. No palette and no longs is
+    /// a section with only light; a palette of one needs no longs, but any it has must fit.
+    /// `packing` gives the layout for the bits per index and the number of longs, or `None`
+    /// when that number fits none.
+    fn decode(
+        palette: Option<&Tag>,
+        data: Option<&Tag>,
+        packing: impl Fn(usize, usize) -> Option<Packing>,
+    ) -> SectionRead {
+        let palette = match (palette, data) {
+            (None, None) => return Ok(None),
+            (Some(Tag::List { items, .. }), _) => self::palette(items).ok_or(IllFormed)?,
+            _ => return Err(IllFormed),
         };
-        let palette = palette(items)?;
-        if let [block] = palette[..] {
-            return Some(Section::Uniform(block));
-        }
-        let Some(Tag::LongArray(data)) = section.get("BlockStates") else {
-            return None;
+        let data = match data {
+            None if palette.len() == 1 => return Ok(Some(Section::Uniform(palette[0]))),
+            Some(Tag::LongArray(data)) => data,
+            _ => return Err(IllFormed),
         };
-        let bits = bits_per_index(palette.len());
-        // Where 64 is a multiple of `bits` the two lengths are equal and so are the layouts.
-        let packing = if data.len() == SECTION_BLOCKS.div_ceil(64 / bits) {
-            Packing::Padded
-        } else if data.len() == (SECTION_BLOCKS * bits).div_ceil(64) {
-            Packing::Spanning
-        } else {
-            return None;
-        };
-        let indices = unpack(palette.len(), data, packing)?;
-        Some(Section::Mixed { palette, indices })
+        let packing = packing(bits_per_index(palette.len()), data.len()).ok_or(IllFormed)?;
+        let indices = unpack(palette.len(), data, packing).ok_or(IllFormed)?;
+        Ok(Some(match palette[..] {
+            [block] => Section::Uniform(block),
+            _ => Section::Mixed { palette, indices },
+        }))
     }
 
     fn block(&self, i: usize) -> Block {
@@ -275,8 +300,9 @@ struct Column {
 }
 
 impl Column {
-    /// `None` when there are no sections at all or a section's `Y` is out of the game's range.
-    fn new(sections: &[Tag], read_section: impl Fn(&Tag) -> Option<Section>) -> Option<Column> {
+    /// `None` when there are no sections at all, a section's `Y` is out of the game's range or
+    /// a section is ill-formed.
+    fn new(sections: &[Tag], read_section: impl Fn(&Tag) -> SectionRead) -> Option<Column> {
         let mut read: Vec<(i8, &Tag)> = Vec::new();
         let mut seen = [false; 256];
         for section in sections {
@@ -297,7 +323,7 @@ impl Column {
         let highest = read.iter().map(|(y, _)| *y).max()?;
         let mut column: Vec<Option<Section>> = (lowest..=highest).map(|_| None).collect();
         for (y, section) in read {
-            column[(i16::from(y) - i16::from(lowest)) as usize] = read_section(section);
+            column[(i16::from(y) - i16::from(lowest)) as usize] = read_section(section).ok()?;
         }
         Some(Column {
             lowest,
@@ -461,10 +487,7 @@ mod tests {
         ]
     }
 
-    #[test]
-    fn the_top_block_of_each_column_is_found() {
-        let bytes = chunk_1_18(terrain(), FULL);
-        let surface = surface(&bytes, Roof::Open, None);
+    fn assert_terrain(surface: &Surface) {
         for z in 0..16 {
             for x in 0..16 {
                 let expected = if x < 8 {
@@ -475,6 +498,13 @@ mod tests {
                 assert_eq!(surface[z * 16 + x], expected, "column {x},{z}");
             }
         }
+    }
+
+    #[test]
+    fn the_top_block_of_each_column_is_found() {
+        let bytes = chunk_1_18(terrain(), FULL);
+        let surface = surface(&bytes, Roof::Open, None);
+        assert_terrain(&surface);
         // The numeric id table is not needed for this shape.
         assert_eq!(
             super::surface(&bytes, Roof::Open, Some(&LegacyIds {})),
@@ -691,34 +721,108 @@ mod tests {
         );
     }
 
+    fn names(palette: &[&str]) -> Tag {
+        compounds(
+            palette
+                .iter()
+                .map(|name| compound(vec![("Name", string(name))]))
+                .collect(),
+        )
+    }
+
+    /// Palettes and packed data that do not hold together in either shape, as
+    /// `(what, palette, packed data)`.
+    fn ill_formed_sections() -> Vec<(&'static str, Option<Tag>, Option<Tag>)> {
+        let two = ["minecraft:air", "minecraft:stone"];
+        let zeros = || Some(Tag::LongArray(vec![0; 256]));
+        let mut past_one = vec![0; 256];
+        past_one[100] = 1 << 8;
+        vec![
+            (
+                "an index past the palette",
+                Some(names(&two)),
+                Some(Tag::LongArray(pack(
+                    &fill(|x, _, _| u16::from(x == 0) * 2),
+                    4,
+                ))),
+            ),
+            (
+                "packed data too short",
+                Some(names(&two)),
+                Some(Tag::LongArray(vec![0; 255])),
+            ),
+            ("packed data missing", Some(names(&two)), None),
+            (
+                "packed data not longs",
+                Some(names(&two)),
+                Some(Tag::IntArray(vec![0; 512])),
+            ),
+            ("palette missing", None, zeros()),
+            ("palette empty", Some(compounds(vec![])), zeros()),
+            ("palette not a list", Some(Tag::Int(3)), zeros()),
+            (
+                "palette of numbers",
+                Some(Tag::List {
+                    element: 3,
+                    items: vec![Tag::Int(1), Tag::Int(2)],
+                }),
+                zeros(),
+            ),
+            (
+                "palette entry without a name",
+                Some(compounds(vec![
+                    compound(vec![("Name", string("minecraft:air"))]),
+                    compound(vec![("Colour", string("red"))]),
+                ])),
+                zeros(),
+            ),
+            (
+                "palette of 4097",
+                Some(names(&vec!["minecraft:stone"; 4097])),
+                Some(Tag::LongArray(vec![0; 64 * 13])),
+            ),
+            (
+                "one block with data of the wrong length",
+                Some(names(&["minecraft:stone"])),
+                Some(Tag::LongArray(vec![0; 255])),
+            ),
+            (
+                "one block with an index past it",
+                Some(names(&["minecraft:stone"])),
+                Some(Tag::LongArray(past_one)),
+            ),
+        ]
+    }
+
+    fn assert_empty(bytes: &[u8], what: &str) {
+        let surface = surface(bytes, Roof::Open, None);
+        assert!(surface.iter().all(Option::is_none), "{what}");
+    }
+
     #[test]
     fn a_chunk_that_lies_is_empty_not_a_panic() {
-        let empty = |bytes: &[u8], what: &str| {
-            let surface = surface(bytes, Roof::Open, None);
-            assert!(surface.iter().all(Option::is_none), "{what}");
-        };
-        let two = ["minecraft:air", "minecraft:stone"];
-
-        let past_palette = chunk_1_18(
-            vec![(0, two.to_vec(), fill(|x, _, _| u16::from(x == 0) * 2))],
-            FULL,
+        let empty = assert_empty;
+        // Each bad section lies over good stone, which must not show through it.
+        let ground = section(0, &["minecraft:stone"], None);
+        for (what, palette, data) in ill_formed_sections() {
+            let mut states = Vec::new();
+            if let Some(palette) = palette {
+                states.push(("palette", palette));
+            }
+            if let Some(data) = data {
+                states.push(("data", data));
+            }
+            let bad = compound(vec![
+                ("Y", Tag::Byte(1)),
+                ("block_states", compound(states)),
+            ]);
+            empty(&chunk_with(vec![ground.clone(), bad], FULL), what);
+        }
+        let not_compound = compound(vec![("Y", Tag::Byte(1)), ("block_states", Tag::Int(3))]);
+        empty(
+            &chunk_with(vec![ground.clone(), not_compound], FULL),
+            "block_states not a compound",
         );
-        empty(&past_palette, "an index past the palette");
-
-        let short = chunk_with(vec![section(0, &two, Some(vec![-1; 255]))], FULL);
-        empty(&short, "data too short");
-
-        let no_palette = chunk_with(
-            vec![compound(vec![
-                ("Y", Tag::Byte(0)),
-                (
-                    "block_states",
-                    compound(vec![("data", Tag::LongArray(vec![-1; 256]))]),
-                ),
-            ])],
-            FULL,
-        );
-        empty(&no_palette, "palette missing");
 
         for y in [127, -128] {
             let bytes = chunk_1_18(vec![(y, vec!["minecraft:stone"], vec![])], FULL);
@@ -929,6 +1033,17 @@ mod tests {
         })
     }
 
+    /// The surface of a section at `Y` 0 holding `mixed_indices`.
+    fn assert_mixed(surface: &Surface) {
+        for i in 0..256 {
+            assert_eq!(
+                surface[i],
+                top(TWENTY[i % 19 + 1], (i % 16) as i16),
+                "column {i}"
+            );
+        }
+    }
+
     #[test]
     fn the_spanning_packing_is_read() {
         assert_eq!(bits_for(TWENTY.len()), 5);
@@ -942,13 +1057,57 @@ mod tests {
         assert_three_blocks(&surface(&bytes, Roof::Open, None));
 
         let bytes = chunk_1_13(vec![(0, TWENTY.to_vec(), mixed_indices())], "full", true);
-        let surface = surface(&bytes, Roof::Open, None);
-        for i in 0..256 {
+        assert_mixed(&surface(&bytes, Roof::Open, None));
+    }
+
+    #[test]
+    fn the_spanning_packing_is_read_at_7_and_12_bits() {
+        // 7 bits, 448 longs. Index 0 is 70 in bits 0 to 6 of long 0. Index 9 is 99 = 0b1100011
+        // and straddles: its bit 0 is bit 63 of long 0, its bits 1 to 6 (49) bits 0 to 5 of
+        // long 1. Index 4095 is 85 in bits 57 to 63 of long 447, the last.
+        let mut seven = vec![0i64; 448];
+        seven[0] = 0x8000_0000_0000_0046_u64 as i64;
+        seven[1] = 0x31;
+        seven[447] = 0xAA00_0000_0000_0000_u64 as i64;
+        // 12 bits, 768 longs. Index 0 is 0xFFF in bits 0 to 11 of long 0. Index 5 is 0xABC and
+        // straddles: 0xC in bits 60 to 63 of long 0, 0xAB in bits 0 to 7 of long 1. Index 4095
+        // is 0x123 in bits 52 to 63 of long 767, the last.
+        let mut twelve = vec![0i64; 768];
+        twelve[0] = 0xC000_0000_0000_0FFF_u64 as i64;
+        twelve[1] = 0xAB;
+        twelve[767] = 0x1230_0000_0000_0000;
+        for (len, bits, data, [first, straddling, last], straddling_x) in [
+            (128, 7, seven, [70, 99, 85], 9),
+            (4096, 12, twelve, [0xFFF, 0xABC, 0x123], 5),
+        ] {
+            assert_eq!(bits_for(len), bits);
+            let named = [
+                (first, "minecraft:diamond_block"),
+                (straddling, "minecraft:emerald_block"),
+                (last, "minecraft:lapis_block"),
+            ];
+            let palette: Vec<String> = (0..len)
+                .map(|i| match named.iter().find(|(at, _)| *at == i) {
+                    Some((_, name)) => name.to_string(),
+                    None if i == 0 => "minecraft:air".to_string(),
+                    None => format!("minecraft:x{i}"),
+                })
+                .collect();
+            let palette: Vec<&str> = palette.iter().map(String::as_str).collect();
+            let bytes = level_chunk_with(vec![level_section(0, &palette, Some(data))], "full");
+            let surface = surface(&bytes, Roof::Open, None);
+            assert_eq!(surface[0], top("minecraft:diamond_block", 0), "{bits} bits");
             assert_eq!(
-                surface[i],
-                top(TWENTY[i % 19 + 1], (i % 16) as i16),
-                "column {i}"
+                surface[straddling_x],
+                top("minecraft:emerald_block", 0),
+                "{bits} bits"
             );
+            assert_eq!(
+                surface[255],
+                top("minecraft:lapis_block", 15),
+                "{bits} bits"
+            );
+            assert_eq!(surface.iter().flatten().count(), 3, "{bits} bits");
         }
     }
 
@@ -963,14 +1122,7 @@ mod tests {
         assert_three_blocks(&surface(&bytes, Roof::Open, None));
 
         let bytes = chunk_1_13(vec![(0, TWENTY.to_vec(), mixed_indices())], "full", false);
-        let surface = surface(&bytes, Roof::Open, None);
-        for i in 0..256 {
-            assert_eq!(
-                surface[i],
-                top(TWENTY[i % 19 + 1], (i % 16) as i16),
-                "column {i}"
-            );
-        }
+        assert_mixed(&surface(&bytes, Roof::Open, None));
     }
 
     #[test]
@@ -1009,7 +1161,52 @@ mod tests {
     }
 
     #[test]
-    fn a_length_that_fits_neither_is_an_empty_section() {
+    fn a_section_with_no_blocks_is_air() {
+        // Gold at 32 over one column, nothing at all in the section under it, stone below.
+        let gold = ["minecraft:air", "minecraft:gold_block"];
+        let gold_indices = fill(|x, y, z| u16::from(x == 0 && z == 0 && y == 0));
+        let assert_stone_shows = |bytes: &[u8], what: &str| {
+            let surface = surface(bytes, Roof::Open, None);
+            assert_eq!(surface[0], top("minecraft:gold_block", 32), "{what}");
+            assert!(
+                surface[1..]
+                    .iter()
+                    .all(|column| *column == top("minecraft:stone", 15)),
+                "{what}"
+            );
+        };
+
+        let stone = section(0, &["minecraft:stone"], None);
+        let top_section = section(2, &gold, Some(pack(&gold_indices, 4)));
+        let light_only = compound(vec![
+            ("Y", Tag::Byte(1)),
+            ("SkyLight", Tag::ByteArray(vec![0; 2048])),
+        ]);
+        let no_states = compound(vec![
+            ("Y", Tag::Byte(1)),
+            ("block_states", compound(vec![])),
+        ]);
+        for (what, middle) in [
+            ("light only", light_only),
+            ("empty block_states", no_states),
+        ] {
+            let bytes = chunk_with(vec![stone.clone(), middle, top_section.clone()], FULL);
+            assert_stone_shows(&bytes, what);
+        }
+
+        let bytes = level_chunk_with(
+            vec![
+                level_section(0, &["minecraft:stone"], Some(vec![0; 256])),
+                level_section(1, &[], None),
+                level_section(2, &gold, Some(pack(&gold_indices, 4))),
+            ],
+            "full",
+        );
+        assert_stone_shows(&bytes, "light only, older shape");
+    }
+
+    #[test]
+    fn a_length_that_fits_neither_empties_the_chunk() {
         let indices = fill(|_, y, _| u16::from(y == 0));
         let ground = level_section(0, &["minecraft:stone"], Some(vec![0; 256]));
         let spanning = pack_spanning(&indices, 5);
@@ -1035,12 +1232,8 @@ mod tests {
                 "full",
             );
             let surface = surface(&bytes, Roof::Open, None);
-            // The section that does not fit is read as air: the one below still shows.
-            let expected = if empty {
-                top("minecraft:stone", 15)
-            } else {
-                top("minecraft:stone", 16)
-            };
+            // The stone under a section that does not fit must not show as the top.
+            let expected = (!empty).then(|| top("minecraft:stone", 16)).flatten();
             assert!(
                 surface.iter().all(|column| *column == expected),
                 "{length} longs"
@@ -1102,17 +1295,7 @@ mod tests {
         let old = chunk_1_13(terrain(), "postprocessed", true);
         let new = chunk_1_18(terrain(), FULL);
         for bytes in [old, new] {
-            let surface = surface(&bytes, Roof::Open, None);
-            for z in 0..16 {
-                for x in 0..16 {
-                    let expected = if x < 8 {
-                        top("minecraft:grass_block", 64)
-                    } else {
-                        top("minecraft:stone", 63)
-                    };
-                    assert_eq!(surface[z * 16 + x], expected, "column {x},{z}");
-                }
-            }
+            assert_terrain(&surface(&bytes, Roof::Open, None));
         }
     }
 
@@ -1146,15 +1329,26 @@ mod tests {
 
     #[test]
     fn an_old_chunk_that_lies_is_empty_not_a_panic() {
-        let empty = |bytes: &[u8], what: &str| {
-            let surface = surface(bytes, Roof::Open, None);
-            assert!(surface.iter().all(Option::is_none), "{what}");
-        };
-        let two = ["minecraft:air", "minecraft:stone"];
+        let empty = assert_empty;
+        let ground = level_section(0, &["minecraft:stone"], Some(vec![0; 256]));
+        for (what, palette, data) in ill_formed_sections() {
+            let mut bad = vec![("Y", Tag::Byte(1))];
+            if let Some(palette) = palette {
+                bad.push(("Palette", palette));
+            }
+            if let Some(data) = data {
+                bad.push(("BlockStates", data));
+            }
+            let bytes = level_chunk_with(vec![ground.clone(), compound(bad)], "full");
+            empty(&bytes, what);
+        }
 
         for spanning in [true, false] {
             let past_palette = chunk_1_13(
-                vec![(0, two.to_vec(), fill(|x, _, _| u16::from(x == 0) * 2))],
+                vec![
+                    (0, vec!["minecraft:stone"], vec![]),
+                    (1, TWENTY.to_vec(), fill(|x, _, _| u16::from(x == 0) * 20)),
+                ],
                 "full",
                 spanning,
             );
@@ -1167,47 +1361,11 @@ mod tests {
         }
 
         // Every index of 5 bits set: 31 is past a palette of twenty.
-        let all_ones = level_section(0, &TWENTY, Some(vec![-1; 320]));
+        let all_ones = level_section(1, &TWENTY, Some(vec![-1; 320]));
         empty(
-            &level_chunk_with(vec![all_ones], "full"),
+            &level_chunk_with(vec![ground.clone(), all_ones], "full"),
             "indices of all ones",
         );
-
-        let short = level_chunk_with(vec![level_section(0, &two, Some(vec![-1; 255]))], "full");
-        empty(&short, "BlockStates too short");
-
-        let no_palette = level_chunk_with(
-            vec![compound(vec![
-                ("Y", Tag::Byte(0)),
-                ("BlockStates", Tag::LongArray(vec![-1; 256])),
-            ])],
-            "full",
-        );
-        empty(&no_palette, "Palette missing");
-
-        let not_longs = level_chunk_with(
-            vec![compound(vec![
-                ("Y", Tag::Byte(0)),
-                (
-                    "Palette",
-                    compounds(
-                        two.iter()
-                            .map(|n| compound(vec![("Name", string(n))]))
-                            .collect(),
-                    ),
-                ),
-                ("BlockStates", Tag::IntArray(vec![-1; 512])),
-            ])],
-            "full",
-        );
-        empty(&not_longs, "BlockStates not longs");
-
-        let too_many = vec!["minecraft:stone"; 4097];
-        let bytes = level_chunk_with(
-            vec![level_section(0, &too_many, Some(vec![0; 64 * 13]))],
-            "full",
-        );
-        empty(&bytes, "a palette of 4097");
 
         let no_y = level_chunk_with(
             vec![compound(vec![("SkyLight", Tag::ByteArray(vec![0; 2048]))])],
