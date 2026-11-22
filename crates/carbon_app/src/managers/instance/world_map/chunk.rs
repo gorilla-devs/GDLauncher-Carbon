@@ -47,22 +47,35 @@ pub(super) enum Roof {
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) struct LegacyIds {}
 
-/// The top visible block of each column of a chunk's uncompressed NBT. A chunk of a shape
-/// this reader does not know, an unfinished one or one that does not hold together is empty.
+/// The top visible block of each column of a chunk's uncompressed NBT, of 1.13 and later.
+/// A chunk of a shape this reader does not know, an unfinished one or one that does not hold
+/// together is empty.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, _legacy: Option<&LegacyIds>) -> Surface {
     let Ok(root) = nbt::read_keeping(chunk_nbt, &keep, LIMITS) else {
         return EMPTY;
     };
-    match root.tag.get("Status") {
-        None => {}
-        Some(Tag::String(status)) if status == b"minecraft:full" || status == b"full" => {}
-        Some(_) => return EMPTY,
-    }
-    let Some(Tag::List { items, .. }) = root.tag.get("sections") else {
+    // Each chunk is read by its own shape: a region upgraded in part holds both.
+    let column = if let Some(sections) = root.tag.get("sections") {
+        if !finished(root.tag.get("Status"), FINISHED) {
+            return EMPTY;
+        }
+        let Tag::List { items, .. } = sections else {
+            return EMPTY;
+        };
+        Column::new(items, |section| Section::read(section.get("block_states")))
+    } else if let Some(level) = root.tag.get("Level") {
+        if !finished(level.get("Status"), FINISHED_LEVEL) {
+            return EMPTY;
+        }
+        let Some(Tag::List { items, .. }) = level.get("Sections") else {
+            return EMPTY;
+        };
+        Column::new(items, Section::read_level)
+    } else {
         return EMPTY;
     };
-    let Some(column) = Column::new(items) else {
+    let Some(column) = column else {
         return EMPTY;
     };
     let open = std::array::from_fn(|i| column.top(i, Roof::Open));
@@ -75,6 +88,21 @@ pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, _legacy: Option<&LegacyIds>)
         std::array::from_fn(|i| column.top(i, Roof::Ceiling).map(|(top, _)| top))
     } else {
         open.map(|top: Option<(Top, bool)>| top.map(|(top, _)| top))
+    }
+}
+
+/// The statuses of a finished chunk of 1.18 and later.
+const FINISHED: &[&[u8]] = &[b"minecraft:full", b"full"];
+
+/// The same for 1.13 to 1.17, where 1.13 has names of its own.
+const FINISHED_LEVEL: &[&[u8]] = &[b"minecraft:full", b"full", b"postprocessed", b"fullchunk"];
+
+/// No status at all is a finished chunk: chunks converted by the earliest 1.13 builds lack one.
+fn finished(status: Option<&Tag>, names: &[&[u8]]) -> bool {
+    match status {
+        None => true,
+        Some(Tag::String(status)) => names.contains(&status.as_slice()),
+        Some(_) => false,
     }
 }
 
@@ -131,43 +159,104 @@ fn palette_name(entry: &Tag) -> Option<&[u8]> {
     }
 }
 
+/// How a section's indices lie in its longs.
+#[derive(Clone, Copy)]
+enum Packing {
+    /// Each long holds `64 / bits` whole indices and leaves its top bits unused (1.16 on).
+    Padded,
+    /// The indices run on from one long into the next (1.13 to 1.15).
+    Spanning,
+}
+
+/// A palette of 1 to 4096 entries, so an index has at most 12 bits.
+fn palette(items: &[Tag]) -> Option<Vec<Block>> {
+    if items.is_empty() || items.len() > SECTION_BLOCKS {
+        return None;
+    }
+    items
+        .iter()
+        .map(|entry| {
+            let name = nbt::decode_string(palette_name(entry)?)?;
+            Some(Block {
+                look: look_of(&name),
+                bedrock: name == "minecraft:bedrock",
+            })
+        })
+        .collect()
+}
+
+/// The bits of one index into a palette of `len` entries, at least 4 as the game writes.
+fn bits_per_index(len: usize) -> usize {
+    ((usize::BITS - len.saturating_sub(1).leading_zeros()) as usize).max(4)
+}
+
+/// The 4096 indices packed in `data`, or `None` when the longs run out or an index is past
+/// the palette.
+fn unpack(palette_len: usize, data: &[i64], packing: Packing) -> Option<Vec<u16>> {
+    let bits = bits_per_index(palette_len);
+    let mask = (1u64 << bits) - 1;
+    let per_long = 64 / bits;
+    (0..SECTION_BLOCKS)
+        .map(|i| {
+            let index = match packing {
+                Packing::Padded => {
+                    (*data.get(i / per_long)? as u64 >> ((i % per_long) * bits)) & mask
+                }
+                Packing::Spanning => {
+                    let (long, offset) = (i * bits / 64, i * bits % 64);
+                    let mut index = *data.get(long)? as u64 >> offset;
+                    if offset + bits > 64 {
+                        // `offset` is above 64 - bits here, so the shift is 1 to 11.
+                        index |= (*data.get(long + 1)? as u64) << (64 - offset);
+                    }
+                    index & mask
+                }
+            };
+            (index < palette_len as u64).then_some(index as u16)
+        })
+        .collect()
+}
+
 impl Section {
     /// The blocks of one section of 1.18 and later; `None` when they do not hold together.
     fn read(block_states: Option<&Tag>) -> Option<Section> {
         let Some(Tag::List { items, .. }) = block_states?.get("palette") else {
             return None;
         };
-        if items.is_empty() || items.len() > SECTION_BLOCKS {
-            return None;
-        }
-        let palette = items
-            .iter()
-            .map(|entry| {
-                let name = nbt::decode_string(palette_name(entry)?)?;
-                Some(Block {
-                    look: look_of(&name),
-                    bedrock: name == "minecraft:bedrock",
-                })
-            })
-            .collect::<Option<Vec<_>>>()?;
+        let palette = palette(items)?;
         if let [block] = palette[..] {
             return Some(Section::Uniform(block));
         }
         let Some(Tag::LongArray(data)) = block_states?.get("data") else {
             return None;
         };
-        let bits = ((usize::BITS - (palette.len() - 1).leading_zeros()) as usize).max(4);
-        let per_long = 64 / bits;
-        if data.len() < SECTION_BLOCKS.div_ceil(per_long) {
+        let indices = unpack(palette.len(), data, Packing::Padded)?;
+        Some(Section::Mixed { palette, indices })
+    }
+
+    /// The blocks of one section of 1.13 to 1.17, whose packing the length of its longs
+    /// tells; `None` (air) for a section with only light or one that does not hold together.
+    fn read_level(section: &Tag) -> Option<Section> {
+        let Some(Tag::List { items, .. }) = section.get("Palette") else {
             return None;
+        };
+        let palette = palette(items)?;
+        if let [block] = palette[..] {
+            return Some(Section::Uniform(block));
         }
-        let mask = (1u64 << bits) - 1;
-        let indices = (0..SECTION_BLOCKS)
-            .map(|i| {
-                let index = (data[i / per_long] as u64 >> ((i % per_long) * bits)) & mask;
-                (index < palette.len() as u64).then_some(index as u16)
-            })
-            .collect::<Option<Vec<_>>>()?;
+        let Some(Tag::LongArray(data)) = section.get("BlockStates") else {
+            return None;
+        };
+        let bits = bits_per_index(palette.len());
+        // Where 64 is a multiple of `bits` the two lengths are equal and so are the layouts.
+        let packing = if data.len() == SECTION_BLOCKS.div_ceil(64 / bits) {
+            Packing::Padded
+        } else if data.len() == (SECTION_BLOCKS * bits).div_ceil(64) {
+            Packing::Spanning
+        } else {
+            return None;
+        };
+        let indices = unpack(palette.len(), data, packing)?;
         Some(Section::Mixed { palette, indices })
     }
 
@@ -187,8 +276,8 @@ struct Column {
 
 impl Column {
     /// `None` when there are no sections at all or a section's `Y` is out of the game's range.
-    fn new(sections: &[Tag]) -> Option<Column> {
-        let mut read: Vec<(i8, Option<&Tag>)> = Vec::new();
+    fn new(sections: &[Tag], read_section: impl Fn(&Tag) -> Option<Section>) -> Option<Column> {
+        let mut read: Vec<(i8, &Tag)> = Vec::new();
         let mut seen = [false; 256];
         for section in sections {
             let Some(Tag::Byte(y)) = section.get("Y") else {
@@ -201,14 +290,14 @@ impl Column {
             let slot = &mut seen[(*y as u8) as usize];
             if !*slot {
                 *slot = true;
-                read.push((*y, section.get("block_states")));
+                read.push((*y, section));
             }
         }
         let lowest = read.iter().map(|(y, _)| *y).min()?;
         let highest = read.iter().map(|(y, _)| *y).max()?;
         let mut column: Vec<Option<Section>> = (lowest..=highest).map(|_| None).collect();
-        for (y, block_states) in read {
-            column[(i16::from(y) - i16::from(lowest)) as usize] = Section::read(block_states);
+        for (y, section) in read {
+            column[(i16::from(y) - i16::from(lowest)) as usize] = read_section(section);
         }
         Some(Column {
             lowest,
@@ -718,9 +807,455 @@ mod tests {
         assert_eq!(open[15], top("minecraft:stone", 63));
     }
 
+    /// Packs 4096 indices the way 1.13 to 1.15 do: an index may run on into the next long.
+    fn pack_spanning(indices: &[u16], bits: usize) -> Vec<i64> {
+        let mut data = vec![0u64; (indices.len() * bits).div_ceil(64)];
+        for (i, &index) in indices.iter().enumerate() {
+            let (long, offset) = (i * bits / 64, i * bits % 64);
+            data[long] |= (index as u64) << offset;
+            if offset + bits > 64 {
+                data[long + 1] |= (index as u64) >> (64 - offset);
+            }
+        }
+        data.into_iter().map(|long| long as i64).collect()
+    }
+
+    /// A section of 1.13 to 1.17; no `data` means one with only light, as 1.13 and 1.14 write.
+    fn level_section(y: i8, palette: &[&str], data: Option<Vec<i64>>) -> Tag {
+        let mut entries = vec![("Y", Tag::Byte(y))];
+        if let Some(data) = data {
+            let palette = palette
+                .iter()
+                .map(|name| {
+                    let mut entry = vec![("Name", string(name))];
+                    if *name == "minecraft:grass_block" {
+                        entry.push(("Properties", compound(vec![("snowy", string("false"))])));
+                    }
+                    compound(entry)
+                })
+                .collect();
+            entries.push(("Palette", compounds(palette)));
+            entries.push(("BlockStates", Tag::LongArray(data)));
+        }
+        entries.push(("BlockLight", Tag::ByteArray(vec![0; 2048])));
+        entries.push(("SkyLight", Tag::ByteArray(vec![0; 2048])));
+        compound(entries)
+    }
+
+    fn level_chunk_with(sections: Vec<Tag>, status: &str) -> Vec<u8> {
+        let mut level = vec![
+            ("xPos", Tag::Int(0)),
+            ("zPos", Tag::Int(0)),
+            ("LastUpdate", Tag::Long(1234)),
+            ("Sections", compounds(sections)),
+            ("Entities", compounds(vec![])),
+        ];
+        if !status.is_empty() {
+            level.push(("Status", string(status)));
+        }
+        nbt::write(&Root {
+            name: Vec::new(),
+            tag: compound(vec![
+                ("DataVersion", Tag::Int(2586)),
+                ("Level", compound(level)),
+            ]),
+        })
+    }
+
+    /// A chunk of 1.13 to 1.17, packed as 1.13 to 1.15 do (`spanning`) or as 1.16 and 1.17
+    /// do; an empty index list is a section of one block, written with its zeros as the game
+    /// writes them.
+    fn chunk_1_13(
+        sections: Vec<(i8, Vec<&str>, Vec<u16>)>,
+        status: &str,
+        spanning: bool,
+    ) -> Vec<u8> {
+        let sections = sections
+            .into_iter()
+            .map(|(y, palette, mut indices)| {
+                if indices.is_empty() {
+                    indices = vec![0; 4096];
+                }
+                let bits = bits_for(palette.len());
+                let data = if spanning {
+                    pack_spanning(&indices, bits)
+                } else {
+                    pack(&indices, bits)
+                };
+                level_section(y, &palette, Some(data))
+            })
+            .collect();
+        level_chunk_with(sections, status)
+    }
+
+    /// Twenty blocks: 5 bits an index, the smallest width where the two packings differ.
+    const TWENTY: [&str; 20] = [
+        "minecraft:air",
+        "minecraft:stone",
+        "minecraft:dirt",
+        "minecraft:sand",
+        "minecraft:gravel",
+        "minecraft:oak_planks",
+        "minecraft:cobblestone",
+        "minecraft:bricks",
+        "minecraft:white_wool",
+        "minecraft:red_wool",
+        "minecraft:blue_wool",
+        "minecraft:green_wool",
+        "minecraft:yellow_wool",
+        "minecraft:black_wool",
+        "minecraft:orange_wool",
+        "minecraft:lime_wool",
+        "minecraft:gold_block",
+        "minecraft:diamond_block",
+        "minecraft:emerald_block",
+        "minecraft:lapis_block",
+    ];
+
+    /// Blocks 17, 18 and 19 at x = 11, 12 and 13 of the top layer of a section at `Y` 0.
+    fn assert_three_blocks(surface: &Surface) {
+        assert_eq!(surface[11], top("minecraft:diamond_block", 15));
+        assert_eq!(surface[12], top("minecraft:emerald_block", 15));
+        assert_eq!(surface[13], top("minecraft:lapis_block", 15));
+        let shown = surface.iter().filter(|column| column.is_some()).count();
+        assert_eq!(shown, 3);
+    }
+
+    /// Every column a different block of the twenty, at a different height.
+    fn mixed_indices() -> Vec<u16> {
+        fill(|x, y, z| {
+            let i = z * 16 + x;
+            if y <= i % 16 { (i % 19 + 1) as u16 } else { 0 }
+        })
+    }
+
+    #[test]
+    fn the_spanning_packing_is_read() {
+        assert_eq!(bits_for(TWENTY.len()), 5);
+        // 5 bits: the top layer starts at bit 3840 * 5 = 19200, the first bit of long 300.
+        // x = 11 takes bits 55 to 59 of it, x = 12 its bits 60 to 63 and bit 0 of long 301,
+        // x = 13 bits 1 to 5 of long 301.
+        let mut data = vec![0i64; 320];
+        data[300] = (17 << 55) | ((18 & 0b1111) << 60);
+        data[301] = (18 >> 4) | (19 << 1);
+        let bytes = level_chunk_with(vec![level_section(0, &TWENTY, Some(data))], "full");
+        assert_three_blocks(&surface(&bytes, Roof::Open, None));
+
+        let bytes = chunk_1_13(vec![(0, TWENTY.to_vec(), mixed_indices())], "full", true);
+        let surface = surface(&bytes, Roof::Open, None);
+        for i in 0..256 {
+            assert_eq!(
+                surface[i],
+                top(TWENTY[i % 19 + 1], (i % 16) as i16),
+                "column {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn the_padded_packing_is_read() {
+        // 5 bits: 12 indices to a long, the top layer from long 320. x = 11 is the last index
+        // of that long, x = 12 and 13 open long 321.
+        let mut data = vec![0i64; 342];
+        data[320] = 17 << 55;
+        data[321] = 18 | (19 << 5);
+        let bytes = level_chunk_with(vec![level_section(0, &TWENTY, Some(data))], "full");
+        assert_three_blocks(&surface(&bytes, Roof::Open, None));
+
+        let bytes = chunk_1_13(vec![(0, TWENTY.to_vec(), mixed_indices())], "full", false);
+        let surface = surface(&bytes, Roof::Open, None);
+        for i in 0..256 {
+            assert_eq!(
+                surface[i],
+                top(TWENTY[i % 19 + 1], (i % 16) as i16),
+                "column {i}"
+            );
+        }
+    }
+
+    #[test]
+    fn where_the_packings_agree_either_is_read() {
+        // 4 and 8 bits fill a long exactly: both packings are the same longs.
+        let sixteen = &TWENTY[..16];
+        let unknown: Vec<String> = (0..200).map(|i| format!("minecraft:x{i}")).collect();
+        let mut wide: Vec<&str> = vec!["minecraft:air"];
+        wide.extend(unknown.iter().map(String::as_str));
+        wide.push("minecraft:gold_block");
+        assert_eq!(bits_for(sixteen.len()), 4);
+        assert_eq!(bits_for(wide.len()), 8);
+        let gold = (wide.len() - 1) as u16;
+        for spanning in [true, false] {
+            let bytes = chunk_1_13(
+                vec![
+                    (
+                        0,
+                        sixteen.to_vec(),
+                        fill(|x, y, _| if y < 3 { x as u16 } else { 0 }),
+                    ),
+                    (
+                        1,
+                        wide.clone(),
+                        fill(|x, y, _| if y == 0 && x == 15 { gold } else { 0 }),
+                    ),
+                ],
+                "full",
+                spanning,
+            );
+            let surface = surface(&bytes, Roof::Open, None);
+            assert_eq!(surface[0], None);
+            assert_eq!(surface[3], top("minecraft:sand", 2));
+            assert_eq!(surface[15], top("minecraft:gold_block", 16));
+        }
+    }
+
+    #[test]
+    fn a_length_that_fits_neither_is_an_empty_section() {
+        let indices = fill(|_, y, _| u16::from(y == 0));
+        let ground = level_section(0, &["minecraft:stone"], Some(vec![0; 256]));
+        let spanning = pack_spanning(&indices, 5);
+        let padded = pack(&indices, 5);
+        assert_eq!((spanning.len(), padded.len()), (320, 342));
+        let resized = |data: &[i64], length: usize| {
+            let mut data = data.to_vec();
+            data.resize(length, 0);
+            data
+        };
+        for (data, empty) in [
+            (spanning.clone(), false),
+            (padded.clone(), false),
+            (resized(&spanning, 330), true),
+            (resized(&spanning, 319), true),
+            (resized(&padded, 343), true),
+            (resized(&padded, 341), true),
+            (Vec::new(), true),
+        ] {
+            let length = data.len();
+            let bytes = level_chunk_with(
+                vec![ground.clone(), level_section(1, &TWENTY, Some(data))],
+                "full",
+            );
+            let surface = surface(&bytes, Roof::Open, None);
+            // The section that does not fit is read as air: the one below still shows.
+            let expected = if empty {
+                top("minecraft:stone", 15)
+            } else {
+                top("minecraft:stone", 16)
+            };
+            assert!(
+                surface.iter().all(|column| *column == expected),
+                "{length} longs"
+            );
+        }
+    }
+
+    #[test]
+    fn negative_and_high_sections_are_read() {
+        let one_block =
+            |local_y: usize| fill(move |x, y, z| u16::from(x == 3 && z == 5 && y == local_y));
+        for spanning in [true, false] {
+            let below = chunk_1_13(
+                vec![(
+                    -1,
+                    vec!["minecraft:air", "minecraft:obsidian"],
+                    one_block(6),
+                )],
+                "full",
+                spanning,
+            );
+            let surface_below = surface(&below, Roof::Open, None);
+            assert_eq!(surface_below[5 * 16 + 3], top("minecraft:obsidian", -10));
+            assert_eq!(surface_below.iter().flatten().count(), 1);
+
+            let above = chunk_1_13(
+                vec![(
+                    18,
+                    vec!["minecraft:air", "minecraft:obsidian"],
+                    one_block(12),
+                )],
+                "full",
+                spanning,
+            );
+            let surface_above = surface(&above, Roof::Open, None);
+            assert_eq!(surface_above[5 * 16 + 3], top("minecraft:obsidian", 300));
+            assert_eq!(surface_above.iter().flatten().count(), 1);
+        }
+
+        // Sections with only light, below the world and above it as 1.14 writes them, are air.
+        let mut sections = vec![level_section(-1, &[], None)];
+        sections.push(level_section(
+            3,
+            &["minecraft:dirt"],
+            Some(pack(&[0; 4096], 4)),
+        ));
+        sections.push(level_section(16, &[], None));
+        let bytes = level_chunk_with(sections, "full");
+        let surface = surface(&bytes, Roof::Open, None);
+        assert!(
+            surface
+                .iter()
+                .all(|column| *column == top("minecraft:dirt", 63))
+        );
+    }
+
+    #[test]
+    fn old_and_new_chunks_side_by_side() {
+        let old = chunk_1_13(terrain(), "postprocessed", true);
+        let new = chunk_1_18(terrain(), FULL);
+        for bytes in [old, new] {
+            let surface = surface(&bytes, Roof::Open, None);
+            for z in 0..16 {
+                for x in 0..16 {
+                    let expected = if x < 8 {
+                        top("minecraft:grass_block", 64)
+                    } else {
+                        top("minecraft:stone", 63)
+                    };
+                    assert_eq!(surface[z * 16 + x], expected, "column {x},{z}");
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn an_unfinished_old_chunk_is_empty() {
+        for status in [
+            "carved",
+            "minecraft:features",
+            "liquid_carved",
+            "base",
+            "postprocessed!",
+        ] {
+            let bytes = chunk_1_13(vec![(0, vec!["minecraft:stone"], vec![])], status, false);
+            let surface = surface(&bytes, Roof::Open, None);
+            assert!(surface.iter().all(Option::is_none), "{status}");
+        }
+        // The statuses 1.13 and 1.14 to 1.17 give a finished chunk, and none at all.
+        for status in ["full", "minecraft:full", "postprocessed", "fullchunk", ""] {
+            let bytes = chunk_1_13(vec![(0, vec!["minecraft:stone"], vec![])], status, false);
+            let surface = surface(&bytes, Roof::Open, None);
+            assert_eq!(surface[0], top("minecraft:stone", 15), "{status:?}");
+        }
+        // The statuses of 1.13 alone do not finish a chunk of the newer shape.
+        let bytes = chunk_1_18(vec![(0, vec!["minecraft:stone"], vec![])], "postprocessed");
+        assert!(
+            surface(&bytes, Roof::Open, None)
+                .iter()
+                .all(Option::is_none)
+        );
+    }
+
+    #[test]
+    fn an_old_chunk_that_lies_is_empty_not_a_panic() {
+        let empty = |bytes: &[u8], what: &str| {
+            let surface = surface(bytes, Roof::Open, None);
+            assert!(surface.iter().all(Option::is_none), "{what}");
+        };
+        let two = ["minecraft:air", "minecraft:stone"];
+
+        for spanning in [true, false] {
+            let past_palette = chunk_1_13(
+                vec![(0, two.to_vec(), fill(|x, _, _| u16::from(x == 0) * 2))],
+                "full",
+                spanning,
+            );
+            empty(&past_palette, "an index past the palette");
+            for y in [127, -128] {
+                let bytes =
+                    chunk_1_13(vec![(y, vec!["minecraft:stone"], vec![])], "full", spanning);
+                empty(&bytes, &format!("section Y {y}"));
+            }
+        }
+
+        // Every index of 5 bits set: 31 is past a palette of twenty.
+        let all_ones = level_section(0, &TWENTY, Some(vec![-1; 320]));
+        empty(
+            &level_chunk_with(vec![all_ones], "full"),
+            "indices of all ones",
+        );
+
+        let short = level_chunk_with(vec![level_section(0, &two, Some(vec![-1; 255]))], "full");
+        empty(&short, "BlockStates too short");
+
+        let no_palette = level_chunk_with(
+            vec![compound(vec![
+                ("Y", Tag::Byte(0)),
+                ("BlockStates", Tag::LongArray(vec![-1; 256])),
+            ])],
+            "full",
+        );
+        empty(&no_palette, "Palette missing");
+
+        let not_longs = level_chunk_with(
+            vec![compound(vec![
+                ("Y", Tag::Byte(0)),
+                (
+                    "Palette",
+                    compounds(
+                        two.iter()
+                            .map(|n| compound(vec![("Name", string(n))]))
+                            .collect(),
+                    ),
+                ),
+                ("BlockStates", Tag::IntArray(vec![-1; 512])),
+            ])],
+            "full",
+        );
+        empty(&not_longs, "BlockStates not longs");
+
+        let too_many = vec!["minecraft:stone"; 4097];
+        let bytes = level_chunk_with(
+            vec![level_section(0, &too_many, Some(vec![0; 64 * 13]))],
+            "full",
+        );
+        empty(&bytes, "a palette of 4097");
+
+        let no_y = level_chunk_with(
+            vec![compound(vec![("SkyLight", Tag::ByteArray(vec![0; 2048]))])],
+            "full",
+        );
+        empty(&no_y, "a section without Y");
+
+        let shapes = [
+            (
+                "Level not a compound",
+                compound(vec![("Level", Tag::Int(3))]),
+            ),
+            (
+                "Sections not a list",
+                compound(vec![("Level", compound(vec![("Sections", Tag::Int(3))]))]),
+            ),
+            ("no Sections", compound(vec![("Level", compound(vec![]))])),
+            (
+                "Status not a string",
+                compound(vec![(
+                    "Level",
+                    compound(vec![
+                        ("Status", Tag::Int(1)),
+                        (
+                            "Sections",
+                            compounds(vec![level_section(
+                                0,
+                                &["minecraft:stone"],
+                                Some(vec![0; 256]),
+                            )]),
+                        ),
+                    ]),
+                )]),
+            ),
+        ];
+        for (what, tag) in shapes {
+            let bytes = nbt::write(&Root {
+                name: Vec::new(),
+                tag,
+            });
+            empty(&bytes, what);
+        }
+    }
+
     fn real_status_is_full(bytes: &[u8]) -> bool {
         let keep = |path: &[&[u8]]| match path {
-            [b"Status"] => Keep::All,
+            [b"Status"] | [b"Level", b"Status"] => Keep::All,
+            [b"Level"] => Keep::Descend,
             _ => Keep::Skip,
         };
         let limits = Limits {
@@ -730,7 +1265,11 @@ mod tests {
         let Ok(root) = nbt::read_keeping(bytes, &keep, limits) else {
             return false;
         };
-        matches!(root.tag.get("Status"), Some(Tag::String(s)) if s == b"minecraft:full" || s == b"full")
+        let status = root
+            .tag
+            .get("Status")
+            .or_else(|| root.tag.get("Level")?.get("Status"));
+        matches!(status, Some(Tag::String(s)) if s == b"minecraft:full" || s == b"full")
     }
 
     /// Runs only with `GDL_REAL_WORLDS` set to the folder of real worlds.
@@ -740,11 +1279,11 @@ mod tests {
             return;
         };
         let root = std::path::PathBuf::from(root);
-        let (mut chunks, mut full, mut columns, mut shown, mut grey) = (0, 0, 0, 0, 0);
         let mut colors = std::collections::HashSet::new();
         let mut water = false;
         let mut grids = Vec::new();
         for world in [
+            "1.16.5/region",
             "1.20.1/region",
             "1.21.1/region",
             "26.3/dimensions/minecraft/overworld/region",
@@ -756,6 +1295,9 @@ mod tests {
                 .collect();
             files.sort();
             assert!(!files.is_empty(), "no regions in {world}");
+            let (mut chunks, mut full, mut columns, mut shown, mut grey) = (0, 0, 0, 0, 0);
+            let mut world_colors = std::collections::HashSet::new();
+            let mut world_water = false;
             for path in files {
                 let Some(region) = Region::read(&path).unwrap() else {
                     continue;
@@ -775,12 +1317,13 @@ mod tests {
                         for top in surface.iter().flatten() {
                             shown += 1;
                             grey += usize::from(top.color == UNKNOWN && !top.water);
-                            water |= top.water;
-                            colors.insert(top.color);
+                            world_water |= top.water;
+                            world_colors.insert(top.color);
                         }
-                        if (x, z) == (0, 0) && !grids.contains(&world) {
+                        // The first finished chunk of each world, rows z and columns x.
+                        if !grids.contains(&world) {
                             grids.push(world);
-                            println!("heights of {path:?} chunk 0,0:");
+                            println!("heights of {path:?} chunk {x},{z}:");
                             for row in surface.chunks(16) {
                                 let line: Vec<String> = row
                                     .iter()
@@ -792,21 +1335,22 @@ mod tests {
                     }
                 }
             }
+            println!(
+                "{world}: {chunks} read, {full} full, {shown} of {columns} columns shown, \
+                 {grey} grey, {} colours, water seen: {world_water}",
+                world_colors.len()
+            );
+            assert!(full > 0, "no finished chunk in {world}");
+            assert!(
+                shown * 100 >= columns * 90,
+                "too few columns shown in {world}"
+            );
+            assert!(grey * 50 < shown, "too many grey columns in {world}");
+            water |= world_water;
+            colors.extend(world_colors);
         }
-        println!(
-            "real chunks: {chunks} read, {full} full, {shown} of {columns} columns shown, \
-             {grey} grey, {} colours, water seen: {water}",
-            colors.len()
-        );
-        assert!(
-            grids.contains(&"1.20.1/region"),
-            "no chunk 0,0 in the 1.20.1 regions"
-        );
-        assert!(shown * 100 >= columns * 90, "too few columns shown");
-        assert!(grey * 50 < shown, "too many grey columns");
+        println!("all worlds: {} colours, water seen: {water}", colors.len());
         assert!(water, "no water");
-        // The full chunks of these worlds are a frozen ocean and a forest: their tops hold 17
-        // colours, as an independent decoder of the same files also counts.
-        assert!(colors.len() >= 15, "too few colours");
+        assert!(colors.len() >= 20, "too few colours");
     }
 }
