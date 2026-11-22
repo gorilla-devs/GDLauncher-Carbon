@@ -1022,8 +1022,10 @@ test.describe("Themes", () => {
       await query.fill("")
       await expect(rows.first()).toBeVisible({ timeout: 60000 })
 
-      // A result's page.
-      await rows.first().click()
+      // A result's page, opened from its title: the middle of a narrow row
+      // can be its install button, which still takes clicks before it slides
+      // in on hover.
+      await rows.first().locator(byHook("search.result.title")).click()
       await expect(page.locator(byHook("addon-page"))).toBeVisible()
       await expectHooks(steps.addonPage)
       await expectDocumented("an add-on's page")
@@ -2045,7 +2047,8 @@ test.describe("Themes", () => {
         return transition
       }) as typeof document.startViewTransition
     })
-    await rows.first().click()
+    // From the title: the middle of a narrow row can be its install button.
+    await rows.first().locator(byHook("search.result.title")).click()
     await expect(page.locator(byHook("addon-page"))).toBeVisible()
     await page.locator(byHook("addon-page.back")).click()
     await expect(rows.first()).toBeVisible()
