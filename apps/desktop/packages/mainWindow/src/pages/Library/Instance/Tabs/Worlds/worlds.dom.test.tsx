@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
+import { batch } from "solid-js"
 import { render } from "solid-js/web"
 import { createStore } from "solid-js/store"
 import type {
@@ -1074,29 +1075,49 @@ it("a refetch that returns the same world keeps the open field and the typed tex
   expect(field(root)!.disabled).toBe(false)
 })
 
-it.each([
-  [
-    "the world can no longer be read",
-    () =>
-      setState("worlds", [
-        world("Alpha", []),
-        world("New World", [], null, "Skyblock")
-      ])
-  ],
-  ["the game started", () => setState("details", BUSY)]
-])(
-  "a name typed before %s sends nothing and keeps the field",
-  async (_, change) => {
-    const root = await renaming()
-    typeInto(field(root)!, "Season 2")
-    change()
-    await flush()
+it("the open field closes when the game starts", async () => {
+  const root = await renaming()
+  typeInto(field(root)!, "Season 2")
+  setState("details", BUSY)
+  await flush()
+  expect(field(root)).toBeNull()
+  expect(io.mutateAsync["instance.renameWorld"]).not.toHaveBeenCalled()
+  const pencil = one(root, "world-rename")!
+  expect(pencil.dataset.disabled).toBe("true")
+  expect(pencil.parentElement!.parentElement!.textContent).toBe(
+    "content:_trn_worlds.busy"
+  )
+})
+
+it("the open field closes when the world can no longer be read", async () => {
+  const root = await renaming()
+  typeInto(field(root)!, "Season 2")
+  setState("worlds", [
+    world("Alpha", []),
+    world("New World", [], null, "Skyblock")
+  ])
+  await flush()
+  expect(field(root)).toBeNull()
+  expect(io.mutateAsync["instance.renameWorld"]).not.toHaveBeenCalled()
+  const pencil = one(root, "world-rename")!
+  expect(pencil.dataset.disabled).toBe("true")
+  expect(pencil.parentElement!.parentElement!.textContent).toBe(
+    "content:_trn_worlds.unreadable"
+  )
+})
+
+it("a rename sent while changes are blocked still reaches the core", async () => {
+  const root = await renaming()
+  io.mutateAsync["instance.renameWorld"].mockResolvedValue("Season 2")
+  typeInto(field(root)!, "Season 2")
+  // The request made in the instant before the field closes.
+  batch(() => {
+    setState("details", BUSY)
     press(field(root)!, "Enter")
-    await flush()
-    expect(io.mutateAsync["instance.renameWorld"]).not.toHaveBeenCalled()
-    expect(field(root)!.value).toBe("Season 2")
-  }
-)
+  })
+  await flush()
+  expect(io.mutateAsync["instance.renameWorld"]).toHaveBeenCalledTimes(1)
+})
 
 it.each([
   [

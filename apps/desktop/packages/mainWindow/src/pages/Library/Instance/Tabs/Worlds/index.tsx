@@ -276,9 +276,10 @@ const Worlds = () => {
   /** Throws when the core refused, so the name field stays open; the global
    *  handler shows the refusal. */
   const rename = async (world: FEWorld, name: string) => {
-    // The pencil is disabled then; a field opened before stays open.
+    // The field closes when the world cannot be read, so this is only a
+    // request made in the instant before. Changes blocked reach the core,
+    // which refuses them with its own message.
     if (world.identity === null) throw new Error("The world cannot be read")
-    if (blocked()) throw new Error("Changes are blocked")
     const id = instanceId()
     const folder = await renameWorld.mutateAsync({
       instance_id: id,

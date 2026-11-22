@@ -75,6 +75,12 @@ const WorldTitle = (props: WorldTitleProps) => {
     if (!saving()) close()
   }
 
+  // The field closes when the world can no longer be renamed, unless a
+  // rename of it is running.
+  createEffect(() => {
+    if (editing() && (props.blocked || unreadable()) && !saving()) close()
+  })
+
   // Another world shown in the header opens with its field closed.
   createEffect(on(folder, close, { defer: true }))
 
