@@ -214,6 +214,7 @@ export function getTaskTranslationKey(taskType: string): NamespacedTranslationKe
     'InstanceTaskInstallMod': 'tasks:_trn_instance_task_install_mod',
     'InstanceTaskStageDatapack': 'tasks:_trn_instance_task_stage_datapack',
     'InstanceTaskInstallWorldCopy': 'tasks:_trn_instance_task_install_world_copy',
+    'InstanceTaskDuplicateWorld': 'tasks:_trn_instance_task_duplicate_world',
     'InstanceTaskLaunchInstallJava': 'tasks:_trn_instance_task_launch_install_java',
     'FinalizingImport': 'tasks:_trn_finalizing_import',
     'InstanceTaskLaunchWaiting': 'tasks:_trn_instance_task_launch_waiting',

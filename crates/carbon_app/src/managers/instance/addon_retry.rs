@@ -171,6 +171,11 @@ impl PlannedDelete {
         self.kind == AddonType::Worlds
     }
 
+    /// The name the row lists; for a world, its folder in `saves`.
+    pub(super) fn filename(&self) -> &str {
+        &self.row.filename
+    }
+
     /// The entry to hand to the Recycle Bin: the addon itself, not a link
     /// to one, which is removed as a link.
     fn recyclable(&self) -> Option<&std::path::Path> {

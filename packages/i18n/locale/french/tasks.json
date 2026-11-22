@@ -50,5 +50,6 @@
   "_trn_cache_cleanup": "Nettoyage du cache",
   "_trn_task_status_active_tasks_many": "{{count}} tâches actives",
   "_trn_task_status_active_count_many": "{{count}} tâches",
-  "_trn_instance_task_install_world_copy": "Installation d’une copie de monde séparée {{world_name}} pour {{instance_name}} ; sauvegarde d’origine conservée"
+  "_trn_instance_task_install_world_copy": "Installation d’une copie de monde séparée {{world_name}} pour {{instance_name}} ; sauvegarde d’origine conservée",
+  "_trn_instance_task_duplicate_world": "Copie du monde {{world_name}} dans {{instance_name}}"
 }

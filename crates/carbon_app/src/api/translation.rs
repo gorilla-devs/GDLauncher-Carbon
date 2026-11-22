@@ -49,6 +49,10 @@ pub enum Translation {
         world_name: String,
         instance_name: String,
     },
+    InstanceTaskDuplicateWorld {
+        world_name: String,
+        instance_name: String,
+    },
     InstanceTaskInstallModDownloadFile,
     ServerTaskInstall {
         server_name: String,

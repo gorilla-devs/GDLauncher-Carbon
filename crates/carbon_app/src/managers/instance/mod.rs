@@ -75,6 +75,7 @@ mod world_copy;
 pub(crate) mod world_datapack_changes;
 pub(crate) mod world_datapack_updates;
 pub(crate) mod world_datapacks;
+pub(crate) mod world_duplicate;
 mod world_folder_name;
 mod world_level;
 pub(crate) mod world_refusal;
@@ -122,6 +123,9 @@ pub struct InstanceManager {
     /// Stops the installed-version check of a running version change (see
     /// `cancel_version_change_check`).
     version_change_checks: modpack::VersionChangeChecks,
+    /// The world each instance is duplicating, at most one (see
+    /// `duplicate_world`).
+    world_copies: world_duplicate::WorldCopies,
     modpack_info_semaphore: Mutex<()>,
     pub any_instance_running: Arc<watch::Sender<bool>>,
     instance_running_tracker: Arc<LivenessTracker>,
@@ -304,6 +308,7 @@ impl InstanceManager {
             log_reads: Mutex::new(()),
             log_history: DashMap::new(),
             version_change_checks: DashMap::new(),
+            world_copies: DashMap::new(),
             modpack_info_semaphore: Mutex::new(()),
             any_instance_running: any_instance_running.clone(),
             instance_running_tracker: LivenessTracker::new(move |count| {

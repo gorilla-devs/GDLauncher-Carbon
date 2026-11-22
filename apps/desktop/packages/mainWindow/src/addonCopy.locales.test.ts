@@ -85,7 +85,10 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_worlds.refusal.name_invalid",
     "_trn_worlds.refusal.rename_incomplete",
     "_trn_worlds.refusal.not_renamed",
-    "_trn_worlds.refusal.holds_link"
+    "_trn_worlds.refusal.holds_link",
+    "_trn_worlds.refusal.no_space",
+    "_trn_worlds.refusal.changed_while_copied",
+    "_trn_worlds.refusal.being_copied"
   ],
   ui: ["_trn_worlds"],
   notifications: [
@@ -162,7 +165,8 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_instance_task_stage_datapack",
     "_trn_server_task_install_mod",
     "_trn_instance_task_check_pack_origin",
-    "_trn_instance_task_check_pack_origin_versions"
+    "_trn_instance_task_check_pack_origin_versions",
+    "_trn_instance_task_duplicate_world"
   ],
   search: [
     "_trn_categories_load_failed",

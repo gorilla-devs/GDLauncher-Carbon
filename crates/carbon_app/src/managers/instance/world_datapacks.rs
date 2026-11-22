@@ -334,6 +334,12 @@ impl ManagerRef<'_, InstanceManager> {
     /// wait for CurseForge or Modrinth. A failed scan is logged and the rows
     /// there are are listed.
     pub async fn list_worlds(self, instance_id: InstanceId) -> anyhow::Result<Vec<World>> {
+        if let Err(error) = self.sweep_world_copy_staging(instance_id).await {
+            warn!(
+                ?error,
+                "Instance {instance_id}: could not remove what unfinished world copies left"
+            );
+        }
         // Not announced: this answer already holds what it changed, and an
         // invalidation would only make the frontend ask again. Packs it finds
         // are asked about as those of a background scan are.

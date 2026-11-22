@@ -9,6 +9,7 @@ export function retainedAddonFailures(tasks: readonly FETask[]): FETask[] {
         "InstanceTaskInstallMod",
         "InstanceTaskStageDatapack",
         "InstanceTaskInstallWorldCopy",
+        "InstanceTaskDuplicateWorld",
         "ServerTaskInstallMod"
       ].includes(task.name.translation)
   )

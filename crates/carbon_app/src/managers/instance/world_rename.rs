@@ -28,8 +28,18 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use tracing::{error, info};
 
-/// The longest in-game name a rename accepts, in characters.
+/// The longest in-game name a rename or a duplicate accepts, in characters.
 const MAX_NAME_CHARS: usize = 64;
+
+/// The in-game name a world is given: `name` trimmed, refused unless it has
+/// 1 to [`MAX_NAME_CHARS`] characters.
+pub(super) fn world_name(name: &str) -> Result<&str, WorldRefusal> {
+    let name = name.trim();
+    if !(1..=MAX_NAME_CHARS).contains(&name.chars().count()) {
+        return Err(WorldRefusal::InvalidName);
+    }
+    Ok(name)
+}
 
 #[derive(Debug, Clone, Deserialize, specta::Type)]
 pub struct RenameWorld {
@@ -92,10 +102,8 @@ impl ManagerRef<'_, InstanceManager> {
         request: &RenameWorld,
     ) -> anyhow::Result<String> {
         self.ensure_world_datapacks_may_change(id).await?;
-        let name = request.name.trim();
-        if !(1..=MAX_NAME_CHARS).contains(&name.chars().count()) {
-            bail!(WorldRefusal::InvalidName);
-        }
+        self.ensure_world_not_copied(id, &request.world)?;
+        let name = world_name(&request.name)?;
         validate_addon_basename(&request.world)?;
         let path = publication::current_path(&self.app, id).await?;
         let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
@@ -217,11 +225,15 @@ impl ManagerRef<'_, InstanceManager> {
         Err(WorldRefusal::NotRenamed.caused_by(error))
     }
 
-    /// The names a renamed world may not take: every entry of `saves` and
-    /// every world the launcher has a record of, or data pack records under,
-    /// whose folder may be gone before a scan removes the records; taking
-    /// such a name would merge those records into the renamed world.
-    async fn taken_world_names(self, id: InstanceId, saves: &Path) -> anyhow::Result<Vec<String>> {
+    /// The names a renamed or copied world may not take: every entry of
+    /// `saves` and every world the launcher has a record of, or data pack
+    /// records under, whose folder may be gone before a scan removes the
+    /// records; taking such a name would merge those records into the world.
+    pub(super) async fn taken_world_names(
+        self,
+        id: InstanceId,
+        saves: &Path,
+    ) -> anyhow::Result<Vec<String>> {
         let mut taken = Vec::new();
         let mut entries = tokio::fs::read_dir(saves)
             .await

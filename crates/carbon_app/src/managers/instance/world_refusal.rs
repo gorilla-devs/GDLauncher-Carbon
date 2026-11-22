@@ -80,6 +80,16 @@ pub enum WorldRefusal {
     /// A link inside the world: a copy could not say what it should hold.
     #[error("The world contains a link and cannot be duplicated")]
     HoldsLink,
+    /// The drive that would hold the copy has less room than the world.
+    #[error("Not enough free disk space to copy the world")]
+    NoSpace,
+    /// The original was played or changed while it was copied, so the copy
+    /// could be torn; it was thrown away.
+    #[error("The world changed while it was copied; nothing was kept")]
+    ChangedWhileCopied,
+    /// The world is being duplicated, and may not change until that ends.
+    #[error("The world is being copied")]
+    BeingCopied,
 }
 
 impl WorldRefusal {
@@ -164,6 +174,9 @@ impl FeErrorCode for WorldRefusal {
             Self::RenameIncomplete { .. } => "WORLD_RENAME_INCOMPLETE",
             Self::NotRenamed => "WORLD_NOT_RENAMED",
             Self::HoldsLink => "WORLD_HOLDS_LINK",
+            Self::NoSpace => "WORLD_NO_SPACE",
+            Self::ChangedWhileCopied => "WORLD_CHANGED_WHILE_COPIED",
+            Self::BeingCopied => "WORLD_BEING_COPIED",
         }
     }
 
@@ -230,6 +243,9 @@ mod tests {
             },
             WorldRefusal::NotRenamed,
             WorldRefusal::HoldsLink,
+            WorldRefusal::NoSpace,
+            WorldRefusal::ChangedWhileCopied,
+            WorldRefusal::BeingCopied,
         ];
         all.extend(
             [

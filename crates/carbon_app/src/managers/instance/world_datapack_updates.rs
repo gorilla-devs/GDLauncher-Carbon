@@ -370,6 +370,9 @@ impl ManagerRef<'_, InstanceManager> {
             .instance_world_datapack(id, row_id)
             .await?
             .ok_or(WorldRefusal::PackGone)?;
+        // Before the platforms are asked; the install checks again under
+        // the gate.
+        self.ensure_world_not_copied(id, &row.world)?;
         let Some(ids) = wdb::get_world_datapack_update_ids(&self.app.db, row_id).await? else {
             return Ok(None);
         };
@@ -540,7 +543,7 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(row.cf_name.or(row.mr_title).unwrap_or(row.filename))
     }
 
-    async fn instance_name(self, id: InstanceId) -> anyhow::Result<String> {
+    pub(super) async fn instance_name(self, id: InstanceId) -> anyhow::Result<String> {
         let instances = self.instances.read().await;
         Ok(instances
             .get(&id)

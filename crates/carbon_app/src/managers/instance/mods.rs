@@ -603,7 +603,7 @@ impl ManagerRef<'_, InstanceManager> {
     /// Each addon has its own result, in the order asked, so one that cannot
     /// be deleted does not hide what happened to the others. An addon asked
     /// for twice is deleted once. A world is refused while the instance's
-    /// game is queued, preparing or running.
+    /// game is queued, preparing or running, and while it is being copied.
     pub async fn delete_mods(
         self,
         instance_id: InstanceId,
@@ -641,10 +641,13 @@ impl ManagerRef<'_, InstanceManager> {
             {
                 // The game has the worlds of a starting or running instance
                 // open: one deleted now would be half removed, or written
-                // back when the game closes. Other addons go as before.
-                Ok(plan) if plan.is_world() => {
-                    self.ensure_game_inactive(instance_id).await.map(|()| plan)
-                }
+                // back when the game closes. One being copied would leave a
+                // copy of what is gone. Other addons go as before.
+                Ok(plan) if plan.is_world() => self
+                    .ensure_game_inactive(instance_id)
+                    .await
+                    .and_then(|()| self.ensure_world_not_copied(instance_id, plan.filename()))
+                    .map(|()| plan),
                 plan => plan,
             };
             match plan {

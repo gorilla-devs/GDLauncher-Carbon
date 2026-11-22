@@ -585,6 +585,16 @@ pub(super) fn mount() -> RouterBuilder<App> {
         mutation RENAME_WORLD[app, request: crate::managers::instance::world_rename::RenameWorld] {
             app.instance_manager().rename_world(request).await
         }
+        mutation DUPLICATE_WORLD[app, request: crate::managers::instance::world_duplicate::DuplicateWorld] {
+            Ok(FETaskId::from(app.instance_manager().duplicate_world(request).await?))
+        }
+        query GET_WORLD_COPY[app, instance_id: FEInstanceId] {
+            Ok(app.instance_manager().world_copy(instance_id.into()).map(FEWorldCopy::from))
+        }
+        mutation CANCEL_WORLD_COPY[app, instance_id: FEInstanceId] {
+            app.instance_manager().cancel_world_copy(instance_id.into());
+            Ok(())
+        }
         mutation UPDATE_WORLD_DATAPACK[app, request: crate::managers::instance::world_datapack_updates::UpdateWorldDatapack] {
             Ok(FETaskId::from(app.instance_manager().update_world_datapack(request).await?))
         }
@@ -2228,6 +2238,26 @@ struct FEWorld {
     addon_id: String,
     identity: Option<String>,
     datapacks: Vec<FEWorldDatapack>,
+}
+
+/// The world an instance is duplicating.
+#[derive(Type, Serialize, Debug)]
+struct FEWorldCopy {
+    /// The folder name of the world being copied.
+    source: String,
+    /// The copy's in-game name.
+    name: String,
+    task: FETaskId,
+}
+
+impl From<crate::managers::instance::world_duplicate::WorldCopy> for FEWorldCopy {
+    fn from(copy: crate::managers::instance::world_duplicate::WorldCopy) -> Self {
+        Self {
+            source: copy.source,
+            name: copy.name,
+            task: copy.task.into(),
+        }
+    }
 }
 
 #[derive(Type, Serialize, Debug)]

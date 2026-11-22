@@ -51,7 +51,6 @@ impl std::error::Error for Cancelled {}
 /// Lists everything in `world` without following links. A link, or anything
 /// else that is neither a regular file nor a folder, refuses the world: a copy
 /// could not say what it should hold.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn survey(world: &Path) -> anyhow::Result<Survey> {
     let mut survey = Survey {
         bytes: 0,
@@ -110,7 +109,6 @@ fn walk(world: &Path, relative: &Path, survey: &mut Survey) -> anyhow::Result<()
 /// Copies what `survey` lists into the new folder `staging`, calling `copied`
 /// with the bytes copied so far after each chunk. The caller removes `staging`
 /// when this fails; it is never removed here.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn copy_tree(
     world: &Path,
     staging: &Path,
@@ -217,7 +215,6 @@ fn set_folder_modified(folder: &Path, modified: SystemTime) -> std::io::Result<(
 
 /// Whether `world` still holds what `survey` saw: the same paths, kinds,
 /// lengths and modified times.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn unchanged_since(world: &Path, survey: &Survey) -> anyhow::Result<bool> {
     Ok(same_entries(&survey.entries, &self::survey(world)?.entries))
 }
@@ -235,7 +232,6 @@ fn same_entries(before: &[Entry], after: &[Entry]) -> bool {
 
 /// The room left on the drive that holds `folder`, or `None` when no listed
 /// drive does.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn free_space(folder: &Path) -> Option<u64> {
     // Not `canonicalize`: on Windows that gives a `\\?\C:\` path, which never
     // starts with the `C:\` mount point sysinfo reports.
@@ -590,10 +586,10 @@ mod tests {
     #[test]
     fn free_space_is_known_for_the_temp_folder() {
         let dir = tempfile::tempdir().unwrap();
-        match free_space(dir.path()) {
-            Some(free) => assert!(free > 0),
-            // A platform where sysinfo lists no disks.
-            None => assert!(sysinfo::Disks::new_with_refreshed_list().list().is_empty()),
+        // `None` where sysinfo lists no disks, or leaves out the mount of the
+        // temp folder (a tmpfs `/tmp`).
+        if let Some(free) = free_space(dir.path()) {
+            assert!(free > 0);
         }
     }
 }

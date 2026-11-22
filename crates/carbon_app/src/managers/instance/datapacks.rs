@@ -180,6 +180,7 @@ impl ManagerRef<'_, InstanceManager> {
         request: &CopyDatapack,
     ) -> anyhow::Result<()> {
         self.ensure_world_datapacks_may_change(id).await?;
+        self.ensure_world_not_copied(id, &request.world.name)?;
         validate_addon_basename(&request.world.name)?;
         let row = self.get_owned_mod_file(id, &request.mod_id).await?;
         if row.addon_type != AddonType::DataPacks.to_db_string() {

@@ -52,5 +52,6 @@
   "_trn_task_status_active_tasks_many": "{{count}} активных задач",
   "_trn_task_status_active_count_few": "{{count}} задачи",
   "_trn_task_status_active_count_many": "{{count}} задач",
-  "_trn_instance_task_install_world_copy": "Установка отдельной копии мира {{world_name}} для {{instance_name}}; исходное сохранение оставлено"
+  "_trn_instance_task_install_world_copy": "Установка отдельной копии мира {{world_name}} для {{instance_name}}; исходное сохранение оставлено",
+  "_trn_instance_task_duplicate_world": "Копирование мира {{world_name}} в {{instance_name}}"
 }

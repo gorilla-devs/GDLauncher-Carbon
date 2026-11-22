@@ -77,7 +77,13 @@ const REFUSALS: Record<string, Refusal> = {
     outdatesWorlds: true
   },
   WORLD_NOT_RENAMED: { key: "content:_trn_worlds.refusal.not_renamed" },
-  WORLD_HOLDS_LINK: { key: "content:_trn_worlds.refusal.holds_link" }
+  WORLD_HOLDS_LINK: { key: "content:_trn_worlds.refusal.holds_link" },
+  WORLD_NO_SPACE: { key: "content:_trn_worlds.refusal.no_space" },
+  WORLD_CHANGED_WHILE_COPIED: {
+    key: "content:_trn_worlds.refusal.changed_while_copied",
+    outdatesWorlds: true
+  },
+  WORLD_BEING_COPIED: { key: "content:_trn_worlds.refusal.being_copied" }
 }
 
 const refusal = (code: string | null | undefined): Refusal | undefined =>

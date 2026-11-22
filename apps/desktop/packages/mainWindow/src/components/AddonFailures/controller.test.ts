@@ -28,16 +28,17 @@ it("discovers retained single/dropdown/row/bulk addon failures after view replac
     task(3, "InstanceTaskInstallWorldCopy"),
     task(4, "ServerTaskInstallMod"),
     task(5, "InstanceTaskLaunch"),
-    task(6, "InstanceTaskInstallMod", false)
+    task(6, "InstanceTaskInstallMod", false),
+    task(7, "InstanceTaskDuplicateWorld")
   ]
   expect(retainedAddonFailures(snapshot).map((task) => task.id)).toEqual([
-    1, 2, 3, 4
+    1, 2, 3, 4, 7
   ])
   // Independent shell reads rediscover the same manager-owned failures.
   expect(retainedAddonFailures([...snapshot])).toEqual(
     retainedAddonFailures(snapshot)
   )
-  expect(snapshot).toHaveLength(6)
+  expect(snapshot).toHaveLength(7)
 })
 it("acknowledges only the captured failed ID before shader retry accepts a new task", async () => {
   const calls: string[] = []

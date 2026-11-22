@@ -811,6 +811,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .instance_world_datapack(id, &request.id)
                 .await?
                 .ok_or(WorldRefusal::PackGone)?;
+            self.ensure_world_not_copied(id, &row.world)?;
             let removal = self.addon_removal().await?;
             // None: the `datapacks` folder is gone, and the pack with it.
             if let Some(path) = self.world_datapack_entry(id, &row).await?
@@ -961,6 +962,7 @@ impl ManagerRef<'_, InstanceManager> {
 
         let operation = self.lock_instance(id).await;
         self.ensure_world_datapacks_may_change(id).await?;
+        self.ensure_world_not_copied(id, &request.world)?;
         let replaced = match &request.replaces {
             Some(row_id) => Some(
                 self.replaceable_row(id, &request.world, row_id)
@@ -1154,6 +1156,7 @@ impl ManagerRef<'_, InstanceManager> {
             bail!(CLOSING);
         }
         self.ensure_world_datapacks_may_change(id).await?;
+        self.ensure_world_not_copied(id, &request.world)?;
         let path = publication::current_path(&self.app, id).await?;
         let root = path.get_root();
         let saves = publication::checked_folder(&path, AddonType::Worlds).await?;

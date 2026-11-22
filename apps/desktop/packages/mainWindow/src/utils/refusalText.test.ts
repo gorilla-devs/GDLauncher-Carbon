@@ -53,7 +53,10 @@ const REFUSALS: [code: string, data?: Record<string, string>][] = [
   ["WORLD_NAME_INVALID"],
   ["WORLD_RENAME_INCOMPLETE", { folder: FOLDER }],
   ["WORLD_NOT_RENAMED"],
-  ["WORLD_HOLDS_LINK"]
+  ["WORLD_HOLDS_LINK"],
+  ["WORLD_NO_SPACE"],
+  ["WORLD_CHANGED_WHILE_COPIED"],
+  ["WORLD_BEING_COPIED"]
 ]
 const CORE_TEXT = "The core's English sentence"
 
@@ -151,6 +154,13 @@ describe("a refusal in the player's language", () => {
     expect(said("WORLD_HOLDS_LINK")).toBe(
       "This world contains a link to another folder and can't be duplicated."
     )
+    expect(said("WORLD_NO_SPACE")).toBe(
+      "Not enough free disk space to copy this world."
+    )
+    expect(said("WORLD_CHANGED_WHILE_COPIED")).toBe(
+      "The world changed while it was copied. Nothing was kept; try again."
+    )
+    expect(said("WORLD_BEING_COPIED")).toBe("This world is being copied.")
   })
 
   it("falls back to the core's sentence for a code it does not know", () => {

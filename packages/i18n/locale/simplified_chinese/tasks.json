@@ -48,5 +48,6 @@
   "_trn_server_task_install_modloader": "正在安装模组加载器",
   "_trn_server_task_install_mod": "正在为 {{server_name}} 安装附加组件",
   "_trn_cache_cleanup": "正在清理缓存",
-  "_trn_instance_task_install_world_copy": "正在为 {{instance_name}} 安装世界 {{world_name}} 的独立副本；原始存档已保留"
+  "_trn_instance_task_install_world_copy": "正在为 {{instance_name}} 安装世界 {{world_name}} 的独立副本；原始存档已保留",
+  "_trn_instance_task_duplicate_world": "正在复制 {{instance_name}} 中的世界 {{world_name}}"
 }
