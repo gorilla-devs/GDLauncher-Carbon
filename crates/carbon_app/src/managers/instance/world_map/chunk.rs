@@ -128,8 +128,12 @@ pub(super) fn surface_asking(
         .flatten()
         .filter(|(_, bedrock)| *bedrock)
         .count();
-    Ok(if roof == Roof::Ceiling || bedrock >= ROOF_COLUMNS {
+    Ok(if roof == Roof::Ceiling {
         std::array::from_fn(|i| column.top(i, Roof::Ceiling).map(|(top, _)| top))
+    } else if bedrock >= ROOF_COLUMNS {
+        // A roof found only by its bedrock may be the floor of a chunk dug down to it: where
+        // nothing lies under it, the column shows its top.
+        std::array::from_fn(|i| column.top(i, Roof::Ceiling).or(open[i]).map(|(top, _)| top))
     } else {
         open.map(|top: Option<(Top, bool)>| top.map(|(top, _)| top))
     })

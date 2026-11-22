@@ -537,6 +537,100 @@ fn under_a_ceiling_the_floor_is_shown() {
     assert_eq!(open[15], top("minecraft:stone", 63));
 }
 
+/// A chunk of 1.18 dug out down to the bedrock floor at -64 and -63, as a world eater leaves
+/// it: air above, but for a block of stone on the floor in column `0, 0`.
+fn perimeter() -> Vec<u8> {
+    let floor = (
+        -4,
+        vec!["minecraft:air", "minecraft:bedrock", "minecraft:stone"],
+        fill(|x, y, z| match y {
+            0 | 1 => 1,
+            2 if (x, z) == (0, 0) => 2,
+            _ => 0,
+        }),
+    );
+    let air = (-3..5).map(|y| (y, vec!["minecraft:air"], vec![]));
+    chunk_1_18(std::iter::once(floor).chain(air).collect(), FULL)
+}
+
+#[test]
+fn a_chunk_dug_down_to_bedrock_shows_its_floor() {
+    let surface = surface(&perimeter(), Roof::Open, None);
+    assert_eq!(surface[0], top("minecraft:stone", -62));
+    for column in 1..256 {
+        assert_eq!(
+            surface[column],
+            top("minecraft:bedrock", -63),
+            "column {column}"
+        );
+    }
+}
+
+#[test]
+fn under_a_ceiling_a_chunk_dug_out_to_the_floor_shows_the_floor() {
+    // A roof at 123 to 127, air from there down to the floor bedrock at 0 to 4.
+    let palette = vec!["minecraft:air", "minecraft:bedrock"];
+    let sections = (0..8)
+        .map(|section_y: i8| {
+            let indices = fill(|_, local, _| {
+                let y = i32::from(section_y) * 16 + local as i32;
+                u16::from(!(5..123).contains(&y))
+            });
+            (section_y, palette.clone(), indices)
+        })
+        .collect();
+    let surface = surface(&chunk_1_18(sections, FULL), Roof::Ceiling, None);
+    assert!(surface.iter().all(|t| *t == top("minecraft:bedrock", 4)));
+}
+
+#[test]
+fn under_a_ceiling_a_column_with_no_gap_below_the_roof_shows_nothing() {
+    // Netherrack from the floor to the bedrock roof at 127 where `x < 8`; elsewhere air
+    // from 40 to 99.
+    let palette = vec!["minecraft:air", "minecraft:netherrack", "minecraft:bedrock"];
+    let sections = (0..8)
+        .map(|section_y: i8| {
+            let indices = fill(|x, local, _| {
+                let y = i32::from(section_y) * 16 + local as i32;
+                match y {
+                    127 => 2,
+                    40..=99 if x >= 8 => 0,
+                    _ => 1,
+                }
+            });
+            (section_y, palette.clone(), indices)
+        })
+        .collect();
+    let surface = surface(&chunk_1_18(sections, FULL), Roof::Ceiling, None);
+    for z in 0..16 {
+        for x in 0..16 {
+            let expected = if x < 8 {
+                None
+            } else {
+                top("minecraft:netherrack", 39)
+            };
+            assert_eq!(surface[z * 16 + x], expected, "column {x},{z}");
+        }
+    }
+}
+
+#[test]
+fn terrain_over_a_bedrock_floor_is_not_taken_for_a_roof() {
+    let mut sections = terrain();
+    sections.push((
+        -4,
+        vec!["minecraft:bedrock", "minecraft:deepslate"],
+        fill(|_, y, _| u16::from(y > 1)),
+    ));
+    sections.extend((-3..2).map(|y| (y, vec!["minecraft:deepslate"], vec![])));
+    assert_terrain(&surface(&chunk_1_18(sections, FULL), Roof::Open, None));
+}
+
+#[test]
+fn a_chunk_without_a_status_is_read_as_finished() {
+    assert_terrain(&surface(&chunk_1_18(terrain(), ""), Roof::Open, None));
+}
+
 /// Packs 4096 indices the way 1.13 to 1.15 do: an index may run on into the next long.
 fn pack_spanning(indices: &[u16], bits: usize) -> Vec<i64> {
     let mut data = vec![0u64; (indices.len() * bits).div_ceil(64)];
