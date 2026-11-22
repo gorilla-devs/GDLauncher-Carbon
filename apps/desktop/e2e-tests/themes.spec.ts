@@ -1966,6 +1966,91 @@ test.describe("Themes", () => {
     }
   })
 
+  // A page slide runs on the compositor. As it ends, Chromium can draw one
+  // more frame of the leaving page's snapshot where the slide began, under
+  // the page that came in: a see-through panel (Silent Night) shows it as a
+  // flash of the old page. So the leaving page's snapshot is hidden as its
+  // slide ends, and the transition still ends with the slide.
+  test("a page slide hides the page it leaves as the slide ends", async ({
+    authenticatedApp
+  }) => {
+    const { page } = authenticatedApp
+    await goTo(page, "#/search")
+    const rows = page.locator(byTestId(TEST_IDS.searchResultRow))
+    await expect(rows.first()).toBeVisible({ timeout: 90_000 })
+    await page.evaluate(() => {
+      interface Slide {
+        slideEnd: number
+        end: number
+        leaving: string[]
+      }
+      const w = window as unknown as { __slides: Slide[] }
+      w.__slides = []
+      const start = document.startViewTransition.bind(document)
+      document.startViewTransition = ((update?: () => unknown) => {
+        const transition = start(update as () => Promise<void>)
+        void transition.ready.then(() => {
+          const pseudo = (a: Animation) =>
+            (a.effect as KeyframeEffect | null)?.pseudoElement ?? ""
+          const all = document
+            .getAnimations()
+            .filter((a) => pseudo(a).startsWith("::view-transition"))
+          const sliding = all.filter(
+            (a) =>
+              /^::view-transition-(old|new)\(slide-/.test(pseudo(a)) &&
+              (a as CSSAnimation).animationName.startsWith("slide-")
+          )
+          const old = sliding.map(pseudo).find((p) => p.includes("-old("))!
+          const end = (list: Animation[]) =>
+            Math.max(
+              ...list.map((a) => Number(a.effect!.getComputedTiming().endTime))
+            )
+          const leaving = () =>
+            getComputedStyle(document.documentElement, old).visibility
+          // The leaving page as the slide starts, then as it ends.
+          for (const a of all) a.pause()
+          const atStart = leaving()
+          for (const a of all) a.finish()
+          w.__slides.push({
+            slideEnd: end(sliding),
+            end: end(all),
+            leaving: [atStart, leaving()]
+          })
+        })
+        return transition
+      }) as typeof document.startViewTransition
+    })
+    await rows.first().click()
+    await expect(page.locator(byHook("addon-page"))).toBeVisible()
+    await page.locator(byHook("addon-page.back")).click()
+    await expect(rows.first()).toBeVisible()
+    await expect
+      .poll(() =>
+        page.evaluate(() =>
+          document.documentElement.matches(":active-view-transition")
+        )
+      )
+      .toBe(false)
+    const slides = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __slides: { slideEnd: number; end: number; leaving: string[] }[]
+          }
+        ).__slides
+    )
+    expect(slides, "to the add-on and back").toHaveLength(2)
+    for (const slide of slides) {
+      expect(
+        slide.leaving,
+        "the leaving page as the slide starts, then as it ends"
+      ).toEqual(["visible", "hidden"])
+      expect(slide.end, "the transition ends with the slide").toBe(
+        slide.slideEnd
+      )
+    }
+  })
+
   test("Silent Night draws its scene, decorations and effects", async ({
     authenticatedApp
   }) => {

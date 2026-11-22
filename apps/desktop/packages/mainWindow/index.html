@@ -281,8 +281,24 @@
         animation: none;
       }
 
+      /* The slide runs on the compositor. As it ends, Chromium can draw one
+         more frame of the leaving page's snapshot where the slide began,
+         under the page that came in: through a see-through panel (Silent
+         Night) that is a flash of the old page. So the leaving page's
+         snapshot is also hidden as it finishes sliding out: visibility is
+         painted by the main thread, not the compositor, and that frame has
+         nothing left to show. */
+      @keyframes gdl-slide-hide {
+        from {
+          visibility: visible;
+        }
+        to {
+          visibility: hidden;
+        }
+      }
+
       ::view-transition-old(slide-right-transition) {
-        animation-name: slide-out-to-left;
+        animation-name: slide-out-to-left, gdl-slide-hide;
       }
 
       ::view-transition-new(slide-right-transition) {
@@ -290,7 +306,7 @@
       }
 
       ::view-transition-old(slide-left-transition) {
-        animation-name: slide-out-to-right;
+        animation-name: slide-out-to-right, gdl-slide-hide;
       }
 
       ::view-transition-new(slide-left-transition) {
