@@ -1,7 +1,67 @@
 import sanitizeHtml from "sanitize-html"
 
-const opts = {
+// An address as the browser reads it: nothing up to a space around it, and no
+// tab or line break anywhere in it.
+const written = (value: string | undefined) => {
+  const text = value ?? ""
+  let start = 0
+  let end = text.length
+  while (start < end && text.charCodeAt(start) <= 0x20) start++
+  while (end > start && text.charCodeAt(end - 1) <= 0x20) end--
+  return text.slice(start, end).replace(/[\t\n\r]/g, "")
+}
+
+// An address that says by itself where it leads, with no page to complete it.
+const complete = (address: string) => {
+  try {
+    return new URL(address)
+  } catch {
+    return undefined
+  }
+}
+
+// An address that names a host and no scheme (`//host/a.png`, with either
+// slash) takes its page's scheme. The packaged window is a local file, where
+// that makes it a file on another computer, and Windows signs in to that
+// computer to fetch it. It is read as https, as on the site it was written for.
+const hostOnly = (address: string) =>
+  /^[/\\]{2}/.test(address) ? complete(`https:${address}`) : undefined
+
+// The address a description may make the window load by itself: a web one.
+// Any other (a path, a drive, a file) would be completed from the window's own
+// place on disk, so it loads nothing.
+const loaded = (value: string | undefined) => {
+  const address = written(value)
+  const url = complete(address) ?? hostOnly(address)
+  return url?.protocol === "https:" || url?.protocol === "http:"
+    ? url.href
+    : undefined
+}
+
+// A link opens only when it is clicked, and the main process opens web and
+// mail addresses alone: it is left as written, a host-only one made https.
+const opened = (value: string) => {
+  const address = written(value)
+  return complete(address) ? value : (hostOnly(address)?.href ?? value)
+}
+
+const withSource =
+  (extra: Record<string, string>): sanitizeHtml.Transformer =>
+  (tagName, attribs) => {
+    const { src, ...rest } = attribs
+    const address = loaded(src)
+    return {
+      tagName,
+      attribs: address
+        ? { ...attribs, src: address, ...extra }
+        : { ...rest, ...extra }
+    }
+  }
+
+const opts: sanitizeHtml.IOptions = {
   allowedTags: sanitizeHtml.defaults.allowedTags.concat(["img", "iframe"]),
+  allowProtocolRelative: false,
+  allowedSchemesByTag: { img: ["https", "http"], iframe: ["https"] },
   allowedAttributes: {
     a: ["href", "name", "target", "class"],
     img: ["src", "width", "height", "class"],
@@ -15,10 +75,16 @@ const opts = {
     "cdn.ko-fi.com"
   ],
   transformTags: {
-    a: sanitizeHtml.simpleTransform("a", { class: "text-blue-500" }),
-    img: sanitizeHtml.simpleTransform("img", {
-      class: "max-w-full h-auto"
-    })
+    a: (tagName, attribs) => ({
+      tagName,
+      attribs: {
+        ...attribs,
+        ...(attribs.href !== undefined && { href: opened(attribs.href) }),
+        class: "text-blue-500"
+      }
+    }),
+    img: withSource({ class: "max-w-full h-auto" }),
+    iframe: withSource({})
   }
 }
 
