@@ -89,7 +89,10 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_worlds.refusal.holds_link",
     "_trn_worlds.refusal.no_space",
     "_trn_worlds.refusal.changed_while_copied",
-    "_trn_worlds.refusal.being_copied"
+    "_trn_worlds.refusal.being_copied",
+    "_trn_worlds.copy_name",
+    "_trn_worlds.copying",
+    "_trn_worlds.copying_unknown"
   ],
   ui: ["_trn_worlds"],
   notifications: [

@@ -71,6 +71,12 @@ vi.mock("@/utils/rspcClient", () => ({
             return io.state.settings
           }
         }
+      if (key === "instance.getWorldCopy")
+        return {
+          get data() {
+            return io.state.copy
+          }
+        }
       return {
         get data() {
           return io.state.mods
@@ -89,8 +95,11 @@ vi.mock("@/utils/rspcClient", () => ({
   }
 }))
 vi.mock("@gd/i18n", () => {
-  const t = (key: string, options?: any) =>
-    options?.places ? `${key}(${options.places})` : key
+  const t = (key: string, options?: any) => {
+    if (key === "content:_trn_worlds.copy_name") return `${options.name} (copy)`
+    if (options?.percent !== undefined) return `${key}(${options.percent})`
+    return options?.places ? `${key}(${options.places})` : key
+  }
   return {
     Trans: (p: any) => <span>{p.key}</span>,
     useTransContext: () => [t],
@@ -105,6 +114,7 @@ vi.mock("@gd/ui", async () => {
   return {
     ...ui,
     PRESS_CLASSES: "",
+    Progress: (p: any) => <div data-testid="progress" data-value={p.value} />,
     Skeleton: { logsList: () => <div /> },
     Button: (p: any) => (
       <button
@@ -221,6 +231,7 @@ function mount(
     details?: any
     worldsError?: boolean
     recycleBin?: boolean | null
+    copy?: { source: string; name: string; task: number } | null
   } = {}
 ) {
   const [state, set] = createStore({
@@ -228,6 +239,7 @@ function mount(
     mods: options.mods ?? [],
     details: options.details ?? { modpack: null, state: { state: "inactive" } },
     worldsError: options.worldsError ?? false,
+    copy: options.copy ?? null,
     settings:
       options.recycleBin === null
         ? undefined
@@ -1157,5 +1169,292 @@ it("offers Rename as the pencil's tooltip", async () => {
   expect(pencil.dataset.disabled).toBe("false")
   expect(pencil.parentElement!.parentElement!.textContent).toBe(
     "content:_trn_worlds.rename"
+  )
+})
+
+const COPY = { source: "Home", name: "Home (copy)", task: 7 }
+const copyTask = (progress: any) => ({
+  id: 7,
+  name: {
+    translation: "InstanceTaskDuplicateWorld",
+    args: { world_name: "Home", instance_name: "Instance" }
+  },
+  progress,
+  downloaded: "0",
+  download_total: "0",
+  active_subtasks: []
+})
+const copying = (value: number | null) => ({
+  type: "Running",
+  value: copyTask(
+    value === null ? { type: "Indeterminate" } : { type: "Known", value }
+  )
+})
+const copyFailed = (code: string) => ({
+  type: "Failed",
+  value: copyTask({
+    type: "Failed",
+    value: {
+      cause: [{ display: "The world changed", debug: "", code, data: null }],
+      backtrace: ""
+    }
+  })
+})
+/** Answers each task outcome read with `outcome`; other reads succeed. */
+const copyOutcome = (outcome: any) =>
+  io.clientQuery.mockImplementation(async ([key, task]: [string, number]) =>
+    key === "vtask.getTaskOutcome" && task === 7
+      ? outcome
+      : { type: "Succeeded" }
+  )
+const tooltip = (element: HTMLElement) =>
+  element.parentElement!.parentElement!.textContent
+
+it("duplicate sends the world and the name of its copy", async () => {
+  copyOutcome(copying(0))
+  const root = mount([world("Alpha", []), world("home", [], "id-home", "Home")])
+  await flush()
+  select(root, "Home")
+  await flush()
+  io.mutateAsync["instance.duplicateWorld"].mockResolvedValue(7)
+  const action = one(root, "world-duplicate")!
+  expect(action.dataset.disabled).toBe("false")
+  expect(tooltip(action)).toBe("instances:_trn_action_duplicate")
+  action.click()
+  await flush()
+  expect(
+    io.mutateAsync["instance.duplicateWorld"]
+  ).toHaveBeenCalledExactlyOnceWith({
+    instance_id: 5,
+    world: "home",
+    identity: "id-home",
+    name: "Home (copy)"
+  })
+  expect(io.clientQuery).toHaveBeenCalledWith(["vtask.getTaskOutcome", 7])
+
+  // A name as long as a name may be is cut, so the copy's stays within it.
+  const long = "L".repeat(64)
+  dispose?.()
+  document.body.textContent = ""
+  const other = mount([world("long", [], "id-long", long)])
+  await flush()
+  io.mutateAsync["instance.duplicateWorld"].mockResolvedValue(8)
+  one(other, "world-duplicate")!.click()
+  await flush()
+  const [request] = io.mutateAsync["instance.duplicateWorld"].mock.calls[1]
+  expect(request.name).toBe(long)
+  expect([...request.name].length).toBeLessThanOrEqual(64)
+})
+
+it("a running copy shows its row with the percent and cannot be selected", async () => {
+  let answer!: (outcome: any) => void
+  io.clientQuery.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve))
+  )
+  const root = mount([world("Home", []), world("Other", [])], { copy: COPY })
+  await flush()
+  const entries = root.querySelectorAll<HTMLElement>(
+    '[data-testid="world-entry"], [data-testid="world-copy"]'
+  )
+  expect([...entries].map((entry) => entry.dataset.testid)).toEqual([
+    "world-entry",
+    "world-copy",
+    "world-entry"
+  ])
+  const row = one(root, "world-copy")!
+  expect(row.textContent).toContain("Home (copy)")
+  expect(row.textContent).toContain("content:_trn_worlds.copying_unknown")
+  expect(one(row, "progress")).not.toBeNull()
+
+  answer(copying(0.42))
+  await flush()
+  expect(one(root, "world-copy")!.textContent).toContain(
+    "content:_trn_worlds.copying(42)"
+  )
+  expect(one(root, "progress")!.dataset.value).toBe("42")
+
+  one(root, "world-copy")!.click()
+  await flush()
+  expect(title(root)).toBe("Home")
+  expect(one(root, "world-copy")!.dataset.selected).toBeUndefined()
+})
+
+it("the cross on the row cancels the copy", async () => {
+  copyOutcome(copying(0.1))
+  const root = mount([world("Home", [])], { copy: COPY })
+  await flush()
+  const cross = one(root, "world-copy-cancel")!
+  expect(tooltip(cross)).toBe("general:_trn_cancel")
+  cross.click()
+  expect(io.mutate["instance.cancelWorldCopy"]).toHaveBeenCalledExactlyOnceWith(
+    5
+  )
+  expect(title(root)).toBe("Home")
+})
+
+it("while a world is copied its changes and every duplicate are disabled with the reason", async () => {
+  copyOutcome(copying(0.1))
+  const reason = "content:_trn_worlds.refusal.being_copied"
+  const root = mount(
+    [
+      world("Home", [known("terra", "terra", true), pack("loose")]),
+      world("Other", [known("o", "other")])
+    ],
+    { copy: COPY }
+  )
+  await flush()
+  for (const id of [
+    "world-rename",
+    "world-delete",
+    "world-duplicate",
+    "world-datapack-switch",
+    "world-datapack-update"
+  ]) {
+    const action = one(root, id)!
+    expect(action.dataset.disabled, id).toBe("true")
+    expect(tooltip(action), id).toBe(reason)
+  }
+  for (const action of all(root, "world-datapack-remove")) {
+    expect(action.dataset.disabled).toBe("true")
+    expect(tooltip(action)).toBe(reason)
+  }
+  const add = one(root, "world-add-datapacks") as HTMLButtonElement
+  expect(add.disabled).toBe(true)
+  expect(tooltip(add)).toContain(reason)
+  one(root, "world-delete")!.click()
+  one(root, "world-duplicate")!.click()
+  one(root, "world-datapack-update")!.click()
+  one(root, "world-datapack-remove")!.click()
+  await flush()
+  expect(io.deleteWorld).not.toHaveBeenCalled()
+  expect(io.mutateAsync["instance.duplicateWorld"]).not.toHaveBeenCalled()
+  expect(io.mutateAsync["instance.updateWorldDatapack"]).not.toHaveBeenCalled()
+  expect(io.mutateAsync["instance.deleteWorldDatapack"]).not.toHaveBeenCalled()
+
+  // Another world can be changed, but not duplicated.
+  select(root, "Other")
+  await flush()
+  expect(one(root, "world-rename")!.dataset.disabled).toBe("false")
+  expect(one(root, "world-delete")!.dataset.disabled).toBe("false")
+  expect(one(root, "world-datapack-remove")!.dataset.disabled).toBe("false")
+  expect((one(root, "world-add-datapacks") as HTMLButtonElement).disabled).toBe(
+    false
+  )
+  const duplicate = one(root, "world-duplicate")!
+  expect(duplicate.dataset.disabled).toBe("true")
+  expect(tooltip(duplicate)).toBe(reason)
+})
+
+it("a finished copy is selected and no toast is shown", async () => {
+  copyOutcome({ type: "Succeeded" })
+  const root = mount(
+    [world("Home", []), world("Home (copy)", [], "id-old", "Home (copy)")],
+    { copy: COPY }
+  )
+  io.refetchWorlds.mockImplementation(async () =>
+    setState({
+      copy: null,
+      worlds: [
+        world("Home", []),
+        world("Home (copy)", [], "id-old", "Home (copy)"),
+        world("Home (copy) (2)", [], "id-new", "Home (copy)")
+      ]
+    })
+  )
+  await flush()
+  await flush()
+  expect(io.refetchWorlds).toHaveBeenCalled()
+  expect(one(root, "world-copy")).toBeNull()
+  // The new one, not the copy made earlier under the same name.
+  expect(title(root)).toBe("Home (copy)")
+  expect(one(root, "world-folder")!.textContent).toBe("Home (copy) (2)")
+  expect(io.toastSuccess).not.toHaveBeenCalled()
+  expect(io.toastError).not.toHaveBeenCalled()
+})
+
+it("a failed copy shows its refusal once and is dismissed", async () => {
+  copyOutcome(copyFailed("WORLD_CHANGED_WHILE_COPIED"))
+  const root = mount([world("Home", [])], { copy: COPY })
+  await flush()
+  await flush()
+  expect(io.toastError).toHaveBeenCalledExactlyOnceWith(
+    "content:_trn_worlds.refusal.changed_while_copied"
+  )
+  expect(io.mutate["vtask.dismissTask"]).toHaveBeenCalledExactlyOnceWith(7)
+  expect(io.refetchWorlds).toHaveBeenCalled()
+  // The query still answering the copy does not tell it again.
+  expect(one(root, "world-copy")).toBeNull()
+  setState("copy", { ...COPY })
+  await flush()
+  expect(io.toastError).toHaveBeenCalledTimes(1)
+  expect(io.toastSuccess).not.toHaveBeenCalled()
+})
+
+it("a cancelled copy shows nothing", async () => {
+  copyOutcome({ type: "Dismissed" })
+  const root = mount([world("Home", [])], { copy: COPY })
+  io.refetchWorlds.mockImplementation(async () => setState("copy", null))
+  await flush()
+  await flush()
+  expect(one(root, "world-copy")).toBeNull()
+  expect(io.toastError).not.toHaveBeenCalled()
+  expect(io.toastSuccess).not.toHaveBeenCalled()
+  expect(io.mutate["vtask.dismissTask"]).not.toHaveBeenCalled()
+  expect(title(root)).toBe("Home")
+})
+
+it.each([
+  [
+    "while the game is busy",
+    world("Alpha", []),
+    BUSY,
+    "content:_trn_worlds.busy"
+  ],
+  [
+    "on a locked instance",
+    world("Alpha", []),
+    LOCKED,
+    "instances:_trn_locked_cannot_apply_changes"
+  ],
+  [
+    "for a world that cannot be read",
+    world("Alpha", [], null),
+    undefined,
+    "content:_trn_worlds.unreadable"
+  ]
+])(
+  "duplicate is disabled with the reason %s",
+  async (_, w, details, reason) => {
+    const root = mount([w], { details })
+    await flush()
+    const action = one(root, "world-duplicate")!
+    expect(action.dataset.disabled).toBe("true")
+    expect(tooltip(action)).toBe(reason)
+    action.click()
+    await flush()
+    expect(io.mutateAsync["instance.duplicateWorld"]).not.toHaveBeenCalled()
+  }
+)
+
+it("a copy already running when the tab opens is shown", async () => {
+  copyOutcome(copying(0.1))
+  const root = mount([world("Home", [])], { copy: COPY })
+  await flush()
+  expect(io.clientQuery).toHaveBeenCalledWith(["vtask.getTaskOutcome", 7])
+  const row = one(root, "world-copy")!
+  expect(row.textContent).toContain("Home (copy)")
+  expect(row.textContent).toContain("content:_trn_worlds.copying(10)")
+  expect(one(root, "world-duplicate")!.dataset.disabled).toBe("true")
+})
+
+it("the open field closes when a copy of the world starts", async () => {
+  copyOutcome(copying(0))
+  const root = await renaming()
+  typeInto(field(root)!, "Season 2")
+  setState("copy", { ...COPY, source: "New World" })
+  await flush()
+  expect(field(root)).toBeNull()
+  expect(tooltip(one(root, "world-rename")!)).toBe(
+    "content:_trn_worlds.refusal.being_copied"
   )
 })

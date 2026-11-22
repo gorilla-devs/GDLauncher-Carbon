@@ -25,6 +25,7 @@ import WorldTitle from "./WorldTitle"
 
 export interface WorldDatapacksActions {
   openFolder: () => void
+  duplicate: () => void
   /** Settles when the world is renamed; throws when it was refused. */
   rename: (_name: string) => Promise<void>
   deleteWorld: () => void
@@ -47,6 +48,10 @@ export interface WorldDatapacksProps {
   /** The world's row in the instance's addon list, once that has loaded. */
   worldRow: Mod | undefined
   blocked: ChangesBlocked
+  /** This world is being duplicated: it cannot be changed meanwhile. */
+  beingCopied: boolean
+  /** The instance is duplicating a world, this one or another. */
+  copyRunning: boolean
   copiesWithUpdate: (_pack: FEWorldDatapack) => number
   isPending: (_packId: string) => boolean
   actions: WorldDatapacksActions
@@ -60,21 +65,27 @@ const packImage = (instanceId: number, pack: FEWorldDatapack) => {
   return null
 }
 
+const BeingCopiedText = () => (
+  <Trans key="content:_trn_worlds.refusal.being_copied" />
+)
+
 const UpdateCell = (props: {
   pack: FEWorldDatapack
   pending: boolean
   blocked: ChangesBlocked
+  beingCopied: boolean
   copies: number
   actions: WorldDatapacksActions
 }) => {
+  const disabled = () => !!props.blocked || props.beingCopied
   const arrow = (onClick?: () => void) => (
     <div
       data-testid="world-datapack-update"
-      data-disabled={!!props.blocked}
+      data-disabled={disabled()}
       class="i-hugeicons:download-02 text-lg transition-colors"
       classList={{
-        "text-green-500 hover:text-green-400 cursor-pointer": !props.blocked,
-        "text-gray-400 cursor-not-allowed": !!props.blocked
+        "text-green-500 hover:text-green-400 cursor-pointer": !disabled(),
+        "text-gray-400 cursor-not-allowed": disabled()
       }}
       onClick={() => onClick?.()}
     />
@@ -86,18 +97,25 @@ const UpdateCell = (props: {
     >
       <Show when={props.pack.has_update}>
         <Show
-          when={!props.blocked && props.copies > 1}
+          when={!disabled() && props.copies > 1}
           fallback={
             <Tooltip>
               <TooltipTrigger>
                 {arrow(() => {
-                  if (!props.blocked) props.actions.updateHere(props.pack)
+                  if (!disabled()) props.actions.updateHere(props.pack)
                 })}
               </TooltipTrigger>
               <TooltipContent>
                 <Show
                   when={props.blocked}
-                  fallback={<Trans key="content:_trn_update_mod" />}
+                  fallback={
+                    <Show
+                      when={props.beingCopied}
+                      fallback={<Trans key="content:_trn_update_mod" />}
+                    >
+                      <BeingCopiedText />
+                    </Show>
+                  }
                 >
                   <BlockedText blocked={props.blocked} />
                 </Show>
@@ -125,6 +143,9 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
   const readable = () => props.world.identity !== null
   const downloaded = () =>
     !!(props.worldRow?.curseforge || props.worldRow?.modrinth)
+  // Changes to this world wait for its copy; `blocked` says its own reason.
+  const held = () => !!props.blocked || props.beingCopied
+  const heldReason = () => (props.beingCopied ? <BeingCopiedText /> : undefined)
 
   return (
     <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -132,6 +153,7 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
         <WorldTitle
           world={props.world}
           blocked={props.blocked}
+          reason={heldReason()}
           onRename={props.actions.rename}
         />
         <IconAction
@@ -141,13 +163,30 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
           onClick={props.actions.openFolder}
         />
         <IconAction
+          testId="world-duplicate"
+          icon="i-hugeicons:copy-01"
+          label={<Trans key="instances:_trn_action_duplicate" />}
+          onClick={props.actions.duplicate}
+          // One copy per instance at a time.
+          disabled={!!props.blocked || !readable() || props.copyRunning}
+          blocked={props.blocked}
+          reason={
+            !readable() ? (
+              <Trans key="content:_trn_worlds.unreadable" />
+            ) : props.copyRunning ? (
+              <BeingCopiedText />
+            ) : undefined
+          }
+        />
+        <IconAction
           testId="world-delete"
           icon="i-hugeicons:delete-02"
           label={<Trans key="content:_trn_delete_mod" />}
           onClick={props.actions.deleteWorld}
           // The game has the save open and writes it when it closes.
-          disabled={!!props.blocked}
+          disabled={held()}
           blocked={props.blocked}
+          reason={heldReason()}
           danger
         />
         <DropdownMenu placement="bottom-end">
@@ -178,7 +217,7 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
               {(row) => (
                 <DropdownMenuItem
                   data-testid="world-update"
-                  disabled={!!props.blocked}
+                  disabled={held()}
                   onSelect={() => props.actions.updateWorld(row())}
                 >
                   <div class="flex items-center gap-2">
@@ -256,15 +295,17 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
               <Button
                 data-testid="world-add-datapacks"
                 size="small"
-                disabled={!!props.blocked}
+                disabled={held()}
                 onClick={props.actions.addDatapacks}
               >
                 <Trans key="content:_trn_worlds.add_datapacks" />
               </Button>
             </TooltipTrigger>
-            <Show when={props.blocked}>
+            <Show when={held()}>
               <TooltipContent>
-                <BlockedText blocked={props.blocked} />
+                <Show when={props.blocked} fallback={<BeingCopiedText />}>
+                  <BlockedText blocked={props.blocked} />
+                </Show>
               </TooltipContent>
             </Show>
           </Tooltip>
@@ -352,6 +393,7 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
                         pack={pack}
                         pending={pending()}
                         blocked={props.blocked}
+                        beingCopied={props.beingCopied}
                         copies={props.copiesWithUpdate(pack)}
                         actions={props.actions}
                       />
@@ -363,8 +405,9 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
                           icon="i-hugeicons:arrow-left-right"
                           label={<Trans key="instances:_trn_switch_version" />}
                           onClick={() => props.actions.switchVersion(pack)}
-                          disabled={!!props.blocked || pending()}
+                          disabled={held() || pending()}
                           blocked={props.blocked}
+                          reason={heldReason()}
                         />
                       </Show>
                       <IconAction
@@ -372,8 +415,9 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
                         icon="i-hugeicons:delete-02"
                         label={<Trans key="content:_trn_delete_mod" />}
                         onClick={() => props.actions.remove(pack)}
-                        disabled={!!props.blocked || pending()}
+                        disabled={held() || pending()}
                         blocked={props.blocked}
+                        reason={heldReason()}
                         danger
                       />
                     </div>

@@ -1,4 +1,9 @@
-import type { FEWorld, FEWorldDatapack, Mod } from "@gd/core_module/bindings"
+import type {
+  FEWorld,
+  FEWorldDatapack,
+  Mod,
+  Progress
+} from "@gd/core_module/bindings"
 import { toast } from "@gd/ui"
 import { useTransContext } from "@gd/i18n"
 import { useParams } from "@solidjs/router"
@@ -8,7 +13,8 @@ import {
   createSignal,
   on,
   onCleanup,
-  onMount
+  onMount,
+  untrack
 } from "solid-js"
 import { rspc } from "@/utils/rspcClient"
 import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
@@ -27,7 +33,7 @@ import { toastUpdateFailures } from "./updateFailures"
 import { changesBlocked } from "@/pages/Library/shared/addons/components/ChangesBlocked"
 import { asksBeforeDeletingAddons } from "@/utils/addonDeletion"
 import { deletionTarget } from "@/utils/deletionTarget"
-import { worldLabel } from "@/utils/worldLabel"
+import { labelOfFolder, worldLabel } from "@/utils/worldLabel"
 
 const noop = () => {}
 
@@ -50,6 +56,10 @@ const Worlds = () => {
   }))
   const settings = rspc.createQuery(() => ({
     queryKey: ["settings.getSettings"]
+  }))
+  // The core reads it again when a copy starts and when it ends.
+  const worldCopy = rspc.createQuery(() => ({
+    queryKey: ["instance.getWorldCopy", instanceId()]
   }))
 
   // The core refreshes names and update arrows of the watched instance only.
@@ -74,6 +84,15 @@ const Worlds = () => {
   }))
   const deleteWorldDatapack = rspc.createMutation(() => ({
     mutationKey: ["instance.deleteWorldDatapack"]
+  }))
+  const duplicateWorld = rspc.createMutation(() => ({
+    mutationKey: ["instance.duplicateWorld"]
+  }))
+  const cancelWorldCopy = rspc.createMutation(() => ({
+    mutationKey: ["instance.cancelWorldCopy"]
+  }))
+  const dismissTask = rspc.createMutation(() => ({
+    mutationKey: ["vtask.dismissTask"]
   }))
 
   const refetchAll = () =>
@@ -308,6 +327,146 @@ const Worlds = () => {
     }
   }
 
+  // Each copy task is followed once, by the instance that started it; an
+  // ended one is never followed again, even while the query still names it.
+  const followedCopies = new Set<number>()
+  const [endedCopies, setEndedCopies] = createSignal<ReadonlySet<number>>(
+    new Set()
+  )
+  const [copyPercent, setCopyPercent] = createSignal<{
+    task: number
+    percent: number
+  }>()
+  // The instance whose duplicate request has not been answered yet.
+  const [starting, setStarting] = createSignal<number>()
+
+  /** The copy this instance is making, until its task is seen to end. */
+  const runningCopy = () => {
+    const copy = worldCopy.data
+    return copy && !endedCopies().has(copy.task) ? copy : undefined
+  }
+  const copyRunning = () => !!runningCopy() || starting() === instanceId()
+
+  const selectCopy = (
+    name: string,
+    before: ReadonlySet<string> | undefined
+  ) => {
+    const named = worldList().filter((world) => worldLabel(world) === name)
+    const copy = before
+      ? named.find((world) => !before.has(world.name))
+      : named.length === 1
+        ? named[0]
+        : undefined
+    if (copy) setSelectedName(copy.name)
+  }
+
+  /** Follows a copy's task until it ends: its percent while it runs, the
+   *  copy selected when it is done, its failure told once. */
+  const followCopy = (
+    task: number,
+    id: number,
+    copy: { source: string; name: string }
+  ) => {
+    if (followedCopies.has(task) || endedCopies().has(task)) return
+    followedCopies.add(task)
+    // The copy is published only at its end, so the list read now lacks it.
+    const folders = () =>
+      worlds.data && new Set(worlds.data.map((world) => world.name))
+    let before = folders()
+    let lastProgress: Progress | null = null
+    // Left for another instance: followed again when the tab shows it.
+    const leave = () => void followedCopies.delete(task)
+    const end = () => {
+      followedCopies.delete(task)
+      setEndedCopies((previous) => new Set(previous).add(task))
+    }
+    const poll = async () => {
+      if (!isCurrent(id)) return leave()
+      let outcome
+      try {
+        outcome = await ctx.client.query(["vtask.getTaskOutcome", task])
+      } catch {
+        /* A read failure cannot tell the copy's end: read it again. */
+      }
+      if (!isCurrent(id)) return leave()
+      const result = resolveTaskPoll(outcome, lastProgress, false)
+      lastProgress = result.nextLastProgress
+      const { action } = result
+      before ??= folders()
+      if (action.kind === "progress")
+        setCopyPercent({ task, percent: action.percent })
+      else if (action.kind === "completed") {
+        // Its row gives way to the copy once the list holds it.
+        try {
+          await refetchAll()
+          if (isCurrent(id)) selectCopy(copy.name, before)
+        } finally {
+          end()
+        }
+        return
+      } else if (action.kind === "dismissed") {
+        // Cancelled: nothing was kept and there is nothing to say.
+        end()
+        void refetchAll()
+        return
+      } else if (action.kind === "failed") {
+        end()
+        toast.error(
+          action.message ||
+            t("instances:_trn_duplicate_failed", {
+              name: labelOfFolder(worlds.data, copy.source),
+              interpolation: { escapeValue: false }
+            })
+        )
+        // Told here, so the failures panel does not list it again.
+        if (outcome?.type === "Failed") dismissTask.mutate(task)
+        void refetchAll()
+        return
+      }
+      const timer = setTimeout(() => {
+        timers.delete(timer)
+        void poll()
+      }, 500)
+      timers.add(timer)
+    }
+    void poll()
+  }
+
+  // A copy started elsewhere, or before the tab opened, is followed too.
+  createEffect(() => {
+    const copy = worldCopy.data
+    if (copy) untrack(() => followCopy(copy.task, instanceId(), copy))
+  })
+
+  const duplicate = async (world: FEWorld) => {
+    if (world.identity === null || copyRunning()) return
+    const id = instanceId()
+    // Cut as the core counts: by characters, then trimmed.
+    const name = Array.from(
+      t("content:_trn_worlds.copy_name", {
+        name: worldLabel(world),
+        interpolation: { escapeValue: false }
+      })
+    )
+      .slice(0, 64)
+      .join("")
+      .trim()
+    setStarting(id)
+    try {
+      const task = await duplicateWorld.mutateAsync({
+        instance_id: id,
+        world: world.name,
+        identity: world.identity,
+        name
+      })
+      if (isCurrent(id)) followCopy(task, id, { source: world.name, name })
+    } catch {
+      /* The global handler shows the refusal. */
+    } finally {
+      if (starting() === id) setStarting(undefined)
+    }
+  }
+
   const worldParam = (world: FEWorld) => encodeURIComponent(world.name)
 
   /** Opens the versions of what `source` names on its platform, asking
@@ -391,6 +550,17 @@ const Worlds = () => {
         isLoading={worlds.isLoading}
         isError={worlds.isError && !worlds.data}
         onRetry={() => void worlds.refetch()}
+        copy={
+          runningCopy() && {
+            source: runningCopy()!.source,
+            name: runningCopy()!.name,
+            percent:
+              copyPercent()?.task === runningCopy()!.task
+                ? copyPercent()!.percent
+                : null,
+            onCancel: () => cancelWorldCopy.mutate(instanceId())
+          }
+        }
       />
       <Show when={selected()}>
         {(world) => (
@@ -399,6 +569,8 @@ const Worlds = () => {
             world={world()}
             worldRow={worldRow(world())}
             blocked={blocked()}
+            beingCopied={runningCopy()?.source === world().name}
+            copyRunning={copyRunning()}
             isPending={isPending}
             copiesWithUpdate={(pack) =>
               datapackCopies(worldList(), instanceMods.data ?? [], pack)
@@ -410,6 +582,7 @@ const Worlds = () => {
                   instance_id: instanceId(),
                   world: world().name
                 }),
+              duplicate: () => void duplicate(world()),
               rename: (name) => rename(world(), name),
               deleteWorld: () => deleteWorld(world()),
               copyName: () => {
@@ -417,7 +590,7 @@ const Worlds = () => {
                 toast.success(t("notifications:_trn_copied_to_clipboard"))
               },
               updateWorld: (row) => {
-                if (blocked()) return
+                if (blocked() || runningCopy()?.source === world().name) return
                 // Its failure is told by the global handler; the arrow comes
                 // back after the refetch.
                 addonMutations.handleUpdateMod(row).catch(noop)
