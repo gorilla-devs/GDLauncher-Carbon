@@ -37,6 +37,7 @@ export type Procedures = {
         { key: "instance.getUserQuota", input: never, result: FEQuotaInfo } | 
         { key: "instance.getUserShares", input: FEGetUserSharesArgs, result: FEPaginatedShares } | 
         { key: "instance.getWorldCopy", input: FEInstanceId, result: FEWorldCopy | null } | 
+        { key: "instance.getWorldMap", input: WorldFolder, result: FEWorldMap } | 
         { key: "instance.getWorlds", input: FEInstanceId, result: FEWorld[] } | 
         { key: "instance.searchLogs", input: SearchLogsQuery, result: FESearchResults } | 
         { key: "instance.validateShareCode", input: string, result: boolean } | 
@@ -972,6 +973,16 @@ export type DatapackWorld = { name: string; identity: string }
 
 export type FEWorld = { name: string; title: string | null; addon_id: string; identity: string | null; datapacks: FEWorldDatapack[] }
 export type FEWorldCopy = { source: string; name: string; task: FETaskId }
+
+export type FEWorldMap = { dimensions: FEMapDimension[]; spawn: FEMapPoint | null; player: FEMapPoint | null; unmappable: FEUnmappable | null }
+
+export type FEMapDimension = { id: string; ceiling: boolean; revision: string; regions: FEMapRegion[] }
+
+export type FEMapRegion = { x: number; z: number; revision: string }
+
+export type FEMapPoint = { dimension: string; x: number; z: number }
+
+export type FEUnmappable = "TooOld" | "NotRegions" | "Unreadable"
 
 export type FEWorldDatapack = { id: string; filename: string; file_size: number; is_folder: boolean; name: string | null; version: string | null; curseforge: CurseForgeModMetadata | null; modrinth: ModrinthModMetadata | null; has_update: boolean }
 

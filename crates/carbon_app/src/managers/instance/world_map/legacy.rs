@@ -147,28 +147,9 @@ fn ids_of(list: &Tag, block_name: impl Fn(&str) -> Option<Option<&str>>) -> Opti
 
 #[cfg(test)]
 pub(super) mod tests {
+    use super::super::test_nbt::{compound, compounds as list, string};
     use super::*;
     use crate::util::nbt::{self, Root, Tag};
-
-    fn compound(entries: Vec<(&str, Tag)>) -> Tag {
-        Tag::Compound(
-            entries
-                .into_iter()
-                .map(|(key, tag)| (key.as_bytes().to_vec(), tag))
-                .collect(),
-        )
-    }
-
-    fn string(text: &str) -> Tag {
-        Tag::String(nbt::encode_string(text))
-    }
-
-    fn list(items: Vec<Tag>) -> Tag {
-        Tag::List {
-            element: if items.is_empty() { 0 } else { 10 },
-            items,
-        }
-    }
 
     fn entries(named: &[(&str, i32)]) -> Tag {
         list(

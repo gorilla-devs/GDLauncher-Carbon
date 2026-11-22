@@ -90,6 +90,18 @@ pub(super) fn level_dat_bytes(name: Option<&str>) -> Vec<u8> {
     tests::level_dat(name, vec![])
 }
 
+/// The bytes of a `level.dat` whose `Data` holds `data`, for tests of code that reads one.
+#[cfg(test)]
+pub(super) fn level_dat_holding(data: Vec<(&str, Tag)>) -> Vec<u8> {
+    tests::level_dat(None, data)
+}
+
+/// `bytes` gzipped, as the game writes `level.dat` and the player files.
+#[cfg(test)]
+pub(super) fn gzipped(bytes: &[u8]) -> Vec<u8> {
+    tests::gzip(bytes)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,7 +124,7 @@ mod tests {
         }
     }
 
-    fn gzip(bytes: &[u8]) -> Vec<u8> {
+    pub(super) fn gzip(bytes: &[u8]) -> Vec<u8> {
         let mut enc = GzEncoder::new(Vec::new(), Compression::default());
         enc.write_all(bytes).unwrap();
         enc.finish().unwrap()

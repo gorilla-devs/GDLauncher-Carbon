@@ -105,6 +105,7 @@ keys! {
         GET_DATAPACK_WORLDS                        = "getDatapackWorlds";
         GET_WORLDS                                  = "getWorlds";
         GET_WORLD_COPY                              = "getWorldCopy";
+        GET_WORLD_MAP                               = "getWorldMap";
         COPY_DATAPACK                             = "copyDatapack";
         GET_PENDING_SETUP                          = "getPendingSetup";
         CANCEL_PENDING_SETUP                       = "cancelPendingSetup";

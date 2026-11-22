@@ -78,7 +78,7 @@ pub(crate) mod world_datapacks;
 pub(crate) mod world_duplicate;
 mod world_folder_name;
 mod world_level;
-mod world_map;
+pub(crate) mod world_map;
 pub(crate) mod world_refusal;
 pub(crate) mod world_rename;
 

@@ -1,28 +1,9 @@
 use super::super::colors::{UNKNOWN, legacy_look_of, look_of};
 use super::super::legacy::tests::{level_dat_1_7, level_dat_1_12, vanilla_level_dat};
 use super::super::region::Region;
+use super::super::test_nbt::{compound, compounds, string};
 use super::*;
 use crate::util::nbt::{self, Keep, Limits, Root, Tag};
-
-fn compound(entries: Vec<(&str, Tag)>) -> Tag {
-    Tag::Compound(
-        entries
-            .into_iter()
-            .map(|(key, tag)| (key.as_bytes().to_vec(), tag))
-            .collect(),
-    )
-}
-
-fn string(text: &str) -> Tag {
-    Tag::String(text.as_bytes().to_vec())
-}
-
-fn compounds(items: Vec<Tag>) -> Tag {
-    Tag::List {
-        element: if items.is_empty() { 0 } else { 10 },
-        items,
-    }
-}
 
 fn bits_for(palette_len: usize) -> usize {
     let needed = (usize::BITS - palette_len.saturating_sub(1).leading_zeros()) as usize;

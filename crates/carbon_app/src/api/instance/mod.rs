@@ -591,6 +591,13 @@ pub(super) fn mount() -> RouterBuilder<App> {
         query GET_WORLD_COPY[app, instance_id: FEInstanceId] {
             Ok(app.instance_manager().world_copy(instance_id.into()).map(FEWorldCopy::from))
         }
+        query GET_WORLD_MAP[app, folder: WorldFolder] {
+            Ok(FEWorldMap::from(
+                app.instance_manager()
+                    .world_map(folder.instance_id.into(), folder.world)
+                    .await?,
+            ))
+        }
         mutation CANCEL_WORLD_COPY[app, instance_id: FEInstanceId] {
             app.instance_manager().cancel_world_copy(instance_id.into());
             Ok(())
@@ -2256,6 +2263,82 @@ impl From<crate::managers::instance::world_duplicate::WorldCopy> for FEWorldCopy
             source: copy.source,
             name: copy.name,
             task: copy.task.into(),
+        }
+    }
+}
+
+/// What a world's map is drawn from.
+#[derive(Type, Serialize, Debug)]
+struct FEWorldMap {
+    dimensions: Vec<FEMapDimension>,
+    spawn: Option<FEMapPoint>,
+    player: Option<FEMapPoint>,
+    unmappable: Option<FEUnmappable>,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct FEMapDimension {
+    id: String,
+    ceiling: bool,
+    revision: String,
+    regions: Vec<FEMapRegion>,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct FEMapRegion {
+    x: i32,
+    z: i32,
+    revision: String,
+}
+
+#[derive(Type, Serialize, Debug)]
+struct FEMapPoint {
+    dimension: String,
+    x: i32,
+    z: i32,
+}
+
+#[derive(Type, Serialize, Debug)]
+enum FEUnmappable {
+    TooOld,
+    NotRegions,
+    Unreadable,
+}
+
+impl From<crate::managers::instance::world_map::facts::WorldMap> for FEWorldMap {
+    fn from(map: crate::managers::instance::world_map::facts::WorldMap) -> Self {
+        use crate::managers::instance::world_map::facts::{MapPoint, Unmappable};
+        let point = |point: MapPoint| FEMapPoint {
+            dimension: point.dimension,
+            x: point.x,
+            z: point.z,
+        };
+        Self {
+            dimensions: map
+                .dimensions
+                .into_iter()
+                .map(|dimension| FEMapDimension {
+                    id: dimension.id,
+                    ceiling: dimension.ceiling,
+                    revision: dimension.revision,
+                    regions: dimension
+                        .regions
+                        .into_iter()
+                        .map(|region| FEMapRegion {
+                            x: region.x,
+                            z: region.z,
+                            revision: region.revision,
+                        })
+                        .collect(),
+                })
+                .collect(),
+            spawn: map.spawn.map(point),
+            player: map.player.map(point),
+            unmappable: map.unmappable.map(|reason| match reason {
+                Unmappable::TooOld => FEUnmappable::TooOld,
+                Unmappable::NotRegions => FEUnmappable::NotRegions,
+                Unmappable::Unreadable => FEUnmappable::Unreadable,
+            }),
         }
     }
 }
