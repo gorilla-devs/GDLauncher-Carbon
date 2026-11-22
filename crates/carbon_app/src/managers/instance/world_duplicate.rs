@@ -43,6 +43,16 @@ fn staging_prefix(id: InstanceId) -> String {
     format!("{STAGING_PREFIX}{}-", *id)
 }
 
+/// The instance a staging folder named `name` was made for, when its name
+/// carries one.
+fn staging_owner(name: &std::ffi::OsStr) -> Option<InstanceId> {
+    let (id, _) = name
+        .to_str()?
+        .strip_prefix(STAGING_PREFIX)?
+        .split_once('-')?;
+    id.parse().ok().map(InstanceId)
+}
+
 /// Whether `name`, in an instance's data folder, is the launcher's own copy
 /// of a world in the making, which is no content of the instance: duplicating
 /// or exporting the instance leaves it out.
@@ -494,7 +504,9 @@ impl ManagerRef<'_, InstanceManager> {
     /// so it never sees one being made. In the instance's own data folder
     /// every staging folder goes, whatever instance id it carries (an
     /// instance duplicate may have brought one along); beside a `saves`
-    /// linked elsewhere only the instance's own do. Nothing else is touched.
+    /// linked elsewhere only the instance's own do. A folder whose id names
+    /// an instance copying now stays: another instance's `saves` may link
+    /// here. Nothing else is touched.
     pub(super) async fn sweep_world_copy_staging(self, id: InstanceId) -> anyhow::Result<()> {
         let _operation = self.lock_instance(id).await;
         if self.world_copies.contains_key(&id) {
@@ -522,6 +534,11 @@ impl ManagerRef<'_, InstanceManager> {
             };
             // Not followed: a link is never what a copy made.
             if !is_staging || !entry.file_type().await?.is_dir() {
+                continue;
+            }
+            // A copy registers before it makes its folder, under a new name each
+            // time, so a listed folder of an instance not copying now is a leftover.
+            if staging_owner(&name).is_some_and(|owner| self.world_copies.contains_key(&owner)) {
                 continue;
             }
             info!(
@@ -1212,6 +1229,38 @@ mod tests {
         assert!(parent.join("kept").is_dir());
         assert!(note.is_file());
         assert_eq!(entries(&saves), vec!["New World"]);
+    }
+
+    /// A `saves` linked into another instance's data folder puts that
+    /// instance's staging folder there; the owner's listing leaves it alone
+    /// while the copy runs.
+    #[tokio::test]
+    async fn a_staging_folder_of_another_running_copy_is_kept_in_the_own_data_folder() {
+        let app = crate::setup_managers_for_test().await;
+        let (owner, owner_saves, _, _) = world_instance(&app, "duplicate-sweep-owner").await;
+        let (copier, _, world, _) = world_instance(&app, "duplicate-sweep-copier").await;
+        let (pause, task) = held(
+            &app,
+            copier,
+            "world_copy_before_publish",
+            request(copier, &world, "Home (copy)"),
+        )
+        .await;
+        let parent = dunce::canonicalize(&owner_saves)
+            .unwrap()
+            .parent()
+            .unwrap()
+            .to_owned();
+        let running = parent.join(format!(".gdl-world-copy-{}-running", *copier));
+        std::fs::create_dir_all(running.join("region")).unwrap();
+
+        listed(&app, owner).await;
+        assert!(running.join("region").is_dir());
+
+        pause.release.notify_one();
+        assert!(matches!(wait(&app, task).await, TaskOutcome::Succeeded));
+        listed(&app, owner).await;
+        assert!(!running.exists());
     }
 
     /// Waits until `work` is done, failing the test if it takes long.
