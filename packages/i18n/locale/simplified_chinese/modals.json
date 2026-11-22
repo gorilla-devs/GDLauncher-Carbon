@@ -85,5 +85,6 @@
   "_trn_cache_cleanup.gdlauncher_title": "GDLauncher 缓存",
   "_trn_cache_cleanup.gdlauncher_desc": "缓存的模组和整合包信息、项目图片、临时下载文件和旧的启动器日志。",
   "_trn_cache_cleanup.minecraft_title": "Minecraft 缓存",
-  "_trn_cache_cleanup.minecraft_desc": "游戏资源、Java 库和本地库。下次启动受影响的实例时会按需重新下载。"
+  "_trn_cache_cleanup.minecraft_desc": "游戏资源、Java 库和本地库。下次启动受影响的实例时会按需重新下载。",
+  "_trn_cache_cleanup.in_use_game": "有游戏正在运行或启动"
 }

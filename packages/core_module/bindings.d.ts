@@ -92,6 +92,7 @@ export type Procedures = {
         { key: "server.getServerProperties", input: FEServerId, result: { [key: string]: string } } | 
         { key: "server.getServerStopProgress", input: FEServerId, result: FEServerStopProgress | null } | 
         { key: "server.getWhitelist", input: FEServerId, result: WhitelistEntry[] } | 
+        { key: "settings.getCacheCleanupBlockers", input: never, result: CacheCleanupBlockers } | 
         { key: "settings.getCacheSizes", input: never, result: CacheSizes } | 
         { key: "settings.getDbSize", input: never, result: number } | 
         { key: "settings.getMemoryWarningDismissed", input: never, result: boolean } | 
@@ -472,6 +473,10 @@ export type ModPlatform = "Curseforge" | "Modrinth"
  * label each option with its real reclaim estimate.
  */
 export type CacheSizes = { gdlauncher: number; minecraft: number }
+
+export type CacheUser = "game" | "install" | "task" | "unconfirmed"
+
+export type CacheCleanupBlockers = { gdlauncher: CacheUser | null; minecraft: CacheUser | null }
 
 export type MoveInstance = { instance: FEInstanceId; target: MoveInstanceTarget }
 

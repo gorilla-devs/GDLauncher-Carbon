@@ -5,13 +5,14 @@ use crate::{
             self,
             settings::{
                 CLEANUP_CACHES, COMPLETE_FIRST_LAUNCH, DISMISS_BETA_PROMPT_PERMANENTLY,
-                GET_CACHE_SIZES, GET_DB_SIZE, GET_MEMORY_WARNING_DISMISSED,
-                GET_PRIVACY_STATEMENT_BODY, GET_SEARCH_SIDEBAR_DOCKED, GET_SEEN_ONBOARDING_TIPS,
-                GET_SETTINGS, GET_TERMS_OF_SERVICE_BODY, GET_WORLD_DELETION_WARNING_DISMISSED,
-                IS_FIRST_LAUNCH, MARK_CHANGELOG_SEEN, MARK_ONBOARDING_TIP_SEEN,
-                REMIND_BETA_PROMPT_LATER, RESET_ONBOARDING_TIPS, SET_MEMORY_WARNING_DISMISSED,
-                SET_SEARCH_SIDEBAR_DOCKED, SET_SETTINGS, SET_WORLD_DELETION_WARNING_DISMISSED,
-                SHOULD_SHOW_BETA_PROMPT, SHOULD_SHOW_CHANGELOG,
+                GET_CACHE_CLEANUP_BLOCKERS, GET_CACHE_SIZES, GET_DB_SIZE,
+                GET_MEMORY_WARNING_DISMISSED, GET_PRIVACY_STATEMENT_BODY,
+                GET_SEARCH_SIDEBAR_DOCKED, GET_SEEN_ONBOARDING_TIPS, GET_SETTINGS,
+                GET_TERMS_OF_SERVICE_BODY, GET_WORLD_DELETION_WARNING_DISMISSED, IS_FIRST_LAUNCH,
+                MARK_CHANGELOG_SEEN, MARK_ONBOARDING_TIP_SEEN, REMIND_BETA_PROMPT_LATER,
+                RESET_ONBOARDING_TIPS, SET_MEMORY_WARNING_DISMISSED, SET_SEARCH_SIDEBAR_DOCKED,
+                SET_SETTINGS, SET_WORLD_DELETION_WARNING_DISMISSED, SHOULD_SHOW_BETA_PROMPT,
+                SHOULD_SHOW_CHANGELOG,
             },
         },
         router::router,
@@ -302,6 +303,10 @@ pub(super) fn mount() -> RouterBuilder<App> {
             Ok::<CacheSizes, anyhow::Error>(app.settings_manager().get_cache_sizes().await)
         }
 
+        query GET_CACHE_CLEANUP_BLOCKERS[app, _args: ()] {
+            Ok::<CacheCleanupBlockers, anyhow::Error>(app.settings_manager().cache_cleanup_blockers())
+        }
+
         mutation CLEANUP_CACHES[app, selection: CacheCleanupSelection] {
             let task_id = app.settings_manager().cleanup_caches(selection).await?;
             Ok(super::vtask::FETaskId::from(task_id))
@@ -390,6 +395,29 @@ pub struct CacheCleanupSelection {
 pub struct CacheSizes {
     pub gdlauncher: f64,
     pub minecraft: f64,
+}
+
+/// Running work that uses a cache, so the cache cannot be cleaned up under it.
+#[derive(Type, Serialize, Debug, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CacheUser {
+    /// A game is running or being started.
+    Game,
+    /// A download or install.
+    Install,
+    /// Other launcher work: an import, export, copy or scan.
+    Task,
+    /// Work whose end the core could not confirm.
+    Unconfirmed,
+}
+
+/// What keeps each cache from being cleaned up right now; `None` means it
+/// can be.
+#[derive(Type, Serialize, Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct CacheCleanupBlockers {
+    pub gdlauncher: Option<CacheUser>,
+    pub minecraft: Option<CacheUser>,
 }
 
 #[derive(Type, Serialize, Deserialize, Debug)]

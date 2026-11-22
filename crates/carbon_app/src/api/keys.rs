@@ -229,6 +229,7 @@ keys! {
         GET_DB_SIZE                                 = "getDbSize";
         GET_CACHE_SIZES                             = "getCacheSizes";
         CLEANUP_CACHES                              = "cleanupCaches";
+        GET_CACHE_CLEANUP_BLOCKERS                  = "getCacheCleanupBlockers";
     }
 
     metrics {

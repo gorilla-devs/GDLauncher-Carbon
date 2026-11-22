@@ -85,5 +85,6 @@
   "_trn_cache_cleanup.gdlauncher_title": "Caché de GDLauncher",
   "_trn_cache_cleanup.gdlauncher_desc": "Información de mods y modpacks en caché, imágenes de proyectos, descargas temporales y registros antiguos del launcher.",
   "_trn_cache_cleanup.minecraft_title": "Caché de Minecraft",
-  "_trn_cache_cleanup.minecraft_desc": "Recursos del juego, librerías de Java y librerías nativas. Se vuelven a descargar bajo demanda la próxima vez que inicies una instancia afectada."
+  "_trn_cache_cleanup.minecraft_desc": "Recursos del juego, librerías de Java y librerías nativas. Se vuelven a descargar bajo demanda la próxima vez que inicies una instancia afectada.",
+  "_trn_cache_cleanup.in_use_game": "Hay un juego en ejecución o iniciándose"
 }

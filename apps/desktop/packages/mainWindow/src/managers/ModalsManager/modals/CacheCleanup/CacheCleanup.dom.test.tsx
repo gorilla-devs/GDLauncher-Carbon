@@ -3,6 +3,7 @@ import { createSignal } from "solid-js"
 import { render } from "solid-js/web"
 import CacheCleanup from "./index"
 const control = vi.hoisted(() => ({
+  blockers: (() => undefined) as () => any,
   query: undefined as any,
   calls: [] as any[],
   invalidate: vi.fn(),
@@ -15,6 +16,13 @@ vi.mock("@/utils/rspcClient", () => ({
     useContext: () => ({ client: { mutation: control.dismiss } }),
     createQuery: (options: any) => {
       const key = options().queryKey[0]
+      if (key === "settings.getCacheCleanupBlockers")
+        return {
+          get data() {
+            return control.blockers()
+          },
+          refetch: async () => ({ data: control.blockers() })
+        }
       return key === "settings.getCacheSizes"
         ? { data: { gdlauncher: 10, minecraft: 20 } }
         : control.query(options)
@@ -57,6 +65,7 @@ afterEach(() => {
   dispose?.()
   document.body.textContent = ""
   control.calls = []
+  control.blockers = () => undefined
   control.invalidate.mockClear()
   control.dismiss.mockClear()
 })
@@ -141,4 +150,69 @@ it("a refused start shows the core's sentence, not the rspc payload", async () =
   expect(root.textContent).toContain("A game is running")
   expect(root.textContent).not.toContain("{")
   expect(root.textContent).not.toContain("backtrace")
+})
+
+const scope = (root: HTMLElement, name: "gdlauncher" | "minecraft") =>
+  root.querySelector<HTMLElement>(
+    `[data-testid="cache-cleanup-scope-${name}"]`
+  )!
+const INSTALL = "app:_trn_shutdown_prompt.blocker_install"
+const GAME = "modals:_trn_cache_cleanup.in_use_game"
+
+it("offers no cache while a download or install uses both, and says why", async () => {
+  control.blockers = () => ({ gdlauncher: "install", minecraft: "install" })
+  const { root } = fixture()
+
+  for (const name of ["gdlauncher", "minecraft"] as const) {
+    expect(scope(root, name).dataset.disabled).toBe("true")
+    expect(scope(root, name).dataset.checked).toBe("false")
+    expect(scope(root, name).textContent).toContain(INSTALL)
+  }
+  expect(root.textContent).not.toContain("gdlauncher_desc")
+  expect(button(root, "start")!.disabled).toBe(true)
+  button(root, "start")!.click()
+  expect(control.calls).toEqual([])
+})
+
+it("cleans up only the cache nothing uses while a game runs", async () => {
+  control.blockers = () => ({ gdlauncher: null, minecraft: "game" })
+  const { root } = fixture()
+
+  expect(scope(root, "gdlauncher").dataset.disabled).toBe("false")
+  expect(scope(root, "gdlauncher").textContent).toContain("gdlauncher_desc")
+  expect(scope(root, "minecraft").dataset.disabled).toBe("true")
+  expect(scope(root, "minecraft").textContent).toContain(GAME)
+  button(root, "start")!.click()
+  expect(control.calls).toEqual([{ gdlauncher: true, minecraft: false }])
+})
+
+it("offers a cache again, ticked as it was, once nothing uses it", async () => {
+  const [blockers, setBlockers] = createSignal<any>({
+    gdlauncher: "task",
+    minecraft: null
+  })
+  control.blockers = blockers
+  const { root } = fixture()
+  expect(scope(root, "gdlauncher").dataset.checked).toBe("false")
+  expect(button(root, "start")!.disabled).toBe(true)
+
+  setBlockers({ gdlauncher: null, minecraft: null })
+  await flush()
+
+  expect(scope(root, "gdlauncher").dataset.disabled).toBe("false")
+  expect(scope(root, "gdlauncher").dataset.checked).toBe("true")
+  expect(scope(root, "gdlauncher").textContent).toContain("gdlauncher_desc")
+  expect(button(root, "start")!.disabled).toBe(false)
+})
+
+it("goes back to the choice when the core refuses a cache that came into use", async () => {
+  const [blockers, setBlockers] = createSignal<any>(undefined)
+  control.blockers = blockers
+  const { root } = fixture()
+  setBlockers({ gdlauncher: "install", minecraft: null })
+  control.start.onError(new Error("refused"))
+  await flush()
+
+  expect(root.textContent).not.toContain("failed_title")
+  expect(scope(root, "gdlauncher").textContent).toContain(INSTALL)
 })

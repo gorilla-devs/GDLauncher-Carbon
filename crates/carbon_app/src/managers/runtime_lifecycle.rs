@@ -1386,6 +1386,11 @@ impl RuntimeLifecycle {
         state.relocation = Some((request.to_owned(), false));
         Ok(())
     }
+    /// Read-only: this core's running work, and the processes and checks of
+    /// an earlier session it still knows of, each named as a move would.
+    pub fn running_work(&self) -> Vec<RuntimeBlocker> {
+        self.state.lock().unwrap().relocation_blockers()
+    }
     /// Read-only: what would refuse `begin_relocation(request)` right now.
     /// Lets the launcher refuse before its slow folder scan; it changes
     /// nothing, so the lease itself still decides.

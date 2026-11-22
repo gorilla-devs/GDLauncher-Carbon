@@ -85,5 +85,6 @@
   "_trn_cache_cleanup.gdlauncher_title": "GDLauncherキャッシュ",
   "_trn_cache_cleanup.gdlauncher_desc": "キャッシュされた mod ・ modpack 情報、プロジェクト画像、一時ダウンロード、古いランチャーログ。",
   "_trn_cache_cleanup.minecraft_title": "Minecraftキャッシュ",
-  "_trn_cache_cleanup.minecraft_desc": "ゲームアセット、Java ライブラリ、ネイティブライブラリ。該当インスタンスを次回起動時にオンデマンドで再ダウンロードされます。"
+  "_trn_cache_cleanup.minecraft_desc": "ゲームアセット、Java ライブラリ、ネイティブライブラリ。該当インスタンスを次回起動時にオンデマンドで再ダウンロードされます。",
+  "_trn_cache_cleanup.in_use_game": "ゲームが実行中または起動中です"
 }

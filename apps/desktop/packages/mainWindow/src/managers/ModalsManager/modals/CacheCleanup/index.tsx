@@ -1,5 +1,6 @@
 import { Button, Checkbox, PRESS_CLASSES, Progress } from "@gd/ui"
 import { Trans } from "@gd/i18n"
+import type { CacheUser } from "@gd/core_module/bindings"
 import {
   createEffect,
   createSignal,
@@ -24,24 +25,38 @@ const ClickableRow = (props: {
   onToggle: () => void
   testId: string
   checked: boolean
+  disabled: boolean
   children: JSX.Element
 }) => {
   return (
     <div
       data-testid={props.testId}
       data-checked={String(props.checked)}
-      class={`hover:bg-darkSlate-700/50 flex cursor-pointer items-start gap-3 px-4 py-3 ${PRESS_CLASSES}`}
+      data-disabled={String(props.disabled)}
+      class={`flex items-start gap-3 px-4 py-3 ${
+        props.disabled
+          ? "cursor-not-allowed"
+          : `hover:bg-darkSlate-700/50 cursor-pointer ${PRESS_CLASSES}`
+      }`}
       onPointerDown={(e) => e.currentTarget.setPointerCapture(e.pointerId)}
       onPointerUp={(e) => {
         if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
         e.currentTarget.releasePointerCapture(e.pointerId)
-        props.onToggle()
+        if (!props.disabled) props.onToggle()
       }}
     >
       {props.children}
     </div>
   )
 }
+
+/** Why a cache cannot be cleaned up now: the running work that uses it. */
+const IN_USE = {
+  game: "modals:_trn_cache_cleanup.in_use_game",
+  install: "app:_trn_shutdown_prompt.blocker_install",
+  task: "app:_trn_shutdown_prompt.blocker_task",
+  unconfirmed: "app:_trn_shutdown_prompt.blocker_unconfirmed"
+} as const satisfies Record<CacheUser, string>
 
 type Phase = "select" | "running" | "done" | "failed"
 
@@ -90,19 +105,45 @@ const CacheCleanup = (props: ModalProps) => {
     enabled: taskId() !== null
   }))
 
+  // A cache is not cleaned up under work that uses it. Read again every
+  // second while the choice is shown, so a cache is offered as soon as that
+  // work ends.
+  const inUse = rspc.createQuery(() => ({
+    queryKey: ["settings.getCacheCleanupBlockers"],
+    enabled: phase() === "select",
+    refetchInterval: 1000
+  }))
+  const gdlauncherUser = () => inUse.data?.gdlauncher ?? undefined
+  const minecraftUser = () => inUse.data?.minecraft ?? undefined
+  // What a cleanup started now would take: the ticked caches nothing uses.
+  const selection = () => ({
+    gdlauncher: gdlauncher() && !gdlauncherUser(),
+    minecraft: minecraft() && !minecraftUser()
+  })
+
   const startMutation = rspc.createMutation(() => ({
     mutationKey: ["settings.cleanupCaches"],
     onSuccess: (id) => {
       setTaskId(id)
       setPhase("running")
     },
-    onError: (err) => {
+    onError: async (err) => {
+      // The core refuses a cache that came into use since the last read:
+      // the choice then shows which, and why.
+      const now = (await inUse.refetch()).data
+      if (
+        (gdlauncher() && now?.gdlauncher) ||
+        (minecraft() && now?.minecraft)
+      ) {
+        setPhase("select")
+        return
+      }
       setFailedMessage({ raw: extractErrorDisplay(err) })
       setPhase("failed")
     }
   }))
 
-  const canSubmit = () => gdlauncher() || minecraft()
+  const canSubmit = () => selection().gdlauncher || selection().minecraft
 
   const failureKey = () => {
     const failure = failedMessage()
@@ -152,7 +193,7 @@ const CacheCleanup = (props: ModalProps) => {
       if (oldTaskId !== null && acknowledge) {
         await rpc.client.mutation(["vtask.dismissTask", oldTaskId])
       }
-      startMutation.mutate({ gdlauncher: gdlauncher(), minecraft: minecraft() })
+      startMutation.mutate(selection())
     } catch (error) {
       setTaskId(oldTaskId)
       const display =
@@ -205,14 +246,21 @@ const CacheCleanup = (props: ModalProps) => {
             <div class="bg-darkSlate-800 divide-darkSlate-700 flex flex-col divide-y rounded">
               <ClickableRow
                 testId="cache-cleanup-scope-gdlauncher"
-                checked={gdlauncher()}
+                checked={selection().gdlauncher}
+                disabled={!!gdlauncherUser()}
                 onToggle={() => setGdlauncher((v) => !v)}
               >
-                <div class="pointer-events-none">
-                  <Checkbox checked={gdlauncher()} />
+                <div
+                  class="pointer-events-none"
+                  classList={{ "opacity-50": !!gdlauncherUser() }}
+                >
+                  <Checkbox checked={selection().gdlauncher} />
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <div class="flex items-baseline justify-between gap-2">
+                  <div
+                    class="flex items-baseline justify-between gap-2"
+                    classList={{ "opacity-50": !!gdlauncherUser() }}
+                  >
                     <span class="text-lightSlate-50 text-sm font-medium">
                       <Trans key="modals:_trn_cache_cleanup.gdlauncher_title" />
                     </span>
@@ -222,22 +270,40 @@ const CacheCleanup = (props: ModalProps) => {
                       </span>
                     </Show>
                   </div>
-                  <span class="text-lightSlate-500 text-xs">
-                    <Trans key="modals:_trn_cache_cleanup.gdlauncher_desc" />
-                  </span>
+                  <Show
+                    when={gdlauncherUser()}
+                    fallback={
+                      <span class="text-lightSlate-500 text-xs">
+                        <Trans key="modals:_trn_cache_cleanup.gdlauncher_desc" />
+                      </span>
+                    }
+                  >
+                    {(user) => (
+                      <span class="text-xs text-yellow-500">
+                        <Trans key={IN_USE[user()]} />
+                      </span>
+                    )}
+                  </Show>
                 </div>
               </ClickableRow>
 
               <ClickableRow
                 testId="cache-cleanup-scope-minecraft"
-                checked={minecraft()}
+                checked={selection().minecraft}
+                disabled={!!minecraftUser()}
                 onToggle={() => setMinecraft((v) => !v)}
               >
-                <div class="pointer-events-none">
-                  <Checkbox checked={minecraft()} />
+                <div
+                  class="pointer-events-none"
+                  classList={{ "opacity-50": !!minecraftUser() }}
+                >
+                  <Checkbox checked={selection().minecraft} />
                 </div>
                 <div class="flex min-w-0 flex-1 flex-col gap-0.5">
-                  <div class="flex items-baseline justify-between gap-2">
+                  <div
+                    class="flex items-baseline justify-between gap-2"
+                    classList={{ "opacity-50": !!minecraftUser() }}
+                  >
                     <span class="text-lightSlate-50 text-sm font-medium">
                       <Trans key="modals:_trn_cache_cleanup.minecraft_title" />
                     </span>
@@ -247,9 +313,20 @@ const CacheCleanup = (props: ModalProps) => {
                       </span>
                     </Show>
                   </div>
-                  <span class="text-lightSlate-500 text-xs">
-                    <Trans key="modals:_trn_cache_cleanup.minecraft_desc" />
-                  </span>
+                  <Show
+                    when={minecraftUser()}
+                    fallback={
+                      <span class="text-lightSlate-500 text-xs">
+                        <Trans key="modals:_trn_cache_cleanup.minecraft_desc" />
+                      </span>
+                    }
+                  >
+                    {(user) => (
+                      <span class="text-xs text-yellow-500">
+                        <Trans key={IN_USE[user()]} />
+                      </span>
+                    )}
+                  </Show>
                 </div>
               </ClickableRow>
             </div>
@@ -268,10 +345,7 @@ const CacheCleanup = (props: ModalProps) => {
                 loading={startMutation.isPending}
                 onClick={() => {
                   setSizeBefore(totalSize() ?? 0)
-                  startMutation.mutate({
-                    gdlauncher: gdlauncher(),
-                    minecraft: minecraft()
-                  })
+                  startMutation.mutate(selection())
                 }}
               >
                 <div class="i-hugeicons:delete-02 h-4 w-4" />
@@ -298,7 +372,7 @@ const CacheCleanup = (props: ModalProps) => {
                   </div>
                 </Show>
               </div>
-              <div class="text-yellow-400 text-xs">
+              <div class="text-xs text-yellow-400">
                 <Trans key="modals:_trn_cache_cleanup.warning_no_close" />
               </div>
             </div>
@@ -309,7 +383,7 @@ const CacheCleanup = (props: ModalProps) => {
               data-testid="cache-cleanup-done"
               class="flex flex-col items-center gap-4 py-8"
             >
-              <div class="i-hugeicons:checkmark-circle-02 text-green-400 h-12 w-12" />
+              <div class="i-hugeicons:checkmark-circle-02 h-12 w-12 text-green-400" />
               <div class="text-lg font-medium">
                 <Trans key="modals:_trn_cache_cleanup.done_title" />
               </div>
@@ -332,7 +406,7 @@ const CacheCleanup = (props: ModalProps) => {
 
           <Match when={phase() === "failed"}>
             <div class="flex flex-col items-center gap-4 py-8">
-              <div class="i-hugeicons:cancel-circle text-red-400 h-12 w-12" />
+              <div class="i-hugeicons:cancel-circle h-12 w-12 text-red-400" />
               <div class="text-lg font-medium">
                 <Trans key="modals:_trn_cache_cleanup.failed_title" />
               </div>

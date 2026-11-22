@@ -2,10 +2,13 @@ use self::terms_and_privacy::TermsAndPrivacy;
 use super::ManagerRef;
 use crate::api::{
     keys::settings::*,
-    settings::{CacheCleanupSelection, CacheSizes, FESettingsUpdate},
+    settings::{
+        CacheCleanupBlockers, CacheCleanupSelection, CacheSizes, CacheUser, FESettingsUpdate,
+    },
     translation::Translation,
 };
 use crate::domain::vtask::VisualTaskId;
+use crate::managers::runtime_lifecycle::{RuntimeBlocker, RuntimeBlockerKind};
 use crate::managers::vtask::{Subtask, TaskState, VisualTask};
 use anyhow::{anyhow, bail};
 use carbon_platforms::{ModChannelWithUsage, ModPlatform};
@@ -291,6 +294,11 @@ impl ManagerRef<'_, SettingsManager> {
         })
     }
 
+    /// What keeps each cache from being cleaned up right now, if anything.
+    pub fn cache_cleanup_blockers(self) -> CacheCleanupBlockers {
+        cache_users(&self.app.runtime_lifecycle.running_work())
+    }
+
     /// Two-tier cleanup. Spawns a background task that:
     ///
     /// 1. If `gdlauncher`: clears the cache tables, except the version
@@ -325,6 +333,24 @@ impl ManagerRef<'_, SettingsManager> {
         {
             bail!("A cache cleanup is already in progress");
         }
+        // Given back by every way out before the background task takes it.
+        let lease = CleanupLease(self.cleanup_running.clone());
+
+        // Nothing is removed under work that uses it, and until the cleanup
+        // ends a quit waits for it and the data folder cannot be moved.
+        let in_use = self.cache_cleanup_blockers();
+        for (selected, user, cache) in [
+            (selection.gdlauncher, in_use.gdlauncher, "GDLauncher"),
+            (selection.minecraft, in_use.minecraft, "Minecraft"),
+        ] {
+            if let (true, Some(user)) = (selected, user) {
+                bail!(
+                    "The {cache} cache can't be cleaned up now: {}.",
+                    user.reason()
+                );
+            }
+        }
+        let activity = self.app.runtime_lifecycle.admit("cache cleanup")?;
 
         let task = VisualTask::new(Translation::CacheCleanup);
         task.require_explicit_completion();
@@ -358,12 +384,12 @@ impl ManagerRef<'_, SettingsManager> {
 
         let app = self.app.clone();
         let runtime_path = self.runtime_path.clone();
-        let cleanup_running = self.cleanup_running.clone();
 
         tokio::spawn(async move {
             info!("Starting cache cleanup with selection: {selection:?}");
 
-            let _guard = CleanupLease(cleanup_running);
+            let _guard = lease;
+            let _activity = activity;
 
             let result =
                 run_cache_cleanup(&app.db, &runtime_path, &selection, work, vacuum_subtask).await;
@@ -381,6 +407,50 @@ impl ManagerRef<'_, SettingsManager> {
         });
 
         Ok(task_id)
+    }
+}
+
+impl CacheUser {
+    /// For the log and for a refusal the dialog could not foresee.
+    fn reason(self) -> &'static str {
+        match self {
+            Self::Game => "a game is running or being started",
+            Self::Install => "a download or install is still running",
+            Self::Task => "a launcher task is still running",
+            Self::Unconfirmed => "earlier work did not confirm that it finished",
+        }
+    }
+}
+
+/// The work that uses each cache, from what the core has running.
+///
+/// The GDLauncher cache holds the temporary folder, where installs,
+/// imports, exports and copies build what they then move into place. The
+/// Minecraft cache holds the files a game is started from, which a game
+/// being prepared is still collecting and a running one may still open.
+fn cache_users(running: &[RuntimeBlocker]) -> CacheCleanupBlockers {
+    use RuntimeBlockerKind as Kind;
+    let first = |users: &[(Kind, CacheUser)]| {
+        users
+            .iter()
+            .find(|(kind, _)| running.iter().any(|work| work.kind == *kind))
+            .map(|(_, user)| *user)
+    };
+    CacheCleanupBlockers {
+        gdlauncher: first(&[
+            (Kind::Install, CacheUser::Install),
+            (Kind::Task, CacheUser::Task),
+            (Kind::Unconfirmed, CacheUser::Unconfirmed),
+        ]),
+        minecraft: first(&[
+            (Kind::Game, CacheUser::Game),
+            (Kind::PreviousGame, CacheUser::Game),
+            (Kind::Install, CacheUser::Install),
+            // Whether a game from before the last restart still runs is not
+            // known until the startup check has finished.
+            (Kind::StartupCheckPending, CacheUser::Task),
+            (Kind::Unconfirmed, CacheUser::Unconfirmed),
+        ]),
     }
 }
 
@@ -873,6 +943,170 @@ mod tests {
                 "{table} must remain empty after cleanup"
             );
         }
+    }
+
+    fn only(gdlauncher: bool, minecraft: bool) -> CacheCleanupSelection {
+        CacheCleanupSelection {
+            gdlauncher,
+            minecraft,
+        }
+    }
+
+    /// One file in the temporary folder and one among the game's files.
+    fn seed_caches(app: &crate::managers::App) -> (PathBuf, PathBuf) {
+        let runtime = &app.settings_manager().runtime_path;
+        let staged = runtime.get_temp().to_path().join("being-installed");
+        let asset = runtime.get_assets().to_path().join("asset");
+        for file in [&staged, &asset] {
+            std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+            std::fs::write(file, b"in use").unwrap();
+        }
+        (staged, asset)
+    }
+
+    /// An install builds what it installs in the temporary folder, and the
+    /// game it prepares in the game's files: neither cache is cleaned up
+    /// under it, nothing is removed, and both are once it has finished.
+    #[tokio::test]
+    async fn no_cache_is_cleaned_up_under_a_running_install() {
+        use crate::managers::runtime_lifecycle::ActivityPolicy;
+        let app = crate::setup_managers_for_test().await;
+        let (staged, asset) = seed_caches(&app);
+        let install = app
+            .runtime_lifecycle
+            .admit_owned("instance 1 preparation", ActivityPolicy::Installer)
+            .unwrap();
+
+        assert_eq!(
+            app.settings_manager().cache_cleanup_blockers(),
+            CacheCleanupBlockers {
+                gdlauncher: Some(CacheUser::Install),
+                minecraft: Some(CacheUser::Install),
+            }
+        );
+        for selection in [only(true, false), only(false, true), only(true, true)] {
+            let refused = app
+                .settings_manager()
+                .cleanup_caches(selection)
+                .await
+                .unwrap_err();
+            assert!(
+                refused.to_string().contains("download or install"),
+                "{refused:#}"
+            );
+        }
+        assert!(staged.exists() && asset.exists());
+
+        install.finish();
+        assert_eq!(
+            app.settings_manager().cache_cleanup_blockers(),
+            CacheCleanupBlockers::default()
+        );
+        let task = app
+            .settings_manager()
+            .cleanup_caches(only(true, true))
+            .await
+            .expect("a refused cleanup leaves the next one free to run");
+        wait_for_task(&app, task).await;
+        assert!(!staged.exists() && !asset.exists());
+    }
+
+    /// An export, import or copy builds its result in the temporary folder
+    /// too. It keeps the GDLauncher cache, and leaves the game's files free.
+    #[tokio::test]
+    async fn the_gdlauncher_cache_is_not_cleaned_up_under_an_export_or_copy() {
+        let app = crate::setup_managers_for_test().await;
+        let (staged, asset) = seed_caches(&app);
+        let export = app.runtime_lifecycle.admit("instance export").unwrap();
+
+        assert_eq!(
+            app.settings_manager().cache_cleanup_blockers(),
+            CacheCleanupBlockers {
+                gdlauncher: Some(CacheUser::Task),
+                minecraft: None,
+            }
+        );
+        app.settings_manager()
+            .cleanup_caches(only(true, false))
+            .await
+            .unwrap_err();
+        let task = app
+            .settings_manager()
+            .cleanup_caches(only(false, true))
+            .await
+            .unwrap();
+        wait_for_task(&app, task).await;
+
+        assert!(staged.exists());
+        assert!(!asset.exists());
+        export.finish();
+    }
+
+    /// A running game may still open the files it was started from. It
+    /// keeps the Minecraft cache, and leaves the GDLauncher cache free.
+    #[tokio::test]
+    async fn the_minecraft_cache_is_not_cleaned_up_under_a_running_game() {
+        use crate::managers::runtime_lifecycle::ActivityPolicy;
+        let app = crate::setup_managers_for_test().await;
+        let (staged, asset) = seed_caches(&app);
+        let game = app
+            .runtime_lifecycle
+            .admit_owned("game 1", ActivityPolicy::Game)
+            .unwrap();
+
+        assert_eq!(
+            app.settings_manager().cache_cleanup_blockers(),
+            CacheCleanupBlockers {
+                gdlauncher: None,
+                minecraft: Some(CacheUser::Game),
+            }
+        );
+        app.settings_manager()
+            .cleanup_caches(only(true, true))
+            .await
+            .unwrap_err();
+        let task = app
+            .settings_manager()
+            .cleanup_caches(only(true, false))
+            .await
+            .unwrap();
+        wait_for_task(&app, task).await;
+
+        assert!(!staged.exists());
+        assert!(asset.exists());
+        game.finish();
+    }
+
+    /// A cleanup is running work itself: a quit waits for it and the data
+    /// folder is not moved under it, until it has ended.
+    #[tokio::test]
+    async fn a_cleanup_counts_as_running_work_until_it_has_ended() {
+        use crate::managers::runtime_lifecycle::RuntimeBlockerKind;
+        let app = crate::setup_managers_for_test().await;
+        let named = |app: &crate::managers::App| {
+            app.runtime_lifecycle
+                .running_work()
+                .into_iter()
+                .filter(|work| work.kind == RuntimeBlockerKind::Task)
+                .map(|work| work.name)
+                .collect::<Vec<_>>()
+        };
+
+        let task = app
+            .settings_manager()
+            .cleanup_caches(only(true, false))
+            .await
+            .unwrap();
+        assert_eq!(named(&app), ["cache cleanup"]);
+
+        wait_for_task(&app, task).await;
+        for _ in 0..200 {
+            if named(&app).is_empty() {
+                break;
+            }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        }
+        assert!(named(&app).is_empty());
     }
 
     /// An instance starts without internet from the version metadata stored
