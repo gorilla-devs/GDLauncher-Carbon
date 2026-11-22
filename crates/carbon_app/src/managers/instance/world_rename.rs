@@ -556,7 +556,7 @@ mod tests {
     #[tokio::test]
     async fn a_renamed_world_loses_the_map_kept_under_its_old_folder() {
         use crate::managers::instance::mods::tests::add_world_row;
-        use crate::managers::instance::world_map::store::{forgotten_soon, test_piece};
+        use crate::managers::instance::world_map::store::test_piece;
         let app = crate::setup_managers_for_test().await;
         let (id, saves, world) = world_instance(&app, "rename-map", "New World", None).await;
         add_world_row(&app, id, &saves, "Other").await;
@@ -569,7 +569,8 @@ mod tests {
         let folder = rename(&app, request(id, &world, "Skyblock")).await.unwrap();
 
         assert_eq!(folder, "Skyblock");
-        assert!(forgotten_soon(&store, &test_piece(id, "New World")).await);
+        app.instance_manager().forgetting_done().await;
+        assert!(store.get(&test_piece(id, "New World")).is_none());
         assert!(store.get(&test_piece(id, "Other")).is_some());
     }
 

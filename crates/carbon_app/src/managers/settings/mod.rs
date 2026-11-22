@@ -15,7 +15,7 @@ use reqwest_middleware::ClientWithMiddleware;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 pub mod terms_and_privacy;
 
@@ -369,7 +369,10 @@ impl ManagerRef<'_, SettingsManager> {
                 run_cache_cleanup(&app.db, &runtime_path, &selection, work, vacuum_subtask).await;
             if selection.gdlauncher {
                 // The kept world maps were emptied under the store's count.
-                app.instance_manager().world_map_store().forget_all();
+                let store = app.instance_manager().world_map_store();
+                if let Err(error) = tokio::task::spawn_blocking(move || store.forget_all()).await {
+                    debug!(?error, "could not reset the count of the kept world maps");
+                }
             }
             // Partial changes are real changes: refresh sizes on every outcome.
             app.invalidate(GET_DB_SIZE, None);

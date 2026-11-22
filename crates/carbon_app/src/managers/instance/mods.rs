@@ -1872,7 +1872,7 @@ pub(crate) mod tests {
     /// A deleted world's kept map goes with it; the map of a world beside it stays.
     #[tokio::test]
     async fn a_deleted_world_loses_its_kept_map() {
-        use crate::managers::instance::world_map::store::{forgotten_soon, test_piece};
+        use crate::managers::instance::world_map::store::test_piece;
         let app = crate::setup_managers_for_test().await;
         let (id, row, world) = addon_fixture(
             &app,
@@ -1892,7 +1892,8 @@ pub(crate) mod tests {
         app.instance_manager().delete_mod(id, row.id).await.unwrap();
 
         assert!(!world.exists());
-        assert!(forgotten_soon(&store, &test_piece(id, "World")).await);
+        app.instance_manager().forgetting_done().await;
+        assert!(store.get(&test_piece(id, "World")).is_none());
         assert!(store.get(&test_piece(id, "Other")).is_some());
     }
 

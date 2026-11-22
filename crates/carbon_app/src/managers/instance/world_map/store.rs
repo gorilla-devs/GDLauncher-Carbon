@@ -107,7 +107,7 @@ impl Store {
             }
         }
         if bytes > self.limit {
-            bytes = self.trim();
+            bytes = self.trim(&path);
         }
         *total = Some(bytes);
         Ok(())
@@ -191,6 +191,18 @@ impl Store {
     }
 
     fn forget_folder(&self, total: &mut Option<u64>, folder: &Path) {
+        // Not a folder of the store's own (a stray file, a link): removed as what it is,
+        // never followed, and not counted.
+        match fs::symlink_metadata(folder) {
+            Ok(meta) if !meta.is_dir() => {
+                if let Err(error) = fs::remove_file(folder).or_else(|_| fs::remove_dir(folder)) {
+                    debug!(?error, "could not remove {}", folder.display());
+                }
+                return;
+            }
+            Err(error) if error.kind() == io::ErrorKind::NotFound => return,
+            _ => {}
+        }
         let bytes = total.is_some().then(|| size_below(folder));
         match fs::remove_dir_all(folder) {
             Ok(()) => {
@@ -209,7 +221,8 @@ impl Store {
 
     /// Drops the least recently used pieces until the store holds at most nine tenths of
     /// its limit, so the next few pieces do not each start a walk. Returns what is left.
-    fn trim(&self) -> u64 {
+    /// `keep`, the piece just put, is never dropped, whatever its time says.
+    fn trim(&self, keep: &Path) -> u64 {
         let mut pieces = pieces_below(&self.root);
         pieces.sort_by_key(|piece| piece.2);
         let mut bytes: u64 = pieces.iter().map(|piece| piece.1).sum();
@@ -217,6 +230,9 @@ impl Store {
         for (path, len, _) in pieces {
             if bytes <= goal {
                 break;
+            }
+            if path == keep {
+                continue;
             }
             match fs::remove_file(&path) {
                 Ok(()) => bytes -= len,
@@ -301,19 +317,6 @@ pub(crate) fn test_piece(instance: InstanceId, world: &str) -> PieceKey<'_> {
         z: 0,
         revision: "aa11",
     }
-}
-
-/// Whether `key` is gone within a few seconds, for what forgets in the background.
-#[cfg(test)]
-pub(crate) async fn forgotten_soon(store: &Store, key: &PieceKey<'_>) -> bool {
-    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-    while std::time::Instant::now() < deadline {
-        if store.get(key).is_none() {
-            return true;
-        }
-        tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    }
-    false
 }
 
 #[cfg(test)]
@@ -585,5 +588,63 @@ mod tests {
         store.forget_world(InstanceId(1), &longer);
         assert_eq!(store.get(&digested), None);
         assert_eq!(store.get(&spelled), Some(piece(1)));
+    }
+
+    #[test]
+    fn the_piece_just_put_survives_a_trim_when_every_time_ties() {
+        let (_folder, store) = store_in("ties", 3 * PIECE as u64);
+        for x in 0..3 {
+            store
+                .put(&key("World", x, "aa11"), &piece(x as u8))
+                .unwrap();
+        }
+        // Everything older is "newer" than the piece about to be put, as on a file system
+        // whose times are too coarse to tell pieces put in a row apart.
+        let later = SystemTime::now() + std::time::Duration::from_secs(86_400);
+        for (path, _, _) in pieces_below(&store.root) {
+            fs::File::options()
+                .write(true)
+                .open(path)
+                .unwrap()
+                .set_modified(later)
+                .unwrap();
+        }
+
+        store.put(&key("World", 3, "aa11"), &piece(3)).unwrap();
+
+        assert_eq!(store.get(&key("World", 3, "aa11")), Some(piece(3)));
+        assert!(size_of(&store.root) <= 3 * PIECE as u64);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_linked_world_folder_is_removed_without_following_it() {
+        let (folder, store) = store_in("link", STORE_LIMIT);
+        store.put(&key("Other", 0, "aa11"), &piece(2)).unwrap();
+        let outside = folder.path().join("outside");
+        fs::create_dir_all(&outside).unwrap();
+        fs::write(outside.join("big"), vec![0u8; 5 * PIECE]).unwrap();
+        let link = store.instance_folder(InstanceId(1)).join(part("Linked"));
+        std::os::unix::fs::symlink(&outside, &link).unwrap();
+
+        store.forget_world(InstanceId(1), "Linked");
+
+        assert!(fs::symlink_metadata(&link).is_err());
+        assert!(outside.join("big").exists());
+        assert_eq!(store.counted_bytes(), Some(PIECE as u64));
+    }
+
+    #[test]
+    fn a_stray_file_does_not_make_the_store_count_again() {
+        let (_folder, store) = store_in("stray", STORE_LIMIT);
+        store.put(&key("Kept", 0, "aa11"), &piece(1)).unwrap();
+        let stray = store.instance_folder(InstanceId(1)).join(".DS_Store");
+        fs::write(&stray, b"x").unwrap();
+
+        store.forget_missing_worlds(InstanceId(1), &["Kept".to_owned()]);
+
+        assert!(!stray.exists());
+        assert_eq!(store.get(&key("Kept", 0, "aa11")), Some(piece(1)));
+        assert_eq!(store.counted_bytes(), Some(PIECE as u64));
     }
 }

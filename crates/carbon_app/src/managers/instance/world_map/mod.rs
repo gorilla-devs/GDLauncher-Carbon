@@ -32,7 +32,7 @@ impl ManagerRef<'_, InstanceManager> {
     pub(super) fn forget_world_map(self, id: InstanceId, world: String) {
         let store = self.world_map_store();
         let forgetting = tokio::task::spawn_blocking(move || store.forget_world(id, &world));
-        tokio::spawn(async move {
+        let task = tokio::spawn(async move {
             if let Err(error) = forgetting.await {
                 debug!(
                     ?error,
@@ -40,6 +40,7 @@ impl ManagerRef<'_, InstanceManager> {
                 );
             }
         });
+        self.keep_for_tests(task);
     }
 
     /// Drops, in the background, the kept maps of the instance's worlds other than
@@ -48,7 +49,7 @@ impl ManagerRef<'_, InstanceManager> {
         let store = self.world_map_store();
         let forgetting =
             tokio::task::spawn_blocking(move || store.forget_missing_worlds(id, &existing));
-        tokio::spawn(async move {
+        let task = tokio::spawn(async move {
             if let Err(error) = forgetting.await {
                 debug!(
                     ?error,
@@ -56,5 +57,31 @@ impl ManagerRef<'_, InstanceManager> {
                 );
             }
         });
+        self.keep_for_tests(task);
+    }
+
+    /// Production lets a background forgetting run on its own; tests keep it to await.
+    fn keep_for_tests(self, task: tokio::task::JoinHandle<()>) {
+        #[cfg(test)]
+        self.forgetting
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .push(task);
+        #[cfg(not(test))]
+        drop(task);
+    }
+
+    /// Waits until every forgetting started so far has finished.
+    #[cfg(test)]
+    pub(crate) async fn forgetting_done(self) {
+        let tasks = std::mem::take(
+            &mut *self
+                .forgetting
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner()),
+        );
+        for task in tasks {
+            task.await.unwrap();
+        }
     }
 }
