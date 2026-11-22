@@ -41,6 +41,12 @@ const MAX_PATH_SEGMENTS: usize = 8;
 /// `entities` and `poi` hold as many files as `region`, so they are not walked.
 const DIMENSION_PARTS: [&str; 3] = ["region", "entities", "poi"];
 
+/// How many folders under `dimensions/` are walked at most; what was found by then is listed.
+const MAX_WALKED_FOLDERS: usize = 4096;
+
+/// `Data.version` of the first worlds kept in Anvil regions (1.2); McRegion is 19132.
+const ANVIL_VERSION: i32 = 19133;
+
 /// Walking a `level.dat` or a player file costs at most this, inventories included.
 const LIMITS: Limits = Limits {
     max_tags: 2_000_000,
@@ -79,11 +85,12 @@ pub struct MapPoint {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Unmappable {
-    /// McRegion files, or the folders per chunk of the first versions.
+    /// McRegion files, or a `level.dat` from before Anvil and no region folder (the folders
+    /// per chunk of the first versions).
     TooOld,
     /// Cubic Chunks' files, which are not regions of 32 by 32 chunks.
     NotRegions,
-    /// `level.dat` cannot be read.
+    /// `level.dat` cannot be read and no region is listed.
     Unreadable,
 }
 
@@ -137,12 +144,12 @@ fn facts_of(world: &Path) -> WorldMap {
     let listed = |point: Option<MapPoint>| {
         point.filter(|point| dimensions.iter().any(|d| d.id == point.dimension))
     };
-    let regions_say = if dimensions.is_empty() {
-        why_no_regions(world)
+    // With regions listed the map is shown, even without a readable `level.dat`.
+    let unmappable = if dimensions.is_empty() {
+        why_no_regions(world, level.as_ref().ok())
     } else {
         None
     };
-    let unmappable = regions_say.or(level.is_err().then_some(Unmappable::Unreadable));
     WorldMap {
         spawn: listed(spawn),
         player: listed(player),
@@ -152,31 +159,15 @@ fn facts_of(world: &Path) -> WorldMap {
 }
 
 /// The region folder of `dimension`, when the world lists it: the folder its regions were
-/// listed from.
+/// listed from. Looked up in the listing itself, so an id is never joined onto a path and
+/// the two cannot disagree (a case-insensitive file system answering `dim7` for `DIM7`).
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn dimension_folder(world: &Path, dimension: &str) -> Option<PathBuf> {
-    if let Some((_, name, old)) = VANILLA.iter().find(|(id, _, _)| *id == dimension) {
-        return vanilla_folder(world, name, old);
-    }
-    let folder = if let Some((namespace, path)) = dimension.split_once(':') {
-        let path: Vec<&str> = path.split('/').collect();
-        if !segment(namespace)
-            || path.len() > MAX_PATH_SEGMENTS
-            || !path
-                .iter()
-                .all(|s| segment(s) && !DIMENSION_PARTS.contains(s))
-        {
-            return None;
-        }
-        let mut parts = vec!["dimensions", namespace];
-        parts.extend(path);
-        parts.push("region");
-        folder_within(world, &parts)?
-    } else {
-        numbered(dimension)?;
-        folder_within(world, &[dimension, "region"])?
-    };
-    has_region(&folder).then_some(folder)
+    listed_folders(world)
+        .into_iter()
+        .find(|(id, _)| id == dimension)
+        .map(|(_, folder)| folder)
+        .filter(|folder| has_region(folder))
 }
 
 /// Each dimension the world may hold, with the region folder it is read from: vanilla ones
@@ -191,18 +182,26 @@ fn listed_folders(world: &Path) -> Vec<(String, PathBuf)> {
         }
     }
     if let Some(root) = folder_within(world, &["dimensions"]) {
+        let mut budget = MAX_WALKED_FOLDERS;
         for namespace in subfolders(&root) {
-            if segment(&namespace) {
-                walk_dimensions(
-                    &root.join(&namespace),
-                    &namespace,
-                    &mut Vec::new(),
-                    &mut others,
-                );
+            if !segment(&namespace) {
+                continue;
             }
+            if budget == 0 {
+                break;
+            }
+            budget -= 1;
+            walk_dimensions(
+                &root.join(&namespace),
+                &namespace,
+                &mut Vec::new(),
+                &mut budget,
+                &mut others,
+            );
         }
     }
-    others.sort_by(|a, b| a.0.cmp(&b.0));
+    // Numbered folders by their number (`DIM7` before `DIM10`), then the ids.
+    others.sort_by_cached_key(|(id, _)| (numbered(id).is_none(), numbered(id), id.clone()));
     VANILLA
         .iter()
         .filter_map(|(id, name, old)| Some((id.to_string(), vanilla_folder(world, name, old)?)))
@@ -210,11 +209,13 @@ fn listed_folders(world: &Path) -> Vec<(String, PathBuf)> {
         .collect()
 }
 
-/// Adds every dimension of `namespace` below `folder`, `path` being the segments walked.
+/// Adds every dimension of `namespace` below `folder`, `path` being the segments walked,
+/// while `budget` folders may still be walked.
 fn walk_dimensions(
     folder: &Path,
     namespace: &str,
     path: &mut Vec<String>,
+    budget: &mut usize,
     out: &mut Vec<(String, PathBuf)>,
 ) {
     if path.len() == MAX_PATH_SEGMENTS {
@@ -224,6 +225,10 @@ fn walk_dimensions(
         if !segment(&name) || DIMENSION_PARTS.contains(&name.as_str()) {
             continue;
         }
+        if *budget == 0 {
+            return;
+        }
+        *budget -= 1;
         let here = folder.join(&name);
         path.push(name);
         let id = format!("{namespace}:{}", path.join("/"));
@@ -232,7 +237,7 @@ fn walk_dimensions(
                 out.push((id, region));
             }
         }
-        walk_dimensions(&here, namespace, path, out);
+        walk_dimensions(&here, namespace, path, budget, out);
         path.pop();
     }
 }
@@ -289,60 +294,66 @@ fn subfolders(folder: &Path) -> Vec<String> {
         .collect()
 }
 
+/// What a region's revision is computed from: a file's size and modified time.
 #[derive(Clone, Copy)]
-struct Stamp {
+pub(super) struct Stamp {
     size: u64,
     modified: u128,
 }
 
+/// The stamp of the file at `path`, `None` when it is not a regular file (a link is not).
+/// Asked of the file system each time: on Windows the metadata of a directory listing
+/// lags while the game holds the file open.
+pub(super) fn stamp(path: &Path) -> Option<Stamp> {
+    let metadata = fs::symlink_metadata(path).ok()?;
+    if !metadata.is_file() {
+        return None;
+    }
+    let modified = metadata
+        .modified()
+        .ok()
+        .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
+        .map_or(0, |since| since.as_nanos());
+    Some(Stamp {
+        size: metadata.len(),
+        modified,
+    })
+}
+
 /// The files named `r.<x>.<z>.mca` in `folder` that are files, not links, of any size.
 fn region_files(folder: &Path) -> HashMap<(i32, i32), Stamp> {
-    let Ok(entries) = fs::read_dir(folder) else {
-        return HashMap::new();
-    };
-    entries
+    region_entries(folder).collect()
+}
+
+fn region_entries(folder: &Path) -> impl Iterator<Item = ((i32, i32), Stamp)> {
+    fs::read_dir(folder)
+        .into_iter()
+        .flatten()
         .flatten()
         .filter_map(|entry| {
             let at = region_name(entry.file_name().to_str()?)?;
-            // The entry's own type and metadata, not a link's target.
+            // The entry's own type, not a link's target.
             if !entry.file_type().ok()?.is_file() {
                 return None;
             }
-            let metadata = entry.metadata().ok()?;
-            let modified = metadata
-                .modified()
-                .ok()
-                .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
-                .map_or(0, |since| since.as_nanos());
-            Some((
-                at,
-                Stamp {
-                    size: metadata.len(),
-                    modified,
-                },
-            ))
+            Some((at, stamp(&entry.path())?))
         })
-        .collect()
 }
 
+/// The place of a region file by its name, only as the game writes it (`r.5.0.mca`, never
+/// `r.+5.0.mca` or `r.05.0.mca`).
 fn region_name(name: &str) -> Option<(i32, i32)> {
     let (x, z) = name
         .strip_prefix("r.")?
         .strip_suffix(".mca")?
         .split_once('.')?;
-    Some((x.parse().ok()?, z.parse().ok()?))
+    let (x, z) = (x.parse().ok()?, z.parse().ok()?);
+    (format!("r.{x}.{z}.mca") == name).then_some((x, z))
 }
 
 /// Whether `folder` holds a region with chunks in it, as the listing counts them.
 fn has_region(folder: &Path) -> bool {
-    let Ok(entries) = fs::read_dir(folder) else {
-        return false;
-    };
-    entries.flatten().any(|entry| {
-        entry.file_name().to_str().and_then(region_name).is_some()
-            && entry.file_type().is_ok_and(|t| t.is_file())
-            && entry.metadata().is_ok_and(|m| m.len() >= MIN_REGION_SIZE)
-    })
+    region_entries(folder).any(|(_, stamp)| stamp.size >= MIN_REGION_SIZE)
 }
 
 fn dimension(id: String, folder: &Path) -> Option<MapDimension> {
@@ -376,10 +387,12 @@ fn dimension(id: String, folder: &Path) -> Option<MapDimension> {
     })
 }
 
-fn region_revision(own: &Stamp, north: Option<&Stamp>) -> String {
+/// The revision of a region from its own stamp and that of `r.<x>.<z-1>.mca`, the region to
+/// its north; a north file too small to hold a chunk counts as absent.
+pub(super) fn region_revision(own: &Stamp, north: Option<&Stamp>) -> String {
     let mut digest = Sha256::new();
     digest.update(format!("{}:{}|", own.size, own.modified));
-    match north {
+    match north.filter(|north| north.size >= MIN_REGION_SIZE) {
         Some(north) => digest.update(format!("{}:{}", north.size, north.modified)),
         None => digest.update("-"),
     }
@@ -391,8 +404,8 @@ fn short_hex(digest: Sha256) -> String {
 }
 
 /// When the world lists no dimension, why it cannot be mapped; `None` for a world that has
-/// no region yet.
-fn why_no_regions(world: &Path) -> Option<Unmappable> {
+/// no region yet. `level` is `None` when `level.dat` cannot be read.
+fn why_no_regions(world: &Path, level: Option<&Level>) -> Option<Unmappable> {
     let holds = |folder: Option<PathBuf>, extensions: &[&str]| {
         folder.is_some_and(|folder| {
             fs::read_dir(folder).is_ok_and(|entries| {
@@ -416,15 +429,22 @@ fn why_no_regions(world: &Path) -> Option<Unmappable> {
     {
         return Some(Unmappable::NotRegions);
     }
-    // The first versions kept a folder per chunk column and no region folder at all.
-    let has_level = fs::symlink_metadata(world.join("level.dat")).is_ok_and(|m| m.is_file());
-    if has_level && region.is_none() && folder_within(world, &["dimensions"]).is_none() {
-        return Some(Unmappable::TooOld);
-    }
-    None
+    let Some(level) = level else {
+        return Some(Unmappable::Unreadable);
+    };
+    // The first versions kept a folder per chunk column and no region folder at all; a world
+    // of a later version without one crashed before its first save.
+    let before_anvil = level.version.is_none_or(|version| version < ANVIL_VERSION);
+    let any_region_folder = region.is_some()
+        || folder_within(world, &["DIM-1", "region"]).is_some()
+        || folder_within(world, &["DIM1", "region"]).is_some()
+        || folder_within(world, &["dimensions"]).is_some();
+    (before_anvil && !any_region_folder).then_some(Unmappable::TooOld)
 }
 
 struct Level {
+    /// `Data.version`, the format of the world's files; absent before McRegion.
+    version: Option<i32>,
     spawn: Option<MapPoint>,
     /// `None` when `level.dat` holds no player (a server's world).
     player: Option<Option<MapPoint>>,
@@ -440,6 +460,10 @@ fn read_level(world: &Path) -> anyhow::Result<Level> {
         bail!("{} has no Data compound", path.display());
     };
     Ok(Level {
+        version: match data.get("version") {
+            Some(Tag::Int(version)) => Some(*version),
+            _ => None,
+        },
         spawn: spawn_of(data),
         player: data.get("Player").map(player_point),
     })
@@ -448,7 +472,7 @@ fn read_level(world: &Path) -> anyhow::Result<Level> {
 fn keep_level(path: &[&[u8]]) -> Keep {
     match path {
         [b"Data"] | [b"Data", b"Player"] => Keep::Descend,
-        [b"Data", b"SpawnX" | b"SpawnZ" | b"spawn"]
+        [b"Data", b"version" | b"SpawnX" | b"SpawnZ" | b"spawn"]
         | [b"Data", b"Player", b"Pos" | b"Dimension"] => Keep::All,
         _ => Keep::Skip,
     }
@@ -903,10 +927,24 @@ mod tests {
         put_region(garbled.path(), "region", 0, 0);
         let without_level = tempfile::tempdir().unwrap();
         put_region(without_level.path(), "region", 0, 0);
+        // With regions listed the map is shown, without spawn and player.
         for (what, world) in [("garbled", &garbled), ("no level.dat", &without_level)] {
             let map = facts_of(world.path());
-            assert_eq!(map.unmappable, Some(Unmappable::Unreadable), "{what}");
+            assert_eq!(ids(&map), [OVERWORLD], "{what}");
+            assert_eq!(map.unmappable, None, "{what}");
             assert_eq!((map.spawn, map.player), (None, None), "{what}");
+        }
+        let garbled_empty = tempfile::tempdir().unwrap();
+        fs::write(garbled_empty.path().join("level.dat"), b"not gzip at all").unwrap();
+        let garbled_new = tempfile::tempdir().unwrap();
+        fs::write(garbled_new.path().join("level.dat"), b"not gzip at all").unwrap();
+        fs::create_dir_all(garbled_new.path().join("region")).unwrap();
+        for (what, world) in [
+            ("no folders", &garbled_empty),
+            ("empty region", &garbled_new),
+        ] {
+            let map = facts_of(world.path());
+            assert_eq!(map.unmappable, Some(Unmappable::Unreadable), "{what}");
         }
 
         // Beta 1.3 to 1.1: McRegion files.
@@ -951,6 +989,123 @@ mod tests {
             assert_eq!(ids(&map), Vec::<&str>::new(), "{what}");
             assert_eq!(map.unmappable, None, "{what}");
         }
+    }
+
+    #[test]
+    fn a_world_with_only_a_level_dat_is_too_old_only_when_its_version_says_so() {
+        for (version, expected) in [
+            (None, Some(Unmappable::TooOld)),
+            (Some(19132), Some(Unmappable::TooOld)),
+            // Anvil: a new world that has not saved a region yet.
+            (Some(19133), None),
+        ] {
+            let mut data = vec![("LevelName", string("Only level"))];
+            if let Some(version) = version {
+                data.push(("version", Tag::Int(version)));
+            }
+            let world = world_with(data);
+            let map = facts_of(world.path());
+            assert_eq!(ids(&map), Vec::<&str>::new(), "{version:?}");
+            assert_eq!(map.unmappable, expected, "{version:?}");
+        }
+        // Any region folder says the world is not from before regions.
+        for folder in ["DIM-1/region", "DIM1/region", "dimensions/minecraft"] {
+            let world = plain_world();
+            fs::create_dir_all(world.path().join(folder)).unwrap();
+            assert_eq!(facts_of(world.path()).unmappable, None, "{folder}");
+        }
+    }
+
+    #[test]
+    fn region_names_the_game_never_writes_are_ignored() {
+        let world = plain_world();
+        put_region(world.path(), "region", 0, 0);
+        for name in ["r.+5.0.mca", "r.05.0.mca", "r.0.-0.mca", "r.0.+1.mca"] {
+            put_file(&world.path().join("region").join(name), 8192);
+            put_file(&world.path().join("DIM4/region").join(name), 8192);
+        }
+        let map = facts_of(world.path());
+        assert_eq!(ids(&map), [OVERWORLD]);
+        assert_eq!(regions(&map, OVERWORLD), [(0, 0)]);
+        assert_eq!(dimension_folder(world.path(), "DIM4"), None);
+    }
+
+    #[test]
+    fn numbered_dimensions_are_ordered_by_their_number() {
+        let world = plain_world();
+        for folder in ["DIM10", "DIM7", "DIM-3", "DIM2", "dimensions/a/b"] {
+            put_region(world.path(), &format!("{folder}/region"), 0, 0);
+        }
+        let map = facts_of(world.path());
+        assert_eq!(ids(&map), ["DIM-3", "DIM2", "DIM7", "DIM10", "a:b"]);
+    }
+
+    #[test]
+    fn the_walk_under_dimensions_stops_after_so_many_folders() {
+        let world = plain_world();
+        let total = MAX_WALKED_FOLDERS + 100;
+        for i in 0..total {
+            let path = world
+                .path()
+                .join(format!("dimensions/many/d{i:05}/region/r.0.0.mca"));
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            // Sparse: the size is what counts.
+            fs::File::create(&path).unwrap().set_len(8192).unwrap();
+        }
+        let map = facts_of(world.path());
+        // The namespace's folder is one of those walked.
+        assert_eq!(map.dimensions.len(), MAX_WALKED_FOLDERS - 1);
+        // The folder of a dimension is only answered for one the listing gives.
+        let listed: Vec<&str> = ids(&map);
+        let first = listed[0];
+        assert_eq!(
+            dimension_folder(world.path(), first),
+            Some(world.path().join(format!(
+                "dimensions/many/{}/region",
+                first.strip_prefix("many:").unwrap()
+            )))
+        );
+        let unlisted: Vec<String> = (0..total)
+            .map(|i| format!("many:d{i:05}"))
+            .filter(|id| !listed.contains(&id.as_str()))
+            .take(5)
+            .collect();
+        assert_eq!(unlisted.len(), 5);
+        for id in unlisted {
+            assert_eq!(dimension_folder(world.path(), &id), None, "{id}");
+        }
+    }
+
+    #[test]
+    fn adding_or_removing_a_region_changes_the_dimensions_revision() {
+        let world = plain_world();
+        put_region(world.path(), "region", 0, 0);
+        let before = facts_of(world.path());
+        let added = put_region(world.path(), "region", 9, 9);
+        let with = facts_of(world.path());
+        fs::remove_file(added).unwrap();
+        let after = facts_of(world.path());
+        assert_ne!(
+            dimension(&before, OVERWORLD).revision,
+            dimension(&with, OVERWORLD).revision
+        );
+        assert_ne!(
+            dimension(&with, OVERWORLD).revision,
+            dimension(&after, OVERWORLD).revision
+        );
+    }
+
+    #[test]
+    fn a_north_neighbour_without_chunks_counts_as_absent() {
+        let world = plain_world();
+        put_region(world.path(), "region", 0, 0);
+        let alone = revision(&facts_of(world.path()), OVERWORLD, 0, 0);
+        put_file(&world.path().join("region/r.0.-1.mca"), 100);
+        let small = revision(&facts_of(world.path()), OVERWORLD, 0, 0);
+        assert_eq!(alone, small);
+        put_file(&world.path().join("region/r.0.-1.mca"), 8192);
+        let real = revision(&facts_of(world.path()), OVERWORLD, 0, 0);
+        assert_ne!(alone, real);
     }
 
     async fn refusal_of(app: &crate::managers::App, id: InstanceId, world: &str) -> Option<String> {
