@@ -234,14 +234,33 @@ export async function openInstanceAddons(
   await goToLibrary(page)
   await page.click(byInstanceName(instanceName))
 
+  // The body is read inside the predicate, and a response whose body cannot
+  // be read is passed over for the next one. The app aborts an in-flight
+  // `getInstanceMods` fetch whenever the core invalidates that query again
+  // (the rspc client hands TanStack Query's abort signal to `fetch`), and the
+  // core does that several times in a row straight after an install. An
+  // aborted request has already fired Playwright's "response" event on its
+  // headers, but its body is gone, so reading it fails with "No data found
+  // for resource with given identifier". The request that replaced it is the
+  // one that carries the list.
+  const read: { body?: RspcEnvelope } = {}
   const modsResponsePromise = page
-    .waitForResponse((r) => r.url().includes("instance.getInstanceMods"), {
-      timeout: MODS_RESPONSE_TIMEOUT
-    })
+    .waitForResponse(
+      async (r) => {
+        if (!r.url().includes("instance.getInstanceMods")) return false
+        try {
+          read.body = (await r.json()) as RspcEnvelope
+          return true
+        } catch {
+          return false
+        }
+      },
+      { timeout: MODS_RESPONSE_TIMEOUT }
+    )
     .catch((cause) => {
       throw new Error(
-        `openInstanceAddons: no instance.getInstanceMods response observed ` +
-          `after opening "${instanceName}"'s Addons tab within ` +
+        `openInstanceAddons: no readable instance.getInstanceMods response ` +
+          `observed after opening "${instanceName}"'s Addons tab within ` +
           `${MODS_RESPONSE_TIMEOUT}ms`,
         { cause }
       )
@@ -249,9 +268,13 @@ export async function openInstanceAddons(
 
   await page.getByRole("tab", { name: "Addons" }).click()
 
-  const response = await modsResponsePromise
-  const body = (await response.json()) as {
-    result?: { type?: string; data?: unknown }
+  await modsResponsePromise
+  const body = read.body
+  if (!body) {
+    throw new Error(
+      `openInstanceAddons: the instance.getInstanceMods response for ` +
+        `"${instanceName}" was matched but its body was never read`
+    )
   }
   if (body.result?.type === "error") {
     throw new Error(
@@ -680,9 +703,8 @@ export async function installModIntoInstance(
   }
 }
 
-/** Envelope every rspc response in this app shares — see
- *  `openInstanceAddons`'s identical inline shape. Named here because the
- *  lifecycle drivers below parse it repeatedly. */
+/** Envelope every rspc response in this app shares. Named because
+ *  `openInstanceAddons` and the lifecycle drivers below all parse it. */
 interface RspcEnvelope {
   result?: { type?: string; data?: unknown }
 }
