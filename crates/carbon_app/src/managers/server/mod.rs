@@ -32,6 +32,7 @@ pub mod local;
 pub mod modloader_install;
 pub mod modloader_launch;
 pub mod modpack;
+mod operators;
 mod pack_loader;
 pub mod properties;
 pub mod provider;
@@ -296,6 +297,8 @@ pub struct ServerManager {
     /// How often it checks, in milliseconds: `RECOVERED_POLL_INTERVAL`,
     /// which tests shorten or stretch.
     recovered_poll_ms: AtomicU64,
+    /// How long a running server is given to save an operator (shortened by tests).
+    operator_save_wait_ms: AtomicU64,
     /// Serializes every read-row-then-write of a `server.json` with the
     /// delete that removes it, so a write that read the row before a delete
     /// never brings the file back after it. See `record`.
@@ -333,6 +336,7 @@ impl ServerManager {
             crash_restart_abandoned: DashMap::new(),
             recovered_watcher: AtomicBool::new(false),
             recovered_poll_ms: AtomicU64::new(RECOVERED_POLL_INTERVAL.as_millis() as u64),
+            operator_save_wait_ms: AtomicU64::new(operators::OPERATOR_SAVE_WAIT.as_millis() as u64),
             record_lock: Mutex::new(()),
             restored_servers: AtomicU32::new(0),
             stop_requested: DashMap::new(),
@@ -5571,7 +5575,7 @@ mod tests {
 
     // --- wait_for_process_exit ----------------------------------------
 
-    fn running_server_with_handle() -> ServerData {
+    pub(super) fn running_server_with_handle() -> ServerData {
         let (kill_tx, _kill_rx) = mpsc::channel::<()>(1);
         let (stdin_tx, _stdin_rx) = mpsc::channel::<String>(1);
         let (exited_tx, exited) = provider::exit_signal();
@@ -5814,7 +5818,7 @@ mod stale_marker_tests {
     use super::*;
     use crate::managers::runtime_lifecycle::{RuntimeBlocker, RuntimeBlockerKind};
 
-    async fn server_fixture(
+    pub(super) async fn server_fixture(
         app: &crate::managers::App,
         shortpath: &str,
     ) -> (ServerId, std::path::PathBuf) {
@@ -6055,7 +6059,7 @@ mod stale_marker_tests {
     }
     /// Keeps `watch_recovered_servers` from getting to a server before the
     /// action a test makes, so the test shows what that action does.
-    fn hold_watcher(app: &crate::managers::App) {
+    pub(super) fn hold_watcher(app: &crate::managers::App) {
         app.server_manager
             .recovered_poll_ms
             .store(60 * 60 * 1000, Ordering::Relaxed);

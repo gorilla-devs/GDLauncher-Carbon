@@ -848,15 +848,7 @@ pub(super) fn mount() -> RouterBuilder<App> {
             let id: ServerId = req.server_id.into();
             let (uuid, name) = app.server_manager()
                 .resolve_player_uuid(&req.username).await?;
-            let entry = OpsEntry { uuid, name: name.clone(), level: req.level, bypasses_player_limit: false };
-            let mut list = app.server_manager()
-                .get_player_list::<OpsEntry>(id, PlayerListFile::Ops).await?;
-            list.push(entry);
-            app.server_manager()
-                .write_player_list(id, PlayerListFile::Ops, &list).await?;
-            app.server_manager()
-                .send_console_if_running(id, format!("op {}", name)).await;
-            Ok(())
+            app.server_manager().add_operator(id, uuid, name, req.level).await
         }
 
         mutation REMOVE_OP[app, req: RemovePlayerRequest] {

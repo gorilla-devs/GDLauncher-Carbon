@@ -36,12 +36,13 @@ afterEach(() => {
   root?.remove()
   vi.clearAllMocks()
 })
-function mount(ips: any[]) {
+function mount(ips: any[], more: Record<string, unknown> = {}) {
   const [lists] = createStore({
     "server.getWhitelist": [{ name: "SyntheticPlayer", uuid: "player-id" }],
     "server.getOps": [],
     "server.getBannedPlayers": [],
-    "server.getBannedIps": ips
+    "server.getBannedIps": ips,
+    ...more
   })
   control.lists = lists
   control.mutation.mockResolvedValue(undefined)
@@ -84,4 +85,39 @@ test("empty banned-IP list mounts no resource or unban row", () => {
   bannedTab()
   expect(root.querySelectorAll("img, [src], [href]")).toHaveLength(0)
   expect(root.textContent).toContain("_trn_server_players_no_entries")
+})
+
+function operatorsTab() {
+  const tab = [...root.querySelectorAll("button")].find((button) =>
+    button.textContent?.includes("_trn_server_players_operators")
+  )!
+  tab.click()
+}
+const SERVER_DEFAULT = "_trn_server_players_op_level_server_default"
+const WHY = "_trn_server_players_op_level_running"
+
+test("a running server offers no operator level, and says why", () => {
+  mount([], { "server.getServerDetails": { state: { status: "running" } } })
+  operatorsTab()
+
+  expect(root.textContent).toContain(SERVER_DEFAULT)
+  expect(root.textContent).toContain(WHY)
+})
+
+test("a stopped server offers the operator levels", () => {
+  mount([], { "server.getServerDetails": { state: { status: "stopped" } } })
+  operatorsTab()
+
+  expect(root.textContent).not.toContain(SERVER_DEFAULT)
+  expect(root.textContent).not.toContain(WHY)
+})
+
+test("an operator of a running server is listed at the level the server saved", () => {
+  mount([], {
+    "server.getServerDetails": { state: { status: "running" } },
+    "server.getOps": [{ name: "Notch", uuid: "notch-id", level: 4 }]
+  })
+  operatorsTab()
+
+  expect(root.textContent).toContain("_trn_server_players_op_level_4")
 })

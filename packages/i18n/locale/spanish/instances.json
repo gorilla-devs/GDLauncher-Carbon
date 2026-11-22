@@ -98,6 +98,8 @@
   "_trn_server_players_op_level_2": "2 - Trucos y bloques de comandos",
   "_trn_server_players_op_level_3": "3 - Expulsar, banear y dar op a jugadores",
   "_trn_server_players_op_level_4": "4 - Control total (detener servidor)",
+  "_trn_server_players_op_level_server_default": "Predeterminado del servidor",
+  "_trn_server_players_op_level_running": "Un servidor en ejecución fija el nivel. Detenlo para elegir uno.",
   "_trn_server_open_folder": "Abrir carpeta",
   "_trn_server_creation_cancel": "Cancelar",
   "_trn_server_creation_create": "Crear servidor",

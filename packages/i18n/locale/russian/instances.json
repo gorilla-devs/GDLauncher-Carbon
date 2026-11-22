@@ -98,6 +98,8 @@
   "_trn_server_players_op_level_2": "2 - Читы и командные блоки",
   "_trn_server_players_op_level_3": "3 - Кик, бан и назначение операторов",
   "_trn_server_players_op_level_4": "4 - Полный контроль (остановка сервера)",
+  "_trn_server_players_op_level_server_default": "По умолчанию для сервера",
+  "_trn_server_players_op_level_running": "Запущенный сервер сам задаёт уровень. Остановите его, чтобы выбрать уровень.",
   "_trn_server_open_folder": "Открыть папку сервера",
   "_trn_server_creation_cancel": "Отмена",
   "_trn_server_creation_create": "Создать сервер",

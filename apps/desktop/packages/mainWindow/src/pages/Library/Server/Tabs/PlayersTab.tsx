@@ -12,10 +12,14 @@ import {
   SelectTrigger,
   SelectContent,
   SelectItem,
-  SelectValue
+  SelectValue,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent
 } from "@gd/ui"
 import { Trans, useTransContext, type NamespacedTranslationKey } from "@gd/i18n"
 import { rspc } from "@/utils/rspcClient"
+import useServerData from "../server.data"
 
 const OP_LEVEL_KEYS: Record<string, string> = {
   "1": "instances:_trn_server_players_op_level_1",
@@ -28,6 +32,10 @@ const PlayersTab = () => {
   const [t] = useTransContext()
   const params = useParams<{ id: string }>()
   const serverId = () => parseInt(params.id, 10)
+  const routeData = useServerData()
+  // A running server gives a new operator its own level and takes no other.
+  const isRunning = () =>
+    routeData.serverDetails.data?.state?.status === "running"
 
   const opLevelLabel = (level: string) =>
     OP_LEVEL_KEYS[level]
@@ -221,26 +229,44 @@ const PlayersTab = () => {
                   e.key === "Enter" && handleAddOp()
                 }
               />
-              <Select
-                value={opLevel()}
-                onChange={(v) => {
-                  if (v) setOpLevel(v)
-                }}
-                options={["1", "2", "3", "4"]}
-                disallowEmptySelection
-                itemComponent={(itemProps) => (
-                  <SelectItem item={itemProps.item}>
-                    {opLevelLabel(itemProps.item.rawValue)}
-                  </SelectItem>
-                )}
+              <Show
+                when={!isRunning()}
+                fallback={
+                  <Tooltip placement="top">
+                    <TooltipTrigger class="inline-flex">
+                      <div class="min-w-50 bg-darkSlate-800 text-lightSlate-100 flex h-9 cursor-not-allowed items-center rounded-md px-3 text-sm opacity-50">
+                        <Trans key="instances:_trn_server_players_op_level_server_default" />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent class="max-w-80">
+                      <p class="m-0 text-xs leading-relaxed">
+                        <Trans key="instances:_trn_server_players_op_level_running" />
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                }
               >
-                <SelectTrigger class="min-w-50">
-                  <SelectValue<string>>
-                    {(state) => opLevelLabel(state.selectedOption())}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent />
-              </Select>
+                <Select
+                  value={opLevel()}
+                  onChange={(v) => {
+                    if (v) setOpLevel(v)
+                  }}
+                  options={["1", "2", "3", "4"]}
+                  disallowEmptySelection
+                  itemComponent={(itemProps) => (
+                    <SelectItem item={itemProps.item}>
+                      {opLevelLabel(itemProps.item.rawValue)}
+                    </SelectItem>
+                  )}
+                >
+                  <SelectTrigger class="min-w-50">
+                    <SelectValue<string>>
+                      {(state) => opLevelLabel(state.selectedOption())}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent />
+                </Select>
+              </Show>
               <Button
                 size="small"
                 onClick={handleAddOp}
