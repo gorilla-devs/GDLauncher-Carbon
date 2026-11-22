@@ -33,8 +33,15 @@ use std::path::{Path, PathBuf};
 use tokio_util::sync::CancellationToken;
 use tracing::{info, warn};
 
-/// Staging folders are named this, then a random part.
+/// Staging folders are named this, then the instance id, `-` and a random
+/// part. The id lets each instance sweep only its own leftovers: a `saves`
+/// linked into a shared folder sits beside other instances' copies.
 const STAGING_PREFIX: &str = ".gdl-world-copy-";
+
+/// The start of the names of `id`'s staging folders.
+fn staging_prefix(id: InstanceId) -> String {
+    format!("{STAGING_PREFIX}{}-", *id)
+}
 
 /// Room the drive keeps beyond the world's own size, so a copy never fills it.
 const SPACE_MARGIN: u64 = 64 * 1024 * 1024;
@@ -60,12 +67,11 @@ pub struct WorldCopy {
     pub task: VisualTaskId,
 }
 
-/// A copy that is running, with what stops it and where it is made.
+/// A copy that is running, with what stops it.
 #[derive(Debug)]
 pub(super) struct RunningCopy {
     copy: WorldCopy,
     cancel: CancellationToken,
-    staging: PathBuf,
 }
 
 /// The copy each instance is making; registered and checked under the gate.
@@ -210,7 +216,11 @@ impl ManagerRef<'_, InstanceManager> {
         if !has_room(free, survey.bytes) {
             bail!(WorldRefusal::NoSpace);
         }
-        let staging = parent.join(format!("{STAGING_PREFIX}{}", uuid::Uuid::new_v4().simple()));
+        let staging = parent.join(format!(
+            "{}{}",
+            staging_prefix(id),
+            uuid::Uuid::new_v4().simple()
+        ));
 
         let label = Translation::InstanceTaskDuplicateWorld {
             world_name: title.unwrap_or_else(|| request.world.clone()),
@@ -232,7 +242,6 @@ impl ManagerRef<'_, InstanceManager> {
                     task: task_id,
                 },
                 cancel: cancel.clone(),
-                staging: staging.clone(),
             },
         );
         // Taken under the gate, so it never waits; a delete or a rename that
@@ -348,22 +357,31 @@ impl ManagerRef<'_, InstanceManager> {
 
         let operation = tokio::select! {
             biased;
-            _ = cancel.cancelled() => return Err(Cancelled.into()),
+            _ = cancel.cancelled() => {
+                // A rename of the instance may have moved the folder meanwhile.
+                if let Ok(moved) = self.current_staging(id, staging).await {
+                    *staging = moved;
+                }
+                return Err(Cancelled.into());
+            }
             operation = self.lock_instance(id) => operation,
         };
-        let path = publication::current_path(&self.app, id).await?;
-        let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
-        if let Some(folder) = staging.file_name() {
-            *staging = staging_parent(&saves)?.join(folder);
-        }
+        *staging = self.current_staging(id, staging).await?;
         if cancel.is_cancelled() {
             return Err(Cancelled.into());
         }
+        let path = publication::current_path(&self.app, id).await?;
+        let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
+        // A game started meanwhile may be writing the original.
+        if self.ensure_game_inactive(id).await.is_err() {
+            bail!(WorldRefusal::ChangedWhileCopied);
+        }
+        // The pack may have been locked while the copy ran.
+        self.ensure_world_datapacks_may_change(id).await?;
         let original = saves.join(&request.world);
-        let untouched = self.ensure_game_inactive(id).await.is_ok()
-            && world_identity(id, &path.get_root(), &original)
-                .await
-                .is_ok_and(|identity| identity == request.identity)
+        let untouched = world_identity(id, &path.get_root(), &original)
+            .await
+            .is_ok_and(|identity| identity == request.identity)
             && tokio::task::spawn_blocking(move || unchanged_since(&original, &survey))
                 .await?
                 // A world that cannot be read again cannot be shown untouched.
@@ -405,8 +423,20 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(folder)
     }
 
-    /// Removes the staging folders beside `saves` that no running copy is
-    /// making: those a crash or a power cut left. Only folders with the
+    /// Where `staging` is now, beside the instance's current `saves`.
+    async fn current_staging(self, id: InstanceId, staging: &Path) -> anyhow::Result<PathBuf> {
+        let path = publication::current_path(&self.app, id).await?;
+        let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
+        let folder = staging
+            .file_name()
+            .with_context(|| format!("{} has no folder name", staging.display()))?;
+        Ok(staging_parent(&saves)?.join(folder))
+    }
+
+    /// Removes the instance's staging folders beside `saves` when it runs no
+    /// copy: those a crash or a power cut left. A copy registers under the
+    /// gate before it makes its folder and this runs under the same gate,
+    /// so it never sees one being made. Only folders with the instance's
     /// staging name go; nothing else is touched.
     pub(super) async fn sweep_world_copy_staging(self, id: InstanceId) -> anyhow::Result<()> {
         let _operation = self.lock_instance(id).await;
@@ -422,12 +452,7 @@ impl ManagerRef<'_, InstanceManager> {
             return Ok(());
         }
         let parent = staging_parent(&saves)?;
-        // `saves` may be shared with other instances through a link.
-        let running: Vec<PathBuf> = self
-            .world_copies
-            .iter()
-            .map(|running| running.staging.clone())
-            .collect();
+        let own = staging_prefix(id);
         let mut entries = tokio::fs::read_dir(&parent)
             .await
             .with_context(|| format!("listing {}", parent.display()))?;
@@ -435,10 +460,9 @@ impl ManagerRef<'_, InstanceManager> {
             let is_staging = entry
                 .file_name()
                 .to_str()
-                .is_some_and(|name| name.starts_with(STAGING_PREFIX));
+                .is_some_and(|name| name.starts_with(&own));
             // Not followed: a link is never what a copy made.
-            if !is_staging || !entry.file_type().await?.is_dir() || running.contains(&entry.path())
-            {
+            if !is_staging || !entry.file_type().await?.is_dir() {
                 continue;
             }
             info!(
@@ -1092,19 +1116,129 @@ mod tests {
             .parent()
             .unwrap()
             .to_owned();
-        let leftover = parent.join(".gdl-world-copy-left");
+        let leftover = parent.join(format!(".gdl-world-copy-{}-left", *id));
         std::fs::create_dir_all(leftover.join("region")).unwrap();
         std::fs::write(leftover.join("region/r.0.0.mca"), b"half").unwrap();
-        // Only staging folders go.
-        std::fs::create_dir(parent.join("kept")).unwrap();
-        std::fs::write(parent.join(".gdl-world-copy-note.txt"), b"a file").unwrap();
+        // Only this instance's staging folders go: a `saves` linked into a
+        // shared folder sits beside other instances' copies.
+        let kept = [
+            "kept".to_owned(),
+            format!(".gdl-world-copy-{}-starting", *id + 1),
+            format!(".gdl-world-copy-{}x-left", *id),
+            ".gdl-world-copy-left".to_owned(),
+        ];
+        for name in &kept {
+            std::fs::create_dir(parent.join(name)).unwrap();
+        }
+        let note = parent.join(format!(".gdl-world-copy-{}-note.txt", *id));
+        std::fs::write(&note, b"a file").unwrap();
 
         listed(&app, id).await;
 
         assert!(!leftover.exists());
-        assert!(parent.join("kept").is_dir());
-        assert!(parent.join(".gdl-world-copy-note.txt").is_file());
+        for name in &kept {
+            assert!(parent.join(name).is_dir(), "{name}");
+        }
+        assert!(note.is_file());
         assert_eq!(entries(&saves), vec!["New World"]);
+    }
+
+    /// Sets the instance's modpack, locked or not.
+    async fn set_pack_locked(app: &App, id: InstanceId, locked: bool) {
+        use crate::domain::instance::info;
+        app.instance_manager()
+            .instances
+            .write()
+            .await
+            .get_mut(&id)
+            .unwrap()
+            .data_mut()
+            .unwrap()
+            .config
+            .modpack = Some(info::ModpackInfo {
+            modpack: info::Modpack::Modrinth(info::ModrinthModpack {
+                project_id: "pack".into(),
+                version_id: "1".into(),
+            }),
+            locked,
+        });
+    }
+
+    #[tokio::test]
+    async fn a_pack_locked_while_it_is_copied_is_not_kept() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves, world, _) = world_instance(&app, "duplicate-locked").await;
+        let (pause, task) = held(
+            &app,
+            id,
+            "world_copy_before_publish",
+            request(id, &world, "Home (copy)"),
+        )
+        .await;
+
+        set_pack_locked(&app, id, true).await;
+        pause.release.notify_one();
+
+        let outcome = wait(&app, task).await;
+        let TaskOutcome::Failed(failed) = &outcome else {
+            panic!("the copy did not fail");
+        };
+        let crate::domain::vtask::Progress::Failed(error) = &failed.progress else {
+            panic!("{:?}", failed.progress);
+        };
+        assert!(
+            format!("{error:#}").contains("Modpack is locked"),
+            "{error:#}"
+        );
+        assert_eq!(entries(&saves), vec!["New World"]);
+        assert!(staging_folders(&saves).is_empty());
+        assert_eq!(app.instance_manager().world_copy(id), None);
+    }
+
+    #[tokio::test]
+    async fn a_cancel_while_waiting_for_a_moved_instance_leaves_nothing() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves, world, _) = world_instance(&app, "duplicate-moved").await;
+        let (pause, task) = held(
+            &app,
+            id,
+            "world_copy_before_publish",
+            request(id, &world, "Home (copy)"),
+        )
+        .await;
+        let manager = app.instance_manager();
+        // The copy waits for the gate while the instance folder is renamed,
+        // as a rename of the instance does under it.
+        let operation = manager.lock_instance(id).await;
+        pause.release.notify_one();
+        let old_root = publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_root();
+        let new_root = old_root.with_file_name("duplicate-moved-renamed");
+        std::fs::rename(&old_root, &new_root).unwrap();
+        manager
+            .instances
+            .write()
+            .await
+            .get_mut(&id)
+            .unwrap()
+            .shortpath = "duplicate-moved-renamed".into();
+        let moved_saves = publication::current_path(&app, id)
+            .await
+            .unwrap()
+            .get_saves_path();
+        assert_eq!(staging_folders(&moved_saves).len(), 1);
+
+        manager.cancel_world_copy(id);
+        let outcome = wait(&app, task).await;
+        drop(operation);
+
+        assert!(matches!(outcome, TaskOutcome::Dismissed));
+        assert!(!saves.exists());
+        assert_eq!(entries(&moved_saves), vec!["New World"]);
+        assert!(staging_folders(&moved_saves).is_empty());
+        assert_eq!(manager.world_copy(id), None);
     }
 
     #[cfg(unix)]
@@ -1131,6 +1265,16 @@ mod tests {
             .filter(|name| name.starts_with(".gdl-world-copy-"))
             .collect();
         assert_eq!(staged.len(), 1, "{:?}", entries(elsewhere.path()));
+        assert!(
+            staged[0].starts_with(&format!(".gdl-world-copy-{}-", *id)),
+            "{staged:?}"
+        );
+        // A listing meanwhile leaves the running copy's folder alone.
+        let staging = elsewhere.path().join(&staged[0]);
+        let copied = snapshot(&staging);
+        assert_eq!(listed(&app, id).await.len(), 1);
+        assert_eq!(snapshot(&staging), copied);
+        assert!(staging.join("level.dat").is_file());
         let instance_folder = saves.parent().unwrap();
         assert!(
             !entries(instance_folder)
