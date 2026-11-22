@@ -50,6 +50,7 @@ const ANVIL_VERSION: i32 = 19133;
 /// Walking a `level.dat` or a player file costs at most this, inventories included.
 const LIMITS: Limits = Limits {
     max_tags: 2_000_000,
+    max_built: 2_000_000,
     max_depth: 64,
 };
 
@@ -294,7 +295,7 @@ fn subfolders(folder: &Path) -> Vec<String> {
 }
 
 /// What a region's revision is computed from: a file's size and modified time.
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) struct Stamp {
     size: u64,
     modified: u128,
@@ -344,14 +345,26 @@ pub(super) fn region_file(folder: &Path, x: i32, z: i32) -> PathBuf {
     folder.join(format!("r.{x}.{z}.mca"))
 }
 
-/// The revision of the region at `(x, z)` in `folder` as the listing gives it, asked of that
-/// file and the one to its north alone; `None` when the listing would leave the region out.
-pub(super) fn region_revision_at(folder: &Path, x: i32, z: i32) -> Option<String> {
+/// A region as a painting finds it: its revision, and the sizes of its file and of the one
+/// to its north.
+pub(super) struct RegionAt {
+    pub revision: String,
+    pub size: u64,
+    pub north_size: Option<u64>,
+}
+
+/// The region at `(x, z)` in `folder` as the listing gives it, asked of that file and the one
+/// to its north alone; `None` when the listing would leave the region out.
+pub(super) fn region_at(folder: &Path, x: i32, z: i32) -> Option<RegionAt> {
     let own = stamp(&region_file(folder, x, z)).filter(|own| own.size >= MIN_REGION_SIZE)?;
     let north = z
         .checked_sub(1)
         .and_then(|north| stamp(&region_file(folder, x, north)));
-    Some(region_revision(&own, north.as_ref()))
+    Some(RegionAt {
+        revision: region_revision(&own, north.as_ref()),
+        size: own.size,
+        north_size: north.map(|north| north.size),
+    })
 }
 
 /// The place of a region file by its name, only as the game writes it (`r.5.0.mca`, never

@@ -1,9 +1,12 @@
-//! Reads a Minecraft region file (`r.<x>.<z>.mca`): the whole file is read into
-//! memory and closed at once, then the inflated bytes of one chunk are handed out
-//! at a time. Nothing in the file is trusted: every offset and length is checked
-//! against the file's real size, and inflating is capped.
+//! Reads a Minecraft region file (`r.<x>.<z>.mca`): the whole file, or only its table and
+//! one row of chunks, is read into memory and closed at once, then the inflated bytes of one
+//! chunk are handed out at a time. Nothing in the file is trusted: every offset and length is
+//! checked against the file's real size, every buffer sized from the file is reserved so that
+//! a refusal is an unreadable region or chunk, and inflating is capped.
 
-use std::io::Read;
+use std::fs::File;
+use std::io::{Read, Seek, SeekFrom};
+use std::ops::Range;
 use std::path::Path;
 
 use flate2::read::GzDecoder;
@@ -17,50 +20,157 @@ pub(super) const MAX_REGION_BYTES: u64 = 256 * 1024 * 1024;
 /// A chunk inflating past this size is left empty.
 pub(super) const MAX_CHUNK_BYTES: usize = 32 * 1024 * 1024;
 
+/// What reading one row of a region holds at most: the table, then for each of its 32 chunks
+/// the most sectors an entry can list and the 4 bytes a length may run past them.
+pub(super) const MAX_ROW_BYTES: u64 = (HEADER + 32 * (255 * SECTOR + 4)) as u64;
+
 pub(super) struct Region {
-    bytes: Vec<u8>,
+    bytes: Held,
+}
+
+enum Held {
+    /// The whole file.
+    Whole(Vec<u8>),
+    /// The table, and the bytes each chunk of one row lists, by where they start in the file.
+    Row {
+        table: Vec<u8>,
+        spans: Vec<(usize, Vec<u8>)>,
+    },
+}
+
+impl Held {
+    /// The bytes at `range` of the file, when they were read.
+    fn get(&self, range: Range<usize>) -> Option<&[u8]> {
+        match self {
+            Held::Whole(bytes) => bytes.get(range),
+            Held::Row { table, spans } => {
+                if range.end <= table.len() {
+                    return table.get(range);
+                }
+                spans.iter().find_map(|(start, bytes)| {
+                    let from = range.start.checked_sub(*start)?;
+                    bytes.get(from..from + range.len())
+                })
+            }
+        }
+    }
+}
+
+/// An empty buffer that can take `len` bytes; `None` when that much cannot be had.
+fn reserved(len: usize) -> Option<Vec<u8>> {
+    let mut bytes = Vec::new();
+    bytes.try_reserve_exact(len).ok()?;
+    Some(bytes)
+}
+
+fn refused() -> std::io::Error {
+    std::io::Error::from(std::io::ErrorKind::OutOfMemory)
+}
+
+/// Opens the region file at `path`; `None` for a missing file, a link, anything but a regular
+/// file, a file shorter than the two header sectors or one above `MAX_REGION_BYTES`.
+fn open(path: &Path) -> std::io::Result<Option<(File, u64)>> {
+    let meta = match std::fs::symlink_metadata(path) {
+        Ok(meta) => meta,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    if !meta.is_file() || meta.len() < HEADER as u64 || meta.len() > MAX_REGION_BYTES {
+        return Ok(None);
+    }
+    let mut options = std::fs::OpenOptions::new();
+    options.read(true);
+    #[cfg(unix)]
+    {
+        // a link swapped in after the check above is refused, not followed
+        use std::os::unix::fs::OpenOptionsExt;
+        options.custom_flags(libc::O_NOFOLLOW);
+    }
+    let file = match options.open(path) {
+        Ok(file) => file,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        #[cfg(unix)]
+        Err(e) if e.raw_os_error() == Some(libc::ELOOP) => return Ok(None),
+        Err(e) => return Err(e),
+    };
+    // what was opened is checked again: it must be the regular file it should be
+    let opened = file.metadata()?;
+    if !opened.is_file() || opened.len() < HEADER as u64 || opened.len() > MAX_REGION_BYTES {
+        return Ok(None);
+    }
+    Ok(Some((file, opened.len())))
+}
+
+/// Reads at most `len` bytes from where `file` is, fewer where it ends.
+fn read_up_to(file: &mut File, len: usize) -> std::io::Result<Vec<u8>> {
+    let mut bytes = reserved(len).ok_or_else(refused)?;
+    file.take(len as u64).read_to_end(&mut bytes)?;
+    Ok(bytes)
 }
 
 impl Region {
-    /// `None` for a missing file, a link, anything but a regular file, a file shorter
-    /// than the two header sectors or one above `MAX_REGION_BYTES`.
+    /// The whole file; `None` as `open` says.
     pub(super) fn read(path: &Path) -> std::io::Result<Option<Region>> {
-        let meta = match std::fs::symlink_metadata(path) {
-            Ok(meta) => meta,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            Err(e) => return Err(e),
-        };
-        if !meta.is_file() || meta.len() < HEADER as u64 || meta.len() > MAX_REGION_BYTES {
+        let Some((file, len)) = open(path)? else {
             return Ok(None);
-        }
+        };
         // The file may grow while it is read (the game is running): the cap holds
         // for what is actually read, not only for what the metadata said.
-        let mut options = std::fs::OpenOptions::new();
-        options.read(true);
-        #[cfg(unix)]
-        {
-            // a link swapped in after the check above is refused, not followed
-            use std::os::unix::fs::OpenOptionsExt;
-            options.custom_flags(libc::O_NOFOLLOW);
-        }
-        let file = match options.open(path) {
-            Ok(file) => file,
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-            #[cfg(unix)]
-            Err(e) if e.raw_os_error() == Some(libc::ELOOP) => return Ok(None),
-            Err(e) => return Err(e),
-        };
-        // what was opened is checked again: it must be the regular file it should be
-        let opened = file.metadata()?;
-        if !opened.is_file() || opened.len() < HEADER as u64 || opened.len() > MAX_REGION_BYTES {
-            return Ok(None);
-        }
-        let mut bytes = Vec::with_capacity(opened.len() as usize);
+        let mut bytes = reserved(len as usize).ok_or_else(refused)?;
         file.take(MAX_REGION_BYTES + 1).read_to_end(&mut bytes)?;
         if bytes.len() < HEADER || bytes.len() as u64 > MAX_REGION_BYTES {
             return Ok(None);
         }
-        Ok(Some(Region { bytes }))
+        Ok(Some(Region {
+            bytes: Held::Whole(bytes),
+        }))
+    }
+
+    /// The table and the chunks of row `z` (0 to 31) alone, which give those chunks as the
+    /// whole file would: a region painted needs only the last row of the one to its north.
+    /// `None` as `open` says.
+    pub(super) fn read_row(path: &Path, z: u8) -> std::io::Result<Option<Region>> {
+        let Some((mut file, _)) = open(path)? else {
+            return Ok(None);
+        };
+        let table = read_up_to(&mut file, HEADER)?;
+        if table.len() < HEADER || z >= 32 {
+            return Ok(None);
+        }
+        let mut spans = Vec::new();
+        for x in 0..32 {
+            let at = (x + usize::from(z) * 32) * 4;
+            let e = &table[at..at + 4];
+            let offset = u32::from_be_bytes([0, e[0], e[1], e[2]]) as usize;
+            let count = e[3] as usize;
+            if offset < 2 || count == 0 {
+                continue;
+            }
+            // `payload` reads the 4 bytes of the length and at most `count` sectors after them.
+            let start = (offset * SECTOR) as u64;
+            if start >= MAX_REGION_BYTES {
+                continue;
+            }
+            file.seek(SeekFrom::Start(start))?;
+            let bytes = read_up_to(&mut file, count * SECTOR + 4)?;
+            if !bytes.is_empty() {
+                spans.push((start as usize, bytes));
+            }
+        }
+        Ok(Some(Region {
+            bytes: Held::Row { table, spans },
+        }))
+    }
+
+    /// How many bytes of the file are held.
+    #[cfg(test)]
+    fn held(&self) -> usize {
+        match &self.bytes {
+            Held::Whole(bytes) => bytes.len(),
+            Held::Row { table, spans } => {
+                table.len() + spans.iter().map(|(_, bytes)| bytes.len()).sum::<usize>()
+            }
+        }
     }
 
     /// The location entry of a chunk slot: `(sector offset, sector count)`, when
@@ -126,7 +236,12 @@ impl Region {
                 let mut out = Vec::new();
                 inflate_zlib_into(data, cap, &mut out).then_some(out)
             }
-            3 => (data.len() <= cap).then(|| data.to_vec()),
+            3 if data.len() <= cap => {
+                let mut out = reserved(data.len())?;
+                out.extend_from_slice(data);
+                Some(out)
+            }
+            3 => None,
             _ => None,
         }
     }
@@ -136,7 +251,8 @@ impl Region {
 const STEP: usize = 16 * 1024;
 
 /// Appends one step of inflated bytes to `out`, keeping both its length within
-/// `cap` and its capacity within `cap + STEP`. False when `cap` would be passed.
+/// `cap` and its capacity within `cap + STEP`. False when `cap` would be passed or the room
+/// cannot be had.
 fn append_within(out: &mut Vec<u8>, step: &[u8], cap: usize) -> bool {
     if out.len() + step.len() > cap {
         return false;
@@ -145,7 +261,9 @@ fn append_within(out: &mut Vec<u8>, step: &[u8], cap: usize) -> bool {
         let want = (out.len() + step.len())
             .max(out.capacity() * 2)
             .min(cap + STEP);
-        out.reserve_exact(want - out.len());
+        if out.try_reserve_exact(want - out.len()).is_err() {
+            return false;
+        }
     }
     out.extend_from_slice(step);
     true
@@ -234,7 +352,9 @@ pub(super) mod test {
     }
 
     pub(in super::super) fn region_of(bytes: Vec<u8>) -> Region {
-        Region { bytes }
+        Region {
+            bytes: Held::Whole(bytes),
+        }
     }
 
     /// Overwrites the location entry of a slot.
@@ -442,6 +562,71 @@ pub(super) mod test {
             std::os::unix::fs::symlink(&real, &link).unwrap();
             assert!(Region::read(&link).unwrap().is_none());
         }
+    }
+
+    /// Bytes that do not compress, so a chunk of them takes as many sectors as it is long.
+    fn noise(len: usize, seed: u32) -> Vec<u8> {
+        (0..len as u32)
+            .map(|i| (i.wrapping_add(seed).wrapping_mul(2654435761) >> 13) as u8)
+            .collect()
+    }
+
+    #[test]
+    fn the_last_row_alone_gives_the_chunks_the_whole_file_does() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("r.0.-1.mca");
+        let mut bytes = region_bytes(&[
+            // A large chunk outside the row, which reading the row must not hold.
+            (0, 0, 3, noise(600_000, 1)),
+            (0, 31, 2, zlib(NBT)),
+            (7, 31, 1, gzip(NBT)),
+            (31, 31, 3, noise(9000, 2)),
+            (12, 31, 2, zlib(&noise(5000, 3))),
+        ]);
+        // Entries of the row that lie, as the whole file reads them.
+        set_entry(&mut bytes, 3, 31, 9999, 3);
+        set_entry(&mut bytes, 4, 31, 1, 1);
+        set_entry(&mut bytes, 5, 31, 2, 0);
+        let last = (bytes.len() / SECTOR - 1) as u32;
+        set_entry(&mut bytes, 6, 31, last, 4); // runs past the end of the file
+        std::fs::write(&path, &bytes).unwrap();
+
+        let whole = Region::read(&path).unwrap().unwrap();
+        let row = Region::read_row(&path, 31).unwrap().unwrap();
+        for x in 0..32 {
+            assert_eq!(row.chunk(x, 31), whole.chunk(x, 31), "slot {x},31");
+        }
+        assert!(row.chunk(0, 31).is_some() && row.chunk(31, 31).is_some());
+        assert_eq!(row.chunk(0, 0), None, "only the row is read");
+        assert!(whole.chunk(0, 0).is_some());
+        assert!(
+            row.held() < 64 * 1024,
+            "{} bytes held of {}",
+            row.held(),
+            bytes.len()
+        );
+
+        assert!(
+            Region::read_row(&dir.path().join("missing.mca"), 31)
+                .unwrap()
+                .is_none()
+        );
+        let short = dir.path().join("short.mca");
+        std::fs::write(&short, vec![0u8; 100]).unwrap();
+        assert!(Region::read_row(&short, 31).unwrap().is_none());
+        #[cfg(unix)]
+        {
+            let link = dir.path().join("link.mca");
+            std::os::unix::fs::symlink(&path, &link).unwrap();
+            assert!(Region::read_row(&link, 31).unwrap().is_none());
+        }
+    }
+
+    #[test]
+    fn a_reservation_that_cannot_be_had_is_refused_not_an_abort() {
+        assert!(reserved(usize::MAX).is_none());
+        assert!(reserved(isize::MAX as usize).is_none());
+        assert_eq!(reserved(10).map(|v| v.capacity() >= 10), Some(true));
     }
 
     #[test]

@@ -1,11 +1,18 @@
 //! Which numeric block ids of a world of 1.2 to 1.12.2 belong to mods, by the world's own list.
 //! A world known to be modded whose list cannot be trusted says nothing about any id.
 
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
+
+use super::super::world_level::inflate_level_dat;
+use super::facts::{Stamp, stamp};
 use crate::util::nbt::{self, Keep, Limits, Tag};
 
 /// Walking a `level.dat` costs at most this, the player's inventory and the rest included.
 const LIMITS: Limits = Limits {
     max_tags: 2_000_000,
+    max_built: 2_000_000,
     max_depth: 64,
 };
 
@@ -74,6 +81,63 @@ impl LegacyIds {
                 .copied()
                 .unwrap_or(IdKind::Unknown),
         }
+    }
+}
+
+/// What each world's `level.dat` says of its numeric ids, read once and kept while the file
+/// keeps its size and modified time. Only a chunk of numeric ids asks, so a world of 1.13 and
+/// later costs no read.
+#[derive(Default)]
+pub(crate) struct LegacyCache {
+    /// By world folder, the stamp of the `level.dat` read (`None` without one) and what it
+    /// said. Held while a file is read: paintings that need a table wait for the one read,
+    /// and no two are inflated at once.
+    worlds: Mutex<HashMap<PathBuf, (Option<Stamp>, Arc<Option<LegacyIds>>)>>,
+    #[cfg(test)]
+    reads: std::sync::atomic::AtomicUsize,
+}
+
+/// Worlds kept at most; past it the others are dropped, to be read again when asked.
+const KEPT_WORLDS: usize = 64;
+
+impl std::fmt::Debug for LegacyCache {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("LegacyCache")
+    }
+}
+
+impl LegacyCache {
+    /// The world's table, as `level.dat` says now; `None` when there is none to read. Blocks.
+    pub(super) fn ids(&self, world: &Path) -> Arc<Option<LegacyIds>> {
+        let level = world.join("level.dat");
+        let mut worlds = self
+            .worlds
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let now = stamp(&level);
+        if let Some((read, ids)) = worlds.get(world)
+            && *read == now
+        {
+            return ids.clone();
+        }
+        #[cfg(test)]
+        self.reads
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let ids = Arc::new(now.and_then(|_| {
+            let nbt = inflate_level_dat(&level).ok()?;
+            Some(LegacyIds::from_level_dat(&nbt))
+        }));
+        if worlds.len() >= KEPT_WORLDS && !worlds.contains_key(world) {
+            worlds.clear();
+        }
+        worlds.insert(world.to_owned(), (now, ids.clone()));
+        ids
+    }
+
+    /// How many times a `level.dat` was read.
+    #[cfg(test)]
+    pub(crate) fn reads(&self) -> usize {
+        self.reads.load(std::sync::atomic::Ordering::Relaxed)
     }
 }
 

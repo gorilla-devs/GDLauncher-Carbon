@@ -131,17 +131,17 @@ impl Tag {
 struct Cursor<'a> {
     rest: &'a [u8],
     tags: usize,
-    max_tags: usize,
-    max_depth: usize,
+    built: usize,
+    limits: Limits,
 }
 
 impl<'a> Cursor<'a> {
-    fn new(bytes: &'a [u8], max_tags: usize, max_depth: usize) -> Self {
+    fn new(bytes: &'a [u8], limits: Limits) -> Self {
         Cursor {
             rest: bytes,
             tags: 0,
-            max_tags,
-            max_depth,
+            built: 0,
+            limits,
         }
     }
 
@@ -193,14 +193,23 @@ impl<'a> Cursor<'a> {
     /// Counts one more tag against the limit, for built and skipped tags alike.
     fn count_tag(&mut self) -> Result<(), NbtError> {
         self.tags += 1;
-        if self.tags > self.max_tags {
+        if self.tags > self.limits.max_tags {
+            return Err(NbtError::TooManyTags);
+        }
+        Ok(())
+    }
+
+    /// Counts one more tag built into the result against its own limit.
+    fn count_built(&mut self) -> Result<(), NbtError> {
+        self.built += 1;
+        if self.built > self.limits.max_built {
             return Err(NbtError::TooManyTags);
         }
         Ok(())
     }
 
     fn check_depth(&self, depth: usize) -> Result<(), NbtError> {
-        if depth >= self.max_depth {
+        if depth >= self.limits.max_depth {
             return Err(NbtError::TooDeep);
         }
         Ok(())
@@ -248,6 +257,9 @@ fn walk_payload(
     build: bool,
 ) -> Result<Option<Tag>, NbtError> {
     cur.count_tag()?;
+    if build {
+        cur.count_built()?;
+    }
     let tag = match id {
         1 => Tag::Byte(i8::from_be_bytes(cur.array()?)),
         2 => Tag::Short(i16::from_be_bytes(cur.array()?)),
@@ -339,7 +351,14 @@ fn read_root_header<'a>(cur: &mut Cursor<'a>) -> Result<&'a [u8], NbtError> {
 
 /// Reads uncompressed NBT whose root is a compound.
 pub fn read(bytes: &[u8]) -> Result<Root, NbtError> {
-    let mut cur = Cursor::new(bytes, MAX_TAGS, MAX_DEPTH);
+    let mut cur = Cursor::new(
+        bytes,
+        Limits {
+            max_tags: MAX_TAGS,
+            max_built: MAX_TAGS,
+            max_depth: MAX_DEPTH,
+        },
+    );
     let name = read_root_header(&mut cur)?.to_vec();
     let tag = read_payload(&mut cur, 10, 0)?;
     if !cur.rest.is_empty() {
@@ -360,10 +379,12 @@ pub enum Keep {
     Skip,
 }
 
-/// Bounds on what one `read_keeping` call may walk, skipped tags included.
+/// Bounds on what one `read_keeping` call may walk, skipped tags included, and on how many
+/// tags it may build.
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
     pub max_tags: usize,
+    pub max_built: usize,
     pub max_depth: usize,
 }
 
@@ -376,6 +397,7 @@ fn read_compound_keeping<'a>(
     keep: &dyn Fn(&[&[u8]]) -> Keep,
 ) -> Result<Tag, NbtError> {
     cur.count_tag()?;
+    cur.count_built()?;
     cur.check_depth(depth)?;
     let mut entries = Vec::new();
     while let Some(id) = cur.entry_id()? {
@@ -390,6 +412,7 @@ fn read_compound_keeping<'a>(
                 // A list is only taken apart when its members are compounds.
                 9 if cur.rest.first() == Some(&10) => {
                     cur.count_tag()?;
+                    cur.count_built()?;
                     let (element, len) = cur.start_list(depth + 1)?;
                     let mut items = Vec::with_capacity(len.min(4096));
                     for _ in 0..len {
@@ -418,7 +441,7 @@ pub fn read_keeping(
     keep: &dyn Fn(&[&[u8]]) -> Keep,
     limits: Limits,
 ) -> Result<Root, NbtError> {
-    let mut cur = Cursor::new(bytes, limits.max_tags, limits.max_depth);
+    let mut cur = Cursor::new(bytes, limits);
     let name = read_root_header(&mut cur)?.to_vec();
     let tag = read_compound_keeping(&mut cur, 0, &mut Vec::new(), keep)?;
     if !cur.rest.is_empty() {
@@ -750,6 +773,7 @@ mod tests {
 
     const LIMITS: Limits = Limits {
         max_tags: 1000,
+        max_built: 1000,
         max_depth: 64,
     };
 
@@ -826,6 +850,7 @@ mod tests {
         b.push(0);
         let limits = Limits {
             max_tags: 100,
+            max_built: 1000,
             max_depth: 64,
         };
         assert_eq!(
@@ -835,9 +860,51 @@ mod tests {
     }
 
     #[test]
+    fn the_built_limit_counts_only_the_tags_kept() {
+        let mut b = vec![10, 0, 0];
+        named(&mut b, 9, "List");
+        b.push(10);
+        b.extend_from_slice(&50i32.to_be_bytes());
+        for i in 0..50 {
+            int_entry(&mut b, "A", i);
+            int_entry(&mut b, "B", i);
+            b.push(0);
+        }
+        for i in 0..100 {
+            int_entry(&mut b, &format!("k{i}"), i);
+        }
+        b.push(0);
+        let limits = |max_built| Limits {
+            max_tags: 1000,
+            max_built,
+            max_depth: 64,
+        };
+        // The root, the list, its 50 compounds and their 100 entries.
+        let list = |path: &[&[u8]]| match path {
+            [b"List"] => Keep::Descend,
+            [b"List", _] => Keep::All,
+            _ => Keep::Skip,
+        };
+        assert!(read_keeping(&b, &list, limits(152)).is_ok());
+        assert_eq!(
+            read_keeping(&b, &list, limits(151)),
+            Err(NbtError::TooManyTags)
+        );
+        // Skipped tags are not built.
+        assert!(read_keeping(&b, &|_| Keep::Skip, limits(1)).is_ok());
+        // A list kept whole counts its members too: the root, 100 ints, the list, 150 more.
+        assert!(read_keeping(&b, &|_| Keep::All, limits(252)).is_ok());
+        assert_eq!(
+            read_keeping(&b, &|_| Keep::All, limits(251)),
+            Err(NbtError::TooManyTags)
+        );
+    }
+
+    #[test]
     fn everything_kept_equals_read() {
         let limits = Limits {
             max_tags: MAX_TAGS,
+            max_built: MAX_TAGS,
             max_depth: MAX_DEPTH,
         };
         for bytes in [partial_fixture(), every_tag_type_fixture()] {

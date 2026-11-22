@@ -138,8 +138,10 @@ pub struct InstanceManager {
     pub(crate) origin_checks: RwLock<HashMap<InstanceId, modpack::origin_check::OriginResults>>,
     /// Finished map pieces, made on first use (see `world_map_store`).
     world_map_store: std::sync::OnceLock<Arc<world_map::store::Store>>,
-    /// Regions painted for the map at once (see `world_map_piece`).
-    world_map_painting: Arc<tokio::sync::Semaphore>,
+    /// What the map's regions painted at once may hold (see `world_map_piece`).
+    world_map_painting: Arc<world_map::budget::PaintingBudget>,
+    /// What each world's `level.dat` says of its numeric block ids, for the map.
+    world_map_legacy: Arc<world_map::legacy::LegacyCache>,
     /// Requests for joined map pieces built at once (see `world_map_piece`).
     world_map_building: Arc<tokio::sync::Semaphore>,
     /// Holds a painting of the map at a chunk, for tests.
@@ -338,9 +340,11 @@ impl InstanceManager {
             addon_retry_receipts: Default::default(),
             addon_graphs: Default::default(),
             world_map_store: Default::default(),
-            world_map_painting: Arc::new(tokio::sync::Semaphore::new(
-                world_map::service::PAINTING_AT_ONCE,
+            world_map_painting: Arc::new(world_map::budget::PaintingBudget::new(
+                world_map::budget::PAINTING_AT_ONCE,
+                world_map::budget::PAINTING_BYTES,
             )),
+            world_map_legacy: Default::default(),
             world_map_building: Arc::new(tokio::sync::Semaphore::new(
                 world_map::service::BUILDING_AT_ONCE,
             )),

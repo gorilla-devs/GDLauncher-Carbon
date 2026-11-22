@@ -4,8 +4,7 @@
 use image::codecs::png::{CompressionType, FilterType, PngEncoder};
 use image::{ExtendedColorType, ImageEncoder, Rgba, RgbaImage};
 
-use super::chunk::{Roof, Top, surface_checked};
-use super::legacy::LegacyIds;
+use super::chunk::{IdsOf, Roof, Top, surface_asking};
 use super::region::Region;
 
 /// The side of a piece in pixels, at every scale.
@@ -32,7 +31,7 @@ pub(super) fn paint_region(
     region: &Region,
     north: Option<&Region>,
     roof: Roof,
-    legacy: Option<&LegacyIds>,
+    legacy: IdsOf<'_>,
     cancelled: &dyn Fn() -> bool,
 ) -> Option<Painted> {
     let mut tops: Vec<Option<Top>> = vec![None; SIDE * SIDE];
@@ -47,7 +46,7 @@ pub(super) fn paint_region(
             }
             // A listed chunk that cannot be found is damaged or not written yet.
             let read = region.chunk(cx, cz);
-            let Some(Ok(surface)) = read.map(|nbt| surface_checked(&nbt, roof, legacy)) else {
+            let Some(Ok(surface)) = read.map(|nbt| surface_asking(&nbt, roof, legacy)) else {
                 complete = false;
                 continue;
             };
@@ -67,7 +66,7 @@ pub(super) fn paint_region(
             }
             let Some(Ok(surface)) = north
                 .chunk(cx, 31)
-                .map(|nbt| surface_checked(&nbt, roof, legacy))
+                .map(|nbt| surface_asking(&nbt, roof, legacy))
             else {
                 continue;
             };
@@ -199,7 +198,7 @@ mod tests {
     }
 
     fn paint(region: &Region, north: Option<&Region>) -> Painted {
-        paint_region(region, north, Roof::Open, None, &never).expect("not cancelled")
+        paint_region(region, north, Roof::Open, &|| None, &never).expect("not cancelled")
     }
 
     /// Checks every pixel of a piece: `expected` gives the pixels of the chunk at `(cx, cz)`
@@ -492,7 +491,7 @@ mod tests {
             polls.set(polls.get() + 1);
             polls.get() > 1
         };
-        let painted = paint_region(&region, None, Roof::Open, None, &after_first_chunk);
+        let painted = paint_region(&region, None, Roof::Open, &|| None, &after_first_chunk);
         assert!(painted.is_none());
         assert_eq!(polls.get(), 2, "it stops at once");
     }

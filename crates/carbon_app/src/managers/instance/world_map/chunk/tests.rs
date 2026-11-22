@@ -1079,7 +1079,10 @@ fn numeric_section_of(y: i8, blocks: Vec<u8>, data: Vec<u8>, add: Option<Vec<u8>
 
 /// A section of numeric ids, `block_at(x, y, z)` giving `(id, data)`; an `Add` array only
 /// when an id needs one.
-fn numeric_section(y: i8, block_at: impl Fn(usize, usize, usize) -> (u16, u8)) -> Tag {
+pub(in super::super) fn numeric_section(
+    y: i8,
+    block_at: impl Fn(usize, usize, usize) -> (u16, u8),
+) -> Tag {
     let (mut blocks, mut data, mut add) = (vec![0u8; 4096], vec![0u8; 2048], vec![0u8; 2048]);
     for i in 0..4096 {
         let (id, value) = block_at(i % 16, i / 256, (i / 16) % 16);
@@ -1093,7 +1096,7 @@ fn numeric_section(y: i8, block_at: impl Fn(usize, usize, usize) -> (u16, u8)) -
 }
 
 /// A chunk of 1.2 to 1.12.2, with `TerrainPopulated` when `populated` is given.
-fn numeric_chunk(sections: Vec<Tag>, populated: Option<i8>) -> Vec<u8> {
+pub(in super::super) fn numeric_chunk(sections: Vec<Tag>, populated: Option<i8>) -> Vec<u8> {
     let mut level = vec![
         ("xPos", Tag::Int(0)),
         ("zPos", Tag::Int(0)),
@@ -1443,6 +1446,36 @@ fn wrong_array_lengths_empty_the_chunk() {
     let surface = surface(&bytes, Roof::Open, None);
     assert_eq!(surface[0], legacy_top(41, 0, 32));
     assert_eq!(surface[1], legacy_top(1, 0, 15));
+}
+
+#[test]
+fn a_chunk_that_would_build_too_large_a_tree_is_unreadable() {
+    // One block whose palette entry carries `properties` tags beside its name.
+    let with_properties = |properties: usize| {
+        let entries: Vec<(Vec<u8>, Tag)> = (0..properties)
+            .map(|i| (format!("p{i}").into_bytes(), Tag::Byte(0)))
+            .collect();
+        let entry = compound(vec![
+            ("Name", string("minecraft:stone")),
+            ("Properties", Tag::Compound(entries)),
+        ]);
+        let section = compound(vec![
+            ("Y", Tag::Byte(0)),
+            (
+                "block_states",
+                compound(vec![("palette", compounds(vec![entry]))]),
+            ),
+        ]);
+        chunk_with(vec![section], FULL)
+    };
+    let read = surface_checked(&with_properties(1000), Roof::Open, None).unwrap();
+    assert_eq!(read[0], top("minecraft:stone", 15));
+    // Well within the tags a walk may pass, far beyond what a chunk may build.
+    assert!(150_000 < LIMITS.max_tags && 150_000 > LIMITS.max_built);
+    assert_eq!(
+        surface_checked(&with_properties(150_000), Roof::Open, None),
+        Err(Unreadable)
+    );
 }
 
 #[test]

@@ -10,9 +10,12 @@ use super::colors::{Look, Rgb, UNKNOWN, legacy_look_of, look_of};
 use super::legacy::{IdKind, LegacyIds};
 use crate::util::nbt::{self, Keep, Limits, Tag};
 
-/// Walking a chunk costs at most this, skipped entities and ticks included.
+/// Walking a chunk costs at most this, skipped entities and ticks included. What it builds is
+/// held to far less: the largest of 15,626 real chunks (1.12.2 to 26.3, Overworld, Nether and
+/// End) builds 825 tags, and a hostile one of two million would hold about 110 MB.
 const LIMITS: Limits = Limits {
     max_tags: 2_000_000,
+    max_built: 100_000,
     max_depth: 64,
 };
 
@@ -56,12 +59,25 @@ pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, legacy: Option<&LegacyIds>) 
 #[derive(Debug, PartialEq, Eq)]
 pub(super) struct Unreadable;
 
+/// What each numeric id of the world is, asked only of a chunk that holds numeric ids.
+pub(super) type IdsOf<'a> = &'a dyn Fn() -> Option<&'a LegacyIds>;
+
 /// As `surface`, telling a chunk that could not be read from one the game has not finished,
 /// which is empty and no error.
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn surface_checked(
     chunk_nbt: &[u8],
     roof: Roof,
     legacy: Option<&LegacyIds>,
+) -> Result<Surface, Unreadable> {
+    surface_asking(chunk_nbt, roof, &|| legacy)
+}
+
+/// As `surface_checked`, asking `legacy` for the world's numeric ids only when they are needed.
+pub(super) fn surface_asking(
+    chunk_nbt: &[u8],
+    roof: Roof,
+    legacy: IdsOf<'_>,
 ) -> Result<Surface, Unreadable> {
     let root = nbt::read_keeping(chunk_nbt, &keep, LIMITS).map_err(|_| Unreadable)?;
     // Each chunk is read by its own shape: a region upgraded in part holds both.
@@ -93,7 +109,7 @@ pub(super) fn surface_checked(
             match this {
                 LevelShape::Palette => Section::read_level(section),
                 LevelShape::NumericIds => {
-                    Section::read_numeric(section, legacy.unwrap_or(&LegacyIds::WITHOUT_LIST))
+                    Section::read_numeric(section, legacy().unwrap_or(&LegacyIds::WITHOUT_LIST))
                 }
             }
         })

@@ -14,25 +14,24 @@ use anyhow::anyhow;
 use futures::future::BoxFuture;
 use image::{ImageFormat, RgbaImage};
 use sha2::{Digest, Sha256};
-use tokio::sync::{OnceCell, Semaphore};
 use tokio::task::spawn_blocking;
 use tracing::debug;
 
 use super::super::world_refusal::WorldRefusal;
-use super::super::{InstanceId, InstanceManager, world_level::inflate_level_dat};
+use super::super::{InstanceId, InstanceManager};
+#[cfg(test)]
+pub(crate) use super::budget::PAINTING_AT_ONCE;
+use super::budget::PaintingBudget;
 use super::chunk::Roof;
-use super::facts::{dimension_folder, has_ceiling, region_file, region_revision_at, short_hex};
-use super::legacy::LegacyIds;
+use super::facts::{RegionAt, dimension_folder, has_ceiling, region_at, region_file, short_hex};
+use super::legacy::LegacyCache;
 use super::paint::{PIECE, Painted, fold, paint_region, png};
-use super::region::Region;
+use super::region::{MAX_REGION_BYTES, MAX_ROW_BYTES, Region};
 use super::store::{PieceKey, Store};
 use crate::managers::ManagerRef;
 
 /// The largest scale: a piece of it covers 16 by 16 regions.
 pub(crate) const MAX_SCALE: u8 = 4;
-
-/// How many regions are painted at once across the launcher.
-pub(crate) const PAINTING_AT_ONCE: usize = 3;
 
 /// How many requests for pieces of scale 1 and up are built at once: each holds a picture per
 /// scale it descends while the regions beneath are painted.
@@ -84,12 +83,12 @@ impl ManagerRef<'_, InstanceManager> {
             spawn_blocking(move || {
                 // Lists the whole world, so asked once per request.
                 let folder = dimension_folder(&world, &dimension)?;
-                let revisions = revisions_beneath(&folder, scale, x, z)?;
-                Some((folder, revisions))
+                let regions = regions_beneath(&folder, scale, x, z)?;
+                Some((folder, regions))
             })
             .await?
         };
-        let Some((folder, revisions)) = found else {
+        let Some((folder, regions)) = found else {
             return Ok(None);
         };
         let given_up = Arc::new(AtomicBool::new(false));
@@ -97,6 +96,7 @@ impl ManagerRef<'_, InstanceManager> {
         let painter = Arc::new(Painter {
             store: self.world_map_store(),
             painting: self.world_map_painting.clone(),
+            legacy: self.world_map_legacy.clone(),
             instance,
             roof: if has_ceiling(&request.dimension) {
                 Roof::Ceiling
@@ -107,8 +107,7 @@ impl ManagerRef<'_, InstanceManager> {
             dimension: request.dimension,
             world,
             folder,
-            revisions,
-            legacy: OnceCell::new(),
+            regions,
             given_up,
             #[cfg(test)]
             pause: self.world_map_pause.get(),
@@ -178,23 +177,32 @@ fn regions_under(scale: u8, x: i32, z: i32) -> Option<(RangeInclusive<i32>, Rang
     Some((range(x)?, range(z)?))
 }
 
-/// The revision of every region under the piece that exists, asked of each file by its name.
-fn revisions_beneath(
+/// Every region under the piece that exists, asked of each file by its name.
+fn regions_beneath(
     folder: &Path,
     scale: u8,
     x: i32,
     z: i32,
-) -> Option<HashMap<(i32, i32), String>> {
+) -> Option<HashMap<(i32, i32), RegionAt>> {
     let (xs, zs) = regions_under(scale, x, z)?;
-    let mut revisions = HashMap::new();
+    let mut regions = HashMap::new();
     for z in zs {
         for x in xs.clone() {
-            if let Some(revision) = region_revision_at(folder, x, z) {
-                revisions.insert((x, z), revision);
+            if let Some(region) = region_at(folder, x, z) {
+                regions.insert((x, z), region);
             }
         }
     }
-    Some(revisions)
+    Some(regions)
+}
+
+/// The bytes of files a painting of `region` reads: the region whole, the last row of the
+/// one to its north.
+fn bytes_read(region: &RegionAt) -> u64 {
+    region.size.min(MAX_REGION_BYTES)
+        + region
+            .north_size
+            .map_or(0, |north| north.min(MAX_ROW_BYTES))
 }
 
 /// Set when the request is dropped: the desktop gave the piece up.
@@ -220,7 +228,8 @@ enum Drawn {
 /// Paints the pieces of one request, all in one dimension of one world.
 struct Painter {
     store: Arc<Store>,
-    painting: Arc<Semaphore>,
+    painting: Arc<PaintingBudget>,
+    legacy: Arc<LegacyCache>,
     instance: InstanceId,
     world_name: String,
     dimension: String,
@@ -229,10 +238,8 @@ struct Painter {
     /// The dimension's region folder.
     folder: PathBuf,
     roof: Roof,
-    /// The revision of every region under the asked piece that exists.
-    revisions: HashMap<(i32, i32), String>,
-    /// Read from `level.dat` once, when a region is first painted; `None` without one.
-    legacy: OnceCell<Arc<Option<LegacyIds>>>,
+    /// Every region under the asked piece that exists.
+    regions: HashMap<(i32, i32), RegionAt>,
     given_up: Arc<AtomicBool>,
     #[cfg(test)]
     pause: Option<Pause>,
@@ -284,15 +291,18 @@ impl Painter {
     /// the regions under it. `None` when no region is under it.
     fn revision(&self, scale: u8, x: i32, z: i32) -> Option<String> {
         if scale == 0 {
-            return self.revisions.get(&(x, z)).cloned();
+            return self
+                .regions
+                .get(&(x, z))
+                .map(|region| region.revision.clone());
         }
         let (xs, zs) = regions_under(scale, x, z)?;
         let mut digest = Sha256::new();
         let mut any = false;
         for z in zs {
             for x in xs.clone() {
-                if let Some(revision) = self.revisions.get(&(x, z)) {
-                    digest.update(format!("{x},{z}:{revision};"));
+                if let Some(region) = self.regions.get(&(x, z)) {
+                    digest.update(format!("{x},{z}:{};", region.revision));
                     any = true;
                 }
             }
@@ -321,52 +331,33 @@ impl Painter {
 
     /// The region `(x, z)` painted; `None` when it is gone since its revision was taken.
     async fn paint(self: &Arc<Self>, x: i32, z: i32) -> anyhow::Result<Option<Painted>> {
-        let legacy =
-            self.legacy
-                .get_or_try_init(|| {
-                    let world = self.world.clone();
-                    async move {
-                        anyhow::Ok(Arc::new(spawn_blocking(move || legacy_ids(&world)).await?))
-                    }
-                })
-                .await?
-                .clone();
+        let bytes = self.regions.get(&(x, z)).map_or(0, bytes_read);
         // A request given up while it waits here is dropped with its wait.
-        let permit = self
-            .painting
-            .clone()
-            .acquire_owned()
-            .await
-            .expect("the map painting semaphore is never closed");
+        let admitted = self.painting.admit(bytes).await;
         let this = self.clone();
         spawn_blocking(move || {
-            let _permit = permit;
-            this.paint_blocking(x, z, legacy.as_ref().as_ref())
+            let _admitted = admitted;
+            this.paint_blocking(x, z)
         })
         .await?
     }
 
-    fn paint_blocking(
-        &self,
-        x: i32,
-        z: i32,
-        legacy: Option<&LegacyIds>,
-    ) -> anyhow::Result<Option<Painted>> {
+    fn paint_blocking(&self, x: i32, z: i32) -> anyhow::Result<Option<Painted>> {
         self.given_up()?;
-        // Each file is read whole and closed before its chunks are parsed.
+        // Each file is read and closed before its chunks are parsed: the region whole, the one
+        // to its north only for its last row.
         let Some(region) = Region::read(&region_file(&self.folder, x, z))? else {
             return Ok(None);
         };
         let mut north_unread = false;
         let north = match z.checked_sub(1) {
             None => None,
-            Some(north) => {
-                Region::read(&region_file(&self.folder, x, north)).unwrap_or_else(|error| {
+            Some(north) => Region::read_row(&region_file(&self.folder, x, north), 31)
+                .unwrap_or_else(|error| {
                     debug!(?error, "could not read the region north of {x},{z}");
                     north_unread = true;
                     None
-                })
-            }
+                }),
         };
         let cancelled = || {
             #[cfg(test)]
@@ -375,8 +366,16 @@ impl Painter {
             }
             self.given_up.load(Ordering::Acquire)
         };
+        // Asked of `level.dat` only when a chunk holds numeric ids.
+        let loaded = std::cell::OnceCell::new();
+        let legacy = || {
+            loaded
+                .get_or_init(|| self.legacy.ids(&self.world))
+                .as_ref()
+                .as_ref()
+        };
         let Some(mut painted) =
-            paint_region(&region, north.as_ref(), self.roof, legacy, &cancelled)
+            paint_region(&region, north.as_ref(), self.roof, &legacy, &cancelled)
         else {
             return Err(anyhow!("the map piece was given up"));
         };
@@ -465,16 +464,6 @@ impl Painter {
             complete,
         })
     }
-}
-
-/// What the world's `level.dat` says of its numeric ids; `None` when there is none to read.
-fn legacy_ids(world: &Path) -> Option<LegacyIds> {
-    let path = world.join("level.dat");
-    if !fs::symlink_metadata(&path).is_ok_and(|meta| meta.is_file()) {
-        return None;
-    }
-    let nbt = inflate_level_dat(&path).ok()?;
-    Some(LegacyIds::from_level_dat(&nbt))
 }
 
 #[cfg(test)]
@@ -576,8 +565,10 @@ pub(crate) mod tests {
     use image::{ImageFormat, RgbaImage};
 
     use super::super::super::mods::tests::addon_fixture;
-    use super::super::super::world_level::level_dat_bytes;
-    use super::super::chunk::tests::{FULL, chunk_1_18, fill};
+    use super::super::super::world_level::{gzipped, level_dat_bytes};
+    use super::super::chunk::tests::{FULL, chunk_1_18, fill, numeric_chunk, numeric_section};
+    use super::super::colors::UNKNOWN;
+    use super::super::legacy::tests::{level_dat_1_12, vanilla_level_dat};
     use super::super::paint::PIECE;
     use super::super::region::test::{region_bytes, zlib};
     use super::*;
@@ -978,10 +969,7 @@ pub(crate) mod tests {
         gate.open();
 
         let painting = app.instance_manager().world_map_painting.clone();
-        until("the permit to come back", || {
-            painting.available_permits() == PAINTING_AT_ONCE
-        })
-        .await;
+        until("the permit to come back", || painting.idle()).await;
         assert_eq!(
             gate.passes(),
             1,
@@ -1040,6 +1028,71 @@ pub(crate) mod tests {
 
         task.await.unwrap().unwrap();
         assert_eq!(kept(&app), Vec::<PathBuf>::new());
+    }
+
+    /// The overworld region `(x, z)` holding one chunk of stone at height 0 in numeric ids, as
+    /// 1.12.2 writes it.
+    fn numeric_region(world: &Path, x: i32, z: i32) {
+        let section = numeric_section(0, |_, y, _| (u16::from(y == 0), 0));
+        let nbt = numeric_chunk(vec![section], Some(1));
+        put_region(world, x, z, &[(0, 0, 2, zlib(&nbt))]);
+    }
+
+    fn set_level_dat(world: &Path, nbt: &[u8], later: u64) {
+        let path = world.join("level.dat");
+        std::fs::write(&path, gzipped(nbt)).unwrap();
+        std::fs::File::options()
+            .write(true)
+            .open(&path)
+            .unwrap()
+            .set_modified(SystemTime::now() + Duration::from_secs(later))
+            .unwrap();
+    }
+
+    #[tokio::test]
+    async fn the_numeric_ids_of_a_world_are_read_once_while_its_level_dat_is_unchanged() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, world) = world(&app, "map-legacy-once").await;
+        // Id 1 is a mod's block in this world, so its chunks are grey.
+        set_level_dat(&world, &level_dat_1_12(&[("ic2:rubber_wood", 1)]), 0);
+        for x in 0..6 {
+            numeric_region(&world, x, 0);
+        }
+        let legacy = app.instance_manager().world_map_legacy.clone();
+
+        let tasks: Vec<_> = (0..6)
+            .map(|x| spawn_piece(&app, request(id, 0, x, 0)))
+            .collect();
+        let grey = UNKNOWN.map(|c| (u16::from(c) * 220 / 255) as u8);
+        for task in tasks {
+            let piece = task.await.unwrap().unwrap().unwrap();
+            let pixel = *decoded(&piece.png).get_pixel(0, 0);
+            assert_eq!(pixel, image::Rgba([grey[0], grey[1], grey[2], 255]));
+        }
+        assert_eq!(legacy.reads(), 1, "six cold pieces, one read");
+
+        // A level.dat written again is read again, and only once.
+        set_level_dat(&world, &vanilla_level_dat(), 10);
+        numeric_region(&world, 8, 0);
+        numeric_region(&world, 9, 0);
+        let stone = decoded(&piece(&app, request(id, 0, 8, 0)).await.unwrap());
+        assert_ne!(stone.get_pixel(0, 0).0[..3], grey[..]);
+        assert!(piece(&app, request(id, 0, 9, 0)).await.is_some());
+        assert_eq!(legacy.reads(), 2);
+    }
+
+    #[tokio::test]
+    async fn a_world_of_block_names_reads_no_level_dat_to_paint() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, world) = world(&app, "map-legacy-none").await;
+        for x in 0..3 {
+            put_region(&world, x, 0, &[ground(0, 0, "minecraft:stone")]);
+        }
+        for x in 0..3 {
+            assert!(piece(&app, request(id, 0, x, 0)).await.is_some());
+        }
+        assert!(piece(&app, request(id, 1, 0, 0)).await.is_some());
+        assert_eq!(app.instance_manager().world_map_legacy.reads(), 0);
     }
 
     /// Regions at `(4k, 0)`, each alone under the scale 2 piece `(k, 0)`.

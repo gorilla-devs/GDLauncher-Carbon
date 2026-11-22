@@ -1,7 +1,8 @@
+pub(crate) mod budget;
 mod chunk;
 mod colors;
 pub(crate) mod facts;
-mod legacy;
+pub(crate) mod legacy;
 mod paint;
 mod region;
 pub(crate) mod service;
