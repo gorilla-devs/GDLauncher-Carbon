@@ -156,6 +156,12 @@ impl ManagerRef<'_, InstanceManager> {
             Some(&request.world),
         );
         let moved = folder != request.world;
+        // Kept to the end, through any move back: the map opens no file of the instance's
+        // worlds while one of them moves.
+        let _map_files = match moved {
+            true => Some(self.close_world_map_files(id).await),
+            false => None,
+        };
         if moved {
             #[cfg(test)]
             let first = match self.test_hooks.fail("world_rename_folder", id) {

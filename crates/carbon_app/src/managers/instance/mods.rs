@@ -659,7 +659,13 @@ impl ManagerRef<'_, InstanceManager> {
             }
         }
         let (indexes, plans): (Vec<usize>, Vec<_>) = planned.into_iter().unzip();
+        // The map opens no file of the instance's worlds while one of them is removed.
+        let map_files = match plans.iter().any(|plan| plan.is_world()) {
+            true => Some(self.close_world_map_files(instance_id).await),
+            false => None,
+        };
         let removed = super::addon_retry::PlannedDelete::remove_all(&plans, removal).await;
+        drop(map_files);
         #[cfg(test)]
         self.test_hooks.pause("addon_removed", instance_id).await;
 

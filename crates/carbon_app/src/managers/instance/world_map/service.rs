@@ -9,11 +9,13 @@ use std::ops::RangeInclusive;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use anyhow::anyhow;
 use futures::future::BoxFuture;
 use image::{ImageFormat, RgbaImage};
 use sha2::{Digest, Sha256};
+use tokio::sync::RwLock;
 use tokio::task::spawn_blocking;
 use tracing::debug;
 
@@ -32,6 +34,23 @@ use crate::managers::ManagerRef;
 
 /// The largest scale: a piece of it covers 16 by 16 regions.
 pub(crate) const MAX_SCALE: u8 = 4;
+
+/// How long a request waits for the files of its world while an operation moves or removes
+/// them; past it, it answers nothing.
+const FILES_WAIT: Duration = Duration::from_millis(500);
+
+/// A piece asked for while the files of its world were closed to the map: answered as nothing,
+/// and nothing of it is kept.
+#[derive(Debug)]
+struct FilesClosed;
+
+impl std::fmt::Display for FilesClosed {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("the files of the world are being moved or removed")
+    }
+}
+
+impl std::error::Error for FilesClosed {}
 
 /// How many requests for pieces of scale 1 and up are built at once: each holds a picture per
 /// scale it descends while the regions beneath are painted.
@@ -61,14 +80,27 @@ pub struct Piece {
 }
 
 impl ManagerRef<'_, InstanceManager> {
-    /// The piece; `None` when nothing of the world lies under it, the world included. No gate
-    /// is taken: the map is drawn while the game runs, and a world renamed or deleted
-    /// meanwhile only makes the answer `None` or a piece that is not kept.
+    /// The piece; `None` when nothing of the world lies under it, the world included, or
+    /// while the world's files are being moved or removed. No instance gate is taken: the map
+    /// is drawn while the game runs, and a world renamed or deleted meanwhile only makes the
+    /// answer `None` or a piece that is not kept.
     pub async fn world_map_piece(self, request: PieceRequest) -> anyhow::Result<Option<Piece>> {
+        match self.world_map_piece_open(request).await {
+            Err(error) if error.is::<FilesClosed>() => Ok(None),
+            answer => answer,
+        }
+    }
+
+    async fn world_map_piece_open(self, request: PieceRequest) -> anyhow::Result<Option<Piece>> {
         if request.scale > MAX_SCALE || !is_revision(&request.rev) {
             return Ok(None);
         }
         let instance = InstanceId(request.instance_id);
+        let files = self.world_map_files(instance);
+        // Held while the world is found and its regions listed; nothing else is waited for.
+        let open = tokio::time::timeout(FILES_WAIT, files.clone().read_owned())
+            .await
+            .map_err(|_| FilesClosed)?;
         let world = match self.map_world_folder(instance, &request.world).await {
             Ok(world) => world,
             // Renamed, deleted or replaced by a link since the desktop listed it.
@@ -88,6 +120,7 @@ impl ManagerRef<'_, InstanceManager> {
             })
             .await?
         };
+        drop(open);
         let Some((folder, regions)) = found else {
             return Ok(None);
         };
@@ -97,6 +130,7 @@ impl ManagerRef<'_, InstanceManager> {
             store: self.world_map_store(),
             painting: self.world_map_painting.clone(),
             legacy: self.world_map_legacy.clone(),
+            files,
             instance,
             roof: if has_ceiling(&request.dimension) {
                 Roof::Ceiling
@@ -111,6 +145,8 @@ impl ManagerRef<'_, InstanceManager> {
             given_up,
             #[cfg(test)]
             pause: self.world_map_pause.get(),
+            #[cfg(test)]
+            read_pause: self.world_map_read_pause.get(),
         });
         let Some(revision) = painter.revision(scale, x, z) else {
             return Ok(None);
@@ -230,6 +266,8 @@ struct Painter {
     store: Arc<Store>,
     painting: Arc<PaintingBudget>,
     legacy: Arc<LegacyCache>,
+    /// Held shared around every read of the world's files (see `world_map_files`).
+    files: Arc<RwLock<()>>,
     instance: InstanceId,
     world_name: String,
     dimension: String,
@@ -243,6 +281,8 @@ struct Painter {
     given_up: Arc<AtomicBool>,
     #[cfg(test)]
     pause: Option<Pause>,
+    #[cfg(test)]
+    read_pause: Option<Pause>,
 }
 
 impl Painter {
@@ -345,10 +385,16 @@ impl Painter {
     fn paint_blocking(&self, x: i32, z: i32) -> anyhow::Result<Option<Painted>> {
         self.given_up()?;
         // Each file is read and closed before its chunks are parsed: the region whole, the one
-        // to its north only for its last row.
+        // to its north only for its last row. Never waited for: a request that finds the files
+        // closed answers nothing.
+        let open = self.files.try_read().map_err(|_| FilesClosed)?;
         let Some(region) = Region::read(&region_file(&self.folder, x, z))? else {
             return Ok(None);
         };
+        #[cfg(test)]
+        if let Some(pause) = &self.read_pause {
+            pause();
+        }
         let mut north_unread = false;
         let north = match z.checked_sub(1) {
             None => None,
@@ -359,6 +405,7 @@ impl Painter {
                     None
                 }),
         };
+        drop(open);
         let cancelled = || {
             #[cfg(test)]
             if let Some(pause) = &self.pause {
@@ -368,9 +415,16 @@ impl Painter {
         };
         // Asked of `level.dat` only when a chunk holds numeric ids.
         let loaded = std::cell::OnceCell::new();
+        let closed = std::cell::Cell::new(false);
         let legacy = || {
             loaded
-                .get_or_init(|| self.legacy.ids(&self.world))
+                .get_or_init(|| match self.files.try_read() {
+                    Ok(_open) => self.legacy.ids(&self.world),
+                    Err(_) => {
+                        closed.set(true);
+                        Arc::new(None)
+                    }
+                })
                 .as_ref()
                 .as_ref()
         };
@@ -379,6 +433,9 @@ impl Painter {
         else {
             return Err(anyhow!("the map piece was given up"));
         };
+        if closed.get() {
+            return Err(FilesClosed.into());
+        }
         painted.complete &= !north_unread;
         Ok(Some(painted))
     }
@@ -400,6 +457,9 @@ impl Painter {
                 Ok(Some(drawn)) => drawn,
                 Err(error) => {
                     self.given_up()?;
+                    if error.is::<FilesClosed>() {
+                        return Err(error);
+                    }
                     debug!(?error, "a map piece at scale {below} could not be painted");
                     complete = false;
                     continue;
@@ -445,7 +505,11 @@ impl Painter {
         painted: Painted,
     ) -> anyhow::Result<Drawn> {
         let Painted { image, complete } = painted;
-        let world_there = fs::symlink_metadata(&self.world).is_ok_and(|meta| meta.is_dir());
+        // Taken for gone while its files are closed to the map.
+        let world_there = self
+            .files
+            .try_read()
+            .is_ok_and(|_open| fs::symlink_metadata(&self.world).is_ok_and(|meta| meta.is_dir()));
         if !complete || !world_there {
             return Ok(Drawn::Painted {
                 image,
@@ -676,11 +740,18 @@ pub(crate) mod tests {
 
     impl Gate {
         fn install(app: &App) -> Arc<Gate> {
+            Gate::install_on(&app.instance_manager().world_map_pause)
+        }
+
+        /// Holds every painting inside its file read, after its own region is read.
+        fn install_in_read(app: &App) -> Arc<Gate> {
+            Gate::install_on(&app.instance_manager().world_map_read_pause)
+        }
+
+        fn install_on(pause: &PaintPause) -> Arc<Gate> {
             let gate = Arc::new(Gate::default());
             let held = gate.clone();
-            app.instance_manager()
-                .world_map_pause
-                .set(Arc::new(move || held.pass()));
+            pause.set(Arc::new(move || held.pass()));
             gate
         }
 
@@ -1093,6 +1164,136 @@ pub(crate) mod tests {
         }
         assert!(piece(&app, request(id, 1, 0, 0)).await.is_some());
         assert_eq!(app.instance_manager().world_map_legacy.reads(), 0);
+    }
+
+    #[tokio::test]
+    async fn a_rename_waits_for_a_file_read_in_flight_then_succeeds() {
+        let app = crate::setup_managers_for_test().await;
+        let id = test_world(&app, "map-rename-read").await;
+        let listed = app.instance_manager().list_worlds(id).await.unwrap();
+        let home = listed.iter().find(|world| world.name == "Home").unwrap();
+        let gate = Gate::install_in_read(&app);
+
+        let task = spawn_piece(&app, request(id, 0, 0, 0));
+        until("the painting to read its region", || gate.held() == 1).await;
+        let rename = {
+            let (app, identity) = (app.clone(), home.identity.clone().unwrap());
+            tokio::spawn(async move {
+                app.instance_manager()
+                    .rename_world(RenameWorld {
+                        instance_id: id.0,
+                        world: "Home".into(),
+                        identity,
+                        name: "Elsewhere".into(),
+                    })
+                    .await
+            })
+        };
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        // Read before opening, asserted after: a closed gate would hold the painting for good.
+        let early = rename.is_finished();
+        gate.open();
+        assert!(!early, "the rename moved a folder with a file open");
+
+        assert_ne!(rename.await.unwrap().unwrap(), "Home");
+        task.await.unwrap().unwrap();
+        app.instance_manager().forgetting_done().await;
+        assert_eq!(kept(&app), Vec::<PathBuf>::new());
+    }
+
+    #[tokio::test]
+    async fn a_delete_waits_for_a_file_read_in_flight_then_succeeds() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, row, world) = addon_fixture(
+            &app,
+            "map-delete-read",
+            AddonType::Worlds,
+            "Home",
+            &level_dat_bytes(Some("Home")),
+        )
+        .await;
+        put_region(&world, 0, 0, &[ground(0, 0, "minecraft:stone")]);
+        let gate = Gate::install_in_read(&app);
+
+        let task = spawn_piece(&app, request(id, 0, 0, 0));
+        until("the painting to read its region", || gate.held() == 1).await;
+        let delete = {
+            let app = app.clone();
+            tokio::spawn(async move { app.instance_manager().delete_mod(id, row.id).await })
+        };
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        // Read before opening, asserted after: a closed gate would hold the painting for good.
+        let early = delete.is_finished();
+        let still_there = world.exists();
+        gate.open();
+        assert!(!early, "the delete removed a folder with a file open");
+        assert!(still_there);
+
+        delete.await.unwrap().unwrap();
+        assert!(!world.exists());
+        task.await.unwrap().unwrap();
+        app.instance_manager().forgetting_done().await;
+        assert_eq!(kept(&app), Vec::<PathBuf>::new());
+    }
+
+    #[tokio::test]
+    async fn while_the_files_are_closed_a_request_opens_none() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, world) = world(&app, "map-files-closed").await;
+        let region = put_region(&world, 0, 0, &[ground(0, 0, "minecraft:stone")]);
+        // A file read would be an error.
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(&region, std::fs::Permissions::from_mode(0o000)).unwrap();
+        }
+        let gate = Gate::install_in_read(&app);
+        gate.open();
+        let manager = app.instance_manager();
+
+        let closed = manager.close_world_map_files(id).await;
+        for scale in [0, 1, MAX_SCALE] {
+            assert_eq!(whole(&app, request(id, scale, 0, 0)).await, None);
+        }
+        let facts = {
+            let app = app.clone();
+            tokio::spawn(async move { app.instance_manager().world_map(id, "Home".into()).await })
+        };
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        assert!(
+            !facts.is_finished(),
+            "the facts were read while the files were closed"
+        );
+        drop(closed);
+        let facts = facts.await.unwrap().unwrap();
+        assert_eq!(facts.dimensions.len(), 1);
+        assert_eq!(gate.passes(), 0, "no region was read");
+        assert_eq!(kept(&app), Vec::<PathBuf>::new());
+
+        #[cfg(unix)]
+        {
+            let answer = manager.world_map_piece(request(id, 0, 0, 0)).await;
+            assert!(
+                answer.is_err(),
+                "open again, the region is read: {answer:?}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_painting_that_finds_the_files_closed_keeps_nothing() {
+        let app = crate::setup_managers_for_test().await;
+        let id = test_world(&app, "map-files-closed-late").await;
+        let gate = Gate::install(&app);
+        // The painting is held at its first chunk, its file read done.
+        let task = spawn_piece(&app, request(id, 1, 0, 0));
+        until("the painting to reach a chunk", || gate.held() == 1).await;
+        let closed = app.instance_manager().close_world_map_files(id).await;
+        gate.open();
+        // It has its bytes, so it may end; what it painted is not kept.
+        task.await.unwrap().unwrap();
+        drop(closed);
+        assert_eq!(kept(&app), Vec::<PathBuf>::new());
     }
 
     /// Regions at `(4k, 0)`, each alone under the scale 2 piece `(k, 0)`.

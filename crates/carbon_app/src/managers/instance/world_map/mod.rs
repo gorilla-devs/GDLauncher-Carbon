@@ -12,6 +12,7 @@ mod test_nbt;
 
 use std::sync::Arc;
 
+use tokio::sync::{OwnedRwLockWriteGuard, RwLock};
 use tracing::debug;
 
 use super::{InstanceId, InstanceManager};
@@ -19,6 +20,21 @@ use crate::managers::ManagerRef;
 use store::{STORE_LIMIT, Store};
 
 impl ManagerRef<'_, InstanceManager> {
+    /// The gate around every file the map opens in the instance's worlds: the map holds it
+    /// shared only while it reads files, an operation that moves or removes a folder of them
+    /// holds it alone. On Windows a folder with an open file under it can be neither renamed
+    /// nor removed.
+    pub(crate) fn world_map_files(self, id: InstanceId) -> Arc<RwLock<()>> {
+        self.world_map_files.entry(id).or_default().clone()
+    }
+
+    /// Closes the instance's worlds to the map until the guard is dropped: waits for the reads
+    /// in flight, which are short, not for whole paintings. Never take it while waiting on
+    /// anything the map holds; the map never waits on it while holding anything.
+    pub(crate) async fn close_world_map_files(self, id: InstanceId) -> OwnedRwLockWriteGuard<()> {
+        self.world_map_files(id).write_owned().await
+    }
+
     /// The launcher's one store of finished map pieces.
     pub(crate) fn world_map_store(self) -> Arc<Store> {
         self.world_map_store

@@ -142,6 +142,12 @@ pub struct InstanceManager {
     world_map_painting: Arc<world_map::budget::PaintingBudget>,
     /// What each world's `level.dat` says of its numeric block ids, for the map.
     world_map_legacy: Arc<world_map::legacy::LegacyCache>,
+    /// Keeps the map out of an instance's worlds while one is moved or removed (see
+    /// `world_map_files`).
+    world_map_files: DashMap<InstanceId, Arc<tokio::sync::RwLock<()>>>,
+    /// Holds a painting of the map inside its file read, for tests.
+    #[cfg(test)]
+    world_map_read_pause: world_map::service::PaintPause,
     /// Requests for joined map pieces built at once (see `world_map_piece`).
     world_map_building: Arc<tokio::sync::Semaphore>,
     /// Holds a painting of the map at a chunk, for tests.
@@ -345,6 +351,9 @@ impl InstanceManager {
                 world_map::budget::PAINTING_BYTES,
             )),
             world_map_legacy: Default::default(),
+            world_map_files: Default::default(),
+            #[cfg(test)]
+            world_map_read_pause: Default::default(),
             world_map_building: Arc::new(tokio::sync::Semaphore::new(
                 world_map::service::BUILDING_AT_ONCE,
             )),
@@ -2913,6 +2922,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         // again did nothing. Whatever fails from here on moves it back.
         // Root ownership is kept through DB and map publication.
         let mut rename_path_guard = None;
+        // Declared before `moved`, so it is let go after a move back: the map opens no file of
+        // the instance's worlds while its folder moves.
+        let mut _map_files = None;
         let mut moved = MovedRoot::default();
         let renamed = update.name.as_ref().is_some_and(|name| *name != old_name);
         if let Some(name) = update.name.as_ref().filter(|_| renamed) {
@@ -2923,6 +2935,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 self.test_hooks
                     .pause("rename_move", update.instance_id)
                     .await;
+                _map_files = Some(self.close_world_map_files(update.instance_id).await);
                 tokio::fs::rename(&path, &new_path)
                     .await
                     .map_err(folder_not_renamed)?;
@@ -3424,11 +3437,13 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .await?
             .deletion_through_recycle_bin;
 
+        // The map opens no file of the instance's worlds while its folder is removed.
+        let map_files = self.close_world_map_files(instance_id).await;
         // The removal runs without path_lock, so a slow Recycle Bin or a
         // shell prompt never holds up creating, importing, renaming or
         // duplicating other instances. Until the retirement below, this
         // instance's library row keeps its folder name reserved.
-        tokio::task::spawn_blocking(move || {
+        let removal = tokio::task::spawn_blocking(move || {
             if !valid
                 && std::fs::symlink_metadata(&path)
                     .is_err_and(|error| error.kind() == std::io::ErrorKind::NotFound)
@@ -3443,7 +3458,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
             Ok::<_, anyhow::Error>(())
         })
-        .await??;
+        .await;
+        drop(map_files);
+        removal??;
 
         // Get the instance's group_id before deleting, so we can check if the group becomes empty
         let id = *instance_id;
