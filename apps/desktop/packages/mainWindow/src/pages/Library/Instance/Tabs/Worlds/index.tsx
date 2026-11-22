@@ -1,6 +1,7 @@
 import type {
   FEWorld,
   FEWorldDatapack,
+  FEWorldMap,
   Mod,
   Progress
 } from "@gd/core_module/bindings"
@@ -10,6 +11,7 @@ import { useParams } from "@solidjs/router"
 import {
   Show,
   createEffect,
+  createMemo,
   createSignal,
   on,
   onCleanup,
@@ -30,6 +32,7 @@ import WorldsSidebar from "./WorldsSidebar"
 import WorldDatapacks from "./WorldDatapacks"
 import { datapackCopies, sameDatapackProject } from "./datapackCopies"
 import { toastUpdateFailures } from "./updateFailures"
+import { isMapFilled, setMapFilled } from "./WorldsRouteWrapper"
 import { changesBlocked } from "@/pages/Library/shared/addons/components/ChangesBlocked"
 import { asksBeforeDeletingAddons } from "@/utils/addonDeletion"
 import { deletionTarget } from "@/utils/deletionTarget"
@@ -95,8 +98,13 @@ const Worlds = () => {
     mutationKey: ["vtask.dismissTask"]
   }))
 
-  const refetchAll = () =>
-    Promise.all([worlds.refetch(), instanceMods.refetch()])
+  // A played world shows its changes: its map is read again with the lists,
+  // unless the selection moved meanwhile, which reads the new world's map.
+  const refetchAll = async () => {
+    const mapBefore = mapKey()
+    await Promise.all([worlds.refetch(), instanceMods.refetch()])
+    if (mapWanted() && mapKey() === mapBefore) void worldMap.refetch()
+  }
 
   // A world is still a row of the addon list in the core: deleting it goes
   // through the Addons tab's deletion, with its confirmation.
@@ -145,6 +153,88 @@ const Worlds = () => {
   }
   const worldRow = (world: FEWorld) =>
     (instanceMods.data ?? []).find((row) => row.id === world.addon_id)
+
+  // The map of the selected readable world. A world keeps its map while it
+  // stays selected, through a rename the tab made; another world or
+  // instance starts a map of its own.
+  let mapCount = 0
+  const mapSession = createMemo<
+    { id: number; instance: number; world: string } | undefined
+  >((previous) => {
+    const world = selected()
+    // A world the launcher cannot read has no map.
+    if (typeof world?.identity !== "string") return undefined
+    const instance = instanceId()
+    if (previous?.instance === instance) {
+      if (previous.world === world.name) return previous
+      const follow = following()
+      if (follow?.from === previous.world && follow.to === world.name)
+        return { ...previous, world: world.name }
+    }
+    return { id: ++mapCount, instance, world: world.name }
+  })
+  const mapId = () => mapSession()?.id
+  const mapKey = () => {
+    const session = mapSession()
+    return session && `${session.instance}/${session.world}`
+  }
+  // It lists the world's region files, so it waits for the panel to be on
+  // screen; once seen, the world's map stays read.
+  const [mapOnScreen, setMapOnScreen] = createSignal(false)
+  const [mapSeen, setMapSeen] = createSignal<number>()
+  createEffect(() => {
+    const id = mapId()
+    if (id !== undefined && mapOnScreen()) setMapSeen(id)
+  })
+  const mapWanted = () =>
+    mapId() !== undefined && (mapOnScreen() || mapSeen() === mapId())
+  const worldMap = rspc.createQuery(() => ({
+    queryKey: [
+      "instance.getWorldMap",
+      { instance_id: instanceId(), world: mapSession()?.world ?? "" }
+    ],
+    enabled: mapWanted()
+  }))
+  // Right after its key changes the query can still answer the previous
+  // key's facts, so each answer belongs to the key it was first seen under
+  // and is shown only for that key. A renamed world shows its last facts
+  // until the new folder's arrive.
+  const factsOwner = new WeakMap<FEWorldMap, string>()
+  const mapShown = createMemo<{ id: number; map: FEWorldMap } | undefined>(
+    (previous) => {
+      const id = mapId()
+      const key = mapKey()
+      if (id === undefined || key === undefined) return undefined
+      const data = worldMap.data
+      if (data && !factsOwner.has(data)) factsOwner.set(data, key)
+      if (data && factsOwner.get(data) === key)
+        return previous?.id === id && previous.map === data
+          ? previous
+          : { id, map: data }
+      return previous?.id === id ? previous : undefined
+    }
+  )
+  const mapFacts = () => mapShown()?.map
+  const [chosenDimension, setChosenDimension] = createSignal<{
+    id: number
+    dimension: string
+  }>()
+  /** The player's choice, else the player's dimension, else the first. */
+  const mapDimension = () => {
+    const ids = mapFacts()?.dimensions.map((d) => d.id) ?? []
+    const chosen = chosenDimension()
+    if (chosen && chosen.id === mapId() && ids.includes(chosen.dimension))
+      return chosen.dimension
+    const player = mapFacts()?.player?.dimension
+    return player && ids.includes(player) ? player : ids[0]
+  }
+  // Another world, or no map to fill with, gives the tab back.
+  createEffect(on(mapId, () => setMapFilled(false), { defer: true }))
+  createEffect(() => {
+    if (!mapFacts()?.dimensions.length || mapFacts()?.unmappable)
+      setMapFilled(false)
+  })
+  onCleanup(() => setMapFilled(false))
 
   const blocked = () => changesBlocked(routeData.instanceDetails.data)
 
@@ -669,6 +759,26 @@ const Worlds = () => {
               updateEverywhere: (pack) => void updateEverywhereFrom(pack),
               switchVersion: (pack) => switchVersion(world(), pack),
               remove: (pack) => remove(pack)
+            }}
+            map={{
+              get facts() {
+                return mapFacts()
+              },
+              get viewOf() {
+                return String(mapId())
+              },
+              get dimension() {
+                return mapDimension()
+              },
+              onDimension: (dimension) => {
+                const id = mapId()
+                if (id !== undefined) setChosenDimension({ id, dimension })
+              },
+              get filled() {
+                return isMapFilled()
+              },
+              onFill: setMapFilled,
+              onScreen: setMapOnScreen
             }}
           />
         )}

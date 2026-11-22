@@ -99,7 +99,9 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_worlds.map.shrink",
     "_trn_worlds.map.overworld",
     "_trn_worlds.map.nether",
-    "_trn_worlds.map.end"
+    "_trn_worlds.map.end",
+    "_trn_worlds.map.too_old",
+    "_trn_worlds.map.not_regions"
   ],
   ui: ["_trn_worlds"],
   notifications: [

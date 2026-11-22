@@ -251,6 +251,8 @@
   "_trn_worlds.map.overworld": "主世界",
   "_trn_worlds.map.nether": "下界",
   "_trn_worlds.map.end": "末地",
+  "_trn_worlds.map.too_old": "此存档来自过旧的游戏版本，无法显示地图。",
+  "_trn_worlds.map.not_regions": "此存档的存储格式无法显示地图。",
   "_trn_worlds.refusal.world_gone": "此存档已不存在。",
   "_trn_worlds.refusal.world_changed": "此存档在磁盘上已更改。请重试。",
   "_trn_worlds.refusal.name_taken": "此存档中已有名为“{{filename}}”的文件。",

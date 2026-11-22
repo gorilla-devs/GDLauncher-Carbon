@@ -1,4 +1,10 @@
-import type { FEWorld, FEWorldDatapack, Mod } from "@gd/core_module/bindings"
+import type {
+  FEUnmappable,
+  FEWorld,
+  FEWorldDatapack,
+  FEWorldMap,
+  Mod
+} from "@gd/core_module/bindings"
 import {
   Button,
   DropdownMenu,
@@ -10,8 +16,8 @@ import {
   TooltipContent,
   TooltipTrigger
 } from "@gd/ui"
-import { For, Show } from "solid-js"
-import { Trans } from "@gd/i18n"
+import { createEffect, For, onCleanup, onMount, Show } from "solid-js"
+import { Trans, type NamespacedTranslationKey } from "@gd/i18n"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { getWorldDatapackImageUrl } from "@/utils/instances"
@@ -21,6 +27,7 @@ import {
 } from "@/pages/Library/shared/addons/components/ChangesBlocked"
 import { UpdateCopiesMenu } from "@/pages/Library/shared/addons/components/UpdateCopiesMenu"
 import IconAction from "./IconAction"
+import WorldMap from "./WorldMap"
 import WorldTitle from "./WorldTitle"
 
 export interface WorldDatapacksActions {
@@ -55,6 +62,112 @@ export interface WorldDatapacksProps {
   copiesWithUpdate: (_pack: FEWorldDatapack) => number
   isPending: (_packId: string) => boolean
   actions: WorldDatapacksActions
+  map: WorldMapPanelProps
+}
+
+export interface WorldMapPanelProps {
+  /** The facts of this world's map, once read. */
+  facts: FEWorldMap | undefined
+  /** What the map's view belongs to: the same across a rename. */
+  viewOf: string
+  /** The dimension shown, once the facts list one. */
+  dimension: string | undefined
+  onDimension: (_id: string) => void
+  filled: boolean
+  onFill: (_filled: boolean) => void
+  /** Told when the panel comes on screen or leaves it. */
+  onScreen: (_visible: boolean) => void
+}
+
+const UNMAPPABLE: Record<FEUnmappable, NamespacedTranslationKey> = {
+  TooOld: "content:_trn_worlds.map.too_old",
+  NotRegions: "content:_trn_worlds.map.not_regions",
+  Unreadable: "content:_trn_worlds.unreadable"
+}
+
+const MapPanel = (props: {
+  instanceId: number
+  world: string
+  map: WorldMapPanelProps
+}) => {
+  let panel!: HTMLDivElement
+  onMount(() => {
+    onCleanup(() => props.map.onScreen(false))
+    // Without an observer the panel counts as on screen.
+    if (typeof IntersectionObserver === "undefined") {
+      props.map.onScreen(true)
+      return
+    }
+    const observer = new IntersectionObserver((entries) =>
+      props.map.onScreen(entries[entries.length - 1].isIntersecting)
+    )
+    observer.observe(panel)
+    onCleanup(() => observer.disconnect())
+  })
+
+  // Escape gives the tab back, unless an open menu or list takes it.
+  createEffect(() => {
+    if (!props.map.filled) return
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || e.defaultPrevented) return
+      if (document.querySelector('[role="listbox"],[role="menu"]')) return
+      props.map.onFill(false)
+    }
+    document.addEventListener("keydown", onKeyDown)
+    onCleanup(() => document.removeEventListener("keydown", onKeyDown))
+  })
+
+  const reason = () => props.map.facts?.unmappable
+  return (
+    <div
+      ref={panel}
+      data-testid="world-map-panel"
+      class="bg-darkSlate-900 relative overflow-hidden"
+      classList={{
+        "h-[280px] shrink-0": !props.map.filled,
+        "min-h-0 flex-1": props.map.filled
+      }}
+    >
+      <Show
+        when={reason()}
+        fallback={
+          // Mounted once per world and only with its own facts: the map
+          // opens on what it is given first.
+          <Show when={props.map.viewOf} keyed>
+            <Show
+              when={
+                props.map.facts?.dimensions.length ? props.map.dimension : null
+              }
+            >
+              {(dimension) => (
+                <WorldMap
+                  instanceId={props.instanceId}
+                  world={props.world}
+                  viewOf={props.map.viewOf}
+                  map={props.map.facts!}
+                  dimension={dimension()}
+                  onDimension={props.map.onDimension}
+                  filled={props.map.filled}
+                  onFill={props.map.onFill}
+                />
+              )}
+            </Show>
+          </Show>
+        }
+      >
+        {(unmappable) => (
+          <div class="flex h-full items-center justify-center px-4">
+            <p
+              data-testid="world-map-reason"
+              class="text-lightSlate-600 m-0 text-center text-sm"
+            >
+              <Trans key={UNMAPPABLE[unmappable()]} />
+            </p>
+          </div>
+        )}
+      </Show>
+    </div>
+  )
 }
 
 const packImage = (instanceId: number, pack: FEWorldDatapack) => {
@@ -328,110 +441,119 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
           </p>
         }
       >
-        <div class="text-lightSlate-600 border-darkSlate-600 border-b-solid box-border flex shrink-0 items-center gap-3 border-0 border-b px-4 py-2 text-xs">
-          <span class="min-w-0 flex-1">
-            <Trans key="content:_trn_worlds.datapack" />
-          </span>
-          <span class="w-16 text-center">
-            <Trans key="content:_trn_table.update" />
-          </span>
-          <span class="w-16 text-right">
-            <Trans key="content:_trn_table.actions" />
-          </span>
-        </div>
-        <div class="flex-1 overflow-y-auto">
-          <Show
-            when={props.world.datapacks.length > 0}
-            fallback={
-              <p class="text-lightSlate-600 m-0 px-4 py-3 text-sm">
-                <Trans key="content:_trn_worlds.no_datapacks" />
-              </p>
-            }
-          >
-            <For each={props.world.datapacks}>
-              {(pack) => {
-                const pending = () => props.isPending(pack.id)
-                const recognised = () => pack.name !== null
-                const image = () => packImage(props.instanceId, pack)
-                return (
-                  <div
-                    data-testid="world-datapack"
-                    data-pending={pending()}
-                    class="border-darkSlate-700 border-b-solid box-border flex items-center gap-3 border-0 border-b px-4 py-2 transition-opacity"
-                    classList={{ "opacity-50": pending() }}
-                  >
-                    <div class="bg-darkSlate-600 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded">
-                      <Show
-                        when={image()}
-                        fallback={
-                          <div
-                            class={`${pack.is_folder ? "i-hugeicons:folder-01" : "i-hugeicons:file-01"} text-lightSlate-400 text-lg`}
-                          />
-                        }
-                      >
-                        <img
-                          src={image()!}
-                          class="h-full w-full object-cover"
-                          alt=""
-                          loading="lazy"
-                        />
-                      </Show>
-                    </div>
-                    <div class="flex min-w-0 flex-1 flex-col">
-                      <span
-                        data-testid="world-datapack-name"
-                        class="text-lightSlate-100 truncate text-sm font-medium"
-                      >
-                        {pack.name ?? pack.filename}
-                      </span>
-                      <Show when={recognised()}>
-                        <span
-                          data-testid="world-datapack-filename"
-                          class="text-lightSlate-600 truncate text-xs"
+        <MapPanel
+          instanceId={props.instanceId}
+          world={props.world.name}
+          map={props.map}
+        />
+        <Show when={!props.map.filled}>
+          <div class="text-lightSlate-600 border-darkSlate-600 border-b-solid box-border flex shrink-0 items-center gap-3 border-0 border-b px-4 py-2 text-xs">
+            <span class="min-w-0 flex-1">
+              <Trans key="content:_trn_worlds.datapack" />
+            </span>
+            <span class="w-16 text-center">
+              <Trans key="content:_trn_table.update" />
+            </span>
+            <span class="w-16 text-right">
+              <Trans key="content:_trn_table.actions" />
+            </span>
+          </div>
+          <div class="flex-1 overflow-y-auto">
+            <Show
+              when={props.world.datapacks.length > 0}
+              fallback={
+                <p class="text-lightSlate-600 m-0 px-4 py-3 text-sm">
+                  <Trans key="content:_trn_worlds.no_datapacks" />
+                </p>
+              }
+            >
+              <For each={props.world.datapacks}>
+                {(pack) => {
+                  const pending = () => props.isPending(pack.id)
+                  const recognised = () => pack.name !== null
+                  const image = () => packImage(props.instanceId, pack)
+                  return (
+                    <div
+                      data-testid="world-datapack"
+                      data-pending={pending()}
+                      class="border-darkSlate-700 border-b-solid box-border flex items-center gap-3 border-0 border-b px-4 py-2 transition-opacity"
+                      classList={{ "opacity-50": pending() }}
+                    >
+                      <div class="bg-darkSlate-600 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded">
+                        <Show
+                          when={image()}
+                          fallback={
+                            <div
+                              class={`${pack.is_folder ? "i-hugeicons:folder-01" : "i-hugeicons:file-01"} text-lightSlate-400 text-lg`}
+                            />
+                          }
                         >
-                          {pack.filename}
+                          <img
+                            src={image()!}
+                            class="h-full w-full object-cover"
+                            alt=""
+                            loading="lazy"
+                          />
+                        </Show>
+                      </div>
+                      <div class="flex min-w-0 flex-1 flex-col">
+                        <span
+                          data-testid="world-datapack-name"
+                          class="text-lightSlate-100 truncate text-sm font-medium"
+                        >
+                          {pack.name ?? pack.filename}
                         </span>
-                      </Show>
-                    </div>
-                    <div class="flex w-16 shrink-0 items-center justify-center">
-                      <UpdateCell
-                        pack={pack}
-                        pending={pending()}
-                        blocked={props.blocked}
-                        beingCopied={props.beingCopied}
-                        copies={props.copiesWithUpdate(pack)}
-                        actions={props.actions}
-                      />
-                    </div>
-                    <div class="flex w-16 shrink-0 items-center justify-end gap-3">
-                      <Show when={recognised() && !pack.is_folder}>
+                        <Show when={recognised()}>
+                          <span
+                            data-testid="world-datapack-filename"
+                            class="text-lightSlate-600 truncate text-xs"
+                          >
+                            {pack.filename}
+                          </span>
+                        </Show>
+                      </div>
+                      <div class="flex w-16 shrink-0 items-center justify-center">
+                        <UpdateCell
+                          pack={pack}
+                          pending={pending()}
+                          blocked={props.blocked}
+                          beingCopied={props.beingCopied}
+                          copies={props.copiesWithUpdate(pack)}
+                          actions={props.actions}
+                        />
+                      </div>
+                      <div class="flex w-16 shrink-0 items-center justify-end gap-3">
+                        <Show when={recognised() && !pack.is_folder}>
+                          <IconAction
+                            testId="world-datapack-switch"
+                            icon="i-hugeicons:arrow-left-right"
+                            label={
+                              <Trans key="instances:_trn_switch_version" />
+                            }
+                            onClick={() => props.actions.switchVersion(pack)}
+                            disabled={held() || pending()}
+                            blocked={props.blocked}
+                            reason={heldReason()}
+                          />
+                        </Show>
                         <IconAction
-                          testId="world-datapack-switch"
-                          icon="i-hugeicons:arrow-left-right"
-                          label={<Trans key="instances:_trn_switch_version" />}
-                          onClick={() => props.actions.switchVersion(pack)}
+                          testId="world-datapack-remove"
+                          icon="i-hugeicons:delete-02"
+                          label={<Trans key="content:_trn_delete_mod" />}
+                          onClick={() => props.actions.remove(pack)}
                           disabled={held() || pending()}
                           blocked={props.blocked}
                           reason={heldReason()}
+                          danger
                         />
-                      </Show>
-                      <IconAction
-                        testId="world-datapack-remove"
-                        icon="i-hugeicons:delete-02"
-                        label={<Trans key="content:_trn_delete_mod" />}
-                        onClick={() => props.actions.remove(pack)}
-                        disabled={held() || pending()}
-                        blocked={props.blocked}
-                        reason={heldReason()}
-                        danger
-                      />
+                      </div>
                     </div>
-                  </div>
-                )
-              }}
-            </For>
-          </Show>
-        </div>
+                  )
+                }}
+              </For>
+            </Show>
+          </div>
+        </Show>
       </Show>
     </div>
   )

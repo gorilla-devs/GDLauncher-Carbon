@@ -253,6 +253,8 @@
   "_trn_worlds.map.overworld": "Surface",
   "_trn_worlds.map.nether": "Nether",
   "_trn_worlds.map.end": "L’End",
+  "_trn_worlds.map.too_old": "Ce monde vient d’une version du jeu trop ancienne pour en tracer la carte.",
+  "_trn_worlds.map.not_regions": "Le format de stockage de ce monde ne permet pas d’en tracer la carte.",
   "_trn_worlds.refusal.world_gone": "Ce monde n’existe plus.",
   "_trn_worlds.refusal.world_changed": "Ce monde a changé sur le disque. Réessayez.",
   "_trn_worlds.refusal.name_taken": "Ce monde contient déjà un fichier nommé « {{filename}} ».",

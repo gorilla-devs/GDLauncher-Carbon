@@ -44,6 +44,9 @@ import {
 export interface WorldMapProps {
   instanceId: number
   world: string
+  /** What the view belongs to; the world's folder when not given. A renamed
+   *  world passes the same value, so its view stays. */
+  viewOf?: string
   map: FEWorldMap
   dimension: string
   onDimension: (_id: string) => void
@@ -228,7 +231,7 @@ const WorldMap = (props: WorldMapProps) => {
   // this key in the same update, so no piece is ever asked for the new world
   // at the old view.
   const viewKey = createMemo(() =>
-    JSON.stringify([props.world, props.dimension])
+    JSON.stringify([props.viewOf ?? props.world, props.dimension])
   )
   const hasSize = createMemo(() => size().width > 0 && size().height > 0)
   const firstView = (): View => {

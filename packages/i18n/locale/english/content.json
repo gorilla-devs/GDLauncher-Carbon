@@ -254,6 +254,8 @@
   "_trn_worlds.map.overworld": "Overworld",
   "_trn_worlds.map.nether": "Nether",
   "_trn_worlds.map.end": "The End",
+  "_trn_worlds.map.too_old": "This world is from a game version too old to map.",
+  "_trn_worlds.map.not_regions": "This world's storage format can't be mapped.",
   "_trn_worlds.refusal.world_gone": "This world no longer exists.",
   "_trn_worlds.refusal.world_changed": "This world changed on disk. Try again.",
   "_trn_worlds.refusal.name_taken": "This world already has a file named “{{filename}}”.",

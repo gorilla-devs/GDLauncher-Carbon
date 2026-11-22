@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
-import { batch, splitProps } from "solid-js"
+import { batch, For, splitProps } from "solid-js"
 import { Dynamic, render } from "solid-js/web"
 import { createStore } from "solid-js/store"
 import type {
   FEDatapackUpdateResult,
   FEWorld,
   FEWorldDatapack,
+  FEWorldMap,
   Mod
 } from "@gd/core_module/bindings"
 import english from "../../../../../../../../../../packages/i18n/locale/english/content.json"
@@ -25,7 +26,10 @@ const io = vi.hoisted(() => ({
   queryOptions: {} as Record<string, any>,
   mutate: {} as Record<string, ReturnType<typeof vi.fn>>,
   mutateAsync: {} as Record<string, ReturnType<typeof vi.fn>>,
-  clientQuery: vi.fn()
+  clientQuery: vi.fn(),
+  /** Each map read sent to the core, with its input. */
+  mapAsked: [] as { instance_id: number; world: string }[],
+  mapAnswer: vi.fn()
 }))
 
 vi.mock("@solidjs/router", () => ({ useParams: () => io.params }))
@@ -50,55 +54,94 @@ vi.mock("@/pages/Library/Instance/instance.data", () => ({
     }
   })
 }))
-vi.mock("@/utils/rspcClient", () => ({
-  rspc: {
-    useContext: () => ({ client: { query: io.clientQuery } }),
-    createQuery: (options: any) => {
-      const key = options().queryKey[0]
-      io.queryOptions[key] = options()
-      if (key === "instance.getWorlds")
-        return {
-          get data() {
-            return io.state.worldsError ? undefined : io.state.worlds
-          },
-          get isLoading() {
-            return false
-          },
-          get isError() {
-            return io.state.worldsError
-          },
-          refetch: io.refetchWorlds
-        }
-      if (key === "settings.getSettings")
-        return {
-          get data() {
-            return io.state.settings
-          }
-        }
-      // The copy is instance 5's: another instance's query answers none.
-      if (key === "instance.getWorldCopy")
-        return {
-          get data() {
-            return options().queryKey[1] === 5 ? io.state.copy : null
-          }
-        }
-      return {
-        get data() {
-          return io.state.mods
-        },
-        isLoading: false,
-        isError: false,
-        refetch: vi.fn(async () => {})
+vi.mock("@/utils/rspcClient", async () => {
+  const { createEffect, createSignal, on } = await import("solid-js")
+  /** The map's query as the tab sees it: read when enabled and whenever its
+   *  key changes, cached by key, and read again by `refetch`. */
+  const mapQuery = (options: () => any) => {
+    const [cache, setCache] = createSignal<Record<string, any>>({})
+    const keyOf = () => JSON.stringify(options().queryKey[1])
+    const read = async () => {
+      const input = options().queryKey[1]
+      io.mapAsked.push(input)
+      try {
+        const answer = await io.mapAnswer(input)
+        setCache((c) => ({ ...c, [JSON.stringify(input)]: answer }))
+      } catch {
+        /* A refusal leaves no data; the global handler tells it. */
       }
-    },
-    createMutation: (options: any) => {
-      const key = options().mutationKey[0]
-      io.mutate[key] ??= vi.fn()
-      io.mutateAsync[key] ??= vi.fn()
-      return { mutate: io.mutate[key], mutateAsync: io.mutateAsync[key] }
+    }
+    // As the real query: read again only when the key or `enabled` changes.
+    const state = () => `${keyOf()} ${!!options().enabled}`
+    createEffect(
+      on(state, (now, before) => {
+        io.queryOptions["instance.getWorldMap"] = options()
+        if (now !== before && options().enabled) void read()
+      })
+    )
+    // As solid-query: right after the key changes, the last answer stays
+    // until the new key has one.
+    let last: any
+    return {
+      get data() {
+        last = cache()[keyOf()] ?? last
+        return last
+      },
+      refetch: read
     }
   }
-}))
+  return {
+    apiUrl: (path: string) => `http://core${path}`,
+    rspc: {
+      useContext: () => ({ client: { query: io.clientQuery } }),
+      createQuery: (options: any) => {
+        const key = options().queryKey[0]
+        io.queryOptions[key] = options()
+        if (key === "instance.getWorldMap") return mapQuery(options)
+        if (key === "instance.getWorlds")
+          return {
+            get data() {
+              return io.state.worldsError ? undefined : io.state.worlds
+            },
+            get isLoading() {
+              return false
+            },
+            get isError() {
+              return io.state.worldsError
+            },
+            refetch: io.refetchWorlds
+          }
+        if (key === "settings.getSettings")
+          return {
+            get data() {
+              return io.state.settings
+            }
+          }
+        // The copy is instance 5's: another instance's query answers none.
+        if (key === "instance.getWorldCopy")
+          return {
+            get data() {
+              return options().queryKey[1] === 5 ? io.state.copy : null
+            }
+          }
+        return {
+          get data() {
+            return io.state.mods
+          },
+          isLoading: false,
+          isError: false,
+          refetch: vi.fn(async () => {})
+        }
+      },
+      createMutation: (options: any) => {
+        const key = options().mutationKey[0]
+        io.mutate[key] ??= vi.fn()
+        io.mutateAsync[key] ??= vi.fn()
+        return { mutate: io.mutate[key], mutateAsync: io.mutateAsync[key] }
+      }
+    }
+  }
+})
 vi.mock("@gd/i18n", () => {
   const t = (key: string, options?: any) => {
     if (key === "content:_trn_worlds.copy_name")
@@ -133,6 +176,23 @@ vi.mock("@gd/ui", async () => {
       )
     },
     Skeleton: { logsList: () => <div /> },
+    // A native select that labels each option the way the map does.
+    Select: (p: any) => (
+      <select
+        data-testid="world-map-dimension-select"
+        value={p.value}
+        onChange={(e) => p.onChange(e.currentTarget.value)}
+      >
+        <For each={p.options}>
+          {(id: string) => (
+            <option value={id}>
+              {p.itemComponent({ item: { rawValue: id } })}
+            </option>
+          )}
+        </For>
+      </select>
+    ),
+    SelectItem: (p: any) => <>{p.children}</>,
     Button: (p: any) => (
       <button
         data-testid={p["data-testid"]}
@@ -223,6 +283,14 @@ const worldRow = (name: string, over: Partial<Mod> = {}): Mod => ({
   ...over
 })
 
+/** The facts of a world that has no region yet. */
+const NO_MAP: FEWorldMap = {
+  dimensions: [],
+  spawn: null,
+  player: null,
+  unmappable: null
+}
+
 let dispose: (() => void) | undefined
 let setState: any
 let setParams: any
@@ -236,11 +304,14 @@ beforeEach(() => {
   io.mutateAsync = {}
   io.clientQuery.mockResolvedValue({ type: "Succeeded" })
   io.copyPattern = english["_trn_worlds.copy_name"]
+  io.mapAsked = []
+  io.mapAnswer.mockImplementation(async () => NO_MAP)
 })
 afterEach(() => {
   dispose?.()
   dispose = undefined
   document.body.textContent = ""
+  vi.unstubAllGlobals()
 })
 
 /** `recycleBin`: the "Deletion through Recycle Bin" setting, on unless given;
@@ -1761,4 +1832,417 @@ it("the open field closes when a copy of the world starts", async () => {
   expect(tooltip(one(root, "world-rename")!)).toBe(
     "content:_trn_worlds.refusal.being_copied"
   )
+})
+
+const OVERWORLD = "minecraft:overworld"
+const NETHER = "minecraft:the_nether"
+const END = "minecraft:the_end"
+const AETHER = "aether:the_aether"
+/** A dimension explored around the origin: four regions. */
+const explored = (id: string) => ({
+  id,
+  ceiling: false,
+  revision: `${id}-rev`,
+  regions: [
+    { x: -1, z: -1, revision: "a" },
+    { x: 0, z: -1, revision: "b" },
+    { x: -1, z: 0, revision: "c" },
+    { x: 0, z: 0, revision: "d" }
+  ]
+})
+const mapOf = (over: Partial<FEWorldMap> = {}): FEWorldMap => ({
+  dimensions: [explored(OVERWORLD)],
+  spawn: { dimension: OVERWORLD, x: 0, z: 0 },
+  player: null,
+  unmappable: null,
+  ...over
+})
+/** Answers each world's map read with its facts, a new world otherwise. */
+const answerMaps = (maps: Record<string, FEWorldMap | Promise<FEWorldMap>>) =>
+  io.mapAnswer.mockImplementation(
+    async (input: { world: string }) => maps[input.world] ?? NO_MAP
+  )
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((r) => (resolve = r))
+  return { promise, resolve }
+}
+
+/** The panel's observers; `intersect` tells them the panel came into or
+ *  left the screen. */
+let observers: { callback: IntersectionObserverCallback; live: boolean }[] = []
+const installObserver = () => {
+  observers = []
+  vi.stubGlobal(
+    "IntersectionObserver",
+    class {
+      entry: { callback: IntersectionObserverCallback; live: boolean }
+      constructor(callback: IntersectionObserverCallback) {
+        this.entry = { callback, live: false }
+        observers.push(this.entry)
+      }
+      observe() {
+        this.entry.live = true
+      }
+      unobserve() {}
+      disconnect() {
+        this.entry.live = false
+      }
+    }
+  )
+}
+const intersect = (visible: boolean) => {
+  for (const o of observers)
+    if (o.live) o.callback([{ isIntersecting: visible } as any], {} as any)
+}
+
+let frames: FrameRequestCallback[] = []
+/** Gives the map a 1000×600 panel and runs its animation frames by hand. */
+const installMapSize = () => {
+  frames = []
+  vi.stubGlobal(
+    "ResizeObserver",
+    class {
+      constructor(private callback: ResizeObserverCallback) {}
+      observe(target: Element) {
+        this.callback(
+          [{ target, contentRect: { width: 1000, height: 600 } } as any],
+          this as any
+        )
+      }
+      unobserve() {}
+      disconnect() {}
+    }
+  )
+  vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+    frames.push(callback)
+    return frames.length
+  })
+  vi.stubGlobal("cancelAnimationFrame", () => {})
+  Element.prototype.setPointerCapture = vi.fn()
+  Element.prototype.releasePointerCapture = vi.fn()
+  Element.prototype.hasPointerCapture = vi.fn(() => true)
+}
+const runFrames = () => {
+  const due = frames
+  frames = []
+  for (const callback of due) callback(0)
+}
+const pieces = (root: HTMLElement) =>
+  all(root, "world-map-piece").map((img) => img.getAttribute("src") ?? "")
+/** The image of the piece at region `x, z` of scale 0, by its address. */
+const pieceAt = (root: HTMLElement, x: number, z: number) =>
+  all(root, "world-map-piece").find((img) =>
+    img.getAttribute("src")?.includes(`&scale=0&x=${x}&z=${z}&`)
+  )
+const drag = (map: HTMLElement, dx: number, dy: number) => {
+  const at = (type: string, x: number, y: number, buttons = 1) =>
+    map.dispatchEvent(
+      new PointerEvent(type, {
+        pointerId: 1,
+        button: 0,
+        buttons,
+        clientX: x,
+        clientY: y,
+        bubbles: true
+      })
+    )
+  at("pointerdown", 500, 300)
+  at("pointermove", 500 + dx, 300 + dy)
+  runFrames()
+  at("pointerup", 500 + dx, 300 + dy, 0)
+}
+const escape = () =>
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true })
+  )
+
+it("the map is asked only once its panel is on screen", async () => {
+  installObserver()
+  const root = mount([world("Alpha", [])])
+  await flush()
+  expect(one(root, "world-map-panel")).not.toBeNull()
+  expect(io.mapAsked).toEqual([])
+
+  intersect(true)
+  await flush()
+  expect(io.mapAsked).toEqual([{ instance_id: 5, world: "Alpha" }])
+  expect(io.queryOptions["instance.getWorldMap"].queryKey).toEqual([
+    "instance.getWorldMap",
+    { instance_id: 5, world: "Alpha" }
+  ])
+  // Once seen, the world's facts stay loaded off screen.
+  intersect(false)
+  await flush()
+  expect(io.queryOptions["instance.getWorldMap"].enabled).toBe(true)
+  expect(io.mapAsked).toHaveLength(1)
+})
+
+it("a world the launcher cannot read has no map panel and asks nothing", async () => {
+  const root = mount([world("Broken", [pack("x")], null)])
+  await flush()
+  expect(one(root, "world-unreadable")).not.toBeNull()
+  expect(one(root, "world-map-panel")).toBeNull()
+  expect(io.mapAsked).toEqual([])
+})
+
+it("a new world shows an empty panel and no text", async () => {
+  const root = mount([world("Alpha", [pack("loose")])])
+  await flush()
+  expect(io.mapAsked).toHaveLength(1)
+  const panel = one(root, "world-map-panel")!
+  expect(panel.textContent).toBe("")
+  expect(one(root, "world-map")).toBeNull()
+  expect(panel.classList.contains("h-[280px]")).toBe(true)
+  // The data pack table stays beneath it.
+  expect(one(root, "world-datapack")).not.toBeNull()
+})
+
+it("a refused map read leaves the panel empty without a toast of its own", async () => {
+  io.mapAnswer.mockRejectedValue(new Error("WorldGone"))
+  const root = mount([world("Alpha", [])])
+  await flush()
+  expect(io.mapAsked).toHaveLength(1)
+  expect(one(root, "world-map-panel")!.textContent).toBe("")
+  expect(io.toastError).not.toHaveBeenCalled()
+})
+
+it.each([
+  ["TooOld", "content:_trn_worlds.map.too_old"],
+  ["NotRegions", "content:_trn_worlds.map.not_regions"],
+  ["Unreadable", "content:_trn_worlds.unreadable"]
+] as const)("each reason shows its one line: %s", async (reason, key) => {
+  answerMaps({ Alpha: { ...NO_MAP, unmappable: reason } })
+  const root = mount([world("Alpha", [])])
+  await flush()
+  expect(one(root, "world-map-reason")!.textContent).toBe(key)
+  expect(one(root, "world-map-panel")!.textContent).toBe(key)
+  expect(one(root, "world-map")).toBeNull()
+})
+
+it("fill takes the whole tab and Escape gives it back", async () => {
+  const { default: WorldsRouteWrapper, isMapFilled } =
+    await import("./WorldsRouteWrapper")
+  const wrapper = document.createElement("div")
+  document.body.append(wrapper)
+  const disposeWrapper = render(() => <WorldsRouteWrapper />, wrapper)
+  const height = () => (wrapper.firstElementChild as HTMLElement).style.height
+  expect(height()).toBe("calc(100vh - 396px)")
+
+  answerMaps({ Alpha: mapOf(), Beta: mapOf() })
+  const root = mount([world("Alpha", [pack("loose")]), world("Beta", [])])
+  await flush()
+  const panel = one(root, "world-map-panel")!
+  const fill = () => one(root, "world-map-fill")!.click()
+
+  fill()
+  await flush()
+  expect(isMapFilled()).toBe(true)
+  expect(height()).toBe("calc(100vh - 155px)")
+  expect(panel.classList.contains("h-[280px]")).toBe(false)
+  expect(one(root, "world-datapack")).toBeNull()
+  const tableHead = () =>
+    all(root, "world-map-panel")[0].nextElementSibling?.textContent ?? ""
+  expect(tableHead()).not.toContain("content:_trn_worlds.datapack")
+  expect(title(root)).toBe("Alpha")
+
+  escape()
+  await flush()
+  expect(isMapFilled()).toBe(false)
+  expect(height()).toBe("calc(100vh - 396px)")
+  expect(panel.classList.contains("h-[280px]")).toBe(true)
+  expect(one(root, "world-datapack")).not.toBeNull()
+  expect(tableHead()).toContain("content:_trn_worlds.datapack")
+
+  // An open menu takes the Escape for itself.
+  fill()
+  await flush()
+  const menu = document.createElement("div")
+  menu.setAttribute("role", "menu")
+  document.body.append(menu)
+  escape()
+  await flush()
+  expect(isMapFilled()).toBe(true)
+  menu.remove()
+  // The icon gives it back too.
+  fill()
+  await flush()
+  expect(isMapFilled()).toBe(false)
+
+  // Another world starts at the normal size.
+  fill()
+  await flush()
+  select(root, "Beta")
+  await flush()
+  expect(isMapFilled()).toBe(false)
+
+  // Leaving the tab gives the page back.
+  fill()
+  await flush()
+  expect(isMapFilled()).toBe(true)
+  dispose?.()
+  dispose = undefined
+  expect(isMapFilled()).toBe(false)
+  disposeWrapper()
+})
+
+it("another world starts its own map and the previous one's pieces are gone", async () => {
+  installMapSize()
+  const beta = deferred<FEWorldMap>()
+  answerMaps({
+    Alpha: mapOf({ dimensions: [explored(OVERWORLD), explored(AETHER)] }),
+    Beta: beta.promise
+  })
+  const root = mount([world("Alpha", []), world("Beta", [])])
+  await flush()
+  expect(pieces(root).length).toBeGreaterThan(0)
+  expect(pieces(root).every((src) => src.includes("world=Alpha&"))).toBe(true)
+  const dimensionSelect = () =>
+    one(root, "world-map-dimension-select") as HTMLSelectElement | null
+  dimensionSelect()!.value = AETHER
+  dimensionSelect()!.dispatchEvent(new Event("change", { bubbles: true }))
+  await flush()
+  expect(dimensionSelect()!.value).toBe(AETHER)
+
+  select(root, "Beta")
+  await flush()
+  expect(io.mapAsked).toContainEqual({ instance_id: 5, world: "Beta" })
+  // Nothing of Alpha is shown while Beta's facts are read.
+  expect(one(root, "world-map")).toBeNull()
+  expect(pieces(root)).toEqual([])
+  // Alpha's facts are still its own when it is selected again meanwhile.
+  select(root, "Alpha")
+  await flush()
+  expect(pieces(root).length).toBeGreaterThan(0)
+  expect(pieces(root).every((src) => src.includes("world=Alpha&"))).toBe(true)
+  select(root, "Beta")
+  await flush()
+  expect(one(root, "world-map")).toBeNull()
+
+  beta.resolve(mapOf())
+  await flush()
+  expect(pieces(root).length).toBeGreaterThan(0)
+  expect(pieces(root).every((src) => src.includes("world=Beta&"))).toBe(true)
+
+  // Back on Alpha, the choice of dimension was dropped.
+  select(root, "Alpha")
+  await flush()
+  expect(dimensionSelect()!.value).toBe(OVERWORLD)
+
+  // Another instance starts over as well.
+  setParams("id", "6")
+  await flush()
+  expect(io.mapAsked.at(-1)).toEqual({ instance_id: 6, world: "Alpha" })
+})
+
+it("a renamed world keeps its map view", async () => {
+  installMapSize()
+  const renamed = deferred<FEWorldMap>()
+  answerMaps({ "New World": mapOf(), "Season 2": renamed.promise })
+  const root = mount([
+    world("Alpha", []),
+    world("New World", [], "id-new", "Skyblock")
+  ])
+  await flush()
+  select(root, "Skyblock")
+  await flush()
+  const map = one(root, "world-map")!
+  drag(map, -100, 0)
+  await flush()
+  const left = pieceAt(root, 0, 0)!.style.left
+  const top = pieceAt(root, 0, 0)!.style.top
+
+  io.mutateAsync["instance.renameWorld"].mockResolvedValue("Season 2")
+  io.refetchWorlds.mockImplementation(async () =>
+    setState("worlds", [
+      world("Alpha", []),
+      world("Season 2", [], "id-new", "Season 2")
+    ])
+  )
+  one(root, "world-rename")!.click()
+  await flush()
+  typeInto(field(root)!, "Season 2")
+  press(field(root)!, "Enter")
+  await flush()
+  expect(title(root)).toBe("Season 2")
+  expect(io.mapAsked).toContainEqual({ instance_id: 5, world: "Season 2" })
+  // The same map, at the same view, now asking the new folder.
+  expect(one(root, "world-map")).toBe(map)
+  expect(pieceAt(root, 0, 0)!.getAttribute("src")).toContain(
+    "world=Season%202&"
+  )
+  expect(pieceAt(root, 0, 0)!.style.left).toBe(left)
+  expect(pieceAt(root, 0, 0)!.style.top).toBe(top)
+
+  renamed.resolve(mapOf())
+  await flush()
+  expect(one(root, "world-map")).toBe(map)
+  expect(pieceAt(root, 0, 0)!.style.left).toBe(left)
+})
+
+it("the lists being read again reads the map again", async () => {
+  const root = mount([world("Alpha", [pack("loose")])], { recycleBin: true })
+  await flush()
+  expect(io.mapAsked).toHaveLength(1)
+  io.mutateAsync["instance.deleteWorldDatapack"].mockResolvedValue(null)
+  one(root, "world-datapack-remove")!.click()
+  await flush()
+  expect(io.refetchWorlds).toHaveBeenCalled()
+  expect(io.mapAsked).toEqual([
+    { instance_id: 5, world: "Alpha" },
+    { instance_id: 5, world: "Alpha" }
+  ])
+})
+
+it("the lists being read again asks no map that was never on screen", async () => {
+  installObserver()
+  const root = mount([world("Alpha", [pack("loose")])], { recycleBin: true })
+  await flush()
+  io.mutateAsync["instance.deleteWorldDatapack"].mockResolvedValue(null)
+  one(root, "world-datapack-remove")!.click()
+  await flush()
+  expect(io.refetchWorlds).toHaveBeenCalled()
+  expect(io.mapAsked).toEqual([])
+})
+
+it("the dimension names are translated for the three vanilla ones and shown by id otherwise", async () => {
+  answerMaps({
+    Alpha: mapOf({
+      dimensions: [
+        explored(OVERWORLD),
+        explored(NETHER),
+        explored(END),
+        explored(AETHER)
+      ]
+    })
+  })
+  const root = mount([world("Alpha", [])])
+  await flush()
+  const options = [
+    ...(one(root, "world-map-dimension-select") as HTMLSelectElement).options
+  ].map((option) => option.textContent)
+  expect(options).toEqual([
+    "content:_trn_worlds.map.overworld",
+    "content:_trn_worlds.map.nether",
+    "content:_trn_worlds.map.end",
+    AETHER
+  ])
+})
+
+it.each([
+  ["the player's when they were in one", NETHER, NETHER],
+  ["the first when the player's has no region", END, OVERWORLD],
+  ["the first without a last position", null, OVERWORLD]
+])("the dimension shown is %s", async (_, playerIn, shown) => {
+  answerMaps({
+    Alpha: mapOf({
+      dimensions: [explored(OVERWORLD), explored(NETHER)],
+      player: playerIn ? { dimension: playerIn, x: 3, z: 4 } : null
+    })
+  })
+  const root = mount([world("Alpha", [])])
+  await flush()
+  expect(
+    (one(root, "world-map-dimension-select") as HTMLSelectElement).value
+  ).toBe(shown)
 })

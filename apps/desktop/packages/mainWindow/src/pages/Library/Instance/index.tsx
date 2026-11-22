@@ -52,6 +52,7 @@ import {
 } from "@/managers/ModalsManager/modals/InstanceExport"
 import { setCheckedFiles } from "@/managers/ModalsManager/modals/InstanceExport/atoms/ExportCheckboxParent"
 import { isFullScreen } from "./Tabs/Log"
+import { isMapFilled } from "./Tabs/Worlds/WorldsRouteWrapper"
 import FeatureStatusBadge from "@/components/FeatureStatusBadge"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import DetailPageLayout, {
@@ -840,7 +841,7 @@ const Instance = (props: { children?: any }) => {
         </Tooltip>
       }
       noPaddingPaths={["/addons", "/worlds", "/logs"]}
-      isFullScreen={isFullScreen}
+      isFullScreen={() => isFullScreen() || isMapFilled()}
     >
       <Show when={duplicatedMods().length > 0}>
         <div
