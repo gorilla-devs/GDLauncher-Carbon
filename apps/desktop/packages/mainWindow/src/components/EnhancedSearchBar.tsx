@@ -92,18 +92,21 @@ export function EnhancedSearchBar(props: { size?: number }) {
     >
       <div
         data-gdl="nav.search.box"
-        class="bg-darkSlate-700 outline-2 outline outline-offset-2 outline-transparent has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 flex max-w-[min(600px,100%)] items-center gap-2 overflow-hidden rounded-md duration-300"
+        class="bg-darkSlate-700 outline-2 outline outline-offset-2 outline-transparent has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 flex max-w-[min(600px,100%)] items-center overflow-hidden rounded-md duration-300"
         style={{
           height: `${props.size ?? 40}px`,
           transition:
-            "width 300ms cubic-bezier(0.4, 0, 0.2, 1), padding 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), outline-color 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+            "width 300ms cubic-bezier(0.4, 0, 0.2, 1), padding 300ms cubic-bezier(0.4, 0, 0.2, 1), column-gap 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), outline-color 150ms cubic-bezier(0.4, 0, 0.2, 1)",
           "will-change": "width, padding",
           contain: "layout",
           transform: "translateZ(0)"
         }}
+        // Collapsed, the dropdown, dividers and buttons are zero-wide: no gap
+        // around them, or the gaps eat the placeholder's room. The gaps come
+        // back with them as the box expands.
         classList={{
-          "w-80 px-4": !isExpanded(),
-          "w-full px-2": isExpanded()
+          "w-80 px-4 gap-0": !isExpanded(),
+          "w-full px-2 gap-2": isExpanded()
         }}
       >
         <div
@@ -125,14 +128,17 @@ export function EnhancedSearchBar(props: { size?: number }) {
           }}
         />
 
-        <div class="i-hugeicons:search-01 text-darkSlate-400 h-5 w-5 shrink-0" />
+        <div
+          class="i-hugeicons:search-01 text-darkSlate-400 h-5 w-5 shrink-0 transition-[margin] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+          classList={{ "mr-2": !isExpanded() }}
+        />
 
         <Show when={!isExpanded()}>
           <input
             ref={simpleInputRef}
             data-testid="search-input"
             placeholder={t("search:_trn_search_discover_anything")}
-            class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 cursor-pointer bg-transparent text-sm outline-none"
+            class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 text-ellipsis cursor-pointer bg-transparent text-sm outline-none"
             value=""
             readOnly
             onClick={handleSimpleClick}
@@ -147,7 +153,7 @@ export function EnhancedSearchBar(props: { size?: number }) {
             ref={expandedInputRef}
             data-testid="search-input"
             placeholder={t("search:_trn_search_discover_anything")}
-            class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
+            class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 text-ellipsis bg-transparent text-sm outline-none"
             value={searchResults?.searchQuery().searchQuery ?? ""}
             onInput={(e) => {
               searchResults?.setSearchQuery((prev) => ({

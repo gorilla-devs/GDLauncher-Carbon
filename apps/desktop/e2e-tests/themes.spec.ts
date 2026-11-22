@@ -1866,6 +1866,36 @@ test.describe("Themes", () => {
       selector
     )
 
+  // The collapsed search box shows its whole placeholder in English, and
+  // ends in an ellipsis wherever it can't (a longer language, a narrower box).
+  test("the search box's placeholder fits", async ({ authenticatedApp }) => {
+    const { page } = authenticatedApp
+    await goToLibrary(page)
+    const input = page.locator(byTestId(TEST_IDS.searchInput)).first()
+    await expect(input).toBeVisible()
+    await page.waitForTimeout(400)
+    const fit = await input.evaluate((el) => {
+      const input = el as HTMLInputElement
+      const s = getComputedStyle(input)
+      const ctx = document.createElement("canvas").getContext("2d")!
+      ctx.font = `${s.fontWeight} ${s.fontSize} ${s.fontFamily}`
+      const room =
+        input.clientWidth -
+        parseFloat(s.paddingLeft) -
+        parseFloat(s.paddingRight)
+      return {
+        text: Math.ceil(ctx.measureText(input.placeholder).width),
+        room,
+        overflow: s.textOverflow
+      }
+    })
+    expect(
+      fit.text,
+      `placeholder ${fit.text}px, room ${fit.room}px`
+    ).toBeLessThanOrEqual(fit.room)
+    expect(fit.overflow).toBe("ellipsis")
+  })
+
   // Each filter section keeps to the sidebar's width, whatever its longest
   // label: a truncated name must not widen its section past the others.
   test("every Search filter section keeps to the sidebar's width", async ({
