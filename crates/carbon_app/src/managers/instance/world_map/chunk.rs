@@ -26,7 +26,6 @@ const ROOF_COLUMNS: usize = 200;
 
 const EMPTY: Surface = [None; 256];
 
-#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Copy, PartialEq, Debug)]
 pub(super) struct Top {
     pub color: Rgb,
@@ -35,10 +34,8 @@ pub(super) struct Top {
 }
 
 /// Indexed `z * 16 + x`; `None` where the column shows nothing.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) type Surface = [Option<Top>; 256];
 
-#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(super) enum Roof {
     Open,
@@ -52,25 +49,37 @@ pub(super) enum Roof {
 /// without it ids from 256 up are mods'.
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, legacy: Option<&LegacyIds>) -> Surface {
-    let Ok(root) = nbt::read_keeping(chunk_nbt, &keep, LIMITS) else {
-        return EMPTY;
-    };
+    surface_checked(chunk_nbt, roof, legacy).unwrap_or(EMPTY)
+}
+
+/// A chunk that could not be read: its bytes or its shape do not hold together.
+#[derive(Debug, PartialEq, Eq)]
+pub(super) struct Unreadable;
+
+/// As `surface`, telling a chunk that could not be read from one the game has not finished,
+/// which is empty and no error.
+pub(super) fn surface_checked(
+    chunk_nbt: &[u8],
+    roof: Roof,
+    legacy: Option<&LegacyIds>,
+) -> Result<Surface, Unreadable> {
+    let root = nbt::read_keeping(chunk_nbt, &keep, LIMITS).map_err(|_| Unreadable)?;
     // Each chunk is read by its own shape: a region upgraded in part holds both.
     let column = if let Some(sections) = root.tag.get("sections") {
-        if !finished(root.tag.get("Status"), FINISHED) {
-            return EMPTY;
+        if !finished(root.tag.get("Status"), FINISHED)? {
+            return Ok(EMPTY);
         }
         let Tag::List { items, .. } = sections else {
-            return EMPTY;
+            return Err(Unreadable);
         };
         Column::new(items, Section::read)
     } else if let Some(level) = root.tag.get("Level") {
         // A chunk of 1.12.2 and earlier has no status: it is read as finished.
-        if !finished(level.get("Status"), FINISHED_LEVEL) {
-            return EMPTY;
+        if !finished(level.get("Status"), FINISHED_LEVEL)? {
+            return Ok(EMPTY);
         }
         let Some(Tag::List { items, .. }) = level.get("Sections") else {
-            return EMPTY;
+            return Err(Unreadable);
         };
         // All of a chunk's sections are of one shape.
         let shape = Cell::new(None);
@@ -89,10 +98,13 @@ pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, legacy: Option<&LegacyIds>) 
             }
         })
     } else {
-        return EMPTY;
+        return Err(Unreadable);
     };
-    let Some(column) = column else {
-        return EMPTY;
+    let column = match column {
+        Ok(Some(column)) => column,
+        // A finished chunk of only air has no sections.
+        Ok(None) => return Ok(EMPTY),
+        Err(IllFormed) => return Err(Unreadable),
     };
     let open = std::array::from_fn(|i| column.top(i, Roof::Open));
     let bedrock = open
@@ -100,11 +112,11 @@ pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, legacy: Option<&LegacyIds>) 
         .flatten()
         .filter(|(_, bedrock)| *bedrock)
         .count();
-    if roof == Roof::Ceiling || bedrock >= ROOF_COLUMNS {
+    Ok(if roof == Roof::Ceiling || bedrock >= ROOF_COLUMNS {
         std::array::from_fn(|i| column.top(i, Roof::Ceiling).map(|(top, _)| top))
     } else {
         open.map(|top: Option<(Top, bool)>| top.map(|(top, _)| top))
-    }
+    })
 }
 
 /// The statuses of a finished chunk of 1.18 and later.
@@ -113,12 +125,13 @@ const FINISHED: &[&[u8]] = &[b"minecraft:full", b"full"];
 /// The same for 1.13 to 1.17, where 1.13 has names of its own.
 const FINISHED_LEVEL: &[&[u8]] = &[b"minecraft:full", b"full", b"postprocessed", b"fullchunk"];
 
-/// A chunk of either shape without a status is read as finished.
-fn finished(status: Option<&Tag>, names: &[&[u8]]) -> bool {
+/// A chunk of either shape without a status is read as finished; a status that is no name
+/// does not hold together.
+fn finished(status: Option<&Tag>, names: &[&[u8]]) -> Result<bool, Unreadable> {
     match status {
-        None => true,
-        Some(Tag::String(status)) => names.contains(&status.as_slice()),
-        Some(_) => false,
+        None => Ok(true),
+        Some(Tag::String(status)) => Ok(names.contains(&status.as_slice())),
+        Some(_) => Err(Unreadable),
     }
 }
 
@@ -398,17 +411,20 @@ struct Column {
 }
 
 impl Column {
-    /// `None` when there are no sections at all, a section's `Y` is out of the game's range or
-    /// a section is ill-formed.
-    fn new(sections: &[Tag], read_section: impl Fn(&Tag) -> SectionRead) -> Option<Column> {
+    /// `None` when there are no sections at all; ill-formed when a section's `Y` is out of
+    /// the game's range or a section is ill-formed.
+    fn new(
+        sections: &[Tag],
+        read_section: impl Fn(&Tag) -> SectionRead,
+    ) -> Result<Option<Column>, IllFormed> {
         let mut read: Vec<(i8, &Tag)> = Vec::new();
         let mut seen = [false; 256];
         for section in sections {
             let Some(Tag::Byte(y)) = section.get("Y") else {
-                return None;
+                return Err(IllFormed);
             };
             if !SECTION_YS.contains(y) {
-                return None;
+                return Err(IllFormed);
             }
             // The first of two sections at one height is the one kept.
             let slot = &mut seen[(*y as u8) as usize];
@@ -417,16 +433,20 @@ impl Column {
                 read.push((*y, section));
             }
         }
-        let lowest = read.iter().map(|(y, _)| *y).min()?;
-        let highest = read.iter().map(|(y, _)| *y).max()?;
+        let (Some(lowest), Some(highest)) = (
+            read.iter().map(|(y, _)| *y).min(),
+            read.iter().map(|(y, _)| *y).max(),
+        ) else {
+            return Ok(None);
+        };
         let mut column: Vec<Option<Section>> = (lowest..=highest).map(|_| None).collect();
         for (y, section) in read {
-            column[(i16::from(y) - i16::from(lowest)) as usize] = read_section(section).ok()?;
+            column[(i16::from(y) - i16::from(lowest)) as usize] = read_section(section)?;
         }
-        Some(Column {
+        Ok(Some(Column {
             lowest,
             sections: column,
-        })
+        }))
     }
 
     /// The top visible block of column `i` (`z * 16 + x`) and whether it is bedrock. Under a
@@ -458,4 +478,4 @@ impl Column {
 }
 
 #[cfg(test)]
-mod tests;
+pub(super) mod tests;

@@ -13,21 +13,18 @@ const SECTOR: usize = 4096;
 const HEADER: usize = 2 * SECTOR;
 
 /// A region file above this size is left empty.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) const MAX_REGION_BYTES: u64 = 256 * 1024 * 1024;
 /// A chunk inflating past this size is left empty.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) const MAX_CHUNK_BYTES: usize = 32 * 1024 * 1024;
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) struct Region {
     bytes: Vec<u8>,
 }
 
-#[cfg_attr(not(test), allow(dead_code))]
 impl Region {
     /// `None` for a missing file, a link, anything but a regular file, a file shorter
     /// than the two header sectors or one above `MAX_REGION_BYTES`.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn read(path: &Path) -> std::io::Result<Option<Region>> {
         let meta = match std::fs::symlink_metadata(path) {
             Ok(meta) => meta,
@@ -193,13 +190,13 @@ fn inflate_into(mut reader: impl Read, cap: usize, out: &mut Vec<u8>) -> bool {
 }
 
 #[cfg(test)]
-mod test {
+pub(super) mod test {
     use super::*;
-    use flate2::write::{GzEncoder, ZlibEncoder};
     use flate2::Compression;
+    use flate2::write::{GzEncoder, ZlibEncoder};
     use std::io::Write;
 
-    fn zlib(data: &[u8]) -> Vec<u8> {
+    pub(in super::super) fn zlib(data: &[u8]) -> Vec<u8> {
         let mut e = ZlibEncoder::new(Vec::new(), Compression::default());
         e.write_all(data).unwrap();
         e.finish().unwrap()
@@ -213,7 +210,7 @@ mod test {
 
     /// A region file holding the given chunks (x, z, kind byte, stored data), each
     /// in the sectors it needs, laid out one after the other from sector 2.
-    fn region_bytes(chunks: &[(u8, u8, u8, Vec<u8>)]) -> Vec<u8> {
+    pub(in super::super) fn region_bytes(chunks: &[(u8, u8, u8, Vec<u8>)]) -> Vec<u8> {
         let mut bytes = vec![0u8; HEADER];
         for (x, z, kind, data) in chunks {
             let sector = bytes.len() / SECTOR;
@@ -230,7 +227,7 @@ mod test {
         bytes
     }
 
-    fn region_of(bytes: Vec<u8>) -> Region {
+    pub(in super::super) fn region_of(bytes: Vec<u8>) -> Region {
         Region { bytes }
     }
 
@@ -400,9 +397,11 @@ mod test {
         assert!(Region::read(&short).unwrap().is_none());
 
         assert!(Region::read(dir.path()).unwrap().is_none());
-        assert!(Region::read(&dir.path().join("missing.mca"))
-            .unwrap()
-            .is_none());
+        assert!(
+            Region::read(&dir.path().join("missing.mca"))
+                .unwrap()
+                .is_none()
+        );
 
         let real = dir.path().join("r.0.0.mca");
         std::fs::write(&real, region_bytes(&[(0, 0, 2, zlib(NBT))])).unwrap();

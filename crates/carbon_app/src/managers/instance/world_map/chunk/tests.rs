@@ -76,7 +76,10 @@ fn chunk_with(sections: Vec<Tag>, status: &str) -> Vec<u8> {
 }
 
 /// A chunk of 1.18 and later; an empty index list means a palette of one with no `data`.
-fn chunk_1_18(sections: Vec<(i8, Vec<&str>, Vec<u16>)>, status: &str) -> Vec<u8> {
+pub(in super::super) fn chunk_1_18(
+    sections: Vec<(i8, Vec<&str>, Vec<u16>)>,
+    status: &str,
+) -> Vec<u8> {
     let sections = sections
         .into_iter()
         .map(|(y, palette, indices)| {
@@ -88,7 +91,7 @@ fn chunk_1_18(sections: Vec<(i8, Vec<&str>, Vec<u16>)>, status: &str) -> Vec<u8>
 }
 
 /// 4096 indices in the game's order, `y * 256 + z * 16 + x`.
-fn fill(index_at: impl Fn(usize, usize, usize) -> u16) -> Vec<u16> {
+pub(in super::super) fn fill(index_at: impl Fn(usize, usize, usize) -> u16) -> Vec<u16> {
     (0..4096)
         .map(|i| index_at(i % 16, i / 256, (i / 16) % 16))
         .collect()
@@ -109,7 +112,7 @@ fn top(name: &str, y: i16) -> Option<Top> {
     })
 }
 
-const FULL: &str = "minecraft:full";
+pub(in super::super) const FULL: &str = "minecraft:full";
 
 /// Stone up to 63 and grass at 64 where `x < 8`; air above.
 fn terrain() -> Vec<(i8, Vec<&'static str>, Vec<u16>)> {
@@ -1686,4 +1689,39 @@ fn real_chunks_show_terrain() {
     println!("all worlds: {} colours, water seen: {water}", colors.len());
     assert!(water, "no water");
     assert!(colors.len() >= 20, "too few colours");
+}
+
+#[test]
+fn an_unfinished_chunk_is_told_from_an_unreadable_one() {
+    let read = |bytes: &[u8]| surface_checked(bytes, Roof::Open, None);
+    let unfinished = chunk_1_18(
+        vec![(0, vec!["minecraft:stone"], vec![])],
+        "minecraft:features",
+    );
+    assert_eq!(read(&unfinished), Ok(EMPTY));
+    let unfinished_level = level_chunk_with(vec![], "carved");
+    assert_eq!(read(&unfinished_level), Ok(EMPTY));
+    // An old chunk of only air has no sections at all.
+    assert_eq!(read(&numeric_chunk(vec![], None)), Ok(EMPTY));
+
+    let good = chunk_1_18(terrain(), FULL);
+    assert_terrain(&read(&good).unwrap());
+
+    assert_eq!(read(b"not nbt at all"), Err(Unreadable));
+    let unknown_shape = nbt::write(&Root {
+        name: Vec::new(),
+        tag: compound(vec![("DataVersion", Tag::Int(3465))]),
+    });
+    assert_eq!(read(&unknown_shape), Err(Unreadable));
+    let ground = section(0, &["minecraft:stone"], None);
+    let bad = compound(vec![("Y", Tag::Byte(1)), ("block_states", Tag::Int(3))]);
+    assert_eq!(read(&chunk_with(vec![ground, bad], FULL)), Err(Unreadable));
+    let odd_status = nbt::write(&Root {
+        name: Vec::new(),
+        tag: compound(vec![
+            ("sections", compounds(vec![])),
+            ("Status", Tag::Int(1)),
+        ]),
+    });
+    assert_eq!(read(&odd_status), Err(Unreadable));
 }
