@@ -1335,7 +1335,7 @@ struct WorldMapPieceQuery {
 }
 
 /// One piece of a world's map as a PNG. Its address changes whenever the piece does, so the
-/// desktop may keep it for good.
+/// desktop may keep a whole one for good; nothing there, the world included, is 204.
 async fn world_map_piece(
     State(app): State<Arc<AppInner>>,
     Query(query): Query<WorldMapPieceQuery>,
@@ -1356,15 +1356,20 @@ async fn world_map_piece(
         .await
         .map_err(|e| FeError::from_anyhow(&e).make_axum())?;
     Ok(match piece {
-        Some(png) => (
+        Some(piece) => (
             [
                 (axum::http::header::CONTENT_TYPE, "image/png"),
                 (
                     axum::http::header::CACHE_CONTROL,
-                    "private, max-age=31536000, immutable",
+                    // A piece with a hole is painted again when asked again.
+                    if piece.complete {
+                        "private, max-age=31536000, immutable"
+                    } else {
+                        "no-store"
+                    },
                 ),
             ],
-            png,
+            piece.png,
         )
             .into_response(),
         None => StatusCode::NO_CONTENT.into_response(),
@@ -3849,7 +3854,7 @@ impl From<manager::KeptAddonCopy> for FEKeptAddonCopy {
 #[cfg(test)]
 mod world_map_piece_route_tests {
     use super::*;
-    use crate::managers::instance::world_map::service::test_world;
+    use crate::managers::instance::world_map::service::test_world_with_faults;
 
     async fn answer(app: &App, query: &str) -> axum::response::Response {
         let uri: axum::http::Uri = format!("/worldMapPiece?{query}").parse().unwrap();
@@ -3859,10 +3864,22 @@ mod world_map_piece_route_tests {
             .into_response()
     }
 
+    async fn png_with_cache(answer: axum::response::Response) -> String {
+        assert_eq!(answer.status(), StatusCode::OK);
+        let headers = answer.headers();
+        assert_eq!(headers["content-type"], "image/png");
+        let cache = headers["cache-control"].to_str().unwrap().to_owned();
+        let body = axum::body::to_bytes(answer.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        assert!(body.starts_with(b"\x89PNG"));
+        cache
+    }
+
     #[tokio::test]
-    async fn a_piece_is_a_png_kept_for_good_and_nothing_is_no_content() {
+    async fn a_whole_piece_is_kept_for_good_one_with_a_hole_not_and_nothing_is_no_content() {
         let app = crate::setup_managers_for_test().await;
-        let id = test_world(&app, "map-route").await;
+        let id = test_world_with_faults(&app, "map-route").await;
         let at = |scale: u32, x: i32| {
             format!(
                 "instance_id={}&world=Home&dimension=minecraft%3Aoverworld&scale={scale}&x={x}&z=0&rev=a1",
@@ -3870,20 +3887,18 @@ mod world_map_piece_route_tests {
             )
         };
 
-        let found = answer(&app, &at(0, 0)).await;
-        assert_eq!(found.status(), StatusCode::OK);
-        let headers = found.headers();
-        assert_eq!(headers["content-type"], "image/png");
         assert_eq!(
-            headers["cache-control"],
+            png_with_cache(answer(&app, &at(0, 0)).await).await,
             "private, max-age=31536000, immutable"
         );
-        let body = axum::body::to_bytes(found.into_body(), usize::MAX)
-            .await
-            .unwrap();
-        assert!(body.starts_with(b"\x89PNG"));
+        assert_eq!(
+            png_with_cache(answer(&app, &at(0, 1)).await).await,
+            "no-store"
+        );
 
-        for query in [at(0, 7), at(5, 0), at(300, 0)] {
+        let gone = at(0, 0).replace("world=Home", "world=Missing");
+        let no_dimension = at(0, 0).replace("minecraft%3Aoverworld", "minecraft%3Athe_end");
+        for query in [at(0, 7), at(5, 0), at(300, 0), gone, no_dimension] {
             let nothing = answer(&app, &query).await;
             assert_eq!(nothing.status(), StatusCode::NO_CONTENT, "{query}");
             assert!(nothing.headers().get("content-type").is_none());
@@ -3894,8 +3909,11 @@ mod world_map_piece_route_tests {
             assert!(body.is_empty());
         }
 
-        let gone = answer(&app, &at(0, 0).replace("world=Home", "world=Missing")).await;
-        assert_eq!(gone.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        #[cfg(unix)]
+        {
+            let unreadable = answer(&app, &at(0, 2)).await;
+            assert_eq!(unreadable.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        }
     }
 }
 

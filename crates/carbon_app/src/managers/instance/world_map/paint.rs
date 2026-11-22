@@ -99,39 +99,46 @@ fn shade(top: &Top, north: Option<Top>) -> Rgba<u8> {
     Rgba([r, g, b, 255])
 }
 
-/// Four pieces, north-west, north-east, south-west and south-east, as one at half scale.
-/// Each pixel is the mean of the opaque ones of four, so the edge of what was explored is not
-/// darkened; a missing piece is transparent.
-pub(super) fn join(children: [Option<&RgbaImage>; 4]) -> RgbaImage {
-    let half = PIECE / 2;
+/// Four pieces, north-west, north-east, south-west and south-east, as one at half scale; a
+/// missing piece is transparent.
+#[cfg(test)]
+fn join(children: [Option<&RgbaImage>; 4]) -> RgbaImage {
     let mut image = RgbaImage::new(PIECE, PIECE);
-    for (n, child) in children.into_iter().enumerate() {
-        let Some(child) = child else {
-            continue;
-        };
-        let (left, top) = ((n as u32 % 2) * half, (n as u32 / 2) * half);
-        for y in 0..half {
-            for x in 0..half {
-                let (mut sum, mut count) = ([0u32; 3], 0u32);
-                for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
-                    let Some(pixel) = child.get_pixel_checked(x * 2 + dx, y * 2 + dy) else {
-                        continue;
-                    };
-                    if pixel[3] != 0 {
-                        for (total, channel) in sum.iter_mut().zip(pixel.0) {
-                            *total += u32::from(channel);
-                        }
-                        count += 1;
-                    }
-                }
-                if count > 0 {
-                    let [r, g, b] = sum.map(|total| ((total + count / 2) / count) as u8);
-                    image.put_pixel(left + x, top + y, Rgba([r, g, b, 255]));
-                }
-            }
+    for (quarter, child) in children.into_iter().enumerate() {
+        if let Some(child) = child {
+            fold(&mut image, quarter, child);
         }
     }
     image
+}
+
+/// Draws `child` at half scale into the `quarter` of `parent` it covers (0 north-west, 1
+/// north-east, 2 south-west, 3 south-east), so a parent is built one child at a time. Each
+/// pixel is the mean of the opaque ones of four, so the edge of what was explored is not
+/// darkened.
+pub(super) fn fold(parent: &mut RgbaImage, quarter: usize, child: &RgbaImage) {
+    let half = PIECE / 2;
+    let (left, top) = ((quarter as u32 % 2) * half, (quarter as u32 / 2) * half);
+    for y in 0..half {
+        for x in 0..half {
+            let (mut sum, mut count) = ([0u32; 3], 0u32);
+            for (dx, dy) in [(0, 0), (1, 0), (0, 1), (1, 1)] {
+                let Some(pixel) = child.get_pixel_checked(x * 2 + dx, y * 2 + dy) else {
+                    continue;
+                };
+                if pixel[3] != 0 {
+                    for (total, channel) in sum.iter_mut().zip(pixel.0) {
+                        *total += u32::from(channel);
+                    }
+                    count += 1;
+                }
+            }
+            if count > 0 {
+                let [r, g, b] = sum.map(|total| ((total + count / 2) / count) as u8);
+                parent.put_pixel(left + x, top + y, Rgba([r, g, b, 255]));
+            }
+        }
+    }
 }
 
 /// A piece as PNG, compressed little: pieces are kept, so painting them fast matters more.
@@ -499,8 +506,9 @@ mod tests {
         Rgba([r, g, b, 255])
     }
 
-    #[test]
-    fn four_pieces_join_at_half_size() {
+    /// North-west, north-east and south-east pieces whose joined pixels are checked by
+    /// `assert_joined`.
+    fn three_of_four() -> [RgbaImage; 3] {
         let nw = piece(|x, y| match (x, y) {
             (0, 0) => Some(rgb(10, 20, 30)),
             (1, 0) => Some(rgb(20, 30, 40)),
@@ -513,7 +521,10 @@ mod tests {
         });
         let ne = piece(|x, y| ((x, y) == (511, 511)).then(|| rgb(7, 8, 9)));
         let se = piece(|_, _| Some(rgb(1, 2, 3)));
-        let joined = join([Some(&nw), Some(&ne), None, Some(&se)]);
+        [nw, ne, se]
+    }
+
+    fn assert_joined(joined: &RgbaImage) {
         assert_eq!(joined.dimensions(), (PIECE, PIECE));
         for (x, y, pixel) in joined.enumerate_pixels() {
             let want = match (x, y) {
@@ -525,6 +536,22 @@ mod tests {
             };
             assert_eq!(*pixel, want, "pixel {x},{y}");
         }
+    }
+
+    #[test]
+    fn four_pieces_join_at_half_size() {
+        let [nw, ne, se] = three_of_four();
+        assert_joined(&join([Some(&nw), Some(&ne), None, Some(&se)]));
+    }
+
+    #[test]
+    fn pieces_folded_one_at_a_time_in_any_order_join_the_same() {
+        let [nw, ne, se] = three_of_four();
+        let mut joined = RgbaImage::new(PIECE, PIECE);
+        for (quarter, child) in [(3, se), (0, nw), (1, ne)] {
+            fold(&mut joined, quarter, &child);
+        }
+        assert_joined(&joined);
     }
 
     #[test]

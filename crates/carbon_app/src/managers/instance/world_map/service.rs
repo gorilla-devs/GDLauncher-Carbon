@@ -18,11 +18,12 @@ use tokio::sync::{OnceCell, Semaphore};
 use tokio::task::spawn_blocking;
 use tracing::debug;
 
+use super::super::world_refusal::WorldRefusal;
 use super::super::{InstanceId, InstanceManager, world_level::inflate_level_dat};
 use super::chunk::Roof;
 use super::facts::{dimension_folder, has_ceiling, region_file, region_revision_at, short_hex};
 use super::legacy::LegacyIds;
-use super::paint::{Painted, join, paint_region, png};
+use super::paint::{PIECE, Painted, fold, paint_region, png};
 use super::region::Region;
 use super::store::{PieceKey, Store};
 use crate::managers::ManagerRef;
@@ -32,6 +33,10 @@ pub(crate) const MAX_SCALE: u8 = 4;
 
 /// How many regions are painted at once across the launcher.
 pub(crate) const PAINTING_AT_ONCE: usize = 3;
+
+/// How many requests for pieces of scale 1 and up are built at once: each holds a picture per
+/// scale it descends while the regions beneath are painted.
+pub(crate) const BUILDING_AT_ONCE: usize = 4;
 
 /// One piece of a world's map, as the desktop asks for it.
 #[derive(Debug, Clone)]
@@ -48,16 +53,31 @@ pub struct PieceRequest {
     pub rev: String,
 }
 
+/// A piece's PNG, and whether every chunk under it could be read: one that is not is painted
+/// again when asked again, so the desktop must not keep it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Piece {
+    pub png: Vec<u8>,
+    pub complete: bool,
+}
+
 impl ManagerRef<'_, InstanceManager> {
-    /// The PNG of a piece; `None` when nothing of the world lies under it. No gate is taken:
-    /// the map is drawn while the game runs, and a world renamed or deleted meanwhile only
-    /// makes the answer `None` or a piece that is not kept.
-    pub async fn world_map_piece(self, request: PieceRequest) -> anyhow::Result<Option<Vec<u8>>> {
+    /// The piece; `None` when nothing of the world lies under it, the world included. No gate
+    /// is taken: the map is drawn while the game runs, and a world renamed or deleted
+    /// meanwhile only makes the answer `None` or a piece that is not kept.
+    pub async fn world_map_piece(self, request: PieceRequest) -> anyhow::Result<Option<Piece>> {
         if request.scale > MAX_SCALE || !is_revision(&request.rev) {
             return Ok(None);
         }
         let instance = InstanceId(request.instance_id);
-        let world = self.map_world_folder(instance, &request.world).await?;
+        let world = match self.map_world_folder(instance, &request.world).await {
+            Ok(world) => world,
+            // Renamed, deleted or replaced by a link since the desktop listed it.
+            Err(error) if matches!(error.downcast_ref(), Some(WorldRefusal::WorldGone)) => {
+                return Ok(None);
+            }
+            Err(error) => return Err(error),
+        };
         let (scale, x, z) = (request.scale, request.x, request.z);
         let found = {
             let (world, dimension) = (world.clone(), request.dimension.clone());
@@ -93,15 +113,52 @@ impl ManagerRef<'_, InstanceManager> {
             #[cfg(test)]
             pause: self.world_map_pause.get(),
         });
+        let Some(revision) = painter.revision(scale, x, z) else {
+            return Ok(None);
+        };
+        if let Some(png) = painter.kept(scale, x, z, &revision).await? {
+            return Ok(Some(Piece {
+                png,
+                complete: true,
+            }));
+        }
+        // Taken here, never under a painting permit, so it cannot wait on one it holds.
+        let _building = match scale {
+            0 => None,
+            _ => Some(
+                self.world_map_building
+                    .clone()
+                    .acquire_owned()
+                    .await
+                    .expect("the map building semaphore is never closed"),
+            ),
+        };
+        #[cfg(test)]
+        let _counted = (scale > 0).then(|| self.world_map_builds.enter());
+        // Built from the store when another request built it while this one waited.
         Ok(match painter.piece(scale, x, z).await? {
             None => None,
-            Some(Piece::Kept(png) | Piece::Painted { png: Some(png), .. }) => Some(png),
-            Some(Piece::Painted { image, .. }) => Some(spawn_blocking(move || png(&image)).await??),
+            Some(Drawn::Kept(png)) => Some(Piece {
+                png,
+                complete: true,
+            }),
+            Some(Drawn::Painted {
+                png: Some(png),
+                complete,
+                ..
+            }) => Some(Piece { png, complete }),
+            Some(Drawn::Painted {
+                image, complete, ..
+            }) => Some(Piece {
+                png: spawn_blocking(move || png(&image)).await??,
+                complete,
+            }),
         })
     }
 }
 
-/// Whether `rev` can be a revision: the store keeps pieces under no other.
+/// Whether `rev` can be an address: the desktop only caches pieces under it and the core
+/// computes the revision it answers for, but a value from outside is bounded all the same.
 fn is_revision(rev: &str) -> bool {
     (1..=64).contains(&rev.len())
         && rev
@@ -149,7 +206,7 @@ impl Drop for GiveUpOnDrop {
     }
 }
 
-enum Piece {
+enum Drawn {
     /// As the store kept it.
     Kept(Vec<u8>),
     /// Painted now; `png` when it was kept.
@@ -188,17 +245,13 @@ impl Painter {
         scale: u8,
         x: i32,
         z: i32,
-    ) -> BoxFuture<'_, anyhow::Result<Option<Piece>>> {
+    ) -> BoxFuture<'_, anyhow::Result<Option<Drawn>>> {
         Box::pin(async move {
             let Some(revision) = self.revision(scale, x, z) else {
                 return Ok(None);
             };
-            let kept = {
-                let (this, revision) = (self.clone(), revision.clone());
-                spawn_blocking(move || this.store.get(&this.key(scale, x, z, &revision))).await?
-            };
-            if let Some(png) = kept {
-                return Ok(Some(Piece::Kept(png)));
+            if let Some(png) = self.kept(scale, x, z, &revision).await? {
+                return Ok(Some(Drawn::Kept(png)));
             }
             let painted = if scale == 0 {
                 match self.paint(x, z).await? {
@@ -213,6 +266,18 @@ impl Painter {
                 spawn_blocking(move || this.keep(scale, x, z, &revision, painted)).await??,
             ))
         })
+    }
+
+    /// The piece as the store keeps it for `revision`.
+    async fn kept(
+        self: &Arc<Self>,
+        scale: u8,
+        x: i32,
+        z: i32,
+        revision: &str,
+    ) -> anyhow::Result<Option<Vec<u8>>> {
+        let (this, revision) = (self.clone(), revision.to_owned());
+        Ok(spawn_blocking(move || this.store.get(&this.key(scale, x, z, &revision))).await?)
     }
 
     /// The revision of the piece: its region's at scale 0, else a digest of the revisions of
@@ -320,50 +385,54 @@ impl Painter {
     }
 
     /// The four pieces of the scale below, joined; a child that could not be had leaves a
-    /// hole and the piece incomplete.
+    /// hole and the piece incomplete. Each child is folded in as it comes, so only one is held.
     async fn joined(self: &Arc<Self>, scale: u8, x: i32, z: i32) -> anyhow::Result<Painted> {
         let below = scale - 1;
         let (x, z) = (x * 2, z * 2);
-        let mut children: [Option<RgbaImage>; 4] = Default::default();
+        let mut parent = RgbaImage::new(PIECE, PIECE);
         let mut complete = true;
-        for (child, (x, z)) in
-            children
-                .iter_mut()
-                .zip([(x, z), (x + 1, z), (x, z + 1), (x + 1, z + 1)])
+        for (quarter, (x, z)) in [(x, z), (x + 1, z), (x, z + 1), (x + 1, z + 1)]
+            .into_iter()
+            .enumerate()
         {
             self.given_up()?;
-            match self.piece(below, x, z).await {
-                Ok(None) => {}
-                Ok(Some(Piece::Painted {
-                    image,
-                    complete: whole,
-                    ..
-                })) => {
-                    *child = Some(image);
-                    complete &= whole;
-                }
-                Ok(Some(Piece::Kept(png))) => {
-                    let decoded = spawn_blocking(move || {
-                        image::load_from_memory_with_format(&png, ImageFormat::Png)
-                    })
-                    .await?;
-                    match decoded {
-                        Ok(image) => *child = Some(image.into_rgba8()),
-                        Err(error) => {
-                            debug!(?error, "a kept map piece could not be read");
-                            complete = false;
-                        }
-                    }
-                }
+            let drawn = match self.piece(below, x, z).await {
+                Ok(None) => continue,
+                Ok(Some(drawn)) => drawn,
                 Err(error) => {
                     self.given_up()?;
                     debug!(?error, "a map piece at scale {below} could not be painted");
                     complete = false;
+                    continue;
                 }
+            };
+            if let Drawn::Painted {
+                complete: whole, ..
+            } = &drawn
+            {
+                complete &= *whole;
             }
+            let (folded, read) = spawn_blocking(move || {
+                let child = match drawn {
+                    Drawn::Painted { image, .. } => Some(image),
+                    Drawn::Kept(png) => image::load_from_memory_with_format(&png, ImageFormat::Png)
+                        .map_err(|error| debug!(?error, "a kept map piece could not be read"))
+                        .ok()
+                        .map(|image| image.into_rgba8()),
+                };
+                if let Some(child) = &child {
+                    fold(&mut parent, quarter, child);
+                }
+                (parent, child.is_some())
+            })
+            .await?;
+            parent = folded;
+            complete &= read;
         }
-        let image = spawn_blocking(move || join(children.each_ref().map(Option::as_ref))).await?;
-        Ok(Painted { image, complete })
+        Ok(Painted {
+            image: parent,
+            complete,
+        })
     }
 
     /// Keeps a complete piece, unless it was given up or its world moved away meanwhile: a
@@ -375,11 +444,11 @@ impl Painter {
         z: i32,
         revision: &str,
         painted: Painted,
-    ) -> anyhow::Result<Piece> {
+    ) -> anyhow::Result<Drawn> {
         let Painted { image, complete } = painted;
         let world_there = fs::symlink_metadata(&self.world).is_ok_and(|meta| meta.is_dir());
         if !complete || !world_there {
-            return Ok(Piece::Painted {
+            return Ok(Drawn::Painted {
                 image,
                 png: None,
                 complete,
@@ -390,7 +459,7 @@ impl Painter {
         if let Err(error) = self.store.put(&self.key(scale, x, z, revision), &png) {
             debug!(?error, "could not keep a map piece");
         }
-        Ok(Piece::Painted {
+        Ok(Drawn::Painted {
             image,
             png: Some(png),
             complete,
@@ -434,12 +503,67 @@ impl PaintPause {
     }
 }
 
+/// How many requests are building a piece of scale 1 and up, and the most there were at once.
+#[cfg(test)]
+#[derive(Debug, Default)]
+pub(crate) struct BuildCount {
+    now: std::sync::atomic::AtomicUsize,
+    most: std::sync::atomic::AtomicUsize,
+}
+
+#[cfg(test)]
+impl BuildCount {
+    fn enter(&self) -> Building<'_> {
+        let now = self.now.fetch_add(1, Ordering::AcqRel) + 1;
+        self.most.fetch_max(now, Ordering::AcqRel);
+        Building(self)
+    }
+
+    fn now(&self) -> usize {
+        self.now.load(Ordering::Acquire)
+    }
+
+    fn most(&self) -> usize {
+        self.most.load(Ordering::Acquire)
+    }
+}
+
+#[cfg(test)]
+struct Building<'a>(&'a BuildCount);
+
+#[cfg(test)]
+impl Drop for Building<'_> {
+    fn drop(&mut self) {
+        self.0.now.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
 /// An instance with the world `Home` holding a region at `(0, 0)` with one chunk, for tests
 /// of what serves pieces.
 #[cfg(test)]
 pub(crate) async fn test_world(app: &crate::managers::App, instance: &str) -> InstanceId {
     let (id, world) = tests::world(app, instance).await;
     tests::put_region(&world, 0, 0, &[tests::ground(0, 0, "minecraft:stone")]);
+    id
+}
+
+/// An instance with the world `Home` holding a whole region at `(0, 0)`, one with an unreadable
+/// chunk at `(1, 0)` and, on unix, one at `(2, 0)` that cannot be opened, for tests of what
+/// serves pieces.
+#[cfg(test)]
+pub(crate) async fn test_world_with_faults(
+    app: &crate::managers::App,
+    instance: &str,
+) -> InstanceId {
+    let (id, world) = tests::world(app, instance).await;
+    tests::put_region(&world, 0, 0, &[tests::ground(0, 0, "minecraft:stone")]);
+    tests::put_region(&world, 1, 0, &[(0, 0, 2, b"not zlib".to_vec())]);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let closed = tests::put_region(&world, 2, 0, &[tests::ground(0, 0, "minecraft:stone")]);
+        std::fs::set_permissions(closed, std::fs::Permissions::from_mode(0o000)).unwrap();
+    }
     id
 }
 
@@ -508,11 +632,15 @@ pub(crate) mod tests {
         }
     }
 
-    async fn piece(app: &App, request: PieceRequest) -> Option<Vec<u8>> {
+    async fn whole(app: &App, request: PieceRequest) -> Option<Piece> {
         app.instance_manager()
             .world_map_piece(request)
             .await
             .unwrap()
+    }
+
+    async fn piece(app: &App, request: PieceRequest) -> Option<Vec<u8>> {
+        whole(app, request).await.map(|piece| piece.png)
     }
 
     fn decoded(png: &[u8]) -> RgbaImage {
@@ -609,7 +737,7 @@ pub(crate) mod tests {
     fn spawn_piece(
         app: &App,
         request: PieceRequest,
-    ) -> tokio::task::JoinHandle<anyhow::Result<Option<Vec<u8>>>> {
+    ) -> tokio::task::JoinHandle<anyhow::Result<Option<Piece>>> {
         let app = app.clone();
         tokio::spawn(async move { app.instance_manager().world_map_piece(request).await })
     }
@@ -620,8 +748,9 @@ pub(crate) mod tests {
         let (id, world) = world(&app, "map-served").await;
         let region = put_region(&world, 0, 0, &[ground(0, 0, "minecraft:stone")]);
 
-        let painted = piece(&app, request(id, 0, 0, 0)).await.expect("a piece");
-        let image = decoded(&painted);
+        let painted = whole(&app, request(id, 0, 0, 0)).await.expect("a piece");
+        assert!(painted.complete);
+        let image = decoded(&painted.png);
         assert_eq!(image.dimensions(), (PIECE, PIECE));
         assert_eq!(image.get_pixel(0, 0)[3], 255);
         assert_eq!(image.get_pixel(16, 0)[3], 0);
@@ -633,7 +762,7 @@ pub(crate) mod tests {
             use std::os::unix::fs::PermissionsExt;
             std::fs::set_permissions(&region, std::fs::Permissions::from_mode(0o000)).unwrap();
         }
-        let served = piece(&app, request(id, 0, 0, 0)).await;
+        let served = whole(&app, request(id, 0, 0, 0)).await;
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
@@ -762,9 +891,27 @@ pub(crate) mod tests {
                 (1, 0, 2, b"not zlib".to_vec()),
             ],
         );
-        let answered = decoded(&piece(&app, request(id, 0, 0, 0)).await.unwrap());
-        assert_eq!(answered.get_pixel(0, 0)[3], 255);
-        assert!(piece(&app, request(id, 1, 0, 0)).await.is_some());
+        let answered = whole(&app, request(id, 0, 0, 0)).await.unwrap();
+        assert!(!answered.complete);
+        assert_eq!(decoded(&answered.png).get_pixel(0, 0)[3], 255);
+        let parent = whole(&app, request(id, 1, 0, 0)).await.unwrap();
+        assert!(!parent.complete, "a parent with a child that has a hole");
+        assert_eq!(kept(&app), Vec::<PathBuf>::new());
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_piece_whose_north_region_cannot_be_read_is_answered_but_not_kept() {
+        use std::os::unix::fs::PermissionsExt;
+        let app = crate::setup_managers_for_test().await;
+        let (id, world) = world(&app, "map-north-unreadable").await;
+        put_region(&world, 0, 0, &[ground(0, 0, "minecraft:stone")]);
+        let north = put_region(&world, 0, -1, &[ground(0, 31, "minecraft:stone")]);
+        std::fs::set_permissions(&north, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let answered = whole(&app, request(id, 0, 0, 0)).await.unwrap();
+        std::fs::set_permissions(&north, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(!answered.complete);
+        assert_eq!(decoded(&answered.png).get_pixel(0, 0)[3], 255);
         assert_eq!(kept(&app), Vec::<PathBuf>::new());
     }
 
@@ -783,22 +930,39 @@ pub(crate) mod tests {
     }
 
     #[tokio::test]
-    async fn a_world_that_is_not_there_is_refused() {
+    async fn a_world_that_is_not_there_is_nothing() {
         let app = crate::setup_managers_for_test().await;
-        let id = test_world(&app, "map-gone").await;
-        let request = PieceRequest {
+        let (id, world) = world(&app, "map-gone").await;
+        put_region(&world, 0, 0, &[ground(0, 0, "minecraft:stone")]);
+        let missing = PieceRequest {
             world: "Missing".into(),
             ..request(id, 0, 0, 0)
         };
-        let error = app
+        assert_eq!(piece(&app, missing).await, None);
+        #[cfg(unix)]
+        {
+            // A world replaced by a link is not followed.
+            let saves = world.parent().unwrap();
+            std::fs::rename(&world, saves.join("Moved")).unwrap();
+            std::os::unix::fs::symlink(saves.join("Moved"), &world).unwrap();
+            assert_eq!(piece(&app, request(id, 0, 0, 0)).await, None);
+        }
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn a_region_that_cannot_be_read_is_an_error() {
+        use std::os::unix::fs::PermissionsExt;
+        let app = crate::setup_managers_for_test().await;
+        let (id, world) = world(&app, "map-closed").await;
+        let region = put_region(&world, 0, 0, &[ground(0, 0, "minecraft:stone")]);
+        std::fs::set_permissions(&region, std::fs::Permissions::from_mode(0o000)).unwrap();
+        let answer = app
             .instance_manager()
-            .world_map_piece(request)
-            .await
-            .unwrap_err();
-        assert_eq!(
-            crate::error::coded_cause(&error).map(|(code, _)| code),
-            Some("WORLD_GONE".to_owned())
-        );
+            .world_map_piece(request(id, 0, 0, 0))
+            .await;
+        std::fs::set_permissions(&region, std::fs::Permissions::from_mode(0o644)).unwrap();
+        assert!(answer.is_err(), "{answer:?}");
     }
 
     #[tokio::test]
@@ -876,5 +1040,79 @@ pub(crate) mod tests {
 
         task.await.unwrap().unwrap();
         assert_eq!(kept(&app), Vec::<PathBuf>::new());
+    }
+
+    /// Regions at `(4k, 0)`, each alone under the scale 2 piece `(k, 0)`.
+    fn one_region_per_scale_two_piece(world: &Path, pieces: i32) {
+        for k in 0..pieces {
+            put_region(world, 4 * k, 0, &[ground(0, 0, "minecraft:stone")]);
+        }
+    }
+
+    #[tokio::test]
+    async fn at_most_four_joined_pieces_are_built_at_once() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, world) = world(&app, "map-building").await;
+        one_region_per_scale_two_piece(&world, 8);
+        let gate = Gate::install(&app);
+        let manager = app.instance_manager();
+        let builds = &manager.world_map_builds;
+
+        let tasks: Vec<_> = (0..8)
+            .map(|k| spawn_piece(&app, request(id, 2, k, 0)))
+            .collect();
+        until("four builds and three paintings", || {
+            builds.most() >= BUILDING_AT_ONCE && gate.held() == PAINTING_AT_ONCE
+        })
+        .await;
+        tokio::time::sleep(Duration::from_millis(300)).await;
+        // Read before opening, asserted after: a closed gate would hold the paintings for good.
+        let most_while_held = builds.most();
+        gate.open();
+        assert_eq!(most_while_held, BUILDING_AT_ONCE);
+        for task in tasks {
+            assert!(task.await.unwrap().unwrap().unwrap().complete);
+        }
+        assert_eq!(builds.most(), BUILDING_AT_ONCE);
+        assert_eq!(builds.now(), 0);
+        // Each piece at scale 2, 1 and 0.
+        assert_eq!(kept(&app).len(), 24);
+    }
+
+    #[tokio::test]
+    async fn a_request_dropped_while_waiting_to_build_leaves_the_queue() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, world) = world(&app, "map-building-dropped").await;
+        one_region_per_scale_two_piece(&world, 6);
+        let gate = Gate::install(&app);
+        let manager = app.instance_manager();
+        let builds = &manager.world_map_builds;
+
+        let tasks: Vec<_> = (0..4)
+            .map(|k| spawn_piece(&app, request(id, 2, k, 0)))
+            .collect();
+        until("four builds", || {
+            builds.now() == BUILDING_AT_ONCE && gate.held() == PAINTING_AT_ONCE
+        })
+        .await;
+        let waiting = spawn_piece(&app, request(id, 2, 4, 0));
+        tokio::time::sleep(Duration::from_millis(200)).await;
+        let most_while_held = builds.most();
+        waiting.abort();
+        let dropped = waiting.await;
+        gate.open();
+        assert_eq!(most_while_held, BUILDING_AT_ONCE);
+        assert!(dropped.unwrap_err().is_cancelled());
+        for task in tasks {
+            assert!(task.await.unwrap().unwrap().is_some());
+        }
+        let building = manager.world_map_building.clone();
+        until("the permits to come back", || {
+            building.available_permits() == BUILDING_AT_ONCE
+        })
+        .await;
+        assert_eq!(kept(&app).len(), 12, "nothing of the dropped request");
+        assert!(piece(&app, request(id, 2, 5, 0)).await.is_some());
+        assert_eq!(kept(&app).len(), 15);
     }
 }

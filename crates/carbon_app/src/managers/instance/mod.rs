@@ -140,9 +140,14 @@ pub struct InstanceManager {
     world_map_store: std::sync::OnceLock<Arc<world_map::store::Store>>,
     /// Regions painted for the map at once (see `world_map_piece`).
     world_map_painting: Arc<tokio::sync::Semaphore>,
+    /// Requests for joined map pieces built at once (see `world_map_piece`).
+    world_map_building: Arc<tokio::sync::Semaphore>,
     /// Holds a painting of the map at a chunk, for tests.
     #[cfg(test)]
     world_map_pause: world_map::service::PaintPause,
+    /// Counts the joined map pieces being built, for tests.
+    #[cfg(test)]
+    world_map_builds: world_map::service::BuildCount,
     /// Background forgetting of kept maps, held so tests can await it.
     #[cfg(test)]
     forgetting: std::sync::Mutex<Vec<tokio::task::JoinHandle<()>>>,
@@ -336,8 +341,13 @@ impl InstanceManager {
             world_map_painting: Arc::new(tokio::sync::Semaphore::new(
                 world_map::service::PAINTING_AT_ONCE,
             )),
+            world_map_building: Arc::new(tokio::sync::Semaphore::new(
+                world_map::service::BUILDING_AT_ONCE,
+            )),
             #[cfg(test)]
             world_map_pause: Default::default(),
+            #[cfg(test)]
+            world_map_builds: Default::default(),
             #[cfg(test)]
             forgetting: Default::default(),
         }
