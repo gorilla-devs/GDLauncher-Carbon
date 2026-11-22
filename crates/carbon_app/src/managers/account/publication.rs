@@ -227,6 +227,7 @@ impl Publication {
         enum Outcome {
             Success(api::FullAccount),
             Rejected(String),
+            Refused(String),
             Transient(String),
         }
         let outcome = {
@@ -240,7 +241,10 @@ impl Publication {
             let status = task.status.read().await;
             match &*status {
                 EnrollmentStatus::Complete(account) => Outcome::Success(account.clone()),
-                EnrollmentStatus::Failed(Ok(e)) => Outcome::Rejected(e.to_string()),
+                // Microsoft renewed the sign-in; Xbox or Minecraft refused the
+                // account. Only Microsoft's own rejection means the saved
+                // sign-in is no longer good.
+                EnrollmentStatus::Failed(Ok(e)) => Outcome::Refused(e.to_string()),
                 EnrollmentStatus::Failed(Err(e)) if e.is::<api::RefreshRejected>() => {
                     Outcome::Rejected(format!("{e:#}"))
                 }
@@ -262,6 +266,13 @@ impl Publication {
                     "Microsoft rejected the saved sign-in of account {uuid}, marking it as needing a new sign-in: {cause}"
                 );
                 state.reject(db, ticket).await
+            }
+            Outcome::Refused(cause) => {
+                warn!(
+                    "Xbox or Minecraft refused account {uuid}, keeping its saved sign-in and asking again in an hour: {cause}"
+                );
+                state.schedule.refused(uuid, Instant::now());
+                Ok(false)
             }
             Outcome::Transient(cause) => {
                 warn!(
@@ -699,6 +710,58 @@ pub(super) mod publication_tests {
                         .eligible("a", Instant::now())
                 );
             }
+        }
+    }
+    /// Microsoft renewed the sign-in, and Xbox or Minecraft then refused
+    /// the account (an Xbox code, the game not owned, no game profile). The
+    /// saved sign-in is still good: it is kept, so the account works again
+    /// without a new sign-in once the refusal is lifted, and the refresh is
+    /// tried again only once an hour so a lasting refusal is not asked about
+    /// every few minutes.
+    #[tokio::test]
+    async fn a_refusal_by_xbox_or_minecraft_keeps_the_saved_sign_in() {
+        use crate::managers::account::api::XboxError;
+        use crate::managers::account::enroll::EnrollmentError;
+        for refusal in [
+            EnrollmentError::XboxError(XboxError::Unknown(2148916299)),
+            EnrollmentError::XboxError(XboxError::ChildAccount),
+            EnrollmentError::XboxError(XboxError::NoAccount),
+            EnrollmentError::EntitlementMissing,
+            EnrollmentError::GameProfileMissing,
+        ] {
+            let named = refusal.to_string();
+            let (_dir, db) = database().await;
+            let publication = Publication::default();
+            publication
+                .save(&db, account("a", "healthy"), |_| {})
+                .await
+                .unwrap();
+            let before = account_repo::get_account(&db, "a").await.unwrap().unwrap();
+            assert!(before.ms_refresh_token.is_some());
+            let (ticket, op) = admit(&publication, EnrollmentStatus::Failed(Ok(refusal))).await;
+
+            let published = publication
+                .complete_refresh(&db, &ticket, &op, |args| assert!(args.is_none()))
+                .await
+                .unwrap();
+
+            assert!(!published, "{named}");
+            let after = account_repo::get_account(&db, "a").await.unwrap().unwrap();
+            assert_eq!(after, before, "{named}");
+            let state = publication.gate.lock().await;
+            let now = Instant::now();
+            assert!(
+                !state
+                    .schedule
+                    .eligible("a", now + Duration::from_secs(59 * 60)),
+                "{named}"
+            );
+            assert!(
+                state
+                    .schedule
+                    .eligible("a", now + Duration::from_secs(60 * 60 + 1)),
+                "{named}"
+            );
         }
     }
     #[tokio::test]

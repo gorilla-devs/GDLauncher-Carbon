@@ -46,6 +46,12 @@ impl RefreshSchedule {
             .unwrap_or(Duration::from_secs(60));
         self.retries.insert(uuid.to_owned(), (now + delay, delay));
     }
+    /// Xbox or Minecraft refused the account. That rarely changes within
+    /// minutes, and may never: the background refresh asks again in an hour.
+    pub fn refused(&mut self, uuid: &str, now: Instant) {
+        let delay = Duration::from_secs(60 * 60);
+        self.retries.insert(uuid.to_owned(), (now + delay, delay));
+    }
     pub fn success(&mut self, uuid: &str) {
         self.retries.remove(uuid);
     }
@@ -124,6 +130,11 @@ mod schedule_tests {
         assert!(schedule.eligible("a", now));
         schedule.failed("a", now);
         schedule.remove("a");
+        assert!(schedule.eligible("a", now));
+        schedule.refused("a", now);
+        assert!(!schedule.eligible("a", now + Duration::from_secs(3599)));
+        assert!(schedule.eligible("a", now + Duration::from_secs(3600)));
+        schedule.success("a");
         assert!(schedule.eligible("a", now));
     }
 }
