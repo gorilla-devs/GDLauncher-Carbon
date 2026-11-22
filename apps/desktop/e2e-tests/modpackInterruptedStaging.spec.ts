@@ -342,7 +342,11 @@ test.describe("modpack interrupted staging", () => {
               "cleanup: stopping the game also failed:"
             )
           }
-          await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+          await attachCoreLogOnFailure(
+            testInfo,
+            harness.runtimePath,
+            alreadyFailed
+          )
           await current.app.close()
         }
         await stopHarness(harness)
@@ -450,7 +454,11 @@ test.describe("modpack interrupted staging", () => {
         }
       },
       async (alreadyFailed) => {
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+        await attachCoreLogOnFailure(
+          testInfo,
+          harness.runtimePath,
+          alreadyFailed
+        )
         // A body that fails inside the version or repair modal leaves it open
         // over the instance page, where it covers the navbar logo. Close it
         // first, the same way `ensureLibraryInteractive` does, so the logo

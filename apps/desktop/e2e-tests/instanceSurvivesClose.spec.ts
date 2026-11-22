@@ -123,6 +123,7 @@ test.describe("running game outlives the launcher", () => {
     /** The instance's folder, for the game's own log on a failure. */
     let shortpath: string | undefined
 
+    let bodyDone = false
     try {
       current = await launchApp(launchOpts)
       const page = current.page
@@ -207,9 +208,15 @@ test.describe("running game outlives the launcher", () => {
         "the pid file was removed when the launcher closed — the next " +
           "startup needs it to find and adopt this process"
       ).toBe(true)
+      bodyDone = true
     } finally {
-      await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-      await attachGameLogOnFailure(testInfo, harness.runtimePath, shortpath)
+      await attachCoreLogOnFailure(testInfo, harness.runtimePath, !bodyDone)
+      await attachGameLogOnFailure(
+        testInfo,
+        harness.runtimePath,
+        shortpath,
+        !bodyDone
+      )
       if (current) {
         // `app.close()` never returns while the app still owns a running
         // game, and bounding it alone leaves a launcher the next spec trips on.

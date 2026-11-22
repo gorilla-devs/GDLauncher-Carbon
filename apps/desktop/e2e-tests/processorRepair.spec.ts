@@ -293,7 +293,11 @@ test.describe("processor output repair", () => {
               `cleanup for "${INSTANCE_NAME}" also failed:`
             )
           }
-          await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+          await attachCoreLogOnFailure(
+            testInfo,
+            harness.runtimePath,
+            alreadyFailed
+          )
           await current.app.close()
         }
         await stopHarness(harness)

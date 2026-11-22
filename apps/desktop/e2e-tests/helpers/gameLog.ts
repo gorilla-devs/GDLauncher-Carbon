@@ -255,9 +255,12 @@ export async function waitForLogQuiescence(
 export async function attachGameLogOnFailure(
   testInfo: TestInfo,
   runtimePath: string,
-  shortpathToAttach: string | undefined
+  shortpathToAttach: string | undefined,
+  /** As `attachCoreLogOnFailure`'s: whether the test failed, for a caller
+   *  inside the test body, where `testInfo.status` still reads passed. */
+  failed?: boolean
 ): Promise<void> {
-  if (testInfo.status === testInfo.expectedStatus) return
+  if (!(failed ?? testInfo.status !== testInfo.expectedStatus)) return
   if (!shortpathToAttach) return
 
   const logFile = newestLogFile(instanceLogsDir(runtimePath, shortpathToAttach))

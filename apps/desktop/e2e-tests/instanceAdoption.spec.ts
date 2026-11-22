@@ -173,6 +173,7 @@ test.describe("adopting a running game across a launcher restart", () => {
     let reopened: RunningApp | null = null
     let gamePid: number | undefined
 
+    let bodyDone = false
     try {
       const left = await leaveAGameRunning(harness, launchOpts, instanceName)
       gamePid = left.gamePid
@@ -264,8 +265,9 @@ test.describe("adopting a running game across a launcher restart", () => {
           )
           .toBeGreaterThan(playtimeBeforeStop)
       })
+      bodyDone = true
     } finally {
-      await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+      await attachCoreLogOnFailure(testInfo, harness.runtimePath, !bodyDone)
       if (reopened) await closeAppAndCore(reopened.app)
       killIfAlive(gamePid)
       await stopHarness(harness)
@@ -289,6 +291,7 @@ test.describe("adopting a running game across a launcher restart", () => {
     let reopened: RunningApp | null = null
     let gamePid: number | undefined
 
+    let bodyDone = false
     try {
       const left = await leaveAGameRunning(harness, launchOpts, instanceName)
       gamePid = left.gamePid
@@ -323,8 +326,9 @@ test.describe("adopting a running game across a launcher restart", () => {
           message: "the pidfile outlived the process it records"
         })
         .toBe(false)
+      bodyDone = true
     } finally {
-      await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+      await attachCoreLogOnFailure(testInfo, harness.runtimePath, !bodyDone)
       if (reopened) await closeAppAndCore(reopened.app)
       killIfAlive(gamePid)
       await stopHarness(harness)

@@ -1032,8 +1032,17 @@ test.describe("modpack lifecycle", () => {
               "cleanup: stopping the game also failed:"
             )
           }
-          await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-          await attachGameLogOnFailure(testInfo, harness.runtimePath, shortpath)
+          await attachCoreLogOnFailure(
+            testInfo,
+            harness.runtimePath,
+            alreadyFailed
+          )
+          await attachGameLogOnFailure(
+            testInfo,
+            harness.runtimePath,
+            shortpath,
+            alreadyFailed
+          )
           await current.app.close()
         }
         // Best-effort: also sweeps any leftover game process via

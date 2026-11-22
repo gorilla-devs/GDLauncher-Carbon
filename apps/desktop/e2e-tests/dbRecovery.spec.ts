@@ -263,6 +263,7 @@ for (const { seed, event } of FATAL_STATES) {
 
     const harness = await startHarness()
     let launched: Launched | undefined
+    let bodyDone = false
     try {
       await seedDatabase(harness.runtimePath, seed)
       launched = await launchAgainstHarness(harness)
@@ -313,11 +314,14 @@ for (const { seed, event } of FATAL_STATES) {
       expect(launched.pageErrors, {
         message: "an uncaught renderer exception accompanied the fatal screen"
       }).toEqual([])
+      bodyDone = true
     } finally {
       if (launched) {
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
-          () => {}
-        )
+        await attachCoreLogOnFailure(
+          testInfo,
+          harness.runtimePath,
+          !bodyDone
+        ).catch(() => {})
         await closeAppAndCore(launched.app)
       }
       await stopHarness(harness)
@@ -331,6 +335,7 @@ test("seeding BACKWARDS_MIGRATION drives the dedicated version-mismatch screen, 
 
   const harness = await startHarness()
   let launched: Launched | undefined
+  let bodyDone = false
   try {
     await seedDatabase(harness.runtimePath, "BACKWARDS_MIGRATION")
     launched = await launchAgainstHarness(harness)
@@ -377,11 +382,14 @@ test("seeding BACKWARDS_MIGRATION drives the dedicated version-mismatch screen, 
       message:
         "an uncaught renderer exception accompanied the backwards-migration screen"
     }).toEqual([])
+    bodyDone = true
   } finally {
     if (launched) {
-      await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
-        () => {}
-      )
+      await attachCoreLogOnFailure(
+        testInfo,
+        harness.runtimePath,
+        !bodyDone
+      ).catch(() => {})
       await closeAppAndCore(launched.app)
     }
     await stopHarness(harness)
@@ -394,6 +402,7 @@ test("seeding DB_DOWNGRADED is non-fatal: the core emits it and the app boots no
 
   const harness = await startHarness()
   let launched: Launched | undefined
+  let bodyDone = false
   try {
     await seedDatabase(harness.runtimePath, "DB_DOWNGRADED")
     launched = await launchAgainstHarness(harness)
@@ -430,11 +439,14 @@ test("seeding DB_DOWNGRADED is non-fatal: the core emits it and the app boots no
       message:
         "an uncaught renderer exception happened during a downgraded-but-proceeding boot"
     }).toEqual([])
+    bodyDone = true
   } finally {
     if (launched) {
-      await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
-        () => {}
-      )
+      await attachCoreLogOnFailure(
+        testInfo,
+        harness.runtimePath,
+        !bodyDone
+      ).catch(() => {})
       await closeAppAndCore(launched.app)
     }
     await stopHarness(harness)
@@ -465,6 +477,7 @@ test("a genuinely healthy, unseeded first launch reports success and none of the
 
   const harness = await startHarness()
   let launched: Launched | undefined
+  let bodyDone = false
   try {
     // Deliberately no `seedDatabase` call: `startHarness` mints a fresh,
     // empty `runtimePath` (`mockIdp.ts`), so this launch hits the real
@@ -503,11 +516,14 @@ test("a genuinely healthy, unseeded first launch reports success and none of the
       message:
         "an uncaught renderer exception happened during a genuinely healthy boot"
     }).toEqual([])
+    bodyDone = true
   } finally {
     if (launched) {
-      await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
-        () => {}
-      )
+      await attachCoreLogOnFailure(
+        testInfo,
+        harness.runtimePath,
+        !bodyDone
+      ).catch(() => {})
       await closeAppAndCore(launched.app)
     }
     await stopHarness(harness)
@@ -736,6 +752,7 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
 
   const harness = await startHarness()
   let launched: Launched | undefined
+  let bodyDone = false
   try {
     await seedDatabase(harness.runtimePath, "DB_CORRUPT")
     launched = await launchAgainstHarness(harness)
@@ -779,11 +796,14 @@ test("clicking Restart genuinely restarts the app, not just a UI no-op", async (
     // the log line above cannot substitute for it, and why this must be the
     // pre-*click* snapshot rather than `beforePids`.
     await waitForRelaunchSibling(preClickPids)
+    bodyDone = true
   } finally {
     if (launched) {
-      await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
-        () => {}
-      )
+      await attachCoreLogOnFailure(
+        testInfo,
+        harness.runtimePath,
+        !bodyDone
+      ).catch(() => {})
       await closeAppAndCore(launched.app)
     }
     await cleanupRelaunchSiblings(beforePids, harness.runtimePath)
@@ -805,6 +825,7 @@ test('"Reset Database & Restart" deletes the database file for real, on its own 
   // other spec, still needs this directory once this test is done with it.
   const harness = await startHarness()
   let launched: Launched | undefined
+  let bodyDone = false
   try {
     await seedDatabase(harness.runtimePath, "DB_CORRUPT")
     const dbPath = `${harness.runtimePath}/gdl_conf.db`
@@ -836,11 +857,14 @@ test('"Reset Database & Restart" deletes the database file for real, on its own 
     await expect
       .poll(() => fs.existsSync(dbPath), { timeout: 15_000 })
       .toBe(false)
+    bodyDone = true
   } finally {
     if (launched) {
-      await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
-        () => {}
-      )
+      await attachCoreLogOnFailure(
+        testInfo,
+        harness.runtimePath,
+        !bodyDone
+      ).catch(() => {})
       await closeAppAndCore(launched.app)
     }
     await cleanupRelaunchSiblings(beforePids, harness.runtimePath)

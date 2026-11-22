@@ -462,9 +462,13 @@ export async function relaunchApp(
  */
 export async function attachCoreLogOnFailure(
   testInfo: TestInfo,
-  runtimePath: string
+  runtimePath: string,
+  /** Whether the test failed, for a caller inside the test body (a cleanup
+   *  or a `finally`): `testInfo.status` only turns failed once the body has
+   *  returned, so there it still reads passed and nothing was attached. */
+  failed?: boolean
 ): Promise<void> {
-  if (testInfo.status === testInfo.expectedStatus) return
+  if (!(failed ?? testInfo.status !== testInfo.expectedStatus)) return
 
   const logsDir = path.join(runtimePath, "__gdl_logs__")
   if (!fs.existsSync(logsDir)) return

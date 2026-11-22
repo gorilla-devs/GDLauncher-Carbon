@@ -228,8 +228,17 @@ test.describe("game launch", () => {
               `cleanup for "${INSTANCE_NAME}" also failed:`
             )
           }
-          await attachCoreLogOnFailure(testInfo, harness.runtimePath)
-          await attachGameLogOnFailure(testInfo, harness.runtimePath, shortpath)
+          await attachCoreLogOnFailure(
+            testInfo,
+            harness.runtimePath,
+            alreadyFailed
+          )
+          await attachGameLogOnFailure(
+            testInfo,
+            harness.runtimePath,
+            shortpath,
+            alreadyFailed
+          )
           await current.app.close()
         }
         await stopHarness(harness)
