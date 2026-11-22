@@ -2,6 +2,7 @@ import type { FEWorld } from "@gd/core_module/bindings"
 import { Button, PRESS_CLASSES, Skeleton } from "@gd/ui"
 import { For, Match, Show, Switch } from "solid-js"
 import { Trans } from "@gd/i18n"
+import { worldNames } from "@/utils/worldLabel"
 
 export interface WorldsSidebarProps {
   worlds: FEWorld[]
@@ -13,6 +14,7 @@ export interface WorldsSidebarProps {
 }
 
 const WorldsSidebar = (props: WorldsSidebarProps) => {
+  const names = () => worldNames(props.worlds)
   return (
     <div class="w-50 box-border flex h-full shrink-0 flex-col pr-6">
       <div class="box-border flex h-8 shrink-0 items-center gap-1.5 px-4 py-6">
@@ -69,7 +71,15 @@ const WorldsSidebar = (props: WorldsSidebarProps) => {
                       <span
                         class={`truncate text-sm ${isSelected() ? "text-lightSlate-100" : "text-lightSlate-500 group-hover:text-lightSlate-300"}`}
                       >
-                        {world.name}
+                        {names().get(world.name)?.label ?? world.name}
+                        <Show when={names().get(world.name)?.folder}>
+                          {(folder) => (
+                            <span class="text-lightSlate-700 text-xs">
+                              {" "}
+                              {folder()}
+                            </span>
+                          )}
+                        </Show>
                       </span>
                       <Show when={world.identity !== null}>
                         <span class="text-lightSlate-700 text-xs">

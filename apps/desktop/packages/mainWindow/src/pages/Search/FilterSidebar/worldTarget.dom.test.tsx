@@ -47,7 +47,7 @@ function mount(component: () => any) {
 }
 function context(
   worldName: string | undefined,
-  world?: { name: string; identity: string | null }
+  world?: { name: string; title?: string | null; identity: string | null }
 ) {
   c.search = {
     searchQuery: () => ({}),
@@ -86,6 +86,17 @@ it("names the world with its instance, and goes back to the Worlds tab", () => {
   expect(header.textContent).not.toContain("search:_trn_context_instance")
   backButton(root).click()
   expect(c.navigate).toHaveBeenCalledWith("/library/3/worlds")
+})
+it("names the world by its in-game name, not its folder", () => {
+  context("New World (2)", {
+    name: "New World (2)",
+    title: "Skyblock with friends",
+    identity: "id"
+  })
+  const root = mount(() => <FilterSidebar />)
+  const header = backButton(root).parentElement!
+  expect(header.textContent).toContain("Skyblock with friends")
+  expect(header.textContent).not.toContain("New World (2)")
 })
 it.each([
   ["missing", undefined],

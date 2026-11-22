@@ -15,6 +15,7 @@ import { Trans } from "@gd/i18n"
 import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { getWorldDatapackImageUrl } from "@/utils/instances"
+import { worldLabel } from "@/utils/worldLabel"
 import {
   BlockedText,
   type ChangesBlocked
@@ -160,12 +161,22 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
   return (
     <div class="flex min-w-0 flex-1 flex-col overflow-hidden">
       <div class="box-border flex shrink-0 items-center gap-3 px-4 py-3">
-        <span
-          data-testid="world-title"
-          class="text-lightSlate-50 min-w-0 flex-1 truncate font-medium"
-        >
-          {props.world.name}
-        </span>
+        <div class="flex min-w-0 flex-1 flex-col">
+          <span
+            data-testid="world-title"
+            class="text-lightSlate-50 truncate font-medium"
+          >
+            {worldLabel(props.world)}
+          </span>
+          <Show when={worldLabel(props.world) !== props.world.name}>
+            <span
+              data-testid="world-folder"
+              class="text-lightSlate-700 truncate text-xs"
+            >
+              {props.world.name}
+            </span>
+          </Show>
+        </div>
         <IconAction
           testId="world-open-folder"
           icon="i-hugeicons:folder-open"

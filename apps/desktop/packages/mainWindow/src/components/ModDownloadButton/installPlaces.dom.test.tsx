@@ -122,8 +122,9 @@ const pluginAndDataPack = {
 const world = (
   name: string,
   datapacks: any[] = [],
-  identity: string | null = `id-${name}`
-) => ({ name, addon_id: `addon-${name}`, identity, datapacks })
+  identity: string | null = `id-${name}`,
+  title: string | null = null
+) => ({ name, title, addon_id: `addon-${name}`, identity, datapacks })
 const curseforgeCopy = (id: string) => ({
   id,
   addon_type: "datapacks",
@@ -282,6 +283,35 @@ it("a world picked there gets the data pack, and its completion names the world"
     ]
   ])
   expect(isOpen()).toBe(false)
+  client.setQueryData(["vtask.getTaskOutcome", 61], { type: "Succeeded" })
+  await flush()
+  expect(c.success).toHaveBeenCalledWith(
+    "content:_trn_worlds.added_to_world:Pack@Skyblock",
+    { duration: 2000 }
+  )
+})
+it("reads each world by its in-game name, following a shared one with its folder, and sends the folder name", async () => {
+  serve([
+    world("New World", [], "id-a", "Skyblock"),
+    world("Survival", [], "id-b", "Survival"),
+    world("Survival (2)", [], "id-c", "Survival"),
+    world("Creative")
+  ])
+  const client = await mount(modrinthHybrid, {}, "datapack")
+  await download()
+  expect(items()).toEqual([
+    "Skyblock",
+    "Survival Survival",
+    "Survival Survival (2)",
+    "Creative",
+    "content:_trn_worlds.download_to_instance"
+  ])
+  await pick("Skyblock")
+  expect(c.mutate.mock.calls[0][1]).toMatchObject({
+    instance_id: 7,
+    world: "New World",
+    identity: "id-a"
+  })
   client.setQueryData(["vtask.getTaskOutcome", 61], { type: "Succeeded" })
   await flush()
   expect(c.success).toHaveBeenCalledWith(

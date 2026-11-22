@@ -230,10 +230,11 @@ const pack = (
 const world = (
   name: string,
   datapacks: FEWorldDatapack[] = [],
-  identity: string | null = `id-${name}`
+  identity: string | null = `id-${name}`,
+  title: string | null = null
 ): FEWorld => ({
   name,
-  title: null,
+  title,
   addon_id: `addon-${name}`,
   identity,
   datapacks
@@ -332,6 +333,59 @@ it("names the worlds holding the same project under a data pack, in the list's o
     "local.zipcontent:_trn_datapack_row_subtitle(filename=local.zip)"
   )
   expect(nameCell("local").textContent).not.toContain("Alpha")
+})
+
+it("names the worlds of a data pack and of the Add to a world menu by their in-game names, and sends the folder", async () => {
+  mutation("instance.copyDatapack").mockResolvedValue("New World")
+  const root = mount(
+    [row("terralith", { modrinth: modrinth("TL") })],
+    [
+      world(
+        "New World",
+        [pack("a", { modrinth: modrinth("TL") })],
+        "id-a",
+        "Skyblock"
+      ),
+      world("Survival", [], "id-b", "Survival"),
+      world("Survival (2)", [], "id-c", "Survival")
+    ]
+  )
+  await flush()
+  expect(rowOf(root, "terralith").firstElementChild!.textContent).toContain(
+    "terralith.zipSkyblock"
+  )
+  const items = within(rowOf(root, "terralith"), "addon-add-to-world-item")
+  expect(items.map((item) => item.textContent)).toEqual([
+    "Skyblock",
+    "Survival Survival",
+    "Survival Survival (2)"
+  ])
+  items[0].click()
+  await flush()
+  expect(mutation("instance.copyDatapack").mock.calls[0][0].world).toEqual({
+    name: "New World",
+    identity: "id-a"
+  })
+  // The core answers with the folder it copied into.
+  expect(io.toastSuccess).toHaveBeenCalledExactlyOnceWith(
+    "content:_trn_datapack_staging.added(name=terralith.zip;world=Skyblock)"
+  )
+})
+
+it("asks about replacing in a world by its in-game name", async () => {
+  mutation("instance.copyDatapack").mockRejectedValueOnce(
+    coded("ALREADY_IN_WORLD", { filenames: ["old.zip"] })
+  )
+  const root = mount(
+    [row("terralith")],
+    [world("New World", [], "id-a", "Skyblock")]
+  )
+  await flush()
+  within(rowOf(root, "terralith"), "addon-add-to-world-item")[0].click()
+  await flush()
+  expect(io.openModal.mock.calls[0][1].title).toBe(
+    "content:_trn_worlds.replace_title(world=Skyblock)"
+  )
 })
 
 it("offers Add to a world on .zip data packs only", async () => {

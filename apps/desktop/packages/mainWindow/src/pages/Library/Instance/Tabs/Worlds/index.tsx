@@ -27,6 +27,7 @@ import { toastUpdateFailures } from "./updateFailures"
 import { changesBlocked } from "@/pages/Library/shared/addons/components/ChangesBlocked"
 import { asksBeforeDeletingAddons } from "@/utils/addonDeletion"
 import { deletionTarget } from "@/utils/deletionTarget"
+import { worldLabel } from "@/utils/worldLabel"
 
 const noop = () => {}
 
@@ -207,7 +208,7 @@ const Worlds = () => {
         instance_id: id,
         origin: { World: pack.id }
       })
-      toastUpdateFailures(results)
+      toastUpdateFailures(results, worldList())
     } catch {
       /* The global handler shows the refusal. */
     } finally {
@@ -299,7 +300,7 @@ const Worlds = () => {
       is_duplicate: false,
       file_size: 0
     }
-    void addonMutations.handleDeleteMod(target)
+    void addonMutations.handleDeleteMod(target, worldLabel(world))
   }
 
   const openOnPlatform = (
@@ -357,10 +358,7 @@ const Worlds = () => {
                 }),
               deleteWorld: () => deleteWorld(world()),
               copyName: () => {
-                const row = worldRow(world())
-                void window.navigator.clipboard.writeText(
-                  row?.metadata?.name || world().name
-                )
+                void window.navigator.clipboard.writeText(worldLabel(world()))
                 toast.success(t("notifications:_trn_copied_to_clipboard"))
               },
               updateWorld: (row) => {

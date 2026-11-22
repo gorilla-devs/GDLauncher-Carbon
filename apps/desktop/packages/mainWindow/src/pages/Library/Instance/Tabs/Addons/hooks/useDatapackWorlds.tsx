@@ -11,6 +11,7 @@ import {
   sameDatapackProject
 } from "../../Worlds/datapackCopies"
 import { toastUpdateFailures } from "../../Worlds/updateFailures"
+import { labelOfFolder, worldLabel } from "@/utils/worldLabel"
 
 /** A world the core can copy a data pack into. */
 export type ReadableWorld = FEWorld & { identity: string }
@@ -65,7 +66,7 @@ export const useDatapackWorlds = (options: {
       .filter((world) =>
         world.datapacks.some((pack) => sameDatapackProject(pack, row))
       )
-      .map((world) => world.name)
+      .map(worldLabel)
 
   const copiesWithUpdate = (row: Mod) =>
     datapackCopies(worldList(), options.rows(), row).withUpdate
@@ -95,7 +96,7 @@ export const useDatapackWorlds = (options: {
         toast.success(
           t("content:_trn_datapack_staging.added", {
             name,
-            world: destination,
+            world: labelOfFolder(worldList(), destination),
             interpolation: { escapeValue: false }
           })
         )
@@ -110,7 +111,7 @@ export const useDatapackWorlds = (options: {
           { name: "confirmChoice" },
           {
             title: t("content:_trn_worlds.replace_title", {
-              world: world.name,
+              world: worldLabel(world),
               interpolation: { escapeValue: false }
             }),
             message: t("content:_trn_worlds.replace_files", {
@@ -136,7 +137,7 @@ export const useDatapackWorlds = (options: {
         instance_id: id,
         origin: { Instance: row.id }
       })
-      toastUpdateFailures(results)
+      toastUpdateFailures(results, worldList())
     } catch {
       /* The global handler shows the refusal. */
     } finally {

@@ -42,6 +42,7 @@ import { useGlobalStore } from "@/components/GlobalStoreContext"
 import useSearchContext from "@/components/SearchInputContext"
 import { LOCAL_ERROR_TOAST } from "@/utils/mutationErrorToast"
 import { refreshWorldsAfter } from "@/utils/refusalText"
+import { worldLabel } from "@/utils/worldLabel"
 import {
   asksWhichWorld,
   canBeDatapack,
@@ -450,7 +451,7 @@ const ModDownloadButton = (props: ModDownloadButtonProps) => {
         staged: false,
         server: false,
         copy: undefined,
-        world: world.name,
+        world: worldLabel(world),
         instanceId
       }
       const request = worldDatapackInstall(

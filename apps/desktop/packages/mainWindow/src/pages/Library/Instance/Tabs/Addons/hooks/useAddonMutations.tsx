@@ -275,7 +275,9 @@ export const useAddonMutations = (
     }
   }
 
-  const handleDeleteMod = async (mod: ModType) => {
+  /** `label` is what the confirmation calls a world; its row only knows the
+   *  folder name. */
+  const handleDeleteMod = async (mod: ModType, label?: string) => {
     // Preferences and confirmation can outlive the current route or row.
     const instanceId = parseInt(params.id, 10)
     const target = snapshotDeletionTarget(mod)
@@ -286,7 +288,7 @@ export const useAddonMutations = (
       modalsContext?.openModal(
         { name: "confirmWorldDeletion" },
         {
-          worldName: target.filename,
+          worldName: label ?? target.filename,
           onConfirm: () => void performDeleteMod(instanceId, target)
         }
       )

@@ -59,3 +59,20 @@ it("keeps the core's sentence for a failed place without a code", () => {
     ]
   ])
 })
+
+it("shows a failed place given as a folder name by its in-game name", () => {
+  toastUpdateFailures(
+    [
+      { place: "New World", ok: false, error: "x", error_code: null },
+      { place: "Creative", ok: false, error: "x", error_code: null },
+      { place: "Gone", ok: false, error: "x", error_code: null }
+    ],
+    [
+      { name: "New World", title: "Skyblock" },
+      { name: "Creative", title: null }
+    ]
+  )
+  expect(error.mock.calls[0][0]).toBe(
+    "content:_trn_worlds.update_failed_in Skyblock, Creative, Gone"
+  )
+})

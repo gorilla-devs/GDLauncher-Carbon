@@ -170,10 +170,11 @@ const known = (id: string, project: string, has_update = false) =>
 const world = (
   name: string,
   datapacks: FEWorldDatapack[],
-  identity: string | null = name
+  identity: string | null = name,
+  titled: string | null = null
 ): FEWorld => ({
   name,
-  title: null,
+  title: titled,
   addon_id: `addon-${name}`,
   identity,
   datapacks
@@ -255,6 +256,41 @@ it("selects the first world and asks the core to watch the instance", async () =
   expect(title(root)).toBe("Alpha")
   expect(all(root, "world-entry")[0].dataset.selected).toBe("true")
   expect(io.mutate["instance.prioritizeInstanceCache"]).toHaveBeenCalledWith(5)
+})
+
+it("names a world by its in-game name, with the folder beneath the title only when it differs", async () => {
+  const root = mount([
+    world("New World (2)", [], "id", "Skyblock with friends"),
+    world("Creative", [], "id2")
+  ])
+  await flush()
+  expect(title(root)).toBe("Skyblock with friends")
+  expect(one(root, "world-folder")!.textContent).toBe("New World (2)")
+  const entries = all(root, "world-entry")
+  expect(entries[0].textContent).toContain("Skyblock with friends")
+  expect(entries[0].textContent).not.toContain("New World (2)")
+  select(root, "Creative")
+  await flush()
+  expect(title(root)).toBe("Creative")
+  expect(one(root, "world-folder")).toBeNull()
+})
+
+it("follows the label of two worlds that share it with their folder, in the sidebar", async () => {
+  const root = mount([
+    world("Survival", [], "a", "Survival"),
+    world("Survival (2)", [], "b", "Survival"),
+    world("Creative", [], "c")
+  ])
+  await flush()
+  const [first, second, third] = all(root, "world-entry")
+  expect(first.textContent).toContain("Survival Survival")
+  expect(second.textContent).toContain("Survival Survival (2)")
+  expect(third.textContent).toContain("Creative")
+  expect(third.textContent).not.toContain("Creative Creative")
+  // The selection is still the folder name.
+  select(root, "Survival (2)")
+  await flush()
+  expect(one(root, "world-folder")!.textContent).toBe("Survival (2)")
 })
 
 it("keeps the chosen world across a refetch while it still exists", async () => {
@@ -341,6 +377,23 @@ it("offers Update here and Update everywhere for three copies with an update", a
   ).toHaveBeenCalledWith({ instance_id: 5, origin: { World: "a" } })
   expect(io.mutateAsync["instance.updateWorldDatapack"]).not.toHaveBeenCalled()
   expect(io.toastError).not.toHaveBeenCalled()
+})
+
+it("names a place Update everywhere could not update by its in-game name", async () => {
+  const root = mount([
+    world("Alpha", [known("a", "terra", true)], "a", "Skyblock"),
+    world("Beta", [known("b", "terra", true)])
+  ])
+  await flush()
+  io.mutateAsync["instance.updateDatapackEverywhere"].mockResolvedValue([
+    { place: "Alpha", ok: false, error: "disk full" }
+  ] satisfies FEDatapackUpdateResult[])
+  one(root, "world-datapack-update-everywhere")!.click()
+  await flush()
+  expect(io.toastError).toHaveBeenCalledExactlyOnceWith(
+    "content:_trn_worlds.update_failed_in(Skyblock)",
+    { description: "disk full" }
+  )
 })
 
 it("names the places Update everywhere could not update", async () => {
@@ -522,7 +575,7 @@ it("deletes a world while the game is not running", async () => {
     "content:_trn_delete_mod"
   )
   action.click()
-  expect(io.deleteWorld).toHaveBeenCalledExactlyOnceWith(row)
+  expect(io.deleteWorld).toHaveBeenCalledExactlyOnceWith(row, "Alpha")
 })
 
 it("shows a failed world list in place with a retry, not as a toast", async () => {
@@ -555,7 +608,17 @@ it("deletes the world through the addon deletion with its row", async () => {
   const root = mount([world("Alpha", [])], { mods: [row] })
   await flush()
   one(root, "world-delete")!.click()
-  expect(io.deleteWorld).toHaveBeenCalledExactlyOnceWith(row)
+  expect(io.deleteWorld).toHaveBeenCalledExactlyOnceWith(row, "Alpha")
+})
+
+it("asks about deleting a world by its in-game name", async () => {
+  const row = worldRow("New World")
+  const root = mount([world("New World", [], "id", "Skyblock")], {
+    mods: [row]
+  })
+  await flush()
+  one(root, "world-delete")!.click()
+  expect(io.deleteWorld).toHaveBeenCalledExactlyOnceWith(row, "Skyblock")
 })
 
 it("opens the search and the versions page for this world", async () => {
@@ -637,6 +700,13 @@ it("copies the world's name", async () => {
     await flush()
     one(root, "world-copy-name")!.click()
     expect(writeText).toHaveBeenCalledExactlyOnceWith("My World")
+    writeText.mockClear()
+    dispose?.()
+    dispose = undefined
+    const titled = mount([world("New World", [], null, "Skyblock")])
+    await flush()
+    one(titled, "world-copy-name")!.click()
+    expect(writeText).toHaveBeenCalledExactlyOnceWith("Skyblock")
     expect(io.toastSuccess).toHaveBeenCalled()
   } finally {
     vi.unstubAllGlobals()

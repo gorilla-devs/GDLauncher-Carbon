@@ -153,6 +153,14 @@ describe("addon deletion target identity", () => {
     expect(selection).not.toHaveBeenCalled()
   })
 
+  it("asks about a world by the label it is given, not its folder name", async () => {
+    state.preference.isLoading = false
+    state.preference.data = false
+    const { actions } = setup()
+    await actions.handleDeleteMod(addon("world-a"), "Skyblock")
+    expect(state.openModal.mock.calls[0][1].worldName).toBe("Skyblock")
+  })
+
   it("keeps the instance and addon shown in a confirmation", async () => {
     state.preference.isLoading = false
     state.preference.data = false

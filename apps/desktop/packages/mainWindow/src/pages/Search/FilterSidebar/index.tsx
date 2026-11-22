@@ -22,6 +22,7 @@ import { ModloadersFilter } from "./ModloadersFilter"
 import { GameVersionsFilter } from "./GameVersionsFilter"
 import { EnvironmentFilter } from "./EnvironmentFilter"
 import { SortFilter } from "./SortFilter"
+import { worldLabel } from "@/utils/worldLabel"
 
 const SIDEBAR_WIDTH = 260
 const COLLAPSED_WIDTH = 48
@@ -47,7 +48,7 @@ function ExpandedPanel(props: {
   const worldTarget = () => searchContext?.selectedWorld?.name !== undefined
   const worldName = () => {
     const world = searchContext?.selectedWorld?.data
-    return world?.identity != null ? world.name : "..."
+    return world?.identity != null ? worldLabel(world) : "..."
   }
   const contextName = () =>
     worldTarget()

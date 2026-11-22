@@ -13,6 +13,7 @@ import { extractErrorDisplay } from "@/utils/rspcErrorText"
 import { addonInstallFailure } from "../addonInstallScope"
 import useSearchContext from "@/components/SearchInputContext"
 import type { InstanceInstall } from "@/utils/installedAddon"
+import { worldLabel } from "@/utils/worldLabel"
 import {
   instanceInstall,
   newestDatapackBuild,
@@ -361,7 +362,7 @@ export const useModInstallation = (
           taskId,
           title: addon.title,
           staged: false,
-          world: world.name
+          world: worldLabel(world)
         })
       )
     } catch {
