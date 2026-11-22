@@ -45,9 +45,10 @@ pub(super) fn paint_region(
             if cancelled() {
                 return None;
             }
-            if !region.has_chunk(cx, cz) {
+            if !region.lists_chunk(cx, cz) {
                 continue;
             }
+            // A listed chunk that cannot be found is damaged or not written yet.
             let read = region.chunk(cx, cz);
             let Some(Ok(surface)) = read.map(|nbt| surface_checked(&nbt, roof, legacy)) else {
                 complete = false;
@@ -312,6 +313,138 @@ mod tests {
         let falling = self::region(vec![(0, 0, hill("minecraft:water", |_, z| 15 - z))]);
         assert_piece(&paint(&falling, None).image, |cx, cz, _, _| {
             ((cx, cz) == (0, 0)).then(|| shaded(water, EQUAL))
+        });
+    }
+
+    #[test]
+    fn a_chunk_in_the_last_slot_fills_the_last_pixels() {
+        let stone = color("minecraft:stone");
+        let region = region(vec![(31, 31, hill("minecraft:stone", |_, _| 5))]);
+        let painted = paint(&region, None);
+        assert!(painted.complete);
+        assert_eq!(painted.image.get_pixel(511, 511), &shaded(stone, EQUAL));
+        assert_piece(&painted.image, |cx, cz, _, _| {
+            ((cx, cz) == (31, 31)).then(|| shaded(stone, EQUAL))
+        });
+    }
+
+    #[test]
+    fn the_first_row_takes_the_last_row_of_the_chunk_above_it() {
+        let stone = color("minecraft:stone");
+        let region = region(vec![
+            (4, 0, hill("minecraft:stone", |_, _| 8)),
+            (5, 0, hill("minecraft:stone", |_, _| 8)),
+            (6, 0, hill("minecraft:stone", |_, _| 8)),
+        ]);
+        let north = self::region(vec![
+            // Every row is higher than 8: a wrong chunk of the row would show as lower.
+            (4, 31, hill("minecraft:stone", |_, _| 15)),
+            // Row 14 is higher, row 15 is lower.
+            (
+                5,
+                31,
+                hill("minecraft:stone", |_, z| if z == 15 { 3 } else { 15 }),
+            ),
+            (
+                6,
+                31,
+                hill("minecraft:stone", |_, z| if z == 15 { 8 } else { 0 }),
+            ),
+        ]);
+        let painted = paint(&region, Some(&north));
+        assert_piece(&painted.image, |cx, cz, _, z| {
+            let factor = match (cx, z) {
+                (4, 0) => LOWER,
+                (5, 0) => HIGHER,
+                (6, 0) | (4..=6, _) => EQUAL,
+                _ => return None,
+            };
+            (cz == 0).then(|| shaded(stone, factor))
+        });
+    }
+
+    /// A finished chunk of 1.18 whose column `(x, z)` has its top block at the world height
+    /// `height(x, z)`, between -48 and -17, with stone below it.
+    fn deep_hill(height: impl Fn(usize, usize) -> i32) -> Vec<u8> {
+        let stone_to = |base: i32| fill(|x, y, z| u16::from(base + y as i32 <= height(x, z)));
+        chunk_1_18(
+            vec![
+                (-3, vec!["minecraft:air", "minecraft:stone"], stone_to(-48)),
+                (-2, vec!["minecraft:air", "minecraft:stone"], stone_to(-32)),
+            ],
+            FULL,
+        )
+    }
+
+    #[test]
+    fn heights_below_zero_compare_as_signed() {
+        let stone = color("minecraft:stone");
+        for (rising, first, later) in [(true, -40, -30), (false, -30, -40)] {
+            let region = region(vec![(
+                0,
+                0,
+                deep_hill(|_, z| if z == 0 { first } else { later }),
+            )]);
+            let painted = paint(&region, None);
+            assert_piece(&painted.image, |cx, cz, _, z| {
+                if (cx, cz) != (0, 0) {
+                    return None;
+                }
+                let factor = match (z, rising) {
+                    (1, true) => HIGHER,
+                    (1, false) => LOWER,
+                    _ => EQUAL,
+                };
+                Some(shaded(stone, factor))
+            });
+        }
+    }
+
+    #[test]
+    fn an_unfinished_chunk_to_the_north_leaves_the_row_unshaded() {
+        let stone = color("minecraft:stone");
+        let region = region(vec![(4, 0, hill("minecraft:stone", |_, _| 8))]);
+        let unfinished = chunk_1_18(
+            vec![(0, vec!["minecraft:stone"], vec![])],
+            "minecraft:features",
+        );
+        let north = self::region(vec![(4, 31, unfinished)]);
+        let painted = paint(&region, Some(&north));
+        assert!(painted.complete);
+        assert_piece(&painted.image, |cx, cz, _, _| {
+            ((cx, cz) == (4, 0)).then(|| shaded(stone, EQUAL))
+        });
+    }
+
+    #[test]
+    fn land_is_shaded_against_water_to_its_north() {
+        let stone = color("minecraft:stone");
+        let north = region(vec![(0, 31, hill("minecraft:water", |_, _| 5))]);
+        for (height, factor) in [(8, HIGHER), (5, EQUAL), (3, LOWER)] {
+            let land = self::region(vec![(0, 0, hill("minecraft:stone", |_, _| height))]);
+            let painted = paint(&land, Some(&north));
+            assert_piece(&painted.image, |cx, cz, _, z| {
+                ((cx, cz) == (0, 0)).then(|| shaded(stone, if z == 0 { factor } else { EQUAL }))
+            });
+        }
+    }
+
+    #[test]
+    fn a_chunk_listed_beyond_the_end_of_the_file_makes_the_piece_incomplete() {
+        let stone = color("minecraft:stone");
+        let mut bytes = region_bytes(&[(0, 0, 2, zlib(&hill("minecraft:stone", |_, _| 4)))]);
+        // Slot (1, 0) lists sector 500 of a file of a few sectors, as a region still being
+        // extended or a truncated copy does.
+        let at = 4;
+        bytes[at..at + 3].copy_from_slice(&500u32.to_be_bytes()[1..]);
+        bytes[at + 3] = 1;
+        let region = region_of(bytes);
+        assert!(!region.has_chunk(1, 0));
+        assert!(region.lists_chunk(1, 0));
+        let painted = paint(&region, None);
+        assert!(!painted.complete);
+        assert_piece(&painted.image, |cx, cz, _, _| {
+            ((cx, cz) == (0, 0)).then(|| shaded(stone, EQUAL))
         });
     }
 

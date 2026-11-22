@@ -99,8 +99,15 @@ impl Region {
 
     /// Whether the table lists a chunk here with bounds that hold; not whether
     /// `chunk` can read it, as its stream may still be broken or too large.
+    #[cfg_attr(not(test), allow(dead_code))]
     pub(super) fn has_chunk(&self, x: u8, z: u8) -> bool {
         self.payload(x, z).is_some()
+    }
+
+    /// Whether the table has an entry for this slot at all, whatever its bounds: a listed
+    /// slot that gives no `chunk` is damaged or not written yet, unlike an empty one.
+    pub(super) fn lists_chunk(&self, x: u8, z: u8) -> bool {
+        self.entry(x, z).is_some()
     }
 
     /// The inflated chunk NBT. `None` for an empty or lying slot, LZ4, an external
@@ -192,8 +199,8 @@ fn inflate_into(mut reader: impl Read, cap: usize, out: &mut Vec<u8>) -> bool {
 #[cfg(test)]
 pub(super) mod test {
     use super::*;
-    use flate2::Compression;
     use flate2::write::{GzEncoder, ZlibEncoder};
+    use flate2::Compression;
     use std::io::Write;
 
     pub(in super::super) fn zlib(data: &[u8]) -> Vec<u8> {
@@ -260,6 +267,23 @@ pub(super) mod test {
         assert_eq!(region.chunk(1, 0), None);
         assert!(!region.has_chunk(32, 0));
         assert_eq!(region.chunk(0, 32), None);
+    }
+
+    #[test]
+    fn a_slot_is_listed_when_its_entry_is_not_zero() {
+        let mut bytes = region_bytes(&[(0, 0, 2, zlib(NBT))]);
+        set_entry(&mut bytes, 1, 0, 9999, 3);
+        set_entry(&mut bytes, 2, 0, 0, 1);
+        let region = region_of(bytes);
+        assert!(region.lists_chunk(0, 0));
+        // Listed but out of bounds, so `chunk` gives nothing and `has_chunk` says no.
+        for x in [1, 2] {
+            assert!(region.lists_chunk(x, 0));
+            assert!(!region.has_chunk(x, 0));
+        }
+        assert!(!region.lists_chunk(3, 0));
+        assert!(!region.lists_chunk(32, 0));
+        assert!(!region.lists_chunk(0, 32));
     }
 
     #[test]
@@ -397,11 +421,9 @@ pub(super) mod test {
         assert!(Region::read(&short).unwrap().is_none());
 
         assert!(Region::read(dir.path()).unwrap().is_none());
-        assert!(
-            Region::read(&dir.path().join("missing.mca"))
-                .unwrap()
-                .is_none()
-        );
+        assert!(Region::read(&dir.path().join("missing.mca"))
+            .unwrap()
+            .is_none());
 
         let real = dir.path().join("r.0.0.mca");
         std::fs::write(&real, region_bytes(&[(0, 0, 2, zlib(NBT))])).unwrap();
