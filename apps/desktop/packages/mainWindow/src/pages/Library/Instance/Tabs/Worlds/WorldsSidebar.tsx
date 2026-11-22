@@ -1,9 +1,16 @@
 import type { FEWorld } from "@gd/core_module/bindings"
-import { Button, PRESS_CLASSES, Progress, Skeleton } from "@gd/ui"
+import {
+  Button,
+  PRESS_CLASSES,
+  Progress,
+  Skeleton,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger
+} from "@gd/ui"
 import { For, Match, Show, Switch } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
 import { worldNames } from "@/utils/worldLabel"
-import IconAction from "./IconAction"
 
 /** A world being duplicated, shown after the world it copies. */
 export interface WorldsSidebarCopy {
@@ -47,14 +54,22 @@ const CopyRow = (props: { copy: WorldsSidebarCopy }) => {
         </span>
         <Progress size="small" value={props.copy.percent ?? undefined} />
       </div>
-      <div class="invisible group-hover:visible">
-        <IconAction
-          testId="world-copy-cancel"
-          icon="i-hugeicons:cancel-01"
-          label={<Trans key="general:_trn_cancel" />}
-          onClick={() => props.copy.onCancel()}
-          danger
-        />
+      {/* Transparent rather than invisible, so Tab still reaches it. */}
+      <div class="opacity-0 transition-opacity group-focus-within:opacity-100 group-hover:opacity-100">
+        <Tooltip>
+          <TooltipTrigger
+            as="button"
+            type="button"
+            data-testid="world-copy-cancel"
+            class="b-0 flex cursor-pointer bg-transparent p-0"
+            onClick={() => props.copy.onCancel()}
+          >
+            <div class="i-hugeicons:cancel-01 text-lightSlate-500 h-5 w-5 transition-colors hover:text-red-400" />
+          </TooltipTrigger>
+          <TooltipContent>
+            <Trans key="general:_trn_cancel" />
+          </TooltipContent>
+        </Tooltip>
       </div>
     </div>
   )

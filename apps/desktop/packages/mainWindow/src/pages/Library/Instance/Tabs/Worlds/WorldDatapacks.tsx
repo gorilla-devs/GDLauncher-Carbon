@@ -173,8 +173,11 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
           reason={
             !readable() ? (
               <Trans key="content:_trn_worlds.unreadable" />
-            ) : props.copyRunning ? (
+            ) : props.beingCopied ? (
               <BeingCopiedText />
+            ) : props.copyRunning ? (
+              // Another world is being copied, not this one.
+              <Trans key="content:_trn_worlds.copying_unknown" />
             ) : undefined
           }
         />

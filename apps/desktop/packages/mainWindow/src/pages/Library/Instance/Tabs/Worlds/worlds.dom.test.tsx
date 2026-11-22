@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
-import { batch } from "solid-js"
-import { render } from "solid-js/web"
+import { batch, splitProps } from "solid-js"
+import { Dynamic, render } from "solid-js/web"
 import { createStore } from "solid-js/store"
 import type {
   FEDatapackUpdateResult,
@@ -8,9 +8,13 @@ import type {
   FEWorldDatapack,
   Mod
 } from "@gd/core_module/bindings"
+import english from "../../../../../../../../../../packages/i18n/locale/english/content.json"
+import japanese from "../../../../../../../../../../packages/i18n/locale/japanese/content.json"
 
 const io = vi.hoisted(() => ({
   state: null as any,
+  params: { id: "5" } as { id: string },
+  copyPattern: "{{name}} (copy)",
   navigate: vi.fn(),
   openModal: vi.fn(),
   deleteWorld: vi.fn(),
@@ -24,7 +28,7 @@ const io = vi.hoisted(() => ({
   clientQuery: vi.fn()
 }))
 
-vi.mock("@solidjs/router", () => ({ useParams: () => ({ id: "5" }) }))
+vi.mock("@solidjs/router", () => ({ useParams: () => io.params }))
 vi.mock("@/managers/NavigationManager", () => ({
   useGDNavigate: () => ({ navigate: io.navigate })
 }))
@@ -71,10 +75,11 @@ vi.mock("@/utils/rspcClient", () => ({
             return io.state.settings
           }
         }
+      // The copy is instance 5's: another instance's query answers none.
       if (key === "instance.getWorldCopy")
         return {
           get data() {
-            return io.state.copy
+            return options().queryKey[1] === 5 ? io.state.copy : null
           }
         }
       return {
@@ -96,7 +101,10 @@ vi.mock("@/utils/rspcClient", () => ({
 }))
 vi.mock("@gd/i18n", () => {
   const t = (key: string, options?: any) => {
-    if (key === "content:_trn_worlds.copy_name") return `${options.name} (copy)`
+    if (key === "content:_trn_worlds.copy_name")
+      return io.copyPattern.replace("{{name}}", options.name)
+    if (key === "instances:_trn_duplicate_failed")
+      return `${key}(${options.name})`
     if (options?.percent !== undefined) return `${key}(${options.percent})`
     return options?.places ? `${key}(${options.places})` : key
   }
@@ -115,6 +123,15 @@ vi.mock("@gd/ui", async () => {
     ...ui,
     PRESS_CLASSES: "",
     Progress: (p: any) => <div data-testid="progress" data-value={p.value} />,
+    // Renders what `as` names, so a trigger that is the button itself is one.
+    TooltipTrigger: (p: any) => {
+      const [own, rest] = splitProps(p, ["as", "children"])
+      return (
+        <Dynamic component={own.as ?? "div"} {...rest}>
+          {own.children}
+        </Dynamic>
+      )
+    },
     Skeleton: { logsList: () => <div /> },
     Button: (p: any) => (
       <button
@@ -206,6 +223,7 @@ const worldRow = (name: string, over: Partial<Mod> = {}): Mod => ({
 
 let dispose: (() => void) | undefined
 let setState: any
+let setParams: any
 const flush = async () => {
   for (let i = 0; i < 10; i++) await Promise.resolve()
 }
@@ -215,6 +233,7 @@ beforeEach(() => {
   io.mutate = {}
   io.mutateAsync = {}
   io.clientQuery.mockResolvedValue({ type: "Succeeded" })
+  io.copyPattern = english["_trn_worlds.copy_name"]
 })
 afterEach(() => {
   dispose?.()
@@ -247,6 +266,9 @@ function mount(
   })
   io.state = state
   setState = set
+  const [params, setP] = createStore({ id: "5" })
+  io.params = params
+  setParams = setP
   const root = document.createElement("div")
   document.body.append(root)
   dispose = render(() => <Worlds />, root)
@@ -1231,20 +1253,46 @@ it("duplicate sends the world and the name of its copy", async () => {
     name: "Home (copy)"
   })
   expect(io.clientQuery).toHaveBeenCalledWith(["vtask.getTaskOutcome", 7])
-
-  // A name as long as a name may be is cut, so the copy's stays within it.
-  const long = "L".repeat(64)
-  dispose?.()
-  document.body.textContent = ""
-  const other = mount([world("long", [], "id-long", long)])
-  await flush()
-  io.mutateAsync["instance.duplicateWorld"].mockResolvedValue(8)
-  one(other, "world-duplicate")!.click()
-  await flush()
-  const [request] = io.mutateAsync["instance.duplicateWorld"].mock.calls[1]
-  expect(request.name).toBe(long)
-  expect([...request.name].length).toBeLessThanOrEqual(64)
 })
+
+const LONG_LABELS = [
+  "L".repeat(10),
+  "L".repeat(57),
+  "L".repeat(58),
+  "L".repeat(64),
+  // Cut by UTF-16 units, either pattern would split an emoji in two.
+  "L".repeat(56) + "😀".repeat(4)
+]
+it.each([
+  ["English", english["_trn_worlds.copy_name"]],
+  ["full-width", japanese["_trn_worlds.copy_name"]]
+])(
+  "a long name is shortened so its copy keeps the whole %s pattern within 64 characters",
+  async (_, pattern) => {
+    io.copyPattern = pattern
+    const [head, tail] = pattern.split("{{name}}")
+    for (const label of LONG_LABELS) {
+      const root = mount([world("w", [], "id-w", label)])
+      await flush()
+      io.mutateAsync["instance.duplicateWorld"].mockResolvedValue(8)
+      one(root, "world-duplicate")!.click()
+      await flush()
+      const name: string =
+        io.mutateAsync["instance.duplicateWorld"].mock.calls.at(-1)![0].name
+      dispose?.()
+      dispose = undefined
+      document.body.textContent = ""
+
+      expect([...name].length, label).toBeLessThanOrEqual(64)
+      expect(name.startsWith(head) && name.endsWith(tail), name).toBe(true)
+      const kept = name.slice(head.length, name.length - tail.length)
+      expect(kept.length, label).toBeGreaterThan(0)
+      expect(label.startsWith(kept), name).toBe(true)
+      expect(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(kept), name).toBe(false)
+      if (label.length === 10) expect(kept).toBe(label)
+    }
+  }
+)
 
 it("a running copy shows its row with the percent and cannot be selected", async () => {
   let answer!: (outcome: any) => void
@@ -1340,9 +1388,75 @@ it("while a world is copied its changes and every duplicate are disabled with th
   expect((one(root, "world-add-datapacks") as HTMLButtonElement).disabled).toBe(
     false
   )
+  // It is not the world being copied: its Duplicate says a copy is running.
   const duplicate = one(root, "world-duplicate")!
   expect(duplicate.dataset.disabled).toBe("true")
-  expect(tooltip(duplicate)).toBe(reason)
+  expect(tooltip(duplicate)).toBe("content:_trn_worlds.copying_unknown")
+})
+
+const HELD = [
+  "world-rename",
+  "world-delete",
+  "world-duplicate",
+  "world-datapack-switch",
+  "world-datapack-update",
+  "world-datapack-remove"
+]
+const expectHeld = (root: HTMLElement, held: boolean) => {
+  const reason = "content:_trn_worlds.refusal.being_copied"
+  for (const id of HELD) {
+    const action = one(root, id)!
+    expect(action.dataset.disabled, id).toBe(String(held))
+    if (held) expect(tooltip(action), id).toBe(reason)
+  }
+  const add = one(root, "world-add-datapacks") as HTMLButtonElement
+  expect(add.disabled).toBe(held)
+  if (held) expect(tooltip(add)).toContain(reason)
+}
+
+it("the world a duplicate was asked for is held from the click until the core answers", async () => {
+  copyOutcome(copying(0.1))
+  let answer!: (task: number) => void
+  let refuse!: (error: Error) => void
+  io.mutateAsync["instance.duplicateWorld"] = vi.fn(
+    () =>
+      new Promise((resolve, reject) => {
+        answer = resolve
+        refuse = reject
+      })
+  )
+  const root = mount([
+    world("Home", [known("terra", "terra", true)]),
+    world("Other", [known("o", "other")])
+  ])
+  await flush()
+  one(root, "world-duplicate")!.click()
+  await flush()
+  expectHeld(root, true)
+
+  // Another world can still be changed; its Duplicate waits for the copy.
+  select(root, "Other")
+  await flush()
+  expect(one(root, "world-delete")!.dataset.disabled).toBe("false")
+  const duplicate = one(root, "world-duplicate")!
+  expect(duplicate.dataset.disabled).toBe("true")
+  expect(tooltip(duplicate)).toBe("content:_trn_worlds.copying_unknown")
+
+  // Refused: nothing is held any more.
+  select(root, "Home")
+  refuse(new Error("refused"))
+  await flush()
+  expectHeld(root, false)
+
+  // Accepted: held until the query names the copy, and then by it.
+  one(root, "world-duplicate")!.click()
+  await flush()
+  answer(7)
+  await flush()
+  expectHeld(root, true)
+  setState("copy", { ...COPY })
+  await flush()
+  expectHeld(root, true)
 })
 
 it("a finished copy is selected and no toast is shown", async () => {
@@ -1370,6 +1484,46 @@ it("a finished copy is selected and no toast is shown", async () => {
   expect(one(root, "world-folder")!.textContent).toBe("Home (copy) (2)")
   expect(io.toastSuccess).not.toHaveBeenCalled()
   expect(io.toastError).not.toHaveBeenCalled()
+})
+
+it("a finished copy leaves the world the player selected meanwhile", async () => {
+  let answer!: (outcome: any) => void
+  io.clientQuery.mockImplementation(
+    () => new Promise((resolve) => (answer = resolve))
+  )
+  const root = mount([world("Home", []), world("Other", [])], { copy: COPY })
+  io.refetchWorlds.mockImplementation(async () =>
+    setState({
+      copy: null,
+      worlds: [
+        world("Home", []),
+        world("Home (copy)", [], "id-new", "Home (copy)"),
+        world("Other", [])
+      ]
+    })
+  )
+  await flush()
+  select(root, "Other")
+  await flush()
+  answer({ type: "Succeeded" })
+  await flush()
+  await flush()
+  expect(io.refetchWorlds).toHaveBeenCalled()
+  expect(one(root, "world-copy")).toBeNull()
+  expect(title(root)).toBe("Other")
+})
+
+it("a copy whose end cannot be read says the copy failed and reads the lists again", async () => {
+  copyOutcome({ type: "Unavailable" })
+  mount([world("Home", [])], { copy: COPY })
+  await flush()
+  await flush()
+  expect(io.toastError).toHaveBeenCalledExactlyOnceWith(
+    "instances:_trn_duplicate_failed(Home (copy))"
+  )
+  // Nothing to dismiss: the core no longer holds the task.
+  expect(io.mutate["vtask.dismissTask"]).not.toHaveBeenCalled()
+  expect(io.refetchWorlds).toHaveBeenCalled()
 })
 
 it("a failed copy shows its refusal once and is dismissed", async () => {
@@ -1435,6 +1589,91 @@ it.each([
     expect(io.mutateAsync["instance.duplicateWorld"]).not.toHaveBeenCalled()
   }
 )
+
+it("the cancel cross is a button that keyboard focus shows", async () => {
+  copyOutcome(copying(0.1))
+  const root = mount([world("Home", [])], { copy: COPY })
+  await flush()
+  const cross = one(root, "world-copy-cancel")! as HTMLButtonElement
+  expect(cross.tagName).toBe("BUTTON")
+  expect(cross.type).toBe("button")
+  // Hidden by transparency, not visibility, so Tab can still reach it.
+  const shown = cross.closest('[class*="group-focus-within:"]')!
+  expect(shown.className).toContain("group-hover:")
+  expect(shown.className).not.toContain("invisible")
+  expect(tooltip(cross)).toBe("general:_trn_cancel")
+})
+
+it("another instance's tab neither shows this instance's copy nor holds its actions", async () => {
+  copyOutcome(copying(0.1))
+  const worlds = [world("Home", [known("terra", "terra", true)])]
+  const root = mount(worlds, { copy: COPY })
+  await flush()
+  expect(one(root, "world-copy")).not.toBeNull()
+  setParams("id", "6")
+  await flush()
+  expect(one(root, "world-copy")).toBeNull()
+  expectHeld(root, false)
+  dispose?.()
+  document.body.textContent = ""
+
+  // Nor a request to duplicate made in this instance and still on its way.
+  io.mutateAsync["instance.duplicateWorld"] = vi.fn(() => new Promise(() => {}))
+  const other = mount(worlds)
+  await flush()
+  one(other, "world-duplicate")!.click()
+  await flush()
+  expectHeld(other, true)
+  setParams("id", "6")
+  await flush()
+  expectHeld(other, false)
+})
+
+it("the poll of a copy stops when the tab closes", async () => {
+  vi.useFakeTimers()
+  try {
+    copyOutcome(copying(0.1))
+    mount([world("Home", [])], { copy: COPY })
+    await flush()
+    await vi.advanceTimersByTimeAsync(1000)
+    const reads = () =>
+      io.clientQuery.mock.calls.filter(
+        ([[key]]) => key === "vtask.getTaskOutcome"
+      ).length
+    expect(reads()).toBeGreaterThan(1)
+    const before = reads()
+    dispose?.()
+    dispose = undefined
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(reads()).toBe(before)
+  } finally {
+    vi.useRealTimers()
+  }
+})
+
+it("a refetch that answers the same copy keeps its percent", async () => {
+  copyOutcome(copying(0.42))
+  const root = mount([world("Home", [])], { copy: COPY })
+  await flush()
+  expect(one(root, "world-copy")!.textContent).toContain(
+    "content:_trn_worlds.copying(42)"
+  )
+  setState("copy", { ...COPY })
+  await flush()
+  expect(one(root, "world-copy")!.textContent).toContain(
+    "content:_trn_worlds.copying(42)"
+  )
+})
+
+it("a double click on Duplicate while its request is on its way sends one", async () => {
+  io.mutateAsync["instance.duplicateWorld"] = vi.fn(() => new Promise(() => {}))
+  const root = mount([world("Home", [])])
+  await flush()
+  one(root, "world-duplicate")!.click()
+  one(root, "world-duplicate")!.click()
+  await flush()
+  expect(io.mutateAsync["instance.duplicateWorld"]).toHaveBeenCalledTimes(1)
+})
 
 it("a copy already running when the tab opens is shown", async () => {
   copyOutcome(copying(0.1))
