@@ -2924,7 +2924,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         let mut rename_path_guard = None;
         // Declared before `moved`, so it is let go after a move back: the map opens no file of
         // the instance's worlds while its folder moves.
-        let mut _map_files = None;
+        let mut map_files = None;
         let mut moved = MovedRoot::default();
         let renamed = update.name.as_ref().is_some_and(|name| *name != old_name);
         if let Some(name) = update.name.as_ref().filter(|_| renamed) {
@@ -2935,7 +2935,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
                 self.test_hooks
                     .pause("rename_move", update.instance_id)
                     .await;
-                _map_files = Some(self.close_world_map_files(update.instance_id).await);
+                map_files = Some(self.close_world_map_files(update.instance_id).await);
                 tokio::fs::rename(&path, &new_path)
                     .await
                     .map_err(folder_not_renamed)?;
@@ -3108,6 +3108,8 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
         }
         moved.keep();
+        // The folder stays where it is from here on.
+        drop(map_files);
         if let Some(icon) = replaced_icon {
             if let Err(error) = tokio::fs::remove_file(path.join(&icon)).await {
                 tracing::warn!(

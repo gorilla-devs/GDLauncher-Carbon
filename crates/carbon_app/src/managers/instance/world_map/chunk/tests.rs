@@ -583,10 +583,9 @@ fn under_a_ceiling_a_chunk_dug_out_to_the_floor_shows_the_floor() {
     assert!(surface.iter().all(|t| *t == top("minecraft:bedrock", 4)));
 }
 
-#[test]
-fn under_a_ceiling_a_column_with_no_gap_below_the_roof_shows_nothing() {
-    // Netherrack from the floor to the bedrock roof at 127 where `x < 8`; elsewhere air
-    // from 40 to 99.
+/// Netherrack from the floor to the bedrock roof at 127 where `x < 8`; elsewhere air from
+/// 40 to 99.
+fn half_solid_under_a_roof() -> Vec<u8> {
     let palette = vec!["minecraft:air", "minecraft:netherrack", "minecraft:bedrock"];
     let sections = (0..8)
         .map(|section_y: i8| {
@@ -601,7 +600,10 @@ fn under_a_ceiling_a_column_with_no_gap_below_the_roof_shows_nothing() {
             (section_y, palette.clone(), indices)
         })
         .collect();
-    let surface = surface(&chunk_1_18(sections, FULL), Roof::Ceiling, None);
+    chunk_1_18(sections, FULL)
+}
+
+fn assert_half_solid(surface: &Surface) {
     for z in 0..16 {
         for x in 0..16 {
             let expected = if x < 8 {
@@ -612,6 +614,27 @@ fn under_a_ceiling_a_column_with_no_gap_below_the_roof_shows_nothing() {
             assert_eq!(surface[z * 16 + x], expected, "column {x},{z}");
         }
     }
+}
+
+#[test]
+fn under_a_ceiling_a_column_with_no_gap_below_the_roof_shows_nothing() {
+    assert_half_solid(&surface(&half_solid_under_a_roof(), Roof::Ceiling, None));
+}
+
+#[test]
+fn under_a_roof_found_by_its_bedrock_a_column_with_no_gap_shows_nothing() {
+    assert_half_solid(&surface(&half_solid_under_a_roof(), Roof::Open, None));
+}
+
+#[test]
+fn a_sheet_of_bedrock_with_nothing_under_it_is_the_ground() {
+    let sheet = (
+        0,
+        vec!["minecraft:air", "minecraft:bedrock"],
+        fill(|_, y, _| u16::from(y == 0)),
+    );
+    let surface = surface(&chunk_1_18(vec![sheet], FULL), Roof::Open, None);
+    assert!(surface.iter().all(|t| *t == top("minecraft:bedrock", 0)));
 }
 
 #[test]

@@ -122,10 +122,15 @@ impl ManagerRef<'_, InstanceManager> {
     /// The map facts of the world; while its files are being moved or removed, read once
     /// the operation ends.
     pub async fn world_map(self, id: InstanceId, world: String) -> anyhow::Result<WorldMap> {
-        let _open = self.world_map_files(id).read_owned().await;
+        let open = self.world_map_files(id).read_owned().await;
         let folder = self.map_world_folder(id, &world).await?;
-        // A world explored far holds thousands of regions to list.
-        Ok(tokio::task::spawn_blocking(move || facts_of(&folder)).await?)
+        // A world explored far holds thousands of regions to list. The files stay open to the
+        // listing until it ends, not until the query is given up.
+        Ok(tokio::task::spawn_blocking(move || {
+            let _open = open;
+            facts_of(&folder)
+        })
+        .await?)
     }
 }
 

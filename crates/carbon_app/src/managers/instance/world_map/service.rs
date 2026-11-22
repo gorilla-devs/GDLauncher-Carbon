@@ -117,6 +117,8 @@ impl ManagerRef<'_, InstanceManager> {
         let found = {
             let (world, dimension) = (world.clone(), request.dimension.clone());
             spawn_blocking(move || {
+                // Let go when the listing ends, not when the request is given up.
+                let _open = open;
                 // Lists the whole world, so asked once per request.
                 let folder = dimension_folder(&world, &dimension)?;
                 let regions = regions_beneath(&folder, scale, x, z)?;
@@ -124,7 +126,6 @@ impl ManagerRef<'_, InstanceManager> {
             })
             .await?
         };
-        drop(open);
         let Some((folder, regions)) = found else {
             return Ok(None);
         };
@@ -383,12 +384,27 @@ impl Painter {
         .await?
     }
 
+    /// The gate, for a painting about to open a file. A rename is over in a moment, so the
+    /// painting waits that long rather than leave a hole in the map; an operation that takes
+    /// longer makes the request answer nothing.
+    fn open_files(&self) -> Result<tokio::sync::RwLockReadGuard<'_, ()>, FilesClosed> {
+        let until = std::time::Instant::now() + FILES_WAIT;
+        loop {
+            if let Ok(open) = self.files.try_read() {
+                return Ok(open);
+            }
+            if std::time::Instant::now() >= until || self.given_up.load(Ordering::Acquire) {
+                return Err(FilesClosed);
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
     fn paint_blocking(&self, x: i32, z: i32) -> anyhow::Result<Option<Painted>> {
         self.given_up()?;
         // Each file is read and closed before its chunks are parsed: the region whole, the one
-        // to its north only for its last row. Never waited for: a request that finds the files
-        // closed answers nothing.
-        let open = self.files.try_read().map_err(|_| FilesClosed)?;
+        // to its north only for its last row.
+        let open = self.open_files()?;
         let Some(region) = Region::read(&region_file(&self.folder, x, z))? else {
             return Ok(None);
         };
@@ -419,7 +435,7 @@ impl Painter {
         let closed = std::cell::Cell::new(false);
         let legacy = || {
             loaded
-                .get_or_init(|| match self.files.try_read() {
+                .get_or_init(|| match self.open_files() {
                     Ok(_open) => self.legacy.ids(&self.world),
                     Err(_) => {
                         closed.set(true);

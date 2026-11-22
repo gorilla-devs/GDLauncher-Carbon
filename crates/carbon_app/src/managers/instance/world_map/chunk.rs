@@ -27,6 +27,10 @@ const SECTION_YS: RangeInclusive<i8> = -127..=126;
 /// A chunk whose top block is bedrock in this many columns is taken to have a roof.
 const ROOF_COLUMNS: usize = 200;
 
+/// Bedrock this close above the lowest block of its column is the floor's: the game's floor
+/// is five blocks thick.
+const FLOOR_BAND: i16 = 8;
+
 const EMPTY: Surface = [None; 256];
 
 #[derive(Clone, Copy, PartialEq, Debug)]
@@ -122,18 +126,20 @@ pub(super) fn surface_asking(
         Ok(None) => return Ok(EMPTY),
         Err(IllFormed) => return Err(Unreadable),
     };
-    let open = std::array::from_fn(|i| column.top(i, Roof::Open));
-    let bedrock = open
+    let open: [Option<(Top, bool)>; 256] = std::array::from_fn(|i| column.top(i, Roof::Open));
+    // Bedrock at the very bottom of its column is the floor, of a chunk dug down to it or of
+    // a world that is nothing else: only bedrock with the world under it is a roof.
+    let roofed = open
         .iter()
-        .flatten()
-        .filter(|(_, bedrock)| *bedrock)
+        .enumerate()
+        .filter(|(i, top)| {
+            top.is_some_and(|(top, bedrock)| {
+                bedrock && column.bottom(*i).is_some_and(|y| top.y - y >= FLOOR_BAND)
+            })
+        })
         .count();
-    Ok(if roof == Roof::Ceiling {
+    Ok(if roof == Roof::Ceiling || roofed >= ROOF_COLUMNS {
         std::array::from_fn(|i| column.top(i, Roof::Ceiling).map(|(top, _)| top))
-    } else if bedrock >= ROOF_COLUMNS {
-        // A roof found only by its bedrock may be the floor of a chunk dug down to it: where
-        // nothing lies under it, the column shows its top.
-        std::array::from_fn(|i| column.top(i, Roof::Ceiling).or(open[i]).map(|(top, _)| top))
     } else {
         open.map(|top: Option<(Top, bool)>| top.map(|(top, _)| top))
     })
@@ -491,6 +497,20 @@ impl Column {
                     return Some((Top { color, y, water }, block.bedrock));
                 }
                 roof_seen = true;
+            }
+        }
+        None
+    }
+
+    /// The height of the lowest block of column `i` that is not see-through.
+    fn bottom(&self, i: usize) -> Option<i16> {
+        for (n, section) in self.sections.iter().enumerate() {
+            let Some(section) = section else { continue };
+            let base = (i16::from(self.lowest) + n as i16) * 16;
+            for local in 0..16 {
+                if !matches!(section.block(local * 256 + i).look, Look::SeeThrough) {
+                    return Some(base + local as i16);
+                }
             }
         }
         None

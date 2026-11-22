@@ -130,13 +130,18 @@ impl Region {
     /// whole file would: a region painted needs only the last row of the one to its north.
     /// `None` as `open` says.
     pub(super) fn read_row(path: &Path, z: u8) -> std::io::Result<Option<Region>> {
-        let Some((mut file, _)) = open(path)? else {
+        let Some((mut file, len)) = open(path)? else {
             return Ok(None);
         };
         let table = read_up_to(&mut file, HEADER)?;
         if table.len() < HEADER || z >= 32 {
             return Ok(None);
         }
+        // Chunks never share sectors, so a row's spans are no more than the file, but for
+        // the 4 bytes each reads past its sectors: a row that claims more is a lie, and is
+        // not held many times over.
+        let most = len.saturating_add(32 * 4);
+        let mut held = 0u64;
         let mut spans = Vec::new();
         for x in 0..32 {
             let at = (x + usize::from(z) * 32) * 4;
@@ -153,6 +158,13 @@ impl Region {
             }
             file.seek(SeekFrom::Start(start))?;
             let bytes = read_up_to(&mut file, count * SECTOR + 4)?;
+            held += bytes.len() as u64;
+            if held > most {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "the row's chunks share sectors",
+                ));
+            }
             if !bytes.is_empty() {
                 spans.push((start as usize, bytes));
             }
@@ -220,10 +232,11 @@ impl Region {
     }
 
     /// Whether the slot holds, within bounds, a chunk this reader does not read by design:
-    /// LZ4 (kind 4), or one kept in an outside `.mcc` file (the kind with its high bit set).
+    /// LZ4 (kind 4), or one kept in an outside `.mcc` file (a known kind with its high bit
+    /// set). Any other kind is damage.
     pub(super) fn left_out(&self, x: u8, z: u8) -> bool {
         self.payload(x, z)
-            .is_some_and(|(kind, _)| kind == 4 || kind & 0x80 != 0)
+            .is_some_and(|(kind, _)| matches!(kind, 4 | 0x81..=0x84))
     }
 
     /// The inflated chunk NBT. `None` for an empty or lying slot, LZ4, an external
@@ -627,6 +640,39 @@ pub(super) mod test {
             std::os::unix::fs::symlink(&path, &link).unwrap();
             assert!(Region::read_row(&link, 31).unwrap().is_none());
         }
+    }
+
+    #[test]
+    fn a_row_whose_entries_share_sectors_is_refused_not_held_many_times() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("r.0.-1.mca");
+        let mut bytes = region_bytes(&[(0, 31, 3, noise(1_000_000, 1))]);
+        for x in 1..32 {
+            set_entry(&mut bytes, x, 31, 2, 255);
+        }
+        std::fs::write(&path, &bytes).unwrap();
+        let error = Region::read_row(&path, 31).err().expect("refused");
+        assert_eq!(error.kind(), std::io::ErrorKind::InvalidData);
+        // The whole file, read once, still gives what each entry names.
+        assert!(Region::read(&path).unwrap().unwrap().chunk(0, 31).is_some());
+    }
+
+    #[test]
+    fn only_a_known_kind_is_left_out_by_design() {
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().join("r.0.0.mca");
+        let bytes = region_bytes(&[
+            (0, 0, 4, noise(100, 1)),
+            (1, 0, 0x82, vec![]),
+            (2, 0, 0x80, noise(100, 2)),
+            (3, 0, 0xff, noise(100, 3)),
+            (4, 0, 9, noise(100, 4)),
+            (5, 0, 2, zlib(NBT)),
+        ]);
+        std::fs::write(&path, &bytes).unwrap();
+        let region = Region::read(&path).unwrap().unwrap();
+        let left_out: Vec<bool> = (0..6).map(|x| region.left_out(x, 0)).collect();
+        assert_eq!(left_out, [true, true, false, false, false, false]);
     }
 
     #[test]
