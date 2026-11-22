@@ -220,6 +220,12 @@ impl<'a> Cursor<'a> {
         Ok((element, len))
     }
 
+    /// Checks the depth of a list starting at `depth` and reads its header.
+    fn start_list(&mut self, depth: usize) -> Result<(u8, usize), NbtError> {
+        self.check_depth(depth)?;
+        self.list_header()
+    }
+
     /// The id of the next entry of a compound, `None` at its end.
     fn entry_id(&mut self) -> Result<Option<u8>, NbtError> {
         let id = self.u8()?;
@@ -265,8 +271,7 @@ fn walk_payload(
             Tag::String(raw.to_vec())
         }
         9 => {
-            cur.check_depth(depth)?;
-            let (element, len) = cur.list_header()?;
+            let (element, len) = cur.start_list(depth)?;
             let mut items = Vec::with_capacity(if build { len.min(4096) } else { 0 });
             for _ in 0..len {
                 if let Some(item) = walk_payload(cur, element, depth + 1, build)? {
@@ -289,6 +294,9 @@ fn walk_payload(
         11 => {
             let len = cur.length(4)?;
             let raw = cur.take(len * 4)?;
+            if !build {
+                return Ok(None);
+            }
             Tag::IntArray(
                 raw.chunks_exact(4)
                     .map(|c| i32::from_be_bytes(c.try_into().unwrap()))
@@ -298,6 +306,9 @@ fn walk_payload(
         12 => {
             let len = cur.length(8)?;
             let raw = cur.take(len * 8)?;
+            if !build {
+                return Ok(None);
+            }
             Tag::LongArray(
                 raw.chunks_exact(8)
                     .map(|c| i64::from_be_bytes(c.try_into().unwrap()))
@@ -381,8 +392,7 @@ fn read_compound_keeping<'a>(
                 // A list is only taken apart when its members are compounds.
                 9 if cur.rest.first() == Some(&10) => {
                     cur.count_tag()?;
-                    cur.check_depth(depth + 1)?;
-                    let (element, len) = cur.list_header()?;
+                    let (element, len) = cur.start_list(depth + 1)?;
                     let mut items = Vec::with_capacity(len.min(4096));
                     for _ in 0..len {
                         items.push(read_compound_keeping(cur, depth + 2, path, keep)?);
@@ -542,8 +552,7 @@ mod tests {
         out.extend_from_slice(raw);
     }
 
-    #[test]
-    fn every_tag_type_round_trips_byte_for_byte() {
+    fn every_tag_type_fixture() -> Vec<u8> {
         let mut b = vec![10, 0, 0];
         named(&mut b, 1, "byte");
         b.push(0xFE);
@@ -591,6 +600,12 @@ mod tests {
         b.extend_from_slice(&5i64.to_be_bytes());
         b.extend_from_slice(&(-6i64).to_be_bytes());
         b.push(0);
+        b
+    }
+
+    #[test]
+    fn every_tag_type_round_trips_byte_for_byte() {
+        let b = every_tag_type_fixture();
 
         let root = read(&b).unwrap();
         assert_eq!(write(&root), b);
@@ -824,11 +839,84 @@ mod tests {
 
     #[test]
     fn everything_kept_equals_read() {
-        let bytes = partial_fixture();
         let limits = Limits {
             max_tags: MAX_TAGS,
             max_depth: MAX_DEPTH,
         };
-        assert_eq!(read_keeping(&bytes, &|_| Keep::All, limits), read(&bytes));
+        for bytes in [partial_fixture(), every_tag_type_fixture()] {
+            assert_eq!(read_keeping(&bytes, &|_| Keep::All, limits), read(&bytes));
+        }
+    }
+
+    fn array_fixture(id: u8, unit: usize, len: usize, declared: usize) -> Vec<u8> {
+        let mut b = vec![10, 0, 0];
+        named(&mut b, id, "Big");
+        b.extend_from_slice(&(declared as i32).to_be_bytes());
+        b.extend(std::iter::repeat(0).take(len * unit));
+        int_entry(&mut b, "After", 4);
+        b.push(0);
+        b
+    }
+
+    #[test]
+    fn a_skipped_int_or_long_array_leaves_the_rest_intact() {
+        let keep = |path: &[&[u8]]| {
+            if path == [b"After".as_slice()] {
+                Keep::All
+            } else {
+                Keep::Skip
+            }
+        };
+        let expected = Tag::Compound(vec![(b"After".to_vec(), Tag::Int(4))]);
+        for (id, unit) in [(11u8, 4usize), (12, 8)] {
+            let n = 1024 * 1024 / unit;
+            let root = read_keeping(&array_fixture(id, unit, n, n), &keep, LIMITS).unwrap();
+            assert_eq!(root.tag, expected);
+        }
+    }
+
+    #[test]
+    fn a_skipped_int_or_long_array_past_the_input_is_refused() {
+        for (id, unit) in [(11u8, 4usize), (12, 8)] {
+            let bytes = array_fixture(id, unit, 2, 1000);
+            assert!(read_keeping(&bytes, &|_| Keep::Skip, LIMITS).is_err());
+        }
+    }
+
+    #[test]
+    fn a_skipped_string_is_left_out() {
+        let mut b = vec![10, 0, 0];
+        named(&mut b, 8, "Name");
+        string_payload(&mut b, b"hello");
+        int_entry(&mut b, "After", 4);
+        b.push(0);
+        let keep = |path: &[&[u8]]| {
+            if path == [b"After".as_slice()] {
+                Keep::All
+            } else {
+                Keep::Skip
+            }
+        };
+        let root = read_keeping(&b, &keep, LIMITS).unwrap();
+        assert_eq!(
+            root.tag,
+            Tag::Compound(vec![(b"After".to_vec(), Tag::Int(4))])
+        );
+    }
+
+    #[test]
+    fn descending_into_a_list_that_is_not_of_compounds_builds_it_whole() {
+        let mut b = vec![10, 0, 0];
+        named(&mut b, 9, "Empty");
+        b.push(0);
+        b.extend_from_slice(&0i32.to_be_bytes());
+        named(&mut b, 9, "Ints");
+        b.push(3);
+        b.extend_from_slice(&2i32.to_be_bytes());
+        b.extend_from_slice(&7i32.to_be_bytes());
+        b.extend_from_slice(&8i32.to_be_bytes());
+        b.push(0);
+        let root = read_keeping(&b, &|_| Keep::Descend, LIMITS).unwrap();
+        assert_eq!(root, read(&b).unwrap());
     }
 }
