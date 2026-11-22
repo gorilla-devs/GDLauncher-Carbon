@@ -4,6 +4,7 @@ import {
   dragged,
   fitAll,
   MAX_ZOOM,
+  pieceBox,
   scaleFor,
   screenOf,
   visiblePieces,
@@ -118,15 +119,51 @@ describe("visiblePieces", () => {
       )
   })
 
-  it("never lists more than 64 pieces", () => {
+  it("never lists more than 256 pieces", () => {
     const pieces = visiblePieces(
       { centerX: 0, centerZ: 0, zoom: 1 },
       10000,
       10000,
       square(-20, 20)
     )
-    expect(pieces).toHaveLength(64)
+    expect(pieces).toHaveLength(256)
     expect([pieces[0].x, pieces[0].z]).toEqual([-1, -1])
+  })
+})
+
+describe("pieceBox", () => {
+  it.each([0.8, 1.5625, 0.37])(
+    "at zoom %f neighbouring pieces share their edges in whole pixels",
+    (zoom) => {
+      const view: View = { centerX: 137.3, centerZ: -91.7, zoom }
+      const scale = scaleFor(zoom)
+      const row = [-1, 0, 1].map((x) =>
+        pieceBox(view, { scale, x, z: 0 }, 999, 601)
+      )
+      const column = [-1, 0, 1].map((z) =>
+        pieceBox(view, { scale, x: 0, z }, 999, 601)
+      )
+      for (const box of [...row, ...column]) {
+        for (const value of Object.values(box))
+          expect(Number.isInteger(value)).toBe(true)
+        expect(box.width).toBeGreaterThan(0)
+        expect(box.height).toBeGreaterThan(0)
+      }
+      for (let i = 1; i < 3; i++) {
+        expect(row[i - 1].left + row[i - 1].width).toBe(row[i].left)
+        expect(column[i - 1].top + column[i - 1].height).toBe(column[i].top)
+      }
+    }
+  )
+
+  it("is where the piece's corner is on screen, rounded", () => {
+    const view: View = { centerX: 0, centerZ: 0, zoom: 1 }
+    expect(pieceBox(view, { scale: 0, x: -1, z: 0 }, 1000, 600)).toEqual({
+      left: -12,
+      top: 300,
+      width: 512,
+      height: 512
+    })
   })
 })
 

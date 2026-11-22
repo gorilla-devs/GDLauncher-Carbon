@@ -12,9 +12,9 @@ export const MIN_PIXELS_PER_PIECE_PIXEL = 0.75
 export const MAX_ZOOM = 8
 /** Pixels on a side of every piece, at every scale. */
 export const PIECE_PIXELS = 512
-/** The core paints a few pieces at once; more than this on screen is asked
- *  nearest the centre first and the rest when the view settles nearer. */
-const MAX_PIECES = 64
+/** Pieces are loaded a few at a time, nearest the centre first, so this
+ *  only bounds the work per view: enough for a large world zoomed out. */
+const MAX_PIECES = 256
 const MAX_SCALE = 4
 
 /** The finest scale whose piece pixel is still at least
@@ -82,6 +82,34 @@ export function visiblePieces(
   return pieces
     .slice(0, MAX_PIECES)
     .map(({ distance: _distance, ...piece }) => piece)
+}
+
+/** A piece's box on screen in whole pixels. Each edge is rounded on its
+ *  own, so neighbours share an edge exactly and no seam shows between them
+ *  at any zoom. */
+export function pieceBox(
+  view: View,
+  piece: { scale: number; x: number; z: number },
+  width: number,
+  height: number
+): { left: number; top: number; width: number; height: number } {
+  const blocks = PIECE_PIXELS * 2 ** piece.scale
+  const near = screenOf(view, piece.x * blocks, piece.z * blocks, width, height)
+  const far = screenOf(
+    view,
+    (piece.x + 1) * blocks,
+    (piece.z + 1) * blocks,
+    width,
+    height
+  )
+  const left = Math.round(near.left)
+  const top = Math.round(near.top)
+  return {
+    left,
+    top,
+    width: Math.round(far.left) - left,
+    height: Math.round(far.top) - top
+  }
 }
 
 /** Zooms by `factor` keeping the block under the screen point (px, pz)
