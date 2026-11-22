@@ -40,6 +40,9 @@ import { worldLabel } from "@/utils/worldLabel"
 
 const noop = () => {}
 
+/** A map's facts with the key (instance and folder) they were read for. */
+type ReadFor = FEWorldMap & { readFor: string | undefined }
+
 const Worlds = () => {
   const [t] = useTransContext()
   const params = useParams<{ id: string }>()
@@ -188,26 +191,32 @@ const Worlds = () => {
   })
   const mapWanted = () =>
     mapId() !== undefined && (mapOnScreen() || mapSeen() === mapId())
-  const worldMap = rspc.createQuery(() => ({
-    queryKey: [
-      "instance.getWorldMap",
-      { instance_id: instanceId(), world: mapSession()?.world ?? "" }
-    ],
-    enabled: mapWanted()
-  }))
+  const worldMap = rspc.createQuery(() => {
+    const key = mapKey()
+    return {
+      queryKey: [
+        "instance.getWorldMap",
+        { instance_id: instanceId(), world: mapSession()?.world ?? "" }
+      ],
+      enabled: mapWanted(),
+      // Each answer carries the key it was read for, so facts of one world
+      // are never taken for another's, whatever the timing.
+      select: (map: FEWorldMap): FEWorldMap => {
+        const owned: ReadFor = { ...map, readFor: key }
+        return owned
+      }
+    }
+  })
   // Right after its key changes the query can still answer the previous
-  // key's facts, so each answer belongs to the key it was first seen under
-  // and is shown only for that key. A renamed world shows its last facts
-  // until the new folder's arrive.
-  const factsOwner = new WeakMap<FEWorldMap, string>()
+  // key's facts: they are shown only under the key they were read for. A
+  // renamed world shows its last facts until the new folder's arrive.
   const mapShown = createMemo<{ id: number; map: FEWorldMap } | undefined>(
     (previous) => {
       const id = mapId()
       const key = mapKey()
       if (id === undefined || key === undefined) return undefined
       const data = worldMap.data
-      if (data && !factsOwner.has(data)) factsOwner.set(data, key)
-      if (data && factsOwner.get(data) === key)
+      if (data && (data as ReadFor).readFor === key)
         return previous?.id === id && previous.map === data
           ? previous
           : { id, map: data }

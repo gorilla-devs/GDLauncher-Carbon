@@ -105,12 +105,16 @@ const MapPanel = (props: {
     onCleanup(() => observer.disconnect())
   })
 
-  // Escape gives the tab back, unless an open menu or list takes it.
+  // Escape gives the tab back, unless an open menu, list or dialog takes it.
   createEffect(() => {
     if (!props.map.filled) return
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || e.defaultPrevented) return
-      if (document.querySelector('[role="listbox"],[role="menu"]')) return
+      // A dialog that refuses to close keeps the Escape too.
+      if (
+        document.querySelector('[role="listbox"],[role="menu"],[role="dialog"]')
+      )
+        return
       props.map.onFill(false)
     }
     document.addEventListener("keydown", onKeyDown)
@@ -124,7 +128,9 @@ const MapPanel = (props: {
       data-testid="world-map-panel"
       class="bg-darkSlate-900 relative overflow-hidden"
       classList={{
-        "h-[280px] shrink-0": !props.map.filled,
+        // 280 px, but at most 45 percent of the pane, so that on a short
+        // window the data pack table below keeps its room.
+        "max-h-[45%] min-h-0 shrink basis-[280px]": !props.map.filled,
         "min-h-0 flex-1": props.map.filled
       }}
     >
@@ -447,111 +453,116 @@ const WorldDatapacks = (props: WorldDatapacksProps) => {
           map={props.map}
         />
         <Show when={!props.map.filled}>
-          <div class="text-lightSlate-600 border-darkSlate-600 border-b-solid box-border flex shrink-0 items-center gap-3 border-0 border-b px-4 py-2 text-xs">
-            <span class="min-w-0 flex-1">
-              <Trans key="content:_trn_worlds.datapack" />
-            </span>
-            <span class="w-16 text-center">
-              <Trans key="content:_trn_table.update" />
-            </span>
-            <span class="w-16 text-right">
-              <Trans key="content:_trn_table.actions" />
-            </span>
-          </div>
-          <div class="flex-1 overflow-y-auto">
-            <Show
-              when={props.world.datapacks.length > 0}
-              fallback={
-                <p class="text-lightSlate-600 m-0 px-4 py-3 text-sm">
-                  <Trans key="content:_trn_worlds.no_datapacks" />
-                </p>
-              }
-            >
-              <For each={props.world.datapacks}>
-                {(pack) => {
-                  const pending = () => props.isPending(pack.id)
-                  const recognised = () => pack.name !== null
-                  const image = () => packImage(props.instanceId, pack)
-                  return (
-                    <div
-                      data-testid="world-datapack"
-                      data-pending={pending()}
-                      class="border-darkSlate-700 border-b-solid box-border flex items-center gap-3 border-0 border-b px-4 py-2 transition-opacity"
-                      classList={{ "opacity-50": pending() }}
-                    >
-                      <div class="bg-darkSlate-600 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded">
-                        <Show
-                          when={image()}
-                          fallback={
-                            <div
-                              class={`${pack.is_folder ? "i-hugeicons:folder-01" : "i-hugeicons:file-01"} text-lightSlate-400 text-lg`}
-                            />
-                          }
-                        >
-                          <img
-                            src={image()!}
-                            class="h-full w-full object-cover"
-                            alt=""
-                            loading="lazy"
-                          />
-                        </Show>
-                      </div>
-                      <div class="flex min-w-0 flex-1 flex-col">
-                        <span
-                          data-testid="world-datapack-name"
-                          class="text-lightSlate-100 truncate text-sm font-medium"
-                        >
-                          {pack.name ?? pack.filename}
-                        </span>
-                        <Show when={recognised()}>
-                          <span
-                            data-testid="world-datapack-filename"
-                            class="text-lightSlate-600 truncate text-xs"
-                          >
-                            {pack.filename}
-                          </span>
-                        </Show>
-                      </div>
-                      <div class="flex w-16 shrink-0 items-center justify-center">
-                        <UpdateCell
-                          pack={pack}
-                          pending={pending()}
-                          blocked={props.blocked}
-                          beingCopied={props.beingCopied}
-                          copies={props.copiesWithUpdate(pack)}
-                          actions={props.actions}
-                        />
-                      </div>
-                      <div class="flex w-16 shrink-0 items-center justify-end gap-3">
-                        <Show when={recognised() && !pack.is_folder}>
-                          <IconAction
-                            testId="world-datapack-switch"
-                            icon="i-hugeicons:arrow-left-right"
-                            label={
-                              <Trans key="instances:_trn_switch_version" />
+          <div
+            data-testid="world-datapack-table"
+            class="flex min-h-[120px] flex-1 flex-col"
+          >
+            <div class="text-lightSlate-600 border-darkSlate-600 border-b-solid box-border flex shrink-0 items-center gap-3 border-0 border-b px-4 py-2 text-xs">
+              <span class="min-w-0 flex-1">
+                <Trans key="content:_trn_worlds.datapack" />
+              </span>
+              <span class="w-16 text-center">
+                <Trans key="content:_trn_table.update" />
+              </span>
+              <span class="w-16 text-right">
+                <Trans key="content:_trn_table.actions" />
+              </span>
+            </div>
+            <div class="min-h-0 flex-1 overflow-y-auto">
+              <Show
+                when={props.world.datapacks.length > 0}
+                fallback={
+                  <p class="text-lightSlate-600 m-0 px-4 py-3 text-sm">
+                    <Trans key="content:_trn_worlds.no_datapacks" />
+                  </p>
+                }
+              >
+                <For each={props.world.datapacks}>
+                  {(pack) => {
+                    const pending = () => props.isPending(pack.id)
+                    const recognised = () => pack.name !== null
+                    const image = () => packImage(props.instanceId, pack)
+                    return (
+                      <div
+                        data-testid="world-datapack"
+                        data-pending={pending()}
+                        class="border-darkSlate-700 border-b-solid box-border flex items-center gap-3 border-0 border-b px-4 py-2 transition-opacity"
+                        classList={{ "opacity-50": pending() }}
+                      >
+                        <div class="bg-darkSlate-600 flex h-8 w-8 shrink-0 items-center justify-center overflow-hidden rounded">
+                          <Show
+                            when={image()}
+                            fallback={
+                              <div
+                                class={`${pack.is_folder ? "i-hugeicons:folder-01" : "i-hugeicons:file-01"} text-lightSlate-400 text-lg`}
+                              />
                             }
-                            onClick={() => props.actions.switchVersion(pack)}
+                          >
+                            <img
+                              src={image()!}
+                              class="h-full w-full object-cover"
+                              alt=""
+                              loading="lazy"
+                            />
+                          </Show>
+                        </div>
+                        <div class="flex min-w-0 flex-1 flex-col">
+                          <span
+                            data-testid="world-datapack-name"
+                            class="text-lightSlate-100 truncate text-sm font-medium"
+                          >
+                            {pack.name ?? pack.filename}
+                          </span>
+                          <Show when={recognised()}>
+                            <span
+                              data-testid="world-datapack-filename"
+                              class="text-lightSlate-600 truncate text-xs"
+                            >
+                              {pack.filename}
+                            </span>
+                          </Show>
+                        </div>
+                        <div class="flex w-16 shrink-0 items-center justify-center">
+                          <UpdateCell
+                            pack={pack}
+                            pending={pending()}
+                            blocked={props.blocked}
+                            beingCopied={props.beingCopied}
+                            copies={props.copiesWithUpdate(pack)}
+                            actions={props.actions}
+                          />
+                        </div>
+                        <div class="flex w-16 shrink-0 items-center justify-end gap-3">
+                          <Show when={recognised() && !pack.is_folder}>
+                            <IconAction
+                              testId="world-datapack-switch"
+                              icon="i-hugeicons:arrow-left-right"
+                              label={
+                                <Trans key="instances:_trn_switch_version" />
+                              }
+                              onClick={() => props.actions.switchVersion(pack)}
+                              disabled={held() || pending()}
+                              blocked={props.blocked}
+                              reason={heldReason()}
+                            />
+                          </Show>
+                          <IconAction
+                            testId="world-datapack-remove"
+                            icon="i-hugeicons:delete-02"
+                            label={<Trans key="content:_trn_delete_mod" />}
+                            onClick={() => props.actions.remove(pack)}
                             disabled={held() || pending()}
                             blocked={props.blocked}
                             reason={heldReason()}
+                            danger
                           />
-                        </Show>
-                        <IconAction
-                          testId="world-datapack-remove"
-                          icon="i-hugeicons:delete-02"
-                          label={<Trans key="content:_trn_delete_mod" />}
-                          onClick={() => props.actions.remove(pack)}
-                          disabled={held() || pending()}
-                          blocked={props.blocked}
-                          reason={heldReason()}
-                          danger
-                        />
+                        </div>
                       </div>
-                    </div>
-                  )
-                }}
-              </For>
-            </Show>
+                    )
+                  }}
+                </For>
+              </Show>
+            </div>
           </div>
         </Show>
       </Show>

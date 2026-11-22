@@ -60,13 +60,20 @@ vi.mock("@/utils/rspcClient", async () => {
    *  key changes, cached by key, and read again by `refetch`. */
   const mapQuery = (options: () => any) => {
     const [cache, setCache] = createSignal<Record<string, any>>({})
+    // The newest answer of any read, whatever key it was for: the worst
+    // case of solid-query's `latest`.
+    const [latest, setLatest] = createSignal<any>()
     const keyOf = () => JSON.stringify(options().queryKey[1])
     const read = async () => {
       const input = options().queryKey[1]
+      // As the observer, an answer is shaped by the `select` of the options
+      // the read was made under.
+      const select = options().select ?? ((answer: any) => answer)
       io.mapAsked.push(input)
       try {
-        const answer = await io.mapAnswer(input)
+        const answer = select(await io.mapAnswer(input))
         setCache((c) => ({ ...c, [JSON.stringify(input)]: answer }))
+        setLatest(() => answer)
       } catch {
         /* A refusal leaves no data; the global handler tells it. */
       }
@@ -81,11 +88,9 @@ vi.mock("@/utils/rspcClient", async () => {
     )
     // As solid-query: right after the key changes, the last answer stays
     // until the new key has one.
-    let last: any
     return {
       get data() {
-        last = cache()[keyOf()] ?? last
-        return last
+        return cache()[keyOf()] ?? latest()
       },
       refetch: read
     }
@@ -1993,7 +1998,7 @@ it("a new world shows an empty panel and no text", async () => {
   const panel = one(root, "world-map-panel")!
   expect(panel.textContent).toBe("")
   expect(one(root, "world-map")).toBeNull()
-  expect(panel.classList.contains("h-[280px]")).toBe(true)
+  expect(panel.classList.contains("basis-[280px]")).toBe(true)
   // The data pack table stays beneath it.
   expect(one(root, "world-datapack")).not.toBeNull()
 })
@@ -2039,7 +2044,7 @@ it("fill takes the whole tab and Escape gives it back", async () => {
   await flush()
   expect(isMapFilled()).toBe(true)
   expect(height()).toBe("calc(100vh - 155px)")
-  expect(panel.classList.contains("h-[280px]")).toBe(false)
+  expect(panel.classList.contains("basis-[280px]")).toBe(false)
   expect(one(root, "world-datapack")).toBeNull()
   const tableHead = () =>
     all(root, "world-map-panel")[0].nextElementSibling?.textContent ?? ""
@@ -2050,7 +2055,7 @@ it("fill takes the whole tab and Escape gives it back", async () => {
   await flush()
   expect(isMapFilled()).toBe(false)
   expect(height()).toBe("calc(100vh - 396px)")
-  expect(panel.classList.contains("h-[280px]")).toBe(true)
+  expect(panel.classList.contains("basis-[280px]")).toBe(true)
   expect(one(root, "world-datapack")).not.toBeNull()
   expect(tableHead()).toContain("content:_trn_worlds.datapack")
 
@@ -2084,6 +2089,103 @@ it("fill takes the whole tab and Escape gives it back", async () => {
   dispose = undefined
   expect(isMapFilled()).toBe(false)
   disposeWrapper()
+})
+
+it("the panel gives way on a short window and the data packs stay reachable", async () => {
+  const root = mount([world("Alpha", [pack("loose")])])
+  await flush()
+  // jsdom has no layout, so the three rules are read from the classes. They
+  // protect a window 700 px high, whose tab pane is 304 px: the panel is
+  // 280 px but never more than 45 percent of the pane (137 px), and the
+  // data pack table, head and rows, always keeps 120 px.
+  const panel = one(root, "world-map-panel")!
+  for (const rule of ["basis-[280px]", "max-h-[45%]", "min-h-0", "shrink"])
+    expect(panel.classList.contains(rule)).toBe(true)
+  expect(panel.classList.contains("shrink-0")).toBe(false)
+  const table = one(root, "world-datapack-table")!
+  expect(table.classList.contains("min-h-[120px]")).toBe(true)
+  // The head and the rows are inside it, and the rows scroll.
+  expect(table.contains(one(root, "world-datapack"))).toBe(true)
+  expect(table.textContent).toContain("content:_trn_worlds.datapack")
+  expect(
+    one(root, "world-datapack")!.parentElement!.classList.contains(
+      "overflow-y-auto"
+    )
+  ).toBe(true)
+})
+
+it("facts of the world read before are never shown under the world selected now", async () => {
+  installMapSize()
+  const alphaAgain = deferred<FEWorldMap>()
+  const beta = deferred<FEWorldMap>()
+  let alphaReads = 0
+  io.mapAnswer.mockImplementation(async (input: { world: string }) =>
+    input.world === "Alpha"
+      ? alphaReads++ === 0
+        ? mapOf()
+        : alphaAgain.promise
+      : beta.promise
+  )
+  const root = mount([world("Alpha", [pack("loose")]), world("Beta", [])], {
+    recycleBin: true
+  })
+  io.mutateAsync["instance.deleteWorldDatapack"].mockResolvedValue(null)
+  await flush()
+  expect(pieces(root).length).toBeGreaterThan(0)
+  // Alpha's map is read again with the lists, and Beta is selected before
+  // that read ends.
+  one(root, "world-datapack-remove")!.click()
+  await flush()
+  expect(io.mapAsked.filter((i) => i.world === "Alpha")).toHaveLength(2)
+  select(root, "Beta")
+  await flush()
+  expect(io.mapAsked).toContainEqual({ instance_id: 5, world: "Beta" })
+  alphaAgain.resolve(mapOf({ dimensions: [explored(AETHER)] }))
+  await flush()
+  expect(one(root, "world-map")).toBeNull()
+  expect(pieces(root)).toEqual([])
+  beta.resolve(mapOf())
+  await flush()
+  expect(pieces(root).length).toBeGreaterThan(0)
+  expect(pieces(root).every((src) => src.includes("world=Beta&"))).toBe(true)
+})
+
+it("a dialog that refuses to close keeps the map filled on Escape", async () => {
+  answerMaps({ Alpha: mapOf() })
+  const root = mount([world("Alpha", [pack("loose")])])
+  await flush()
+  one(root, "world-map-fill")!.click()
+  await flush()
+  const { isMapFilled } = await import("./WorldsRouteWrapper")
+  expect(isMapFilled()).toBe(true)
+  const dialog = document.createElement("div")
+  dialog.setAttribute("role", "dialog")
+  document.body.append(dialog)
+  escape()
+  await flush()
+  expect(isMapFilled()).toBe(true)
+  dialog.remove()
+  escape()
+  await flush()
+  expect(isMapFilled()).toBe(false)
+})
+
+it("another instance while the map fills the tab gives the normal layout back", async () => {
+  answerMaps({ Alpha: mapOf() })
+  const root = mount([world("Alpha", [pack("loose")])])
+  await flush()
+  const { isMapFilled } = await import("./WorldsRouteWrapper")
+  one(root, "world-map-fill")!.click()
+  await flush()
+  expect(isMapFilled()).toBe(true)
+  expect(one(root, "world-datapack")).toBeNull()
+  setParams("id", "6")
+  await flush()
+  expect(isMapFilled()).toBe(false)
+  expect(one(root, "world-datapack")).not.toBeNull()
+  expect(
+    one(root, "world-map-panel")!.classList.contains("basis-[280px]")
+  ).toBe(true)
 })
 
 it("another world starts its own map and the previous one's pieces are gone", async () => {
