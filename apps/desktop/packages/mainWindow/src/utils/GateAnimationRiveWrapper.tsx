@@ -1,5 +1,6 @@
 import { Rive } from "@rive-app/canvas"
 import { createSignal, onCleanup, onMount } from "solid-js"
+import "./riveRuntime"
 
 interface Props {
   src: string
