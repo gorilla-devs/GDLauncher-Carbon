@@ -947,6 +947,157 @@ it("selecting another world closes an open name field", async () => {
   expect(title(root)).toBe("Alpha")
 })
 
+const selectedEntry = (root: HTMLElement) =>
+  all(root, "world-entry").find((entry) => entry.dataset.selected === "true")
+    ?.textContent
+/** Renames "New World" to "Season 2" and leaves the request running; the
+ *  returned `answer` settles it, and the refetch then lists "Season 2". */
+async function renameRunning() {
+  const root = await renaming()
+  let answer!: (_folder: string) => void
+  io.mutateAsync["instance.renameWorld"].mockReturnValue(
+    new Promise<string>((resolve) => (answer = resolve))
+  )
+  io.refetchWorlds.mockImplementation(async () =>
+    setState("worlds", [
+      world("Alpha", []),
+      world("Season 2", [], "id-new", "Season 2")
+    ])
+  )
+  typeInto(field(root)!, "Season 2")
+  press(field(root)!, "Enter")
+  await flush()
+  return { root, answer: (folder: string) => answer(folder) }
+}
+
+it("a rename still running does not disable or close another world's field", async () => {
+  const { root, answer } = await renameRunning()
+  select(root, "Alpha")
+  await flush()
+  expect(field(root)).toBeNull()
+  one(root, "world-rename")!.click()
+  await flush()
+  expect(field(root)!.disabled).toBe(false)
+  expect(field(root)!.value).toBe("Alpha")
+  expect(one(root, "world-rename-save")!.dataset.disabled).toBe("false")
+  expect(one(root, "world-rename-cancel")!.dataset.disabled).toBe("false")
+  typeInto(field(root)!, "Alpha 2")
+
+  answer("Season 2")
+  await flush()
+  expect(io.refetchWorlds).toHaveBeenCalled()
+  expect(field(root)!.value).toBe("Alpha 2")
+  expect(field(root)!.disabled).toBe(false)
+  expect(selectedEntry(root)).toContain("Alpha")
+})
+
+it("a rename that answers after the player selected another world leaves that selection", async () => {
+  const { root, answer } = await renameRunning()
+  select(root, "Alpha")
+  await flush()
+  answer("Season 2")
+  await flush()
+  expect(io.refetchWorlds).toHaveBeenCalled()
+  expect(title(root)).toBe("Alpha")
+  expect(selectedEntry(root)).toContain("Alpha")
+})
+
+it("the renamed world stays in the header while the lists are read again", async () => {
+  const root = await renaming()
+  const header = () => title(root) ?? field(root)?.value
+  const seen: (string | undefined)[] = []
+  io.mutateAsync["instance.renameWorld"].mockImplementation(async () => {
+    seen.push(header())
+    return "Season 2"
+  })
+  io.refetchWorlds.mockImplementation(async () => {
+    seen.push(header())
+    setState("worlds", [
+      world("Alpha", []),
+      world("Season 2", [], "id-new", "Season 2")
+    ])
+    seen.push(header())
+    await Promise.resolve()
+    seen.push(header())
+  })
+  typeInto(field(root)!, "Season 2")
+  press(field(root)!, "Enter")
+  await flush()
+  seen.push(header())
+  expect(seen).toEqual([
+    "Season 2",
+    "Season 2",
+    "Season 2",
+    "Season 2",
+    "Season 2"
+  ])
+  expect(selectedEntry(root)).toContain("Season 2")
+})
+
+it.each([
+  ["isComposing", { isComposing: true }],
+  ["key code 229", { keyCode: 229 }]
+])(
+  "an Enter that confirms a composition does not save (%s)",
+  async (_, init) => {
+    const root = await renaming()
+    io.mutateAsync["instance.renameWorld"].mockResolvedValue("Season 2")
+    typeInto(field(root)!, "Season 2")
+    field(root)!.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "Enter", bubbles: true, ...init })
+    )
+    await flush()
+    expect(io.mutateAsync["instance.renameWorld"]).not.toHaveBeenCalled()
+    expect(field(root)!.value).toBe("Season 2")
+  }
+)
+
+it("Enter pressed twice quickly sends one request", async () => {
+  const root = await renaming()
+  io.mutateAsync["instance.renameWorld"].mockResolvedValue("Season 2")
+  typeInto(field(root)!, "Season 2")
+  press(field(root)!, "Enter")
+  press(field(root)!, "Enter")
+  await flush()
+  expect(io.mutateAsync["instance.renameWorld"]).toHaveBeenCalledTimes(1)
+})
+
+it("a refetch that returns the same world keeps the open field and the typed text", async () => {
+  const root = await renaming()
+  typeInto(field(root)!, "Season 2")
+  setState("worlds", [
+    world("Alpha", []),
+    world("New World", [known("p", "terra")], "id-new", "Skyblock")
+  ])
+  await flush()
+  expect(field(root)!.value).toBe("Season 2")
+  expect(field(root)!.disabled).toBe(false)
+})
+
+it.each([
+  [
+    "the world can no longer be read",
+    () =>
+      setState("worlds", [
+        world("Alpha", []),
+        world("New World", [], null, "Skyblock")
+      ])
+  ],
+  ["the game started", () => setState("details", BUSY)]
+])(
+  "a name typed before %s sends nothing and keeps the field",
+  async (_, change) => {
+    const root = await renaming()
+    typeInto(field(root)!, "Season 2")
+    change()
+    await flush()
+    press(field(root)!, "Enter")
+    await flush()
+    expect(io.mutateAsync["instance.renameWorld"]).not.toHaveBeenCalled()
+    expect(field(root)!.value).toBe("Season 2")
+  }
+)
+
 it.each([
   [
     "while the game is busy",

@@ -98,16 +98,32 @@ const Worlds = () => {
   // Kept by name, so a refetch keeps the world shown while it exists; the
   // first world stands in when nothing is chosen or the choice is gone.
   const [selectedName, setSelectedName] = createSignal<string>()
+  // A renamed world, while the lists are read again: the selection names
+  // the old folder until they list the new one.
+  const [following, setFollowing] = createSignal<{ from: string; to: string }>()
   createEffect(
     on(
       () => params.id,
-      () => setSelectedName(undefined),
+      () => {
+        setSelectedName(undefined)
+        setFollowing(undefined)
+      },
       { defer: true }
     )
   )
   const worldList = (): FEWorld[] => worlds.data ?? []
-  const selected = () =>
-    worldList().find((world) => world.name === selectedName()) ?? worldList()[0]
+  const byName = (name: string | undefined) =>
+    worldList().find((world) => world.name === name)
+  const selected = () => {
+    const follow = following()
+    return (
+      byName(selectedName()) ??
+      (follow && selectedName() === follow.from
+        ? byName(follow.to)
+        : undefined) ??
+      worldList()[0]
+    )
+  }
   const worldRow = (world: FEWorld) =>
     (instanceMods.data ?? []).find((row) => row.id === world.addon_id)
 
@@ -260,7 +276,9 @@ const Worlds = () => {
   /** Throws when the core refused, so the name field stays open; the global
    *  handler shows the refusal. */
   const rename = async (world: FEWorld, name: string) => {
-    if (world.identity === null) return
+    // The pencil is disabled then; a field opened before stays open.
+    if (world.identity === null) throw new Error("The world cannot be read")
+    if (blocked()) throw new Error("Changes are blocked")
     const id = instanceId()
     const folder = await renameWorld.mutateAsync({
       instance_id: id,
@@ -269,9 +287,24 @@ const Worlds = () => {
       name
     })
     if (!isCurrent(id)) return
-    // The folder follows the name, so the selection follows the folder.
-    setSelectedName(folder)
-    await refetchAll()
+    // The folder follows the name, so the selection follows the folder,
+    // unless the player chose another world meanwhile.
+    const follow =
+      selected()?.name === world.name
+        ? { from: world.name, to: folder }
+        : undefined
+    if (follow) {
+      setSelectedName(follow.from)
+      setFollowing(follow)
+    }
+    try {
+      await refetchAll()
+    } finally {
+      if (follow && isCurrent(id) && following() === follow) {
+        if (selectedName() === follow.from) setSelectedName(follow.to)
+        setFollowing(undefined)
+      }
+    }
   }
 
   const worldParam = (world: FEWorld) => encodeURIComponent(world.name)

@@ -1,5 +1,13 @@
 import type { FEWorld } from "@gd/core_module/bindings"
-import { JSX, Show, createEffect, createSignal, on, onCleanup } from "solid-js"
+import {
+  JSX,
+  Show,
+  createEffect,
+  createMemo,
+  createSignal,
+  on,
+  onCleanup
+} from "solid-js"
 import { Trans } from "@gd/i18n"
 import { worldLabel } from "@/utils/worldLabel"
 import { renameTo } from "@/utils/instanceName"
@@ -23,39 +31,52 @@ const WorldTitle = (props: WorldTitleProps) => {
   const renameDisabled = () =>
     !!props.blocked || unreadable() || props.reason !== undefined
 
-  const [editing, setEditing] = createSignal(false)
+  // Kept per folder name: a rename still running belongs to its own world,
+  // not to another one the header shows meanwhile.
+  const folder = createMemo(() => props.world.name)
+  const [editingFor, setEditingFor] = createSignal<string>()
+  const [savingFor, setSavingFor] = createSignal<ReadonlySet<string>>(new Set())
+  const editing = () => editingFor() === folder()
+  const saving = () => savingFor().has(folder())
+  const markSaving = (name: string, value: boolean) =>
+    setSavingFor((previous) => {
+      const next = new Set(previous)
+      if (value) next.add(name)
+      else next.delete(name)
+      return next
+    })
   const [draft, setDraft] = createSignal("")
-  const [saving, setSaving] = createSignal(false)
   let box: HTMLDivElement | undefined
   let input: HTMLInputElement | undefined
 
-  const close = () => setEditing(false)
+  const close = () => setEditingFor(undefined)
   const start = () => {
     setDraft(label())
-    setEditing(true)
+    setEditingFor(folder())
     input?.focus()
     input?.select()
   }
   const save = async () => {
+    const renamed = folder()
     if (saving()) return
     const name = renameTo(draft(), label())
     if (name === null) return close()
-    setSaving(true)
+    markSaving(renamed, true)
     try {
       await props.onRename(name)
-      close()
+      if (editingFor() === renamed) close()
     } catch {
       // The global handler shows the refusal; the typed name stays.
     } finally {
-      setSaving(false)
+      markSaving(renamed, false)
     }
   }
   const cancel = () => {
     if (!saving()) close()
   }
 
-  // Another world shown in the header is not the one being renamed.
-  createEffect(on(() => props.world.name, close, { defer: true }))
+  // Another world shown in the header opens with its field closed.
+  createEffect(on(folder, close, { defer: true }))
 
   createEffect(() => {
     if (!editing()) return
@@ -106,6 +127,9 @@ const WorldTitle = (props: WorldTitleProps) => {
             disabled={saving()}
             onInput={(event) => setDraft(event.currentTarget.value)}
             on:keydown={(event) => {
+              // An Enter that confirms an input method's composition is
+              // part of the typing.
+              if (event.isComposing || event.keyCode === 229) return
               if (event.key === "Enter") {
                 event.preventDefault()
                 void save()
