@@ -3501,7 +3501,10 @@ pub(crate) mod tests {
         );
     }
 
-    fn renamed(id: InstanceId, name: &str) -> crate::domain::instance::InstanceSettingsUpdate {
+    pub(crate) fn renamed(
+        id: InstanceId,
+        name: &str,
+    ) -> crate::domain::instance::InstanceSettingsUpdate {
         crate::domain::instance::InstanceSettingsUpdate {
             instance_id: id,
             name: Some(name.into()),

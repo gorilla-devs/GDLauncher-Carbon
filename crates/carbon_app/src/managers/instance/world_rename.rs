@@ -13,6 +13,7 @@ use crate::{
     domain::instance::AddonType,
     managers::{
         ManagerRef,
+        metadata::cache::CacheEntityId,
         runtime_lifecycle::{ActivityPolicy, spawn_retained},
     },
     util::publish::rename_dir,
@@ -32,10 +33,11 @@ use tracing::{error, info};
 const MAX_NAME_CHARS: usize = 64;
 
 /// The in-game name a world is given: `name` trimmed, refused unless it has
-/// 1 to [`MAX_NAME_CHARS`] characters.
+/// 1 to [`MAX_NAME_CHARS`] characters and no control character (a pasted tab
+/// or line break, which the game's own field does not allow).
 pub(super) fn world_name(name: &str) -> Result<&str, WorldRefusal> {
     let name = name.trim();
-    if !(1..=MAX_NAME_CHARS).contains(&name.chars().count()) {
+    if !(1..=MAX_NAME_CHARS).contains(&name.chars().count()) || name.chars().any(char::is_control) {
         return Err(WorldRefusal::InvalidName);
     }
     Ok(name)
@@ -89,7 +91,13 @@ impl ManagerRef<'_, InstanceManager> {
                 }) =>
             {
                 self.refresh_worlds(id, "a rename that was not finished")
-                    .await
+                    .await;
+                // The world's own row still names the folder it left; the
+                // instance scan lists it where it is now.
+                self.app
+                    .meta_cache_manager()
+                    .queue_caching(CacheEntityId::Instance(id), false)
+                    .await;
             }
             Err(_) => {}
         }
@@ -661,7 +669,13 @@ mod tests {
         let (id, saves, world) = world_instance(&app, "rename-invalid", "New World", None).await;
         let before = snapshot(&saves);
 
-        for name in [String::new(), "   ".into(), "a".repeat(65)] {
+        for name in [
+            String::new(),
+            "   ".into(),
+            "a".repeat(65),
+            "two\nlines".into(),
+            "a\ttab".into(),
+        ] {
             let error = rename(&app, request(id, &world, &name)).await.unwrap_err();
             assert_eq!(
                 code(&error).as_deref(),
@@ -765,6 +779,23 @@ mod tests {
         );
         assert_eq!(entries(&saves), vec!["Elsewhere"]);
         assert_eq!(title(&saves.join("Elsewhere")).as_deref(), Some("Old"));
+        // The list catches up with where the world is now.
+        let shown = tokio::time::timeout(std::time::Duration::from_secs(20), async {
+            loop {
+                let worlds = listed(&app, id).await;
+                if worlds
+                    .iter()
+                    .map(|world| world.name.as_str())
+                    .eq(["Elsewhere"])
+                {
+                    return worlds;
+                }
+                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+            }
+        })
+        .await
+        .expect("the list kept the old folder name");
+        assert_eq!(shown[0].title.as_deref(), Some("Old"));
     }
 
     #[tokio::test]

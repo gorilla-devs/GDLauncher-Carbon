@@ -33,7 +33,7 @@ use crate::{
     },
 };
 
-use super::InvalidInstanceIdError;
+use super::{InvalidInstanceIdError, world_duplicate::is_world_copy_staging};
 
 mod curseforge_archive;
 pub mod gdlauncher_archive;
@@ -968,6 +968,9 @@ fn list_share_entries(basepath: &Path) -> anyhow::Result<Vec<ShareEntry>> {
     let mut entries = Vec::new();
     for entry in fs::read_dir(basepath)? {
         let entry = entry?;
+        if is_world_copy_staging(&entry.file_name()) {
+            continue;
+        }
         let name = entry.file_name().to_string_lossy().to_string();
         if SHARE_EXCLUDED_FOLDERS.contains(&name.as_str()) {
             continue;
@@ -1184,6 +1187,10 @@ fn build_share_filter(basepath: &Path, include_saves: bool) -> anyhow::Result<Ex
 
     for entry in fs::read_dir(basepath)? {
         let entry = entry?;
+        // A world copy in the making is the launcher's, not the instance's.
+        if is_world_copy_staging(&entry.file_name()) {
+            continue;
+        }
         let name = entry.file_name().to_string_lossy().to_string();
 
         // Regenerable cache folders (e.g. the Distant Horizons LOD cache) only

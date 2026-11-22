@@ -6,8 +6,9 @@ const MAX_BYTES: usize = 100;
 
 /// Names Windows reserves as devices, with or without an extension.
 const RESERVED: &[&str] = &[
-    "CON", "PRN", "AUX", "NUL", "CLOCK$", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7",
-    "COM8", "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+    "CON", "PRN", "AUX", "NUL", "CLOCK$", "CONIN$", "CONOUT$", "COM0", "COM1", "COM2", "COM3",
+    "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5",
+    "LPT6", "LPT7", "LPT8", "LPT9",
 ];
 
 fn is_dot_or_space(c: char) -> bool {
@@ -119,6 +120,11 @@ mod tests {
             ("con.txt".into(), "_con.txt".into()),
             ("COM1".into(), "_COM1".into()),
             ("Console".into(), "Console".into()),
+            ("CONIN$".into(), "_CONIN$".into()),
+            ("conout$.log".into(), "_conout$.log".into()),
+            ("COM0".into(), "_COM0".into()),
+            ("lpt0".into(), "_lpt0".into()),
+            ("COM10".into(), "COM10".into()),
             ("tab\tname".into(), "tab_name".into()),
             ("日本語 😀".into(), "日本語 😀".into()),
             (long, "é".repeat(50)),

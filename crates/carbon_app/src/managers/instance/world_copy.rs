@@ -16,6 +16,21 @@ const CHUNK: usize = 1024 * 1024;
 /// it is neither copied nor counted as a change.
 const SESSION_LOCK: &str = "session.lock";
 
+/// Notes Finder and Explorer leave in any folder the player looks at, for
+/// example through the Open folder icon beside Duplicate. They are copied when
+/// there, but writing one is no change of the world.
+const FILE_MANAGER_NOTES: &[&str] = &[".DS_Store", "Thumbs.db", "desktop.ini"];
+
+fn is_file_manager_note(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| {
+            FILE_MANAGER_NOTES
+                .iter()
+                .any(|note| note.eq_ignore_ascii_case(name))
+        })
+}
+
 /// What a world folder holds: its files and folders as paths relative to it,
 /// each folder before its content.
 pub(super) struct Survey {
@@ -131,6 +146,12 @@ pub(super) fn copy_tree(
         }
 
         let source = world.join(&entry.path);
+        if is_file_manager_note(&entry.path) {
+            copy_note(&source, &target)?;
+            total += entry.stamp.len;
+            copied(total);
+            continue;
+        }
         let mut from =
             open_source(&source).with_context(|| format!("opening {}", source.display()))?;
         let mut to = std::fs::File::create_new(&target)
@@ -184,6 +205,20 @@ pub(super) fn copy_tree(
     Ok(())
 }
 
+/// Copies a file manager's note as it is now: it may have been rewritten or
+/// removed since the survey, which is no reason to fail the copy.
+fn copy_note(source: &Path, target: &Path) -> anyhow::Result<()> {
+    let mut from = match open_source(source) {
+        Ok(from) => from,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(()),
+        Err(error) => return Err(error).with_context(|| format!("opening {}", source.display())),
+    };
+    let mut to = std::fs::File::create_new(target)
+        .with_context(|| format!("creating {}", target.display()))?;
+    std::io::copy(&mut from, &mut to).with_context(|| format!("copying {}", source.display()))?;
+    Ok(())
+}
+
 /// Opens a surveyed file. On unix a link that replaced it since the survey is
 /// an error instead of a read from outside the world.
 fn open_source(path: &Path) -> std::io::Result<std::fs::File> {
@@ -214,24 +249,67 @@ fn set_folder_modified(folder: &Path, modified: SystemTime) -> std::io::Result<(
 }
 
 /// Whether `world` still holds what `survey` saw: the same paths, kinds,
-/// lengths and modified times.
+/// lengths and modified times, leaving out the file managers' notes.
 pub(super) fn unchanged_since(world: &Path, survey: &Survey) -> anyhow::Result<bool> {
     Ok(same_entries(&survey.entries, &self::survey(world)?.entries))
 }
 
-/// Equal lists count only when every entry has a modified time: without one a
+/// Equal lists count only when every file has a modified time: without one a
 /// rewrite that keeps the length goes unseen, so the copy cannot be proven
-/// untorn.
+/// untorn. Folders are compared by what they hold, which the list has, not
+/// by their time, which a note written in them moves.
 fn same_entries(before: &[Entry], after: &[Entry]) -> bool {
+    let kept = |entries: &[Entry]| -> Vec<Entry> {
+        entries
+            .iter()
+            .filter(|entry| entry.folder || !is_file_manager_note(&entry.path))
+            .map(|entry| match entry.folder {
+                true => Entry {
+                    stamp: Stamp {
+                        len: 0,
+                        modified: None,
+                    },
+                    ..entry.clone()
+                },
+                false => entry.clone(),
+            })
+            .collect()
+    };
+    let (before, after) = (kept(before), kept(after));
     before == after
         && before
             .iter()
-            .chain(after)
-            .all(|entry| entry.stamp.modified.is_some())
+            .chain(&after)
+            .all(|entry| entry.folder || entry.stamp.modified.is_some())
+}
+
+/// The room left on the drive that holds `folder`, or `None` when it cannot
+/// be read.
+///
+/// On unix the file system of the folder is asked directly: a mount table
+/// can leave the folder's own volume out (tmpfs, network drives) or list it
+/// under a path that is no prefix of it (on macOS `/Users` is on the Data
+/// volume, mounted at `/System/Volumes/Data`).
+#[cfg(unix)]
+// The field types differ between platforms.
+#[allow(clippy::unnecessary_cast)]
+pub(super) fn free_space(folder: &Path) -> Option<u64> {
+    use std::os::unix::ffi::OsStrExt;
+    let path = std::ffi::CString::new(folder.as_os_str().as_bytes()).ok()?;
+    let mut stat = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    // SAFETY: `path` is NUL-terminated and `stat` is only read after the
+    // call filled it in.
+    if unsafe { libc::statvfs(path.as_ptr(), stat.as_mut_ptr()) } != 0 {
+        return None;
+    }
+    // SAFETY: statvfs returned 0, so it wrote the whole struct.
+    let stat = unsafe { stat.assume_init() };
+    (stat.f_bavail as u64).checked_mul(stat.f_frsize as u64)
 }
 
 /// The room left on the drive that holds `folder`, or `None` when no listed
 /// drive does.
+#[cfg(not(unix))]
 pub(super) fn free_space(folder: &Path) -> Option<u64> {
     // Not `canonicalize`: on Windows that gives a `\\?\C:\` path, which never
     // starts with the `C:\` mount point sysinfo reports.
@@ -242,44 +320,18 @@ pub(super) fn free_space(folder: &Path) -> Option<u64> {
         .iter()
         .map(|disk| (disk.mount_point().to_path_buf(), disk.available_space()))
         .collect::<Vec<_>>();
-    free_space_among(&folder, &mounts, &device_of)
+    free_space_among(&folder, &mounts)
 }
 
 /// Picks the mount point that is the longest prefix of `folder` and returns
-/// its room. sysinfo leaves some mounts out (tmpfs, network drives), which
-/// would make the search settle on a shorter mount, a different drive; so on
-/// unix the answer is given only when `device` says the folder and the chosen
-/// mount point are on the same device.
-fn free_space_among(
-    folder: &Path,
-    mounts: &[(PathBuf, u64)],
-    device: &dyn Fn(&Path) -> Option<u64>,
-) -> Option<u64> {
-    let (mount, available) = mounts
+/// its room.
+#[cfg(any(not(unix), test))]
+fn free_space_among(folder: &Path, mounts: &[(PathBuf, u64)]) -> Option<u64> {
+    mounts
         .iter()
         .filter(|(mount, _)| folder.starts_with(mount))
-        .max_by_key(|(mount, _)| mount.components().count())?;
-    #[cfg(unix)]
-    {
-        let on_mount = device(mount)?;
-        if device(folder)? != on_mount {
-            return None;
-        }
-    }
-    #[cfg(not(unix))]
-    let _ = (mount, device);
-    Some(*available)
-}
-
-#[cfg(unix)]
-fn device_of(path: &Path) -> Option<u64> {
-    use std::os::unix::fs::MetadataExt;
-    std::fs::metadata(path).ok().map(|meta| meta.dev())
-}
-
-#[cfg(not(unix))]
-fn device_of(_: &Path) -> Option<u64> {
-    None
+        .max_by_key(|(mount, _)| mount.components().count())
+        .map(|(_, available)| *available)
 }
 
 #[cfg(test)]
@@ -476,6 +528,59 @@ mod tests {
         }
     }
 
+    /// What Finder and Explorer write while the player looks at the folder
+    /// is copied when it was there, but is not a change of the world.
+    #[test]
+    fn notes_a_file_manager_writes_are_copied_but_not_a_change() {
+        let dir = tempfile::tempdir().unwrap();
+        let world = the_world(dir.path());
+        write(&world.join("region/.DS_Store"), b"finder");
+        let found = survey(&world).unwrap();
+
+        write(&world.join(".DS_Store"), b"finder");
+        write(&world.join("data/Thumbs.db"), b"explorer");
+        write(&world.join("desktop.ini"), b"explorer");
+        write(&world.join("region/.DS_Store"), b"finder, a lot longer");
+        write(&world.join("session.lock"), b"another lock");
+        set_time(
+            &world.join("region/.DS_Store"),
+            SystemTime::UNIX_EPOCH + Duration::from_secs(7),
+        );
+        // Only because something appeared in it.
+        set_folder_modified(
+            &world.join("data"),
+            SystemTime::UNIX_EPOCH + Duration::from_secs(9),
+        )
+        .unwrap();
+        assert!(unchanged_since(&world, &found).unwrap());
+
+        let staging = dir.path().join("staging");
+        copy_tree(
+            &world,
+            &staging,
+            &found,
+            &nothing,
+            &CancellationToken::new(),
+        )
+        .unwrap();
+        assert_eq!(
+            std::fs::read(staging.join("region/.DS_Store")).unwrap(),
+            b"finder, a lot longer"
+        );
+        assert!(!staging.join(".DS_Store").exists());
+        assert!(!staging.join("data/Thumbs.db").exists());
+
+        // A note gone before it is copied is no reason to fail the copy.
+        std::fs::remove_file(world.join("region/.DS_Store")).unwrap();
+        let again = dir.path().join("again");
+        copy_tree(&world, &again, &found, &nothing, &CancellationToken::new()).unwrap();
+        assert!(again.join("region/r.0.0.mca").is_file());
+
+        // A change to the world's own files still counts.
+        write(&world.join("region/r.0.0.mca"), b"played");
+        assert!(!unchanged_since(&world, &found).unwrap());
+    }
+
     #[test]
     fn a_missing_modified_time_counts_as_changed() {
         let dir = tempfile::tempdir().unwrap();
@@ -483,7 +588,8 @@ mod tests {
         let found = survey(&world).unwrap();
         assert!(same_entries(&found.entries, &found.entries));
         let mut without = found.entries.clone();
-        without[0].stamp.modified = None;
+        let file = without.iter_mut().find(|entry| !entry.folder).unwrap();
+        file.stamp.modified = None;
         assert!(!same_entries(&without, &without));
     }
 
@@ -546,48 +652,37 @@ mod tests {
         assert!(unchanged_since(&world, &found).unwrap());
     }
 
+    #[test]
+    fn the_drive_rule_picks_the_longest_mount() {
+        let (root, data, games) = if cfg!(windows) {
+            (r"C:\", r"D:\", r"D:\games")
+        } else {
+            ("/", "/data", "/data/games")
+        };
+        let mounts = vec![
+            (PathBuf::from(root), 1u64),
+            (PathBuf::from(data), 2),
+            (PathBuf::from(games), 3),
+        ];
+        let at = |path: &str, rest: &str| Path::new(path).join(rest);
+        assert_eq!(free_space_among(&at(games, "saves"), &mounts), Some(3));
+        assert_eq!(free_space_among(&at(data, "x"), &mounts), Some(2));
+        assert_eq!(free_space_among(&at(root, "home"), &mounts), Some(1));
+        assert_eq!(free_space_among(&at(root, "x"), &[]), None);
+    }
+
     #[cfg(unix)]
     #[test]
-    fn the_drive_rule_picks_the_longest_mount_on_the_same_device() {
-        let mounts = vec![
-            (PathBuf::from("/"), 1u64),
-            (PathBuf::from("/data"), 2),
-            (PathBuf::from("/data/games"), 3),
-        ];
-        let device = |path: &Path| -> Option<u64> {
-            Some(if path.starts_with("/data/games") {
-                30
-            } else if path.starts_with("/data") {
-                20
-            } else {
-                10
-            })
-        };
-        assert_eq!(
-            free_space_among(Path::new("/data/games/saves"), &mounts, &device),
-            Some(3)
-        );
-        assert_eq!(
-            free_space_among(Path::new("/data/x"), &mounts, &device),
-            Some(2)
-        );
-        assert_eq!(
-            free_space_among(Path::new("/home/me"), &mounts, &device),
-            Some(1)
-        );
-        // A mount sysinfo leaves out: the folder is on another device than "/".
-        let other = |path: &Path| -> Option<u64> {
-            Some(if path == Path::new("/run/x") { 99 } else { 10 })
-        };
-        assert_eq!(free_space_among(Path::new("/run/x"), &mounts, &other), None);
-        assert_eq!(free_space_among(Path::new("/x"), &[], &device), None);
+    fn free_space_is_read_from_the_folder_itself() {
+        let dir = tempfile::tempdir().unwrap();
+        let free = free_space(dir.path()).expect("the room of the temp folder");
+        assert!(free > 0);
     }
 
     #[test]
     fn free_space_is_known_for_the_temp_folder() {
         let dir = tempfile::tempdir().unwrap();
-        // `None` where sysinfo lists no disks, or leaves out the mount of the
-        // temp folder (a tmpfs `/tmp`).
+        // `None` on Windows where sysinfo lists no disks.
         if let Some(free) = free_space(dir.path()) {
             assert!(free > 0);
         }

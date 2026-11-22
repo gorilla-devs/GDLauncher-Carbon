@@ -972,3 +972,24 @@ async fn a_share_keeps_the_too_large_and_disk_full_errors_of_its_export() {
         "Export task failed: controlled exporter failure"
     );
 }
+
+#[test]
+fn a_share_leaves_out_a_world_copy_in_the_making() {
+    let dir = tempfile::tempdir().unwrap();
+    let base = dir.path();
+    std::fs::create_dir_all(base.join("saves/World")).unwrap();
+    std::fs::create_dir_all(base.join("config")).unwrap();
+    std::fs::create_dir_all(base.join(".gdl-world-copy-1-abc/region")).unwrap();
+
+    let listed: Vec<_> = list_share_entries(base)
+        .unwrap()
+        .into_iter()
+        .map(|entry| entry.name)
+        .collect();
+    assert_eq!(listed, vec!["saves", "config"]);
+    for include_saves in [false, true] {
+        let shared = build_share_filter(base, include_saves).unwrap();
+        assert!(shared.0.contains_key("config"));
+        assert!(!shared.0.contains_key(".gdl-world-copy-1-abc"));
+    }
+}

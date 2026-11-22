@@ -5,7 +5,7 @@ use crate::{
     managers::ManagerRef,
 };
 
-use super::{InstanceManager, InvalidInstanceIdError};
+use super::{InstanceManager, InvalidInstanceIdError, world_duplicate::is_world_copy_staging};
 
 impl<'s> ManagerRef<'s, InstanceManager> {
     /// Retrieve a single level of the file tree of an instance
@@ -46,6 +46,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             }
         }
 
+        let top = path.is_empty();
         let mut data_path = instance_data_path.clone();
         for segment in path {
             data_path.push(segment);
@@ -76,6 +77,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
 
         let mut entries = Vec::<ExploreEntry>::new();
         while let Some(entry) = dir.next_entry().await? {
+            // A world copy in the making is the launcher's, not the player's.
+            if top && is_world_copy_staging(&entry.file_name()) {
+                continue;
+            }
             let meta = entry.metadata().await?;
             entries.push(ExploreEntry {
                 name: entry.file_name().to_string_lossy().to_string(),

@@ -25,7 +25,7 @@ use crate::{
         runtime_lifecycle::{ActivityPolicy, spawn_retained},
         vtask::{Subtask, TaskState, VisualTask},
     },
-    util::publish::rename_noclobber,
+    util::publish::rename_dir_noclobber,
 };
 use anyhow::{Context, bail};
 use serde::Deserialize;
@@ -42,6 +42,18 @@ const STAGING_PREFIX: &str = ".gdl-world-copy-";
 fn staging_prefix(id: InstanceId) -> String {
     format!("{STAGING_PREFIX}{}-", *id)
 }
+
+/// Whether `name`, in an instance's data folder, is the launcher's own copy
+/// of a world in the making, which is no content of the instance: duplicating
+/// or exporting the instance leaves it out.
+pub(crate) fn is_world_copy_staging(name: &std::ffi::OsStr) -> bool {
+    name.to_str()
+        .is_some_and(|name| name.starts_with(STAGING_PREFIX))
+}
+
+/// How many folder names a copy tries when the one it picked turns out taken
+/// at the last moment (a name the file system folds differently).
+const PUBLISH_TRIES: usize = 5;
 
 /// Room the drive keeps beyond the world's own size, so a copy never fills it.
 const SPACE_MARGIN: u64 = 64 * 1024 * 1024;
@@ -67,11 +79,13 @@ pub struct WorldCopy {
     pub task: VisualTaskId,
 }
 
-/// A copy that is running, with what stops it.
+/// A copy that is running, with what stops it and what tells it ended.
 #[derive(Debug)]
 pub(super) struct RunningCopy {
     copy: WorldCopy,
     cancel: CancellationToken,
+    /// Cancelled once the copy is off the list and its staging folder gone.
+    ended: CancellationToken,
 }
 
 /// The copy each instance is making; registered and checked under the gate.
@@ -86,8 +100,12 @@ struct Registration<'a> {
 
 impl Drop for Registration<'_> {
     fn drop(&mut self) {
-        self.copies
-            .remove_if(&self.id, |_, running| running.copy.task == self.task);
+        if let Some((_, running)) = self
+            .copies
+            .remove_if(&self.id, |_, running| running.copy.task == self.task)
+        {
+            running.ended.cancel();
+        }
     }
 }
 
@@ -233,6 +251,12 @@ impl ManagerRef<'_, InstanceManager> {
             .await;
         subtask.update_download(0, survey.bytes, false);
         let task_id = self.app.task_manager().spawn_task(&task).await;
+        // Taken under the gate, so it never waits; a delete or a rename that
+        // moves the instance folder stops the copy first (see
+        // `stop_world_copy`).
+        let root_hold = self.hold_root(&operation, false).await;
+        // Nothing waits between this and the task's start, where the
+        // registration is taken off again however the copy ends.
         self.world_copies.insert(
             id,
             RunningCopy {
@@ -242,11 +266,9 @@ impl ManagerRef<'_, InstanceManager> {
                     task: task_id,
                 },
                 cancel: cancel.clone(),
+                ended: CancellationToken::new(),
             },
         );
-        // Taken under the gate, so it never waits; a delete or a rename that
-        // moves the instance folder waits for the copy's files.
-        let root_hold = self.hold_root(&operation, false).await;
         // The copy does not hold up Play, scans or other changes.
         drop(operation);
         Ok(Admitted {
@@ -372,10 +394,9 @@ impl ManagerRef<'_, InstanceManager> {
         }
         let path = publication::current_path(&self.app, id).await?;
         let saves = publication::checked_folder(&path, AddonType::Worlds).await?;
-        // A game started meanwhile may be writing the original.
-        if self.ensure_game_inactive(id).await.is_err() {
-            bail!(WorldRefusal::ChangedWhileCopied);
-        }
+        // A game started meanwhile may be writing the original, so the copy
+        // is not kept, and the refusal says why.
+        self.ensure_game_inactive(id).await?;
         // The pack may have been locked while the copy ran.
         self.ensure_world_datapacks_may_change(id).await?;
         let original = saves.join(&request.world);
@@ -390,14 +411,34 @@ impl ManagerRef<'_, InstanceManager> {
             bail!(WorldRefusal::ChangedWhileCopied);
         }
 
-        let folder = free_folder_name(
-            &safe_folder_name(&name),
-            &self.taken_world_names(id, &saves).await?,
-            None,
-        );
-        let target = saves.join(&folder);
-        rename_noclobber(staging, &target)
-            .with_context(|| format!("moving {} to {}", staging.display(), target.display()))?;
+        let taken = self.taken_world_names(id, &saves).await?;
+        let mut tried = Vec::new();
+        let folder = loop {
+            let all: Vec<String> = taken.iter().chain(&tried).cloned().collect();
+            let folder = free_folder_name(&safe_folder_name(&name), &all, None);
+            let target = saves.join(&folder);
+            match rename_dir_noclobber(staging, &target).await {
+                Ok(()) => break folder,
+                // A name judged free that the file system holds already.
+                Err(error)
+                    if error.kind() == std::io::ErrorKind::AlreadyExists
+                        && tried.len() + 1 < PUBLISH_TRIES =>
+                {
+                    info!(
+                        "Instance {id}: {} is taken, trying another name",
+                        target.display()
+                    );
+                    tried.push(folder);
+                }
+                Err(error) => {
+                    return Err(anyhow::Error::from(error).context(format!(
+                        "moving {} to {}",
+                        staging.display(),
+                        target.display()
+                    )));
+                }
+            }
+        };
         // The copy is in place: from here on nothing fails it. A row the
         // scan will make later still lists it.
         let cache = self.app.meta_cache_manager();
@@ -433,11 +474,27 @@ impl ManagerRef<'_, InstanceManager> {
         Ok(staging_parent(&saves)?.join(folder))
     }
 
+    /// Stops the instance's copy, if one runs, and waits until it ended and
+    /// its staging folder is gone. Called under the gate by a delete or a
+    /// rename that moves the instance folder, before they take the folder:
+    /// the copy would be lost either way, and they need not wait for it.
+    pub(super) async fn stop_world_copy(&self, id: InstanceId) {
+        let ended = self.world_copies.get(&id).map(|running| {
+            running.cancel.cancel();
+            running.ended.clone()
+        });
+        if let Some(ended) = ended {
+            ended.cancelled().await;
+        }
+    }
+
     /// Removes the instance's staging folders beside `saves` when it runs no
     /// copy: those a crash or a power cut left. A copy registers under the
     /// gate before it makes its folder and this runs under the same gate,
-    /// so it never sees one being made. Only folders with the instance's
-    /// staging name go; nothing else is touched.
+    /// so it never sees one being made. In the instance's own data folder
+    /// every staging folder goes, whatever instance id it carries (an
+    /// instance duplicate may have brought one along); beside a `saves`
+    /// linked elsewhere only the instance's own do. Nothing else is touched.
     pub(super) async fn sweep_world_copy_staging(self, id: InstanceId) -> anyhow::Result<()> {
         let _operation = self.lock_instance(id).await;
         if self.world_copies.contains_key(&id) {
@@ -453,14 +510,16 @@ impl ManagerRef<'_, InstanceManager> {
         }
         let parent = staging_parent(&saves)?;
         let own = staging_prefix(id);
+        let in_own_data_folder = own_data_folder(&path).is_some_and(|data| data == parent);
         let mut entries = tokio::fs::read_dir(&parent)
             .await
             .with_context(|| format!("listing {}", parent.display()))?;
         while let Some(entry) = entries.next_entry().await? {
-            let is_staging = entry
-                .file_name()
-                .to_str()
-                .is_some_and(|name| name.starts_with(&own));
+            let name = entry.file_name();
+            let is_staging = match in_own_data_folder {
+                true => is_world_copy_staging(&name),
+                false => name.to_str().is_some_and(|name| name.starts_with(&own)),
+            };
             // Not followed: a link is never what a copy made.
             if !is_staging || !entry.file_type().await?.is_dir() {
                 continue;
@@ -493,6 +552,15 @@ fn staging_parent(saves: &Path) -> anyhow::Result<PathBuf> {
         .parent()
         .with_context(|| format!("{} has no parent folder", resolved.display()))?
         .to_owned())
+}
+
+/// The instance's data folder as resolved, when it is the instance's own:
+/// inside its folder, not a link to another place.
+fn own_data_folder(path: &carbon_rt_path::InstancePath) -> Option<PathBuf> {
+    let root = dunce::canonicalize(path.get_root()).ok()?;
+    let data = path.get_data_path();
+    let own = root.join(data.file_name()?);
+    (dunce::canonicalize(&data).ok()? == own).then_some(own)
 }
 
 /// Whether a drive with `free` bytes left takes a copy of `bytes`. A drive
@@ -1008,9 +1076,10 @@ mod tests {
 
         let outcome = wait(&app, task).await;
         set_state(&app, id, LaunchState::Inactive { failed_task: None }).await;
+        // Said as it is: the world itself may not have changed.
         assert_eq!(
             failed_code(&outcome).as_deref(),
-            Some("WORLD_CHANGED_WHILE_COPIED")
+            Some("INSTANCE_GAME_ACTIVE")
         );
         assert_eq!(entries(&saves), vec!["New World"]);
         assert!(staging_folders(&saves).is_empty());
@@ -1119,28 +1188,196 @@ mod tests {
         let leftover = parent.join(format!(".gdl-world-copy-{}-left", *id));
         std::fs::create_dir_all(leftover.join("region")).unwrap();
         std::fs::write(leftover.join("region/r.0.0.mca"), b"half").unwrap();
-        // Only this instance's staging folders go: a `saves` linked into a
-        // shared folder sits beside other instances' copies.
-        let kept = [
-            "kept".to_owned(),
+        // In the instance's own folder every staging folder is a leftover,
+        // whatever instance it was made for: one an instance duplicate
+        // carried over has the old instance's id.
+        let foreign = [
             format!(".gdl-world-copy-{}-starting", *id + 1),
             format!(".gdl-world-copy-{}x-left", *id),
             ".gdl-world-copy-left".to_owned(),
         ];
-        for name in &kept {
+        for name in &foreign {
             std::fs::create_dir(parent.join(name)).unwrap();
         }
+        std::fs::create_dir(parent.join("kept")).unwrap();
         let note = parent.join(format!(".gdl-world-copy-{}-note.txt", *id));
         std::fs::write(&note, b"a file").unwrap();
 
         listed(&app, id).await;
 
         assert!(!leftover.exists());
-        for name in &kept {
-            assert!(parent.join(name).is_dir(), "{name}");
+        for name in &foreign {
+            assert!(!parent.join(name).exists(), "{name}");
         }
+        assert!(parent.join("kept").is_dir());
         assert!(note.is_file());
         assert_eq!(entries(&saves), vec!["New World"]);
+    }
+
+    /// Waits until `work` is done, failing the test if it takes long.
+    async fn soon<T>(work: impl std::future::Future<Output = T>, what: &str) -> T {
+        tokio::time::timeout(Duration::from_secs(10), work)
+            .await
+            .unwrap_or_else(|_| panic!("{what} did not end"))
+    }
+
+    #[tokio::test]
+    async fn an_instance_duplicated_during_a_copy_does_not_take_the_copy() {
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves, world, _) = world_instance(&app, "duplicate-instance-during").await;
+        let (pause, task) = held(
+            &app,
+            id,
+            "world_copy_before_publish",
+            request(id, &world, "Home (copy)"),
+        )
+        .await;
+        // The running copy's folder is not a leftover.
+        assert_eq!(listed(&app, id).await.len(), 1);
+        let staged = staging_folders(&saves);
+        assert_eq!(staged.len(), 1);
+        let explored = app
+            .instance_manager()
+            .explore_data(id, Vec::new())
+            .await
+            .unwrap();
+        assert!(explored.iter().any(|entry| entry.name == "saves"));
+        assert!(
+            !explored
+                .iter()
+                .any(|entry| entry.name.starts_with(".gdl-world-copy-")),
+            "{explored:?}"
+        );
+
+        let copy = soon(
+            app.instance_manager()
+                .duplicate_instance(id, "Duplicated".into()),
+            "the instance duplicate",
+        )
+        .await
+        .unwrap();
+
+        let copied = publication::current_path(&app, copy).await.unwrap();
+        assert!(staging_folders(&copied.get_saves_path()).is_empty());
+        assert_eq!(entries(&copied.get_saves_path()), vec!["New World"]);
+        assert!(
+            copied
+                .get_data_path()
+                .join("saves/New World/level.dat")
+                .is_file()
+        );
+        assert_eq!(staging_folders(&saves), staged);
+        pause.release.notify_one();
+        assert!(matches!(wait(&app, task).await, TaskOutcome::Succeeded));
+        assert_eq!(entries(&saves), vec!["Home (copy)", "New World"]);
+    }
+
+    /// A rename that moves the instance folder, or a delete, stops the copy
+    /// instead of waiting for it: the copy is lost either way. It ends as
+    /// cancelled, with nothing shown and nothing left.
+    #[tokio::test]
+    async fn moving_or_deleting_the_instance_stops_its_copy() {
+        use crate::managers::instance::world_datapack_changes::tests::{
+            renamed, without_recycle_bin,
+        };
+        for (n, at) in ["world_copy_before_files", "world_copy_before_publish"]
+            .into_iter()
+            .enumerate()
+        {
+            let app = crate::setup_managers_for_test().await;
+            without_recycle_bin(&app).await;
+            let instance = format!("duplicate-stopped-{n}");
+            let (id, _, world, _) = world_instance(&app, &instance).await;
+
+            let (pause, task) = held(&app, id, at, request(id, &world, "Home (copy)")).await;
+            let manager = app.clone();
+            let new_name = format!("{instance}-renamed");
+            let rename = tokio::spawn(async move {
+                manager
+                    .instance_manager()
+                    .update_instance(renamed(id, &new_name))
+                    .await
+            });
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            pause.release.notify_one();
+            soon(rename, "the rename").await.unwrap().unwrap();
+            assert!(
+                matches!(wait(&app, task).await, TaskOutcome::Dismissed),
+                "{at}"
+            );
+            let moved = publication::current_path(&app, id).await.unwrap();
+            assert!(moved.get_root().ends_with(format!("{instance}-renamed")));
+            assert_eq!(entries(&moved.get_saves_path()), vec!["New World"], "{at}");
+            assert!(staging_folders(&moved.get_saves_path()).is_empty(), "{at}");
+            assert_eq!(app.instance_manager().world_copy(id), None);
+
+            let world = listed(&app, id).await.pop().unwrap();
+            let (pause, task) = held(&app, id, at, request(id, &world, "Home (copy)")).await;
+            let manager = app.clone();
+            let delete =
+                tokio::spawn(async move { manager.instance_manager()._delete_instance(id).await });
+            tokio::time::sleep(Duration::from_millis(50)).await;
+            pause.release.notify_one();
+            soon(delete, "the delete").await.unwrap().unwrap();
+            assert!(
+                matches!(wait(&app, task).await, TaskOutcome::Dismissed),
+                "{at}"
+            );
+            assert!(!moved.get_root().exists(), "{at}");
+            assert_eq!(app.instance_manager().world_copy(id), None);
+        }
+    }
+
+    #[tokio::test]
+    async fn a_copy_held_open_by_a_scanner_for_a_moment_is_published() {
+        use crate::util::publish::fault::{Step, inject};
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves, world, _) = world_instance(&app, "duplicate-scanned").await;
+        inject(Step::NoReplace, &saves.join("Home (copy)"), 5);
+        inject(Step::NoReplace, &saves.join("Home (copy)"), 5);
+
+        let task = duplicate(&app, request(id, &world, "Home (copy)"))
+            .await
+            .unwrap();
+
+        assert!(matches!(wait(&app, task).await, TaskOutcome::Succeeded));
+        assert_eq!(entries(&saves), vec!["Home (copy)", "New World"]);
+        assert!(staging_folders(&saves).is_empty());
+    }
+
+    #[tokio::test]
+    async fn a_folder_name_taken_at_the_last_moment_gets_the_next_number() {
+        use crate::util::publish::fault::{Step, inject, pending};
+        const ALREADY_EXISTS: i32 = if cfg!(windows) { 183 } else { 17 };
+        let app = crate::setup_managers_for_test().await;
+        let (id, saves, world, _) = world_instance(&app, "duplicate-raced").await;
+        inject(Step::NoReplace, &saves.join("Home (copy)"), ALREADY_EXISTS);
+
+        let task = duplicate(&app, request(id, &world, "Home (copy)"))
+            .await
+            .unwrap();
+
+        assert!(matches!(wait(&app, task).await, TaskOutcome::Succeeded));
+        assert_eq!(entries(&saves), vec!["Home (copy) (2)", "New World"]);
+        assert_eq!(
+            read_level_name(&saves.join("Home (copy) (2)"))
+                .unwrap()
+                .as_deref(),
+            Some("Home (copy)")
+        );
+
+        // Tried a few times only, then the copy fails and leaves nothing.
+        let taken = ["Other", "Other (2)", "Other (3)", "Other (4)", "Other (5)"];
+        for name in taken {
+            inject(Step::NoReplace, &saves.join(name), ALREADY_EXISTS);
+        }
+        let task = duplicate(&app, request(id, &world, "Other")).await.unwrap();
+        assert!(matches!(wait(&app, task).await, TaskOutcome::Failed(_)));
+        for name in taken {
+            assert!(!pending(Step::NoReplace, &saves.join(name)), "{name}");
+        }
+        assert_eq!(entries(&saves), vec!["Home (copy) (2)", "New World"]);
+        assert!(staging_folders(&saves).is_empty());
     }
 
     /// Sets the instance's modpack, locked or not.
@@ -1251,7 +1488,19 @@ mod tests {
         let real = elsewhere.path().join("real saves");
         std::fs::rename(&saves, &real).unwrap();
         std::os::unix::fs::symlink(&real, &saves).unwrap();
+        // Beside a shared folder only this instance's leftovers go.
+        let others = elsewhere
+            .path()
+            .join(format!(".gdl-world-copy-{}-other", *id + 1));
+        std::fs::create_dir(&others).unwrap();
+        let own = elsewhere
+            .path()
+            .join(format!(".gdl-world-copy-{}-left", *id));
+        std::fs::create_dir(&own).unwrap();
         let world = listed(&app, id).await.pop().unwrap();
+        assert!(others.is_dir());
+        assert!(!own.exists());
+        std::fs::remove_dir(&others).unwrap();
 
         let (pause, task) = held(
             &app,

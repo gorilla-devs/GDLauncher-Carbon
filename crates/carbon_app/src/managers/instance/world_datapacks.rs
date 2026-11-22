@@ -400,7 +400,8 @@ impl ManagerRef<'_, InstanceManager> {
         let mut titles = match &saves {
             Some(saves) => {
                 let folders: Vec<_> = rows.iter().map(|row| saves.join(&row.filename)).collect();
-                tokio::task::spawn_blocking(move || {
+                let count = folders.len();
+                let read = tokio::task::spawn_blocking(move || {
                     folders
                         .iter()
                         .map(|folder| match read_level_name(folder) {
@@ -412,7 +413,8 @@ impl ManagerRef<'_, InstanceManager> {
                         })
                         .collect::<Vec<_>>()
                 })
-                .await?
+                .await;
+                titles_or_none(read, count)
             }
             None => vec![None; rows.len()],
         }
@@ -584,9 +586,30 @@ impl ManagerRef<'_, InstanceManager> {
     }
 }
 
+/// The worlds' titles, or none for any of them when reading them stopped
+/// (a panic): the worlds are still listed, under their folder names.
+fn titles_or_none(
+    read: Result<Vec<Option<String>>, tokio::task::JoinError>,
+    count: usize,
+) -> Vec<Option<String>> {
+    read.unwrap_or_else(|error| {
+        warn!(?error, "could not read the names of the worlds");
+        vec![None; count]
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn worlds_whose_names_could_not_be_read_have_none() {
+        let stopped = tokio::spawn(std::future::pending::<Vec<Option<String>>>());
+        stopped.abort();
+        assert_eq!(titles_or_none(stopped.await, 2), vec![None, None]);
+        let read = Ok(vec![Some("Home".to_owned()), None]);
+        assert_eq!(titles_or_none(read, 2), vec![Some("Home".to_owned()), None]);
+    }
     use crate::domain::instance::AddonType;
     use crate::managers::App;
     use crate::managers::instance::{installer::publication, mods::tests::addon_fixture};

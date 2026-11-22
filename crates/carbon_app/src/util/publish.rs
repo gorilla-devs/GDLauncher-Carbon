@@ -32,7 +32,8 @@
 //!   with POSIX semantics.
 //! - Windows folder renames: a folder can't be renamed while a file in it is
 //!   open, and antivirus or the indexer opens freshly written files for a
-//!   moment, so [`rename_dir`] retries that refusal briefly.
+//!   moment, so [`rename_dir`] and [`rename_dir_noclobber`] retry that
+//!   refusal briefly.
 //!
 //! Callers keep their original paths for records, comparisons and messages;
 //! only the paths handed to tempfile change form.
@@ -328,6 +329,14 @@ pub async fn rename_dir(from: &Path, to: &Path) -> io::Result<()> {
         held_open,
     )
     .await
+}
+
+/// [`rename_noclobber`] for a folder that was just written, such as a copy
+/// to publish: a refusal because a file in it is held open is tried again
+/// for about two seconds, as [`rename_dir`] does. An occupied destination is
+/// never retried and never replaced.
+pub async fn rename_dir_noclobber(from: &Path, to: &Path) -> io::Result<()> {
+    retry_while_busy(move || async move { rename_noclobber(from, to) }, held_open).await
 }
 
 /// Runs `attempt` again after each of [`BUSY_RETRY_DELAYS`] while it fails
@@ -1190,6 +1199,74 @@ mod tests {
         let error = rename_dir(&missing, &from).await.unwrap_err();
         assert_eq!(error.kind(), io::ErrorKind::NotFound);
         assert_eq!(started.elapsed(), std::time::Duration::ZERO);
+    }
+
+    /// The rule a busy folder is published by, run on a stand-in rename: a
+    /// file held open is waited out, anything else is answered at once, and
+    /// an occupied destination is never taken for a busy one.
+    #[tokio::test(start_paused = true)]
+    async fn only_a_folder_held_open_is_renamed_again() {
+        use super::fault::SHARING_VIOLATION;
+        use std::cell::RefCell;
+        use std::collections::VecDeque;
+        const ALREADY_EXISTS: i32 = if cfg!(windows) { 183 } else { 17 };
+
+        let run = |outcomes: Vec<io::Result<()>>| {
+            let outcomes = RefCell::new(VecDeque::from(outcomes));
+            let attempts = RefCell::new(0);
+            async move {
+                let result = retry_while_busy(
+                    || {
+                        *attempts.borrow_mut() += 1;
+                        let next = outcomes.borrow_mut().pop_front().unwrap();
+                        async move { next }
+                    },
+                    held_open,
+                )
+                .await;
+                (result, *attempts.borrow())
+            }
+        };
+
+        let (result, attempts) = run(vec![
+            Err(io::Error::from_raw_os_error(SHARING_VIOLATION)),
+            Err(io::Error::from_raw_os_error(5)),
+            Ok(()),
+        ])
+        .await;
+        assert!(result.is_ok());
+        assert_eq!(attempts, 3);
+
+        let (result, attempts) = run(vec![Err(io::ErrorKind::NotFound.into())]).await;
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::NotFound);
+        assert_eq!(attempts, 1);
+
+        let (result, attempts) = run(vec![Err(io::Error::from_raw_os_error(ALREADY_EXISTS))]).await;
+        assert_eq!(result.unwrap_err().kind(), io::ErrorKind::AlreadyExists);
+        assert_eq!(attempts, 1);
+    }
+
+    /// A folder published without replacing waits out a busy refusal and
+    /// still never replaces what is at its destination.
+    #[tokio::test(start_paused = true)]
+    async fn rename_dir_noclobber_waits_out_a_busy_folder_and_keeps_a_taken_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let from = tmp.path().join("staging");
+        let to = tmp.path().join("World");
+        std::fs::create_dir_all(from.join("region")).unwrap();
+
+        inject(Step::NoReplace, &to, 5);
+        inject(Step::NoReplace, &to, 5);
+        rename_dir_noclobber(&from, &to).await.unwrap();
+        assert!(!pending(Step::NoReplace, &to));
+        assert!(to.join("region").is_dir());
+
+        std::fs::create_dir_all(from.join("other")).unwrap();
+        let error = rename_dir_noclobber(&from, &to).await.unwrap_err();
+        assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+        assert!(to.join("region").is_dir());
+        assert!(!to.join("other").exists());
+        assert!(from.join("other").is_dir());
     }
 
     /// A replacing persist refused with Access denied: Windows retries it

@@ -430,6 +430,30 @@ impl Drop for FolderReservation {
 /// The name of an entry of the instances folder as an instance is known by
 /// (its shortpath), or `None` when the name is not valid UTF-8 and so cannot
 /// be one.
+/// Copies every entry of `from` that `keep` accepts into the new folder `to`,
+/// following links as `fs_extra` does.
+fn copy_entries(
+    from: &Path,
+    to: &Path,
+    keep: &dyn Fn(&std::ffi::OsStr) -> bool,
+) -> anyhow::Result<()> {
+    std::fs::create_dir(to)?;
+    for entry in std::fs::read_dir(from)? {
+        let entry = entry?;
+        let name = entry.file_name();
+        if !keep(&name) {
+            continue;
+        }
+        let item = entry.path();
+        if item.is_dir() {
+            fs_extra::dir::copy(&item, to, &CopyOptions::new())?;
+        } else {
+            fs_extra::file::copy(&item, to.join(&name), &fs_extra::file::CopyOptions::new())?;
+        }
+    }
+    Ok(())
+}
+
 fn scanned_name(path: &Path) -> Option<String> {
     path.file_name()?.to_str().map(str::to_owned)
 }
@@ -2722,6 +2746,9 @@ impl<'s> ManagerRef<'s, InstanceManager> {
             .as_ref()
             .is_some_and(|name| *name != config.name && *name != shortpath);
         let rename_root = if moves_root {
+            // A world copy would be thrown away by the move; it is stopped
+            // rather than waited for.
+            self.stop_world_copy(update.instance_id).await;
             Some(self.hold_root(&_instance_guard, true).await)
         } else {
             None
@@ -3340,7 +3367,10 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         self.app
             .invalidate(INSTANCE_DETAILS, Some(instance_id.0.into()));
 
-        // Waits, showing Deleting, for duplicates still copying the folder.
+        // A world copy goes with the instance; it is stopped rather than
+        // waited for. Then waits, showing Deleting, for duplicates still
+        // copying the folder.
+        self.stop_world_copy(instance_id).await;
         let _root = self.hold_root(&operation, true).await;
 
         let path = self
@@ -3510,13 +3540,14 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         #[cfg(test)]
         self.test_hooks.pause("duplicate_copy", instance_id).await;
 
-        let path = self
+        let instance_path = self
             .app
             .settings_manager()
             .runtime_path
             .get_instances()
-            .get_instance_path(&src_shortpath)
-            .get_root();
+            .get_instance_path(&src_shortpath);
+        let path = instance_path.get_root();
+        let data_path = instance_path.get_data_path();
 
         let tmpdir = self
             .app
@@ -3534,24 +3565,21 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         );
         let tmppath2 = tmppath.clone();
         // Everything but what earlier setups left for the original alone: its
-        // retired setups and the recovery copies Repair moved aside.
+        // retired setups and the recovery copies Repair moved aside; and in
+        // the data folder, the world copies being made there.
         tokio::task::spawn_blocking(move || -> anyhow::Result<()> {
-            std::fs::create_dir(&tmppath2)?;
-            for entry in std::fs::read_dir(&path2)? {
-                let entry = entry?;
-                if modpack::session::setup_leftover(&entry.file_name()) {
-                    continue;
-                }
-                let item = entry.path();
-                if item.is_dir() {
-                    fs_extra::dir::copy(&item, &tmppath2, &CopyOptions::new())?;
-                } else {
-                    fs_extra::file::copy(
-                        &item,
-                        tmppath2.join(entry.file_name()),
-                        &fs_extra::file::CopyOptions::new(),
-                    )?;
-                }
+            let data_name = data_path
+                .file_name()
+                .context("the data folder has no name")?
+                .to_owned();
+            let data_folder = data_path.is_dir();
+            copy_entries(&path2, &tmppath2, &|name| {
+                !modpack::session::setup_leftover(name) && !(data_folder && name == data_name)
+            })?;
+            if data_folder {
+                copy_entries(&data_path, &tmppath2.join(&data_name), &|name| {
+                    !world_duplicate::is_world_copy_staging(name)
+                })?;
             }
             Ok(())
         })
