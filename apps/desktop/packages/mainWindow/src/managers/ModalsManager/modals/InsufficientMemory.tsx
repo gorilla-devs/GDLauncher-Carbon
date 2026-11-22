@@ -62,6 +62,7 @@ function InsufficientMemory(props: ModalProps) {
         <DialogFooter>
           <TextLink
             class="whitespace-nowrap"
+            data-testid="insufficient-memory-play-anyway"
             onClick={async () => {
               // Persist the dismissal first if requested. The next launch
               // (not this one — this one passes skipMemoryCheck) reads

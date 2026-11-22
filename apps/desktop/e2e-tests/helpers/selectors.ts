@@ -64,6 +64,8 @@ export const TEST_IDS = Object.freeze({
   instanceCreationSubmit: "instance-creation-submit",
   instanceTile: "instance-tile",
   instancePlay: "instance-play",
+  /** "Play anyway" in the app's "Not enough memory" warning. */
+  insufficientMemoryPlayAnyway: "insufficient-memory-play-anyway",
   instanceContextDelete: "instance-context-delete",
   confirmInstanceDeletion: "confirm-instance-deletion",
   // Generic close (X) rendered by ModalLayout's header — present on every

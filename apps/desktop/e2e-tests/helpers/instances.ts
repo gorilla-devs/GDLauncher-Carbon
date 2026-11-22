@@ -408,13 +408,31 @@ export async function clickPlayAndAwaitLaunched(
   const tile = page.locator(byInstanceName(name))
   await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
 
+  // A machine short of free memory gets the app's "Not enough memory" warning
+  // instead of a launch (the macOS CI runners do, with about 2.3 GB free).
+  // That is the app working, not the launch failing: the test goes on the
+  // way a user would, with "Play anyway".
+  const playAnyway = page.locator(
+    byTestId(TEST_IDS.insufficientMemoryPlayAnyway)
+  )
   await expect
-    .poll(() => launchedCount(), {
-      timeout: opts.timeout ?? LAUNCH_TIMEOUT,
-      message:
-        opts.message ??
-        "the core never reported GAME_LAUNCHED after Play was clicked"
-    })
+    .poll(
+      async () => {
+        if (
+          launchedCount() <= before &&
+          (await playAnyway.isVisible().catch(() => false))
+        ) {
+          await playAnyway.click().catch(() => {})
+        }
+        return launchedCount()
+      },
+      {
+        timeout: opts.timeout ?? LAUNCH_TIMEOUT,
+        message:
+          opts.message ??
+          "the core never reported GAME_LAUNCHED after Play was clicked"
+      }
+    )
     .toBeGreaterThan(before)
 }
 
