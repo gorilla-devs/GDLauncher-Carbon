@@ -50,6 +50,7 @@ const LAUNCHER_FOLDERS = new Set(
     "natives",
     "logging_configs",
     "temp",
+    "world_maps",
     "download"
   ].map(fold)
 )

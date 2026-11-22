@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs"
 import { describe, expect, it } from "vitest"
 import { isLauncherEntry, isSystemLeftover } from "../runtimeFolderContents"
 
@@ -12,6 +13,7 @@ describe("what is at the top of a data folder", () => {
       "natives",
       "logging_configs",
       "temp",
+      "world_maps",
       "download",
       "gdl_conf.db",
       "gdl_conf.db-wal",
@@ -23,6 +25,22 @@ describe("what is at the top of a data folder", () => {
       ".gdl_migration_in_progress"
     ])
       expect(isLauncherEntry(name), name).toBe(true)
+  })
+  it("knows every folder the core keeps at the top of the data folder", () => {
+    const source = readFileSync(
+      new URL(
+        "../../../../../../crates/carbon_rt_path/src/lib.rs",
+        import.meta.url
+      ),
+      "utf8"
+    )
+    const block =
+      /\nimpl RuntimePath \{\n([\s\S]*?)\n\}\n/.exec(source)?.[1] ?? ""
+    const folders = [...block.matchAll(/self\.0\.join\("([^"]+)"\)/g)].map(
+      (m) => m[1]
+    )
+    expect(folders).toContain("instances")
+    for (const name of folders) expect(isLauncherEntry(name), name).toBe(true)
   })
   it("takes anything else for someone else's", () => {
     for (const name of [
