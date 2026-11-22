@@ -349,7 +349,6 @@ pub fn read(bytes: &[u8]) -> Result<Root, NbtError> {
 }
 
 /// What `read_keeping` does with a named tag inside a compound.
-#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Keep {
     /// Build the tag whole.
@@ -362,7 +361,6 @@ pub enum Keep {
 }
 
 /// Bounds on what one `read_keeping` call may walk, skipped tags included.
-#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
     pub max_tags: usize,
@@ -415,7 +413,6 @@ fn read_compound_keeping<'a>(
 /// `keep` gets the compound keys from the root's content down to and including the tag in
 /// question; the root's own name is not part of the path. The members of a list of
 /// compounds are asked with the list's path plus their own key.
-#[cfg_attr(not(test), allow(dead_code))]
 pub fn read_keeping(
     bytes: &[u8],
     keep: &dyn Fn(&[&[u8]]) -> Keep,

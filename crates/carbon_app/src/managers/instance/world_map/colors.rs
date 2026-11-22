@@ -3,13 +3,11 @@
 use std::collections::HashMap;
 use std::sync::OnceLock;
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) type Rgb = [u8; 3];
 
 #[cfg_attr(not(test), allow(dead_code))]
 pub(super) const UNKNOWN: Rgb = [0x80, 0x80, 0x80];
 
-#[cfg_attr(not(test), allow(dead_code))]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum Look {
     Color(Rgb),
@@ -30,7 +28,6 @@ struct LegacyTable {
 
 /// The look of a block of 1.13 or later by its name, such as `minecraft:stone`. A block the
 /// table does not know (a mod's, or one of a newer game) is grey.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn look_of(name: &str) -> Look {
     static TABLE: OnceLock<HashMap<&'static str, Look>> = OnceLock::new();
     let table = TABLE.get_or_init(|| BLOCK_COLORS.lines().filter_map(parse_block_line).collect());

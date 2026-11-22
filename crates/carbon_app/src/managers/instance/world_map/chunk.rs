@@ -1,0 +1,812 @@
+//! The top visible block of each of a chunk's 256 columns, for a map seen from above.
+//! Worlds come from anywhere: a chunk that does not hold together gives an empty
+//! surface, never a panic or a guess.
+
+use std::ops::RangeInclusive;
+
+use super::colors::{Look, Rgb, look_of};
+use crate::util::nbt::{self, Keep, Limits, Tag};
+
+/// Walking a chunk costs at most this, skipped entities and ticks included.
+const LIMITS: Limits = Limits {
+    max_tags: 2_000_000,
+    max_depth: 64,
+};
+
+const SECTION_BLOCKS: usize = 4096;
+
+/// The sections a world can have: the game allows heights from -2032 to 2031.
+const SECTION_YS: RangeInclusive<i8> = -127..=126;
+
+/// A chunk whose top block is bedrock in this many columns is taken to have a roof.
+const ROOF_COLUMNS: usize = 200;
+
+const EMPTY: Surface = [None; 256];
+
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Copy, PartialEq, Debug)]
+pub(super) struct Top {
+    pub color: Rgb,
+    pub y: i16,
+    pub water: bool,
+}
+
+/// Indexed `z * 16 + x`; `None` where the column shows nothing.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) type Surface = [Option<Top>; 256];
+
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum Roof {
+    Open,
+    /// The dimension has a roof: show what lies under it.
+    Ceiling,
+}
+
+/// What a world of 1.2 to 1.12.2 says about its numeric block ids.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) struct LegacyIds {}
+
+/// The top visible block of each column of a chunk's uncompressed NBT. A chunk of a shape
+/// this reader does not know, an unfinished one or one that does not hold together is empty.
+#[cfg_attr(not(test), allow(dead_code))]
+pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, _legacy: Option<&LegacyIds>) -> Surface {
+    let Ok(root) = nbt::read_keeping(chunk_nbt, &keep, LIMITS) else {
+        return EMPTY;
+    };
+    match root.tag.get("Status") {
+        None => {}
+        Some(Tag::String(status)) if status == b"minecraft:full" || status == b"full" => {}
+        Some(_) => return EMPTY,
+    }
+    let Some(Tag::List { items, .. }) = root.tag.get("sections") else {
+        return EMPTY;
+    };
+    let Some(column) = Column::new(items) else {
+        return EMPTY;
+    };
+    let open = std::array::from_fn(|i| column.top(i, Roof::Open));
+    let bedrock = open
+        .iter()
+        .flatten()
+        .filter(|(_, bedrock)| *bedrock)
+        .count();
+    if roof == Roof::Ceiling || bedrock >= ROOF_COLUMNS {
+        std::array::from_fn(|i| column.top(i, Roof::Ceiling).map(|(top, _)| top))
+    } else {
+        open.map(|top: Option<(Top, bool)>| top.map(|(top, _)| top))
+    }
+}
+
+/// Keeps the block data and status of each shape of chunk and walks past the rest.
+fn keep(path: &[&[u8]]) -> Keep {
+    match path {
+        [b"sections"] | [b"sections", b"block_states"] => Keep::Descend,
+        [b"sections", b"Y"] | [b"sections", b"block_states", b"palette" | b"data"] => Keep::All,
+        [b"Level"] | [b"Level", b"Sections"] => Keep::Descend,
+        [
+            b"Level",
+            b"Sections",
+            b"Y" | b"Palette" | b"BlockStates" | b"Blocks" | b"Data" | b"Add",
+        ] => Keep::All,
+        [b"Status"] | [b"Level", b"Status"] => Keep::All,
+        _ => Keep::Skip,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Block {
+    look: Look,
+    bedrock: bool,
+}
+
+const AIR: Block = Block {
+    look: Look::SeeThrough,
+    bedrock: false,
+};
+
+enum Section {
+    Uniform(Block),
+    Mixed {
+        palette: Vec<Block>,
+        /// One per block, in the game's order `y * 256 + z * 16 + x`, each within `palette`.
+        indices: Vec<u16>,
+    },
+}
+
+/// The block name of a palette entry: `{Name, Properties}` in 1.18 to 1.21; newer games (26.3
+/// worlds) write a bare name, `{id, properties}`, or `{"": name}` in a list mixing the two.
+fn palette_name(entry: &Tag) -> Option<&[u8]> {
+    let name = match entry {
+        Tag::String(_) => entry,
+        Tag::Compound(_) => entry
+            .get("Name")
+            .or_else(|| entry.get("id"))
+            .or_else(|| entry.get(""))?,
+        _ => return None,
+    };
+    match name {
+        Tag::String(raw) => Some(raw),
+        _ => None,
+    }
+}
+
+impl Section {
+    /// The blocks of one section of 1.18 and later; `None` when they do not hold together.
+    fn read(block_states: Option<&Tag>) -> Option<Section> {
+        let Some(Tag::List { items, .. }) = block_states?.get("palette") else {
+            return None;
+        };
+        if items.is_empty() || items.len() > SECTION_BLOCKS {
+            return None;
+        }
+        let palette = items
+            .iter()
+            .map(|entry| {
+                let name = nbt::decode_string(palette_name(entry)?)?;
+                Some(Block {
+                    look: look_of(&name),
+                    bedrock: name == "minecraft:bedrock",
+                })
+            })
+            .collect::<Option<Vec<_>>>()?;
+        if let [block] = palette[..] {
+            return Some(Section::Uniform(block));
+        }
+        let Some(Tag::LongArray(data)) = block_states?.get("data") else {
+            return None;
+        };
+        let bits = ((usize::BITS - (palette.len() - 1).leading_zeros()) as usize).max(4);
+        let per_long = 64 / bits;
+        if data.len() < SECTION_BLOCKS.div_ceil(per_long) {
+            return None;
+        }
+        let mask = (1u64 << bits) - 1;
+        let indices = (0..SECTION_BLOCKS)
+            .map(|i| {
+                let index = (data[i / per_long] as u64 >> ((i % per_long) * bits)) & mask;
+                (index < palette.len() as u64).then_some(index as u16)
+            })
+            .collect::<Option<Vec<_>>>()?;
+        Some(Section::Mixed { palette, indices })
+    }
+
+    fn block(&self, i: usize) -> Block {
+        match self {
+            Section::Uniform(block) => *block,
+            Section::Mixed { palette, indices } => palette[indices[i] as usize],
+        }
+    }
+}
+
+/// A chunk's sections from the lowest to the highest present, a missing one counting as air.
+struct Column {
+    lowest: i8,
+    sections: Vec<Option<Section>>,
+}
+
+impl Column {
+    /// `None` when there are no sections at all or a section's `Y` is out of the game's range.
+    fn new(sections: &[Tag]) -> Option<Column> {
+        let mut read: Vec<(i8, Option<&Tag>)> = Vec::new();
+        let mut seen = [false; 256];
+        for section in sections {
+            let Some(Tag::Byte(y)) = section.get("Y") else {
+                return None;
+            };
+            if !SECTION_YS.contains(y) {
+                return None;
+            }
+            // The first of two sections at one height is the one kept.
+            let slot = &mut seen[(*y as u8) as usize];
+            if !*slot {
+                *slot = true;
+                read.push((*y, section.get("block_states")));
+            }
+        }
+        let lowest = read.iter().map(|(y, _)| *y).min()?;
+        let highest = read.iter().map(|(y, _)| *y).max()?;
+        let mut column: Vec<Option<Section>> = (lowest..=highest).map(|_| None).collect();
+        for (y, block_states) in read {
+            column[(i16::from(y) - i16::from(lowest)) as usize] = Section::read(block_states);
+        }
+        Some(Column {
+            lowest,
+            sections: column,
+        })
+    }
+
+    /// The top visible block of column `i` (`z * 16 + x`) and whether it is bedrock. Under a
+    /// roof the scan passes the roof and the air under it, and takes the first block below.
+    fn top(&self, i: usize, roof: Roof) -> Option<(Top, bool)> {
+        let mut under_roof = roof == Roof::Open;
+        let mut roof_seen = false;
+        for (n, section) in self.sections.iter().enumerate().rev() {
+            let base = (i16::from(self.lowest) + n as i16) * 16;
+            for local in (0..16).rev() {
+                let block = section.as_ref().map_or(AIR, |s| s.block(local * 256 + i));
+                let (color, water) = match block.look {
+                    Look::SeeThrough => {
+                        under_roof |= roof_seen;
+                        continue;
+                    }
+                    Look::Color(color) => (color, false),
+                    Look::Water(color) => (color, true),
+                };
+                if under_roof {
+                    let y = base + local as i16;
+                    return Some((Top { color, y, water }, block.bedrock));
+                }
+                roof_seen = true;
+            }
+        }
+        None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::super::colors::{UNKNOWN, look_of};
+    use super::super::region::Region;
+    use super::*;
+    use crate::util::nbt::{self, Keep, Limits, Root, Tag};
+
+    fn compound(entries: Vec<(&str, Tag)>) -> Tag {
+        Tag::Compound(
+            entries
+                .into_iter()
+                .map(|(key, tag)| (key.as_bytes().to_vec(), tag))
+                .collect(),
+        )
+    }
+
+    fn string(text: &str) -> Tag {
+        Tag::String(text.as_bytes().to_vec())
+    }
+
+    fn compounds(items: Vec<Tag>) -> Tag {
+        Tag::List {
+            element: if items.is_empty() { 0 } else { 10 },
+            items,
+        }
+    }
+
+    fn bits_for(palette_len: usize) -> usize {
+        let needed = (usize::BITS - palette_len.saturating_sub(1).leading_zeros()) as usize;
+        needed.max(4)
+    }
+
+    /// Packs 4096 indices the way the game does from 1.16: no index spans two longs.
+    fn pack(indices: &[u16], bits: usize) -> Vec<i64> {
+        let per_long = 64 / bits;
+        let mut data = vec![0u64; indices.len().div_ceil(per_long)];
+        for (i, &index) in indices.iter().enumerate() {
+            data[i / per_long] |= (index as u64) << ((i % per_long) * bits);
+        }
+        data.into_iter().map(|long| long as i64).collect()
+    }
+
+    fn section(y: i8, palette: &[&str], data: Option<Vec<i64>>) -> Tag {
+        let mut states = vec![(
+            "palette",
+            compounds(
+                palette
+                    .iter()
+                    .map(|name| compound(vec![("Name", string(name))]))
+                    .collect(),
+            ),
+        )];
+        if let Some(data) = data {
+            states.push(("data", Tag::LongArray(data)));
+        }
+        compound(vec![
+            ("Y", Tag::Byte(y)),
+            ("block_states", compound(states)),
+            ("SkyLight", Tag::ByteArray(vec![0; 2048])),
+        ])
+    }
+
+    fn chunk_with(sections: Vec<Tag>, status: &str) -> Vec<u8> {
+        let mut entries = vec![
+            ("DataVersion", Tag::Int(3465)),
+            ("yPos", Tag::Int(-4)),
+            ("sections", compounds(sections)),
+            ("block_entities", compounds(vec![])),
+        ];
+        if !status.is_empty() {
+            entries.push(("Status", string(status)));
+        }
+        nbt::write(&Root {
+            name: Vec::new(),
+            tag: compound(entries),
+        })
+    }
+
+    /// A chunk of 1.18 and later; an empty index list means a palette of one with no `data`.
+    fn chunk_1_18(sections: Vec<(i8, Vec<&str>, Vec<u16>)>, status: &str) -> Vec<u8> {
+        let sections = sections
+            .into_iter()
+            .map(|(y, palette, indices)| {
+                let data = (!indices.is_empty()).then(|| pack(&indices, bits_for(palette.len())));
+                section(y, &palette, data)
+            })
+            .collect();
+        chunk_with(sections, status)
+    }
+
+    /// 4096 indices in the game's order, `y * 256 + z * 16 + x`.
+    fn fill(index_at: impl Fn(usize, usize, usize) -> u16) -> Vec<u16> {
+        (0..4096)
+            .map(|i| index_at(i % 16, i / 256, (i / 16) % 16))
+            .collect()
+    }
+
+    fn color(name: &str) -> Rgb {
+        match look_of(name) {
+            Look::Color(rgb) | Look::Water(rgb) => rgb,
+            Look::SeeThrough => panic!("{name} is see-through"),
+        }
+    }
+
+    fn top(name: &str, y: i16) -> Option<Top> {
+        Some(Top {
+            color: color(name),
+            y,
+            water: matches!(look_of(name), Look::Water(_)),
+        })
+    }
+
+    const FULL: &str = "minecraft:full";
+
+    /// Stone up to 63 and grass at 64 where `x < 8`; air above.
+    fn terrain() -> Vec<(i8, Vec<&'static str>, Vec<u16>)> {
+        vec![
+            (2, vec!["minecraft:stone"], vec![]),
+            (
+                4,
+                vec!["minecraft:air", "minecraft:grass_block"],
+                fill(|x, y, _| u16::from(y == 0 && x < 8)),
+            ),
+            (3, vec!["minecraft:stone"], vec![]),
+            (5, vec!["minecraft:air"], vec![]),
+        ]
+    }
+
+    #[test]
+    fn the_top_block_of_each_column_is_found() {
+        let bytes = chunk_1_18(terrain(), FULL);
+        let surface = surface(&bytes, Roof::Open, None);
+        for z in 0..16 {
+            for x in 0..16 {
+                let expected = if x < 8 {
+                    top("minecraft:grass_block", 64)
+                } else {
+                    top("minecraft:stone", 63)
+                };
+                assert_eq!(surface[z * 16 + x], expected, "column {x},{z}");
+            }
+        }
+        // The numeric id table is not needed for this shape.
+        assert_eq!(
+            super::surface(&bytes, Roof::Open, Some(&LegacyIds {})),
+            surface
+        );
+    }
+
+    #[test]
+    fn plants_and_air_are_looked_through() {
+        let bytes = chunk_1_18(
+            vec![(
+                4,
+                vec![
+                    "minecraft:air",
+                    "minecraft:grass_block",
+                    "minecraft:poppy",
+                    "minecraft:stone",
+                ],
+                fill(|_, y, _| match y {
+                    0..=4 => 3,
+                    5 => 1,
+                    6 => 2,
+                    _ => 0,
+                }),
+            )],
+            "full",
+        );
+        let surface = surface(&bytes, Roof::Open, None);
+        assert!(
+            surface
+                .iter()
+                .all(|column| *column == top("minecraft:grass_block", 69))
+        );
+    }
+
+    #[test]
+    fn water_is_marked() {
+        let bytes = chunk_1_18(
+            vec![(
+                3,
+                vec!["minecraft:air", "minecraft:sand", "minecraft:water"],
+                fill(|_, y, _| match y {
+                    0..=5 => 1,
+                    6..=12 => 2,
+                    _ => 0,
+                }),
+            )],
+            FULL,
+        );
+        let surface = surface(&bytes, Roof::Open, None);
+        let water = surface[0].expect("a top");
+        assert!(water.water);
+        assert_eq!(water.y, 3 * 16 + 12);
+        assert_eq!(water.color, color("minecraft:water"));
+        assert!(surface.iter().all(|column| *column == Some(water)));
+    }
+
+    #[test]
+    fn a_palette_of_one_needs_no_data() {
+        let bytes = chunk_1_18(vec![(0, vec!["minecraft:dirt"], vec![])], FULL);
+        let surface = surface(&bytes, Roof::Open, None);
+        assert!(
+            surface
+                .iter()
+                .all(|column| *column == top("minecraft:dirt", 15))
+        );
+    }
+
+    #[test]
+    fn palette_entries_of_newer_games_are_read() {
+        let indices = fill(|x, y, _| if y == 15 { (x % 3) as u16 + 1 } else { 0 });
+        let palettes = [
+            Tag::List {
+                element: 8,
+                items: [
+                    "minecraft:air",
+                    "minecraft:stone",
+                    "minecraft:dirt",
+                    "minecraft:sand",
+                ]
+                .map(string)
+                .to_vec(),
+            },
+            compounds(vec![
+                compound(vec![("", string("minecraft:air"))]),
+                compound(vec![("", string("minecraft:stone"))]),
+                compound(vec![
+                    ("id", string("minecraft:dirt")),
+                    ("properties", compound(vec![("snowy", string("false"))])),
+                ]),
+                compound(vec![("", string("minecraft:sand"))]),
+            ]),
+        ];
+        for palette in palettes {
+            let section = compound(vec![
+                ("Y", Tag::Byte(0)),
+                (
+                    "block_states",
+                    compound(vec![
+                        ("palette", palette),
+                        ("data", Tag::LongArray(pack(&indices, 4))),
+                    ]),
+                ),
+            ]);
+            let surface = surface(&chunk_with(vec![section], FULL), Roof::Open, None);
+            assert_eq!(surface[0], top("minecraft:stone", 15));
+            assert_eq!(surface[1], top("minecraft:dirt", 15));
+            assert_eq!(surface[2], top("minecraft:sand", 15));
+        }
+    }
+
+    #[test]
+    fn indices_do_not_span_longs() {
+        let palette = [
+            "minecraft:air",
+            "minecraft:stone",
+            "minecraft:dirt",
+            "minecraft:sand",
+            "minecraft:gravel",
+            "minecraft:oak_planks",
+            "minecraft:cobblestone",
+            "minecraft:bricks",
+            "minecraft:white_wool",
+            "minecraft:red_wool",
+            "minecraft:blue_wool",
+            "minecraft:green_wool",
+            "minecraft:yellow_wool",
+            "minecraft:black_wool",
+            "minecraft:orange_wool",
+            "minecraft:lime_wool",
+            "minecraft:gold_block",
+            "minecraft:diamond_block",
+            "minecraft:emerald_block",
+            "minecraft:lapis_block",
+        ];
+        assert_eq!(bits_for(palette.len()), 5);
+        // 5 bits: 12 indices to a long and 4 bits left over. The top layer of the
+        // section starts at index 3840, the first index of long 320, so x = 11 is the
+        // last index of that long and x = 12 and 13 open the next one.
+        let mut data = vec![0i64; 4096_usize.div_ceil(12)];
+        data[320] = 17 << 55;
+        data[321] = 18 | (19 << 5);
+        let bytes = chunk_with(vec![section(0, &palette, Some(data))], FULL);
+        let surface = surface(&bytes, Roof::Open, None);
+        assert_eq!(surface[11], top("minecraft:diamond_block", 15));
+        assert_eq!(surface[12], top("minecraft:emerald_block", 15));
+        assert_eq!(surface[13], top("minecraft:lapis_block", 15));
+        let shown = surface.iter().filter(|column| column.is_some()).count();
+        assert_eq!(shown, 3);
+    }
+
+    #[test]
+    fn sections_below_zero_and_above_255_are_read() {
+        let one_block =
+            |local_y: usize| fill(move |x, y, z| u16::from(x == 3 && z == 5 && y == local_y));
+        let below = chunk_1_18(
+            vec![(
+                -3,
+                vec!["minecraft:air", "minecraft:obsidian"],
+                one_block(8),
+            )],
+            FULL,
+        );
+        let surface_below = surface(&below, Roof::Open, None);
+        assert_eq!(surface_below[5 * 16 + 3], top("minecraft:obsidian", -40));
+        assert_eq!(surface_below.iter().flatten().count(), 1);
+
+        let above = chunk_1_18(
+            vec![(
+                18,
+                vec!["minecraft:air", "minecraft:obsidian"],
+                one_block(12),
+            )],
+            FULL,
+        );
+        let surface_above = surface(&above, Roof::Open, None);
+        assert_eq!(surface_above[5 * 16 + 3], top("minecraft:obsidian", 300));
+        assert_eq!(surface_above.iter().flatten().count(), 1);
+
+        // The lowest and highest sections the game allows, in one chunk.
+        let tallest = chunk_1_18(
+            vec![
+                (-127, vec!["minecraft:stone"], vec![]),
+                (
+                    126,
+                    vec!["minecraft:air", "minecraft:obsidian"],
+                    one_block(15),
+                ),
+            ],
+            FULL,
+        );
+        let surface_tallest = surface(&tallest, Roof::Open, None);
+        assert_eq!(surface_tallest[5 * 16 + 3], top("minecraft:obsidian", 2031));
+        assert_eq!(surface_tallest[0], top("minecraft:stone", -2017));
+    }
+
+    #[test]
+    fn sections_out_of_order_or_duplicated() {
+        let bytes = chunk_1_18(
+            vec![
+                (1, vec!["minecraft:stone"], vec![]),
+                (6, vec!["minecraft:dirt"], vec![]),
+                (-2, vec!["minecraft:deepslate"], vec![]),
+                (6, vec!["minecraft:gold_block"], vec![]),
+                (7, vec!["minecraft:air"], vec![]),
+            ],
+            FULL,
+        );
+        let surface = surface(&bytes, Roof::Open, None);
+        assert!(
+            surface
+                .iter()
+                .all(|column| *column == top("minecraft:dirt", 6 * 16 + 15))
+        );
+    }
+
+    #[test]
+    fn a_chunk_that_lies_is_empty_not_a_panic() {
+        let empty = |bytes: &[u8], what: &str| {
+            let surface = surface(bytes, Roof::Open, None);
+            assert!(surface.iter().all(Option::is_none), "{what}");
+        };
+        let two = ["minecraft:air", "minecraft:stone"];
+
+        let past_palette = chunk_1_18(
+            vec![(0, two.to_vec(), fill(|x, _, _| u16::from(x == 0) * 2))],
+            FULL,
+        );
+        empty(&past_palette, "an index past the palette");
+
+        let short = chunk_with(vec![section(0, &two, Some(vec![-1; 255]))], FULL);
+        empty(&short, "data too short");
+
+        let no_palette = chunk_with(
+            vec![compound(vec![
+                ("Y", Tag::Byte(0)),
+                (
+                    "block_states",
+                    compound(vec![("data", Tag::LongArray(vec![-1; 256]))]),
+                ),
+            ])],
+            FULL,
+        );
+        empty(&no_palette, "palette missing");
+
+        for y in [127, -128] {
+            let bytes = chunk_1_18(vec![(y, vec!["minecraft:stone"], vec![])], FULL);
+            empty(&bytes, &format!("section Y {y}"));
+        }
+
+        empty(b"", "nothing");
+        empty(b"not nbt at all", "not NBT");
+        empty(&[10, 0, 0, 9, 0, 1], "cut short");
+
+        // A valid chunk with 3,000,000 bytes in a list the map never reads.
+        let mut many = chunk_1_18(vec![(0, vec!["minecraft:stone"], vec![])], FULL);
+        let end = many.pop();
+        assert_eq!(end, Some(0));
+        many.extend_from_slice(&[9, 0, 4]);
+        many.extend_from_slice(b"junk");
+        many.push(1);
+        many.extend_from_slice(&3_000_000_i32.to_be_bytes());
+        many.resize(many.len() + 3_000_000, 0);
+        many.push(0);
+        empty(&many, "3,000,000 tags");
+    }
+
+    #[test]
+    fn an_unfinished_chunk_is_empty() {
+        let bytes = chunk_1_18(
+            vec![(0, vec!["minecraft:stone"], vec![])],
+            "minecraft:features",
+        );
+        let surface = surface(&bytes, Roof::Open, None);
+        assert!(surface.iter().all(Option::is_none));
+    }
+
+    /// Bedrock roof at 127, netherrack 100 to 126, air 40 to 99. Where `x < 8` netherrack
+    /// fills 0 to 39; elsewhere air goes on down to 32, over lava at 31 and netherrack below.
+    fn nether() -> Vec<u8> {
+        let palette = vec![
+            "minecraft:air",
+            "minecraft:netherrack",
+            "minecraft:bedrock",
+            "minecraft:lava",
+        ];
+        let sections = (0..8)
+            .map(|section_y: i8| {
+                let indices = fill(|x, local, _| {
+                    let y = i32::from(section_y) * 16 + local as i32;
+                    match y {
+                        127 => 2,
+                        100..=126 => 1,
+                        40..=99 => 0,
+                        _ if x < 8 => 1,
+                        32..=39 => 0,
+                        31 => 3,
+                        _ => 1,
+                    }
+                });
+                (section_y, palette.clone(), indices)
+            })
+            .collect();
+        chunk_1_18(sections, FULL)
+    }
+
+    fn assert_floor(surface: &Surface) {
+        for z in 0..16 {
+            for x in 0..16 {
+                let expected = if x < 8 {
+                    top("minecraft:netherrack", 39)
+                } else {
+                    top("minecraft:lava", 31)
+                };
+                assert_eq!(surface[z * 16 + x], expected, "column {x},{z}");
+            }
+        }
+    }
+
+    #[test]
+    fn under_a_ceiling_the_floor_is_shown() {
+        let bytes = nether();
+        assert_floor(&surface(&bytes, Roof::Ceiling, None));
+        // A flat sheet of bedrock on top is taken for a roof.
+        assert_floor(&surface(&bytes, Roof::Open, None));
+
+        let terrain = chunk_1_18(terrain(), FULL);
+        let open = surface(&terrain, Roof::Open, None);
+        assert_eq!(open[0], top("minecraft:grass_block", 64));
+        assert_eq!(open[15], top("minecraft:stone", 63));
+    }
+
+    fn real_status_is_full(bytes: &[u8]) -> bool {
+        let keep = |path: &[&[u8]]| match path {
+            [b"Status"] => Keep::All,
+            _ => Keep::Skip,
+        };
+        let limits = Limits {
+            max_tags: 2_000_000,
+            max_depth: 64,
+        };
+        let Ok(root) = nbt::read_keeping(bytes, &keep, limits) else {
+            return false;
+        };
+        matches!(root.tag.get("Status"), Some(Tag::String(s)) if s == b"minecraft:full" || s == b"full")
+    }
+
+    /// Runs only with `GDL_REAL_WORLDS` set to the folder of real worlds.
+    #[test]
+    fn real_chunks_show_terrain() {
+        let Some(root) = std::env::var_os("GDL_REAL_WORLDS") else {
+            return;
+        };
+        let root = std::path::PathBuf::from(root);
+        let (mut chunks, mut full, mut columns, mut shown, mut grey) = (0, 0, 0, 0, 0);
+        let mut colors = std::collections::HashSet::new();
+        let mut water = false;
+        let mut grids = Vec::new();
+        for world in [
+            "1.20.1/region",
+            "1.21.1/region",
+            "26.3/dimensions/minecraft/overworld/region",
+        ] {
+            let mut files: Vec<_> = std::fs::read_dir(root.join(world))
+                .unwrap()
+                .map(|entry| entry.unwrap().path())
+                .filter(|path| path.extension().is_some_and(|e| e == "mca"))
+                .collect();
+            files.sort();
+            assert!(!files.is_empty(), "no regions in {world}");
+            for path in files {
+                let Some(region) = Region::read(&path).unwrap() else {
+                    continue;
+                };
+                for z in 0..32 {
+                    for x in 0..32 {
+                        let Some(bytes) = region.chunk(x, z) else {
+                            continue;
+                        };
+                        chunks += 1;
+                        let surface = surface(&bytes, Roof::Open, None);
+                        if !real_status_is_full(&bytes) {
+                            continue;
+                        }
+                        full += 1;
+                        columns += 256;
+                        for top in surface.iter().flatten() {
+                            shown += 1;
+                            grey += usize::from(top.color == UNKNOWN && !top.water);
+                            water |= top.water;
+                            colors.insert(top.color);
+                        }
+                        if (x, z) == (0, 0) && !grids.contains(&world) {
+                            grids.push(world);
+                            println!("heights of {path:?} chunk 0,0:");
+                            for row in surface.chunks(16) {
+                                let line: Vec<String> = row
+                                    .iter()
+                                    .map(|top| top.map_or("   -".into(), |t| format!("{:4}", t.y)))
+                                    .collect();
+                                println!("{}", line.join(""));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        println!(
+            "real chunks: {chunks} read, {full} full, {shown} of {columns} columns shown, \
+             {grey} grey, {} colours, water seen: {water}",
+            colors.len()
+        );
+        assert!(
+            grids.contains(&"1.20.1/region"),
+            "no chunk 0,0 in the 1.20.1 regions"
+        );
+        assert!(shown * 100 >= columns * 90, "too few columns shown");
+        assert!(grey * 50 < shown, "too many grey columns");
+        assert!(water, "no water");
+        // The full chunks of these worlds are a frozen ocean and a forest: their tops hold 17
+        // colours, as an independent decoder of the same files also counts.
+        assert!(colors.len() >= 15, "too few colours");
+    }
+}
