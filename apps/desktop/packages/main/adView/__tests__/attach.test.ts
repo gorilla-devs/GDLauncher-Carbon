@@ -89,7 +89,8 @@ describe("attachAdView", () => {
     expect(win.contentView.addChildView).toHaveBeenCalledTimes(1)
     expect(view.setBackgroundColor).toHaveBeenCalledWith("#00000000")
     const [file, opts] = view.webContents.loadFile.mock.calls[0]
-    expect(file.endsWith("adview/index.html")).toBe(true)
+    // A native path: backslashes on Windows.
+    expect(file.replaceAll("\\", "/")).toMatch(/\/adview\/index\.html$/)
     expect(opts.search).toContain("w=440")
   })
 
