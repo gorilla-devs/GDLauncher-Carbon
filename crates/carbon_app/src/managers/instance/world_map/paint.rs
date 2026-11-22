@@ -155,8 +155,6 @@ pub(super) fn png(image: &RgbaImage) -> anyhow::Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use std::cell::Cell;
-    use std::path::{Path, PathBuf};
-    use std::time::Instant;
 
     use super::super::chunk::tests::{FULL, chunk_1_18, fill};
     use super::super::colors::{Look, Rgb, look_of};
@@ -543,110 +541,5 @@ mod tests {
             .unwrap()
             .to_rgba8();
         assert_eq!(decoded, image);
-    }
-
-    /// The overworld region folder of a real world, of either layout.
-    fn overworld_regions(world: &Path) -> PathBuf {
-        let newer = world.join("dimensions/minecraft/overworld/region");
-        if newer.is_dir() {
-            newer
-        } else {
-            world.join("region")
-        }
-    }
-
-    /// The `(x, z)` of a file named `r.<x>.<z>.mca`.
-    fn region_position(path: &Path) -> Option<(i32, i32)> {
-        let name = path.file_name()?.to_str()?;
-        let mut parts = name.strip_prefix("r.")?.strip_suffix(".mca")?.split('.');
-        let position = (parts.next()?.parse().ok()?, parts.next()?.parse().ok()?);
-        parts.next().is_none().then_some(position)
-    }
-
-    fn level_dat(world: &Path) -> Option<LegacyIds> {
-        use std::io::Read;
-        let bytes = std::fs::read(world.join("level.dat")).ok()?;
-        let mut nbt = Vec::new();
-        flate2::read::GzDecoder::new(&bytes[..])
-            .read_to_end(&mut nbt)
-            .ok()?;
-        Some(LegacyIds::from_level_dat(&nbt))
-    }
-
-    /// Runs only with `GDL_REAL_WORLDS` set to the folder of real worlds and `GDL_MAP_OUT` to
-    /// a folder for the pictures.
-    #[test]
-    fn real_worlds_are_painted() {
-        let (Some(root), Some(out)) = (
-            std::env::var_os("GDL_REAL_WORLDS"),
-            std::env::var_os("GDL_MAP_OUT"),
-        ) else {
-            return;
-        };
-        let (root, out) = (PathBuf::from(root), PathBuf::from(out));
-        let mut worlds: Vec<PathBuf> = std::fs::read_dir(&root)
-            .unwrap()
-            .map(|entry| entry.unwrap().path())
-            .filter(|path| path.is_dir())
-            .collect();
-        worlds.sort();
-        assert!(!worlds.is_empty(), "no worlds under GDL_REAL_WORLDS");
-        for world in worlds {
-            let name = world.file_name().unwrap().to_string_lossy().into_owned();
-            let folder = overworld_regions(&world);
-            let legacy = level_dat(&world);
-            let file = |x: i32, z: i32| folder.join(format!("r.{x}.{z}.mca"));
-            let mut positions: Vec<(i32, i32)> = std::fs::read_dir(&folder)
-                .unwrap()
-                .filter_map(|entry| region_position(&entry.unwrap().path()))
-                .collect();
-            positions.sort();
-            let world_out = out.join(&name);
-            std::fs::create_dir_all(&world_out).unwrap();
-            let mut pieces = std::collections::HashMap::new();
-            let (mut opaque, mut flags, mut times) = (0, Vec::new(), Vec::new());
-            for &(x, z) in &positions {
-                // The game leaves empty files for regions it only looked at.
-                let Some(region) = Region::read(&file(x, z)).unwrap() else {
-                    flags.push(format!("r.{x}.{z}=no region"));
-                    continue;
-                };
-                let north = Region::read(&file(x, z - 1)).unwrap();
-                let start = Instant::now();
-                let painted =
-                    paint_region(&region, north.as_ref(), Roof::Open, legacy.as_ref(), &never)
-                        .unwrap();
-                times.push(start.elapsed());
-                opaque += painted.image.pixels().filter(|p| p[3] != 0).count();
-                flags.push(format!("r.{x}.{z}={}", painted.complete));
-                let bytes = png(&painted.image).unwrap();
-                std::fs::write(world_out.join(format!("r.{x}.{z}.png")), bytes).unwrap();
-                pieces.insert((x, z), painted.image);
-            }
-            // The first block of four neighbouring regions, joined as one piece of scale 1.
-            let joined = positions.iter().find_map(|&(x, z)| {
-                let children = [(x, z), (x + 1, z), (x, z + 1), (x + 1, z + 1)];
-                let children = children.map(|at| pieces.get(&at));
-                children
-                    .iter()
-                    .all(Option::is_some)
-                    .then(|| (x, z, join(children)))
-            });
-            if let Some((x, z, image)) = &joined {
-                let bytes = png(image).unwrap();
-                std::fs::write(world_out.join(format!("joined.{x}.{z}.png")), bytes).unwrap();
-            }
-            let millis: Vec<String> = times
-                .iter()
-                .map(|t| format!("{:.1}", t.as_secs_f64() * 1000.0))
-                .collect();
-            println!(
-                "{name}: {} regions painted, {opaque} opaque pixels, complete [{}], ms per region [{}], joined {}",
-                times.len(),
-                flags.join(" "),
-                millis.join(" "),
-                joined.map_or("none".to_string(), |(x, z, _)| format!("from r.{x}.{z}")),
-            );
-        }
     }
 }
