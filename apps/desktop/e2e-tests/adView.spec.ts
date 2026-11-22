@@ -1,6 +1,6 @@
 import { byTestId, TEST_IDS } from "./helpers/selectors.js"
 import { adText, adViewInfo } from "./helpers/adView.js"
-import { AD_HOSTILE_CSS } from "./helpers/themes.js"
+import { AD_HOSTILE_CSS, goToLibrary } from "./helpers/themes.js"
 import { expect, test } from "./fixtures/index.js"
 import {
   computeAdStackBounds,
@@ -124,6 +124,8 @@ test.describe("Protected ad view", () => {
       await expect
         .poll(() => adText(app, "#why"), { timeout: 15_000 })
         .toBe(english)
+      // The app is shared with later specs, which start from the library.
+      await goToLibrary(page)
     }
   })
 

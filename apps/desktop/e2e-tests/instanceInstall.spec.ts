@@ -11,6 +11,7 @@ import {
 import { verifyAssetIndex, verifyClientJar } from "./helpers/installVerify.js"
 import { readVersionInfo } from "./helpers/versionCache.js"
 import { withCleanup } from "./helpers/cleanup.js"
+import { goToLibrary } from "./helpers/themes.js"
 
 const raw = process.env.E2E_VERSION_MATRIX
 if (!raw) {
@@ -43,6 +44,10 @@ test.describe("instance install", () => {
     }) => {
       const { page } = authenticatedApp
       const name = `gdl-e2e-${entry.id}`
+
+      // The app is shared with every spec before this one, so the library
+      // is opened here rather than assumed.
+      await goToLibrary(page)
 
       // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why
       // cleanup must never re-throw over an already-failing body, only over
