@@ -61,6 +61,19 @@ impl ManagerRef<'_, InstanceManager> {
         self.keep_for_tests(task);
     }
 
+    /// Drops, in the background, every map kept for the deleted instance `id`: its delete is
+    /// never held up or failed by them.
+    pub(super) fn forget_instance_maps(self, id: InstanceId) {
+        let store = self.world_map_store();
+        let forgetting = tokio::task::spawn_blocking(move || store.forget_instance(id));
+        let task = tokio::spawn(async move {
+            if let Err(error) = forgetting.await {
+                debug!(?error, "Instance {id}: forgetting its maps stopped");
+            }
+        });
+        self.keep_for_tests(task);
+    }
+
     /// Drops, in the background, the kept maps of the instance's worlds other than
     /// `existing`, the folder names of every world it has.
     pub(super) fn forget_maps_of_missing_worlds(self, id: InstanceId, existing: Vec<String>) {

@@ -219,6 +219,13 @@ impl Region {
         self.entry(x, z).is_some()
     }
 
+    /// Whether the slot holds, within bounds, a chunk this reader does not read by design:
+    /// LZ4 (kind 4), or one kept in an outside `.mcc` file (the kind with its high bit set).
+    pub(super) fn left_out(&self, x: u8, z: u8) -> bool {
+        self.payload(x, z)
+            .is_some_and(|(kind, _)| kind == 4 || kind & 0x80 != 0)
+    }
+
     /// The inflated chunk NBT. `None` for an empty or lying slot, LZ4, an external
     /// file, an unknown kind or a stream that is broken or too large.
     pub(super) fn chunk(&self, x: u8, z: u8) -> Option<Vec<u8>> {

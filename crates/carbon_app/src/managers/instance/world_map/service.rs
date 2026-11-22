@@ -77,6 +77,10 @@ pub struct PieceRequest {
 pub struct Piece {
     pub png: Vec<u8>,
     pub complete: bool,
+    /// Whether the desktop may keep it for good under the address asked: it is complete and,
+    /// at scale 0, painted for the revision the address names. Above scale 0 the address
+    /// carries the dimension's revision, which says as much of the regions beneath.
+    pub lasting: bool,
 }
 
 impl ManagerRef<'_, InstanceManager> {
@@ -151,11 +155,14 @@ impl ManagerRef<'_, InstanceManager> {
         let Some(revision) = painter.revision(scale, x, z) else {
             return Ok(None);
         };
+        let named = scale > 0 || revision == request.rev;
+        let piece = |png, complete: bool| Piece {
+            png,
+            complete,
+            lasting: complete && named,
+        };
         if let Some(png) = painter.kept(scale, x, z, &revision).await? {
-            return Ok(Some(Piece {
-                png,
-                complete: true,
-            }));
+            return Ok(Some(piece(png, true)));
         }
         // Taken here, never under a painting permit, so it cannot wait on one it holds.
         let _building = match scale {
@@ -173,21 +180,15 @@ impl ManagerRef<'_, InstanceManager> {
         // Built from the store when another request built it while this one waited.
         Ok(match painter.piece(scale, x, z).await? {
             None => None,
-            Some(Drawn::Kept(png)) => Some(Piece {
-                png,
-                complete: true,
-            }),
+            Some(Drawn::Kept(png)) => Some(piece(png, true)),
             Some(Drawn::Painted {
                 png: Some(png),
                 complete,
                 ..
-            }) => Some(Piece { png, complete }),
+            }) => Some(piece(png, complete)),
             Some(Drawn::Painted {
                 image, complete, ..
-            }) => Some(Piece {
-                png: spawn_blocking(move || png(&image)).await??,
-                complete,
-            }),
+            }) => Some(piece(spawn_blocking(move || png(&image)).await??, complete)),
         })
     }
 }
@@ -857,6 +858,58 @@ pub(crate) mod tests {
         let kept_after = kept(&app);
         assert_eq!(kept_after.len(), 1, "{kept_after:?}");
         assert_ne!(kept_after, kept_before);
+    }
+
+    #[tokio::test]
+    async fn a_piece_lasts_only_under_the_revision_it_was_painted_for() {
+        let app = crate::setup_managers_for_test().await;
+        let id = test_world(&app, "map-lasting").await;
+        let facts = app
+            .instance_manager()
+            .world_map(id, "Home".into())
+            .await
+            .unwrap();
+        let dimension = &facts.dimensions[0];
+        let current = PieceRequest {
+            rev: dimension.regions[0].revision.clone(),
+            ..request(id, 0, 0, 0)
+        };
+        // Painted, then from the store.
+        for _ in 0..2 {
+            let other = whole(&app, request(id, 0, 0, 0)).await.unwrap();
+            assert!(other.complete && !other.lasting);
+            let named = whole(&app, current.clone()).await.unwrap();
+            assert!(named.complete && named.lasting);
+            assert_eq!(named.png, other.png);
+        }
+        // Above scale 0 the desktop names the dimension's revision, not the piece's own.
+        let joined = PieceRequest {
+            rev: dimension.revision.clone(),
+            ..request(id, 1, 0, 0)
+        };
+        assert!(whole(&app, joined).await.unwrap().lasting);
+    }
+
+    #[tokio::test]
+    async fn a_deleted_instance_loses_its_kept_maps() {
+        let app = crate::setup_managers_for_test().await;
+        let gone = test_world(&app, "map-instance-gone").await;
+        let stays = test_world(&app, "map-instance-stays").await;
+        for id in [gone, stays] {
+            assert!(piece(&app, request(id, 0, 0, 0)).await.is_some());
+        }
+        assert_eq!(kept(&app).len(), 2);
+
+        app.instance_manager()._delete_instance(gone).await.unwrap();
+        app.instance_manager().forgetting_done().await;
+
+        let left = kept(&app);
+        assert_eq!(left.len(), 1);
+        let store = app.settings_manager().runtime_path.get_world_maps();
+        assert!(
+            left[0].starts_with(store.join(stays.0.to_string())),
+            "{left:?}"
+        );
     }
 
     #[tokio::test]

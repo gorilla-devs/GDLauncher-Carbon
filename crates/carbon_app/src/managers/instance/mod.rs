@@ -3461,6 +3461,7 @@ impl<'s> ManagerRef<'s, InstanceManager> {
         .await;
         drop(map_files);
         removal??;
+        self.forget_instance_maps(instance_id);
 
         // Get the instance's group_id before deleting, so we can check if the group becomes empty
         let id = *instance_id;

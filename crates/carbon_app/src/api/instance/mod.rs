@@ -1361,8 +1361,9 @@ async fn world_map_piece(
                 (axum::http::header::CONTENT_TYPE, "image/png"),
                 (
                     axum::http::header::CACHE_CONTROL,
-                    // A piece with a hole is painted again when asked again.
-                    if piece.complete {
+                    // A piece with a hole is painted again when asked again, and one painted
+                    // for files other than the address names must not stay under it.
+                    if piece.lasting {
                         "private, max-age=31536000, immutable"
                     } else {
                         "no-store"
@@ -3886,11 +3887,31 @@ mod world_map_piece_route_tests {
                 id.0
             )
         };
+        let facts = app
+            .instance_manager()
+            .world_map(id, "Home".into())
+            .await
+            .unwrap();
+        let current = &facts.dimensions[0]
+            .regions
+            .iter()
+            .find(|region| (region.x, region.z) == (0, 0))
+            .unwrap()
+            .revision;
 
         assert_eq!(
-            png_with_cache(answer(&app, &at(0, 0)).await).await,
+            png_with_cache(
+                answer(&app, &at(0, 0).replace("rev=a1", &format!("rev={current}"))).await
+            )
+            .await,
             "private, max-age=31536000, immutable"
         );
+        // The same piece under an address of other files is sent, but not to be kept.
+        assert_eq!(
+            png_with_cache(answer(&app, &at(0, 0)).await).await,
+            "no-store"
+        );
+
         assert_eq!(
             png_with_cache(answer(&app, &at(0, 1)).await).await,
             "no-store"

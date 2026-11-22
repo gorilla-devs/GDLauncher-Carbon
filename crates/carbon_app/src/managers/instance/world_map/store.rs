@@ -117,6 +117,13 @@ impl Store {
         self.forget_folder(&mut total, &folder);
     }
 
+    /// Drops every piece kept for `instance`.
+    pub(crate) fn forget_instance(&self, instance: InstanceId) {
+        let mut total = self.lock();
+        let folder = self.instance_folder(instance);
+        self.forget_folder(&mut total, &folder);
+    }
+
     /// Drops the pieces of every world of `instance` whose folder name is not in `existing`.
     pub(crate) fn forget_missing_worlds(&self, instance: InstanceId, existing: &[String]) {
         let mut total = self.lock();
@@ -491,6 +498,26 @@ mod tests {
         assert_eq!(store.counted_bytes(), Some(2 * PIECE as u64));
         // A world never kept is nothing to forget.
         store.forget_world(InstanceId(7), "Never");
+    }
+
+    #[test]
+    fn an_instance_is_forgotten() {
+        let (_folder, store) = store_in("forget-instance", STORE_LIMIT);
+        store.put(&key("World", 0, "aa11"), &piece(1)).unwrap();
+        store.put(&key("Other", 0, "aa11"), &piece(1)).unwrap();
+        let elsewhere = PieceKey {
+            instance: InstanceId(2),
+            ..key("World", 0, "aa11")
+        };
+        store.put(&elsewhere, &piece(3)).unwrap();
+
+        store.forget_instance(InstanceId(1));
+
+        assert_eq!(store.get(&key("World", 0, "aa11")), None);
+        assert_eq!(store.get(&key("Other", 0, "aa11")), None);
+        assert_eq!(store.get(&elsewhere), Some(piece(3)));
+        assert_eq!(store.counted_bytes(), Some(PIECE as u64));
+        store.forget_instance(InstanceId(7));
     }
 
     #[test]

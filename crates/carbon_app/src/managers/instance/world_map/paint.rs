@@ -41,7 +41,8 @@ pub(super) fn paint_region(
             if cancelled() {
                 return None;
             }
-            if !region.lists_chunk(cx, cz) {
+            // A chunk the reader leaves out by design shows nothing, as it will next time.
+            if !region.lists_chunk(cx, cz) || region.left_out(cx, cz) {
                 continue;
             }
             // A listed chunk that cannot be found is damaged or not written yet.
@@ -478,6 +479,30 @@ mod tests {
         let north = region_of(region_bytes(&[(0, 31, 2, b"not zlib".to_vec())]));
         let region = region_of(region_bytes(&[good()]));
         assert!(paint(&region, Some(&north)).complete);
+    }
+
+    #[test]
+    fn a_chunk_left_out_by_design_paints_nothing_and_leaves_the_piece_whole() {
+        let stone = color("minecraft:stone");
+        let good = || (0, 0, 2, zlib(&hill("minecraft:stone", |_, _| 4)));
+        let nbt = || zlib(&hill("minecraft:stone", |_, _| 4));
+        // LZ4, and chunks kept in an outside `.mcc` file, whose slot holds only their kind.
+        for left_out in [
+            (1, 0, 4, nbt()),
+            (1, 0, 0x82, Vec::new()),
+            (1, 0, 0x84, Vec::new()),
+        ] {
+            let region = region_of(region_bytes(&[good(), left_out]));
+            assert!(region.lists_chunk(1, 0));
+            let painted = paint(&region, None);
+            assert!(painted.complete);
+            assert_piece(&painted.image, |cx, cz, _, _| {
+                ((cx, cz) == (0, 0)).then(|| shaded(stone, EQUAL))
+            });
+        }
+        // A kind the game never writes is still a chunk that could not be read.
+        let region = region_of(region_bytes(&[good(), (1, 0, 9, nbt())]));
+        assert!(!paint(&region, None).complete);
     }
 
     #[test]
