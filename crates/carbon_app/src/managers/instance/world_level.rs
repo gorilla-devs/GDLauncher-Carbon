@@ -15,6 +15,11 @@ use crate::util::nbt::{self, Root, Tag};
 const MAX_LEVEL_DAT_SIZE: u64 = 64 * 1024 * 1024;
 
 fn read_tree(path: &Path) -> anyhow::Result<Root> {
+    Ok(nbt::read(&inflate_level_dat(path)?)?)
+}
+
+/// The uncompressed NBT of the `level.dat` at `path`.
+pub(super) fn inflate_level_dat(path: &Path) -> anyhow::Result<Vec<u8>> {
     let file = File::open(path).with_context(|| format!("opening {}", path.display()))?;
     let mut raw = Vec::new();
     GzDecoder::new(file)
@@ -27,7 +32,7 @@ fn read_tree(path: &Path) -> anyhow::Result<Root> {
             path.display()
         );
     }
-    Ok(nbt::read(&raw)?)
+    Ok(raw)
 }
 
 pub(super) fn read_level_name(world: &Path) -> anyhow::Result<Option<String>> {

@@ -5,7 +5,6 @@ use std::sync::OnceLock;
 
 pub(super) type Rgb = [u8; 3];
 
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) const UNKNOWN: Rgb = [0x80, 0x80, 0x80];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,7 +35,6 @@ pub(super) fn look_of(name: &str) -> Look {
 
 /// The look of a vanilla block of 1.2 to 1.12.2 by its numeric id and data value; `None` for an
 /// id the game never had.
-#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn legacy_look_of(id: u16, data: u8) -> Option<Look> {
     static TABLE: OnceLock<LegacyTable> = OnceLock::new();
     let table = TABLE.get_or_init(|| {

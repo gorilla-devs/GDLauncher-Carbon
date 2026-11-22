@@ -2,9 +2,12 @@
 //! Worlds come from anywhere: a chunk that does not hold together gives an empty
 //! surface, never a panic or a guess.
 
+use std::cell::Cell;
+use std::collections::HashMap;
 use std::ops::RangeInclusive;
 
-use super::colors::{Look, Rgb, look_of};
+use super::colors::{Look, Rgb, UNKNOWN, legacy_look_of, look_of};
+use super::legacy::{HIGHEST_VANILLA_ID, LegacyIds};
 use crate::util::nbt::{self, Keep, Limits, Tag};
 
 /// Walking a chunk costs at most this, skipped entities and ticks included.
@@ -43,15 +46,12 @@ pub(super) enum Roof {
     Ceiling,
 }
 
-/// What a world of 1.2 to 1.12.2 says about its numeric block ids.
-#[cfg_attr(not(test), allow(dead_code))]
-pub(super) struct LegacyIds {}
-
-/// The top visible block of each column of a chunk's uncompressed NBT, of 1.13 and later.
+/// The top visible block of each column of a chunk's uncompressed NBT, of 1.2 and later.
 /// A chunk of a shape this reader does not know, an unfinished one or one that does not hold
-/// together is empty.
+/// together is empty. `legacy` says which numeric ids are mods' in a world of 1.2 to 1.12.2;
+/// without it ids from 256 up are.
 #[cfg_attr(not(test), allow(dead_code))]
-pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, _legacy: Option<&LegacyIds>) -> Surface {
+pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, legacy: Option<&LegacyIds>) -> Surface {
     let Ok(root) = nbt::read_keeping(chunk_nbt, &keep, LIMITS) else {
         return EMPTY;
     };
@@ -65,13 +65,27 @@ pub(super) fn surface(chunk_nbt: &[u8], roof: Roof, _legacy: Option<&LegacyIds>)
         };
         Column::new(items, Section::read)
     } else if let Some(level) = root.tag.get("Level") {
+        // A chunk of 1.12.2 and earlier has no status: it is read as finished.
         if !finished(level.get("Status"), FINISHED_LEVEL) {
             return EMPTY;
         }
         let Some(Tag::List { items, .. }) = level.get("Sections") else {
             return EMPTY;
         };
-        Column::new(items, Section::read_level)
+        // All of a chunk's sections are of one shape.
+        let shape = Cell::new(None);
+        Column::new(items, |section| {
+            let Some(this) = LevelShape::of(section)? else {
+                return Ok(None);
+            };
+            if shape.replace(Some(this)).is_some_and(|other| other != this) {
+                return Err(IllFormed);
+            }
+            match this {
+                LevelShape::Palette => Section::read_level(section),
+                LevelShape::NumericIds => Section::read_numeric(section, legacy),
+            }
+        })
     } else {
         return EMPTY;
     };
@@ -115,7 +129,8 @@ fn keep(path: &[&[u8]]) -> Keep {
         [
             b"Level",
             b"Sections",
-            b"Y" | b"Palette" | b"BlockStates" | b"Blocks" | b"Data" | b"Add",
+            b"Y" | b"Palette" | b"BlockStates" | b"Blocks" | b"Data" | b"Add" | b"Blocks16"
+            | b"Add2",
         ] => Keep::All,
         [b"Status"] | [b"Level", b"Status"] => Keep::All,
         _ => Keep::Skip,
@@ -224,6 +239,49 @@ struct IllFormed;
 /// A section read: `None` when it holds no blocks at all and is air.
 type SectionRead = Result<Option<Section>, IllFormed>;
 
+/// The two shapes of section under `Level.Sections`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum LevelShape {
+    /// `Palette` and `BlockStates`, 1.13 to 1.17.
+    Palette,
+    /// `Blocks`, `Data` and `Add`, 1.2 to 1.12.2.
+    NumericIds,
+}
+
+impl LevelShape {
+    /// `None` for a section with only light. Arrays of mods that widen the ids, or the arrays
+    /// of both shapes in one section, are ill-formed: read as either, the section would lie.
+    fn of(section: &Tag) -> Result<Option<LevelShape>, IllFormed> {
+        let has = |keys: &[&str]| keys.iter().any(|key| section.get(key).is_some());
+        if has(&["Blocks16", "Add2"]) {
+            return Err(IllFormed);
+        }
+        match (
+            has(&["Palette", "BlockStates"]),
+            has(&["Blocks", "Data", "Add"]),
+        ) {
+            (true, true) => Err(IllFormed),
+            (true, false) => Ok(Some(LevelShape::Palette)),
+            (false, true) => Ok(Some(LevelShape::NumericIds)),
+            (false, false) => Ok(None),
+        }
+    }
+}
+
+/// The look of a numeric id and data value: grey for a mod's block or an id the table lacks.
+fn numeric_block(id: u16, data: u8, legacy: Option<&LegacyIds>) -> Block {
+    let is_mod = legacy.map_or(id > HIGHEST_VANILLA_ID, |legacy| legacy.is_mod_block(id));
+    let look = if is_mod {
+        Look::Color(UNKNOWN)
+    } else {
+        legacy_look_of(id, data).unwrap_or(Look::Color(UNKNOWN))
+    };
+    Block {
+        look,
+        bedrock: !is_mod && id == 7,
+    }
+}
+
 impl Section {
     /// One section of 1.18 and later. Data longer than its palette needs is read as the game
     /// would; shorter is ill-formed.
@@ -258,8 +316,39 @@ impl Section {
         )
     }
 
+    /// One section of 1.2 to 1.12.2: an id byte per block, and nibbles of data and of the
+    /// id's high bits, the low nibble first.
+    fn read_numeric(section: &Tag, legacy: Option<&LegacyIds>) -> SectionRead {
+        let bytes = |key: &str, len: usize| match section.get(key) {
+            None => Ok(None),
+            Some(Tag::ByteArray(bytes)) if bytes.len() == len => Ok(Some(bytes)),
+            Some(_) => Err(IllFormed),
+        };
+        let blocks = bytes("Blocks", SECTION_BLOCKS)?.ok_or(IllFormed)?;
+        let data = bytes("Data", SECTION_BLOCKS / 2)?.ok_or(IllFormed)?;
+        let add = bytes("Add", SECTION_BLOCKS / 2)?;
+        let nibble = |array: &[u8], i: usize| (array[i / 2] >> ((i % 2) * 4)) & 0xF;
+        let mut palette = Vec::new();
+        let mut seen = HashMap::new();
+        let indices = (0..SECTION_BLOCKS)
+            .map(|i| {
+                let high = add.map_or(0, |add| u16::from(nibble(add, i)) << 8);
+                let (id, data) = (u16::from(blocks[i]) | high, nibble(data, i));
+                *seen.entry((id, data)).or_insert_with(|| {
+                    palette.push(numeric_block(id, data, legacy));
+                    (palette.len() - 1) as u16
+                })
+            })
+            .collect();
+        Ok(Some(match palette[..] {
+            [block] => Section::Uniform(block),
+            _ => Section::Mixed { palette, indices },
+        }))
+    }
+
     /// A section from its palette and packed longs, either shape. No palette and no longs is
-    /// a section with only light; a palette of one needs no longs, but any it has must fit.
+    /// a section with only light; a palette of one needs no longs (an empty array of them is
+    /// none, as world editors write it), but any it has must fit.
     /// `packing` gives the layout for the bits per index and the number of longs, or `None`
     /// when that number fits none.
     fn decode(
@@ -274,6 +363,9 @@ impl Section {
         };
         let data = match data {
             None if palette.len() == 1 => return Ok(Some(Section::Uniform(palette[0]))),
+            Some(Tag::LongArray(data)) if data.is_empty() && palette.len() == 1 => {
+                return Ok(Some(Section::Uniform(palette[0])));
+            }
             Some(Tag::LongArray(data)) => data,
             _ => return Err(IllFormed),
         };
@@ -361,7 +453,8 @@ impl Column {
 
 #[cfg(test)]
 mod tests {
-    use super::super::colors::{UNKNOWN, look_of};
+    use super::super::colors::{UNKNOWN, legacy_look_of, look_of};
+    use super::super::legacy::{level_dat_1_7, level_dat_1_12};
     use super::super::region::Region;
     use super::*;
     use crate::util::nbt::{self, Keep, Limits, Root, Tag};
@@ -507,7 +600,7 @@ mod tests {
         assert_terrain(&surface);
         // The numeric id table is not needed for this shape.
         assert_eq!(
-            super::surface(&bytes, Roof::Open, Some(&LegacyIds {})),
+            super::surface(&bytes, Roof::Open, Some(&LegacyIds::from_level_dat(&[]))),
             surface
         );
     }
@@ -1410,6 +1503,392 @@ mod tests {
         }
     }
 
+    #[test]
+    fn a_palette_of_one_with_an_empty_data_array_is_that_block() {
+        let newer = compound(vec![
+            ("Y", Tag::Byte(0)),
+            (
+                "block_states",
+                compound(vec![
+                    ("palette", names(&["minecraft:dirt"])),
+                    ("data", Tag::LongArray(vec![])),
+                ]),
+            ),
+        ]);
+        let older = compound(vec![
+            ("Y", Tag::Byte(0)),
+            ("Palette", names(&["minecraft:dirt"])),
+            ("BlockStates", Tag::LongArray(vec![])),
+        ]);
+        for (what, bytes) in [
+            ("newer shape", chunk_with(vec![newer], FULL)),
+            ("older shape", level_chunk_with(vec![older], "full")),
+        ] {
+            let surface = surface(&bytes, Roof::Open, None);
+            assert!(
+                surface
+                    .iter()
+                    .all(|column| *column == top("minecraft:dirt", 15)),
+                "{what}"
+            );
+        }
+    }
+
+    /// A section of numeric ids from its arrays as they are, light included.
+    fn numeric_section_of(y: i8, blocks: Vec<u8>, data: Vec<u8>, add: Option<Vec<u8>>) -> Tag {
+        let mut entries = vec![
+            ("Y", Tag::Byte(y)),
+            ("Blocks", Tag::ByteArray(blocks)),
+            ("Data", Tag::ByteArray(data)),
+        ];
+        if let Some(add) = add {
+            entries.push(("Add", Tag::ByteArray(add)));
+        }
+        entries.push(("BlockLight", Tag::ByteArray(vec![0; 2048])));
+        entries.push(("SkyLight", Tag::ByteArray(vec![0xFF; 2048])));
+        compound(entries)
+    }
+
+    /// A section of numeric ids, `block_at(x, y, z)` giving `(id, data)`; an `Add` array only
+    /// when an id needs one.
+    fn numeric_section(y: i8, block_at: impl Fn(usize, usize, usize) -> (u16, u8)) -> Tag {
+        let (mut blocks, mut data, mut add) = (vec![0u8; 4096], vec![0u8; 2048], vec![0u8; 2048]);
+        for i in 0..4096 {
+            let (id, value) = block_at(i % 16, i / 256, (i / 16) % 16);
+            let shift = (i % 2) * 4;
+            blocks[i] = id as u8;
+            data[i / 2] |= (value & 0xF) << shift;
+            add[i / 2] |= ((id >> 8) as u8 & 0xF) << shift;
+        }
+        let add = add.iter().any(|&byte| byte != 0).then_some(add);
+        numeric_section_of(y, blocks, data, add)
+    }
+
+    /// A chunk of 1.2 to 1.12.2, with `TerrainPopulated` when `populated` is given.
+    fn numeric_chunk(sections: Vec<Tag>, populated: Option<i8>) -> Vec<u8> {
+        let mut level = vec![
+            ("xPos", Tag::Int(0)),
+            ("zPos", Tag::Int(0)),
+            ("LastUpdate", Tag::Long(1234)),
+            ("LightPopulated", Tag::Byte(1)),
+            ("InhabitedTime", Tag::Long(0)),
+            ("HeightMap", Tag::IntArray(vec![64; 256])),
+            ("Sections", compounds(sections)),
+            ("Entities", compounds(vec![])),
+            ("TileEntities", compounds(vec![])),
+        ];
+        if let Some(populated) = populated {
+            level.push(("TerrainPopulated", Tag::Byte(populated)));
+        }
+        nbt::write(&Root {
+            name: Vec::new(),
+            tag: compound(vec![
+                ("DataVersion", Tag::Int(1343)),
+                ("Level", compound(level)),
+            ]),
+        })
+    }
+
+    fn legacy_top(id: u16, data: u8, y: i16) -> Option<Top> {
+        let (color, water) = match legacy_look_of(id, data) {
+            Some(Look::Color(rgb)) => (rgb, false),
+            Some(Look::Water(rgb)) => (rgb, true),
+            other => panic!("{id}:{data} is {other:?}"),
+        };
+        Some(Top { color, y, water })
+    }
+
+    fn grey(y: i16) -> Option<Top> {
+        Some(Top {
+            color: UNKNOWN,
+            y,
+            water: false,
+        })
+    }
+
+    /// Stone up to 63, then on layer 64: grass where `x < 4` (a poppy over it at x = 0, a gold
+    /// block at x = 1, z = 2, y = 70), still water where `x` is 4 to 7, and wool where `x` is
+    /// 8 to 15: red (data 14) at even `x` and blue (data 11) at odd `x`, written by hand.
+    fn numeric_terrain() -> Vec<Tag> {
+        let mut sections: Vec<Tag> = (0..4)
+            .map(|y| numeric_section(y, |_, _, _| (1, 0)))
+            .collect();
+        let mut blocks = vec![0u8; 4096];
+        let mut data = vec![0u8; 2048];
+        for z in 0..16 {
+            for x in 0..16 {
+                blocks[z * 16 + x] = match x {
+                    0..=3 => 2,
+                    4..=7 => 9,
+                    _ => 35,
+                };
+                // Index z * 16 + x: x = 8 and 9 share byte z * 8 + 4, x = 8 in its low nibble.
+                if x >= 8 && x % 2 == 0 {
+                    data[z * 8 + x / 2] = 0xBE;
+                }
+            }
+        }
+        blocks[256] = 38;
+        blocks[6 * 256 + 2 * 16 + 1] = 41;
+        sections.push(numeric_section_of(4, blocks, data, None));
+        sections
+    }
+
+    #[test]
+    fn numeric_ids_are_read() {
+        for populated in [Some(1), Some(0), None] {
+            let bytes = numeric_chunk(numeric_terrain(), populated);
+            let surface = surface(&bytes, Roof::Open, None);
+            for z in 0..16 {
+                for x in 0..16 {
+                    let expected = match x {
+                        1 if z == 2 => legacy_top(41, 0, 70),
+                        0..=3 => legacy_top(2, 0, 64),
+                        4..=7 => legacy_top(9, 0, 64),
+                        _ if x % 2 == 0 => legacy_top(35, 14, 64),
+                        _ => legacy_top(35, 11, 64),
+                    };
+                    assert_eq!(surface[z * 16 + x], expected, "{x},{z} {populated:?}");
+                }
+            }
+            assert!(surface[4].unwrap().water);
+            assert_ne!(surface[8], surface[9]);
+        }
+    }
+
+    #[test]
+    fn an_add_array_gives_ids_above_255() {
+        // Id 1 throughout the top layer; by hand, Add byte 1920 holds the nibbles of x = 0
+        // (low, 0) and x = 1 (high, 1), so x = 1 is id 257. The builder puts 300 at x = 2.
+        let mut blocks = vec![1u8; 4096];
+        blocks[15 * 256 + 2] = 300_u16 as u8;
+        let mut add = vec![0u8; 2048];
+        add[1920] = 0x10;
+        add[1921] = 0x01;
+        let by_hand = numeric_section_of(0, blocks, vec![0; 2048], Some(add));
+        let built = numeric_section(1, |x, y, z| match (x, y, z) {
+            (3, 0, 0) => (300, 0),
+            (4, 0, 0) => (1, 0),
+            _ => (0, 0),
+        });
+        let bytes = numeric_chunk(vec![by_hand, built], Some(1));
+        let vanilla = LegacyIds::from_level_dat(&[]);
+        for legacy in [None, Some(&vanilla)] {
+            let surface = surface(&bytes, Roof::Open, legacy);
+            assert_eq!(surface[0], legacy_top(1, 0, 15));
+            assert_eq!(surface[1], grey(15));
+            assert_eq!(surface[2], grey(15));
+            assert_eq!(surface[3], grey(16));
+            assert_eq!(surface[4], legacy_top(1, 0, 16));
+            assert_eq!(surface[5], legacy_top(1, 0, 15));
+        }
+    }
+
+    #[test]
+    fn a_mod_block_named_by_the_worlds_list_is_grey_even_below_256() {
+        // Id 200 is the chorus flower in the game itself; in these worlds a mod's block.
+        let bytes = numeric_chunk(
+            vec![numeric_section(
+                0,
+                |x, _, _| if x < 8 { (200, 0) } else { (1, 0) },
+            )],
+            Some(1),
+        );
+        let named = [
+            ("minecraft:air", 0),
+            ("minecraft:stone", 1),
+            ("ic2:rubber_wood", 200),
+        ];
+        let vanilla = LegacyIds::from_level_dat(&[]);
+        let from_1_12 = LegacyIds::from_level_dat(&level_dat_1_12(&named));
+        let from_1_7 = LegacyIds::from_level_dat(&level_dat_1_7(&named));
+        let chorus =
+            LegacyIds::from_level_dat(&level_dat_1_12(&[("minecraft:chorus_flower", 200)]));
+        for (what, legacy, mod_block) in [
+            ("no list given", None, false),
+            ("a world without a list", Some(&vanilla), false),
+            ("a 1.12 list", Some(&from_1_12), true),
+            ("a 1.7 list", Some(&from_1_7), true),
+            ("a list naming the game's own block", Some(&chorus), false),
+        ] {
+            let surface = surface(&bytes, Roof::Open, legacy);
+            let expected = if mod_block {
+                grey(15)
+            } else {
+                legacy_top(200, 0, 15)
+            };
+            assert_eq!(surface[0], expected, "{what}");
+            assert_eq!(surface[15], legacy_top(1, 0, 15), "{what}");
+        }
+    }
+
+    #[test]
+    fn wrong_array_lengths_empty_the_chunk() {
+        // Each bad section lies over good stone, which must not show through it.
+        let ground = numeric_section(0, |_, _, _| (1, 0));
+        let good = || {
+            vec![
+                ("Y", Tag::Byte(1)),
+                ("Blocks", Tag::ByteArray(vec![1; 4096])),
+                ("Data", Tag::ByteArray(vec![0; 2048])),
+            ]
+        };
+        let with = |key: &'static str, tag: Tag| {
+            let mut entries = good();
+            entries.retain(|(name, _)| *name != key);
+            entries.push((key, tag));
+            compound(entries)
+        };
+        let without = |key: &str| {
+            let mut entries = good();
+            entries.retain(|(name, _)| *name != key);
+            compound(entries)
+        };
+        let bad = [
+            (
+                "Blocks of 4095",
+                with("Blocks", Tag::ByteArray(vec![1; 4095])),
+            ),
+            (
+                "Blocks of 4097",
+                with("Blocks", Tag::ByteArray(vec![1; 4097])),
+            ),
+            (
+                "Blocks of 8192",
+                with("Blocks", Tag::ByteArray(vec![1; 8192])),
+            ),
+            (
+                "Blocks not bytes",
+                with("Blocks", Tag::IntArray(vec![1; 4096])),
+            ),
+            ("Blocks missing", without("Blocks")),
+            ("Data of 2047", with("Data", Tag::ByteArray(vec![0; 2047]))),
+            ("Data of 4096", with("Data", Tag::ByteArray(vec![0; 4096]))),
+            ("Data missing", without("Data")),
+            ("Add of 2047", with("Add", Tag::ByteArray(vec![0; 2047]))),
+            ("Add of 4096", with("Add", Tag::ByteArray(vec![0; 4096]))),
+            ("Add not bytes", with("Add", Tag::Int(0))),
+            (
+                "Blocks16 of an id mod",
+                with("Blocks16", Tag::ByteArray(vec![0; 8192])),
+            ),
+            (
+                "Add2 of an id mod",
+                with("Add2", Tag::ByteArray(vec![0; 2048])),
+            ),
+            (
+                "a Palette beside Blocks",
+                with("Palette", Tag::IntArray(vec![1, 2])),
+            ),
+            (
+                "BlockStates beside Blocks",
+                with("BlockStates", Tag::LongArray(vec![0; 256])),
+            ),
+        ];
+        for (what, section) in bad {
+            let bytes = numeric_chunk(vec![ground.clone(), section], Some(1));
+            assert_empty(&bytes, what);
+        }
+
+        // The good section itself shows, so the cases above fail for their own reason.
+        let bytes = numeric_chunk(vec![ground.clone(), compound(good())], Some(1));
+        assert_eq!(surface(&bytes, Roof::Open, None)[0], legacy_top(1, 0, 31));
+
+        // Sections of both shapes in one chunk, either way round.
+        let palette = level_section(1, &["minecraft:stone"], Some(vec![0; 256]));
+        for sections in [
+            vec![ground.clone(), palette.clone()],
+            vec![palette.clone(), numeric_section(2, |_, _, _| (1, 0))],
+        ] {
+            assert_empty(&numeric_chunk(sections, Some(1)), "both shapes");
+        }
+
+        // A section with only light is air in this shape too.
+        let light_only = compound(vec![
+            ("Y", Tag::Byte(1)),
+            ("SkyLight", Tag::ByteArray(vec![0; 2048])),
+        ]);
+        let gold = numeric_section(2, |x, y, _| if x == 0 && y == 0 { (41, 0) } else { (0, 0) });
+        let bytes = numeric_chunk(vec![ground.clone(), light_only, gold], Some(1));
+        let surface = surface(&bytes, Roof::Open, None);
+        assert_eq!(surface[0], legacy_top(41, 0, 32));
+        assert_eq!(surface[1], legacy_top(1, 0, 15));
+    }
+
+    #[test]
+    fn a_chunk_without_sections_is_empty() {
+        assert_empty(&numeric_chunk(vec![], Some(1)), "an empty section list");
+        assert_empty(
+            &numeric_chunk(vec![compound(vec![("Y", Tag::Byte(0))])], Some(1)),
+            "sections without blocks",
+        );
+        // Before 1.2: one array of 32768 blocks under `Level`, no sections.
+        let before = nbt::write(&Root {
+            name: Vec::new(),
+            tag: compound(vec![(
+                "Level",
+                compound(vec![
+                    ("xPos", Tag::Int(0)),
+                    ("zPos", Tag::Int(0)),
+                    ("Blocks", Tag::ByteArray(vec![1; 32768])),
+                    ("Data", Tag::ByteArray(vec![0; 16384])),
+                    ("HeightMap", Tag::ByteArray(vec![64; 256])),
+                    ("TerrainPopulated", Tag::Byte(1)),
+                ]),
+            )]),
+        });
+        assert_empty(&before, "a chunk of before 1.2");
+        // Cubic Chunks: a cube's blocks under `Level.Section`, no `Sections`.
+        let cube = nbt::write(&Root {
+            name: Vec::new(),
+            tag: compound(vec![(
+                "Level",
+                compound(vec![
+                    ("x", Tag::Int(0)),
+                    ("y", Tag::Int(4)),
+                    ("z", Tag::Int(0)),
+                    (
+                        "Section",
+                        compound(vec![
+                            ("Blocks", Tag::ByteArray(vec![1; 4096])),
+                            ("Data", Tag::ByteArray(vec![0; 2048])),
+                        ]),
+                    ),
+                ]),
+            )]),
+        });
+        assert_empty(&cube, "a cube of Cubic Chunks");
+    }
+
+    #[test]
+    fn a_bedrock_roof_of_numeric_ids_is_looked_under() {
+        // Bedrock (7) at 127, netherrack (87) 100 to 126, air 40 to 99, netherrack below.
+        let sections = (0..8)
+            .map(|section_y: i8| {
+                numeric_section(section_y, move |_, local, _| {
+                    match i32::from(section_y) * 16 + local as i32 {
+                        127 => (7, 0),
+                        100..=126 => (87, 0),
+                        40..=99 => (0, 0),
+                        _ => (87, 0),
+                    }
+                })
+            })
+            .collect();
+        let bytes = numeric_chunk(sections, Some(1));
+        for roof in [Roof::Open, Roof::Ceiling] {
+            let surface = surface(&bytes, roof, None);
+            assert!(
+                surface
+                    .iter()
+                    .all(|column| *column == legacy_top(87, 0, 39)),
+                "{roof:?}"
+            );
+        }
+    }
+
+    /// Whether a real chunk is finished by its own status; one of 1.12.2 and earlier has none
+    /// and is always drawn.
     fn real_status_is_full(bytes: &[u8]) -> bool {
         let keep = |path: &[&[u8]]| match path {
             [b"Status"] | [b"Level", b"Status"] => Keep::All,
@@ -1427,7 +1906,34 @@ mod tests {
             .tag
             .get("Status")
             .or_else(|| root.tag.get("Level")?.get("Status"));
-        matches!(status, Some(Tag::String(s)) if s == b"minecraft:full" || s == b"full")
+        match status {
+            None => root.tag.get("Level").is_some(),
+            Some(Tag::String(s)) => s == b"minecraft:full" || s == b"full",
+            Some(_) => false,
+        }
+    }
+
+    /// The numeric id and data value at `x`, `y`, `z` of a real chunk of 1.12.2 and earlier.
+    fn real_numeric_block(bytes: &[u8], x: usize, y: i16, z: usize) -> Option<(u16, u8)> {
+        let root = nbt::read(bytes).ok()?;
+        let Some(Tag::List { items, .. }) = root.tag.get("Level")?.get("Sections") else {
+            return None;
+        };
+        let section = items
+            .iter()
+            .find(|section| section.get("Y") == Some(&Tag::Byte((y / 16) as i8)))?;
+        let i = (y as usize % 16) * 256 + z * 16 + x;
+        let nibble = |key: &str| match section.get(key) {
+            Some(Tag::ByteArray(array)) => (array[i / 2] >> ((i % 2) * 4)) & 0xF,
+            _ => 0,
+        };
+        let Some(Tag::ByteArray(blocks)) = section.get("Blocks") else {
+            return None;
+        };
+        Some((
+            u16::from(blocks[i]) | u16::from(nibble("Add")) << 8,
+            nibble("Data"),
+        ))
     }
 
     /// Runs only with `GDL_REAL_WORLDS` set to the folder of real worlds.
@@ -1440,12 +1946,20 @@ mod tests {
         let mut colors = std::collections::HashSet::new();
         let mut water = false;
         let mut grids = Vec::new();
-        for world in [
-            "1.16.5/region",
-            "1.20.1/region",
-            "1.21.1/region",
-            "26.3/dimensions/minecraft/overworld/region",
+        for (world, numeric) in [
+            ("1.12.2/region", true),
+            ("1.16.5/region", false),
+            ("1.20.1/region", false),
+            ("1.21.1/region", false),
+            ("26.3/dimensions/minecraft/overworld/region", false),
         ] {
+            // A world of numeric ids is read with its own id list, as the map reads it.
+            let legacy = numeric.then(|| {
+                let level_dat = root.join(world).with_file_name("level.dat");
+                let inflated =
+                    super::super::super::world_level::inflate_level_dat(&level_dat).unwrap();
+                LegacyIds::from_level_dat(&inflated)
+            });
             let mut files: Vec<_> = std::fs::read_dir(root.join(world))
                 .unwrap()
                 .map(|entry| entry.unwrap().path())
@@ -1456,6 +1970,7 @@ mod tests {
             let (mut chunks, mut full, mut columns, mut shown, mut grey) = (0, 0, 0, 0, 0);
             let mut world_colors = std::collections::HashSet::new();
             let mut world_water = false;
+            let mut ids = std::collections::HashMap::<(u16, u8), (usize, Rgb)>::new();
             for path in files {
                 let Some(region) = Region::read(&path).unwrap() else {
                     continue;
@@ -1466,17 +1981,25 @@ mod tests {
                             continue;
                         };
                         chunks += 1;
-                        let surface = surface(&bytes, Roof::Open, None);
+                        let surface = surface(&bytes, Roof::Open, legacy.as_ref());
                         if !real_status_is_full(&bytes) {
                             continue;
                         }
                         full += 1;
                         columns += 256;
-                        for top in surface.iter().flatten() {
+                        for (i, top) in surface.iter().enumerate() {
+                            let Some(top) = top else {
+                                continue;
+                            };
                             shown += 1;
                             grey += usize::from(top.color == UNKNOWN && !top.water);
                             world_water |= top.water;
                             world_colors.insert(top.color);
+                            if numeric {
+                                let id = real_numeric_block(&bytes, i % 16, top.y, i / 16)
+                                    .expect("the top block");
+                                ids.entry(id).or_insert((0, top.color)).0 += 1;
+                            }
                         }
                         // The first finished chunk of each world, rows z and columns x.
                         if !grids.contains(&world) {
@@ -1498,6 +2021,14 @@ mod tests {
                  {grey} grey, {} colours, water seen: {world_water}",
                 world_colors.len()
             );
+            if numeric {
+                let mut ids: Vec<_> = ids.into_iter().collect();
+                ids.sort_by_key(|(id, (count, _))| (std::cmp::Reverse(*count), *id));
+                println!("{world}: most frequent top blocks (id:data count colour):");
+                for ((id, data), (count, [r, g, b])) in ids.iter().take(10) {
+                    println!("  {id}:{data} {count} #{r:02x}{g:02x}{b:02x}");
+                }
+            }
             assert!(full > 0, "no finished chunk in {world}");
             assert!(
                 shown * 100 >= columns * 90,
