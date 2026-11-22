@@ -92,7 +92,14 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_worlds.refusal.being_copied",
     "_trn_worlds.copy_name",
     "_trn_worlds.copying",
-    "_trn_worlds.copying_unknown"
+    "_trn_worlds.copying_unknown",
+    "_trn_worlds.map.spawn",
+    "_trn_worlds.map.player",
+    "_trn_worlds.map.fill",
+    "_trn_worlds.map.shrink",
+    "_trn_worlds.map.overworld",
+    "_trn_worlds.map.nether",
+    "_trn_worlds.map.end"
   ],
   ui: ["_trn_worlds"],
   notifications: [
