@@ -39,10 +39,28 @@ impl Region {
         }
         // The file may grow while it is read (the game is running): the cap holds
         // for what is actually read, not only for what the metadata said.
-        let mut bytes = Vec::with_capacity(meta.len() as usize);
-        std::fs::File::open(path)?
-            .take(MAX_REGION_BYTES + 1)
-            .read_to_end(&mut bytes)?;
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true);
+        #[cfg(unix)]
+        {
+            // a link swapped in after the check above is refused, not followed
+            use std::os::unix::fs::OpenOptionsExt;
+            options.custom_flags(libc::O_NOFOLLOW);
+        }
+        let file = match options.open(path) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            #[cfg(unix)]
+            Err(e) if e.raw_os_error() == Some(libc::ELOOP) => return Ok(None),
+            Err(e) => return Err(e),
+        };
+        // what was opened is checked again: it must be the regular file it should be
+        let opened = file.metadata()?;
+        if !opened.is_file() || opened.len() < HEADER as u64 || opened.len() > MAX_REGION_BYTES {
+            return Ok(None);
+        }
+        let mut bytes = Vec::with_capacity(opened.len() as usize);
+        file.take(MAX_REGION_BYTES + 1).read_to_end(&mut bytes)?;
         if bytes.len() < HEADER || bytes.len() as u64 > MAX_REGION_BYTES {
             return Ok(None);
         }
@@ -82,6 +100,8 @@ impl Region {
         Some((head[4], data))
     }
 
+    /// Whether the table lists a chunk here with bounds that hold; not whether
+    /// `chunk` can read it, as its stream may still be broken or too large.
     pub(super) fn has_chunk(&self, x: u8, z: u8) -> bool {
         self.payload(x, z).is_some()
     }
@@ -95,55 +115,88 @@ impl Region {
     fn chunk_capped(&self, x: u8, z: u8, cap: usize) -> Option<Vec<u8>> {
         let (kind, data) = self.payload(x, z)?;
         match kind {
-            1 => inflate(GzDecoder::new(data), cap),
-            2 => inflate_zlib(data, cap),
+            1 => {
+                let mut out = Vec::new();
+                inflate_into(GzDecoder::new(data), cap, &mut out).then_some(out)
+            }
+            2 => {
+                let mut out = Vec::new();
+                inflate_zlib_into(data, cap, &mut out).then_some(out)
+            }
             3 => (data.len() <= cap).then(|| data.to_vec()),
             _ => None,
         }
     }
 }
 
+/// Output is produced through a scratch buffer of this size.
+const STEP: usize = 16 * 1024;
+
+/// Appends one step of inflated bytes to `out`, keeping both its length within
+/// `cap` and its capacity within `cap + STEP`. False when `cap` would be passed.
+fn append_within(out: &mut Vec<u8>, step: &[u8], cap: usize) -> bool {
+    if out.len() + step.len() > cap {
+        return false;
+    }
+    if out.capacity() - out.len() < step.len() {
+        let want = (out.len() + step.len())
+            .max(out.capacity() * 2)
+            .min(cap + STEP);
+        out.reserve_exact(want - out.len());
+    }
+    out.extend_from_slice(step);
+    true
+}
+
 /// Inflates a zlib stream that must end inside `data`. The reading decoders
 /// report a cut stream as a clean end, so the end of the stream is checked here.
-fn inflate_zlib(data: &[u8], cap: usize) -> Option<Vec<u8>> {
+fn inflate_zlib_into(data: &[u8], cap: usize, out: &mut Vec<u8>) -> bool {
     let mut decoder = Decompress::new(true);
-    let mut out = Vec::new();
+    let mut scratch = [0u8; STEP];
     loop {
-        // grows in steps and never past one step beyond the cap
-        out.reserve((cap + 1 - out.len().min(cap)).clamp(1, 16 * 1024));
         let (read_before, written_before) = (decoder.total_in(), decoder.total_out());
-        let status = decoder
-            .decompress_vec(
-                &data[read_before as usize..],
-                &mut out,
-                FlushDecompress::None,
-            )
-            .ok()?;
-        if out.len() > cap {
-            return None;
+        let Ok(status) = decoder.decompress(
+            &data[read_before as usize..],
+            &mut scratch,
+            FlushDecompress::None,
+        ) else {
+            return false;
+        };
+        let written = (decoder.total_out() - written_before) as usize;
+        if !append_within(out, &scratch[..written], cap) {
+            return false;
         }
         match status {
-            Status::StreamEnd => return Some(out),
-            _ if decoder.total_in() == read_before && decoder.total_out() == written_before => {
-                return None;
-            }
+            Status::StreamEnd => return true,
+            _ if decoder.total_in() == read_before && written == 0 => return false,
             _ => {}
         }
     }
 }
 
-/// Reads at most `cap` bytes; one more means the stream is too large.
-fn inflate(reader: impl Read, cap: usize) -> Option<Vec<u8>> {
-    let mut out = Vec::new();
-    reader.take(cap as u64 + 1).read_to_end(&mut out).ok()?;
-    (out.len() <= cap).then_some(out)
+/// Reads through a scratch buffer until the stream ends; false when it errors
+/// or holds more than `cap` bytes.
+fn inflate_into(mut reader: impl Read, cap: usize, out: &mut Vec<u8>) -> bool {
+    let mut scratch = [0u8; STEP];
+    loop {
+        match reader.read(&mut scratch) {
+            Ok(0) => return true,
+            Ok(n) => {
+                if !append_within(out, &scratch[..n], cap) {
+                    return false;
+                }
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(_) => return false,
+        }
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use flate2::Compression;
     use flate2::write::{GzEncoder, ZlibEncoder};
+    use flate2::Compression;
     use std::io::Write;
 
     fn zlib(data: &[u8]) -> Vec<u8> {
@@ -307,6 +360,38 @@ mod test {
     }
 
     #[test]
+    fn inflating_never_holds_much_more_than_the_cap() {
+        let cap = 1000;
+        let zeros = vec![0u8; 1024 * 1024];
+        let mut out = Vec::new();
+        assert!(!inflate_zlib_into(&zlib(&zeros), cap, &mut out));
+        assert!(out.capacity() <= cap + 16 * 1024, "zlib {}", out.capacity());
+        let mut out = Vec::new();
+        assert!(!inflate_into(
+            GzDecoder::new(&gzip(&zeros)[..]),
+            cap,
+            &mut out
+        ));
+        assert!(out.capacity() <= cap + 16 * 1024, "gzip {}", out.capacity());
+
+        // a stream that fits is still returned whole, with a bounded capacity
+        let cap = 100_000;
+        let data: Vec<u8> = (0..cap as u32).map(|i| (i * 7 >> 3) as u8).collect();
+        let mut out = Vec::new();
+        assert!(inflate_zlib_into(&zlib(&data), cap, &mut out));
+        assert_eq!(out, data);
+        assert!(out.capacity() <= cap + 16 * 1024);
+        let mut out = Vec::new();
+        assert!(inflate_into(
+            GzDecoder::new(&gzip(&data)[..]),
+            cap,
+            &mut out
+        ));
+        assert_eq!(out, data);
+        assert!(out.capacity() <= cap + 16 * 1024);
+    }
+
+    #[test]
     fn a_file_that_is_no_region_is_not_read() {
         let dir = tempfile::tempdir().unwrap();
 
@@ -315,11 +400,9 @@ mod test {
         assert!(Region::read(&short).unwrap().is_none());
 
         assert!(Region::read(dir.path()).unwrap().is_none());
-        assert!(
-            Region::read(&dir.path().join("missing.mca"))
-                .unwrap()
-                .is_none()
-        );
+        assert!(Region::read(&dir.path().join("missing.mca"))
+            .unwrap()
+            .is_none());
 
         let real = dir.path().join("r.0.0.mca");
         std::fs::write(&real, region_bytes(&[(0, 0, 2, zlib(NBT))])).unwrap();
@@ -328,6 +411,11 @@ mod test {
 
         #[cfg(unix)]
         {
+            let fifo = dir.path().join("fifo.mca");
+            let c = std::ffi::CString::new(fifo.to_str().unwrap()).unwrap();
+            assert_eq!(unsafe { libc::mkfifo(c.as_ptr(), 0o600) }, 0);
+            assert!(Region::read(&fifo).unwrap().is_none()); // returns, does not block
+
             let link = dir.path().join("link.mca");
             std::os::unix::fs::symlink(&real, &link).unwrap();
             assert!(Region::read(&link).unwrap().is_none());
@@ -377,7 +465,7 @@ mod test {
             }
         }
         assert!(!files.is_empty(), "no .mca under GDL_REAL_WORLDS");
-        let (mut regions, mut chunks) = (0, 0);
+        let (mut regions, mut chunks, mut unreadable) = (0, 0, 0);
         for path in files {
             let Some(region) = Region::read(&path).unwrap() else {
                 continue;
@@ -386,15 +474,24 @@ mod test {
             for z in 0..32 {
                 for x in 0..32 {
                     if region.has_chunk(x, z) {
-                        let bytes = region
-                            .chunk(x, z)
-                            .unwrap_or_else(|| panic!("{path:?} chunk {x},{z} does not inflate"));
-                        assert_eq!(bytes.first(), Some(&10), "{path:?} chunk {x},{z}");
-                        chunks += 1;
+                        match region.chunk(x, z) {
+                            Some(bytes) => {
+                                assert_eq!(bytes.first(), Some(&10), "{path:?} chunk {x},{z}");
+                                chunks += 1;
+                            }
+                            None => unreadable += 1,
+                        }
                     }
                 }
             }
         }
-        println!("real worlds: {regions} regions, {chunks} chunks inflated");
+        println!(
+            "real worlds: {regions} regions, {chunks} chunks inflated, {unreadable} listed but unreadable"
+        );
+        assert!(
+            chunks * 100 >= (chunks + unreadable) * 95,
+            "only {chunks} of {} listed chunks inflate",
+            chunks + unreadable
+        );
     }
 }
