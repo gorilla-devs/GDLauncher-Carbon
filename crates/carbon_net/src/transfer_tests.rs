@@ -1023,3 +1023,203 @@ async fn destination_gate_keys_a_path_it_cannot_resolve_lexically() {
         assert!(Arc::ptr_eq(&first, &second));
     }
 }
+
+/// A server that cuts every connection after `per_connection` bytes of the
+/// body, and serves the rest of the file to a request that asks for it by
+/// range. Counts its connections and records the range each one asked for.
+async fn cutting_server(
+    body: Vec<u8>,
+    per_connection: usize,
+) -> (
+    String,
+    Arc<std::sync::Mutex<Vec<Option<usize>>>>,
+    tokio::task::JoinHandle<()>,
+) {
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let url = format!("http://{}/cut", listener.local_addr().unwrap());
+    let asked = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = asked.clone();
+    let task = tokio::spawn(async move {
+        loop {
+            let (mut socket, _) = listener.accept().await.unwrap();
+            let mut request = Vec::new();
+            while !request.ends_with(b"\r\n\r\n") {
+                match socket.read_u8().await {
+                    Ok(byte) => request.push(byte),
+                    Err(_) => break,
+                }
+            }
+            let request = String::from_utf8_lossy(&request).to_ascii_lowercase();
+            let from = request
+                .lines()
+                .find_map(|line| line.strip_prefix("range: bytes="))
+                .map(|range| range.trim_end_matches('-').parse::<usize>().unwrap());
+            seen.lock().unwrap().push(from);
+            let start = from.unwrap_or(0);
+            let head = match from {
+                Some(start) => format!(
+                    "HTTP/1.1 206 Partial Content\r\nContent-Range: bytes {start}-{}/{}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len() - 1,
+                    body.len(),
+                    body.len() - start
+                ),
+                None => format!(
+                    "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
+                    body.len()
+                ),
+            };
+            let end = (start + per_connection).min(body.len());
+            let _ = socket.write_all(head.as_bytes()).await;
+            let _ = socket.write_all(&body[start..end]).await;
+            let _ = socket.shutdown().await;
+        }
+    });
+    (url, asked, task)
+}
+
+fn leftovers_in(dir: &Path) -> Vec<String> {
+    std::fs::read_dir(dir)
+        .unwrap()
+        .map(|entry| entry.unwrap().file_name().to_string_lossy().into_owned())
+        .collect()
+}
+
+/// A connection that drops in the middle of a file used to fail the whole
+/// batch and throw the received bytes away. The transfer now carries on from
+/// the bytes it has, asking the server only for the rest.
+#[tokio::test]
+async fn a_transfer_cut_midway_carries_on_from_the_bytes_it_has() {
+    let dir = tempfile::tempdir().unwrap();
+    let (url, asked, server) = cutting_server(b"test".to_vec(), 2).await;
+    let file = verified(url, &dir.path().join("file"));
+    let (tx, rx) = tokio::sync::watch::channel(Progress::new());
+    let mut opts = options(CancellationToken::new());
+    opts.progress_sender = Some(tx);
+
+    download_multiple(&[file.clone()], opts).await.unwrap();
+
+    server.abort();
+    assert_eq!(std::fs::read(&file.path).unwrap(), b"test");
+    assert_eq!(*asked.lock().unwrap(), [None, Some(2)]);
+    assert_eq!(leftovers_in(dir.path()), ["file"]);
+    let progress = rx.borrow().clone();
+    assert_eq!((progress.current_size, progress.total_size), (4, 4));
+}
+
+/// A file with no size or checksum known beforehand is carried on the same
+/// way, checked by the range the server answers with.
+#[tokio::test]
+async fn a_cut_transfer_of_a_file_of_unknown_size_carries_on_too() {
+    let dir = tempfile::tempdir().unwrap();
+    let (url, asked, server) = cutting_server(b"0123456789".to_vec(), 4).await;
+    let path = dir.path().join("file");
+    let (tx, rx) = tokio::sync::watch::channel(Progress::new());
+    let mut opts = options(CancellationToken::new());
+    opts.progress_sender = Some(tx);
+
+    download_multiple(&[Downloadable::new(url, &path)], opts)
+        .await
+        .unwrap();
+
+    server.abort();
+    assert_eq!(std::fs::read(&path).unwrap(), b"0123456789");
+    assert_eq!(*asked.lock().unwrap(), [None, Some(4), Some(8)]);
+    let progress = rx.borrow().clone();
+    assert_eq!((progress.current_size, progress.total_size), (10, 10));
+}
+
+/// A server that keeps cutting the same file is given up on after a bounded
+/// number of tries in a row, and nothing of the file is left behind.
+#[tokio::test]
+async fn a_transfer_that_keeps_being_cut_is_given_up() {
+    let dir = tempfile::tempdir().unwrap();
+    let (url, asked, server) = cutting_server(vec![7; 64], 1).await;
+    let path = dir.path().join("file");
+
+    let result = download_multiple(
+        &[Downloadable::new(url, &path).with_size(64)],
+        options(CancellationToken::new()),
+    )
+    .await;
+
+    server.abort();
+    assert!(result.is_err(), "{result:?}");
+    assert_eq!(
+        *asked.lock().unwrap(),
+        [None, Some(1), Some(2), Some(3), Some(4), Some(5)]
+    );
+    assert_eq!(leftovers_in(dir.path()), Vec::<String>::new());
+}
+
+/// A try that brought a good part of the file counts as the line working
+/// again: a large file on a line that drops now and then still arrives.
+#[tokio::test]
+async fn a_cut_transfer_that_keeps_getting_further_is_not_given_up() {
+    const PIECE: usize = 1024 * 1024;
+    let dir = tempfile::tempdir().unwrap();
+    let body: Vec<u8> = (0..8 * PIECE).map(|i| (i / PIECE) as u8).collect();
+    let (url, asked, server) = cutting_server(body.clone(), PIECE).await;
+    let path = dir.path().join("file");
+
+    download_multiple(
+        &[Downloadable::new(url, &path).with_size(body.len() as u64)],
+        options(CancellationToken::new()),
+    )
+    .await
+    .unwrap();
+
+    server.abort();
+    assert_eq!(asked.lock().unwrap().len(), 8);
+    assert!(std::fs::read(&path).unwrap() == body);
+}
+
+/// A connection that ends before any of the file arrived is not tried
+/// again here: the request itself is already retried by the client, and
+/// being offline must not take longer to report.
+#[tokio::test]
+async fn a_transfer_cut_before_any_data_is_not_tried_again() {
+    let dir = tempfile::tempdir().unwrap();
+    let (url, asked, server) = cutting_server(b"test".to_vec(), 0).await;
+    let path = dir.path().join("file");
+
+    let result =
+        download_multiple(&[verified(url, &path)], options(CancellationToken::new())).await;
+
+    server.abort();
+    assert!(result.is_err(), "{result:?}");
+    assert_eq!(*asked.lock().unwrap(), [None]);
+    assert_eq!(leftovers_in(dir.path()), Vec::<String>::new());
+}
+
+/// Cancelling while the transfer waits before its next try ends it at once.
+#[tokio::test]
+async fn cancelling_ends_the_wait_before_the_next_try() {
+    let dir = tempfile::tempdir().unwrap();
+    let (url, asked, server) = cutting_server(b"test".to_vec(), 2).await;
+    let path = dir.path().join("file");
+    let token = CancellationToken::new();
+    let mut opts = options(token.clone());
+    opts.interruption_backoff = Duration::from_secs(30);
+    let owner = tokio::spawn(download_owned(vec![verified(url, &path)], opts));
+    for _ in 0..200 {
+        if !asked.lock().unwrap().is_empty() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(10)).await;
+    }
+    tokio::time::sleep(Duration::from_millis(150)).await;
+
+    token.cancel();
+    let result = tokio::time::timeout(Duration::from_secs(2), owner)
+        .await
+        .expect("cancelling must not wait for the next try")
+        .unwrap();
+
+    server.abort();
+    assert!(
+        matches!(result, Err(DownloadError::Cancelled)),
+        "{result:?}"
+    );
+    assert_eq!(*asked.lock().unwrap(), [None]);
+    assert_eq!(leftovers_in(dir.path()), Vec::<String>::new());
+}

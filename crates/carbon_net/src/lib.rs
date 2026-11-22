@@ -29,6 +29,19 @@ const PART_POSTFIX: &str = ".__gdl_part~";
 /// connection that delivers no bytes errors out instead of hanging forever.
 const READ_STALL_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(120);
 
+/// How often in a row a file whose transfer broke off midway is carried on
+/// from the bytes it has before the file is given up.
+const INTERRUPTION_TRIES: u32 = 5;
+/// The wait before the first of those tries; each later one waits twice as long.
+const INTERRUPTION_BACKOFF: std::time::Duration = if cfg!(test) {
+    std::time::Duration::from_millis(10)
+} else {
+    std::time::Duration::from_secs(1)
+};
+/// A try that brought this much more of the file shows the line works again:
+/// the tries in a row start from zero.
+const INTERRUPTION_PROGRESS: u64 = 1024 * 1024;
+
 /// CurseForge requires an API key on direct CDN downloads; unauthenticated requests to
 /// `edge.forgecdn.net` are rejected with `401 A valid api-key is required.`
 ///
@@ -723,6 +736,7 @@ pub struct DownloadOptions {
     publication: Option<Arc<Publication>>,
     destination_policy: DestinationPolicy,
     read_stall_timeout: std::time::Duration,
+    interruption_backoff: std::time::Duration,
     cancel_token: CancellationToken,
     only_validate: bool,
     deep_check: bool,
@@ -739,6 +753,7 @@ impl Default for DownloadOptions {
             partial_pause: None,
             destination_policy: DestinationPolicy::native(),
             read_stall_timeout: READ_STALL_TIMEOUT,
+            interruption_backoff: INTERRUPTION_BACKOFF,
             cancel_token: CancellationToken::new(),
             only_validate: false,
             deep_check: true,
@@ -813,6 +828,7 @@ impl DownloadOptionsBuilder {
             partial_pause: None,
             destination_policy: DestinationPolicy::native(),
             read_stall_timeout: READ_STALL_TIMEOUT,
+            interruption_backoff: INTERRUPTION_BACKOFF,
             cancel_token: self.cancel_token.unwrap_or_else(CancellationToken::new),
             only_validate: self.only_validate.unwrap_or(false),
             deep_check: self.deep_check.unwrap_or(false),
@@ -1056,12 +1072,16 @@ async fn download_file(
     let result = async {
         for (candidate, url) in candidates.iter().enumerate() {
             downloadable.url = url.clone();
-            for attempt in 0..2 {
+            // A mirror never continues another address's bytes.
+            let mut from_zero = candidate != 0;
+            let mut restarted = false;
+            let mut interruptions = 0;
+            loop {
                 check_cancel(&options)?;
                 let (part, mut file, headers, mut hasher, resumed) = prepare_download(
                     &downloadable,
                     &owned.path,
-                    candidate != 0 || attempt != 0,
+                    from_zero,
                     total_downloaded_size,
                     &file_processed_bytes,
                     current_files_count,
@@ -1071,6 +1091,7 @@ async fn download_file(
                     &options,
                 )
                 .await?;
+                let retained = file_processed_bytes.load(Ordering::SeqCst);
                 let complete = resumed
                     && downloadable.checksum.as_ref().is_some_and(|checksum| {
                         let expected = match checksum {
@@ -1137,7 +1158,7 @@ async fn download_file(
                     }
                     Err(error)
                         if resumed
-                            && attempt == 0
+                            && !restarted
                             && restarts_resume(&error)
                             && !options.cancel_token.is_cancelled() =>
                     {
@@ -1152,6 +1173,52 @@ async fn download_file(
                             file_added_to_total.swap(0, Ordering::SeqCst),
                             Ordering::SeqCst,
                         );
+                        restarted = true;
+                        from_zero = true;
+                    }
+                    // The connection dropped or stalled after part of the file
+                    // arrived. Those bytes are in the owned partial, closed
+                    // above: the same address is asked for the rest, and the
+                    // answer goes through the checks every resumed transfer
+                    // gets. A failure before any byte is left to the client's
+                    // own retries of the request.
+                    Err(error)
+                        if interrupted(&error)
+                            && file_processed_bytes.load(Ordering::SeqCst) > retained
+                            && !options.cancel_token.is_cancelled()
+                            && {
+                                let gained = file_processed_bytes.load(Ordering::SeqCst) - retained;
+                                if gained >= INTERRUPTION_PROGRESS {
+                                    interruptions = 0;
+                                }
+                                interruptions < INTERRUPTION_TRIES
+                            } =>
+                    {
+                        interruptions += 1;
+                        warn!(
+                            url = %downloadable.url,
+                            ?error,
+                            try_in_a_row = interruptions,
+                            "Transfer broke off midway; carrying on from the bytes received"
+                        );
+                        // The next try counts the retained bytes again as it reads them.
+                        total_downloaded_size.fetch_sub(
+                            file_processed_bytes.swap(0, Ordering::SeqCst),
+                            Ordering::SeqCst,
+                        );
+                        total_files_size.fetch_sub(
+                            file_added_to_total.swap(0, Ordering::SeqCst),
+                            Ordering::SeqCst,
+                        );
+                        let wait = options.interruption_backoff * 2u32.pow(interruptions - 1);
+                        tokio::select! {
+                            biased;
+                            _ = options.cancel_token.cancelled() => {
+                                return Err(DownloadError::Cancelled);
+                            }
+                            _ = tokio::time::sleep(wait) => {}
+                        }
+                        from_zero = false;
                     }
                     Err(error) if mirror_failure(&error) && candidate + 1 < candidates.len() => {
                         check_cancel(&options)?;
@@ -1203,6 +1270,17 @@ fn resume_proven_stale(error: &DownloadError) -> bool {
             | DownloadError::SizeMismatch { .. }
             | DownloadError::RestartPartial
             | DownloadError::InvalidRange
+    )
+}
+
+/// Failures of the connection itself, as opposed to an answer of the server
+/// or a file that does not check out.
+fn interrupted(error: &DownloadError) -> bool {
+    matches!(
+        error,
+        DownloadError::NetworkError(_)
+            | DownloadError::NetworkError2(_)
+            | DownloadError::GenericDownload(_)
     )
 }
 
