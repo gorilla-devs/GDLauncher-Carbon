@@ -1282,6 +1282,10 @@ test.describe("Themes", () => {
         const [r, g, b, a = 1] = nums
         return [r, g, b, Math.round(a * 255)]
       }, prop)
+  // Colours are polled, not read once: a colour that changes with the theme
+  // or the route can be read mid-transition.
+  const rgb = async (page: Page, selector: string, prop: string) =>
+    (await painted(page, selector, prop)).slice(0, 3)
   const paletteRgb = (page: Page, token: string) =>
     page.evaluate(
       (token) =>
@@ -1327,17 +1331,21 @@ test.describe("Themes", () => {
     try {
       // The default theme: pure white logo and button, palette words.
       await openSearch()
-      expect(await painted(page, logo, "color")).toEqual([255, 255, 255, 255])
-      expect(await painted(page, filters, "color")).toEqual([
-        255, 255, 255, 255
-      ])
+      await expect
+        .poll(() => painted(page, logo, "color"))
+        .toEqual([255, 255, 255, 255])
+      await expect
+        .poll(() => painted(page, filters, "color"))
+        .toEqual([255, 255, 255, 255])
       await openNews()
-      expect(
-        (await painted(page, byHook("news.slide.title"), "color")).slice(0, 3)
-      ).toEqual(await paletteRgb(page, "lightSlate-50"))
-      expect(
-        (await painted(page, byHook("news.slide.text"), "color")).slice(0, 3)
-      ).toEqual(await paletteRgb(page, "lightSlate-200"))
+      const title = await paletteRgb(page, "lightSlate-50")
+      await expect
+        .poll(() => rgb(page, byHook("news.slide.title"), "color"))
+        .toEqual(title)
+      const summary = await paletteRgb(page, "lightSlate-200")
+      await expect
+        .poll(() => rgb(page, byHook("news.slide.text"), "color"))
+        .toEqual(summary)
 
       await setTheme(page, "win95")
       await page.waitForSelector('html[data-gdl-theme="win95"]', {
@@ -1348,38 +1356,57 @@ test.describe("Themes", () => {
 
       // The logo and the open filter button take the dark text colour.
       await openSearch()
-      expect((await painted(page, logo, "color")).slice(0, 3)).toEqual(text)
-      expect((await painted(page, filters, "color")).slice(0, 3)).toEqual(text)
+      await expect.poll(() => rgb(page, logo, "color")).toEqual(text)
+      await expect.poll(() => rgb(page, filters, "color")).toEqual(text)
 
       // The slideshow's words are light over its dark veil.
       await openNews()
       for (const part of ["title", "text", "date"]) {
-        const [r, g, b] = await painted(
-          page,
-          byHook(`news.slide.${part}`),
-          "color"
-        )
-        expect(lightness([r, g, b]), part).toBeGreaterThan(0.85)
+        await expect
+          .poll(
+            async () =>
+              lightness(await rgb(page, byHook(`news.slide.${part}`), "color")),
+            { message: part }
+          )
+          .toBeGreaterThan(0.85)
       }
 
       // The slider's knob is solid enough to see.
       await goTo(page, "#/settings/java")
       await expect(page.locator(byHook("slider.thumb")).first()).toBeAttached()
       await page.mouse.move(5, 5)
-      const [, , , alpha] = await painted(
-        page,
-        byHook("slider.thumb"),
-        "background-color"
-      )
-      expect(alpha / 255, "the knob's opacity").toBeGreaterThan(0.5)
+      await expect
+        .poll(
+          async () =>
+            (
+              await painted(page, byHook("slider.thumb"), "background-color")
+            )[3] / 255,
+          { message: "the knob's opacity" }
+        )
+        .toBeGreaterThan(0.5)
 
       // The two dims behind a dialog are the same colour.
       await openDialog()
-      expect(
-        await painted(page, byHook("modal.column-backdrop"), "background-color")
-      ).toEqual(
-        await painted(page, byHook("modal.backdrop"), "background-color")
-      )
+      await expect
+        .poll(
+          async () => {
+            const column = await painted(
+              page,
+              byHook("modal.column-backdrop"),
+              "background-color"
+            )
+            const backdrop = await painted(
+              page,
+              byHook("modal.backdrop"),
+              "background-color"
+            )
+            return column.join() === backdrop.join()
+              ? "the same"
+              : `${column.join()} against ${backdrop.join()}`
+          },
+          { message: "the two dims behind a dialog" }
+        )
+        .toBe("the same")
       await closeDialog()
 
       // A light palette with no CSS of its own: the open filter button and
@@ -1398,22 +1425,19 @@ test.describe("Themes", () => {
         state: "attached"
       })
       await openSearch()
-      expect((await painted(page, filters, "color")).slice(0, 3)).toEqual([
-        40, 40, 40
-      ])
-      expect((await painted(page, logo, "color")).slice(0, 3)).toEqual([
-        40, 40, 40
-      ])
+      await expect.poll(() => rgb(page, filters, "color")).toEqual([40, 40, 40])
+      await expect.poll(() => rgb(page, logo, "color")).toEqual([40, 40, 40])
 
       // The slideshow's title, summary and date all switch to light words.
       await openNews()
       for (const part of ["title", "text", "date"]) {
-        const [r, g, b] = await painted(
-          page,
-          byHook(`news.slide.${part}`),
-          "color"
-        )
-        expect(lightness([r, g, b]), part).toBeGreaterThan(0.85)
+        await expect
+          .poll(
+            async () =>
+              lightness(await rgb(page, byHook(`news.slide.${part}`), "color")),
+            { message: part }
+          )
+          .toBeGreaterThan(0.85)
       }
     } finally {
       await goToLibrary(page).catch(() => {})
@@ -1859,12 +1883,13 @@ test.describe("Themes", () => {
       selector
     )
 
+  // null until the element is there (a tile that was just created renders a
+  // moment later), so `expect.poll` keeps polling: a throw would end it.
   const backgroundImageOf = (page: Page, selector: string) =>
-    page.evaluate(
-      (selector) =>
-        getComputedStyle(document.querySelector(selector)!).backgroundImage,
-      selector
-    )
+    page.evaluate((selector) => {
+      const element = document.querySelector(selector)
+      return element ? getComputedStyle(element).backgroundImage : null
+    }, selector)
 
   // The collapsed search box shows its whole placeholder in English, and
   // ends in an ellipsis wherever it can't (a longer language, a narrower box).
