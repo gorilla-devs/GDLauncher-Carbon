@@ -10,7 +10,7 @@ jobs:
     defaults:
       run:
         working-directory: ./GDL
-    runs-on: macos-14
+    runs-on: macos-15
     timeout-minutes: 160
     env:
       MACOSX_DEPLOYMENT_TARGET: "11.0"
@@ -68,13 +68,13 @@ jobs:
         run: pnpm test:all
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: playwright-report-macos
           path: ./GDL/apps/desktop/playwright-report/
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: test-results-macos
           path: ./GDL/apps/desktop/test-results/
@@ -155,13 +155,13 @@ jobs:
           echo "DISPLAY=$DISPLAY"
           pnpm test:all
       - name: Upload Playwright report
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report
           path: ./GDL/apps/desktop/playwright-report/
       - name: Upload test results
-        if: failure()
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: test-results-linux
@@ -250,13 +250,13 @@ jobs:
         run: pnpm test:all
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: playwright-report-win
           path: ./GDL/apps/desktop/playwright-report/
       - name: Upload test results
         uses: actions/upload-artifact@v4
-        if: failure()
+        if: always()
         with:
           name: test-results-windows
           path: ./GDL/apps/desktop/test-results/
