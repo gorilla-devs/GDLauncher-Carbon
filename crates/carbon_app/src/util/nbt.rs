@@ -131,9 +131,20 @@ impl Tag {
 struct Cursor<'a> {
     rest: &'a [u8],
     tags: usize,
+    max_tags: usize,
+    max_depth: usize,
 }
 
 impl<'a> Cursor<'a> {
+    fn new(bytes: &'a [u8], max_tags: usize, max_depth: usize) -> Self {
+        Cursor {
+            rest: bytes,
+            tags: 0,
+            max_tags,
+            max_depth,
+        }
+    }
+
     fn take(&mut self, n: usize) -> Result<&'a [u8], NbtError> {
         if n > self.rest.len() {
             return Err(NbtError::UnexpectedEnd);
@@ -170,18 +181,68 @@ impl<'a> Cursor<'a> {
         Ok(len)
     }
 
-    fn name(&mut self) -> Result<Vec<u8>, NbtError> {
+    fn name_bytes(&mut self) -> Result<&'a [u8], NbtError> {
         let len = self.u16()? as usize;
-        Ok(self.take(len)?.to_vec())
+        self.take(len)
+    }
+
+    fn name(&mut self) -> Result<Vec<u8>, NbtError> {
+        Ok(self.name_bytes()?.to_vec())
+    }
+
+    /// Counts one more tag against the limit, for built and skipped tags alike.
+    fn count_tag(&mut self) -> Result<(), NbtError> {
+        self.tags += 1;
+        if self.tags > self.max_tags {
+            return Err(NbtError::TooManyTags);
+        }
+        Ok(())
+    }
+
+    fn check_depth(&self, depth: usize) -> Result<(), NbtError> {
+        if depth >= self.max_depth {
+            return Err(NbtError::TooDeep);
+        }
+        Ok(())
+    }
+
+    /// The element id and length of a list, as checked for every list.
+    fn list_header(&mut self) -> Result<(u8, usize), NbtError> {
+        let element = self.u8()?;
+        if element > 12 {
+            return Err(NbtError::UnknownTag(element));
+        }
+        // Every element takes at least one byte, so the length is bounded by the input.
+        let len = self.length(1)?;
+        if element == 0 && len > 0 {
+            return Err(NbtError::UnknownTag(0));
+        }
+        Ok((element, len))
+    }
+
+    /// The id of the next entry of a compound, `None` at its end.
+    fn entry_id(&mut self) -> Result<Option<u8>, NbtError> {
+        let id = self.u8()?;
+        if id == 0 {
+            return Ok(None);
+        }
+        if id > 12 {
+            return Err(NbtError::UnknownTag(id));
+        }
+        Ok(Some(id))
     }
 }
 
-fn read_payload(cur: &mut Cursor, id: u8, depth: usize) -> Result<Tag, NbtError> {
-    cur.tags += 1;
-    if cur.tags > MAX_TAGS {
-        return Err(NbtError::TooManyTags);
-    }
-    Ok(match id {
+/// Walks one payload with every bounds check; builds it only when `build` is set
+/// (and returns `None` otherwise, without allocating for arrays, lists or strings).
+fn walk_payload(
+    cur: &mut Cursor,
+    id: u8,
+    depth: usize,
+    build: bool,
+) -> Result<Option<Tag>, NbtError> {
+    cur.count_tag()?;
+    let tag = match id {
         1 => Tag::Byte(i8::from_be_bytes(cur.array()?)),
         2 => Tag::Short(i16::from_be_bytes(cur.array()?)),
         3 => Tag::Int(cur.i32()?),
@@ -190,43 +251,38 @@ fn read_payload(cur: &mut Cursor, id: u8, depth: usize) -> Result<Tag, NbtError>
         6 => Tag::Double(f64::from_bits(u64::from_be_bytes(cur.array()?))),
         7 => {
             let len = cur.length(1)?;
-            Tag::ByteArray(cur.take(len)?.to_vec())
+            let raw = cur.take(len)?;
+            if !build {
+                return Ok(None);
+            }
+            Tag::ByteArray(raw.to_vec())
         }
-        8 => Tag::String(cur.name()?),
+        8 => {
+            let raw = cur.name_bytes()?;
+            if !build {
+                return Ok(None);
+            }
+            Tag::String(raw.to_vec())
+        }
         9 => {
-            if depth >= MAX_DEPTH {
-                return Err(NbtError::TooDeep);
-            }
-            let element = cur.u8()?;
-            if element > 12 {
-                return Err(NbtError::UnknownTag(element));
-            }
-            // Every element takes at least one byte, so the length is bounded by the input.
-            let len = cur.length(1)?;
-            if element == 0 && len > 0 {
-                return Err(NbtError::UnknownTag(0));
-            }
-            let mut items = Vec::with_capacity(len.min(4096));
+            cur.check_depth(depth)?;
+            let (element, len) = cur.list_header()?;
+            let mut items = Vec::with_capacity(if build { len.min(4096) } else { 0 });
             for _ in 0..len {
-                items.push(read_payload(cur, element, depth + 1)?);
+                if let Some(item) = walk_payload(cur, element, depth + 1, build)? {
+                    items.push(item);
+                }
             }
             Tag::List { element, items }
         }
         10 => {
-            if depth >= MAX_DEPTH {
-                return Err(NbtError::TooDeep);
-            }
+            cur.check_depth(depth)?;
             let mut entries = Vec::new();
-            loop {
-                let id = cur.u8()?;
-                if id == 0 {
-                    break;
+            while let Some(id) = cur.entry_id()? {
+                let name = cur.name_bytes()?;
+                if let Some(tag) = walk_payload(cur, id, depth + 1, build)? {
+                    entries.push((name.to_vec(), tag));
                 }
-                if id > 12 {
-                    return Err(NbtError::UnknownTag(id));
-                }
-                let name = cur.name()?;
-                entries.push((name, read_payload(cur, id, depth + 1)?));
             }
             Tag::Compound(entries)
         }
@@ -249,15 +305,16 @@ fn read_payload(cur: &mut Cursor, id: u8, depth: usize) -> Result<Tag, NbtError>
             )
         }
         other => return Err(NbtError::UnknownTag(other)),
-    })
+    };
+    Ok(build.then_some(tag))
 }
 
-/// Reads uncompressed NBT whose root is a compound.
-pub fn read(bytes: &[u8]) -> Result<Root, NbtError> {
-    let mut cur = Cursor {
-        rest: bytes,
-        tags: 0,
-    };
+fn read_payload(cur: &mut Cursor, id: u8, depth: usize) -> Result<Tag, NbtError> {
+    Ok(walk_payload(cur, id, depth, true)?.expect("built"))
+}
+
+/// Reads the root header: it must be a compound. Returns its name.
+fn read_root_header<'a>(cur: &mut Cursor<'a>) -> Result<&'a [u8], NbtError> {
     let id = cur.u8()?;
     if id != 10 {
         return Err(if id > 12 || id == 0 {
@@ -266,8 +323,97 @@ pub fn read(bytes: &[u8]) -> Result<Root, NbtError> {
             NbtError::RootNotCompound
         });
     }
-    let name = cur.name()?;
+    cur.name_bytes()
+}
+
+/// Reads uncompressed NBT whose root is a compound.
+pub fn read(bytes: &[u8]) -> Result<Root, NbtError> {
+    let mut cur = Cursor::new(bytes, MAX_TAGS, MAX_DEPTH);
+    let name = read_root_header(&mut cur)?.to_vec();
     let tag = read_payload(&mut cur, 10, 0)?;
+    if !cur.rest.is_empty() {
+        return Err(NbtError::TrailingBytes);
+    }
+    Ok(Root { name, tag })
+}
+
+/// What `read_keeping` does with a named tag inside a compound.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Keep {
+    /// Build the tag whole.
+    All,
+    /// Build a compound, or a list of compounds, and ask about each entry inside it.
+    /// Any other tag is built whole.
+    Descend,
+    /// Walk the tag with every check but build nothing; it is left out of the result.
+    Skip,
+}
+
+/// Bounds on what one `read_keeping` call may walk, skipped tags included.
+#[cfg_attr(not(test), allow(dead_code))]
+#[derive(Debug, Clone, Copy)]
+pub struct Limits {
+    pub max_tags: usize,
+    pub max_depth: usize,
+}
+
+/// Builds the entries of a compound whose payload starts at the cursor, asking `keep`
+/// about each with `path` plus the entry's key.
+fn read_compound_keeping<'a>(
+    cur: &mut Cursor<'a>,
+    depth: usize,
+    path: &mut Vec<&'a [u8]>,
+    keep: &dyn Fn(&[&[u8]]) -> Keep,
+) -> Result<Tag, NbtError> {
+    cur.count_tag()?;
+    cur.check_depth(depth)?;
+    let mut entries = Vec::new();
+    while let Some(id) = cur.entry_id()? {
+        let name = cur.name_bytes()?;
+        path.push(name);
+        let verdict = keep(path);
+        let built = match verdict {
+            Keep::All => Some(read_payload(cur, id, depth + 1)?),
+            Keep::Skip => walk_payload(cur, id, depth + 1, false)?,
+            Keep::Descend => match id {
+                10 => Some(read_compound_keeping(cur, depth + 1, path, keep)?),
+                // A list is only taken apart when its members are compounds.
+                9 if cur.rest.first() == Some(&10) => {
+                    cur.count_tag()?;
+                    cur.check_depth(depth + 1)?;
+                    let (element, len) = cur.list_header()?;
+                    let mut items = Vec::with_capacity(len.min(4096));
+                    for _ in 0..len {
+                        items.push(read_compound_keeping(cur, depth + 2, path, keep)?);
+                    }
+                    Some(Tag::List { element, items })
+                }
+                _ => Some(read_payload(cur, id, depth + 1)?),
+            },
+        };
+        path.pop();
+        if let Some(tag) = built {
+            entries.push((name.to_vec(), tag));
+        }
+    }
+    Ok(Tag::Compound(entries))
+}
+
+/// Reads uncompressed NBT whose root is a compound, building only the parts `keep` asks for.
+///
+/// `keep` gets the compound keys from the root's content down to and including the tag in
+/// question; the root's own name is not part of the path. The members of a list of
+/// compounds are asked with the list's path plus their own key.
+#[cfg_attr(not(test), allow(dead_code))]
+pub fn read_keeping(
+    bytes: &[u8],
+    keep: &dyn Fn(&[&[u8]]) -> Keep,
+    limits: Limits,
+) -> Result<Root, NbtError> {
+    let mut cur = Cursor::new(bytes, limits.max_tags, limits.max_depth);
+    let name = read_root_header(&mut cur)?.to_vec();
+    let tag = read_compound_keeping(&mut cur, 0, &mut Vec::new(), keep)?;
     if !cur.rest.is_empty() {
         return Err(NbtError::TrailingBytes);
     }
@@ -537,5 +683,152 @@ mod tests {
     fn a_list_of_a_hundred_thousand_tags_round_trips() {
         let bytes = byte_list(100_000);
         assert_eq!(write(&read(&bytes).unwrap()), bytes);
+    }
+
+    fn keep_paths(
+        wanted: &'static [&'static [&'static str]],
+        descend: &'static [&'static [&'static str]],
+    ) -> impl Fn(&[&[u8]]) -> Keep {
+        move |path| {
+            let is = |list: &[&[&str]]| {
+                list.iter().any(|p| {
+                    p.len() == path.len() && p.iter().zip(path).all(|(a, b)| a.as_bytes() == *b)
+                })
+            };
+            if is(wanted) {
+                Keep::All
+            } else if is(descend) {
+                Keep::Descend
+            } else {
+                Keep::Skip
+            }
+        }
+    }
+
+    fn int_entry(out: &mut Vec<u8>, name: &str, v: i32) {
+        named(out, 3, name);
+        out.extend_from_slice(&v.to_be_bytes());
+    }
+
+    fn partial_fixture() -> Vec<u8> {
+        let mut b = vec![10, 0, 0];
+        named(&mut b, 10, "Data");
+        int_entry(&mut b, "Keep", 1);
+        named(&mut b, 7, "Drop");
+        b.extend_from_slice(&(5 * 1024 * 1024i32).to_be_bytes());
+        b.extend(std::iter::repeat(9).take(5 * 1024 * 1024));
+        named(&mut b, 10, "Inner");
+        int_entry(&mut b, "A", 2);
+        int_entry(&mut b, "B", 3);
+        b.push(0);
+        b.push(0);
+        named(&mut b, 9, "Sections");
+        b.push(10);
+        b.extend_from_slice(&3i32.to_be_bytes());
+        for y in 0..3 {
+            int_entry(&mut b, "Y", y);
+            named(&mut b, 7, "Blob");
+            b.extend_from_slice(&4i32.to_be_bytes());
+            b.extend_from_slice(&[1, 2, 3, 4]);
+            b.push(0);
+        }
+        b.push(0);
+        b
+    }
+
+    const LIMITS: Limits = Limits {
+        max_tags: 1000,
+        max_depth: 64,
+    };
+
+    #[test]
+    fn only_the_named_parts_are_built() {
+        let keep = keep_paths(
+            &[
+                &["Data", "Keep"],
+                &["Data", "Inner", "A"],
+                &["Sections", "Y"],
+            ],
+            &[&["Data"], &["Data", "Inner"], &["Sections"]],
+        );
+        let root = read_keeping(&partial_fixture(), &keep, LIMITS).unwrap();
+        let expected = Tag::Compound(vec![
+            (
+                b"Data".to_vec(),
+                Tag::Compound(vec![
+                    (b"Keep".to_vec(), Tag::Int(1)),
+                    (
+                        b"Inner".to_vec(),
+                        Tag::Compound(vec![(b"A".to_vec(), Tag::Int(2))]),
+                    ),
+                ]),
+            ),
+            (
+                b"Sections".to_vec(),
+                Tag::List {
+                    element: 10,
+                    items: (0..3)
+                        .map(|y| Tag::Compound(vec![(b"Y".to_vec(), Tag::Int(y))]))
+                        .collect(),
+                },
+            ),
+        ]);
+        assert_eq!(root.tag, expected);
+    }
+
+    #[test]
+    fn a_skipped_part_is_still_checked() {
+        let skip_all = |_: &[&[u8]]| Keep::Skip;
+
+        let mut long_bytes = vec![10, 0, 0];
+        named(&mut long_bytes, 7, "x");
+        long_bytes.extend_from_slice(&1000i32.to_be_bytes());
+        long_bytes.extend_from_slice(&[1, 2, 3]);
+        long_bytes.push(0);
+        assert!(read_keeping(&long_bytes, &skip_all, LIMITS).is_err());
+
+        let mut bad_list = vec![10, 0, 0];
+        named(&mut bad_list, 9, "x");
+        bad_list.push(13);
+        bad_list.extend_from_slice(&1i32.to_be_bytes());
+        bad_list.push(0);
+        assert!(read_keeping(&bad_list, &skip_all, LIMITS).is_err());
+
+        let mut deep = vec![10, 0, 0];
+        for _ in 0..100 {
+            named(&mut deep, 10, "n");
+        }
+        deep.extend(std::iter::repeat(0).take(101));
+        assert_eq!(
+            read_keeping(&deep, &skip_all, LIMITS),
+            Err(NbtError::TooDeep)
+        );
+    }
+
+    #[test]
+    fn the_tag_limit_counts_skipped_tags() {
+        let mut b = vec![10, 0, 0];
+        for i in 0..200 {
+            int_entry(&mut b, &format!("k{i}"), i);
+        }
+        b.push(0);
+        let limits = Limits {
+            max_tags: 100,
+            max_depth: 64,
+        };
+        assert_eq!(
+            read_keeping(&b, &|_| Keep::Skip, limits),
+            Err(NbtError::TooManyTags)
+        );
+    }
+
+    #[test]
+    fn everything_kept_equals_read() {
+        let bytes = partial_fixture();
+        let limits = Limits {
+            max_tags: MAX_TAGS,
+            max_depth: MAX_DEPTH,
+        };
+        assert_eq!(read_keeping(&bytes, &|_| Keep::All, limits), read(&bytes));
     }
 }
