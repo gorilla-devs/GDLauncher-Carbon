@@ -315,11 +315,21 @@ export async function waitForInstallComplete(
   // diagnosis.
   const installTimeout = opts.installTimeout ?? 11 * 60_000
 
+  // The tile has to be on the page for this to count. Without it the state
+  // reads as missing, not "inactive", and this wait used to pass at once:
+  // a version change or repair navigates to the library as it is confirmed,
+  // the grid then mounts the tile still saying "inactive" until the core's
+  // state change reaches it, and the second wait passed on that too. The
+  // caller went on before its task had even started (a repair's assertions
+  // read the install audit the previous version change had written).
   await page
     .waitForFunction(
-      (sel) =>
-        document.querySelector(sel)?.getAttribute("data-instance-state") !==
-        "inactive",
+      (sel) => {
+        const state = document
+          .querySelector(sel)
+          ?.getAttribute("data-instance-state")
+        return state != null && state !== "inactive"
+      },
       selector,
       { timeout: startTimeout }
     )
