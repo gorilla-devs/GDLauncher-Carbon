@@ -100,6 +100,7 @@
   "_trn_server_players_op_level_4": "4 - Contrôle total (arrêter le serveur)",
   "_trn_server_players_op_level_server_default": "Par défaut du serveur",
   "_trn_server_players_op_level_running": "Un serveur en cours d'exécution fixe le niveau. Arrêtez-le pour en choisir un.",
+  "_trn_server_players_whitelist_only": "Seuls ces joueurs peuvent rejoindre",
   "_trn_server_open_folder": "Ouvrir le dossier",
   "_trn_server_creation_cancel": "Annuler",
   "_trn_server_creation_create": "Créer un serveur",

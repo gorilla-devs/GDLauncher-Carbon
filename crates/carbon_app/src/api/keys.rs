@@ -274,6 +274,7 @@ keys! {
         GET_WHITELIST                               = "getWhitelist";
         ADD_TO_WHITELIST                            = "addToWhitelist";
         REMOVE_FROM_WHITELIST                       = "removeFromWhitelist";
+        SET_WHITELIST_ENABLED                       = "setWhitelistEnabled";
         GET_OPS                                     = "getOps";
         ADD_OP                                      = "addOp";
         REMOVE_OP                                   = "removeOp";

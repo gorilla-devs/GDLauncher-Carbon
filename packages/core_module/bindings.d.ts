@@ -228,6 +228,7 @@ export type Procedures = {
         { key: "server.recoverLegacyDatapack", input: [FEServerId, LegacyDatapack], result: null } | 
         { key: "server.reinstallServer", input: FEServerId, result: FETaskId } | 
         { key: "server.removeFromWhitelist", input: RemovePlayerRequest, result: null } | 
+        { key: "server.setWhitelistEnabled", input: SetWhitelistEnabledRequest, result: null } | 
         { key: "server.removeOp", input: RemovePlayerRequest, result: null } | 
         { key: "server.renameServerGroup", input: RenameServerGroup, result: null } | 
         { key: "server.sendConsoleCommand", input: SendCommand, result: null } | 
@@ -344,6 +345,8 @@ export type ChangeModpack = { instance: FEInstanceId; modpack: Modpack }
 export type CFFEModAsset = { id: number; modId: number; title: string; description: string; thumbnailUrl: string; url: string }
 
 export type AddPlayerRequest = { serverId: FEServerId; username: string }
+
+export type SetWhitelistEnabledRequest = { serverId: FEServerId; enabled: boolean }
 
 export type ConfigurationParseError = { type_: ConfigurationParseErrorType; message: string; line: number; config_text: string }
 

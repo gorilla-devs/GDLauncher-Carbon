@@ -304,6 +304,13 @@ struct UpdateServerProperties {
 
 #[derive(Type, Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+struct SetWhitelistEnabledRequest {
+    server_id: FEServerId,
+    enabled: bool,
+}
+
+#[derive(Type, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct AddPlayerRequest {
     server_id: FEServerId,
     username: String,
@@ -836,6 +843,12 @@ pub(super) fn mount() -> RouterBuilder<App> {
                     .send_console_if_running(id, format!("whitelist remove {}", name)).await;
             }
             Ok(())
+        }
+
+        mutation SET_WHITELIST_ENABLED[app, req: SetWhitelistEnabledRequest] {
+            app.server_manager()
+                .set_whitelist_enabled(req.server_id.into(), req.enabled)
+                .await
         }
 
         // Ops

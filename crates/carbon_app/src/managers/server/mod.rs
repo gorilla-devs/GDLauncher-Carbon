@@ -38,6 +38,7 @@ pub mod properties;
 pub mod provider;
 pub(crate) mod record;
 mod repair_backup;
+mod whitelist;
 pub(crate) mod world;
 
 const MAX_PATH: usize = if cfg!(windows) { 260 } else { 4096 };
@@ -297,8 +298,9 @@ pub struct ServerManager {
     /// How often it checks, in milliseconds: `RECOVERED_POLL_INTERVAL`,
     /// which tests shorten or stretch.
     recovered_poll_ms: AtomicU64,
-    /// How long a running server is given to save an operator (shortened by tests).
-    operator_save_wait_ms: AtomicU64,
+    /// How long a running server is given to save what a console command
+    /// changed (shortened by tests).
+    server_save_wait_ms: AtomicU64,
     /// Serializes every read-row-then-write of a `server.json` with the
     /// delete that removes it, so a write that read the row before a delete
     /// never brings the file back after it. See `record`.
@@ -336,7 +338,7 @@ impl ServerManager {
             crash_restart_abandoned: DashMap::new(),
             recovered_watcher: AtomicBool::new(false),
             recovered_poll_ms: AtomicU64::new(RECOVERED_POLL_INTERVAL.as_millis() as u64),
-            operator_save_wait_ms: AtomicU64::new(operators::OPERATOR_SAVE_WAIT.as_millis() as u64),
+            server_save_wait_ms: AtomicU64::new(SERVER_SAVE_WAIT.as_millis() as u64),
             record_lock: Mutex::new(()),
             restored_servers: AtomicU32::new(0),
             stop_requested: DashMap::new(),
@@ -609,6 +611,8 @@ const RECOVERED_KILL_CONFIRM: std::time::Duration = std::time::Duration::from_se
 /// on their own (`watch_recovered_servers`), and so how long their page can
 /// lag a JVM that exited. Each check reads one small file and one process.
 const RECOVERED_POLL_INTERVAL: std::time::Duration = std::time::Duration::from_secs(5);
+/// How long a running server is given to save what a console command changed.
+const SERVER_SAVE_WAIT: std::time::Duration = std::time::Duration::from_secs(3);
 
 /// What a server's process marker from an earlier session says when it is
 /// checked. Every check removes a marker whose process ended or whose PID
@@ -3224,6 +3228,19 @@ impl ManagerRef<'_, ServerManager> {
     }
 
     /// Get all server.properties as a key-value map
+    async fn server_properties_path(self, id: ServerId) -> anyhow::Result<std::path::PathBuf> {
+        let db_server = server_repo::get_server(&self.app.db, id.0)
+            .await?
+            .ok_or_else(|| anyhow!("Server not found"))?;
+        Ok(self
+            .app
+            .settings_manager()
+            .runtime_path
+            .get_servers()
+            .get_server_path(&db_server.shortpath)
+            .get_server_properties_path())
+    }
+
     pub async fn get_server_properties(
         self,
         id: ServerId,

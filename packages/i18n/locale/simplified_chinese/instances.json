@@ -100,6 +100,7 @@
   "_trn_server_players_op_level_4": "4 - 完全控制（停止服务器）",
   "_trn_server_players_op_level_server_default": "服务器默认",
   "_trn_server_players_op_level_running": "运行中的服务器会自行设定等级。停止服务器后才能选择。",
+  "_trn_server_players_whitelist_only": "仅允许这些玩家加入",
   "_trn_server_open_folder": "打开文件夹",
   "_trn_server_creation_cancel": "取消",
   "_trn_server_creation_create": "创建服务器",

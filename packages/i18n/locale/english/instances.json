@@ -99,6 +99,7 @@
   "_trn_server_players_op_level_4": "4 - Full control (stop server)",
   "_trn_server_players_op_level_server_default": "Server default",
   "_trn_server_players_op_level_running": "A running server sets the level. Stop it to choose one.",
+  "_trn_server_players_whitelist_only": "Only these players can join",
   "_trn_server_open_folder": "Open Folder",
   "_trn_server_creation_cancel": "Cancel",
   "_trn_server_creation_create": "Create Server",

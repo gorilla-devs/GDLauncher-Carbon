@@ -121,3 +121,33 @@ test("an operator of a running server is listed at the level the server saved", 
 
   expect(root.textContent).toContain("_trn_server_players_op_level_4")
 })
+
+const whitelistSwitch = () =>
+  root.querySelector<HTMLInputElement>('input[type="checkbox"]')!
+
+test("a new server shows that its whitelist does not count", () => {
+  mount([], { "server.getServerProperties": { motd: "A Minecraft Server" } })
+
+  expect(root.textContent).toContain("_trn_server_players_whitelist_only")
+  expect(whitelistSwitch().checked).toBe(false)
+})
+
+test("a server that lets in only listed players shows it", () => {
+  mount([], { "server.getServerProperties": { "white-list": "true" } })
+
+  expect(whitelistSwitch().checked).toBe(true)
+})
+
+test("the switch makes the whitelist count and reads the setting again", async () => {
+  mount([], { "server.getServerProperties": { "white-list": "false" } })
+
+  whitelistSwitch().click()
+  await Promise.resolve()
+  await Promise.resolve()
+
+  expect(control.mutation).toHaveBeenCalledWith("server.setWhitelistEnabled", {
+    serverId: 7,
+    enabled: true
+  })
+  expect(control.refetch).toHaveBeenCalledOnce()
+})

@@ -100,6 +100,7 @@
   "_trn_server_players_op_level_4": "4 - Controllo completo (arresto server)",
   "_trn_server_players_op_level_server_default": "Predefinito del server",
   "_trn_server_players_op_level_running": "Un server in esecuzione imposta il livello. Arrestalo per sceglierne uno.",
+  "_trn_server_players_whitelist_only": "Solo questi giocatori possono entrare",
   "_trn_server_open_folder": "Apri Cartella",
   "_trn_server_creation_cancel": "Annulla",
   "_trn_server_creation_create": "Crea Server",

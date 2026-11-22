@@ -100,6 +100,7 @@
   "_trn_server_players_op_level_4": "4 - 完全権限 (サーバー停止)",
   "_trn_server_players_op_level_server_default": "サーバーの既定値",
   "_trn_server_players_op_level_running": "実行中のサーバーはレベルを自動で決めます。選ぶにはサーバーを停止してください。",
+  "_trn_server_players_whitelist_only": "これらのプレイヤーのみ参加可能",
   "_trn_server_open_folder": "フォルダを開く",
   "_trn_server_creation_cancel": "キャンセル",
   "_trn_server_creation_create": "サーバーを作成",

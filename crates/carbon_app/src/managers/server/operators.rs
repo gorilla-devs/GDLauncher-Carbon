@@ -7,8 +7,6 @@ use crate::managers::ManagerRef;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
-/// How long a running server is given to save an operator it was told of.
-pub(super) const OPERATOR_SAVE_WAIT: Duration = Duration::from_secs(3);
 const OPERATOR_SAVE_POLL: Duration = Duration::from_millis(50);
 /// The level a server gives when its properties name none.
 const DEFAULT_OPERATOR_LEVEL: i32 = 4;
@@ -58,7 +56,7 @@ impl ManagerRef<'_, ServerManager> {
     /// Whether the server's own list names the player before the wait is
     /// over. A list caught half written counts as not yet.
     async fn operator_saved(self, id: ServerId, name: &str) -> bool {
-        let wait = Duration::from_millis(self.operator_save_wait_ms.load(Ordering::Relaxed));
+        let wait = Duration::from_millis(self.server_save_wait_ms.load(Ordering::Relaxed));
         let deadline = Instant::now() + wait;
         loop {
             let saved = self
@@ -172,7 +170,7 @@ mod tests {
         let app = env.app.clone();
         hold_watcher(&app);
         app.server_manager
-            .operator_save_wait_ms
+            .server_save_wait_ms
             .store(150, Ordering::Relaxed);
         let (id, root) = server_fixture(&app, "ops-silent").await;
         ops_fixture(&root, "[]").await;

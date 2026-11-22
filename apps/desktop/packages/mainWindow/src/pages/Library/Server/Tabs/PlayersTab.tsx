@@ -13,6 +13,7 @@ import {
   SelectContent,
   SelectItem,
   SelectValue,
+  Switch,
   Tooltip,
   TooltipTrigger,
   TooltipContent
@@ -64,6 +65,16 @@ const PlayersTab = () => {
     queryKey: ["server.getBannedIps", serverId()]
   }))
 
+  // The list counts only while the server's own `white-list` property is on.
+  const propertiesQuery = rspc.createQuery(() => ({
+    queryKey: ["server.getServerProperties", serverId()]
+  }))
+  const whitelistOnly = () => propertiesQuery.data?.["white-list"] === "true"
+
+  const setWhitelistEnabledMutation = rspc.createMutation(() => ({
+    mutationKey: ["server.setWhitelistEnabled"]
+  }))
+
   const addWhitelistMutation = rspc.createMutation(() => ({
     mutationKey: ["server.addToWhitelist"]
   }))
@@ -95,6 +106,18 @@ const PlayersTab = () => {
   const unbanIpMutation = rspc.createMutation(() => ({
     mutationKey: ["server.unbanIp"]
   }))
+
+  const handleWhitelistOnly = async (enabled: boolean) => {
+    try {
+      await setWhitelistEnabledMutation.mutateAsync({
+        serverId: serverId(),
+        enabled
+      })
+    } finally {
+      // Also after a refusal: the switch shows what the server has.
+      propertiesQuery.refetch()
+    }
+  }
 
   const handleAddWhitelist = async () => {
     const name = newUsername().trim()
@@ -178,6 +201,17 @@ const PlayersTab = () => {
 
         <TabsContent value="whitelist">
           <div class="flex flex-col gap-4">
+            <div class="flex items-center gap-3">
+              <Switch
+                id="server-whitelist-only"
+                checked={whitelistOnly()}
+                disabled={setWhitelistEnabledMutation.isPending}
+                onChange={(e) => handleWhitelistOnly(e.currentTarget.checked)}
+              />
+              <label for="server-whitelist-only" class="text-sm">
+                <Trans key="instances:_trn_server_players_whitelist_only" />
+              </label>
+            </div>
             <div class="flex items-center gap-2">
               <Input
                 class="flex-1"
