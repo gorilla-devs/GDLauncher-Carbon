@@ -109,8 +109,11 @@ export function EnhancedSearchBar(props: { size?: number }) {
           "w-full px-2 gap-2": isExpanded()
         }}
       >
+        {/* Under lg the bar can be too narrow for everything; there the
+            type's label gives way (cut with an ellipsis), not the text field.
+            Wider windows always have the room. */}
         <div
-          class="shrink-0 transition-[opacity,max-width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+          class="lt-lg:min-w-0 transition-[opacity,max-width] duration-300 ease-[cubic-bezier(.4,0,.2,1)] lg:shrink-0"
           classList={{
             "opacity-0 pointer-events-none max-w-0 overflow-hidden":
               !isExpanded(),
@@ -153,7 +156,7 @@ export function EnhancedSearchBar(props: { size?: number }) {
             ref={expandedInputRef}
             data-testid="search-input"
             placeholder={t("search:_trn_search_discover_anything")}
-            class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 text-ellipsis bg-transparent text-sm outline-none"
+            class="placeholder:text-darkSlate-400 text-lightSlate-50 lt-lg:min-w-16 h-full min-w-0 flex-1 text-ellipsis bg-transparent text-sm outline-none"
             value={searchResults?.searchQuery().searchQuery ?? ""}
             onInput={(e) => {
               searchResults?.setSearchQuery((prev) => ({
@@ -193,7 +196,7 @@ export function EnhancedSearchBar(props: { size?: number }) {
           }
         >
           <div
-            class="i-hugeicons:cancel-01 text-lg text-darkSlate-500 cursor-pointer transition-colors duration-200 ease-spring gdl-white-text-hover"
+            class="i-hugeicons:cancel-01 text-lg text-darkSlate-500 lt-lg:shrink-0 cursor-pointer transition-colors duration-200 ease-spring gdl-white-text-hover"
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()

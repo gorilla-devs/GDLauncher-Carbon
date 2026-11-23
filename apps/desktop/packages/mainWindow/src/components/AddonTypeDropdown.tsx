@@ -73,10 +73,12 @@ export function AddonTypeDropdown() {
     <DropdownMenu>
       <DropdownMenuTrigger
         data-testid="addon-type-dropdown-trigger"
-        class="text-lightSlate-50 hover:bg-darkSlate-600 data-[expanded]:bg-darkSlate-600 flex items-center gap-2 rounded px-2.5 py-1.5 transition-colors hover:text-white data-[expanded]:text-white"
+        class="text-lightSlate-50 hover:bg-darkSlate-600 data-[expanded]:bg-darkSlate-600 lt-lg:max-w-full flex items-center gap-2 rounded px-2.5 py-1.5 transition-colors hover:text-white data-[expanded]:text-white"
       >
-        <div class={`${currentOption()?.icon} text-lg`} />
-        <span class="text-sm font-medium">{currentOption()?.label}</span>
+        <div class={`${currentOption()?.icon} shrink-0 text-lg`} />
+        <span class="lt-lg:min-w-0 lt-lg:truncate text-sm font-medium">
+          {currentOption()?.label}
+        </span>
         <div class="i-hugeicons:arrow-down-01 text-xs shrink-0" />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
