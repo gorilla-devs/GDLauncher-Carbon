@@ -88,8 +88,8 @@ To contribute, please see the [contributing](CONTRIBUTING.md) guide.
 
 ### Requirements
 
-- Node 22.x.x
-- Rust >= 1.85.1
+- Node >= 24.14.0
+- Rust >= 1.95.0
 
 ### Pnpm
 
