@@ -1566,7 +1566,10 @@ test.describe("Themes", () => {
       .toBe(true)
   }
 
-  /** The search box's x in every frame for a while, started before `act`. */
+  /** The search box's right edge in every frame for a while, started before
+   *  `act`. On a wide bar the whole box moves; on a bar too narrow for it,
+   *  the box keeps its left edge and narrows. Either way it is the right
+   *  edge that makes room for the strip. */
   const searchBoxFrames = async (page: Page, act: () => Promise<void>) => {
     const frames = page.evaluate(
       () =>
@@ -1575,7 +1578,7 @@ test.describe("Themes", () => {
           const xs: number[] = []
           const start = performance.now()
           const tick = () => {
-            xs.push(Math.round(box.getBoundingClientRect().x))
+            xs.push(Math.round(box.getBoundingClientRect().right))
             if (performance.now() - start < 600) requestAnimationFrame(tick)
             else resolve(xs)
           }
@@ -1587,7 +1590,8 @@ test.describe("Themes", () => {
   }
 
   // The strip grows out of the account button and the bar reflows with it:
-  // the search box glides to its new place and back, never jumps.
+  // the search box glides to its new place and back, or on a small window
+  // narrows and widens again, never jumps.
   test("the search box glides as the account strip opens and closes", async ({
     authenticatedApp
   }) => {
@@ -1894,7 +1898,8 @@ test.describe("Themes", () => {
     }, selector)
 
   // The collapsed search box shows its whole placeholder in English, and
-  // ends in an ellipsis wherever it can't (a longer language, a narrower box).
+  // ends in an ellipsis wherever it can't (a longer language, or a bar too
+  // narrow for the box's full width).
   test("the search box's placeholder fits", async ({ authenticatedApp }) => {
     const { page } = authenticatedApp
     await goToLibrary(page)
@@ -1910,16 +1915,24 @@ test.describe("Themes", () => {
         input.clientWidth -
         parseFloat(s.paddingLeft) -
         parseFloat(s.paddingRight)
+      // On a bar narrower than the box (a small window), the box takes all
+      // the bar has and is narrower than it is made to be.
+      const box = input.closest('[data-gdl~="nav.search.box"]')!
+      const bar = input.closest('[data-gdl="nav.search"]')!
       return {
         text: Math.ceil(ctx.measureText(input.placeholder).width),
         room,
-        overflow: s.textOverflow
+        overflow: s.textOverflow,
+        squeezed:
+          box.getBoundingClientRect().width >=
+          bar.getBoundingClientRect().width - 0.5
       }
     })
-    expect(
-      fit.text,
-      `placeholder ${fit.text}px, room ${fit.room}px`
-    ).toBeLessThanOrEqual(fit.room)
+    if (!fit.squeezed)
+      expect(
+        fit.text,
+        `placeholder ${fit.text}px, room ${fit.room}px`
+      ).toBeLessThanOrEqual(fit.room)
     expect(fit.overflow).toBe("ellipsis")
   })
 

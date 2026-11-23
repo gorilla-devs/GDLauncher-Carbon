@@ -408,7 +408,8 @@ const LAYOUTS: { name: string; layout: ThemeLayout }[] = [
   { name: "rail", layout: { nav: "rail", tileStyle: "caption" } }
 ]
 
-/** The ad view, from main: exactly where main computes it, at full size. */
+/** The ad view, from main: exactly where main computes it, at full size, or
+ *  cut at the window's bottom edge when the window is too short for it. */
 const expectAdViewInPlace = async (app: ElectronApplication, page: Page) => {
   const layout = (await page.evaluate(() =>
     (window as any).getAdSize()
@@ -429,7 +430,12 @@ const expectAdViewInPlace = async (app: ElectronApplication, page: Page) => {
     : 0
   const link = layout.hideAdText ? 0 : SLOT_GAP + LINK_BLOCK
   expect(view.width, "full width").toBe(layout.adSize.width)
-  expect(view.height, "full height").toBe(banner + layout.adSize.height + link)
+  // macOS keeps a window inside the screen, so on a short screen main can't
+  // grow it to its minimum height, and the view stops at the window's bottom.
+  const room = info.content.height - NAVBAR_HEIGHT
+  expect(view.height, "full height, or all the window has").toBe(
+    Math.min(banner + layout.adSize.height + link, room)
+  )
   return { view, layout, content: info.content }
 }
 
@@ -531,7 +537,10 @@ test.describe("Theme layouts, particles, sounds and anchors", () => {
           let top = view.y
           slots.forEach((slot, i) => {
             expect(slot.y, `placeholder ${i} top`).toBeCloseTo(top, 0)
-            expect(slot.height).toBe(sizes[i].height)
+            // Cut where the view is cut, on a window too short for it.
+            expect(slot.height).toBe(
+              Math.min(sizes[i].height, view.y + view.height - top)
+            )
             expect(slot.width).toBe(sizes[i].width)
             expect(slot.x).toBeGreaterThanOrEqual(view.x)
             expect(slot.x + slot.width).toBeLessThanOrEqual(view.x + view.width)
