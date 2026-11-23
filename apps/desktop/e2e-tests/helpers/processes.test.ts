@@ -92,6 +92,33 @@ describe("killGameProcesses", () => {
     PROCESS_TEST_TIMEOUT
   )
 
+  it(
+    "kills this run's process when the runtime path is spelled another way",
+    async () => {
+      // The core names its runtime path in its canonical form, which need
+      // not be the spelling the harness made it with: Windows hands Node the
+      // short 8.3 temp path (C:\Users\RUNNER~1\...) and the game runs under
+      // the long one; macOS's temp dir is a symlink into /private. A link to
+      // the same folder stands in for both.
+      const real = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-real-"))
+      const linked = `${real}-link`
+      fs.symlinkSync(real, linked, "junction")
+      runtimePaths.push(real, linked)
+      const child = spawnChildMarkedWith(real)
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      const instanceDir = path.join(linked, "instances", "an-instance")
+      fs.mkdirSync(instanceDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(instanceDir, ".gdl_instance.pid"),
+        `${child.pid}\n1700000000`
+      )
+
+      expect(killGameProcesses(linked)).toEqual([child.pid])
+    },
+    PROCESS_TEST_TIMEOUT
+  )
+
   it("reports nothing when there are no pidfiles", () => {
     const runtimePath = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-empty-"))
     runtimePaths.push(runtimePath)

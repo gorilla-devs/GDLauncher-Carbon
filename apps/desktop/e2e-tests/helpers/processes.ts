@@ -167,6 +167,11 @@ function commandLineOf(pid: number): string | null {
  * it. Here every run gets its own temp runtime path, so the path appearing in
  * the process's own command line is already proof of identity, and a recycled
  * pid cannot fake it.
+ *
+ * The path is looked for both as given and in its canonical form, which is
+ * the one the core and the game use: on Windows Node's temp dir is the short
+ * 8.3 path (`C:\Users\RUNNER~1\...`) while the game's command line has the
+ * long one, and macOS's temp dir is a symlink into `/private`.
  */
 export function pidBelongsToRun(pid: number, runtimePath: string): boolean {
   const command = commandLineOf(pid)
@@ -174,9 +179,18 @@ export function pidBelongsToRun(pid: number, runtimePath: string): boolean {
     return false
   }
 
-  return process.platform === "win32"
-    ? command.toLowerCase().includes(runtimePath.toLowerCase())
-    : command.includes(runtimePath)
+  const spellings = [runtimePath]
+  try {
+    spellings.push(nodeFs.realpathSync.native(runtimePath))
+  } catch {
+    // Already gone: the path as given is all there is to match.
+  }
+
+  return spellings.some((spelling) =>
+    process.platform === "win32"
+      ? command.toLowerCase().includes(spelling.toLowerCase())
+      : command.includes(spelling)
+  )
 }
 
 /** Pids recorded by every instance pidfile under `runtimePath`. */
