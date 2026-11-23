@@ -233,6 +233,21 @@ jobs:
       - name: Clear target before tests to avoid folder getting too big
         shell: bash
         run: rm -rf target
+      # The runner has no graphics driver, so Windows offers no OpenGL and
+      # Minecraft can't open its window ("WGL: The driver does not appear to
+      # support OpenGL"). Mesa's software renderer gives it one, as Xvfb's
+      # Mesa does on Linux.
+      - name: Install a software OpenGL driver
+        shell: pwsh
+        working-directory: ${{ runner.temp }}
+        run: |
+          $version = "26.0.3"
+          Invoke-WebRequest "https://github.com/pal1000/mesa-dist-win/releases/download/$version/mesa3d-$version-release-msvc.7z" -OutFile mesa.7z
+          $hash = (Get-FileHash mesa.7z -Algorithm SHA256).Hash
+          if ($hash -ne "DE1EC45C906164DE2C046288A8969E83CF2D51D031DC8DFD1F9371BB31CD6755") { throw "unexpected Mesa archive: $hash" }
+          7z x mesa.7z -omesa | Out-Null
+          Set-Location mesa
+          .\systemwidedeploy.cmd 1
       - name: Test
         shell: bash
         env:
