@@ -51,11 +51,10 @@ import {
 } from "./fixtures/electronApp.js"
 import { startHarness, stopHarness } from "./fixtures/mockIdp.js"
 import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
-import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
+  clickPlayAndAwaitLaunched,
   createInstanceViaUi,
-  waitForInstallComplete,
-  LAUNCH_TIMEOUT
+  waitForInstallComplete
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { attachGameLogOnFailure } from "./helpers/gameLog.js"
@@ -149,21 +148,11 @@ test.describe("running game outlives the launcher", () => {
         PID_FILE_NAME
       )
 
-      // Counted, not searched for: the install itself ends with a transition
-      // to Inactive, which prints GAME_LAUNCHED's counterpart before anything
-      // has launched. See gameLaunch.spec.ts's identical note.
-      const launchedCount = () => stdout.join("").split("GAME_LAUNCHED").length
-
       await test.step("launch the game", async () => {
-        const tile = page.locator(byInstanceName(INSTANCE_NAME))
-        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
-
-        await expect
-          .poll(() => launchedCount(), {
-            timeout: LAUNCH_TIMEOUT,
-            message: "the core never reported GAME_LAUNCHED after Play"
-          })
-          .toBeGreaterThan(1)
+        await clickPlayAndAwaitLaunched(page, INSTANCE_NAME, {
+          stdout,
+          message: "the core never reported GAME_LAUNCHED after Play"
+        })
 
         await expect
           .poll(() => fs.existsSync(pidFile), {

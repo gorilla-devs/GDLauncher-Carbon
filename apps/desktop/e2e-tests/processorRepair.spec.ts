@@ -62,6 +62,7 @@ import { startHarness, stopHarness } from "./fixtures/mockIdp.js"
 import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
+  clickPlay,
   createInstanceViaUi,
   waitForInstallComplete
 } from "./helpers/instances.js"
@@ -126,6 +127,13 @@ test.describe("processor output repair", () => {
     /** The core's stdout, captured so cleanup can wait on the process-level
      *  GAME_CLOSED event rather than on a UI state that races it. */
     let stdout: string[] = []
+    // Counted, not merely searched for. `change_launch_state` (`run/mod.rs`)
+    // prints GAME_CLOSED on every transition to Inactive, and the *install*
+    // ends with one of those — so this string is already in stdout long
+    // before anything launches. Only a new occurrence means the game ended.
+    const closedCount = () => stdout.join("").split("GAME_CLOSED").length
+    /** `closedCount()` just before Play; unset until the test clicks it. */
+    let closedBeforeLaunch: number | undefined
 
     // See `withCleanup`'s doc comment (`helpers/cleanup.ts`) for why cleanup
     // must never re-throw over an already-failing body, only over a passing
@@ -224,8 +232,8 @@ test.describe("processor output repair", () => {
 
         await test.step("launch, and assert the libraries are rebuilt", async () => {
           await goToLibrary(page)
-          const tile = page.locator(byInstanceName(INSTANCE_NAME))
-          await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+          closedBeforeLaunch = closedCount()
+          await clickPlay(page, INSTANCE_NAME)
 
           await expect
             .poll(
@@ -255,31 +263,29 @@ test.describe("processor output repair", () => {
             // instance runs: `Tile.tsx`'s `handlePlay` calls `killInstance`
             // when `props.isRunning`, and the `instance-play` anchor stays
             // mounted, swapping only its icon and label.
-            const tile = current.page.locator(byInstanceName(INSTANCE_NAME))
-            const play = tile.locator(byTestId(TEST_IDS.instancePlay))
+            //
+            // Only while it is still running, though: on an instance that is
+            // not running the same control starts it, so after a game that
+            // already ended (or a test that never got to Play) a click would
+            // launch a new one and wait for a close that never comes.
+            const stillRunning =
+              closedBeforeLaunch !== undefined &&
+              closedCount() <= closedBeforeLaunch
+            if (stillRunning) {
+              const tile = current.page.locator(byInstanceName(INSTANCE_NAME))
+              const before = closedCount()
+              await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
 
-            // Counted, not merely searched for. `change_launch_state`
-            // (`run/mod.rs`) prints GAME_CLOSED on every transition to
-            // Inactive, and the *install* ends with one of those — so this
-            // string is already in stdout long before anything launches, and a
-            // plain `includes("GAME_CLOSED")` is satisfied instantly, waits for
-            // nothing, and lets teardown race the kill it was supposed to be
-            // waiting on. Only a new occurrence means this stop happened.
-            const closedCount = () =>
-              stdout.join("").split("GAME_CLOSED").length
-            const before = closedCount()
-
-            await play.click()
-
-            await expect
-              .poll(() => closedCount(), {
-                timeout: GAME_STOP_TIMEOUT,
-                message:
-                  "the launched instance never reported a new GAME_CLOSED " +
-                  "after its stop control was clicked — a Minecraft process " +
-                  "may have been left running"
-              })
-              .toBeGreaterThan(before)
+              await expect
+                .poll(() => closedCount(), {
+                  timeout: GAME_STOP_TIMEOUT,
+                  message:
+                    "the launched instance never reported a new GAME_CLOSED " +
+                    "after its stop control was clicked — a Minecraft " +
+                    "process may have been left running"
+                })
+                .toBeGreaterThan(before)
+            }
 
             // The instance is deliberately not deleted. This spec owns its
             // runtime path outright and `stopHarness` removes the whole

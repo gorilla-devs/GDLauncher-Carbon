@@ -15,6 +15,7 @@ import { startHarness, stopHarness } from "./fixtures/mockIdp.js"
 import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
+  clickPlay,
   deleteInstanceViaUi,
   ensureLibraryInteractive,
   STOP_TIMEOUT
@@ -237,9 +238,8 @@ test.describe("modpack interrupted staging", () => {
         await dismissStartupModals(page)
         await ensureLibraryInteractive(page)
 
-        const tile = page.locator(byInstanceName(name))
         closedBeforeLaunch = closedCount()
-        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+        await clickPlay(page, name)
 
         await expect
           .poll(
