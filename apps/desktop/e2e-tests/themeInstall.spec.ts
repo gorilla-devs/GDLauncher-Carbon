@@ -36,9 +36,30 @@ const CLOSE = byTestId("theme-install-close")
 const ERROR = byTestId("theme-install-error")
 const TILE_FAILED = /couldn't be loaded/
 
+// A tile previews its theme while the pointer is on it, and the pointer stays
+// where the last test left it, which on a small window can be where a tile
+// lands. Parked on the bar first, it previews nothing when the page opens.
 const goToAppearance = async (page: Page) => {
+  await page.mouse.move(5, 5)
   await goTo(page, "#/settings/appearance")
   await expect(page.locator(byThemeTile("main"))).toBeVisible()
+}
+
+// A tooltip closes when the page under it scrolls, and a scroll's event comes
+// a frame after the scroll. After an earlier test's tooltips Kobalte can open
+// the next one at once, with no delay, so a hover that has to scroll its
+// target into view (a small window) would close its own tooltip. Scroll
+// first, let the event pass, then hover.
+const hoverInPlace = async (page: Page, selector: string) => {
+  const target = page.locator(selector)
+  await target.scrollIntoViewIfNeeded()
+  await page.evaluate(
+    () =>
+      new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      )
+  )
+  await target.hover()
 }
 
 const slate800 = (page: Page) =>
@@ -343,7 +364,7 @@ test.describe("Installing and managing themes", () => {
         await expect(page.locator(byThemeTile(`user:${id}`))).toBeVisible()
         await expect(page.locator(byThemeWarning(id))).toBeVisible()
       }
-      await page.locator(byThemeWarning("My Theme")).hover()
+      await hoverInPlace(page, byThemeWarning("My Theme"))
       await expect(
         page.getByText("The theme's files contain a mistake.")
       ).toBeVisible()
