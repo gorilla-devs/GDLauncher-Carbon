@@ -18,7 +18,22 @@
 
 import fs from "node:fs"
 import path from "node:path"
-import { expect, type TestInfo } from "@playwright/test"
+import { expect, test, type TestInfo } from "@playwright/test"
+
+/**
+ * Skips the calling test on a machine that has no OpenGL, where Minecraft
+ * can't open its window at all. CI says so with `E2E_NO_OPENGL`: GitHub's
+ * Mac runners have no GPU ("NSGL: Failed to find a suitable pixel format").
+ * Only for a test that needs the game to reach its menu or keep running; a
+ * test that only needs the launch to start runs anyway. Call it at the top
+ * of the test.
+ */
+export function skipWithoutOpenGL(): void {
+  test.skip(
+    !!process.env.E2E_NO_OPENGL,
+    "this machine has no OpenGL (E2E_NO_OPENGL), so Minecraft can't open its window"
+  )
+}
 
 /** Matches one log4j event's message payload, including multi-line ones —
  *  the launcher pretty-prints Rust structs across a dozen lines inside a

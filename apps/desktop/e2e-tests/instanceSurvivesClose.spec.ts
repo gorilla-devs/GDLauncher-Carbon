@@ -57,7 +57,7 @@ import {
   waitForInstallComplete
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
-import { attachGameLogOnFailure } from "./helpers/gameLog.js"
+import { attachGameLogOnFailure, skipWithoutOpenGL } from "./helpers/gameLog.js"
 import {
   isPidAlive,
   killProcessTree,
@@ -102,6 +102,7 @@ function gameIsRunning(runtimePath: string, pid: number): boolean {
 test.describe("running game outlives the launcher", () => {
   // eslint-disable-next-line no-empty-pattern
   test("keeps the game running after the launcher is closed", async ({}, testInfo) => {
+    skipWithoutOpenGL()
     expect(isCoreModulePresent()).toBeTruthy()
 
     const harness = await startHarness()

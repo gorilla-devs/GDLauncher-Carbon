@@ -65,6 +65,9 @@ jobs:
           USER_AGENT_PREFIX: ${{ vars.USER_AGENT_PREFIX }}
           CURSEFORGE_API_KEY: "${{ secrets.CURSEFORGE_API_KEY }}"
           CURSEFORGE_API_BASE: ${{ vars.CURSEFORGE_API_BASE }}
+          # GitHub's Mac runners have no GPU, so Minecraft can't open its
+          # window there. The tests that need the window skip and say why.
+          E2E_NO_OPENGL: "1"
         run: pnpm test:all
       - name: Upload Playwright report
         uses: actions/upload-artifact@v4

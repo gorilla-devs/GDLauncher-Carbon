@@ -79,6 +79,7 @@ import {
   LAUNCH_MARKER_QUORUM,
   newestLogFile,
   readLogMessages,
+  skipWithoutOpenGL,
   waitForLogQuiescence
 } from "./helpers/gameLog.js"
 import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
@@ -90,6 +91,7 @@ const LOADER = "forge"
 test.describe("game launch", () => {
   // eslint-disable-next-line no-empty-pattern
   test("starts Minecraft and reaches a stable main menu", async ({}, testInfo) => {
+    skipWithoutOpenGL()
     expect(isCoreModulePresent()).toBeTruthy()
 
     const harness = await startHarness()

@@ -31,6 +31,7 @@ import {
   LAUNCH_MARKERS,
   newestLogFile,
   readLogMessages,
+  skipWithoutOpenGL,
   waitForLogQuiescence
 } from "./helpers/gameLog.js"
 import {
@@ -251,6 +252,7 @@ import { reportCleanupFailure, withCleanup } from "./helpers/cleanup.js"
 test.describe("modpack lifecycle", () => {
   // eslint-disable-next-line no-empty-pattern
   test("preserves user and game data across a modpack upgrade and downgrade", async ({}, testInfo) => {
+    skipWithoutOpenGL()
     expect(isCoreModulePresent()).toBeTruthy()
 
     const harness = await startHarness()
