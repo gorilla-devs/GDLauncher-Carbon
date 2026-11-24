@@ -11,7 +11,11 @@ import {
 import { startHarness, stopHarness } from "./fixtures/mockIdp.js"
 import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
-import { clickPlayAndAwaitLaunched, STOP_TIMEOUT } from "./helpers/instances.js"
+import {
+  clickPlayAndAwaitLaunched,
+  holdStop,
+  STOP_TIMEOUT
+} from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { readInstanceConfig } from "./helpers/instanceConfig.js"
 import {
@@ -309,7 +313,7 @@ test.describe("modpack change version guard", () => {
         await cancelVersionModal(page)
 
         // Stop the game.
-        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+        await holdStop(tile)
         await expect
           .poll(() => closedCount(), {
             timeout: STOP_TIMEOUT,
@@ -378,9 +382,7 @@ test.describe("modpack change version guard", () => {
                 .catch(() => {})
 
               const tile = current.page.locator(byInstanceName(name))
-              await tile
-                .locator(byTestId(TEST_IDS.instancePlay))
-                .click({ timeout: 10_000 })
+              await holdStop(tile, { timeout: 10_000 })
               await expect
                 .poll(() => closedCount(), { timeout: STOP_TIMEOUT })
                 .toBeGreaterThan(closedBeforeLaunch)

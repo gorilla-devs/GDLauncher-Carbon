@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test"
+import { expect, type Locator, type Page } from "@playwright/test"
 import { byInstanceName, byLoader, byTestId, TEST_IDS } from "./selectors.js"
 import {
   armInstallOperation,
@@ -434,6 +434,23 @@ export const LAUNCH_TIMEOUT = 180_000
  *  clicked. Shared for the same reason as `LAUNCH_TIMEOUT` above: imported
  *  from here rather than redeclared per spec. */
 export const STOP_TIMEOUT = 60_000
+
+/** Longer than the 1.2 s a tile's Stop must be held (`HOLD_TO_CONFIRM_MS`). */
+const STOP_HOLD_MS = 1_500
+
+/**
+ * Stops the running game from its tile. Stop acts only when held: a click
+ * just shows the hint, the game keeps running, and closing the app then
+ * waits on it.
+ */
+export async function holdStop(
+  tile: Locator,
+  options: { timeout?: number } = {}
+): Promise<void> {
+  await tile
+    .locator(byTestId(TEST_IDS.instancePlay))
+    .click({ delay: STOP_HOLD_MS, ...options })
+}
 
 /**
  * A machine short of free memory gets the app's "Not enough memory" warning

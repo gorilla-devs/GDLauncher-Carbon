@@ -53,6 +53,7 @@ import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
   clickPlayAndAwaitLaunched,
   createInstanceViaUi,
+  holdStop,
   waitForInstallComplete
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
@@ -225,7 +226,7 @@ test.describe("adopting a running game across a launcher restart", () => {
 
         await test.step("stop ends the process and clears the pidfile", async () => {
           await page.locator(byTestId(TEST_IDS.navbarLogo)).click()
-          await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+          await holdStop(tile)
 
           await expect
             .poll(() => isPidAlive(gamePid!), {

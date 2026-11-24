@@ -35,6 +35,7 @@ import {
 import {
   clickPlayAndAwaitLaunched,
   createInstanceViaUi,
+  holdStop,
   LAUNCH_TIMEOUT,
   STOP_TIMEOUT,
   waitForInstallComplete
@@ -211,9 +212,7 @@ test.describe("game launch", () => {
               if (before > closedBeforeLaunch) return
               const tile = current.page.locator(byInstanceName(INSTANCE_NAME))
               // Stop acts only when held (1.2 s); a click just shows the hint.
-              await tile
-                .locator(byTestId(TEST_IDS.instancePlay))
-                .click({ delay: 1500 })
+              await holdStop(tile)
               await expect
                 .poll(() => closedCount(), {
                   timeout: STOP_TIMEOUT,

@@ -64,6 +64,7 @@ import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
   clickPlay,
   createInstanceViaUi,
+  holdStop,
   waitForInstallComplete
 } from "./helpers/instances.js"
 import {
@@ -276,7 +277,7 @@ test.describe("processor output repair", () => {
             if (stillRunning) {
               const tile = current.page.locator(byInstanceName(INSTANCE_NAME))
               const before = closedCount()
-              await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+              await holdStop(tile)
 
               await expect
                 .poll(() => closedCount(), {

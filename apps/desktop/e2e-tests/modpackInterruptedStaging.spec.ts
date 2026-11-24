@@ -18,6 +18,7 @@ import {
   clickPlay,
   deleteInstanceViaUi,
   ensureLibraryInteractive,
+  holdStop,
   STOP_TIMEOUT
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
@@ -406,9 +407,7 @@ test.describe("modpack interrupted staging", () => {
                 .click({ timeout: 5_000 })
                 .catch(() => {})
               const tile = current.page.locator(byInstanceName(name))
-              await tile
-                .locator(byTestId(TEST_IDS.instancePlay))
-                .click({ timeout: 10_000 })
+              await holdStop(tile, { timeout: 10_000 })
               await expect
                 .poll(() => closedCount(), { timeout: STOP_TIMEOUT })
                 .toBeGreaterThan(closedBeforeLaunch)
