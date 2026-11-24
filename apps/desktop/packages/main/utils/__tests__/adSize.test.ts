@@ -123,14 +123,20 @@ it.each([
   (platform, titlebar) => {
     fixture.platform = platform
     const navbar = 60
+    // About 70,000 displays: the checks are plain comparisons and the broken
+    // ones are asserted once, since an `expect` per check takes seconds.
+    const broken: string[] = []
+    const check = (holds: boolean, what: string, where: string) => {
+      if (!holds) broken.push(`${where}: ${what}`)
+    }
     for (let width = 1024; width <= 3840; width += 64)
       for (let height = titlebar + 610; height <= 2160; height += 1) {
         const size = getAdSize(display(width, height, 1))
         const where = `${width}x${height}`
-        expect(size.minHeight, where).toBeLessThanOrEqual(height)
-        expect(size.minWidth, where).toBeLessThanOrEqual(width)
-        expect(size.height, where).toBeGreaterThanOrEqual(size.minHeight)
-        expect(size.height, where).toBeLessThanOrEqual(height)
+        check(size.minHeight <= height, "minHeight above the display", where)
+        check(size.minWidth <= width, "minWidth above the display", where)
+        check(size.height >= size.minHeight, "height under minHeight", where)
+        check(size.height <= height, "height above the display", where)
         // The room the ad column has at the smallest window: under the
         // title bar, and under the navbar unless the column runs beside it.
         const column =
@@ -138,8 +144,9 @@ it.each([
         const ads =
           size.adSize.height +
           (size.bannerAdSize.shouldShow ? size.bannerAdSize.height + 8 : 0)
-        expect(ads, where).toBeLessThanOrEqual(column)
+        check(ads <= column, "the ads do not fit their column", where)
       }
+    expect(broken.slice(0, 20)).toEqual([])
   }
 )
 it("primary lookup is used only without a supplied display and workArea wins over size", () => {

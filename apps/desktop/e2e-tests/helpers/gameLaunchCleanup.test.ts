@@ -167,6 +167,10 @@ it.each([
     byInstanceName: (x: string) => x,
     byTestId: (x: string) => x,
     TEST_IDS: { instancePlay: "play" },
+    // The real helper holds the tile's Stop; here the press is the click.
+    holdStop: (tile: {
+      locator: (id: string) => { click: () => Promise<void> }
+    }) => tile.locator("play").click(),
     expect: {
       poll: (read: () => number) => ({
         toBeGreaterThan: async (before: number) => {
