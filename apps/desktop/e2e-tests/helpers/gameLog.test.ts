@@ -32,7 +32,7 @@ const leftXmlLayout = [
     `    <log4j:Message><![CDATA[Launching target 'forgeclient' with arguments [--version, 1.20.1]]]></log4j:Message>`,
     `  </log4j:Event>`
   ].join("\r\n"),
-  "2026-11-05 17:13:43,201 main WARN Error parsing URI C:\\Users\\runneradmin\\AppData\\Local\\Temp\\gdl-e2e-xg5t6E\\logging_configs\\client-1.12.xml",
+  "2026-11-05 17:13:43,201 main WARN Error parsing URI C:\\Users\\player\\AppData\\Local\\Temp\\gdl-e2e-xg5t6E\\logging_configs\\client-1.12.xml",
   "[17:13:50] [Render thread/INFO] [minecraft/Minecraft]: Setting user: e2e_0a44ba86",
   "[17:13:50] [Render thread/INFO] [minecraft/Minecraft]: Backend library: LWJGL version 3.3.1 build 7",
   "[17:13:53] [Render thread/INFO] [minecraft/ReloadableResourceManager]: Reloading ResourceManager: vanilla, mod_resources",
@@ -75,7 +75,7 @@ describe("parseLogMessages", () => {
     expect(parseLogMessages(leftXmlLayout)).toEqual([
       "LWJGL Meta org.lwjgl3 - 3.3.1",
       "Launching target 'forgeclient' with arguments [--version, 1.20.1]",
-      "2026-11-05 17:13:43,201 main WARN Error parsing URI C:\\Users\\runneradmin\\AppData\\Local\\Temp\\gdl-e2e-xg5t6E\\logging_configs\\client-1.12.xml",
+      "2026-11-05 17:13:43,201 main WARN Error parsing URI C:\\Users\\player\\AppData\\Local\\Temp\\gdl-e2e-xg5t6E\\logging_configs\\client-1.12.xml",
       "[17:13:50] [Render thread/INFO] [minecraft/Minecraft]: Setting user: e2e_0a44ba86",
       "[17:13:50] [Render thread/INFO] [minecraft/Minecraft]: Backend library: LWJGL version 3.3.1 build 7",
       "[17:13:53] [Render thread/INFO] [minecraft/ReloadableResourceManager]: Reloading ResourceManager: vanilla, mod_resources",
