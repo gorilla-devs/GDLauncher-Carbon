@@ -949,10 +949,9 @@ impl InstanceManager {
         let entries = match tokio::fs::read_dir(path).await {
             Ok(entries) => entries,
             Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
-                // No logs folder in a folder that is there: nothing played
-                // yet. With the folder itself gone (renamed meanwhile) the
-                // next look tries the new one.
-                *initialized = path.parent().is_some_and(Path::exists);
+                // No logs folder: nothing played yet, or the instance folder
+                // was renamed meanwhile. The next look tries again, so a
+                // logs folder that appears later is still read.
                 return Ok(false);
             }
             Err(e) => return Err(e.into()),
