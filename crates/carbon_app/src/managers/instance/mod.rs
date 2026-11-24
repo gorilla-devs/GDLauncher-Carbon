@@ -6056,8 +6056,9 @@ mod test {
     /// on-disk shape `scan_instances` reads, without going through
     /// `create_instance` (which needs a resolvable game version) or the DB.
     /// One entry with such a name used to panic
-    /// the scan, so nothing after it loaded, on every start.
-    #[cfg(unix)]
+    /// the scan, so nothing after it loaded, on every start. Linux only: macOS
+    /// refuses to create such a name.
+    #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn scan_instances_passes_over_names_that_are_not_text_and_reads_the_rest()
     -> anyhow::Result<()> {

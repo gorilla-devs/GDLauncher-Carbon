@@ -4302,12 +4302,15 @@ fn legacy_tree(root: &Path) -> std::collections::BTreeMap<String, Option<Vec<u8>
         .into_iter()
         .map(|entry| entry.unwrap())
         .map(|entry| {
+            // With `/` on every system, the way the tests spell a path.
             let relative = entry
                 .path()
                 .strip_prefix(root)
                 .unwrap()
-                .to_string_lossy()
-                .into_owned();
+                .components()
+                .map(|part| part.as_os_str().to_string_lossy())
+                .collect::<Vec<_>>()
+                .join("/");
             let bytes = entry
                 .file_type()
                 .is_file()

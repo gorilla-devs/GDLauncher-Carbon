@@ -621,7 +621,8 @@ mod tests {
         assert!(!leaked);
     }
 
-    #[cfg(unix)]
+    // Linux only: macOS refuses to create a name that is not text.
+    #[cfg(target_os = "linux")]
     #[test]
     fn odd_names_and_deep_folders_are_copied() {
         use std::os::unix::ffi::OsStrExt;

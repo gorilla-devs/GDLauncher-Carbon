@@ -5892,6 +5892,10 @@ async fn a_file_the_apply_cannot_change_is_named_with_the_way_on() {
 /// A failure that is not a held or read-only file says what the system
 /// said, again with the file.
 #[tokio::test]
+#[cfg_attr(
+    not(target_os = "linux"),
+    ignore = "Windows and macOS answer access denied for a folder where a file should be, the case above"
+)]
 async fn another_failure_of_the_apply_names_the_file_and_what_the_system_said() {
     const PATH: &str = "/mods/old.jar";
     let (_tmp, instance_root, staging_dir) = scaffold();

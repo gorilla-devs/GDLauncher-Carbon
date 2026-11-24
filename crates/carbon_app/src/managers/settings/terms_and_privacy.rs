@@ -226,8 +226,11 @@ mod startup_check_tests {
         let checksum = TermsAndPrivacy::latest_consent_sha_within(&api, PATIENT).await;
 
         assert_eq!(checksum, None);
+        // Windows itself takes about two seconds to report a refused local
+        // connection; a second attempt would add as much again and its wait.
+        let one_attempt = Duration::from_millis(if cfg!(windows) { 3000 } else { 400 });
         assert!(
-            started.elapsed() < Duration::from_millis(400),
+            started.elapsed() < one_attempt,
             "took {:?}: the first retry alone waits 500ms",
             started.elapsed()
         );

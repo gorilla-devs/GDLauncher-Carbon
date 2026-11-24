@@ -729,7 +729,9 @@ mod tests {
         assert_eq!(title(&saves.join(&folder)), Some(longest));
     }
 
-    #[cfg(unix)]
+    // Linux only: macOS does not rename a folder it cannot write to, so the
+    // rename stops a step earlier there, with nothing changed either.
+    #[cfg(target_os = "linux")]
     #[tokio::test]
     async fn a_name_that_cannot_be_written_puts_the_folder_back() {
         use std::os::unix::fs::PermissionsExt;
