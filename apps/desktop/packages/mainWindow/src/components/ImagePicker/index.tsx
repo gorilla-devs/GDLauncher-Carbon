@@ -14,6 +14,8 @@ interface ImagePickerProps {
   fileExtensions?: string[]
   placeholderIcon?: string
   class?: string
+  /** Theme hooks for the picker's box. */
+  hooks?: string
 }
 
 const ImagePicker = (props: ImagePickerProps) => {
@@ -64,6 +66,7 @@ const ImagePicker = (props: ImagePickerProps) => {
     <div class="relative">
       {/* Main picker area */}
       <div
+        data-gdl={props.hooks}
         class={`bg-darkSlate-800 group relative flex cursor-pointer items-center justify-center rounded-xl bg-cover bg-center transition-all hover:ring-2 hover:ring-darkSlate-500 ${merged.sizeClass} ${props.class || ""}`}
         style={{
           "background-image": props.imageUrl()

@@ -90,6 +90,7 @@ export const GLOBALLY_PRESENTED = {
   ACCOUNT_BANNED: () => true,
   SERVER_RECOVERED_PROCESS: () => true,
   INSUFFICIENT_MEMORY: (cause: RspcErrorCause) => !!cause.data,
+  JAVA_MISMATCH: (cause: RspcErrorCause) => !!cause.data,
   ACCOUNT_SIGN_IN_EXPIRED: (cause: RspcErrorCause) => !!cause.data,
   EULA_NOT_ACCEPTED: (cause: RspcErrorCause) => !!cause.data
 }

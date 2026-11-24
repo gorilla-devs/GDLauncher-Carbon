@@ -2,6 +2,7 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { Match, Switch } from "solid-js"
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import { ModalProps, useModal } from ".."
 import { rspc } from "@/utils/rspcClient"
 
@@ -84,14 +85,11 @@ function RecoveredServerProcess(props: ModalProps) {
             </Match>
           </Switch>
         </p>
-        <div class="flex w-full justify-between pt-2">
-          <Button
+        <DialogFooter class="pt-2">
+          <CancelLink
             onClick={() => modalsContext?.closeModal()}
             disabled={pending()}
-          >
-            <div class="i-hugeicons:cancel-01" />
-            {t("instances:_trn_instance_confirm_deletion.cancel")}
-          </Button>
+          />
           <Button
             variant="red"
             loading={pending()}
@@ -110,7 +108,7 @@ function RecoveredServerProcess(props: ModalProps) {
               </Match>
             </Switch>
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

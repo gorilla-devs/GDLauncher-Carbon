@@ -65,6 +65,27 @@ function watchPreload(mainWindow) {
       }
     ],
     build: {
+      // Every watch rebuild re-empties the out dir, which would delete the
+      // separately built adview.cjs.
+      emptyOutDir: false,
+      watch: true
+    }
+  })
+}
+
+function watchAdviewPreload(mainWindow) {
+  return build({
+    configFile: "packages/preload/vite.adview.config.mjs",
+    mode: "development",
+    plugins: [
+      {
+        name: "electron-adview-preload-watcher",
+        writeBundle() {
+          mainWindow.ws.send({ type: "full-reload" })
+        }
+      }
+    ],
+    build: {
       watch: true
     }
   })
@@ -76,4 +97,5 @@ const mainWindow = await createServer({
 
 await mainWindow.listen()
 await watchPreload(mainWindow)
+await watchAdviewPreload(mainWindow)
 await watchMain(mainWindow)

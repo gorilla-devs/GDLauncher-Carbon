@@ -24,8 +24,12 @@ pub enum Translation {
     InstanceTaskLaunchExtractModpackFiles,
     InstanceTaskLaunchRequestAddonMetadata,
     InstanceTaskLaunchApplyStagedPatches,
-    InstanceTaskLaunchDownloadJava,
-    InstanceTaskLaunchExtractJava,
+    InstanceTaskLaunchDownloadJava {
+        major: u8,
+    },
+    InstanceTaskLaunchExtractJava {
+        major: u8,
+    },
     InstanceTaskRequestModloaderInfo,
     InstanceTaskRequestMinecraftFiles,
     InstanceTaskLaunchCheckingFiles,

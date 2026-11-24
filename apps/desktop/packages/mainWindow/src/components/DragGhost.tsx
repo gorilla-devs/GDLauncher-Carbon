@@ -286,6 +286,7 @@ const InstanceGhost = (props: InstanceGhostProps) => {
       {/* Count badge */}
       <Show when={count() > 1}>
         <div
+          data-gdl="badge badge.default"
           class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md"
           style={{ "z-index": MAX_SCATTER_TILES + 1 }}
         >
@@ -379,6 +380,7 @@ const ServerGhost = (props: ServerGhostProps) => {
       {/* Count badge */}
       <Show when={count() > 1}>
         <div
+          data-gdl="badge badge.default"
           class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md"
           style={{ "z-index": MAX_SCATTER_TILES + 1 }}
         >
@@ -474,7 +476,10 @@ const GroupGhost = (props: GroupGhostProps) => {
 
       {/* Count badge */}
       <Show when={count() > 1}>
-        <div class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md">
+        <div
+          data-gdl="badge badge.default"
+          class="absolute -top-2 -right-2 min-w-6 h-6 px-1.5 rounded-full bg-primary-500 text-white text-sm font-bold flex items-center justify-center shadow-md"
+        >
           {count()}
         </div>
       </Show>

@@ -15,6 +15,7 @@ vi.mock("@gd/ui", () => ({
   )
 }))
 vi.mock("@gd/i18n", () => ({
+  Trans: (p: any) => <span>{p.key}</span>,
   useTransContext: () => [(key: string) => key]
 }))
 vi.mock("@/utils/rspcClient", () => ({

@@ -1,5 +1,6 @@
 import { screen, Display } from "electron"
 import os from "os"
+import { NAVBAR_HEIGHT } from "./adView/geometry"
 
 // Ad Configuration
 const USE_HIGH_IMPACT_AD = true
@@ -17,7 +18,6 @@ const TITLEBAR_HEIGHT = {
   win32: 32, // Windows
   linux: 30 // Linux (TODO: varies by DE. Best approach: ??)
 }
-const NAVBAR_HEIGHT = 60
 
 // Gap and text height configurations for different tiers
 const GAP_LARGE = 16

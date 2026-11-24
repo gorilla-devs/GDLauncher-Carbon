@@ -1,5 +1,6 @@
 import { useModal } from ".."
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import { Button, Input, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
@@ -623,10 +624,8 @@ const EditGDLProfile = () => {
         </div>
 
         {/* Buttons */}
-        <div class="flex justify-between border-t border-darkSlate-600 pt-4">
-          <Button onClick={() => modalsContext?.closeModal()} type="secondary">
-            <Trans key="accounts:_trn_cancel" />
-          </Button>
+        <DialogFooter class="border-t border-darkSlate-600 pt-4">
+          <CancelLink onClick={() => modalsContext?.closeModal()} />
           <Button
             type="primary"
             disabled={!canSave()}
@@ -635,7 +634,7 @@ const EditGDLProfile = () => {
           >
             <Trans key="accounts:_trn_save_changes" />
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

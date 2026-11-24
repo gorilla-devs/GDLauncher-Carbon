@@ -1,8 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest"
-import { createSignal } from "solid-js"
 import { createStore } from "solid-js/store"
 import { render } from "solid-js/web"
-import JavaPathAutoComplete from "./JavaPathAutoComplete"
 import AuthorAvatars from "./AuthorAvatars"
 import { SpotlightOverlay } from "./Onboarding/SpotlightOverlay"
 import {
@@ -13,12 +11,9 @@ import {
 } from "./Onboarding/OnboardingContext"
 
 const c = vi.hoisted(() => ({
-  java: undefined as any,
-  pending: false,
   marks: [] as string[],
   firstLaunch: false,
   seen: [] as string[],
-  register: vi.fn(),
   onboarding: undefined as any
 }))
 vi.mock("@/utils/rspcClient", () => ({
@@ -27,22 +22,12 @@ vi.mock("@/utils/rspcClient", () => ({
       const key = options().queryKey[0]
       return {
         get data() {
-          return key === "java.getAvailableJavas"
-            ? c.java
-            : key === "settings.isFirstLaunch"
-              ? c.firstLaunch
-              : c.seen
+          return key === "settings.isFirstLaunch" ? c.firstLaunch : c.seen
         }
       }
     },
-    createMutation: (options: any) => ({
-      get isPending() {
-        return c.pending
-      },
-      mutate: (input: any) =>
-        options().mutationKey[0] === "settings.markOnboardingTipSeen"
-          ? c.marks.push(input)
-          : c.register(input)
+    createMutation: () => ({
+      mutate: (input: any) => c.marks.push(input)
     })
   }
 }))
@@ -64,20 +49,9 @@ const disposals: (() => void)[] = []
 afterEach(() => {
   disposals.splice(0).forEach((d) => d())
   document.body.textContent = ""
-  Object.defineProperty(c, "java", {
-    configurable: true,
-    writable: true,
-    value: {}
-  })
-  Object.defineProperty(c, "pending", {
-    configurable: true,
-    writable: true,
-    value: false
-  })
   c.marks = []
   c.seen = []
   c.firstLaunch = false
-  c.register.mockReset()
   unregisterTip("search-input-syntax")
 })
 const flush = async () => {
@@ -90,166 +64,6 @@ function mount(component: () => any) {
   disposals.push(dispose)
   return { root, dispose }
 }
-function inputValue(input: HTMLInputElement, value: string) {
-  input.value = value
-  input.dispatchEvent(new Event("input", { bubbles: true }))
-}
-it.each([true, false])(
-  "D5 mount default first clear stays empty with blur-only=%s",
-  async (blurOnly) => {
-    const update = vi.fn(),
-      selection = vi.fn()
-    const { root } = mount(() => (
-      <JavaPathAutoComplete
-        defaultValue="synthetic/old/java"
-        updateValueOnlyOnBlur={blurOnly}
-        updateValue={update}
-        onSelection={selection}
-      />
-    ))
-    const input = root.querySelector("input")!
-    update.mockClear()
-    inputValue(input, "")
-    await flush()
-    expect(input.value).toBe("")
-    if (blurOnly) expect(update).not.toHaveBeenCalled()
-    input.dispatchEvent(new FocusEvent("blur"))
-    expect(update).toHaveBeenLastCalledWith(null, "")
-    expect(selection).toHaveBeenLastCalledWith({
-      id: null,
-      path: "",
-      pending: false
-    })
-    inputValue(input, "synthetic/new/java")
-    expect(input.value).toBe("synthetic/new/java")
-    inputValue(input, "")
-    expect(input.value).toBe("")
-  }
-)
-it("D5 pristine delayed default hydrates once and first clear remains empty", async () => {
-  const [value, setValue] = createSignal<string>()
-  const { root } = mount(() => <JavaPathAutoComplete defaultValue={value()} />)
-  const input = root.querySelector("input")!
-  input.dispatchEvent(new FocusEvent("focus"))
-  setValue("synthetic/delayed/java")
-  await flush()
-  expect(input.value).toBe("synthetic/delayed/java")
-  inputValue(input, "")
-  setValue("synthetic/second/java")
-  await flush()
-  expect(input.value).toBe("")
-})
-it.each(["", "synthetic/edited/java"])(
-  "D5 deliberate input %j revokes delayed hydration",
-  async (edit) => {
-    const [value, setValue] = createSignal<string>()
-    const { root } = mount(() => (
-      <JavaPathAutoComplete defaultValue={value()} />
-    ))
-    const input = root.querySelector("input")!
-    inputValue(input, edit)
-    setValue("synthetic/late/java")
-    await flush()
-    expect(input.value).toBe(edit)
-  }
-)
-it("exact validity and pending selection contract survives real Java option selection", async () => {
-  const [javas, setJavas] = createSignal<any>({
-    synthetic: [
-      {
-        id: "valid",
-        path: "synthetic/valid/java",
-        type: "custom",
-        version: "21",
-        isValid: true
-      },
-      {
-        id: "invalid",
-        path: "synthetic/invalid/java",
-        type: "custom",
-        version: "17",
-        isValid: false
-      }
-    ]
-  })
-  const [pending, setPending] = createSignal(false)
-  Object.defineProperty(c, "java", {
-    configurable: true,
-    get: javas,
-    set: () => {}
-  })
-  Object.defineProperty(c, "pending", {
-    configurable: true,
-    get: pending,
-    set: () => {}
-  })
-  const selection = vi.fn(),
-    update = vi.fn()
-  const { root } = mount(() => (
-    <JavaPathAutoComplete
-      updateValueOnlyOnBlur
-      onSelection={selection}
-      updateValue={update}
-    />
-  ))
-  const input = root.querySelector("input")!
-  input.dispatchEvent(new FocusEvent("focus"))
-  await flush()
-  const option = [...document.querySelectorAll("li")].find((el) =>
-    el.textContent?.includes("synthetic/valid/java")
-  )!
-  option.click()
-  await flush()
-  expect(input.value).toBe("synthetic/valid/java")
-  expect(selection).toHaveBeenLastCalledWith({
-    id: "valid",
-    path: "synthetic/valid/java",
-    pending: false
-  })
-  expect(update).not.toHaveBeenCalled()
-  input.dispatchEvent(new FocusEvent("blur"))
-  expect(update).toHaveBeenLastCalledWith("valid", "synthetic/valid/java")
-  setPending(true)
-  expect(selection).toHaveBeenLastCalledWith({
-    id: null,
-    path: "synthetic/valid/java",
-    pending: true
-  })
-  setPending(false)
-  inputValue(input, "synthetic/invalid/java")
-  expect(selection).toHaveBeenLastCalledWith({
-    id: null,
-    path: "synthetic/invalid/java",
-    pending: false
-  })
-  inputValue(input, "synthetic/new/java")
-  setJavas({
-    synthetic: [
-      {
-        id: "late",
-        path: "synthetic/valid/java",
-        isValid: true,
-        type: "custom",
-        version: "21"
-      }
-    ]
-  })
-  expect(selection).toHaveBeenLastCalledWith({
-    id: null,
-    path: "synthetic/new/java",
-    pending: false
-  })
-  Object.defineProperty(c, "java", {
-    configurable: true,
-    writable: true,
-    value: {}
-  })
-  Object.defineProperty(c, "pending", {
-    configurable: true,
-    writable: true,
-    value: false
-  })
-})
 function spotlight() {
   registerTip("search-input-syntax", {
     id: "search-input-syntax",

@@ -531,7 +531,7 @@ it("normal cleanup and re-enable preserve frozen displayed selections", () => {
     .click()
   root
     .querySelector<HTMLElement>('[data-testid="repair-reenable-checkbox"]')!
-    .closest("label")!
+    .closest('[data-gdl~="checkbox"]')!
     .querySelector<HTMLInputElement>("input")!
     .click()
   confirm(root).click()
@@ -682,7 +682,7 @@ it("a withheld preview is never fetched, and Confirm sends no file selections", 
     .click()
   root
     .querySelector<HTMLElement>('[data-testid="repair-reenable-checkbox"]')!
-    .closest("label")!
+    .closest('[data-gdl~="checkbox"]')!
     .querySelector<HTMLInputElement>("input")!
     .click()
   // The setup turns out to have stopped while changing the pack's files.

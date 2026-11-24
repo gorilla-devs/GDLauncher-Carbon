@@ -254,16 +254,25 @@ pub struct LogEntry {
     pub level: LogEntryLevel,
     /// The entry message itself.
     pub message: String,
+    /// An exception kept apart from the message, for the Java issue check,
+    /// which reads why a game crashed. An entry read from the game's log has
+    /// none: its exception is already under its `message`, where the log
+    /// view shows it and the check reads it.
+    #[serde(skip)]
+    pub throwable: Option<String>,
 }
 
 impl From<(LogEntrySourceKind, carbon_parsing::log::LogEntry)> for LogEntry {
     fn from((source_kind, entry): (LogEntrySourceKind, carbon_parsing::log::LogEntry)) -> Self {
+        // The exception goes under its message, the way the game's own log
+        // file prints the two.
+        let message = entry.message_with_throwable();
         let carbon_parsing::log::LogEntry {
             logger,
             level,
             timestamp,
             thread_name,
-            message,
+            ..
         } = entry;
 
         Self {
@@ -272,7 +281,8 @@ impl From<(LogEntrySourceKind, carbon_parsing::log::LogEntry)> for LogEntry {
             timestamp,
             thread: thread_name.to_owned(),
             level: level.into(),
-            message: message.to_owned(),
+            message,
+            throwable: None,
         }
     }
 }
@@ -287,6 +297,7 @@ impl LogEntry {
             thread: "N/A".into(),
             level: LogEntryLevel::Info,
             message: msg.to_string(),
+            throwable: None,
         }
     }
 
@@ -298,6 +309,7 @@ impl LogEntry {
             thread: "N/A".into(),
             level: LogEntryLevel::Info,
             message: msg.to_string(),
+            throwable: None,
         }
     }
 
@@ -375,7 +387,7 @@ impl GameLog {
             return true;
         }
 
-        self.message_bytes += entry.message.len();
+        self.message_bytes += entry.message.len() + entry.throwable.as_ref().map_or(0, String::len);
         self.entries.push(entry);
         true
     }

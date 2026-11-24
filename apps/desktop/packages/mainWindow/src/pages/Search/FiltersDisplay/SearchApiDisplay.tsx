@@ -1,9 +1,8 @@
 import useSearchContext from "@/components/SearchInputContext"
 import { Show } from "solid-js"
 import { FilterBadge } from "./FilterBadge"
-import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { capitalize } from "@/utils/helpers"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 export default function SearchApiDisplay() {
   const searchContext = useSearchContext()
@@ -19,11 +18,11 @@ export default function SearchApiDisplay() {
         }}
       >
         <div class="flex items-center gap-2">
-          <img
-            src={
+          <PlatformLogo
+            platform={
               searchContext?.searchQuery().searchApi === "curseforge"
-                ? CurseforgeLogo
-                : ModrinthLogo
+                ? "curseforge"
+                : "modrinth"
             }
             class="h-4 w-4"
           />

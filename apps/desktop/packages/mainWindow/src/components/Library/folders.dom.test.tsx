@@ -1033,7 +1033,7 @@ test("R1 a partial pinned operation still permits cancellation without completin
   await vi.waitFor(() =>
     expect(root.querySelector('[role="alert"]')).not.toBeNull()
   )
-  const cancel = button("_trn_instance_confirm_deletion.cancel")
+  const cancel = button("general:_trn_cancel")
   expect(cancel.disabled).toBe(false)
   cancel.click()
   expect(control.close).toHaveBeenCalledTimes(1)

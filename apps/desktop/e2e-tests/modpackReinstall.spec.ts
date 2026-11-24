@@ -260,7 +260,11 @@ test.describe("modpack reinstall", () => {
         ).toContain(editKey)
       },
       async (alreadyFailed) => {
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+        await attachCoreLogOnFailure(
+          testInfo,
+          harness.runtimePath,
+          alreadyFailed
+        )
         if (name) {
           try {
             await page
@@ -468,7 +472,11 @@ test.describe("modpack reinstall", () => {
               "cleanup: stopping the game also failed:"
             )
           }
-          await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+          await attachCoreLogOnFailure(
+            testInfo,
+            harness.runtimePath,
+            alreadyFailed
+          )
           await current.app.close()
         }
         // Best-effort: also sweeps any leftover game process via

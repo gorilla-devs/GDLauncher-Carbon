@@ -5,6 +5,16 @@ import { render } from "solid-js/web"
 vi.mock("@/components/AdBanner", () => ({ AdsBanner: () => <div /> }))
 vi.mock("@/components/TopBannerAd", () => ({ TopBannerAd: () => <div /> }))
 vi.mock("@/components/Navbar", () => ({ default: () => <nav /> }))
+vi.mock("@/components/NavRail", () => ({ default: () => <nav /> }))
+vi.mock("@/components/EnhancedSearchBar", () => ({
+  EnhancedSearchBar: () => <div />
+}))
+vi.mock("@solidjs/router", () => ({
+  useLocation: () => ({ pathname: "/library" })
+}))
+vi.mock("@/managers/NavigationManager", () => ({ PAGE_ID: "page" }))
+vi.mock("@/themes/DecorationSlot", () => ({ DecorationSlot: () => null }))
+vi.mock("@/themes/effects/EffectsLayer", () => ({ EffectsLayer: () => null }))
 vi.mock("@/components/ThemedPatternSVG", () => ({ default: () => <svg /> }))
 vi.mock("@/managers/ModalsManager", () => ({ useModal: () => undefined }))
 vi.mock("@/components/SearchInputContext", () => ({
@@ -15,7 +25,10 @@ vi.mock("@/utils/rspcClient", () => ({
   rspc: { createQuery: () => ({ data: undefined }) }
 }))
 vi.mock("@/utils/formatBytes", () => ({ formatBytes: () => "" }))
-vi.mock("@gd/i18n", () => ({ Trans: (props: any) => <span>{props.key}</span> }))
+vi.mock("@gd/i18n", () => ({
+  Trans: (props: any) => <span>{props.key}</span>,
+  useTransContext: () => [(key: string) => key]
+}))
 vi.mock("@gd/ui", () => ({
   Button: (props: any) => <button>{props.children}</button>
 }))
@@ -24,7 +37,9 @@ vi.mock("@gd/ui", () => ({
 Object.assign(window, {
   getAdSize: () =>
     Promise.resolve({ adSize: { width: 400, height: 600, shouldShow: true } }),
-  adSizeChanged: () => {}
+  adSizeChanged: () => {},
+  // The ad itself is main's own view; the page only labels it.
+  adView: { setLabels: () => {}, onOpenWhyAds: () => () => {} }
 })
 
 const { default: withAdsLayout } = await import("./withAds")
@@ -58,6 +73,9 @@ it("puts the ad column beside the navbar on a short display without rebuilding t
   )
   const find = (testId: string) =>
     root.querySelector<HTMLElement>(`[data-testid="${testId}"]`)!
+  // The part of the row the page lives in, left of the ad column.
+  const contentColumn = () =>
+    find("page").closest('[data-gdl="content"]')!.parentElement
   try {
     const page = find("page")
     const column = find("ads-column")
@@ -65,7 +83,7 @@ it("puts the ad column beside the navbar on a short display without rebuilding t
     expect(column.classList.contains("fixed")).toBe(false)
     expect(column.classList.contains("h-full")).toBe(true)
     expect(find("ads-layout-top").style.width).toBe("")
-    expect(column.previousElementSibling).toBe(page.parentElement)
+    expect(column.previousElementSibling).toBe(contentColumn())
 
     _setAdSize({
       width: 160,
@@ -81,7 +99,7 @@ it("puts the ad column beside the navbar on a short display without rebuilding t
     expect(find("ads-layout-top").style.width).toBe("calc(100vw - 160px)")
     // Its place in the row is kept, so the page keeps its width.
     const spacer = column.previousElementSibling as HTMLElement
-    expect(spacer).not.toBe(page.parentElement)
+    expect(spacer).not.toBe(contentColumn())
     expect(spacer.style.width).toBe("160px")
     // Moving to another display must not reload the page or the ad.
     expect(find("page")).toBe(page)
@@ -95,7 +113,7 @@ it("puts the ad column beside the navbar on a short display without rebuilding t
     })
     expect(column.classList.contains("fixed")).toBe(false)
     expect(find("ads-layout-top").style.width).toBe("")
-    expect(column.previousElementSibling).toBe(page.parentElement)
+    expect(column.previousElementSibling).toBe(contentColumn())
     expect(find("page")).toBe(page)
   } finally {
     dispose()

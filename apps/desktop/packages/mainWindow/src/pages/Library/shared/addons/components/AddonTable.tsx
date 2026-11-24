@@ -17,6 +17,7 @@ import {
 } from "@tanstack/solid-table"
 import { ContextMenu, ContextMenuTrigger, ContextMenuContent } from "@gd/ui"
 import { AddonTableItem, AddonTableProps } from "../types"
+import { withStates } from "@gd/ui"
 
 interface VirtualizationConfig {
   /** Fixed row height or function to get height for each row index */
@@ -496,6 +497,18 @@ export function AddonTable<T extends AddonTableItem>(
       .map((row) => row.original)
   }
 
+  // A row the context menu or a drag-select is about to act on (`targeted`),
+  // which a drag can also be about to deselect; `selected` is the selection.
+  const isRowTargeted = (rowId: string) =>
+    (contextMenuSelection().has(rowId) && isContextMenuOpen()) ||
+    previewSelection().has(rowId)
+
+  // A drag that is about to deselect the row (the app shows it in red).
+  const isRowDeselecting = (rowId: string) =>
+    !(contextMenuSelection().has(rowId) && isContextMenuOpen()) &&
+    previewSelection().has(rowId) &&
+    dragMode() !== "select"
+
   const getRowClasses = (rowId: string) => {
     const baseClasses =
       "border-darkSlate-600 flex w-full border-t group/row cursor-pointer"
@@ -668,9 +681,13 @@ export function AddonTable<T extends AddonTableItem>(
 
   return (
     <ContextMenu onOpenChange={handleContextMenuOpenChange}>
-      <ContextMenuTrigger class="border-darkSlate-600 rounded-lg border">
+      <ContextMenuTrigger
+        data-gdl="addons.table"
+        class="border-darkSlate-600 rounded-lg border"
+      >
         <div
           ref={headerRef}
+          data-gdl="addons.table.header"
           class="bg-darkSlate-700 sticky z-10 rounded-t-lg"
           style={{ top: `${props.headerTopOffset ?? 170}px` }}
         >
@@ -680,6 +697,7 @@ export function AddonTable<T extends AddonTableItem>(
                 <For each={headerGroup.headers}>
                   {(header) => (
                     <div
+                      data-gdl="addons.table.header.cell"
                       class="text-lightSlate-300 min-w-0 px-4 py-3 text-left text-sm font-medium"
                       classList={{
                         "flex-1": !header.getSize() || header.getSize() === 150,
@@ -774,6 +792,12 @@ export function AddonTable<T extends AddonTableItem>(
                     }
                   }}
                   class={getRowClasses(row.id)}
+                  data-gdl={withStates("addons.row", {
+                    selected: !!props.rowSelection()[row.id],
+                    targeted: isRowTargeted(row.id),
+                    deselecting: isRowDeselecting(row.id),
+                    disabled: !row.original.enabled
+                  })}
                   style={{
                     height: enableDynamicHeight ? "auto" : `${rowHeight()}px`,
                     "min-height": enableDynamicHeight
@@ -800,6 +824,7 @@ export function AddonTable<T extends AddonTableItem>(
                   <For each={row.getVisibleCells()}>
                     {(cell) => (
                       <div
+                        data-gdl="addons.cell"
                         class="flex min-w-0 items-center px-4 py-3 text-sm"
                         classList={{
                           "flex-1":

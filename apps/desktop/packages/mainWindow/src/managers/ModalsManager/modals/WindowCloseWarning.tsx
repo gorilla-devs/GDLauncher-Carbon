@@ -1,6 +1,8 @@
 import { Show, onCleanup, onMount } from "solid-js"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
+import { DialogFooter } from "../DialogFooter"
+import { TextLink } from "@/components/TextLink"
 import { Trans, useTransContext } from "@gd/i18n"
 import { Button, Checkbox } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
@@ -83,7 +85,9 @@ const WindowCloseWarning = (props: ModalProps) => {
       <Show
         when={stopsWork()}
         fallback={
-          <div class="text-lightSlate-300 flex h-full flex-col justify-between overflow-y-auto">
+          // 4 px of padding inside the scroller, taken back by the margin, so
+          // focus outlines at its edges (the checkbox, the button) show.
+          <div class="text-lightSlate-300 -m-1 box-content flex h-full flex-col justify-between overflow-y-auto p-1">
             <div class="flex flex-col gap-8">
               <div class="text-center text-xl font-bold text-yellow-400">
                 <Trans key="window:_trn_window_close_title" />
@@ -119,8 +123,7 @@ const WindowCloseWarning = (props: ModalProps) => {
             <div class="flex items-center justify-between">
               {neverShowAgain()}
               <Button
-                type="secondary"
-                class="w-full"
+                type="primary"
                 data-testid="window-close-warning-quit"
                 onClick={() => {
                   window.closeWindow()
@@ -157,19 +160,18 @@ const WindowCloseWarning = (props: ModalProps) => {
 
           <div class="flex flex-wrap items-center justify-between gap-4">
             {neverShowAgain()}
-            <div class="flex gap-2">
-              <Button
-                type="secondary"
+            <DialogFooter>
+              <TextLink
                 data-testid="window-close-warning-cancel"
                 onClick={() => modalsManager?.closeModal()}
               >
                 <Trans key="general:_trn_cancel" />
-              </Button>
+              </TextLink>
               <Show
                 when={action() === "quit"}
                 fallback={
                   <Button
-                    type="secondary"
+                    type="primary"
                     data-testid="window-close-warning-confirm"
                     onClick={() => {
                       answer(true)
@@ -186,7 +188,7 @@ const WindowCloseWarning = (props: ModalProps) => {
                 }
               >
                 <Button
-                  type="secondary"
+                  type="primary"
                   data-testid="window-close-warning-quit"
                   onClick={() => {
                     window.closeWindow()
@@ -195,7 +197,7 @@ const WindowCloseWarning = (props: ModalProps) => {
                   <Trans key="window:_trn_window_close_quit_app" />
                 </Button>
               </Show>
-            </div>
+            </DialogFooter>
           </div>
         </div>
       </Show>

@@ -1,4 +1,9 @@
 use crate::domain::vtask::VisualTaskId;
+use crate::managers::instance::run::java_issue::JavaIssue;
+use crate::managers::java::{
+    instance_java::{MismatchFix, ResolvedJava},
+    resolve::JavaRequirement,
+};
 use carbon_platforms::ModSources;
 use chrono::{DateTime, Local, Utc};
 use std::collections::HashMap;
@@ -50,13 +55,36 @@ pub struct InstanceDetails {
     pub wrapper_command: Option<String>,
     pub seconds_played: u32,
     pub modloaders: Vec<info::ModLoader>,
+    /// The Java override as a launch applies it: none for a GDLauncher Java
+    /// that is gone, which runs on Automatic.
     pub java_override: Option<info::JavaOverride>,
+    /// The system profile the Minecraft version asks for. A `Profile`
+    /// override naming it means Automatic.
     pub required_java_profile: Option<String>,
-    /// True when a user-set Java override resolves to a major version that does
-    /// not satisfy `required_java_profile`, so the UI can warn before launch.
-    /// Only reported when the override's Java can be identified from already
-    /// scanned Javas (no probing at details-fetch time).
+    /// The Java Automatic gives the Minecraft version; `None` without version
+    /// data.
+    pub required_java: Option<JavaRequirement>,
+    /// Every Java the Minecraft version runs on; empty without version data.
+    pub accepted_java: Vec<JavaRequirement>,
+    /// Set when a wrong-Java crash raised what the instance needs: every
+    /// Java of this major or later fits it.
+    pub java_floor: Option<u8>,
+    /// The Java a launch uses, resolved as a launch does it.
+    pub resolved_java: Option<ResolvedJava>,
+    /// What Automatic would give the instance, whatever its override says.
+    pub automatic_java: Option<ResolvedJava>,
+    /// The Java Automatic would download for the instance, while no valid
+    /// Java that fits it is installed.
+    pub download_java: Option<JavaRequirement>,
+    /// The Java override names a Java none of `accepted_java` takes, so the
+    /// UI can warn before launch. A path no listed Java has is never
+    /// reported: telling would mean running it.
     pub java_override_mismatch: bool,
+    /// With `java_override_mismatch`, how the fix before a launch moves the
+    /// instance onto a Java that fits.
+    pub java_mismatch_fix: Option<MismatchFix>,
+    /// The last game crashed on a Java older than a mod needs.
+    pub java_issue: Option<JavaIssue>,
     pub state: LaunchState,
     pub notes: String,
     pub icon_revision: Option<u32>,
@@ -80,6 +108,8 @@ pub struct InstanceSettingsUpdate {
     pub version: Option<String>,
     pub modloader: Option<Option<info::ModLoader>>,
     pub java_override: Option<Option<info::JavaOverride>>,
+    /// See [`info::GameConfig::java_floor`].
+    pub java_floor: Option<Option<u8>>,
     pub global_java_args: Option<bool>,
     pub extra_java_args: Option<Option<String>>,
     pub memory: Option<Option<(u16, u16)>>,

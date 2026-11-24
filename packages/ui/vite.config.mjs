@@ -16,7 +16,10 @@ export default defineConfig({
       tsconfigPath: resolve(__dirname, "tsconfig.build.json"),
       exclude: ["showcase/**/*"]
     }),
-    solidPlugin({ hot: false }),
+    // No hot reload under vitest: it imports the `/@solid-refresh` runtime,
+    // which Windows resolves to `file:///@solid-refresh` and every component
+    // test file then fails to load.
+    solidPlugin({ hot: !process.env.VITEST }),
     Unocss(unocssConfig)
   ],
   test: {
@@ -31,7 +34,7 @@ export default defineConfig({
     // load on its own; the showcase route tests import it.
     server: {
       deps: {
-        inline: [/solid-js/, /@tanstack\/solid-router/]
+        inline: [/solid-js/, /@tanstack\/solid-router/, /somoto/]
       }
     }
   },

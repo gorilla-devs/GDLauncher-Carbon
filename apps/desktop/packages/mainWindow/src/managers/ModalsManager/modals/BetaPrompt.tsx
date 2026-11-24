@@ -3,6 +3,8 @@ import ModalLayout from "../ModalLayout"
 import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { rspc } from "@/utils/rspcClient"
+import { DialogFooter } from "../DialogFooter"
+import { TextLink } from "@/components/TextLink"
 import { HeroIcon } from "@/components/HeroIcon"
 
 const BetaPrompt = (props: ModalProps) => {
@@ -41,7 +43,7 @@ const BetaPrompt = (props: ModalProps) => {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props.title}>
-      <div class="w-120 flex flex-col gap-8 overflow-hidden">
+      <div class="w-120 flex flex-col gap-8">
         {/* Content */}
         <div class="flex flex-col items-center gap-6">
           {/* Hero Icon */}
@@ -60,30 +62,20 @@ const BetaPrompt = (props: ModalProps) => {
           </div>
         </div>
 
-        {/* Primary Action - Centered */}
-        <div class="flex justify-center">
+        <DialogFooter>
+          <TextLink data-testid="beta-prompt-never" onClick={handleNeverAsk}>
+            <Trans key="modals:_trn_beta_prompt_never" />
+          </TextLink>
+          <TextLink onClick={handleMaybeLater}>
+            <Trans key="modals:_trn_beta_prompt_later" />
+          </TextLink>
           <Button type="primary" onClick={handleSwitchToBeta} size="large">
             <div class="flex items-center gap-2">
               <i class="i-hugeicons:rocket-01 h-4 w-4" />
               <Trans key="modals:_trn_beta_prompt_switch" />
             </div>
           </Button>
-        </div>
-
-        {/* Bottom Buttons */}
-        <div class="flex w-full justify-between">
-          <Button type="secondary" size="large" onClick={handleMaybeLater}>
-            <Trans key="modals:_trn_beta_prompt_later" />
-          </Button>
-          <Button
-            data-testid="beta-prompt-never"
-            type="secondary"
-            size="large"
-            onClick={handleNeverAsk}
-          >
-            <Trans key="modals:_trn_beta_prompt_never" />
-          </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

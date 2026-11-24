@@ -832,6 +832,7 @@ pub async fn apply_imported_settings(
             .java_path
             .clone()
             .map(|path| Some(JavaOverride::Path(Some(path)))),
+        java_floor: None,
         global_java_args: None,
         extra_java_args: settings.extra_java_args.clone().map(Some),
         memory: settings.memory().map(Some),
@@ -1463,6 +1464,7 @@ pub(super) fn persisted_config(
             java_override: None,
             memory: settings.memory(),
             game_resolution: None,
+            java_floor: None,
         },
         pre_launch_hook: None,
         post_exit_hook: None,

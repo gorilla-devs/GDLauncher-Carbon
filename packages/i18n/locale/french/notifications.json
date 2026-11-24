@@ -17,7 +17,6 @@
   "_trn_cannot_delete_instance": "Impossible de supprimer l'instance",
   "_trn_cannot_delete_server": "Impossible de supprimer le serveur",
   "_trn_eula_accept_failed": "Échec de l'acceptation de l'EULA",
-  "_trn_custom_java_added": "Chemin Java personnalisé ajouté avec succès",
   "_trn_addon_downloading_to_server": "Téléchargement de {{title}} vers le serveur",
   "_trn_addon_installed": "{{title}} a été installé",
   "_trn_datapack_downloaded": "{{title}} a été téléchargé. Ajoutez-le à un monde depuis l’onglet Addons de l’instance.",

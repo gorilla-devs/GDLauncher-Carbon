@@ -8,7 +8,8 @@ import {
   SelectItem,
   SelectValue,
   Badge,
-  PRESS_CLASSES
+  PRESS_CLASSES,
+  withStates
 } from "@gd/ui"
 import { ModalProps, useModal, useModalStackEntry } from "../.."
 import { Trans, useTransContext } from "@gd/i18n"
@@ -516,16 +517,26 @@ const Custom = (
       >
         {/* Instance Details Section */}
         <div class="flex flex-col gap-3">
-          <div class="flex w-full items-center">
-            <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+          <div
+            data-gdl="instance-creation.divider"
+            class="flex w-full items-center"
+          >
+            <div
+              data-gdl="instance-creation.divider.line"
+              class="border-t-1 border-lightSlate-400 flex-1 border-solid"
+            />
             <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
               <div class="i-hugeicons:file-02 text-primary-500 text-sm" />
               <Trans key="general:_trn_about" />
             </span>
-            <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+            <div
+              data-gdl="instance-creation.divider.line"
+              class="border-t-1 border-lightSlate-400 flex-1 border-solid"
+            />
           </div>
           <div class="flex w-full items-start gap-4">
             <ImagePicker
+              hooks="instance-creation.icon"
               imageUrl={bgPreview}
               onSelect={loadPreview}
               isLoading={editsLocked}
@@ -566,13 +577,22 @@ const Custom = (
 
         {/* Minecraft Version Section */}
         <div class="flex flex-col gap-3">
-          <div class="flex w-full items-center">
-            <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+          <div
+            data-gdl="instance-creation.divider"
+            class="flex w-full items-center"
+          >
+            <div
+              data-gdl="instance-creation.divider.line"
+              class="border-t-1 border-lightSlate-400 flex-1 border-solid"
+            />
             <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
               <div class="i-hugeicons:minecraft text-primary-500 text-sm" />
               <Trans key="instances:_trn_instance_mc_version" />
             </span>
-            <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+            <div
+              data-gdl="instance-creation.divider.line"
+              class="border-t-1 border-lightSlate-400 flex-1 border-solid"
+            />
           </div>
           <div class="flex w-full flex-col gap-2">
             <Select
@@ -686,18 +706,30 @@ const Custom = (
 
         {/* Modloader Section */}
         <div class="flex flex-col gap-3">
-          <div class="flex w-full items-center">
-            <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+          <div
+            data-gdl="instance-creation.divider"
+            class="flex w-full items-center"
+          >
+            <div
+              data-gdl="instance-creation.divider.line"
+              class="border-t-1 border-lightSlate-400 flex-1 border-solid"
+            />
             <span class="text-lightSlate-400 flex items-center gap-2 px-3 text-base">
               <div class="i-hugeicons:package text-primary-500 text-sm" />
               <Trans key="content:_trn_modloader" />
             </span>
-            <div class="border-t-1 border-lightSlate-400 flex-1 border-solid" />
+            <div
+              data-gdl="instance-creation.divider.line"
+              class="border-t-1 border-lightSlate-400 flex-1 border-solid"
+            />
           </div>
           <div class="grid grid-cols-5 gap-3">
             <For each={modloaders}>
               {(modloader) => (
                 <button
+                  data-gdl={withStates("instance-creation.loader", {
+                    selected: loader() === modloader.key
+                  })}
                   class={`bg-darkSlate-800 hover:outline-darkSlate-600 hover:bg-darkSlate-700 group flex flex-col items-center gap-2 rounded-lg border-0 border-transparent p-3 outline-none ${PRESS_CLASSES}`}
                   classList={{
                     "!outline-primary-500": loader() === modloader.key
@@ -823,7 +855,10 @@ const Custom = (
       </Show>
 
       {/* Buttons - outside scrollable area */}
-      <div class="flex w-full flex-wrap justify-end gap-2 px-4 pb-4 pt-0">
+      <div
+        data-gdl="modal.footer"
+        class="flex w-full flex-wrap justify-end gap-2 px-4 pb-4 pt-0"
+      >
         <Show when={preparationRecovery()}>
           <Button
             data-testid="instance-creation-retry"

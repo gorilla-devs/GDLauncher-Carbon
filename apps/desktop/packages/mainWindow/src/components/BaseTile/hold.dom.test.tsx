@@ -50,6 +50,7 @@ const mount = (props: {
         isDeleting={false}
         isMultiSelected={false}
         showCheckbox={false}
+        decorationKey="instance:1"
         isDragging={false}
         isDragActive={false}
         canDrag

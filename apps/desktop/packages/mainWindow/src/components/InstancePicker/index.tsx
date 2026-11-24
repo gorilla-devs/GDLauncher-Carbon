@@ -16,7 +16,7 @@ import { getInstanceImageUrl } from "@/utils/instances"
 import DefaultImg from "/assets/images/default-instance-img.png"
 
 /** An instance as a row of the picker. */
-export type PickableInstance = {
+export interface PickableInstance {
   id: number
   name: string
   gameVersion: string

@@ -1,11 +1,13 @@
-import { useTransContext } from "@gd/i18n"
 import { Checkbox } from "@gd/ui"
+import { useTransContext } from "@gd/i18n"
 import { createColumnHelper } from "@tanstack/solid-table"
 
 interface SelectColumnConfig {
   selectedCount: () => number
   totalRows: () => number
   onSelectAll: () => void
+  /** Names a row's checkbox after its addon. */
+  getDisplayName: (row: any) => string
 }
 
 export const createSelectColumn = (config: SelectColumnConfig) => {
@@ -25,15 +27,16 @@ export const createSelectColumn = (config: SelectColumnConfig) => {
 
       return (
         <Checkbox
-          ariaLabel={t("content:_trn_select_all_mods")}
           checked={isAllSelected()}
           indeterminate={isSomeSelected()}
+          aria-label={t("content:_trn_a11y_select_all")}
           onChange={() => config.onSelectAll()}
         />
       )
     },
     cell: (props) => (
       <div
+        // Shown on hover, and while the keyboard is on it.
         class={`ease-spring transition-opacity duration-100 has-[:focus-visible]:opacity-100 ${
           props.row.getIsSelected()
             ? "opacity-100"
@@ -43,14 +46,14 @@ export const createSelectColumn = (config: SelectColumnConfig) => {
         onClick={(e) => e.stopPropagation()}
       >
         <Checkbox
-          ariaLabel={
-            props.row.original.metadata?.name ||
-            props.row.original.filename ||
-            props.row.id
-          }
           checked={props.row.getIsSelected()}
           disabled={!props.row.getCanSelect()}
           indeterminate={props.row.getIsSomeSelected()}
+          aria-label={t("content:_trn_a11y_select_addon", {
+            name: config.getDisplayName(props.row.original),
+            // A name, not HTML: "Xaero's Minimap" stays as it is.
+            interpolation: { escapeValue: false }
+          })}
           onChange={(value) => props.row.toggleSelected(!!value)}
         />
       </div>

@@ -16,8 +16,6 @@
   "_trn_tooltip.rtp_not_a_folder": "This is not a folder: it is a file, or a link to something that no longer exists. Pick a folder.",
   "_trn_tooltip.rtp_not_writable": "GDLauncher can't write to this folder. Pick a folder you own, or allow writing to it.",
   "_trn_tooltip.rtp_has_other_files": "This folder has other files in it. Pick an empty folder, for example a new folder inside it, or a folder that already holds GDLauncher data.",
-  "_trn_path": "Path",
-  "_trn_profile": "Profile",
   "_trn_custom": "Custom",
   "_trn_tile_size": "Tile Size",
   "_trn_sort_options": "Sort Options",

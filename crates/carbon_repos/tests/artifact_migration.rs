@@ -68,7 +68,7 @@ fn populated_legacy_current_and_representable_down_preserve_identities() {
     assert_eq!(identities(&c), before);
     fk(&c);
     assert_eq!(
-        old(27).open(&mut c, &path).unwrap(),
+        old(28).open(&mut c, &path).unwrap(),
         OpenVerdict::Downgraded
     );
     assert_eq!(identities(&c), before);
@@ -135,7 +135,7 @@ fn artifact_collision_down_keeps_one_cache_row_per_version() {
             )
             .unwrap();
         assert_eq!(
-            old(27).open(&mut c, &path).unwrap(),
+            old(28).open(&mut c, &path).unwrap(),
             OpenVerdict::Downgraded,
             "second file hash {second_sha}"
         );
@@ -168,20 +168,20 @@ fn artifact_collision_down_keeps_one_cache_row_per_version() {
         );
         let reference = {
             let mut fresh = Connection::open_in_memory().unwrap();
-            old(27).to_latest(&mut fresh).unwrap();
+            old(28).to_latest(&mut fresh).unwrap();
             dump_schema(&fresh).unwrap()
         };
         assert_eq!(dump_schema(&c).unwrap(), reference);
         assert_eq!(
             c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
                 .unwrap(),
-            27
+            28
         );
         assert_eq!(
             c.query_row("SELECT count(*) FROM _migrations", [], |r| r
                 .get::<_, i32>(0))
                 .unwrap(),
-            27
+            28
         );
         assert_eq!(
             c.query_row(
@@ -243,7 +243,7 @@ fn legacy_fresh_mismatch_is_unusable_but_reversibly_preserved() {
         "02"
     );
     assert_eq!(
-        old(27).open(&mut c, &path).unwrap(),
+        old(28).open(&mut c, &path).unwrap(),
         OpenVerdict::Downgraded
     );
     fk(&c);
@@ -253,7 +253,7 @@ fn interrupted_artifact_step_rolls_back_and_reopens() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("db");
     let mut c = Connection::open(&path).unwrap();
-    old(27).to_latest(&mut c).unwrap();
+    old(28).to_latest(&mut c).unwrap();
     c.execute_batch(
         "CREATE INDEX ServerModFileCache_metadataId_idx ON ServerModFileCache(serverId)",
     )
@@ -269,13 +269,13 @@ fn interrupted_artifact_step_rolls_back_and_reopens() {
     assert_eq!(
         c.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
             .unwrap(),
-        27
+        28
     );
     assert_eq!(
         c.query_row("SELECT count(*) FROM _migrations", [], |r| r
             .get::<_, i32>(0))
             .unwrap(),
-        27
+        28
     );
     c.execute_batch("DROP INDEX ServerModFileCache_metadataId_idx")
         .unwrap();

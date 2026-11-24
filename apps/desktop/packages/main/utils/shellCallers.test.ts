@@ -21,6 +21,9 @@ import {
   userWindows
 } from "./windowLifecycle"
 import { ShutdownPrompts } from "./shutdownPrompt"
+import { isResetThemeShortcut } from "../appMenu"
+import { THEME_HOST } from "../themeChannels"
+import { forwardWindowVisibility } from "../windowVisibility"
 import {
   ShutdownFlow,
   ShutdownNotPossibleError,
@@ -781,6 +784,10 @@ class ElectronLikeWindow extends EventEmitter {
   async loadFile() {
     this.live()
   }
+  getBounds() {
+    this.live()
+    return { x: 0, y: 0, width: 1, height: 1 }
+  }
 }
 function mainWindow() {
   const text = source("apps/desktop/packages/main/index.ts")
@@ -799,7 +806,19 @@ function mainWindow() {
     lastDisplay: null,
     pendingDisplayChange: false,
     adSizeFallbackTimeout: null,
-    screen: { getPrimaryDisplay: () => ({ id: 1 }) },
+    screen: {
+      getPrimaryDisplay: () => ({ id: 1 }),
+      getDisplayMatching: () => ({ id: 1 })
+    },
+    // The ad view is a second web view inside the window: Electron's own,
+    // so it is the one part of the window that stays synthetic here.
+    adView: null,
+    attachAdView: () => ({ updateLayout() {}, setSuppressed() {} }),
+    __E2E_BUILD__: false,
+    forwardWindowVisibility,
+    THEME_HOST,
+    isResetThemeShortcut,
+    requestThemeReset: () => {},
     getAdSize: () => ({ minWidth: 1, minHeight: 1, height: 1, width: 1 }),
     BrowserWindow: ElectronLikeWindow,
     join: path.join,

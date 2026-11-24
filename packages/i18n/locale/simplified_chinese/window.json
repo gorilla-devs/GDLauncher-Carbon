@@ -9,5 +9,7 @@
   "_trn_window_close_stops_servers": "正在运行的本地服务器将被停止，其中的玩家会断开连接。",
   "_trn_window_close_stops_installs": "正在进行的下载和安装将被取消，之后可以重新开始。",
   "_trn_window_close_game_keeps_running": "游戏会继续运行，但在重新打开 GDLauncher 之前，部分功能将无法正常使用。",
-  "_trn_view_logs": "查看日志"
+  "_trn_view_logs": "查看日志",
+  "_trn_menu_view": "视图",
+  "_trn_menu_reset_theme": "重置主题"
 }

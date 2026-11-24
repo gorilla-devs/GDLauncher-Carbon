@@ -15,6 +15,28 @@ pub struct LogEntry {
     pub thread_name: String,
     /// The log message.
     pub message: String,
+    /// The exception logged with the message (`<log4j:Throwable>`): its type,
+    /// message and stack trace.
+    pub throwable: Option<String>,
+}
+
+impl LogEntry {
+    /// The message with the event's exception under it, the way the game's
+    /// own log file prints the two: log4j carries the stack trace of a logged
+    /// exception in a `<log4j:Throwable>` element next to the message, and it
+    /// is the part of an error that says why it happened.
+    pub fn message_with_throwable(&self) -> String {
+        let throwable = self.throwable.as_deref().unwrap_or_default().trim_end();
+        if throwable.is_empty() {
+            return self.message.clone();
+        }
+
+        let message = self.message.trim_end_matches(['\r', '\n']);
+        if message.is_empty() {
+            return throwable.to_owned();
+        }
+        format!("{message}\n{throwable}")
+    }
 }
 
 /// The log level of the log entry.
@@ -134,6 +156,7 @@ impl LogParser {
             timestamp: 0,
             thread_name: String::new(),
             message: String::new(),
+            throwable: None,
         };
 
         for attr in element.attributes() {
@@ -198,7 +221,7 @@ impl LogParser {
 
         let mut entry = Self::parse_attributes(&start)?;
         let mut message = None;
-        let mut throwable = Vec::new();
+        let mut throwable: Option<Vec<u8>> = None;
         let mut depth = 1;
 
         loop {
@@ -209,7 +232,9 @@ impl LogParser {
                         message = Some(String::from_utf8(text)?);
                     }
                     b"log4j:Throwable" => {
-                        throwable.extend(Self::read_element_text(&mut reader, b"log4j:Throwable")?);
+                        throwable
+                            .get_or_insert_with(Vec::new)
+                            .extend(Self::read_element_text(&mut reader, b"log4j:Throwable")?);
                     }
                     _ => depth += 1,
                 },
@@ -219,7 +244,12 @@ impl LogParser {
                         let Some(message) = message else {
                             return Err(ParserError::MissingAttribute("message".to_string()));
                         };
-                        entry.message = Self::with_throwable(message, &throwable);
+                        entry.message = message;
+                        // A trace that is not valid UTF-8 is kept with the
+                        // bad bytes replaced rather than costing the whole
+                        // event.
+                        entry.throwable =
+                            throwable.map(|bytes| String::from_utf8_lossy(&bytes).into_owned());
                         return Ok(entry);
                     }
                 }
@@ -247,27 +277,6 @@ impl LogParser {
                 _ => {}
             }
         }
-    }
-
-    /// The message with the event's exception under it, the way the game's
-    /// own log file prints the two: log4j carries the stack trace of a logged
-    /// exception in a `<log4j:Throwable>` element next to the message, and it
-    /// is the part of an error that says why it happened.
-    ///
-    /// A trace that is not valid UTF-8 is kept with the bad bytes replaced
-    /// rather than costing the whole event.
-    fn with_throwable(message: String, throwable: &[u8]) -> String {
-        let throwable = String::from_utf8_lossy(throwable);
-        let throwable = throwable.trim_end();
-        if throwable.is_empty() {
-            return message;
-        }
-
-        let message = message.trim_end_matches(['\r', '\n']);
-        if message.is_empty() {
-            return throwable.to_owned();
-        }
-        format!("{message}\n{throwable}")
     }
 
     /// Attempts to parse the next item from the buffer.
@@ -506,8 +515,9 @@ mod throwable_tests {
              \tat a.B.c(B.java:1)\n\tat a.D.e(D.java:2)\n]]></log4j:Throwable>\n",
         ));
 
+        assert_eq!(entry.message, "Failed to load mod");
         assert_eq!(
-            entry.message,
+            entry.message_with_throwable(),
             "Failed to load mod\njava.lang.IllegalStateException: boom\n\tat a.B.c(B.java:1)\n\tat a.D.e(D.java:2)"
         );
     }
@@ -517,12 +527,13 @@ mod throwable_tests {
         let entry = parse(&event(
             "<log4j:Message><![CDATA[two lines\n]]></log4j:Message>",
         ));
-        assert_eq!(entry.message, "two lines\n");
+        assert_eq!(entry.throwable, None);
+        assert_eq!(entry.message_with_throwable(), "two lines\n");
 
         let entry = parse(&event(
             "<log4j:Message><![CDATA[plain]]></log4j:Message><log4j:Throwable><![CDATA[\n]]></log4j:Throwable>",
         ));
-        assert_eq!(entry.message, "plain");
+        assert_eq!(entry.message_with_throwable(), "plain");
     }
 
     #[test]
@@ -531,7 +542,10 @@ mod throwable_tests {
             "<log4j:Throwable><![CDATA[java.lang.Error: first]]></log4j:Throwable>\
              <log4j:Message><![CDATA[message]]></log4j:Message>",
         ));
-        assert_eq!(entry.message, "message\njava.lang.Error: first");
+        assert_eq!(
+            entry.message_with_throwable(),
+            "message\njava.lang.Error: first"
+        );
     }
 
     #[test]
@@ -542,7 +556,7 @@ mod throwable_tests {
              <log4j:Throwable><![CDATA[java.lang.Error: a]]]]><![CDATA[>b\n\tat x.Y.z(Y.java:3)]]></log4j:Throwable>",
         ));
         assert_eq!(
-            entry.message,
+            entry.message_with_throwable(),
             "message\njava.lang.Error: a]]>b\n\tat x.Y.z(Y.java:3)"
         );
     }
@@ -553,7 +567,7 @@ mod throwable_tests {
             "<log4j:Message><![CDATA[]]></log4j:Message>\
              <log4j:Throwable><![CDATA[java.lang.Error: alone]]></log4j:Throwable>",
         ));
-        assert_eq!(entry.message, "java.lang.Error: alone");
+        assert_eq!(entry.message_with_throwable(), "java.lang.Error: alone");
     }
 
     #[test]
@@ -567,7 +581,10 @@ mod throwable_tests {
         let Some(ParsedItem::LogEntry(entry)) = parser.parse_next().unwrap() else {
             panic!("expected a log entry");
         };
-        assert_eq!(entry.message, "message\nbad \u{fffd} trace");
+        assert_eq!(
+            entry.message_with_throwable(),
+            "message\nbad \u{fffd} trace"
+        );
     }
 
     #[test]
@@ -596,7 +613,7 @@ mod throwable_tests {
             .unwrap()
             .into_iter()
             .filter(|item| {
-                matches!(item, ParsedItem::LogEntry(entry) if entry.message.contains("\n\tat "))
+                matches!(item, ParsedItem::LogEntry(entry) if entry.message_with_throwable().contains("\n\tat "))
             })
             .count();
         assert_eq!(with_trace, traces);

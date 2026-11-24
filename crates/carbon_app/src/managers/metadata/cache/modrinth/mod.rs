@@ -389,24 +389,38 @@ impl ModplatformCacher for ModrinthModCacher {
     ) {
         trace!("processing modrinth mod batch for {entity_id}");
 
+        // `/teams` answers in its own order and leaves out teams it shows no
+        // members for, so a project's team is found by its id, never by its
+        // position in the list. A project whose team didn't come back still
+        // caches, with no authors.
+        let teams_by_id = teams
+            .iter()
+            .filter_map(|team| team.first().map(|member| (member.team_id.as_str(), team)))
+            .collect::<HashMap<_, _>>();
+        let no_team = TeamResponse(Vec::new());
         let matches = sha512_hashes
             .iter()
-            .map(|hash| versions.get_key_value(hash))
-            .filter_map(|version_match| match version_match {
-                Some((hash, version)) => projects
+            .filter_map(|hash| {
+                let (hash, version) = versions.get_key_value(hash)?;
+                let project = projects
                     .iter()
-                    .zip(teams.iter())
-                    .find(|(proj, _team)| proj.id == version.project_id)
-                    .map(|(proj, team)| (hash, (proj, team, version))),
-                None => None,
+                    .find(|project| project.id == version.project_id)?;
+                let team = teams_by_id
+                    .get(project.team.as_str())
+                    .copied()
+                    .unwrap_or(&no_team);
+                Some((hash, (project, team, version)))
             })
             .collect::<HashMap<_, _>>();
+        // Only a file Modrinth has no version for is not on Modrinth. One
+        // whose project didn't come back is asked about again next time
+        // rather than ignored for the rest of the session.
         let mcm = app.meta_cache_manager();
         let now = mcm.now();
         mcm.ignored_remote_mr_hashes.write().await.ignore(
             sha512_hashes
                 .iter()
-                .filter(|hash| !matches.contains_key(hash))
+                .filter(|hash| !versions.contains_key(hash.as_str()))
                 .cloned(),
             now,
         );
@@ -1649,6 +1663,83 @@ pub(crate) mod test {
         assert!(
             cached.is_some(),
             "an uppercase response hash describes the same file and must still cache"
+        );
+    }
+
+    /// Modrinth's `/teams` answers in its own order and leaves out teams it
+    /// shows no members for, so its teams can't be paired with `/projects` by
+    /// position. Every mod whose version and project came back must cache,
+    /// with its own team's authors, and none may be ignored for the rest of
+    /// the session: an ignored mod never shows as installed from Modrinth.
+    #[tokio::test]
+    async fn teams_are_found_by_id_not_by_position() {
+        let app = crate::setup_managers_for_test().await;
+
+        let first_sha512 = "1".repeat(128);
+        let mut first_version = version("first-version", "first-project", 1, VersionType::Release);
+        first_version.files = vec![file(&first_sha512)];
+        let second_sha512 = "2".repeat(128);
+        let mut second_version =
+            version("second-version", "second-project", 2, VersionType::Release);
+        second_version.files = vec![file(&second_sha512)];
+
+        let mut versions = HashMap::new();
+        versions.insert(first_sha512.clone(), first_version);
+        versions.insert(second_sha512.clone(), second_version);
+
+        insert_test_metadata(&app, "first-metadata", 1, &first_sha512, b"first-sha1-raw").await;
+        insert_test_metadata(
+            &app,
+            "second-metadata",
+            2,
+            &second_sha512,
+            b"second-sha1-raw",
+        )
+        .await;
+
+        let mut second_team = team("second-project");
+        second_team.0[0].user.username = "second-author".to_string();
+        let bundle = (
+            vec![first_sha512.clone(), second_sha512.clone()],
+            vec![
+                (
+                    "first-metadata".to_string(),
+                    first_sha512.clone(),
+                    "mods".into(),
+                ),
+                (
+                    "second-metadata".to_string(),
+                    second_sha512.clone(),
+                    "mods".into(),
+                ),
+            ],
+            VersionHashesResponse(versions),
+            ProjectsResponse(vec![project("first-project"), project("second-project")]),
+            // The first project's team didn't come back, so the second
+            // project's team is first.
+            vec![second_team],
+            Vec::new(),
+            None,
+        );
+
+        ModrinthModCacher::save_batch(&app, CacheEntityId::Server(1), bundle).await;
+
+        let first = metarepo::get_mr_cache_by_metadata(&app.db, "first-metadata")
+            .await
+            .unwrap()
+            .expect("a mod whose team didn't come back still caches");
+        assert_eq!(first.authors, "", "and has no authors, not another team's");
+        let second = metarepo::get_mr_cache_by_metadata(&app.db, "second-metadata")
+            .await
+            .unwrap()
+            .expect("a mod past the end of the teams list still caches");
+        assert_eq!(second.authors, "second-author");
+        let mcm = app.meta_cache_manager();
+        let now = mcm.now();
+        let ignored = mcm.ignored_remote_mr_hashes.read().await;
+        assert!(
+            !ignored.contains(&first_sha512, now) && !ignored.contains(&second_sha512, now),
+            "no mod on Modrinth is ignored for the session"
         );
     }
 

@@ -5,9 +5,10 @@ import {
 } from "@/utils/mutationErrorToast"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button, Spinner } from "@gd/ui"
+import { Spinner } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import ConfirmActions from "../ConfirmActions"
 import { createSignal, For, Show } from "solid-js"
 import { ListInstance } from "@gd/core_module/bindings"
 
@@ -69,6 +70,7 @@ const ConfirmBatchInstanceDeletion = (props: ModalProps) => {
       title={props?.title}
       height="h-auto"
       width="w-120"
+      compact
     >
       <div class="flex flex-col gap-4">
         <Show
@@ -104,22 +106,18 @@ const ConfirmBatchInstanceDeletion = (props: ModalProps) => {
               )}
             </For>
           </div>
-          <div class="flex w-full justify-between pt-2">
-            <Button
-              onClick={() => {
-                modalsContext?.closeModal()
-              }}
+          <div class="pt-2">
+            <ConfirmActions
+              busy={false}
+              onCancel={() => modalsContext?.closeModal()}
+              onConfirm={handleDelete}
             >
-              <div class="i-hugeicons:cancel-01" />
-              {t("instances:_trn_instance_confirm_deletion.cancel")}
-            </Button>
-            <Button type="secondary" onClick={handleDelete}>
               <div class="i-hugeicons:delete-02" />
               <Trans
                 key="instances:_trn_delete_instances_button"
                 options={{ count: instances().length }}
               />
-            </Button>
+            </ConfirmActions>
           </div>
         </Show>
       </div>

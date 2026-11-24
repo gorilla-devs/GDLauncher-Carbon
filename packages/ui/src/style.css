@@ -261,3 +261,39 @@ a {
     rgba(0, 0, 0, 0.15) 6px
   );
 }
+
+/* Text and icons on an accent fill: primary buttons, the filled badge, a
+   ticked box's mark, a tile's Play button, a toast's action button. A theme
+   sets `--gdl-on-primary` ("r g b"); it defaults to the main text colour. One
+   class's weight, so a theme's hook rule still wins. */
+.gdl-on-primary {
+  color: rgb(var(--gdl-on-primary, var(--lightSlate-50)));
+}
+
+/* A disabled primary button's words: `--gdl-on-primary-disabled` ("r g b"). */
+.gdl-on-primary-disabled {
+  color: rgb(var(--gdl-on-primary-disabled, 64 71 89));
+}
+
+/* A collapsable's body clips what it holds, so it can fold shut. One hook's
+   weight, so a theme's rule can change it; the app's controls.css lets a
+   library group spill by `--gdl-group-bleed`. */
+[data-gdl~="collapsable.body"] {
+  overflow: hidden;
+}
+/* Open, it clips 4 px out, so the focus outlines of controls at its edge
+   show. Still one hook's weight. */
+:where([data-gdl~="collapsable.open"] > div) > [data-gdl~="collapsable.body"] {
+  overflow: clip;
+  overflow-clip-margin: 4px;
+}
+
+/* A slider's knob at rest: the text colour, faint on a dark palette (15%) and
+   stronger when the text colour is dark, so it shows on a light palette too.
+   No weight, so the app's hover and drag colours, and a theme's rule, win. */
+:where([data-gdl~="slider.thumb"]) {
+  background-color: rgb(
+    from rgb(var(--lightSlate-50)) r g b /
+      clamp(0.15, (0.6 - (r + g + b) / 765) * 2, 0.7)
+  );
+}

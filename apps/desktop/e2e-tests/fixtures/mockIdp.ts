@@ -20,6 +20,10 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
 export type HarnessMode = "proxy" | "standalone"
 
+/** The standalone mock's player name. Constant, because a random one changes
+ *  the account menu's width and shifts the navbar in every screenshot. */
+export const E2E_DISPLAY_NAME = "e2e_player"
+
 export interface Harness {
   mock: MockServer
   user: ProvisionedUser
@@ -55,7 +59,8 @@ export async function startHarness(): Promise<Harness> {
           token: `standalone-gdl-token-${oid}`,
           oid,
           email: `e2e-${oid}@e2e.invalid`,
-          displayName: `e2e_${oid.slice(-8)}`,
+          // Fixed so screenshots of the account menu are stable run to run.
+          displayName: E2E_DISPLAY_NAME,
           expiresAt: Math.floor(Date.now() / 1000) + 86_400
         }
       })()

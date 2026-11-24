@@ -560,7 +560,10 @@ const General = () => {
             </div>
           </RightHandSide>
         </Row>
-        <Row class="bg-darkSlate-900 rounded-xl px-6 py-4">
+        <Row
+          hooks="settings.about"
+          class="bg-darkSlate-900 rounded-xl px-6 py-4"
+        >
           <img
             src={wideLogoUrl}
             class="h-14 cursor-pointer transition-opacity duration-200 ease-spring hover:opacity-80"

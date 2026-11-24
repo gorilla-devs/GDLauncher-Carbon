@@ -1,6 +1,6 @@
 {
-  "_trn_search_instances": "Cerca Istanze",
-  "_trn_search_servers": "Cerca Server",
+  "_trn_search_instances": "Cerca istanze...",
+  "_trn_search_servers": "Cerca server...",
   "_trn_browser_table_headers.name": "Nome",
   "_trn_browser_table_headers.published": "Pubblicato",
   "_trn_browser_table_headers.downloads": "Download",

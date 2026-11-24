@@ -513,6 +513,13 @@ fn extra_java_launch_args(input: &str) -> Vec<String> {
     args
 }
 
+/// User args are quote-parsed; mitigation args are appended afterwards as their
+/// own argv elements so they win and a stray user quote cannot swallow them.
+fn push_java_args(command: &mut Vec<String>, extra_java_args: &str, mitigation_args: &[String]) {
+    command.extend(extra_java_launch_args(extra_java_args));
+    command.extend(mitigation_args.iter().cloned());
+}
+
 #[allow(clippy::too_many_arguments)]
 pub async fn generate_startup_command(
     java_component: JavaComponent,
@@ -521,6 +528,7 @@ pub async fn generate_startup_command(
     xms_memory: u16,
     game_resolution: Option<(u16, u16)>,
     extra_java_args: &str,
+    mitigation_args: &[String],
     runtime_path: &RuntimePath,
     version: VersionInfo,
     lwjgl_group: &LibraryGroup,
@@ -696,7 +704,7 @@ pub async fn generate_startup_command(
     // Any source-specific sanitization/provenance policy belongs at the import
     // boundary. Preserve the token grammar and intentional agent arguments used
     // by profilers, hot-swap tools and authlib-injector.
-    command.extend(extra_java_launch_args(extra_java_args));
+    push_java_args(&mut command, extra_java_args, mitigation_args);
 
     if Os::native() == Os::Osx {
         let lwjgl_3 = version
@@ -733,6 +741,7 @@ pub async fn launch_minecraft(
     xms_memory: u16,
     game_resolution: Option<(u16, u16)>,
     extra_java_args: &str,
+    mitigation_args: &[String],
     runtime_path: &RuntimePath,
     version: VersionInfo,
     lwjgl_group: &LibraryGroup,
@@ -759,6 +768,7 @@ pub async fn launch_minecraft(
         xms_memory,
         game_resolution,
         extra_java_args,
+        mitigation_args,
         runtime_path,
         version,
         lwjgl_group,
@@ -1241,6 +1251,7 @@ mod tests {
             2048,
             None,
             "",
+            &[],
             &runtime_path,
             version,
             &lwjgl_group,
@@ -1327,6 +1338,7 @@ mod tests {
             1024,
             None,
             r#"-XX:+UseG1GC "" " ""#,
+            &[],
             &RuntimePath::new(dir.path().to_path_buf()),
             version,
             &lwjgl_group,
@@ -1345,6 +1357,17 @@ mod tests {
             .find(|arg| arg.trim().is_empty());
         assert_eq!(blank, None, "{command:?}");
         assert_eq!(command[main_class - 1], "-XX:+UseG1GC", "{command:?}");
+    }
+
+    #[test]
+    fn mitigation_args_survive_unbalanced_user_quote() {
+        let mut command = vec!["java".to_string()];
+        push_java_args(
+            &mut command,
+            r#"-Dfoo="a b"#,
+            &["-XX:-UseBASE64Intrinsics".to_string()],
+        );
+        assert_eq!(command.last().unwrap(), "-XX:-UseBASE64Intrinsics");
     }
 
     #[test]

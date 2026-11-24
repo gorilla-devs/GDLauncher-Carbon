@@ -1,7 +1,6 @@
-import { Button } from "@gd/ui"
+import { DialogFooter, CancelLink } from "../../DialogFooter"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
-import { Trans } from "@gd/i18n"
 import SharePreviewContent from "@/components/SharePreviewContent"
 import { useGDNavigate } from "@/managers/NavigationManager"
 
@@ -25,12 +24,9 @@ function SharePreview(props: ModalProps) {
           }}
         />
 
-        {/* Cancel button */}
-        <div class="flex justify-start">
-          <Button type="secondary" onClick={() => modalsContext?.closeModal()}>
-            <Trans key="instances:_trn_share_preview.cancel" />
-          </Button>
-        </div>
+        <DialogFooter>
+          <CancelLink onClick={() => modalsContext?.closeModal()} />
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

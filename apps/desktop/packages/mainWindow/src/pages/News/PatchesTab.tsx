@@ -148,6 +148,7 @@ const PatchesTab = (props: PatchesTabProps) => {
                   </div>
 
                   <div
+                    data-gdl="news.patch"
                     class="border-darkSlate-600 bg-darkSlate-700 flex-1 cursor-pointer rounded-xl border p-6 shadow-lg transition-transform hover:scale-[1.02]"
                     onClick={() => {
                       props.onNavigateToDetail?.()

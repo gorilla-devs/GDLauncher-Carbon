@@ -80,9 +80,12 @@ vi.mock("@gd/i18n", () => ({
   useTransContext: () => [(key: string) => key],
   i18n: { t: (key: string) => key }
 }))
-vi.mock("@gd/ui", () => {
+vi.mock("@gd/ui", async () => {
+  // Theme hook names are plain strings: the real helpers.
+  const hooks = await import("../../../../../../packages/ui/src/hooks")
   const passthrough = (p: any) => <div>{p.children}</div>
   return {
+    ...hooks,
     Button: (p: any) => (
       <button
         data-variant={p.variant}
@@ -128,7 +131,7 @@ vi.mock("@gd/ui", () => {
 vi.mock("@/components/VirtuaWrapper", () => ({
   VList: (p: any) => (
     <div>
-      <For each={p.data}>{(item) => p.children(item)}</For>
+      <For each={p.data}>{(item, index) => p.children(item, index)}</For>
     </div>
   )
 }))

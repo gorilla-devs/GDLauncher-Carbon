@@ -1,6 +1,8 @@
 import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import ModalLayout from "../ModalLayout"
+import { DialogFooter } from "../DialogFooter"
+import { TextLink } from "@/components/TextLink"
 import { ModalProps, useModal } from ".."
 
 export interface ConfirmChoiceData {
@@ -26,14 +28,13 @@ function ConfirmChoice(props: ModalProps) {
         <p class="text-lightSlate-300 m-0 break-words text-sm">
           {data().message}
         </p>
-        <div class="flex w-full justify-between pt-2">
-          <Button
-            type="secondary"
+        <DialogFooter class="pt-2">
+          <TextLink
             data-testid="confirm-choice-cancel"
             onClick={() => modalsContext?.closeModal()}
           >
             <Trans key="general:_trn_cancel" />
-          </Button>
+          </TextLink>
           <Button
             type="primary"
             data-testid="confirm-choice-confirm"
@@ -44,7 +45,7 @@ function ConfirmChoice(props: ModalProps) {
           >
             {data().confirmLabel}
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

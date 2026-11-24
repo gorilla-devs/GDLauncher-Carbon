@@ -74,12 +74,26 @@ assertBuiltAfterSources(
 )
 
 export default defineConfig({
+  // solid-js must resolve to its browser build so effects run under jsdom
+  resolve: { conditions: ["browser"] },
+  // Same rule as mainWindow's vite.config.mjs: theme package assets are never
+  // inlined as data: URIs, however small.
+  build: {
+    assetsInlineLimit: (filePath) =>
+      /[\\/]packages[\\/]ui[\\/]themes[\\/]/.test(filePath) ? false : undefined
+  },
   test: {
     projects: [
       {
+        // Takes `resolve` and `build` above; a project given inline has
+        // none of the root's options otherwise.
+        extends: true,
         test: {
           name: "node",
           globals: true,
+          server: { deps: { inline: [/solid-js/] } },
+          // Built-in theme CSS is read with ?raw; by default vitest empties .css modules.
+          css: { include: [/packages\/ui\/themes\/.*\.css/] },
           // Playwright specs are `*.spec.ts` and stay out of vitest; the mock
           // server's own unit tests are `*.test.ts` and run here.
           include: nodeInclude,

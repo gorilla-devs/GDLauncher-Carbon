@@ -32,7 +32,6 @@
   "_trn_common.read_more": "Leer más",
   "_trn_common.view_all": "Ver todo",
   "_trn_common.clear_all": "Limpiar todo",
-  "_trn_add_custom_java_path": "Añadir ruta de Java personalizada",
   "_trn_profile_name": "Nombre del perfil",
   "_trn_assigned_java_path": "Ruta de Java asignada",
   "_trn_instance_unlock_confirmation": "Desbloquear te permite instalar contenido adicional en esta instancia. Si no se hace correctamente, podría resultar en que la instancia no se inicie más. Esta acción no se puede deshacer.",
@@ -43,5 +42,6 @@
   "_trn_edit": "Editar",
   "_trn_ok": "Aceptar",
   "_trn_field_required": "Este campo es obligatorio",
-  "_trn_dismiss": "Descartar"
+  "_trn_dismiss": "Descartar",
+  "_trn_close": "Cerrar"
 }

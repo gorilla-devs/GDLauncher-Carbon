@@ -70,7 +70,11 @@ export default defineConfig({
     target: "esnext",
     emptyOutDir: true,
     outDir: "../../dist/mainWindow",
-    sourcemap: true
+    sourcemap: true,
+    // The CSP's font-src and media-src don't allow data: URIs, so theme package
+    // assets must always be emitted as files, however small.
+    assetsInlineLimit: (filePath) =>
+      /[\\/]packages[\\/]ui[\\/]themes[\\/]/.test(filePath) ? false : undefined
   },
   resolve: {
     alias: {

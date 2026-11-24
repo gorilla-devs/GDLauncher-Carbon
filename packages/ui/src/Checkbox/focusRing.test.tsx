@@ -14,7 +14,7 @@ function mount(component: () => any) {
   const root = document.createElement("div")
   document.body.append(root)
   dispose = render(component, root)
-  return root.querySelector("label")!
+  return root
 }
 
 // Generates the CSS the app's UnoCSS preset makes for these classes and
@@ -22,7 +22,7 @@ function mount(component: () => any) {
 async function rules(tokens: string[]) {
   const uno = await createGenerator({
     presets: [presetWind3()],
-    theme: { colors: { primary: { 400: "#5078ff" } } }
+    theme: { colors: { primary: { 500: "#5078ff" } } }
   })
   const { css } = await uno.generate(tokens.join(" "), {
     preflights: false,
@@ -35,24 +35,35 @@ async function rules(tokens: string[]) {
 }
 
 it("draws its focus ring only for keyboard focus, not after a mouse click", async () => {
-  const label = mount(() => <Checkbox onChange={vi.fn()} ariaLabel="A" />)
-  const tokens = Array.from(label.classList)
+  const root = mount(() => <Checkbox onChange={vi.fn()} ariaLabel="A" />)
+  const input = root.querySelector("input")!
+  const box = root.querySelector<HTMLElement>('[data-gdl="checkbox.box"]')!
+  const tokens = Array.from(box.classList)
 
-  // A mouse click on the label also focuses the input, so a ring keyed on
-  // :focus-within or :focus would stay after every click.
-  expect(tokens).toContain("has-[:focus-visible]:ring-2")
-  expect(tokens).toContain("has-[:focus-visible]:ring-primary-400")
-  expect(
-    tokens.filter(
-      (t) => t.startsWith("focus-within:") || t.startsWith("focus:")
-    )
-  ).toEqual([])
+  // The ring is the box's outline, drawn while the real checkbox before it
+  // has keyboard focus.
+  expect(input.classList.contains("peer")).toBe(true)
+  expect(input.nextElementSibling).toBe(box)
+  expect(tokens).toContain("peer-focus-visible:outline")
+  expect(tokens).toContain("peer-focus-visible:outline-2")
+  expect(tokens).toContain("peer-focus-visible:outline-primary-500")
+  // A ring keyed on :focus-within or :focus would stay after a click.
+  for (const element of [box, box.parentElement!]) {
+    expect(
+      Array.from(element.classList).filter(
+        (t) =>
+          t.startsWith("focus-within:") ||
+          t.startsWith("focus:") ||
+          t.startsWith("peer-focus:")
+      )
+    ).toEqual([])
+  }
 
-  const ring = await rules(tokens.filter((t) => t.includes("ring")))
-  expect(ring.some((r) => r.body.includes("--un-ring-width:2px"))).toBe(true)
-  expect(ring.some((r) => r.body.includes("--un-ring-color"))).toBe(true)
+  const ring = await rules(tokens.filter((t) => t.includes("outline")))
+  expect(ring.some((r) => r.body.includes("outline-width:2px"))).toBe(true)
+  expect(ring.some((r) => r.body.includes("outline-color"))).toBe(true)
   for (const rule of ring) {
-    expect(rule.selector).toContain(":has(:focus-visible)")
+    expect(rule.selector).toContain(".peer:focus-visible")
     expect(rule.selector).not.toContain(":focus-within")
   }
 })

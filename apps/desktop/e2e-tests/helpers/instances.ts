@@ -372,6 +372,13 @@ export async function waitForInstallComplete(
   if (operation) {
     await operation.wait(startTimeout, installTimeout)
   } else
+    // The tile has to be on the page, and saying so, for this to count.
+    // Without it the state reads as missing, not "inactive": a version
+    // change or repair navigates to the library as it is confirmed, the grid
+    // then mounts the tile still saying "inactive" until the core's state
+    // change reaches it, and a wait for "not inactive" passed on both. The
+    // caller went on before its task had even started (a repair's assertions
+    // read the install audit the previous version change had written).
     await page
       .waitForFunction(
         (sel) => {
@@ -429,6 +436,50 @@ export const LAUNCH_TIMEOUT = 180_000
 export const STOP_TIMEOUT = 60_000
 
 /**
+ * A machine short of free memory gets the app's "Not enough memory" warning
+ * instead of a launch (the macOS CI runners do, with about 2.3 GB free).
+ * That is the app working, not the launch failing: a test goes on the way a
+ * user would, with "Play anyway". Does nothing when the warning isn't open.
+ */
+async function passMemoryWarning(page: Page): Promise<void> {
+  const playAnyway = page.locator(
+    byTestId(TEST_IDS.insufficientMemoryPlayAnyway)
+  )
+  if (await playAnyway.isVisible().catch(() => false)) {
+    await playAnyway.click().catch(() => {})
+  }
+}
+
+/**
+ * Clicks an instance tile's Play control and waits until the core has taken
+ * the launch: the tile leaves "inactive" for its preparing state. For a test
+ * that watches what happens before the game starts (a repair, a resumed
+ * download) rather than the start itself, which `clickPlayAndAwaitLaunched`
+ * below waits for. Goes past the memory warning as that one does.
+ */
+export async function clickPlay(page: Page, name: string): Promise<void> {
+  const tile = page.locator(byInstanceName(name))
+  await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+
+  await expect
+    .poll(
+      async () => {
+        const state = await tile
+          .getAttribute("data-instance-state", { timeout: 1_000 })
+          .catch(() => null)
+        if (state === "inactive") await passMemoryWarning(page)
+        // A missing tile is not a launch: null must not pass for one.
+        return state != null && state !== "inactive"
+      },
+      {
+        timeout: 30_000,
+        message: `"${name}" never started preparing after Play was clicked`
+      }
+    )
+    .toBe(true)
+}
+
+/**
  * Clicks an instance tile's Play control and waits for the core to report a
  * new `GAME_LAUNCHED`, i.e. a real launch actually started — not merely that
  * the click landed. Counted via `opts.stdout`, never searched for with a
@@ -459,12 +510,18 @@ export async function clickPlayAndAwaitLaunched(
   await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
 
   await expect
-    .poll(() => launchedCount(), {
-      timeout: opts.timeout ?? LAUNCH_TIMEOUT,
-      message:
-        opts.message ??
-        "the core never reported GAME_LAUNCHED after Play was clicked"
-    })
+    .poll(
+      async () => {
+        if (launchedCount() <= before) await passMemoryWarning(page)
+        return launchedCount()
+      },
+      {
+        timeout: opts.timeout ?? LAUNCH_TIMEOUT,
+        message:
+          opts.message ??
+          "the core never reported GAME_LAUNCHED after Play was clicked"
+      }
+    )
     .toBeGreaterThan(before)
 }
 

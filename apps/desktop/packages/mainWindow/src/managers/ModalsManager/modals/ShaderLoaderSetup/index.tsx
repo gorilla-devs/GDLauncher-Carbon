@@ -6,6 +6,8 @@ import type {
 } from "@gd/core_module/bindings"
 import { Button, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
+import { CancelLink, DialogFooter } from "@/managers/ModalsManager/DialogFooter"
+import { TextLink } from "@/components/TextLink"
 import Installing from "./Installing"
 import ModalLayout from "@/managers/ModalsManager/ModalLayout"
 import { ModalProps, useModal } from "@/managers/ModalsManager"
@@ -89,25 +91,19 @@ const Intro = (props: StepProps) => {
           </Switch>
         </p>
       </div>
-      <div class="mt-4 flex w-full items-center justify-between">
-        <Button type="secondary" onClick={cancel}>
-          <div class="i-hugeicons:cancel-01" />
-          <Trans key="content:_trn_shader_loader_cancel" />
+      <DialogFooter class="mt-4">
+        <CancelLink onClick={cancel} />
+        <TextLink
+          data-testid="shader-loader-continue-anyway"
+          onClick={continueWithout}
+        >
+          <Trans key="content:_trn_shader_loader_continue_anyway" />
+        </TextLink>
+        <Button type="primary" onClick={startAutoSetup}>
+          <div class="i-hugeicons:magic-wand-01" />
+          <Trans key="content:_trn_shader_loader_auto_setup" />
         </Button>
-        <div class="flex gap-2">
-          <Button
-            data-testid="shader-loader-continue-anyway"
-            type="secondary"
-            onClick={continueWithout}
-          >
-            <Trans key="content:_trn_shader_loader_continue_anyway" />
-          </Button>
-          <Button type="primary" onClick={startAutoSetup}>
-            <div class="i-hugeicons:magic-wand-01" />
-            <Trans key="content:_trn_shader_loader_auto_setup" />
-          </Button>
-        </div>
-      </div>
+      </DialogFooter>
     </div>
   )
 }

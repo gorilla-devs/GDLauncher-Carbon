@@ -42,6 +42,7 @@ import {
 import { isPidAlive } from "./helpers/processes.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import {
+  attachGameLogOnFailure,
   countMatchedMarkers,
   findFatalSignature,
   instanceLogsDir,
@@ -49,6 +50,7 @@ import {
   LAUNCH_MARKER_QUORUM,
   newestLogFile,
   readLogMessages,
+  skipWithoutOpenGL,
   waitForLogQuiescence
 } from "./helpers/gameLog.js"
 import { runCleanupSteps, withCleanup } from "./helpers/cleanup.js"
@@ -100,6 +102,7 @@ function readGamePid(pidFile: string): number {
 test.describe("game launch", () => {
   // eslint-disable-next-line no-empty-pattern
   test("starts Minecraft and observes a live process with quiet startup logs", async ({}, testInfo) => {
+    skipWithoutOpenGL()
     expect(isCoreModulePresent()).toBeTruthy()
 
     const harness = await startHarness()
@@ -124,6 +127,8 @@ test.describe("game launch", () => {
      *  here because `finally` is a different block scope from `try`, and
      *  teardown needs it to tell "still running" from "already died". */
     let closedBeforeLaunch = 0
+    /** The instance's folder, for the game's own log on a failure. */
+    let shortpath: string | undefined
 
     /** Counted rather than searched for: `change_launch_state`
      *  (`run/mod.rs`) prints GAME_CLOSED on every transition to Inactive,
@@ -153,6 +158,7 @@ test.describe("game launch", () => {
         })
 
         const row = readInstanceByName(harness.runtimePath, INSTANCE_NAME)
+        shortpath = row.shortpath
         const logsDir = instanceLogsDir(harness.runtimePath, row.shortpath)
         closedBeforeLaunch = closedCount()
 
@@ -216,9 +222,22 @@ test.describe("game launch", () => {
                 })
                 .toBeGreaterThan(before)
             },
+            // Before the harness goes: it deletes the runtime folder, the
+            // game's own log with it. `alreadyFailed` because inside a cleanup
+            // the test's status still reads passed.
             async () => {
-              if (current)
-                await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+              if (!current) return
+              await attachCoreLogOnFailure(
+                testInfo,
+                harness.runtimePath,
+                alreadyFailed
+              )
+              await attachGameLogOnFailure(
+                testInfo,
+                harness.runtimePath,
+                shortpath,
+                alreadyFailed
+              )
             },
             async () => {
               if (current) {
@@ -466,7 +485,11 @@ async function withCloseWindowLauncher(
           },
           async () => {
             if (current)
-              await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+              await attachCoreLogOnFailure(
+                testInfo,
+                harness.runtimePath,
+                alreadyFailed
+              )
           },
           async () => {
             if (current) {

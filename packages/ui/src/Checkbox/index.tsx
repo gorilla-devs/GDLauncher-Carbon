@@ -1,6 +1,14 @@
-import { createEffect, createSignal, Show, JSX } from "solid-js"
+import {
+  children,
+  createEffect,
+  createSignal,
+  createUniqueId,
+  Show,
+  JSX
+} from "solid-js"
 import { cva, type VariantProps } from "class-variance-authority"
 import { PRESS_CLASSES } from "../Clickable"
+import { withStates } from "../hooks"
 
 const checkboxStyles = cva(
   "box-border flex h-5 min-h-5 w-5 min-w-5 items-center justify-center rounded-md transition-all duration-200 ease-spring",
@@ -36,89 +44,126 @@ interface Props extends VariantProps<typeof checkboxStyles> {
   checked?: boolean
   indeterminate?: boolean
   disabled?: boolean
+  /** Without it, the checkbox is only drawn, for a parent that handles the
+   *  click (a tile, a row): it then takes no focus of its own. */
   onChange?: (_checked: boolean) => void
+  /** Its name when its label isn't among its children. */
+  "aria-label"?: string
+  /** The same name, under the spelling older callers use. */
   ariaLabel?: string
   children?: JSX.Element
 }
 
 function Checkbox(props: Props) {
   const [checked, setChecked] = createSignal(props.checked || false)
-  let input: HTMLInputElement | undefined
-
-  createEffect(() => {
-    checked()
-    if (input) input.indeterminate = !!props.indeterminate
-  })
+  const label = children(() => props.children)
+  const labelId = createUniqueId()
+  const [input, setInput] = createSignal<HTMLInputElement>()
 
   createEffect(() => {
     setChecked(props.checked || false)
   })
 
+  // A property only: screen readers then say "partly checked".
+  createEffect(() => {
+    const el = input()
+    if (el) el.indeterminate = !checked() && !!props.indeterminate
+  })
+
   return (
-    // A mouse click on the label also focuses the input, so the ring keys on
-    // :focus-visible to show for keyboard focus only.
-    <label
-      class={`relative flex items-center gap-2 rounded-md has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary-400 ${PRESS_CLASSES}`}
+    <div
+      data-gdl={withStates("checkbox", {
+        checked: checked(),
+        // The dash it draws when it's not ticked.
+        indeterminate: !checked() && props.indeterminate,
+        disabled: props.disabled
+      })}
+      class={`relative flex items-center gap-2 rounded-md ${PRESS_CLASSES}`}
       classList={{
         "cursor-pointer": !props.disabled,
         "cursor-not-allowed": props.disabled
       }}
-      onPointerDown={(event) => {
-        if (props.disabled || !props.onChange) return
-        event.currentTarget.setPointerCapture(event.pointerId)
+      onPointerDown={(e) => {
+        if (props.disabled) return
+        // Capture so pointerup lands here even if active:scale-95 shrinks
+        // the bounding box out from under a cursor that started near the edge.
+        e.currentTarget.setPointerCapture(e.pointerId)
       }}
-      onPointerUp={(event) => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-          event.currentTarget.releasePointerCapture(event.pointerId)
-        }
+      onPointerUp={(e) => {
+        if (props.disabled) return
+        if (!e.currentTarget.hasPointerCapture(e.pointerId)) return
+        // Don't bounds-check the pointerup position: getBoundingClientRect
+        // returns the active:scale-95 *transformed* rect, which excludes
+        // exactly the edge pixels we're trying to fix. Pointer capture
+        // already guarantees pointerup landed on the captured element.
+        e.currentTarget.releasePointerCapture(e.pointerId)
+        const check = !checked()
+        setChecked(check)
+        props.onChange?.(check)
       }}
     >
-      <input
-        ref={input}
-        type="checkbox"
-        class="sr-only"
-        aria-label={props.ariaLabel}
-        aria-hidden={!props.onChange ? true : undefined}
-        tabIndex={props.onChange ? 0 : -1}
-        checked={checked()}
-        disabled={!!props.disabled || !props.onChange}
-        onChange={(event) => {
-          if (props.disabled) return
-          const value = event.currentTarget.checked
-          setChecked(value)
-          props.onChange?.(value)
-        }}
-        onKeyDown={(event) => {
-          if (event.key !== "Enter") return
-          event.preventDefault()
-          if (!props.disabled && !event.repeat) event.currentTarget.click()
-        }}
-      />
+      {/* The real checkbox, for the keyboard and screen readers: Space
+          toggles it. It covers the row unseen, so focusing it scrolls the
+          whole row into view, and lets the pointer through to the press
+          handling above. */}
+      <Show when={props.onChange}>
+        <input
+          ref={setInput}
+          type="checkbox"
+          class="peer pointer-events-none absolute inset-0 m-0 h-full w-full opacity-0"
+          checked={checked()}
+          disabled={props.disabled}
+          aria-labelledby={label() ? labelId : undefined}
+          aria-label={props["aria-label"] ?? props.ariaLabel}
+          onChange={(e) => {
+            const check = e.currentTarget.checked
+            setChecked(check)
+            props.onChange?.(check)
+          }}
+          // Enter toggles it too, as Space does natively.
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return
+            e.preventDefault()
+            if (!e.repeat) e.currentTarget.click()
+          }}
+        />
+      </Show>
       <div
-        class={checkboxStyles({
+        data-gdl="checkbox.box"
+        class={`${checkboxStyles({
           checked: checked(),
           disabled: props.disabled,
           indeterminate: props.indeterminate,
           hover: !props.disabled
-        })}
+        })} peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary-500`}
       >
         <Show when={!checked() && props.indeterminate}>
-          <div class="bg-primary-500 h-3 min-h-3 w-3 min-w-3 rounded-sm" />
+          <div
+            data-gdl="checkbox.dash"
+            class="bg-primary-500 h-3 min-h-3 w-3 min-w-3 rounded-sm"
+          />
         </Show>
         <Show when={!props.indeterminate || checked()}>
           <div
+            data-gdl="checkbox.mark"
             class="i-hugeicons:tick-02 h-4 w-4 transition-transform duration-200 ease-spring"
             classList={{
               "scale-100": checked(),
               "scale-0": !checked(),
-              "text-lightSlate-50": !props.disabled,
+              // On the accent fill: `--gdl-on-primary` (style.css).
+              "gdl-on-primary": !props.disabled,
               "text-lightSlate-700": props.disabled
             }}
           />
         </Show>
       </div>
-      <Show when={props.children}>{props.children}</Show>
-    </label>
+      <Show when={label()}>
+        {/* No box of its own: the label lays out as before. */}
+        <span id={labelId} class="contents">
+          {label()}
+        </span>
+      </Show>
+    </div>
   )
 }
 

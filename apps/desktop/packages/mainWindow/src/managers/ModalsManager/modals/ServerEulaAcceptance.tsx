@@ -1,6 +1,7 @@
 import { Trans, useTransContext } from "@gd/i18n"
 import { Button, Checkbox, toast } from "@gd/ui"
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import { ModalProps, useModal } from ".."
 import { rspc } from "@/utils/rspcClient"
 import { createSignal } from "solid-js"
@@ -65,14 +66,11 @@ function ServerEulaAcceptance(props: ModalProps) {
             <Trans key="instances:_trn_server_eula_agree" />
           </span>
         </Checkbox>
-        <div class="flex w-full justify-between pt-2">
-          <Button
+        <DialogFooter class="pt-2">
+          <CancelLink
             onClick={() => modalsContext?.closeModal()}
             disabled={isSubmitting()}
-          >
-            <div class="i-hugeicons:cancel-01" />
-            {t("instances:_trn_instance_confirm_deletion.cancel")}
-          </Button>
+          />
           <Button
             type="primary"
             onClick={handleAccept}
@@ -81,7 +79,7 @@ function ServerEulaAcceptance(props: ModalProps) {
             <div class="i-hugeicons:play" />
             <Trans key="instances:_trn_server_eula_accept_and_start" />
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

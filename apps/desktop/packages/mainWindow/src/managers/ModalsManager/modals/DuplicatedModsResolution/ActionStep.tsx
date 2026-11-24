@@ -1,5 +1,5 @@
 import { Button, Radio } from "@gd/ui"
-import { createSignal } from "solid-js"
+import { createSignal, createUniqueId } from "solid-js"
 import { Trans } from "@gd/i18n"
 
 export type DuplicateAction = "remove" | "disable"
@@ -14,6 +14,8 @@ interface Props {
 }
 
 const ActionStep = (props: Props) => {
+  // The actions are one radio group for the keyboard.
+  const actionGroup = createUniqueId()
   const [selectedAction, setSelectedAction] = createSignal<DuplicateAction>(
     props.selectedAction || "disable"
   )
@@ -56,6 +58,7 @@ const ActionStep = (props: Props) => {
             }}
           >
             <Radio
+              name={actionGroup}
               disabled={props.isApplying || props.actionLocked}
               value="disable"
               checked={selectedAction() === "disable"}
@@ -84,6 +87,7 @@ const ActionStep = (props: Props) => {
             }}
           >
             <Radio
+              name={actionGroup}
               disabled={props.isApplying || props.actionLocked}
               value="remove"
               checked={selectedAction() === "remove"}

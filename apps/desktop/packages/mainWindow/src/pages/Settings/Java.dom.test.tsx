@@ -11,24 +11,56 @@ const control = vi.hoisted(() => ({
   cancel: vi.fn(),
   invalidate: vi.fn()
 }))
-vi.mock("@gd/ui", () => import("@/test/uiBasic.fixture"))
+vi.mock("@gd/ui", async () => ({
+  ...(await import("@/test/uiBasic.fixture")),
+  Collapsable: (props: any) => <div>{props.children}</div>,
+  // The undo and reset actions are their tooltip's trigger.
+  TooltipTrigger: (props: any) => (
+    <button
+      type="button"
+      disabled={props.disabled}
+      aria-label={props["aria-label"]}
+      onClick={props.onClick}
+    >
+      {props.children}
+    </button>
+  )
+}))
 vi.mock("@gd/i18n", () => ({
   Trans: (props: any) => <span>{props.key}</span>,
-  useTransContext: () => [(key: string) => key]
+  useTransContext: () => [
+    (key: string) => key,
+    { getI18next: () => ({ language: "en" }) }
+  ]
 }))
-vi.mock("@solidjs/router", () => ({ useParams: () => control.params }))
+vi.mock("@solidjs/router", () => ({
+  useParams: () => control.params,
+  useSearchParams: () => [{}, vi.fn()]
+}))
 vi.mock("@/managers/ModalsManager", () => ({
   useModal: () => ({ openModal: vi.fn() })
 }))
 vi.mock("@/components/SearchInputContext", () => ({
   default: () => ({ setSelectedInstanceId: vi.fn() })
 }))
-vi.mock("@/components/JavaPathAutoComplete", () => ({ default: () => <div /> }))
+// Which Java an instance runs on is another control's business.
+vi.mock("../Library/Instance/Tabs/Settings/InstanceJavaSelect", () => ({
+  default: () => <div />
+}))
+vi.mock("./java/YourJavas", () => ({ default: () => <div /> }))
+vi.mock("./java/CustomProfiles", () => ({ default: () => <div /> }))
 vi.mock("./settings.java.data", () => ({
+  createJavaOverviewQuery: () => ({ data: undefined }),
   default: () => ({
-    availableJavas: { data: {} },
     javaProfiles: { data: [] },
-    totalRam: { data: 8589934592 }
+    totalRam: { data: 8589934592 },
+    settings: {
+      get data() {
+        return control.state.settings
+      }
+    },
+    javaOverview: { data: undefined, isFetching: false },
+    managedJavaInstalls: { data: [] }
   })
 }))
 vi.mock("@/utils/rspcClient", () => ({

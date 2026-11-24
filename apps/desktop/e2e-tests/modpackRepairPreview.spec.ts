@@ -337,7 +337,11 @@ test.describe("modpack repair preview", () => {
         ).toBe("disabled-by-user")
       },
       async (alreadyFailed) => {
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+        await attachCoreLogOnFailure(
+          testInfo,
+          harness.runtimePath,
+          alreadyFailed
+        )
         if (name) {
           try {
             await page
@@ -459,7 +463,11 @@ test.describe("modpack repair preview", () => {
         ).toContain(disabledKey)
       },
       async (alreadyFailed) => {
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+        await attachCoreLogOnFailure(
+          testInfo,
+          harness.runtimePath,
+          alreadyFailed
+        )
         if (name) {
           try {
             await page

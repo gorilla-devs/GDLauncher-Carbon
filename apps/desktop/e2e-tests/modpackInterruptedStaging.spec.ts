@@ -15,6 +15,7 @@ import { startHarness, stopHarness } from "./fixtures/mockIdp.js"
 import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
+  clickPlay,
   deleteInstanceViaUi,
   ensureLibraryInteractive,
   STOP_TIMEOUT
@@ -315,9 +316,8 @@ test.describe("modpack interrupted staging", () => {
         await dismissStartupModals(page)
         await ensureLibraryInteractive(page)
 
-        const tile = page.locator(byInstanceName(name))
         closedBeforeLaunch = closedCount()
-        await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
+        await clickPlay(page, name)
 
         await expect
           .poll(
@@ -420,7 +420,11 @@ test.describe("modpack interrupted staging", () => {
               "cleanup: stopping the game also failed:"
             )
           }
-          await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+          await attachCoreLogOnFailure(
+            testInfo,
+            harness.runtimePath,
+            alreadyFailed
+          )
           await current.app.close()
         }
         await stopHarness(harness)
@@ -532,7 +536,19 @@ test.describe("modpack interrupted staging", () => {
         )
       },
       async (alreadyFailed) => {
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath)
+        await attachCoreLogOnFailure(
+          testInfo,
+          harness.runtimePath,
+          alreadyFailed
+        )
+        // A body that fails inside the version or repair modal leaves it open
+        // over the instance page, where it covers the navbar logo. Close it
+        // first, the same way `ensureLibraryInteractive` does, so the logo
+        // click below can bring back the library grid the delete needs.
+        const modalClose = page.locator(byTestId(TEST_IDS.modalClose)).last()
+        if (await modalClose.isVisible().catch(() => false)) {
+          await modalClose.dispatchEvent("click").catch(() => {})
+        }
         if (name) {
           try {
             await page
@@ -548,7 +564,19 @@ test.describe("modpack interrupted staging", () => {
             )
           }
         }
-        await ensureLibraryInteractive(page)
+        // Guarded like the delete. Unguarded, its throw replaced the body's
+        // own error: twice this test reported only a missing `library-root`,
+        // while the body had failed inside the version modal and left the
+        // page on the instance's Settings tab.
+        try {
+          await ensureLibraryInteractive(page)
+        } catch (cleanupError) {
+          reportCleanupFailure(
+            cleanupError,
+            alreadyFailed,
+            "cleanup: the library was not left interactive:"
+          )
+        }
       }
     )
   })

@@ -1,5 +1,5 @@
 //! A database this build migrated must open in an older build that has the
-//! compat runner. Migrations 26-28 narrow three scan caches; their stored downs
+//! compat runner. Migrations 27-29 narrow three scan caches; their stored downs
 //! drop the cache rows the older schema cannot hold instead of refusing the
 //! downgrade, and leave every row it can hold alone.
 
@@ -72,12 +72,13 @@ fn an_older_build_opens_a_migrated_database_and_drops_only_the_cache_rows_it_can
     );
     seed_current(&conn);
 
-    // Every older build with the compat runner opens a copy: 28 and 29 overlay
-    // the additive 30, 26 and 27 run the downs above them.
-    assert_eq!(count, 30);
+    // Every older build with the compat runner opens a copy: 29 and 30 overlay
+    // the additive migrations above them, 26 to 28 run the downs above them.
+    assert_eq!(count, 31);
     for (older, verdict) in [
+        (30, OpenVerdict::Proceed),
         (29, OpenVerdict::Proceed),
-        (28, OpenVerdict::Proceed),
+        (28, OpenVerdict::Downgraded),
         (27, OpenVerdict::Downgraded),
         (26, OpenVerdict::Downgraded),
     ] {

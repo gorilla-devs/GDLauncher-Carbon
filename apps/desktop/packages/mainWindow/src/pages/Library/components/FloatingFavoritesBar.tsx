@@ -56,6 +56,7 @@ import type {
   ValidListInstance,
   ListServer
 } from "@gd/core_module/bindings"
+import { withStates } from "@gd/ui"
 
 /** Icon + text hint centered over the library grid area */
 function UnfavoriteHint() {
@@ -251,7 +252,8 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
       </Show>
       <Portal>
         <div
-          class="group/dock fixed bottom-6 left-6 flex animate-popoverEnter"
+          class="group/dock fixed bottom-6 flex animate-popoverEnter"
+          style={{ left: "calc(1.5rem + var(--gdl-rail-width, 0px))" }}
           classList={{
             "z-[10001]": isDragActiveForItems(),
             "z-40": !isDragActiveForItems()
@@ -261,6 +263,7 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
         >
           <div
             ref={containerRef}
+            data-gdl="library.dock"
             class="relative flex items-center min-h-13 min-w-13 rounded-full shadow-lg transition-all duration-250 ease-spring cursor-pointer overflow-visible group-hover/dock:py-3 group-hover/dock:pr-5"
             classList={{
               "bg-darkSlate-800 border border-white/10 shadow-darkSlate-900/50": true,
@@ -282,6 +285,7 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
             {/* Star / state icon - fixed w-13 container so position doesn't shift */}
             <div class="flex items-center justify-center w-13 h-13 shrink-0">
               <div
+                data-gdl="library.dock.star"
                 class="h-6 w-6 transition-all duration-250 ease-spring"
                 classList={{
                   "i-ri:add-line text-primary-400 scale-125":
@@ -327,9 +331,9 @@ export function FloatingFavoritesBar(props: FloatingFavoritesBarProps) {
             {/* Avatar row - CSS group-hover drives sizing, JS signal drives child stagger */}
             <Show when={props.favoriteIds.length > 0}>
               <div
-                class="flex items-center gap-3 max-w-0 opacity-0 pointer-events-none group-hover/dock:max-w-[70vw] group-hover/dock:opacity-100 group-hover/dock:pointer-events-auto transition-all duration-250 ease-spring"
+                class="flex items-center gap-3 max-w-0 opacity-0 pointer-events-none group-hover/dock:max-w-[calc(70vw_-_var(--gdl-rail-width,0px))] group-hover/dock:opacity-100 group-hover/dock:pointer-events-auto transition-all duration-250 ease-spring"
                 classList={{
-                  "!max-w-[70vw] !opacity-100 !pointer-events-auto":
+                  "!max-w-[calc(70vw_-_var(--gdl-rail-width,0px))] !opacity-100 !pointer-events-auto":
                     isDragActiveForItems() ||
                     openMenuCount() > 0 ||
                     recentlyAdded()
@@ -851,6 +855,9 @@ function DockAvatar(props: DockAvatarProps) {
             <Tooltip placement="top">
               <TooltipTrigger as="div">
                 <div
+                  data-gdl={withStates("library.dock.item", {
+                    running: isRunning()
+                  })}
                   class="group relative h-12 w-12 shrink-0 cursor-pointer rounded-full transition-all duration-200 hover:scale-110"
                   classList={{
                     "opacity-50": isDeleting(),
@@ -906,6 +913,7 @@ function DockAvatar(props: DockAvatarProps) {
 
                   {/* Play button overlay on hover */}
                   <div
+                    data-gdl="library.dock.item.play"
                     class="absolute inset-0 flex items-center justify-center rounded-full opacity-0 transition-all duration-200"
                     classList={{
                       "group-hover:opacity-100":

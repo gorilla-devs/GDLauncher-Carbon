@@ -1,6 +1,8 @@
 import { useGDNavigate } from "@/managers/NavigationManager"
 import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
+import { DialogFooter } from "../DialogFooter"
+import { TextLink } from "@/components/TextLink"
 import ModalLayout from "../ModalLayout"
 import { ModalProps, useModal } from ".."
 import { rspc } from "@/utils/rspcClient"
@@ -24,7 +26,7 @@ function AccountExpired(props: ModalProps) {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
-      <div class="w-120 flex min-h-60 flex-col justify-between gap-2 overflow-hidden">
+      <div class="w-120 flex min-h-60 flex-col justify-between gap-2">
         <div class="flex flex-col gap-8">
           <div class="text-xl font-bold">
             <Trans key="accounts:_trn_account_expired.expiration_text" />
@@ -37,10 +39,8 @@ function AccountExpired(props: ModalProps) {
           </div>
         </div>
 
-        <div class="flex w-full justify-between">
-          <Button
-            type="secondary"
-            size="large"
+        <DialogFooter>
+          <TextLink
             data-testid="account-expired-launch-anyway"
             onClick={() => {
               // Asked after the memory question, and only once the sign-in
@@ -53,11 +53,8 @@ function AccountExpired(props: ModalProps) {
               modalsContext?.closeModal()
             }}
           >
-            <div class="flex items-center gap-2">
-              <i class="i-hugeicons:play h-4 w-4" />
-              <Trans key="accounts:_trn_account_expired.launch_anyway" />
-            </div>
-          </Button>
+            <Trans key="accounts:_trn_account_expired.launch_anyway" />
+          </TextLink>
           <Button
             type="primary"
             size="large"
@@ -71,7 +68,7 @@ function AccountExpired(props: ModalProps) {
               <Trans key="accounts:_trn_account_expired.back_to_login" />
             </div>
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

@@ -1,4 +1,5 @@
 import { RSPCError } from "@/utils/rspcClient"
+import { formatSeconds } from "./intl"
 
 export const parseTwoDigitNumber = (number: number) => {
   return number.toString().length === 1 ? `0${number}` : number
@@ -16,43 +17,10 @@ export const strToMs = (string: string) => {
   return new Date(string)?.getTime()
 }
 
-export const convertSecondsToHumanTime = (seconds: number): string => {
-  const timeUnits = [
-    { name: "year", length: 60 * 60 * 24 * 365 },
-    { name: "month", length: 60 * 60 * 24 * 30 },
-    { name: "week", length: 60 * 60 * 24 * 7 },
-    { name: "day", length: 60 * 60 * 24 },
-    { name: "hour", length: 60 * 60 },
-    { name: "minute", length: 60 },
-    { name: "second", length: 1 }
-  ]
-
-  let remainingSeconds = seconds
-  const result: string[] = []
-
-  for (const timeUnit of timeUnits) {
-    const timeValue = Math.floor(remainingSeconds / timeUnit.length)
-
-    if (timeValue > 0) {
-      remainingSeconds = remainingSeconds % timeUnit.length
-      const unit = timeValue > 1 ? timeUnit.name + "s" : timeUnit.name
-      result.push(`${timeValue} ${unit}`)
-    }
-  }
-
-  if (result.length === 0) {
-    return "0 seconds"
-  }
-
-  if (result.length === 1) {
-    return result[0]
-  } else if (result.length === 2) {
-    return result.join(" and ")
-  } else {
-    const lastPart = result.pop()
-    return result.join(", ") + ", and " + lastPart
-  }
-}
+/** "1 hour, 5 minutes, and 3 seconds", in English. For the app language,
+ *  see `formatSeconds`. */
+export const convertSecondsToHumanTime = (seconds: number): string =>
+  formatSeconds(seconds, "english")
 
 export const getTitleByDays = (days: string) => {
   const parsedDays = Number.parseInt(days, 10)

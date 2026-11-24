@@ -15,7 +15,7 @@ const TextArea = (props: Props) => {
     <>
       <textarea
         {...props}
-        class={`bg-darkSlate-800 border-0 w-full min-h-20 rounded-md outline-none focus-visible:outline-darkSlate-500 text-lightSlate-50 py-2 px-3 box-border placeholder:text-lightSlate-700 ${
+        class={`bg-darkSlate-800 border-0 w-full min-h-20 rounded-md outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary-500 text-lightSlate-50 py-2 px-3 box-border placeholder:text-lightSlate-700 ${
           props.class || ""
         }`}
         classList={{

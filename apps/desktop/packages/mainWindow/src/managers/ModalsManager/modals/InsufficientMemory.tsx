@@ -4,7 +4,9 @@ import ModalLayout from "../ModalLayout"
 import { ModalProps, useModal } from ".."
 import { rspc } from "@/utils/rspcClient"
 import { useNavigate } from "@solidjs/router"
-import { createSignal } from "solid-js"
+import { createSignal, onMount } from "solid-js"
+import { DialogFooter } from "../DialogFooter"
+import { TextLink } from "@/components/TextLink"
 
 function InsufficientMemory(props: ModalProps) {
   const navigate = useNavigate()
@@ -24,14 +26,19 @@ function InsufficientMemory(props: ModalProps) {
   const neededMb = () => props.data?.needed_mb as number
   const availableMb = () => props.data?.available_mb as number
 
+  let primary: HTMLButtonElement | undefined
+  onMount(() => primary?.focus())
+
   return (
-    <ModalLayout noHeader={props.noHeader} title={props?.title} width="w-120">
-      <div class="flex min-h-50 flex-col justify-between gap-6 overflow-hidden">
+    <ModalLayout
+      noHeader={props.noHeader}
+      title={props?.title}
+      width="w-120"
+      height="h-auto"
+      compact
+    >
+      <div class="flex flex-col gap-6">
         <div class="flex flex-col gap-4">
-          <div class="flex items-center gap-2 text-xl font-bold text-yellow-400">
-            <div class="i-hugeicons:alert-02 h-6 w-6 shrink-0" />
-            <Trans key="java:_trn_insufficient_memory_title" />
-          </div>
           <div class="text-lightSlate-300">
             <Trans
               key="java:_trn_insufficient_memory_body"
@@ -52,10 +59,10 @@ function InsufficientMemory(props: ModalProps) {
           </Checkbox>
         </div>
 
-        <div class="flex w-full justify-between">
-          <Button
-            type="secondary"
-            size="large"
+        <DialogFooter>
+          <TextLink
+            class="whitespace-nowrap"
+            data-testid="insufficient-memory-play-anyway"
             onClick={async () => {
               // Persist the dismissal first if requested. The next launch
               // (not this one — this one passes skipMemoryCheck) reads
@@ -65,32 +72,29 @@ function InsufficientMemory(props: ModalProps) {
               if (dontShowAgain()) {
                 await dismissWarningMutation.mutateAsync(true)
               }
+              // The Java check comes first, so it passed or "Play anyway"
+              // skipped it: asking again would loop.
               launchInstanceMutation.mutate({
                 id: instanceId(),
-                skipMemoryCheck: true
+                skipMemoryCheck: true,
+                skipJavaCheck: true
               })
               modalsContext?.closeModal()
             }}
           >
-            <div class="flex items-center gap-2">
-              <i class="i-hugeicons:play h-4 w-4" />
-              <Trans key="java:_trn_launch_anyway" />
-            </div>
-          </Button>
+            <Trans key="java:_trn_java_issue_play_anyway" />
+          </TextLink>
           <Button
-            type="primary"
-            size="large"
+            ref={primary}
+            class="whitespace-nowrap"
             onClick={() => {
               navigate(`/library/${instanceId()}/settings`)
               modalsContext?.closeModal()
             }}
           >
-            <div class="flex items-center gap-2">
-              <i class="i-hugeicons:settings-02 h-4 w-4" />
-              <Trans key="java:_trn_adjust_memory" />
-            </div>
+            <Trans key="java:_trn_adjust_memory" />
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

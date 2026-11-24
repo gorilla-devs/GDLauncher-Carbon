@@ -49,18 +49,29 @@ const META_VERSION: &str = formatcp!("v{}", CURRENT_FORMAT_VERSION);
 
 pub(crate) struct MinecraftManager {
     pub meta_base_url: Url,
+    /// For tests: served instead of fetching the version manifest. An error
+    /// stands for an unreachable manifest.
+    #[cfg(test)]
+    pub manifest_for_test: std::sync::Mutex<Option<Result<VersionManifest, String>>>,
 }
 
 impl MinecraftManager {
     pub fn new() -> Self {
         Self {
             meta_base_url: Url::parse(env!("META_BASE_URL")).unwrap(),
+            #[cfg(test)]
+            manifest_for_test: Default::default(),
         }
     }
 }
 
 impl ManagerRef<'_, MinecraftManager> {
     pub async fn get_minecraft_manifest(&self) -> anyhow::Result<VersionManifest> {
+        #[cfg(test)]
+        if let Some(manifest) = self.manifest_for_test.lock().unwrap().clone() {
+            return manifest.map_err(|e| anyhow::anyhow!(e));
+        }
+
         minecraft::get_manifest(&self.app.reqwest_client, &self.meta_base_url).await
     }
 
@@ -448,6 +459,7 @@ mod tests {
             2048,
             None,
             "",
+            &[],
             runtime_path,
             version_info,
             &lwjgl_group,

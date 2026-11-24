@@ -1,0 +1,388 @@
+import { afterEach, expect, it, vi } from "vitest"
+import { createContext, createSignal } from "solid-js"
+import { render } from "solid-js/web"
+import { QueryClient, QueryClientProvider } from "@tanstack/solid-query"
+import { deferred, settle } from "@/test/uiBoxes.fixture"
+import PageView from "./pages/News/PageView"
+import PatchesTab from "./pages/News/PatchesTab"
+import Versions from "./pages/AddonViewPage/Versions"
+import { AddonContext, StickyHeaderHeightContext } from "./pages/AddonViewPage"
+
+const control = vi.hoisted(() => ({
+  articles: [] as any[],
+  navigate: vi.fn(),
+  list: undefined as any
+}))
+vi.mock("@gd/ui", async () => import("@/test/uiBoxes.fixture"))
+vi.mock("@gd/i18n", () => ({
+  Trans: (props: any) => <span>{props.key}</span>,
+  useTransContext: () => [(key: string) => key]
+}))
+vi.mock("@solidjs/router", () => ({
+  useParams: () => ({ id: "article" }),
+  useSearchParams: () => [{ instanceId: "12", serverId: "34" }]
+}))
+vi.mock("@/utils/news", () => ({
+  useNews: () => ({ isPending: false, data: [] }),
+  usePatchNotes: () => ({ isPending: false, data: control.articles })
+}))
+vi.mock("@/managers/NavigationManager", () => ({
+  useGDNavigate: () => ({ navigate: control.navigate })
+}))
+vi.mock("@/managers/ModalsManager", () => ({
+  useModal: () => ({ closeModal: vi.fn(), openModal: vi.fn() })
+}))
+vi.mock("@/utils/rspcClient", () => ({
+  rspc: {
+    createQuery: (options: any) => ({
+      data: options().queryKey[0] === "instance.getInstanceMods" ? [] : {}
+    })
+  }
+}))
+vi.mock("@/components/InfiniteScrollVersionsQueryWrapper", () => ({
+  useInfiniteVersionsQuery: () => control.list
+}))
+vi.mock("@/pages/AddonViewPage", () => ({
+  AddonContext: createContext(),
+  StickyHeaderHeightContext: createContext(() => 0)
+}))
+vi.mock("@tanstack/solid-virtual", () => ({
+  createVirtualizer: (options: any) => ({
+    getTotalSize: () => options.count * 70,
+    getVirtualItems: () =>
+      Array.from({ length: options.count }, (_, index) => ({
+        index,
+        start: index * 70,
+        size: 70
+      }))
+  })
+}))
+vi.mock("./pages/AddonViewPage/Versions/VersionRow", () => ({
+  default: (props: any) => (
+    <span>
+      {props.modVersion.fileId}:{props.instanceId}:{props.serverId}
+    </span>
+  )
+}))
+
+let dispose: (() => void) | undefined
+let client: QueryClient | undefined
+afterEach(() => {
+  dispose?.()
+  dispose = undefined
+  client?.clear()
+  client = undefined
+  document.body.textContent = ""
+  vi.unstubAllGlobals()
+  vi.clearAllMocks()
+})
+function mount(component: () => any) {
+  const root = document.createElement("div")
+  document.body.append(root)
+  dispose = render(component, root)
+  return root
+}
+const button = (root: HTMLElement, key: string) =>
+  Array.from(root.querySelectorAll("button")).find((item) =>
+    item.textContent?.includes(key)
+  )!
+function articleFixture() {
+  control.articles = [
+    {
+      id: "article",
+      type: "patch",
+      contentPath: "https://synthetic.invalid/patch",
+      title: "Article",
+      date: "2026-01-01",
+      url: "https://synthetic.invalid/article"
+    }
+  ]
+  client = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: Infinity } }
+  })
+  return () => (
+    <QueryClientProvider client={client!}>
+      <PageView />
+    </QueryClientProvider>
+  )
+}
+for (const kind of ["transport", "json", "http"] as const) {
+  it(`${kind} failure settles into Retry and Retry fetches real query content`, async () => {
+    const pending = deferred()
+    const fetcher = vi.fn(() => pending.promise)
+    vi.stubGlobal("fetch", fetcher)
+    const root = mount(articleFixture())
+    expect(root.querySelector('[data-testid="spinner"]')).not.toBeNull()
+    if (kind === "transport") pending.reject(new Error("synthetic offline"))
+    else
+      pending.resolve({
+        ok: kind !== "http",
+        status: 503,
+        json: async () => {
+          if (kind === "json") throw new Error("synthetic malformed JSON")
+          return { body: "bad status body" }
+        }
+      })
+    await settle()
+    expect(
+      client!.getQueryCache().find({
+        queryKey: ["patchContent", "https://synthetic.invalid/patch"]
+      })!.state.status
+    ).toBe("error")
+    expect(button(root, "retry")).toBeDefined()
+    expect(root.querySelector('[data-testid="spinner"]')).toBeNull()
+    fetcher.mockImplementationOnce(async () => ({
+      ok: true,
+      json: async () => ({ body: "<p>Recovered</p>" })
+    }))
+    button(root, "retry").click()
+    await settle()
+    expect(root.textContent).toContain("Recovered")
+    expect(fetcher).toHaveBeenCalledTimes(2)
+    expect(button(root, "Read Full Patch Notes")).toBeDefined()
+  })
+}
+it("a failed patch load is shown in place only, without the global toast", async () => {
+  const fetcher = vi.fn(async () => ({
+    ok: false,
+    status: 404,
+    json: async () => ({})
+  }))
+  vi.stubGlobal("fetch", fetcher)
+  const root = mount(articleFixture())
+  await settle()
+  const query = client!.getQueryCache().find({
+    queryKey: ["patchContent", "https://synthetic.invalid/patch"]
+  })!
+  expect(query.state.status).toBe("error")
+  expect(root.querySelector('[role="alert"]')).not.toBeNull()
+  // The app's QueryCache leaves a query with this meta to its own error UI.
+  expect(query.meta?.localErrorToast).toBe(true)
+})
+it("empty success reopens from the same real cache without loading or fetching", async () => {
+  const fetcher = vi.fn(async () => ({
+    ok: true,
+    json: async () => ({ body: "" })
+  }))
+  vi.stubGlobal("fetch", fetcher)
+  const component = articleFixture()
+  let root = mount(component)
+  await settle()
+  expect(root.querySelector('[data-testid="spinner"]')).toBeNull()
+  expect(root.textContent).toContain("no_content")
+  dispose!()
+  dispose = undefined
+  root.remove()
+  root = mount(component)
+  await settle()
+  expect(fetcher).toHaveBeenCalledTimes(1)
+  expect(root.textContent).toContain("no_content")
+})
+it("cached body and empty success survive background failure with recovery", async () => {
+  for (const body of ["<p>Cached body</p>", ""]) {
+    const fetcher = vi.fn(async () => ({
+      ok: true,
+      json: async () => ({ body })
+    }))
+    vi.stubGlobal("fetch", fetcher)
+    const root = mount(articleFixture())
+    await settle()
+    fetcher.mockRejectedValueOnce(new Error("synthetic background failure"))
+    await client!.refetchQueries()
+    await settle()
+    expect(root.textContent).toContain(body ? "Cached body" : "no_content")
+    expect(root.querySelector('[data-testid="spinner"]')).toBeNull()
+    expect(button(root, "retry")).toBeDefined()
+    dispose!()
+    dispose = undefined
+    client!.clear()
+    root.remove()
+  }
+})
+
+const patches = [
+  { id: "26.3-pre-3", version: "26.3-pre-3", versionType: "snapshot" },
+  { id: "26.3-pre-2", version: "26.3-pre-2", versionType: "snapshot" },
+  { id: "1.20-pre1", versionType: "snapshot" },
+  { id: "explicit", versionType: "pre-release" },
+  { id: "weekly", version: "26w12a", versionType: "snapshot" },
+  { id: "release", version: "1.20", versionType: "release" },
+  { id: "rc", version: "1.20-rc1", versionType: "snapshot" },
+  { id: "prose", version: "the 1.20-pre1 preview", versionType: "snapshot" }
+].map((item) => ({ ...item, title: item.id, date: "2026-01-01" }))
+it("actual filter includes numbered prereleases and excludes RC/prose", () => {
+  control.articles = patches
+  const root = mount(() => <PatchesTab />)
+  const ids = () =>
+    Array.from(root.querySelectorAll("h3")).map((item) => item.textContent)
+  expect(ids()).toHaveLength(8)
+  button(root, "prereleases").click()
+  expect(ids()).toEqual(["26.3-pre-3", "26.3-pre-2", "1.20-pre1", "explicit"])
+  button(root, "snapshots").click()
+  expect(ids()).toEqual([
+    "26.3-pre-3",
+    "26.3-pre-2",
+    "1.20-pre1",
+    "weekly",
+    "rc",
+    "prose"
+  ])
+  button(root, "releases").click()
+  expect(ids()).toEqual(["release"])
+  root.querySelector("h3")!.parentElement!.parentElement!.parentElement!.click()
+  expect(control.navigate).toHaveBeenCalledWith("/news/release")
+})
+
+function versionsFixture(
+  projectError: boolean,
+  listError: boolean,
+  cached = false,
+  pending = false
+) {
+  const [project, setProject] = createSignal<any>({
+    data: cached ? { type: "mod" } : undefined,
+    error: projectError ? new Error("project") : null,
+    isPending: pending && !projectError
+  })
+  const [list, setList] = createSignal<any>({
+    rows: cached
+      ? [
+          {
+            fileId: "build",
+            datePublished: "2026-01-01",
+            gameVersions: ["1.20"]
+          }
+        ]
+      : [],
+    error: listError ? new Error("versions") : null,
+    loading: pending
+  })
+  const projectRefetch = vi.fn(async () => {
+    setProject({ data: { type: "mod" }, error: null, isPending: false })
+  })
+  const listRefetch = vi.fn(async () => {
+    setList({
+      rows: [
+        { fileId: "build", datePublished: "2026-01-01", gameVersions: ["1.20"] }
+      ],
+      error: null,
+      loading: false
+    })
+  })
+  const mod = {
+    get data() {
+      return project().data
+    },
+    get error() {
+      return project().error
+    },
+    get isPending() {
+      return project().isPending
+    },
+    refetch: projectRefetch
+  }
+  control.list = {
+    targetReady: true,
+    allRows: () => list().rows,
+    get isLoading() {
+      return list().loading
+    },
+    infiniteQuery: {
+      get error() {
+        return list().error
+      },
+      refetch: listRefetch
+    }
+  }
+  const root = mount(() => (
+    <AddonContext.Provider value={mod as any}>
+      <StickyHeaderHeightContext.Provider value={() => 0}>
+        <Versions />
+      </StickyHeaderHeightContext.Provider>
+    </AddonContext.Provider>
+  ))
+  return { root, projectRefetch, listRefetch }
+}
+for (const [projectError, listError] of [
+  [true, true],
+  [true, false],
+  [false, true]
+]) {
+  it(`settled project=${projectError} list=${listError} errors recover both queries`, async () => {
+    const { root, projectRefetch, listRefetch } = versionsFixture(
+      projectError,
+      listError
+    )
+    expect(root.querySelector('[data-testid="skeleton"]')).toBeNull()
+    expect(root.textContent).toContain("error_loading_versions")
+    button(root, "retry").click()
+    await settle()
+    expect(projectRefetch).toHaveBeenCalledTimes(1)
+    expect(listRefetch).toHaveBeenCalledTimes(1)
+    expect(root.querySelector('[data-file-id="build"]')!.textContent).toContain(
+      "build:12:34"
+    )
+  })
+}
+it("true pending scope retains skeleton", () => {
+  const { root } = versionsFixture(false, false, false, true)
+  expect(root.querySelector('[data-testid="skeleton"]')).not.toBeNull()
+})
+it("cached rows survive background errors and offer nonblocking retry", () => {
+  const { root } = versionsFixture(true, true, true)
+  expect(root.querySelector('[data-file-id="build"]')).not.toBeNull()
+  expect(root.querySelector('[data-testid="skeleton"]')).toBeNull()
+  expect(button(root, "retry")).toBeDefined()
+})
+it("pending target still retries project without forcing an unadmitted list", async () => {
+  const { root, projectRefetch, listRefetch } = versionsFixture(
+    true,
+    false,
+    false,
+    true
+  )
+  control.list.targetReady = false
+  button(root, "retry").click()
+  await settle()
+  expect(projectRefetch).toHaveBeenCalledTimes(1)
+  expect(listRefetch).not.toHaveBeenCalled()
+})
+it("manual list dispatch rechecks current target after project recovery starts", async () => {
+  const { root, projectRefetch, listRefetch } = versionsFixture(true, true)
+  projectRefetch.mockImplementationOnce(async () => {
+    control.list.targetReady = false
+  })
+  button(root, "retry").click()
+  await settle()
+  expect(listRefetch).not.toHaveBeenCalled()
+  control.list.targetReady = true
+  button(root, "retry").click()
+  await settle()
+  expect(listRefetch).toHaveBeenCalledTimes(1)
+})
+it("cached project with list error shows recovery and successful empty remains distinct", async () => {
+  const { root, projectRefetch } = versionsFixture(false, true)
+  await projectRefetch()
+  expect(root.textContent).toContain("error_loading_versions")
+  expect(root.querySelector('[data-testid="skeleton"]')).toBeNull()
+  dispose!()
+  dispose = undefined
+  root.remove()
+  const empty = versionsFixture(false, false)
+  await empty.projectRefetch()
+  expect(empty.root.textContent).toContain("no_versions_found")
+  expect(empty.root.querySelector('[data-testid="skeleton"]')).toBeNull()
+})
+it("rejected retry settles without leaking event errors or hiding cached rows", async () => {
+  const { root, projectRefetch, listRefetch } = versionsFixture(
+    true,
+    true,
+    true
+  )
+  projectRefetch.mockRejectedValueOnce(new Error("synthetic project retry"))
+  listRefetch.mockRejectedValueOnce(new Error("synthetic versions retry"))
+  button(root, "retry").click()
+  await settle()
+  expect(root.querySelector('[data-file-id="build"]')).not.toBeNull()
+  expect(button(root, "retry").disabled).toBe(false)
+})

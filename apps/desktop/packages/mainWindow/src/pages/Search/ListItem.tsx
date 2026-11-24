@@ -1,8 +1,6 @@
 import { FEUnifiedCategory, Mod, ServerAddon } from "@gd/core_module/bindings"
 import { Trans } from "@gd/i18n"
 import { formatDownloadCount } from "@/utils/helpers"
-import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import DynamicBadgeContainer from "./DynamicBadgeContainer"
 import { createMemo, createSignal, Match, Show, Switch } from "solid-js"
@@ -11,9 +9,14 @@ import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
 import { LinkedSearchResult } from "@/utils/linkedFile"
 import { LinkedFileLabel } from "./LinkedFileLabel"
+import { withStates } from "@gd/ui"
+import { PlatformLogo } from "@/components/PlatformLogo"
+import { resultImageUrl } from "./resultImage"
 
 interface SearchResultItemProps {
   result: LinkedSearchResult
+  /** Its place in the results, from 1: `--gdl-result-index` for themes. */
+  position?: number
   onItemClick: (id: string, platform: string) => void
   isInstalled: boolean
   instanceId?: number
@@ -47,14 +50,20 @@ export function ListItem(props: SearchResultItemProps) {
       )
   })
 
+  const image = () => resultImageUrl(props.result, "small")
+
   return (
     <div class="my-1 overflow-hidden rounded-md">
       <div
         data-testid="search-result-row"
         data-project-id={props.result.id}
+        data-gdl={withStates("search.result", {
+          installed: props.isInstalled
+        })}
         class="group relative flex h-full cursor-pointer gap-2 overflow-x-hidden overflow-y-visible rounded-md border border-transparent px-8 py-4 transition-all duration-100 hover:scale-[1.02] hover:border-white/10 hover:bg-white/5 hover:shadow-lg hover:shadow-black/10"
         style={{
-          isolation: "isolate"
+          isolation: "isolate",
+          "--gdl-result-index": props.position
         }}
         classList={{
           "scale-[1.02] border-white/10 bg-white/5 shadow-lg shadow-black/10":
@@ -65,13 +74,14 @@ export function ListItem(props: SearchResultItemProps) {
         }
       >
         <div
+          data-gdl="search.result.backdrop"
           class="absolute inset-0 z-0 bg-cover bg-center opacity-20 transition-opacity duration-100 group-hover:opacity-30"
           classList={{
             "opacity-30": isHoverActive(),
             "opacity-20": !isHoverActive()
           }}
           style={{
-            "background-image": `url(${props.result.imageUrl || ""})`,
+            "background-image": image() ? `url(${image()})` : "none",
             "mask-image": "linear-gradient(to right, transparent 20%, black)",
             "-webkit-mask-image":
               "linear-gradient(to right, transparent 20%, black)",
@@ -80,12 +90,36 @@ export function ListItem(props: SearchResultItemProps) {
           }}
         />
         <div class="relative z-10 flex w-full items-center gap-4">
-          <img src={props.result.imageUrl || ""} class="h-16 w-16 rounded-md" />
+          <Show
+            when={image()}
+            fallback={
+              <div
+                data-gdl="search.result.image"
+                class="bg-darkSlate-700 flex h-16 w-16 shrink-0 items-center justify-center rounded-md"
+              >
+                <div class="i-hugeicons:package text-darkSlate-400 h-7 w-7" />
+              </div>
+            }
+          >
+            {(src) => (
+              <img
+                data-gdl="search.result.image"
+                src={src()}
+                class="h-16 w-16 rounded-md"
+              />
+            )}
+          </Show>
           <div class="w-7/10 flex flex-col gap-2">
-            <div class="truncate text-left text-xl font-medium">
+            <div
+              data-gdl="search.result.title"
+              class="truncate text-left text-xl font-medium"
+            >
               {props.result.title}
             </div>
-            <div class="text-lightSlate-700 truncate text-left text-sm">
+            <div
+              data-gdl="search.result.description"
+              class="text-lightSlate-700 truncate text-left text-sm"
+            >
               {props.result.description}
             </div>
             <LinkedFileLabel result={props.result} />
@@ -100,6 +134,7 @@ export function ListItem(props: SearchResultItemProps) {
             <div class="relative flex items-center">
               {/* Download count and platform icon - visible by default, slides right on hover */}
               <div
+                data-gdl="search.result.stats"
                 class="flex items-center gap-2 transition-all duration-200"
                 classList={{
                   "opacity-100 translate-x-0 group-hover:opacity-0 group-hover:translate-x-8":
@@ -110,11 +145,11 @@ export function ListItem(props: SearchResultItemProps) {
                 <div class="text-lightSlate-700 text-sm">
                   {formatDownloadCount(props.result.downloadsCount)}
                 </div>
-                <img
-                  src={
+                <PlatformLogo
+                  platform={
                     props.result.platform === "curseforge"
-                      ? CurseforgeLogo
-                      : ModrinthLogo
+                      ? "curseforge"
+                      : "modrinth"
                   }
                   class="h-4 w-4"
                 />
@@ -124,6 +159,7 @@ export function ListItem(props: SearchResultItemProps) {
                   only while shown, so a click on a row that is not hovered yet
                   (a list just redrawn under the pointer) opens the addon. */}
               <div
+                data-gdl="search.result.action"
                 class="absolute right-0 flex items-center justify-center transition-all duration-200"
                 classList={{
                   "opacity-0 -translate-x-16 pointer-events-none group-hover:opacity-100 group-hover:translate-x-0 group-hover:pointer-events-auto":

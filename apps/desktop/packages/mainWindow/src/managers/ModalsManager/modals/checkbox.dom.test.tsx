@@ -62,7 +62,7 @@ function mount(component: () => any) {
 function gesture(root: HTMLElement) {
   const input = root.querySelector('input[type="checkbox"]')
   pointerGesture(
-    (input?.closest("label") ??
+    (input?.closest<HTMLElement>('[data-gdl~="checkbox"]') ??
       root.querySelector(".cursor-pointer.rounded-md"))!
   )
 }
@@ -83,7 +83,11 @@ it("shared control exposes labelled focusable reactive native checked disabled i
   ))
   const input = root.querySelector<HTMLInputElement>('input[type="checkbox"]')
   expect(input).not.toBeNull()
-  expect(input!.labels?.[0].textContent).toContain("Synthetic consent")
+  // Named by its label, which is the element aria-labelledby points at.
+  expect(
+    document.getElementById(input!.getAttribute("aria-labelledby")!)
+      ?.textContent
+  ).toContain("Synthetic consent")
   expect(input!.disabled).toBe(false)
   expect(input!.indeterminate).toBe(true)
   input!.focus()

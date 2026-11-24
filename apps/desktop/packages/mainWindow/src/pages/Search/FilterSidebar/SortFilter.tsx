@@ -9,7 +9,9 @@ const CF_ORDER_OPTIONS = ["ascending", "descending"] as const
 
 function CurseforgeSortFilter() {
   const searchResults = useSearchContext()
-  const radioName = `sort-${createUniqueId()}`
+  // Each set of radios is one group for the keyboard.
+  const sortFieldGroup = createUniqueId()
+  const sortOrderGroup = createUniqueId()
 
   const currentFilters = () => {
     const filters = searchResults?.searchQuery().platformFilters
@@ -46,7 +48,7 @@ function CurseforgeSortFilter() {
           <For each={CF_SORT_FIELDS}>
             {(option) => (
               <Radio
-                name={`${radioName}-field`}
+                name={sortFieldGroup}
                 value={option.value}
                 checked={currentFilters().sort_field === option.value}
                 allowDeselect
@@ -77,7 +79,7 @@ function CurseforgeSortFilter() {
           <For each={[...CF_ORDER_OPTIONS]}>
             {(value) => (
               <Radio
-                name={`${radioName}-order`}
+                name={sortOrderGroup}
                 value={value}
                 checked={currentFilters().sort_order === value}
                 allowDeselect
@@ -101,7 +103,8 @@ function CurseforgeSortFilter() {
 
 function ModrinthSortFilter() {
   const searchResults = useSearchContext()
-  const radioName = `sort-${createUniqueId()}`
+  // One group for the keyboard.
+  const sortGroup = createUniqueId()
 
   const currentFilters = () => {
     const filters = searchResults?.searchQuery().platformFilters
@@ -131,7 +134,7 @@ function ModrinthSortFilter() {
       <For each={MR_SORT_OPTIONS}>
         {(option) => (
           <Radio
-            name={radioName}
+            name={sortGroup}
             value={option.value}
             checked={currentFilters().sort_index === option.value}
             allowDeselect

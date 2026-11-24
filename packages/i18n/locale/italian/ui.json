@@ -16,8 +16,6 @@
   "_trn_tooltip.rtp_not_a_folder": "Questa non è una cartella: è un file, o un collegamento a qualcosa che non esiste più. Scegli una cartella.",
   "_trn_tooltip.rtp_not_writable": "GDLauncher non può scrivere in questa cartella. Scegli una cartella di tua proprietà, o consenti la scrittura al suo interno.",
   "_trn_tooltip.rtp_has_other_files": "Questa cartella contiene altri file. Scegli una cartella vuota, ad esempio una nuova cartella al suo interno, o una cartella che contiene già dati di GDLauncher.",
-  "_trn_path": "Percorso",
-  "_trn_profile": "Profilo",
   "_trn_custom": "Personalizzato",
   "_trn_tile_size": "Dimensione Riquadro",
   "_trn_sort_options": "Opzioni Ordinamento",

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest"
-import { createSignal } from "solid-js"
+import { createSignal, For } from "solid-js"
 import { render } from "solid-js/web"
 import type { FEHookTest } from "@gd/core_module/bindings"
 
@@ -36,14 +36,16 @@ vi.mock("@/components/InstancePicker", () => ({
         {p.children}
       </button>
       <ul aria-label={p.label}>
-        {p.instances().map((instance: { id: number; name: string }) => (
-          <li
-            data-testid="hook-test-choice"
-            onClick={() => p.onPick(instance.id)}
-          >
-            {instance.name}
-          </li>
-        ))}
+        <For each={p.instances()}>
+          {(instance: { id: number; name: string }) => (
+            <li
+              data-testid="hook-test-choice"
+              onClick={() => p.onPick(instance.id)}
+            >
+              {instance.name}
+            </li>
+          )}
+        </For>
       </ul>
     </>
   )

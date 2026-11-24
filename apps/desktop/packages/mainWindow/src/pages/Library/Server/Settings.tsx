@@ -4,6 +4,7 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { createEffect, createSignal, on, Show } from "solid-js"
 import { FEServerDetails } from "@gd/core_module/bindings"
 import { generateSequence } from "@/utils/helpers"
+import JavaArgumentsHint from "@/components/Java/JavaArgumentsHint"
 import Title from "@/pages/Settings/components/Title"
 import Row from "@/pages/Settings/components/Row"
 import RowsContainer from "@/pages/Settings/components/RowsContainer"
@@ -261,7 +262,7 @@ const Settings = (props: SettingsProps) => {
         </Row>
 
         <Row>
-          <Title description={<Trans key="java:_trn_java_arguments_hint" />}>
+          <Title description={<JavaArgumentsHint />}>
             <Trans key="instances:_trn_server_settings_extra_args" />
           </Title>
           <RightHandSide>

@@ -177,9 +177,10 @@ impl ToString for JavaOs {
     }
 }
 
-#[derive(Debug, EnumIter)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, EnumIter)]
 pub enum JavaVendor {
     Azul,
+    Mojang,
 }
 
 impl JavaVendor {
@@ -322,6 +323,17 @@ pub enum SystemJavaProfileName {
 }
 
 impl SystemJavaProfileName {
+    pub fn major(&self) -> u8 {
+        match self {
+            Self::Legacy | Self::LegacyFixed1 => 8,
+            Self::Alpha => 16,
+            Self::Beta | Self::Gamma | Self::GammaSnapshot => 17,
+            Self::Delta => 21,
+            Self::Epsilon => 25,
+            Self::MinecraftJavaExe => 14,
+        }
+    }
+
     pub fn is_java_version_compatible(&self, java_version: &JavaVersion) -> bool {
         match self {
             Self::Legacy => java_version.major == 8,

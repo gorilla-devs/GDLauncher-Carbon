@@ -22,6 +22,7 @@ import { taskTranslationOptions } from "@/utils/taskTranslation"
 import type { StepProps } from "."
 import { extractErrorDisplay, rspc } from "@/utils/rspcClient"
 import { useModal } from "@/managers/ModalsManager"
+import { CancelLink, DialogFooter } from "@/managers/ModalsManager/DialogFooter"
 import { setShaderInstallRunning } from "./state"
 import { formatBytes } from "@/utils/formatBytes"
 
@@ -396,17 +397,15 @@ const Installing = (props: StepProps) => {
               {t("content:_trn_shader_loader_uncertain")}
             </p>
           </Show>
-          <div class="mt-2 flex gap-2">
-            <Button type="secondary" onClick={cancel}>
-              <Trans key="content:_trn_shader_loader_cancel" />
-            </Button>
+          <DialogFooter class="mt-2">
+            <CancelLink onClick={cancel} />
             <Show when={!unresolvedRequest() && !destroyed()}>
               <Button type="primary" onClick={retry}>
                 <div class="i-hugeicons:refresh h-4 w-4" />
                 <Trans key="general:_trn_retry" />
               </Button>
             </Show>
-          </div>
+          </DialogFooter>
         </div>
       }
     >

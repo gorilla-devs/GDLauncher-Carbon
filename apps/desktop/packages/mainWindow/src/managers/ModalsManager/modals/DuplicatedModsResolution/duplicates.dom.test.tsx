@@ -15,7 +15,10 @@ const c = vi.hoisted(() => ({
 vi.mock("@gd/ui", async () => import("@/test/uiForms.fixture"))
 vi.mock("@gd/i18n", () => ({
   Trans: (p: any) => <span>{p.key}</span>,
-  useTransContext: () => [(k: string) => k]
+  useTransContext: () => [
+    (k: string) => k,
+    { getI18next: () => ({ language: "en" }) }
+  ]
 }))
 vi.mock("@solidjs/router", () => ({
   useParams: () => ({ id: "7" }),

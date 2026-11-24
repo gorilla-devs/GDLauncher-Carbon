@@ -5,7 +5,7 @@ use carbon_repos::{
 use rusqlite::Connection;
 fn old() -> MigrationSet {
     let (mut set, _) = carbon_repos::get_migrations();
-    set.migrations.truncate(26);
+    set.migrations.truncate(27);
     set
 }
 fn seed(conn: &Connection) {
@@ -102,7 +102,7 @@ fn colliding_owner_down_keeps_one_row_per_file_name() {
     assert_eq!(
         conn.query_row("PRAGMA user_version", [], |r| r.get::<_, i32>(0))
             .unwrap(),
-        26
+        27
     );
     assert!(
         conn.prepare("PRAGMA foreign_key_check")

@@ -116,6 +116,7 @@ fn update(id: InstanceId) -> domain::InstanceSettingsUpdate {
         post_exit_hook: None,
         wrapper_command: None,
         game_resolution: None,
+        java_floor: None,
         mod_sources: None,
         modpack_locked: None,
     }

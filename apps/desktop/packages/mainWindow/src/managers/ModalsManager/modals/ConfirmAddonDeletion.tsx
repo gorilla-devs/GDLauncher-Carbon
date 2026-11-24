@@ -2,6 +2,8 @@ import { Trans, useTransContext } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import { For, Show } from "solid-js"
 import ModalLayout from "../ModalLayout"
+import { DialogFooter } from "../DialogFooter"
+import { TextLink } from "@/components/TextLink"
 import { ModalProps, useModal } from ".."
 import { rspc } from "@/utils/rspcClient"
 import { deletionTarget } from "@/utils/deletionTarget"
@@ -112,14 +114,13 @@ function ConfirmAddonDeletion(props: ModalProps) {
             />
           </DeletionNoteBox>
         </Show>
-        <div class="flex w-full justify-between pt-2">
-          <Button
-            onClick={() => modalsContext?.closeModal()}
+        <DialogFooter class="pt-2">
+          <TextLink
             data-testid="addon-deletion-cancel"
+            onClick={() => modalsContext?.closeModal()}
           >
-            <div class="i-hugeicons:cancel-01" />
-            {t("instances:_trn_instance_confirm_deletion.cancel")}
-          </Button>
+            <Trans key="general:_trn_cancel" />
+          </TextLink>
           <Button
             type="secondary"
             textColor={target() === "permanent" ? "!text-red-400" : undefined}
@@ -135,7 +136,7 @@ function ConfirmAddonDeletion(props: ModalProps) {
               options={{ count: count() }}
             />
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

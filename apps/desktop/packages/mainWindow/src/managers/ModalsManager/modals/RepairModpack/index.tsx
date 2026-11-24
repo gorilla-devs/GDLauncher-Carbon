@@ -16,6 +16,7 @@ import {
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { freezeSelection, reconcileSelections } from "./selections"
+import ConfirmActions from "../../ConfirmActions"
 import { Button, Checkbox, Spinner, toast } from "@gd/ui"
 import { Trans, useTransContext, type TypedTFunction } from "@gd/i18n"
 import { useLocation } from "@solidjs/router"
@@ -919,49 +920,40 @@ const RepairModpack = (props: ModalProps) => {
           </p>
         </Show>
 
-        <div class="flex w-full justify-between">
-          <Button
-            onClick={() => {
-              modalsContext?.closeModal()
-            }}
-          >
-            <div class="i-hugeicons:cancel-01" />
-            {t("instances:_trn_repair_cancel")}
-          </Button>
-          <Button
-            type="secondary"
-            data-testid="repair-modpack-confirm"
-            disabled={!canConfirm()}
-            onClick={() => {
-              if (!canConfirm()) return
-              const status = pendingSetup.data
-              if (!isServer() && !status) return
-              modalsContext?.closeModal()
-              navigateAwayIfInsideDetail()
-              if (isServer()) {
-                repairServerMutation.mutate(props?.data?.id)
-              } else if (status) {
-                // Without a preview nothing was shown to select or re-enable.
-                const withheld = status.preview_withheld
-                repairInstanceMutation.mutate({
-                  instance: instanceId(),
-                  cleanup_paths: [],
-                  cleanup_selections: withheld ? [] : [...ticked().values()],
-                  re_enable_disabled: withheld ? false : reEnable(),
-                  // Sent back as the core gave it.
-                  expected_pending: status.discard_token ?? null
-                })
-              }
-            }}
-          >
-            <div class="i-hugeicons:refresh" />
-            {t(
-              pending() && !busy()
-                ? "instances:_trn_repair_confirm_discard"
-                : "instances:_trn_repair_confirm"
-            )}
-          </Button>
-        </div>
+        <ConfirmActions
+          busy={false}
+          confirmTestId="repair-modpack-confirm"
+          disabled={!canConfirm()}
+          onCancel={() => modalsContext?.closeModal()}
+          onConfirm={() => {
+            if (!canConfirm()) return
+            const status = pendingSetup.data
+            if (!isServer() && !status) return
+            modalsContext?.closeModal()
+            navigateAwayIfInsideDetail()
+            if (isServer()) {
+              repairServerMutation.mutate(props?.data?.id)
+            } else if (status) {
+              // Without a preview nothing was shown to select or re-enable.
+              const withheld = status.preview_withheld
+              repairInstanceMutation.mutate({
+                instance: instanceId(),
+                cleanup_paths: [],
+                cleanup_selections: withheld ? [] : [...ticked().values()],
+                re_enable_disabled: withheld ? false : reEnable(),
+                // Sent back as the core gave it.
+                expected_pending: status.discard_token ?? null
+              })
+            }
+          }}
+        >
+          <div class="i-hugeicons:refresh" />
+          {t(
+            pending() && !busy()
+              ? "instances:_trn_repair_confirm_discard"
+              : "instances:_trn_repair_confirm"
+          )}
+        </ConfirmActions>
       </div>
     </ModalLayout>
   )

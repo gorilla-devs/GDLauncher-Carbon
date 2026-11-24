@@ -1,4 +1,12 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import {
+  describe,
+  it,
+  expect,
+  vi,
+  beforeEach,
+  afterEach,
+  type MockInstance
+} from "vitest"
 
 const toastError = vi.fn()
 const toastSuccess = vi.fn()
@@ -26,14 +34,56 @@ vi.mock("@gd/i18n", () => ({
   }
 }))
 
+const dispatchJavaMismatch = vi.fn()
+
+vi.mock("./javaMismatchBridge", () => ({
+  dispatchJavaMismatchEvent: dispatchJavaMismatch
+}))
+
 const {
+  extractErrorCode,
   extractErrorDisplay,
   handleGlobalError,
   parseInvalidateFrame,
-  queryClient
+  queryClient,
+  rspcErrorCode
 } = await import("./rspcClient")
 const { LOCAL_ERROR_TOAST, toastMutationError } =
   await import("./mutationErrorToast")
+
+describe("extractErrorCode", () => {
+  it("reads the first coded cause", () => {
+    const message = JSON.stringify({
+      cause: [{ display: "a" }, { display: "b", code: "THEME_INVALID" }],
+      backtrace: ""
+    })
+    expect(extractErrorCode(new Error(message))).toBe("THEME_INVALID")
+    expect(extractErrorCode(new Error("nope"))).toBeUndefined()
+    expect(extractErrorCode("nope")).toBeUndefined()
+  })
+})
+
+describe("theme errors", () => {
+  afterEach(() => vi.restoreAllMocks())
+
+  it("theme errors are logged once as a warning", () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {})
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    toastError.mockClear()
+    const message = JSON.stringify({
+      cause: [{ display: "bad manifest", code: "THEME_INVALID" }],
+      backtrace: "stack"
+    })
+    handleGlobalError(new Error(message), "query")
+    expect(warn).toHaveBeenCalledTimes(1)
+    expect(warn.mock.calls[0]).toContain("bad manifest")
+    expect(error).not.toHaveBeenCalled()
+    expect(toastError).not.toHaveBeenCalled()
+
+    handleGlobalError(new Error("a different plain failure"), "query")
+    expect(error).toHaveBeenCalledTimes(1)
+  })
+})
 
 describe("extractErrorDisplay", () => {
   it("falls back to the raw text for a bare JSON literal instead of throwing", () => {
@@ -382,11 +432,16 @@ describe("a coded cause with a mutation's own toast", () => {
 })
 
 describe("a refused change to a world or its data packs", () => {
-  const invalidate = vi.spyOn(queryClient, "invalidateQueries")
+  // Spied on per test: another group here restores every mock after its own.
+  let invalidate: MockInstance<typeof queryClient.invalidateQueries>
   beforeEach(() => {
     toastError.mockClear()
-    invalidate.mockClear()
-    invalidate.mockResolvedValue(undefined)
+    invalidate = vi
+      .spyOn(queryClient, "invalidateQueries")
+      .mockResolvedValue(undefined)
+  })
+  afterEach(() => {
+    invalidate.mockRestore()
   })
   const refusal = (code: string, display: string, data?: unknown) =>
     corePayload([
@@ -528,6 +583,107 @@ describe("a query that shows its failure in place", () => {
       "Patch content request failed (410)",
       expect.anything()
     )
+  })
+})
+
+describe("rspcErrorCode", () => {
+  it("reads the code of the first cause that has one", () => {
+    const message = JSON.stringify({
+      cause: [
+        { display: "Not enough memory" },
+        { display: "Not enough memory", code: "INSUFFICIENT_MEMORY" }
+      ],
+      backtrace: ""
+    })
+    expect(rspcErrorCode(new Error(message))).toBe("INSUFFICIENT_MEMORY")
+  })
+
+  it("has none for a plain error or a payload without codes", () => {
+    expect(rspcErrorCode(new Error("boom"))).toBeUndefined()
+    expect(
+      rspcErrorCode(new Error(JSON.stringify({ cause: [{ display: "x" }] })))
+    ).toBeUndefined()
+    expect(rspcErrorCode("not an error")).toBeUndefined()
+  })
+})
+
+describe("a launch on a Java that doesn't fit", () => {
+  it("asks through the crash help dialog instead of a toast", () => {
+    toastError.mockClear()
+    const data = {
+      instanceId: 3,
+      instanceName: "Survival",
+      neededMajor: 21,
+      usedMajor: 17,
+      fixMajor: 21
+    }
+    const message = JSON.stringify({
+      cause: [
+        {
+          display: "Survival is set to Java 17, which doesn't fit it",
+          code: "JAVA_MISMATCH",
+          data
+        }
+      ],
+      backtrace: ""
+    })
+
+    handleGlobalError(new Error(message), "mutation")
+
+    expect(dispatchJavaMismatch).toHaveBeenCalledWith(data)
+    expect(toastError).not.toHaveBeenCalled()
+  })
+
+  it("is logged at debug level, not as an error", () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const debugSpy = vi.spyOn(console, "debug").mockImplementation(() => {})
+    for (const code of ["JAVA_MISMATCH", "INSUFFICIENT_MEMORY"]) {
+      handleGlobalError(
+        new Error(
+          JSON.stringify({
+            cause: [{ display: "x", code }],
+            backtrace: ""
+          })
+        ),
+        "mutation"
+      )
+    }
+    expect(errorSpy).not.toHaveBeenCalled()
+    expect(debugSpy).toHaveBeenCalledTimes(2)
+    handleGlobalError(new Error("boom"), "mutation")
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+    errorSpy.mockRestore()
+    debugSpy.mockRestore()
+  })
+})
+
+describe("query error toasts", () => {
+  beforeEach(() => {
+    toastError.mockClear()
+  })
+
+  const failQuery = (message: string, meta?: Record<string, unknown>) =>
+    queryClient
+      .fetchQuery({
+        queryKey: ["test.failingQuery", message],
+        queryFn: () => Promise.reject(new Error(message)),
+        meta
+      })
+      .catch(() => {})
+
+  it("toasts a failed query by default", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => {})
+    await failQuery("default query failure")
+    expect(toastError).toHaveBeenCalledWith(
+      "default query failure",
+      expect.anything()
+    )
+    error.mockRestore()
+  })
+
+  it("stays quiet for a query that shows its own error (meta.silentError)", async () => {
+    await failQuery("silent query failure", { silentError: true })
+    expect(toastError).not.toHaveBeenCalled()
   })
 })
 

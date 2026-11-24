@@ -218,10 +218,10 @@ function commandLineOf(pid: number): string | null {
  * the process's own command line is already proof of identity, and a recycled
  * pid cannot fake it.
  *
- * On Windows the path can reach the game in another spelling than the one
- * the harness holds: the temp folder is an 8.3 short name on the CI runners
- * (`C:\Users\RUNNER~1\...`), and the core expands it before it builds the
- * game's command line (`C:\Users\runneradmin\...`). Both spellings count.
+ * The path is looked for both as given and in its canonical form, which is
+ * the one the core and the game use: on Windows Node's temp dir is the short
+ * 8.3 path (`C:\Users\RUNNER~1\...`) while the game's command line has the
+ * long one, and macOS's temp dir is a symlink into `/private`.
  */
 export function pidBelongsToRun(pid: number, runtimePath: string): boolean {
   const command = commandLineOf(pid)
@@ -229,26 +229,25 @@ export function pidBelongsToRun(pid: number, runtimePath: string): boolean {
     return false
   }
 
-  if (process.platform !== "win32") {
-    return command.includes(runtimePath)
-  }
-  const lowered = command.toLowerCase()
-  return windowsPathSpellings(runtimePath).some((spelling) =>
-    lowered.includes(spelling.toLowerCase())
+  return pathSpellings(runtimePath).some((spelling) =>
+    process.platform === "win32"
+      ? command.toLowerCase().includes(spelling.toLowerCase())
+      : command.includes(spelling)
   )
 }
 
-/** `runtimePath` as given and, when it exists, with every short (8.3)
- *  component expanded: `realpathSync.native` asks Windows for the final
- *  path, which spells each component out in full. */
-export function windowsPathSpellings(
+/** `runtimePath` as given and, when it exists and differs, in its canonical
+ *  form: `realpathSync.native` expands every short (8.3) component on
+ *  Windows and follows macOS's temp symlink into `/private`. */
+export function pathSpellings(
   runtimePath: string,
   realpath: (p: string) => string = (p) => nodeFs.realpathSync.native(p)
 ): string[] {
   try {
-    const expanded = realpath(runtimePath)
-    return expanded === runtimePath ? [runtimePath] : [runtimePath, expanded]
+    const canonical = realpath(runtimePath)
+    return canonical === runtimePath ? [runtimePath] : [runtimePath, canonical]
   } catch {
+    // Already gone: the path as given is all there is to match.
     return [runtimePath]
   }
 }

@@ -556,12 +556,15 @@ it("a start that could not open the data folder says which one and offers a rest
   await showUnavailableRuntimePath((value) =>
     c.manager.openModal({ name: "runtimePathUnavailable" }, value)
   )
-  await vi.waitFor(() =>
-    expect(document.body.textContent).toContain(
-      englishJava["_trn_runtime_recovery.unavailable"]
-        .replaceAll("{{path}}", folder)
-        .replace("{{defaultPath}}", current)
-    )
+  // The dialog is loaded on demand, which takes longer on a busy machine.
+  await vi.waitFor(
+    () =>
+      expect(document.body.textContent).toContain(
+        englishJava["_trn_runtime_recovery.unavailable"]
+          .replaceAll("{{path}}", folder)
+          .replace("{{defaultPath}}", current)
+      ),
+    { timeout: 5000 }
   )
   button(document.body, "Restart").click()
   await settle()

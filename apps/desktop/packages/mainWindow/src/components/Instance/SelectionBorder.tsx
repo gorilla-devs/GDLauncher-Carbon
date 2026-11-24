@@ -1,16 +1,27 @@
-import {
-  Show,
-  createMemo,
-  createSignal,
-  createEffect,
-  onCleanup
-} from "solid-js"
+import { Show, createSignal, createEffect, onCleanup } from "solid-js"
+import { TILE_SIZES } from "@/pages/Library/constants"
 
 interface SelectionBorderProps {
   isSelected: boolean
-  size: 1 | 2 | 3 | 4 | 5
+  /** Draw at this tile size's fixed box (the picture plus 2px round it)
+   *  instead of filling the parent: for a folder, whose frame is as wide as
+   *  its grid cell rather than its picture. */
+  size?: 1 | 2 | 3 | 4 | 5
 }
 
+/** The dash pattern's length: the rect's `pathLength`, so drawing it round
+ *  works for any size and corner radius. */
+const PATH_LENGTH = 1000
+
+/**
+ * The outline drawn round a selected tile (`library.tile.outline`). On an
+ * instance or server tile it fills the tile's frame (`library.tile.frame`),
+ * whatever size a theme gives it. On a folder it sits outside the frame, in
+ * the root, at the picture's fixed size plus 2px round it (`size`). Its
+ * corners follow `--gdl-tile-radius`, like the frame and the picture. The stroke is set on
+ * the SVG and inherited, so a theme's `stroke` or `stroke-width` on the hook
+ * reaches it. With reduced motion it is drawn whole at once (index.html).
+ */
 const SelectionBorder = (props: SelectionBorderProps) => {
   // Track visibility and animation state
   const [isVisible, setIsVisible] = createSignal(props.isSelected)
@@ -33,63 +44,44 @@ const SelectionBorder = (props: SelectionBorderProps) => {
     }
   })
 
-  // Tile dimensions based on size (from Tile.tsx)
-  // UnoCSS uses 0.25rem per unit, so h-24 = 24 * 0.25rem = 6rem = 96px
-  const tileDimension = createMemo(() => {
-    const sizes = {
-      1: 24 * 4, // h-24 = 6rem = 96px
-      2: 46 * 4, // h-46 = 11.5rem = 184px
-      3: 60 * 4, // h-60 = 15rem = 240px
-      4: 84 * 4, // h-84 = 21rem = 336px
-      5: 120 * 4 // h-120 = 30rem = 480px
-    }
-    return sizes[props.size] || sizes[2]
-  })
-
-  const borderRadius = 16 // rounded-2xl = 1rem = 16px
-  const strokeWidth = 2
-
-  // SVG matches the BaseTile's wrapper exactly (image + 2px padding on each side).
-  // The stroke is placed flush with the image's outer edge (centered on x=2,y=2 from
-  // the SVG origin) so there's no visible gap between the outline and the image.
-  const svgSize = createMemo(() => tileDimension() + 4)
-
-  // Rect tracks the image bounds (inset 2px from SVG edges). Stroke is 2px wide
-  // and centers on the rect edge → 1px overlay on the image, 1px on the wrapper.
-  const rectSize = createMemo(() => tileDimension())
-
-  // Calculate perimeter for rounded rectangle
-  // P = 2(w - 2r) + 2(h - 2r) + 2πr = 2w + 2h - 8r + 2πr
-  const perimeter = createMemo(() => {
-    const d = rectSize()
-    return 2 * d + 2 * d - 8 * borderRadius + 2 * Math.PI * borderRadius
-  })
+  // The box: the parent's, or a tile size's fixed one.
+  const outer = () =>
+    props.size ? `${TILE_SIZES[props.size].widthPx + 4}px` : "100%"
+  const inner = () =>
+    props.size ? `${TILE_SIZES[props.size].widthPx}px` : "calc(100% - 4px)"
 
   return (
     <Show when={isVisible()}>
+      {/* The rect sits 2px inside the frame, on the picture's edge, so the
+          2px stroke lies half over the picture and half over the frame. */}
       <svg
+        data-gdl="library.tile.outline"
         class="absolute pointer-events-none z-10"
+        fill="none"
+        stroke="rgb(var(--primary-500))"
+        stroke-width="2"
         style={{
           top: "0px",
           left: "0px",
-          width: `${svgSize()}px`,
-          height: `${svgSize()}px`
+          width: outer(),
+          height: outer()
         }}
       >
         <rect
-          x="2"
-          y="2"
-          width={rectSize()}
-          height={rectSize()}
-          rx={borderRadius}
-          ry={borderRadius}
-          fill="none"
-          stroke="rgb(var(--primary-500))"
-          stroke-width={strokeWidth}
+          pathLength={PATH_LENGTH}
           class={
             isExiting() ? "selection-border-undraw" : "selection-border-draw"
           }
-          style={{ "--border-perimeter": `${perimeter()}px` }}
+          // SVG geometry as CSS (Solid's style typings don't list it), so
+          // the rect follows the frame's size and the tile's radius.
+          style={[
+            "x: 2px",
+            "y: 2px",
+            `width: ${inner()}`,
+            `height: ${inner()}`,
+            "rx: var(--gdl-tile-radius, calc(1rem * var(--radius-scale, 1)))",
+            `--border-perimeter: ${PATH_LENGTH}`
+          ].join("; ")}
         />
       </svg>
     </Show>

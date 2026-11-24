@@ -133,6 +133,10 @@ const FROZEN: &[(&str, &str)] = &[
         "0c1160f20ea909a746ad9716360e71f29df538e4116d6cf8a3a4aa75c54c55d3",
     ),
     (
+        "20261118172601_add_auto_update_managed_java",
+        "16acc5811c6467e8ae69d0e3629e21e64eb2e44479de2ccbe57fc6df40ac9b09",
+    ),
+    (
         "20261004000000_server_addon_location",
         "f18baea65ba40b76d8a7da6d72d3de8c6096d52835895e34511106c6f73cc3cc",
     ),

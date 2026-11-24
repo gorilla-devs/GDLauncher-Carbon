@@ -1,9 +1,10 @@
-import { JSX, Show, createEffect, createSignal } from "solid-js"
+import { JSX, Show, createEffect, createSignal, splitProps } from "solid-js"
 import { cva, type VariantProps } from "class-variance-authority"
 import { PRESS_CLASSES } from "../Clickable"
+import { gdlHooks, withStates } from "../hooks"
 
 const switchStyles = cva(
-  "absolute top-0 left-0 right-0 bottom-0 transition-colors duration-100 ease-spring rounded-md",
+  "absolute top-0 left-0 right-0 bottom-0 peer-focus-visible:outline peer-focus-visible:outline-2 peer-focus-visible:outline-offset-2 peer-focus-visible:outline-primary-500 transition-colors duration-100 ease-spring rounded-md",
   {
     variants: {
       state: {
@@ -68,6 +69,7 @@ interface Props
 }
 
 function Switch(props: Props) {
+  const [hook, inputProps] = splitProps(props, ["data-gdl" as keyof Props])
   const [state, setState] = createSignal<{
     togglePosition: "start" | "middle" | "end"
     switchState:
@@ -119,14 +121,28 @@ function Switch(props: Props) {
   })
 
   return (
-    <label class={`relative inline-block w-10 h-5 group ${PRESS_CLASSES}`}>
+    <label
+      class={`relative inline-block w-10 h-5 group ${PRESS_CLASSES}`}
+      data-gdl={gdlHooks(
+        // `checked` only while the switch shows it: loading and
+        // indeterminate draw the knob in the middle instead.
+        withStates("switch", {
+          checked: props.checked && !props.isLoading && !props.isIndeterminate,
+          loading: props.isLoading,
+          indeterminate: props.isIndeterminate && !props.isLoading,
+          disabled: props.disabled
+        }),
+        (hook as Record<string, unknown>)["data-gdl"]
+      )}
+    >
       <input
-        {...props}
+        {...inputProps}
         class="opacity-0 w-0 h-0 peer"
         type="checkbox"
         disabled={props.disabled}
       />
       <span
+        data-gdl="switch.track"
         class={switchStyles({
           state: state().switchState,
           cursor: state().cursorStyle
@@ -139,6 +155,7 @@ function Switch(props: Props) {
           />
         )}
         <span
+          data-gdl="switch.thumb"
           class={toggleStyles({
             position: state().togglePosition,
             disabled: props.disabled

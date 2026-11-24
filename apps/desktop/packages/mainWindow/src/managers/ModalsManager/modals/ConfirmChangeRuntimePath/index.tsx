@@ -1,6 +1,7 @@
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
 import { Button, Progress, Radio } from "@gd/ui"
+import ConfirmActions from "../../ConfirmActions"
 import { Trans, useTransContext } from "@gd/i18n"
 import {
   For,
@@ -8,7 +9,8 @@ import {
   Show,
   Switch,
   createResource,
-  createSignal
+  createSignal,
+  onMount
 } from "solid-js"
 import { Portal } from "solid-js/web"
 import { RTprogress, RTsetProgress } from "@/utils/runtimePathProgress"
@@ -143,6 +145,24 @@ function blockerRows(blockers: RuntimeBlocker[]) {
     )
   }
   return [...rows.values()]
+}
+
+/** The migration error's way out. Its overlay covers the dialog, and focus
+ *  was on body while the migration ran (Confirm was disabled), so it takes
+ *  focus when it shows. */
+const DismissButton = (props: { onClick: () => void }) => {
+  let button: HTMLButtonElement | undefined
+  onMount(() => button?.focus())
+  return (
+    <Button
+      ref={button}
+      type="primary"
+      class="mt-6"
+      onClick={() => props.onClick()}
+    >
+      <Trans key="general:_trn_dismiss" />
+    </Button>
+  )
 }
 
 const ConfirmChangeRuntimePath = (props: ModalProps) => {
@@ -427,39 +447,36 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
               </div>
             </Show>
           </div>
-          <div class="flex w-full justify-between">
-            <Button
-              disabled={locked()}
-              onClick={() => {
-                if (locked()) return
-                modalsContext?.closeModal()
-              }}
-            >
-              <Trans key="settings:_trn_confirm_change_cancel_button" />
-            </Button>
-            <Button
-              type="secondary"
-              disabled={locked() || change.loading}
-              onClick={() => {
-                if (change.loading) return
-                void attemptRelocation(false)
-              }}
-            >
-              <Trans
-                key={
-                  submitted.switchOnly
-                    ? "java:_trn_runtime_switch.confirm"
-                    : "settings:_trn_confirm_change_confirm_button"
-                }
-              />
-            </Button>
-          </div>
+          <ConfirmActions
+            busy={locked()}
+            disabled={locked() || change.loading}
+            onCancel={() => {
+              if (locked()) return
+              modalsContext?.closeModal()
+            }}
+            onConfirm={() => {
+              if (change.loading) return
+              void attemptRelocation(false)
+            }}
+          >
+            <Trans
+              key={
+                submitted.switchOnly
+                  ? "java:_trn_runtime_switch.confirm"
+                  : "settings:_trn_confirm_change_confirm_button"
+              }
+            />
+          </ConfirmActions>
         </div>
       </ModalLayout>
 
       <Show when={isChangingRuntimePath() || migrationError()}>
         <Portal mount={document.getElementById("overlay")!}>
+          {/* Outside the dialog's element, yet part of it
+              (DIALOG_PORTAL_ATTR): focus may stay here and Tab stays inside.
+              Dismiss takes focus when the error shows. */}
           <div
+            data-dialog-portal
             class="z-9999 fixed inset-0 flex flex-col items-center justify-center bg-opacity-65 p-8 backdrop-blur-sm"
             // The ad column stays on top at the right: centre in what is left.
             style={{
@@ -849,17 +866,13 @@ const ConfirmChangeRuntimePath = (props: ModalProps) => {
                     </Show>
                   </Show>
                   <Show when={!runtimeRecoveryRequired()}>
-                    <Button
-                      type="secondary"
-                      class="mt-6"
+                    <DismissButton
                       onClick={() => {
                         if (runtimeRecoveryRequired()) return
                         setMigrationError(undefined)
                         modalsContext?.closeModal()
                       }}
-                    >
-                      <Trans key="general:_trn_dismiss" />
-                    </Button>
+                    />
                   </Show>
                 </div>
               </Match>

@@ -5,10 +5,11 @@ import {
 } from "@/utils/mutationErrorToast"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import { Button, Spinner } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { createMemo, createSignal, For, Show } from "solid-js"
+import { createMemo, createSignal, For, Show, onMount } from "solid-js"
 import { ListGroup, ListInstance } from "@gd/core_module/bindings"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 
@@ -17,6 +18,10 @@ const ConfirmBatchMixedDeletion = (props: ModalProps) => {
   const modalsContext = useModal()
   const navigator = useGDNavigate()
   const globalStore = useGlobalStore()
+
+  let cancelLink: HTMLButtonElement | undefined
+  // Enter or Esc right after opening must leave everything as it was.
+  onMount(() => cancelLink?.focus({ preventScroll: true }))
 
   const [isDeleting, setIsDeleting] = createSignal(false)
   const [deletedCount, setDeletedCount] = createSignal(0)
@@ -116,6 +121,7 @@ const ConfirmBatchMixedDeletion = (props: ModalProps) => {
       title={props?.title}
       height="h-auto"
       width="w-140"
+      compact
     >
       <div class="flex flex-col gap-4">
         <Show
@@ -208,20 +214,12 @@ const ConfirmBatchMixedDeletion = (props: ModalProps) => {
             </p>
           </div>
 
-          <div class="flex w-full justify-between gap-2 pt-2">
-            <Button
-              onClick={() => {
-                modalsContext?.closeModal()
-              }}
-            >
-              <div class="i-hugeicons:cancel-01" />
-              {t("instances:_trn_instance_confirm_deletion.cancel")}
-            </Button>
-            <div class="flex gap-2">
-              <Button type="secondary" onClick={() => handleDelete("unlink")}>
-                <div class="i-hugeicons:folder-remove" />
-                <Trans key="instances:_trn_delete_unlink_folders" />
-              </Button>
+          <DialogFooter class="pt-2">
+            <CancelLink
+              ref={(el) => (cancelLink = el)}
+              onClick={() => modalsContext?.closeModal()}
+            />
+            <div class="flex flex-wrap-reverse items-center justify-end gap-3">
               <Button
                 type="secondary"
                 onClick={() => handleDelete("deleteAll")}
@@ -229,8 +227,12 @@ const ConfirmBatchMixedDeletion = (props: ModalProps) => {
                 <div class="i-hugeicons:delete-02" />
                 <Trans key="instances:_trn_delete_all_with_folder_contents" />
               </Button>
+              <Button onClick={() => handleDelete("unlink")}>
+                <div class="i-hugeicons:folder-remove" />
+                <Trans key="instances:_trn_delete_unlink_folders" />
+              </Button>
             </div>
-          </div>
+          </DialogFooter>
         </Show>
       </div>
     </ModalLayout>

@@ -30,6 +30,10 @@ import {
   type SignInExpiredData
 } from "./signInExpiredBridge"
 import {
+  dispatchJavaMismatchEvent,
+  type JavaMismatchData
+} from "./javaMismatchBridge"
+import {
   recoveredServerRefusalKey,
   type RecoveredServerRefusal
 } from "./recoveredServer"
@@ -177,6 +181,10 @@ const globalPresenters: Record<
   ACCOUNT_BANNED: () => dispatchBannedEvent(),
   INSUFFICIENT_MEMORY: (cause) =>
     dispatchMemoryWarningEvent(cause.data as InsufficientMemoryData),
+  // A launch held back on a Java that doesn't fit: the crash help dialog
+  // asks first.
+  JAVA_MISMATCH: (cause) =>
+    dispatchJavaMismatchEvent(cause.data as JavaMismatchData),
   ACCOUNT_SIGN_IN_EXPIRED: (cause) =>
     dispatchSignInExpiredEvent(cause.data as SignInExpiredData),
   EULA_NOT_ACCEPTED: (cause) =>
@@ -221,6 +229,39 @@ function presentRefusal(
   )
 }
 
+function firstCodedCause(
+  parsed: ParsedRspcError | undefined
+): RspcErrorCause | undefined {
+  return parsed?.cause?.find((c) => c.code)
+}
+
+/** The code of an rspc error's first cause that has one, such as
+ *  `INSUFFICIENT_MEMORY`, for UI that reacts to a specific failure. */
+export function rspcErrorCode(error: unknown): string | undefined {
+  if (!(error instanceof Error)) return undefined
+  return firstCodedCause(parseRspcErrorPayload(error.message))?.code
+}
+
+/** The code of the first cause that carries one (for example `THEME_INVALID`),
+ *  or undefined when the error has no code or doesn't parse. */
+export function extractErrorCode(error: unknown): string | undefined {
+  const message = error instanceof Error ? error.message : String(error)
+  return firstCodedCause(parseRspcErrorPayload(message))?.code
+}
+
+/** Errors the core raises on purpose so the UI can ask the user something
+ *  (a dialog), not failures: they are logged at debug level only. */
+const EXPECTED_ERROR_CODES = new Set(["INSUFFICIENT_MEMORY", "JAVA_MISMATCH"])
+
+function logRspcError(error: Error, parsed: ParsedRspcError | undefined) {
+  const code = firstCodedCause(parsed)?.code
+  if (code && EXPECTED_ERROR_CODES.has(code)) {
+    console.debug("RSPC flow-control error:", code)
+    return
+  }
+  console.error("RSPC error:", error)
+}
+
 // Exported for unit testing (see rspcClient.test.ts) — not meant to be
 // called from application code, which reaches this only through the
 // QueryCache/MutationCache `onError` wiring below. `localToast` is set for a
@@ -234,9 +275,20 @@ export function handleGlobalError(
   localToast = false,
   input?: unknown
 ) {
-  console.error("RSPC error:", error)
-
   const parsed = parseRspcErrorPayload(error.message)
+  const errorCause = firstCodedCause(parsed)
+  const errorCode = errorCause?.code
+
+  // A theme error is an author's typo, not a bug: one warning with the
+  // detail, no backtrace, no toast (the theme code shows its own translated
+  // one). Nothing picks up a renderer console.error today; theme errors stay
+  // off it so a future renderer SDK or console capture won't count them.
+  if (errorCode?.startsWith("THEME_")) {
+    console.warn("Theme error:", errorCause?.display ?? error.message)
+    return
+  }
+
+  logRspcError(error, parsed)
   if (!parsed) {
     if (!localToast) showDedupedErrorToast(error.message, source)
     return
@@ -244,7 +296,6 @@ export function handleGlobalError(
 
   // A coded cause is presented only through `globalPresenters` or as a
   // worded refusal; any other code is left to the caller.
-  const errorCause = parsed.cause?.find((c) => c.code)
   if (presentedGlobally(errorCause)) {
     if (hasOwnPresenter(errorCause))
       globalPresenters[errorCause.code](errorCause, parsed, source)
@@ -274,8 +325,12 @@ export const queryClient = new QueryClient({
   // sets the same `meta` as a mutation with its own toast, so the global
   // toast does not repeat it.
   queryCache: new QueryCache({
-    onError: (error, query) =>
+    onError: (error, query) => {
+      // `meta: { silentError: true }` opts a query out altogether, for UI
+      // that shows the error inline itself.
+      if (query.meta?.silentError === true) return
       handleGlobalError(error, "query", query.meta?.localErrorToast === true)
+    }
   }),
   mutationCache: new MutationCache({
     onError: (error, variables, _result, mutation) =>

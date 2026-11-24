@@ -1,6 +1,6 @@
 {
-  "_trn_search_instances": "搜索实例",
-  "_trn_search_servers": "搜索服务器",
+  "_trn_search_instances": "搜索实例...",
+  "_trn_search_servers": "搜索服务器...",
   "_trn_browser_table_headers.name": "名称",
   "_trn_browser_table_headers.published": "发布时间",
   "_trn_browser_table_headers.downloads": "下载量",

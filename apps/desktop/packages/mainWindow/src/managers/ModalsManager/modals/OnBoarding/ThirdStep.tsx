@@ -113,6 +113,7 @@ const ThirdStep = (props: Props) => {
                   <EntityCard
                     entity={entity}
                     icon={ENTITIES[entity.entity].icon}
+                    platform={ENTITIES[entity.entity].platform}
                     translation={ENTITIES[entity.entity].translation}
                     onClick={[handleClickEntity, entity]}
                   />
@@ -141,6 +142,7 @@ const ThirdStep = (props: Props) => {
                   <EntityCard
                     entity={entity}
                     icon={ENTITIES[entity.entity].icon}
+                    platform={ENTITIES[entity.entity].platform}
                     translation={ENTITIES[entity.entity].translation}
                     onClick={[handleClickEntity, entity]}
                   />

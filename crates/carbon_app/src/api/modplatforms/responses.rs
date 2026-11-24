@@ -442,16 +442,35 @@ impl From<CurseForgeResponse<Mod>> for FEUnifiedSearchResult {
     }
 }
 
+/// A CurseForge logo's small and full-size image: each falls back to the
+/// other when empty, as CurseForge leaves `thumbnailUrl` empty for some
+/// logos (a project then showed a broken image in search).
+fn curseforge_logo_urls(
+    logo: Option<&carbon_platforms::curseforge::ModAsset>,
+) -> (Option<String>, Option<String>) {
+    let non_empty = |s: &str| (!s.is_empty()).then(|| s.to_string());
+    let Some(logo) = logo else {
+        return (None, None);
+    };
+    let thumbnail = non_empty(&logo.thumbnail_url);
+    let full = non_empty(&logo.url);
+    (
+        thumbnail.clone().or_else(|| full.clone()),
+        full.or(thumbnail),
+    )
+}
+
 impl From<Mod> for FEUnifiedSearchResult {
     fn from(value: Mod) -> Self {
+        let (logo_image, logo_high_res) = curseforge_logo_urls(value.logo.as_ref());
         FEUnifiedSearchResult {
             title: value.name,
             description: value.summary,
             slug: value.slug.clone(),
             requested_version_id: None,
             main_file_id: Some(value.main_file_id.to_string()),
-            image_url: value.logo.as_ref().map(|logo| logo.thumbnail_url.clone()),
-            high_res_image_url: value.logo.as_ref().map(|logo| logo.url.clone()),
+            image_url: logo_image,
+            high_res_image_url: logo_high_res,
             id: value.id.to_string(),
             release_date: value.date_created,
             last_updated: value.date_modified.to_string(),
@@ -716,4 +735,49 @@ pub struct FEUnifiedSearchResultWithDescription {
     pub full_description_body: String,
     #[serde(flatten)]
     pub result: FEUnifiedSearchResult,
+}
+
+#[cfg(test)]
+mod logo_tests {
+    use super::curseforge_logo_urls;
+    use carbon_platforms::curseforge::ModAsset;
+
+    fn logo(thumbnail_url: &str, url: &str) -> ModAsset {
+        ModAsset {
+            id: 1,
+            mod_id: 1,
+            title: String::new(),
+            description: String::new(),
+            thumbnail_url: thumbnail_url.into(),
+            url: url.into(),
+        }
+    }
+
+    #[test]
+    fn a_logo_without_a_thumbnail_uses_the_full_image() {
+        // CurseForge leaves thumbnailUrl empty for some logos (Prominence II).
+        let full = "https://media.forgecdn.net/avatars/1969/863/a.webp";
+        assert_eq!(
+            curseforge_logo_urls(Some(&logo("", full))),
+            (Some(full.to_string()), Some(full.to_string()))
+        );
+    }
+
+    #[test]
+    fn a_logo_with_both_keeps_them() {
+        assert_eq!(
+            curseforge_logo_urls(Some(&logo("t", "u"))),
+            (Some("t".to_string()), Some("u".to_string()))
+        );
+        assert_eq!(
+            curseforge_logo_urls(Some(&logo("t", ""))),
+            (Some("t".to_string()), Some("t".to_string()))
+        );
+    }
+
+    #[test]
+    fn no_logo_or_empty_urls_give_none() {
+        assert_eq!(curseforge_logo_urls(None), (None, None));
+        assert_eq!(curseforge_logo_urls(Some(&logo("", ""))), (None, None));
+    }
 }

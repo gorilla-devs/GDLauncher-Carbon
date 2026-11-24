@@ -1,17 +1,40 @@
 import type { Component, ComponentProps, JSX, ValidComponent } from "solid-js"
-import { splitProps } from "solid-js"
+import { createContext, splitProps, useContext } from "solid-js"
 
 import * as DropdownMenuPrimitive from "@kobalte/core/dropdown-menu"
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
 
 import { cn } from "../util"
+import { gdlHooks, withStates } from "../hooks"
+import { getFloatingRoot } from "../floatingRoot"
 import { PRESS_CLASSES } from "../Clickable"
 
 const DropdownMenuTrigger = DropdownMenuPrimitive.Trigger
-const DropdownMenuPortal = DropdownMenuPrimitive.Portal
+const DropdownMenuPortal = (
+  props: ComponentProps<typeof DropdownMenuPrimitive.Portal>
+) => <DropdownMenuPrimitive.Portal mount={getFloatingRoot()} {...props} />
 const DropdownMenuSub = DropdownMenuPrimitive.Sub
 const DropdownMenuGroup = DropdownMenuPrimitive.Group
-const DropdownMenuRadioGroup = DropdownMenuPrimitive.RadioGroup
+
+// The group's value, so a radio item can mark itself `dropdown.item.checked`.
+const RadioValueContext = createContext<() => string | undefined>(
+  () => undefined
+)
+
+const DropdownMenuRadioGroup = <T extends ValidComponent = "div">(
+  props: PolymorphicProps<
+    T,
+    DropdownMenuPrimitive.DropdownMenuRadioGroupProps<T>
+  >
+) => (
+  <RadioValueContext.Provider
+    value={() =>
+      (props as DropdownMenuPrimitive.DropdownMenuRadioGroupProps).value
+    }
+  >
+    <DropdownMenuPrimitive.RadioGroup {...props} />
+  </RadioValueContext.Provider>
+)
 
 const DropdownMenu: Component<DropdownMenuPrimitive.DropdownMenuRootProps> = (
   props
@@ -27,10 +50,17 @@ type DropdownMenuContentProps<T extends ValidComponent = "div"> =
 const DropdownMenuContent = <T extends ValidComponent = "div">(
   props: PolymorphicProps<T, DropdownMenuContentProps<T>>
 ) => {
-  const [, rest] = splitProps(props as DropdownMenuContentProps, ["class"])
+  const [local, rest] = splitProps(props as DropdownMenuContentProps, [
+    "class",
+    "data-gdl" as keyof DropdownMenuContentProps
+  ])
   return (
-    <DropdownMenuPrimitive.Portal>
+    <DropdownMenuPrimitive.Portal mount={getFloatingRoot()}>
       <DropdownMenuPrimitive.Content
+        data-gdl={gdlHooks(
+          "dropdown",
+          (local as Record<string, unknown>)["data-gdl"]
+        )}
         class={cn(
           "z-100000 min-w-32 origin-[var(--kb-menu-content-transform-origin)] overflow-visible rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md outline-none data-[expanded]:animate-menuEnter animate-menuLeave",
           props.class
@@ -58,6 +88,12 @@ const DropdownMenuItem = <T extends ValidComponent = "div">(
         props.class
       )}
       {...rest}
+      data-gdl={gdlHooks(
+        withStates("dropdown.item", {
+          disabled: (props as DropdownMenuItemProps).disabled
+        }),
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     />
   )
 }
@@ -84,6 +120,10 @@ const DropdownMenuLabel: Component<
         props.class
       )}
       {...rest}
+      data-gdl={gdlHooks(
+        "dropdown.label",
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     />
   )
 }
@@ -101,6 +141,10 @@ const DropdownMenuSeparator = <T extends ValidComponent = "hr">(
     <DropdownMenuPrimitive.Separator
       class={cn("h-[1px] my-1 bg-darkSlate-600 border-none", props.class)}
       {...rest}
+      data-gdl={gdlHooks(
+        "dropdown.separator",
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     />
   )
 }
@@ -126,6 +170,12 @@ const DropdownMenuSubTrigger = <T extends ValidComponent = "div">(
         props.class
       )}
       {...rest}
+      data-gdl={gdlHooks(
+        withStates("dropdown.item", {
+          disabled: (props as DropdownMenuSubTriggerProps).disabled
+        }),
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     >
       {props.children}
       <svg
@@ -160,6 +210,10 @@ const DropdownMenuSubContent = <T extends ValidComponent = "div">(
         props.class
       )}
       {...rest}
+      data-gdl={gdlHooks(
+        "dropdown.submenu",
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     />
   )
 }
@@ -184,6 +238,13 @@ const DropdownMenuCheckboxItem = <T extends ValidComponent = "div">(
         props.class
       )}
       {...rest}
+      data-gdl={gdlHooks(
+        withStates("dropdown.item", {
+          checked: (props as DropdownMenuCheckboxItemProps).checked,
+          disabled: (props as DropdownMenuCheckboxItemProps).disabled
+        }),
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     >
       <span class="absolute left-2 flex size-3.5 items-center justify-center">
         <DropdownMenuPrimitive.ItemIndicator>
@@ -222,6 +283,10 @@ const DropdownMenuGroupLabel = <T extends ValidComponent = "span">(
         props.class
       )}
       {...rest}
+      data-gdl={gdlHooks(
+        "dropdown.label",
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     />
   )
 }
@@ -239,6 +304,7 @@ const DropdownMenuRadioItem = <T extends ValidComponent = "div">(
     "class",
     "children"
   ])
+  const groupValue = useContext(RadioValueContext)
   return (
     <DropdownMenuPrimitive.RadioItem
       class={cn(
@@ -246,6 +312,15 @@ const DropdownMenuRadioItem = <T extends ValidComponent = "div">(
         props.class
       )}
       {...rest}
+      data-gdl={gdlHooks(
+        withStates("dropdown.item", {
+          checked:
+            groupValue() !== undefined &&
+            groupValue() === (props as DropdownMenuRadioItemProps).value,
+          disabled: (props as DropdownMenuRadioItemProps).disabled
+        }),
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     >
       <span class="absolute left-2 flex size-3.5 items-center justify-center">
         <DropdownMenuPrimitive.ItemIndicator>

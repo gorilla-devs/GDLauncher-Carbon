@@ -10,7 +10,6 @@ import {
 } from "solid-js"
 import { VList } from "@/components/VirtuaWrapper"
 import { Trans, useTransContext } from "@gd/i18n"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import { useModal } from "@/managers/ModalsManager"
@@ -18,6 +17,7 @@ import type { ReportModalData } from "@/managers/ModalsManager/modals/Report"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { gdlAccountAccess } from "@/utils/gdlAccountAccess"
 import { useLocation } from "@solidjs/router"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 // Helper to extract error code from rspc error.
 //
@@ -486,7 +486,10 @@ const SharePreviewContent = (props: SharePreviewContentProps) => {
                             }
                             title="View on CurseForge"
                           >
-                            <img src={CurseforgeLogo} class="h-4 w-4" />
+                            <PlatformLogo
+                              platform="curseforge"
+                              class="h-4 w-4"
+                            />
                           </button>
                         </Show>
                         <Show when={mod.modrinthSlug}>

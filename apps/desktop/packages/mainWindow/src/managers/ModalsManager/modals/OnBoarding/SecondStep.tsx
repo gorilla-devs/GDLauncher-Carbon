@@ -21,53 +21,36 @@ const SecondStep = (props: Props) => {
 
   return (
     <div class="lg:w-160 box-border flex h-full flex-col justify-between">
-      <RowsContainer>
-        <Row>
-          <Title
-            description={
-              <Trans key="java:_trn_auto_manage_java_system_profiles_text" />
-            }
-          >
-            <Trans key="java:_trn_auto_manage_java_system_profiles" />
-          </Title>
-          <RightHandSide>
-            <Switch
-              checked={settings.data?.autoManageJavaSystemProfiles}
-              onChange={(e) => {
-                settingsMutation.mutate({
-                  autoManageJavaSystemProfiles: {
-                    Set: e.target.checked
-                  }
-                })
-              }}
-            />
-          </RightHandSide>
-        </Row>
-        <Row>
-          <Title
-            description={
-              <Trans key="settings:_trn_deletion_through_recycle_bin_text" />
-            }
-          >
-            <Trans key="settings:_trn_deletion_through_recycle_bin_title" />
-          </Title>
-          <RightHandSide>
-            <Switch
-              checked={settings.data?.deletionThroughRecycleBin}
-              onChange={(e) => {
-                settingsMutation.mutate({
-                  deletionThroughRecycleBin: {
-                    Set: e.currentTarget.checked
-                  }
-                })
-              }}
-            />
-          </RightHandSide>
-        </Row>
-        <Row>
-          <Trans key="onboarding:_trn_manage_more_options_from_settings" />
-        </Row>
-      </RowsContainer>
+      {/* Narrow enough to stay clear of the cubes on the right
+          of the background. */}
+      <div class="lg:w-[30rem]">
+        <RowsContainer>
+          <Row>
+            <Title
+              description={
+                <Trans key="settings:_trn_deletion_through_recycle_bin_text" />
+              }
+            >
+              <Trans key="settings:_trn_deletion_through_recycle_bin_title" />
+            </Title>
+            <RightHandSide>
+              <Switch
+                checked={settings.data?.deletionThroughRecycleBin}
+                onChange={(e) => {
+                  settingsMutation.mutate({
+                    deletionThroughRecycleBin: {
+                      Set: e.currentTarget.checked
+                    }
+                  })
+                }}
+              />
+            </RightHandSide>
+          </Row>
+          <Row>
+            <Trans key="onboarding:_trn_manage_more_options_from_settings" />
+          </Row>
+        </RowsContainer>
+      </div>
       <div class="flex w-full justify-between">
         <Button
           type="secondary"

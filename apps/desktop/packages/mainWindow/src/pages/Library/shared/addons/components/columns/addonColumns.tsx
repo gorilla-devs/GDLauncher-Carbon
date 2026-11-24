@@ -1,5 +1,4 @@
 import { Tooltip, TooltipContent, TooltipTrigger, Spinner } from "@gd/ui"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { JSX, Show } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
@@ -15,6 +14,7 @@ import {
 import { supportsEnableToggle } from "../../addonCapabilities"
 import { BlockedText, type ChangesBlocked } from "../ChangesBlocked"
 import { UpdateCopiesMenu } from "../UpdateCopiesMenu"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 /**
  * Unified column config for both Instance and Server addon tables.
@@ -80,7 +80,8 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
     createSelectColumn({
       selectedCount: config.selectedCount,
       totalRows: config.totalRows,
-      onSelectAll: config.onSelectAll
+      onSelectAll: config.onSelectAll,
+      getDisplayName: config.getDisplayName
     }),
 
     // 2. Icon / thumbnail
@@ -205,8 +206,8 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
                 <Tooltip>
                   <TooltipTrigger>
                     <div class="bg-darkSlate-800 absolute -left-0.5 -top-0.5 h-4 w-4 rounded-full p-0.5">
-                      <img
-                        src={CurseforgeLogo}
+                      <PlatformLogo
+                        platform="curseforge"
                         class="h-full w-full"
                         alt={t("enums:_trn_curseforge")}
                       />
@@ -231,12 +232,11 @@ export const createAddonColumns = (config: AddonColumnConfig) => {
           }
 
           const platform = hasCurseforge ? "curseforge" : "modrinth"
-          const logo = hasCurseforge ? CurseforgeLogo : ModrinthLogo
           return (
             <Tooltip>
               <TooltipTrigger>
-                <img
-                  src={logo}
+                <PlatformLogo
+                  platform={platform}
                   class="hidden h-4 w-4 md:block"
                   alt={t(getPlatformKey(platform))}
                 />

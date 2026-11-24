@@ -315,7 +315,10 @@ const AddonExplore = (props: { children?: any }) => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <div class="i-hugeicons:dashboard-square-01 text-lg" />
+          <div
+            data-gdl="tab.icon"
+            class="i-hugeicons:dashboard-square-01 text-lg"
+          />
           {t("ui:_trn_overview")}
         </div>
       ),
@@ -324,7 +327,7 @@ const AddonExplore = (props: { children?: any }) => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <div class="i-hugeicons:note-edit text-lg" />
+          <div data-gdl="tab.icon" class="i-hugeicons:note-edit text-lg" />
           {t("ui:_trn_changelog")}
         </div>
       ),
@@ -333,7 +336,7 @@ const AddonExplore = (props: { children?: any }) => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <div class="i-hugeicons:image-01 text-lg" />
+          <div data-gdl="tab.icon" class="i-hugeicons:image-01 text-lg" />
           {t("ui:_trn_screenshots")}
         </div>
       ),
@@ -342,7 +345,7 @@ const AddonExplore = (props: { children?: any }) => {
     {
       label: (
         <div class="flex items-center gap-2">
-          <div class="i-hugeicons:package text-lg" />
+          <div data-gdl="tab.icon" class="i-hugeicons:package text-lg" />
           {t("ui:_trn_versions")}
         </div>
       ),
@@ -398,11 +401,21 @@ const AddonExplore = (props: { children?: any }) => {
   })
 
   return (
-    <div class="bg-darkSlate-800 relative flex h-full flex-col">
-      <div class="h-58 max-h-58 min-h-58 ease-spring flex flex-col items-stretch justify-between transition-all">
+    <div
+      data-gdl="addon-page"
+      class="bg-darkSlate-800 relative flex h-full flex-col"
+    >
+      <div
+        data-gdl="addon-page.header"
+        class="h-58 max-h-58 min-h-58 ease-spring flex flex-col items-stretch justify-between transition-all"
+      >
         <div class="relative h-full">
-          <div class="from-darkSlate-700 absolute left-0 right-0 top-0 z-20 h-full bg-gradient-to-t from-30%" />
           <div
+            data-gdl="addon-page.header.fade"
+            class="from-darkSlate-700 absolute left-0 right-0 top-0 z-20 h-full bg-gradient-to-t from-30%"
+          />
+          <div
+            data-gdl="addon-page.cover"
             class="absolute left-0 right-0 top-0 z-10 h-full bg-cover bg-fixed bg-center bg-no-repeat"
             style={{
               "background-image": `url("${project.data?.imageUrl}")`,
@@ -411,6 +424,7 @@ const AddonExplore = (props: { children?: any }) => {
           />
           <div class="sticky top-5 z-20 box-border flex w-full justify-between px-6">
             <Button
+              data-gdl="addon-page.back"
               onClick={() => {
                 navigator.prev()
               }}
@@ -446,9 +460,13 @@ const AddonExplore = (props: { children?: any }) => {
               </TooltipContent>
             </Tooltip>
           </div>
-          <div class="from-darkSlate-800 sticky top-52 z-40 flex h-24 justify-center bg-gradient-to-t from-10% px-6">
+          <div
+            data-gdl="addon-page.header.fade"
+            class="from-darkSlate-800 sticky top-52 z-40 flex h-24 justify-center bg-gradient-to-t from-10% px-6"
+          >
             <div class="flex w-full flex-row gap-4">
               <div
+                data-gdl="addon-page.icon"
                 class="bg-darkSlate-800 h-16 w-16 rounded-xl bg-cover bg-center"
                 style={{
                   "background-image": `url("${project.data?.imageUrl}")`
@@ -458,7 +476,9 @@ const AddonExplore = (props: { children?: any }) => {
                 <div class="flex cursor-pointer items-center gap-4">
                   <Switch>
                     <Match when={!isFetching()}>
-                      <h1 class="m-0 h-9">{project.data?.title}</h1>
+                      <h1 data-gdl="page-title" class="m-0 h-9">
+                        {project.data?.title}
+                      </h1>
                     </Match>
                     <Match when={isFetching()}>
                       <div class="h-9 w-full">
@@ -540,7 +560,10 @@ const AddonExplore = (props: { children?: any }) => {
                       </div>
                     </div>
                   </div>
-                  <div class="mt-0 flex items-center gap-2">
+                  <div
+                    data-gdl="addon-page.actions"
+                    class="mt-0 flex items-center gap-2"
+                  >
                     <Show
                       when={selectionReady()}
                       fallback={
@@ -628,6 +651,7 @@ const AddonExplore = (props: { children?: any }) => {
               ref={(el) => {
                 refStickyTabs = el
               }}
+              data-gdl="addon-page.tabs"
               class="bg-darkSlate-800 sticky top-0 z-30 flex flex-col pb-0"
             >
               <div class="my-2 flex h-14 items-center justify-between">

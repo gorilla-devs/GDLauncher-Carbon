@@ -51,9 +51,9 @@ import { startHarness, stopHarness, type Harness } from "./fixtures/mockIdp.js"
 import { completeLogin, dismissStartupModals } from "./fixtures/login.js"
 import { byInstanceName, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
+  clickPlayAndAwaitLaunched,
   createInstanceViaUi,
-  waitForInstallComplete,
-  LAUNCH_TIMEOUT
+  waitForInstallComplete
 } from "./helpers/instances.js"
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { readInstanceConfig } from "./helpers/instanceConfig.js"
@@ -112,20 +112,10 @@ async function leaveAGameRunning(
         PID_FILE_NAME
       )
 
-      // Counted, not searched for: the install itself ends with a transition to
-      // Inactive, so the string is already present before anything has launched.
-      const launchedCount = () =>
-        current.stdout.join("").split("GAME_LAUNCHED").length
-
-      const tile = current.page.locator(byInstanceName(instanceName))
-      await tile.locator(byTestId(TEST_IDS.instancePlay)).click()
-
-      await expect
-        .poll(() => launchedCount(), {
-          timeout: LAUNCH_TIMEOUT,
-          message: "the core never reported GAME_LAUNCHED after Play"
-        })
-        .toBeGreaterThan(1)
+      await clickPlayAndAwaitLaunched(current.page, instanceName, {
+        stdout: current.stdout,
+        message: "the core never reported GAME_LAUNCHED after Play"
+      })
 
       await expect
         .poll(() => fs.existsSync(pidFile), {
@@ -280,7 +270,12 @@ test.describe("adopting a running game across a launcher restart", () => {
       },
       (alreadyFailed) =>
         cleanupAdoption(owner, alreadyFailed, {
-          logs: () => attachCoreLogOnFailure(testInfo, harness.runtimePath),
+          logs: () =>
+            attachCoreLogOnFailure(
+              testInfo,
+              harness.runtimePath,
+              alreadyFailed
+            ),
           reapGames: async () => {
             killGameProcesses(harness.runtimePath)
           },
@@ -356,7 +351,12 @@ test.describe("adopting a running game across a launcher restart", () => {
       },
       (alreadyFailed) =>
         cleanupAdoption(owner, alreadyFailed, {
-          logs: () => attachCoreLogOnFailure(testInfo, harness.runtimePath),
+          logs: () =>
+            attachCoreLogOnFailure(
+              testInfo,
+              harness.runtimePath,
+              alreadyFailed
+            ),
           reapGames: async () => {
             killGameProcesses(harness.runtimePath)
           },

@@ -47,6 +47,7 @@ export const AddonFilters = (props: AddonFiltersProps) => {
   return (
     <div
       ref={containerRef}
+      data-gdl="addons.filters"
       class={`bg-darkSlate-800 border-darkSlate-700 sticky z-30 border-b px-6 pb-6 pt-0 ${props.stickyTop ?? "top-0"}`}
     >
       <div class="flex flex-col gap-4">

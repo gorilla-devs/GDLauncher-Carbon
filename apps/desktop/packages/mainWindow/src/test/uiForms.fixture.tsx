@@ -1,6 +1,9 @@
 import { createContext, createSignal, For, Show, useContext } from "solid-js"
 import { vi } from "vitest"
 
+// Theme hook names are plain strings: tests get the real helpers.
+export { gdlHooks, withStates } from "../../../../../../packages/ui/src/hooks"
+
 export const Box = (p: any) => <div>{p.children}</div>
 export const Button = (p: any) => (
   <button

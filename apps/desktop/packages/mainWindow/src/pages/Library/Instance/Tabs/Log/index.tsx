@@ -310,7 +310,10 @@ const Logs = () => {
   }
 
   return (
-    <div class="border-darkSlate-600 border-t-solid flex h-full w-full overflow-hidden border">
+    <div
+      data-gdl="logs"
+      class="border-darkSlate-600 border-t-solid flex h-full w-full overflow-hidden border"
+    >
       <LogsSidebar
         availableLogEntries={availableLogEntries.data || []}
         instanceId={parseInt(params.id, 10)}

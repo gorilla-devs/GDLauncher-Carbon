@@ -9,19 +9,12 @@ import {
   SelectItem,
   SelectValue,
   Input,
-  Radio,
   Slider,
   Switch
 } from "@gd/ui"
 import { useParams } from "@solidjs/router"
 import useInstanceData from "../../instance.data"
-import {
-  Match,
-  Show,
-  createMemo,
-  createSignal,
-  Switch as SolidSwitch
-} from "solid-js"
+import { Show, createMemo, createSignal } from "solid-js"
 import HookTest from "@/components/HookTest"
 import { InstanceDetails } from "@gd/core_module/bindings"
 import Title from "@/pages/Settings/components/Title"
@@ -29,8 +22,9 @@ import Row from "@/pages/Settings/components/Row"
 import RowsContainer from "@/pages/Settings/components/RowsContainer"
 import RightHandSide from "@/pages/Settings/components/RightHandSide"
 import { useModal } from "@/managers/ModalsManager"
-import JavaPathAutoComplete from "@/components/JavaPathAutoComplete"
 import useSearchContext from "@/components/SearchInputContext"
+import JavaArgumentsHint from "@/components/Java/JavaArgumentsHint"
+import InstanceJavaSelect from "./InstanceJavaSelect"
 
 const Settings = () => {
   const [t] = useTransContext()
@@ -80,6 +74,11 @@ const Settings = () => {
               variables.javaOverride?.Set !== undefined
                 ? variables.javaOverride.Set
                 : old.javaOverride,
+            // Automatic always suits the Minecraft version.
+            javaOverrideMismatch:
+              variables.javaOverride?.Set === null
+                ? false
+                : old.javaOverrideMismatch,
             extraJavaArgs:
               variables.extraJavaArgs?.Set !== undefined
                 ? variables.extraJavaArgs.Set
@@ -125,10 +124,6 @@ const Settings = () => {
         queryKey: ["instance.getInstanceDetails", variables.instance]
       })
     }
-  }))
-
-  const getAllProfiles = rspc.createQuery(() => ({
-    queryKey: ["java.getJavaProfiles"]
   }))
 
   const routeData = useInstanceData()
@@ -184,24 +179,6 @@ const Settings = () => {
     }
 
     return "custom"
-  }
-
-  const javaOverrideType = () => {
-    if ("Profile" in (routeData?.instanceDetails?.data?.javaOverride || {})) {
-      return "Profile"
-    }
-
-    return "Path"
-  }
-
-  const javaSelectedProfile = () => {
-    const profileName = (routeData?.instanceDetails?.data?.javaOverride as any)
-      ?.Profile
-
-    if (!profileName) return null
-
-    return getAllProfiles.data?.find((profile) => profile.name === profileName)
-      ?.name
   }
 
   return (
@@ -326,152 +303,24 @@ const Settings = () => {
       </Row>
       <Row>
         <Title>
-          <Trans key="java:_trn_instance_settings.java_path_profile" />
+          <Trans key="java:_trn_java" />
         </Title>
         <RightHandSide>
-          <Switch
-            checked={!!routeData?.instanceDetails?.data?.javaOverride}
-            onChange={(v) => {
-              updateInstanceMutation.mutate({
-                javaOverride: {
-                  Set: v.target.checked
-                    ? ({
-                        Profile:
-                          routeData.instanceDetails.data?.requiredJavaProfile
-                      } as any)
-                    : null
-                },
-                instance: parseInt(params.id, 10)
-              })
-            }}
-          />
-        </RightHandSide>
-      </Row>
-      <Show when={routeData?.instanceDetails?.data?.javaOverride !== null}>
-        <Radio.group
-          value={javaOverrideType()}
-          buttonStyle="button"
-          onChange={(v) => {
-            const payload =
-              v?.toString() === "Path"
-                ? {
-                    Path: null
-                  }
-                : {
-                    Profile: routeData.instanceDetails.data?.requiredJavaProfile
-                  }
-
-            updateInstanceMutation.mutate({
-              javaOverride: {
-                Set: payload as any
-              },
-              instance: parseInt(params.id, 10)
-            })
-          }}
-          options={[
-            {
-              value: "Path",
-              label: t("ui:_trn_path")
-            },
-            {
-              value: "Profile",
-              label: t("ui:_trn_profile")
-            }
-          ]}
-        />
-        <SolidSwitch>
-          <Match when={javaOverrideType() === "Path"}>
-            <div class="min-w-100 max-w-2/3">
-              <JavaPathAutoComplete
-                defaultValue={
-                  (routeData?.instanceDetails?.data?.javaOverride as any)?.Path
-                }
-                updateValueOnlyOnBlur
-                updateValue={(id, value) => {
+          <Show when={routeData?.instanceDetails?.data}>
+            {(details) => (
+              <InstanceJavaSelect
+                details={details()}
+                setOverride={(javaOverride) => {
                   updateInstanceMutation.mutate({
-                    javaOverride: {
-                      Set: {
-                        Path: value || null
-                      }
-                    },
+                    javaOverride: { Set: javaOverride },
                     instance: parseInt(params.id, 10)
                   })
                 }}
               />
-            </div>
-          </Match>
-          <Match when={javaOverrideType() === "Profile"}>
-            <div class="flex gap-2">
-              <div class="text-lightSlate-700">
-                <Trans key="java:_trn_this_instance_requires" />
-              </div>
-              <div class="text-lightSlate-100">
-                {routeData.instanceDetails.data?.requiredJavaProfile}
-              </div>
-            </div>
-            <div class="flex items-center">
-              <Select
-                value={javaSelectedProfile()}
-                placeholder={t("placeholders:_trn_select_java_profile")}
-                options={
-                  getAllProfiles.data?.map((profile) => profile.name) || []
-                }
-                onChange={(option) => {
-                  if (option) {
-                    updateInstanceMutation.mutate({
-                      javaOverride: {
-                        Set: {
-                          Profile: option
-                        }
-                      },
-                      instance: parseInt(params.id, 10)
-                    })
-                  }
-                }}
-                itemComponent={(props) => (
-                  <SelectItem item={props.item}>
-                    {props.item.rawValue}
-                  </SelectItem>
-                )}
-              >
-                <SelectTrigger class="min-w-100 max-w-2/3">
-                  <SelectValue<string>>
-                    {(state) =>
-                      state.selectedOption() ||
-                      t("placeholders:_trn_select_java_profile")
-                    }
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent />
-              </Select>
-              <Button
-                type="primary"
-                onClick={() => {
-                  modalsContext?.openModal({
-                    name: "javaProfileCreation"
-                  })
-                }}
-              >
-                <Trans key="java:_trn_add_new_profile" />
-              </Button>
-            </div>
-          </Match>
-        </SolidSwitch>
-        <Show when={routeData?.instanceDetails?.data?.javaOverrideMismatch}>
-          <div class="mt-2 flex items-start gap-2 text-yellow-500">
-            <div class="i-hugeicons:alert-02 mt-0.5 h-4 w-4 shrink-0" />
-            <p class="m-0 text-sm">
-              <Trans
-                key="java:_trn_instance_settings.java_override_mismatch"
-                options={{
-                  defaultValue:
-                    "The selected Java doesn't match the version this instance requires. Minecraft may fail to start; pick a matching Java or turn on automatic Java management."
-                }}
-              />
-            </p>
-          </div>
-        </Show>
-      </Show>
+            )}
+          </Show>
+        </RightHandSide>
+      </Row>
       <Row>
         <Title>
           <Trans key="java:_trn_instance_settings.java_memory_title" />
@@ -556,7 +405,7 @@ const Settings = () => {
       </Show>
 
       <Row>
-        <Title description={<Trans key="java:_trn_java_arguments_hint" />}>
+        <Title description={<JavaArgumentsHint />}>
           <Trans key="java:_trn_instance_settings.java_arguments_title" />
         </Title>
         <Switch

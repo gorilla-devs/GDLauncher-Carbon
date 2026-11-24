@@ -242,25 +242,33 @@ export async function openInstanceAddons(
   await goToLibrary(page)
   await page.click(byInstanceName(instanceName))
 
-  // Waits for a request that *finished*, not for the first response headers.
-  // The app aborts an in-flight getInstanceMods fetch whenever it replaces it
-  // with a new one (TanStack Query cancels a running query on an
-  // invalidation's refetch or when its last observer unmounts, and
-  // `utils/rspcClient.ts` hands the query's abort signal to `fetch`). An
-  // aborted fetch has already emitted its `response` event but never gets a
-  // body, so reading it failed with "Protocol error
-  // (Network.getResponseBody): No data found for resource with given
-  // identifier". It ends in `requestfailed` instead, and the refetch that
-  // replaced it is the read this waits for.
-  const modsRequestPromise = page
-    .waitForEvent("requestfinished", {
-      predicate: (r) => r.url().includes("instance.getInstanceMods"),
-      timeout: MODS_RESPONSE_TIMEOUT
-    })
+  // The body is read inside the predicate, and a response whose body cannot
+  // be read is passed over for the next one. The app aborts an in-flight
+  // `getInstanceMods` fetch whenever the core invalidates that query again
+  // (the rspc client hands TanStack Query's abort signal to `fetch`), and the
+  // core does that several times in a row straight after an install. An
+  // aborted request has already fired Playwright's "response" event on its
+  // headers, but its body is gone, so reading it fails with "No data found
+  // for resource with given identifier". The request that replaced it is the
+  // one that carries the list.
+  const read: { body?: RspcEnvelope } = {}
+  const modsResponsePromise = page
+    .waitForResponse(
+      async (r) => {
+        if (!r.url().includes("instance.getInstanceMods")) return false
+        try {
+          read.body = (await r.json()) as RspcEnvelope
+          return true
+        } catch {
+          return false
+        }
+      },
+      { timeout: MODS_RESPONSE_TIMEOUT }
+    )
     .catch((cause) => {
       throw new Error(
-        `openInstanceAddons: no instance.getInstanceMods request finished ` +
-          `after opening "${instanceName}"'s Addons tab within ` +
+        `openInstanceAddons: no readable instance.getInstanceMods response ` +
+          `observed after opening "${instanceName}"'s Addons tab within ` +
           `${MODS_RESPONSE_TIMEOUT}ms`,
         { cause }
       )
@@ -268,15 +276,13 @@ export async function openInstanceAddons(
 
   await page.getByRole("tab", { name: "Addons" }).click()
 
-  const response = await (await modsRequestPromise).response()
-  if (response === null) {
+  await modsResponsePromise
+  const body = read.body
+  if (!body) {
     throw new Error(
-      `openInstanceAddons: the finished instance.getInstanceMods request ` +
-        `for "${instanceName}" has no response`
+      `openInstanceAddons: the instance.getInstanceMods response for ` +
+        `"${instanceName}" was matched but its body was never read`
     )
-  }
-  const body = (await response.json()) as {
-    result?: { type?: string; data?: unknown }
   }
   if (body.result?.type === "error") {
     throw new Error(
@@ -463,10 +469,11 @@ export async function searchForMod(
       ? TEST_IDS.searchPlatformCurseforge
       : TEST_IDS.searchPlatformModrinth
   const platformWrapper = page.locator(byTestId(platformTestId))
-  // The native `<input type="radio">` `Radio` forwards unknown props onto
-  // (visually hidden — `class="hidden"` — but a real DOM node with a real
-  // `checked` property, see `Radio/index.tsx` and `selectors.ts`'s hazard-1
-  // comment). Reading it first is what makes the click below a *set* rather
+  // The native `<input type="radio">` `Radio` renders inside its label
+  // (transparent, and the pointer passes through it, but a real DOM node
+  // with a real `checked` property, see `Radio/index.tsx` and
+  // `selectors.ts`'s hazard-1 comment), which is why the click below goes
+  // to the wrapper. Reading it first is what makes the click a *set* rather
   // than the *toggle* `PlatformFilter.handleSelect` (`PlatformFilter.tsx:22-38`)
   // actually implements: it deselects (`searchApi: null`) when the clicked
   // value already equals the current selection, and the filter's provider
@@ -1124,9 +1131,8 @@ export async function installModIntoInstance(
   }
 }
 
-/** Envelope every rspc response in this app shares — see
- *  `openInstanceAddons`'s identical inline shape. Named here because the
- *  lifecycle drivers below parse it repeatedly. */
+/** Envelope every rspc response in this app shares. Named because
+ *  `openInstanceAddons` and the lifecycle drivers below all parse it. */
 interface RspcEnvelope {
   result?: { type?: string; data?: unknown }
 }

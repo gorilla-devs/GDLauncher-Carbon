@@ -45,6 +45,7 @@ const ExportFormat = () => {
             <Card
               entity={entity}
               icon={ENTITIES[entity.entity].icon}
+              platform={ENTITIES[entity.entity].platform}
               translation={ENTITIES[entity.entity].translation}
               onClick={[() => {}, entity]}
               instanceTitle={exportTargets[entity.entity]!}

@@ -137,7 +137,6 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_confirm_world_deletion_title",
     "_trn_confirm_world_deletion_body",
     "_trn_confirm_world_deletion_dont_ask",
-    "_trn_confirm_world_deletion_cancel",
     "_trn_confirm_world_deletion_confirm",
     "_trn_confirm_world_deletion_confirm_selection",
     "_trn_import_scan_failed",
@@ -165,7 +164,6 @@ const KEYS: Record<string, readonly string[]> = {
     "_trn_server_recovered_refusal_running_force"
   ],
   java: [
-    "_trn_instance_settings.java_override_mismatch",
     "_trn_runtime_relocation_busy.previous_process",
     "_trn_runtime_relocation_busy.hook"
   ],

@@ -5,7 +5,8 @@ import { RESET_CONFIRM_GUARD_MS } from "./resetButton"
 const bridge = vi.hoisted(() => ({
   api: {} as Record<string, any>,
   invoke: vi.fn(),
-  on: vi.fn()
+  on: vi.fn(),
+  send: vi.fn()
 }))
 vi.mock("electron", () => ({
   contextBridge: {
@@ -13,7 +14,7 @@ vi.mock("electron", () => ({
       bridge.api[name] = value
     }
   },
-  ipcRenderer: { invoke: bridge.invoke, on: bridge.on }
+  ipcRenderer: { invoke: bridge.invoke, on: bridge.on, send: bridge.send }
 }))
 vi.mock("./utils", () => ({ domReady: async () => true }))
 let clock = 0
@@ -33,6 +34,7 @@ async function ready() {
   vi.stubGlobal("__APP_VERSION__", "synthetic")
   bridge.invoke.mockReset()
   bridge.on.mockReset()
+  bridge.send.mockReset()
   bridge.invoke.mockImplementation(async (name: string) =>
     name === "getRuntimePath"
       ? "/synthetic/runtime"

@@ -10,6 +10,8 @@ import {
 } from "@gd/ui"
 import { ModalProps, useModal } from "../.."
 import ModalLayout from "../../ModalLayout"
+import { DialogFooter } from "../../DialogFooter"
+import { TextLink } from "@/components/TextLink"
 import { extractErrorDisplay, rspc } from "@/utils/rspcClient"
 import {
   Show,
@@ -264,9 +266,12 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             placeholder={t("instances:_trn_change_version_pick")}
             disallowEmptySelection={true}
             itemComponent={(itemProps) => {
-              const version = versions().find(
-                (v) => v.id === itemProps.item.rawValue
-              )
+              // Read in the JSX, not here: Kobalte calls this from a tracked
+              // scope, so a read here would rebuild every row whenever the
+              // version list refetches, and losing the focused row closes
+              // the open list under the user's cursor.
+              const version = () =>
+                versions().find((v) => v.id === itemProps.item.rawValue)
               return (
                 <SelectItem item={itemProps.item}>
                   <div
@@ -274,8 +279,8 @@ const ModPackVersionUpdate = (props: ModalProps) => {
                     data-testid="modpack-version-option"
                     data-version-id={itemProps.item.rawValue}
                   >
-                    <span>{version?.name}</span>
-                    <Show when={version?.isCurrent}>
+                    <span>{version()?.name}</span>
+                    <Show when={version()?.isCurrent}>
                       <span class="text-green-500">
                         <Trans key="instances:_trn_version_current" />
                       </span>
@@ -350,15 +355,14 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             </div>
           </Show>
 
-          <div class="flex justify-between">
-            <Button
-              type="secondary"
+          <DialogFooter>
+            <TextLink
               data-testid="modpack-version-update-cancel"
               disabled={cancelling()}
               onClick={cancel}
             >
-              {t("instances:_trn_cancel_export")}
-            </Button>
+              <Trans key="general:_trn_cancel" />
+            </TextLink>
             <Button
               type="primary"
               data-testid="modpack-version-update-confirm"
@@ -368,7 +372,7 @@ const ModPackVersionUpdate = (props: ModalProps) => {
             >
               {t("instances:_trn_instance_modal_instance_update")}
             </Button>
-          </div>
+          </DialogFooter>
         </Show>
       </div>
     </ModalLayout>

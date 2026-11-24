@@ -109,6 +109,20 @@ impl InstallTurn {
         }
     }
 
+    /// The turn of a run with no instance behind it, for tests of steps that
+    /// take it. It shows nothing as queued, so it must find the turn free.
+    #[cfg(test)]
+    pub(super) fn detached_for_test(app: Arc<AppInner>) -> Self {
+        Self {
+            app,
+            instance: InstanceId(i32::MAX),
+            task: VisualTaskId(i32::MAX),
+            cancel: CancellationToken::new(),
+            shown_queued: false,
+            held: None,
+        }
+    }
+
     /// Shows the instance as preparing, for a run that starts without the
     /// turn.
     pub(super) async fn start_without(&mut self) -> anyhow::Result<()> {

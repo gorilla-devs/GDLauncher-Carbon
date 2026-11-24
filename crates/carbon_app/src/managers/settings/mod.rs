@@ -64,8 +64,11 @@ impl ManagerRef<'_, SettingsManager> {
     pub async fn set_settings(self, incoming_settings: FESettingsUpdate) -> anyhow::Result<()> {
         let mut patch = AppConfigurationPatch::default();
 
+        let mut new_theme = None;
         if let Some(theme) = incoming_settings.theme {
-            patch.theme = Some(theme.inner());
+            let theme = theme.inner();
+            new_theme = Some(theme.clone());
+            patch.theme = Some(theme);
         }
 
         if let Some(language) = incoming_settings.language {
@@ -175,6 +178,10 @@ impl ManagerRef<'_, SettingsManager> {
                 Some(auto_manage_java_system_profiles.clone().inner());
         }
 
+        if let Some(auto_update_managed_java) = incoming_settings.auto_update_managed_java {
+            patch.auto_update_managed_java = Some(auto_update_managed_java.inner());
+        }
+
         if let Some(mod_sources) = incoming_settings.mod_sources {
             let mod_sources = mod_sources.inner();
 
@@ -216,6 +223,25 @@ impl ManagerRef<'_, SettingsManager> {
             patch.terms_and_privacy_accepted_checksum = Some(Some(latest_consent_sha));
         }
 
+        // The old theme is read before the write, for the season's memory of
+        // what to go back to.
+        // The season guard is held from reading the old theme to recording
+        // the change, so the season check can't interleave with a pick.
+        let season_guard = match &new_theme {
+            Some(_) => Some(self.app.theme_manager().lock_season().await),
+            None => None,
+        };
+        let old_theme = match &new_theme {
+            Some(_) => match self.get_settings().await {
+                Ok(s) => Some(s.theme),
+                Err(e) => {
+                    tracing::warn!("couldn't read the old theme for the season: {e:#}");
+                    None
+                }
+            },
+            None => None,
+        };
+
         if let Some(query) = patch.build() {
             self.app
                 .db
@@ -223,19 +249,27 @@ impl ManagerRef<'_, SettingsManager> {
                 .await?;
             self.app.invalidate(GET_SETTINGS, None);
 
+            if let Some(theme) = new_theme {
+                self.app.theme_manager().set_active(&theme);
+                if let Some(old) = old_theme {
+                    if let Err(e) = self
+                        .app
+                        .theme_manager()
+                        .record_theme_change_locked(&old, &theme)
+                        .await
+                    {
+                        tracing::warn!("couldn't record the theme change for the season: {e:#}");
+                    }
+                }
+            }
+
+            drop(season_guard);
+
             if let Some(show_app_close_warning) = incoming_settings.show_app_close_warning {
                 crate::launcher::tell(format_args!(
                     "_SHOW_APP_CLOSE_WARNING_:{}",
                     show_app_close_warning.inner()
                 ));
-            }
-        }
-
-        if let Some(auto_manage_java_system_profiles) =
-            incoming_settings.auto_manage_java_system_profiles
-        {
-            if auto_manage_java_system_profiles.inner() {
-                super::java::scan_and_sync::sync_system_java_profiles(&self.app.db).await?;
             }
         }
 

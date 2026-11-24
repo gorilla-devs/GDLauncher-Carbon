@@ -686,15 +686,22 @@ mod test {
         let app_data = tmp.path().join("xmcl");
         std::fs::create_dir_all(&app_data).unwrap();
         let instances = tmp.path().join("instances");
-        // Absolute on every platform; "/abs/C" has no drive letter on Windows.
-        let external = tmp.path().join("abs").join("C");
+        // An instance kept outside the instances folder, by its absolute
+        // path: built from the temp dir so it is absolute on every platform
+        // (on Windows "/abs/C" has no drive and is relative).
+        let elsewhere = tmp.path().join("elsewhere").join("C");
         std::fs::write(
             app_data.join("instances.json"),
             serde_json::json!({
                 "instances": ["A", "B"],
                 "groups": [
                     "A",
-                    { "name": "Modded", "id": "g1", "color": "", "instances": ["B", external] }
+                    {
+                        "name": "Modded",
+                        "id": "g1",
+                        "color": "",
+                        "instances": ["B", elsewhere.to_string_lossy()]
+                    }
                 ]
             })
             .to_string(),
@@ -705,7 +712,7 @@ mod test {
             groups.get(&instances.join("B")).map(String::as_str),
             Some("Modded")
         );
-        assert_eq!(groups.get(&external).map(String::as_str), Some("Modded"));
+        assert_eq!(groups.get(&elsewhere).map(String::as_str), Some("Modded"));
         assert!(!groups.contains_key(&instances.join("A")));
         assert!(
             instance_groups(&tmp.path().join("nope"), &instances)

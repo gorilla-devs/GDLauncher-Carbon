@@ -22,6 +22,47 @@ fn test_single_complete_xml_entry() {
 }
 
 #[test]
+fn test_throwable_is_kept_apart_from_the_message() {
+    let input = r#"<log4j:Event logger="net.minecraft.client.main.Main" timestamp="1234567890" level="ERROR" thread="main">
+  <log4j:Message><![CDATA[Failed to start the game]]></log4j:Message>
+  <log4j:Throwable><![CDATA[java.lang.UnsupportedClassVersionError: a/B has been compiled by a more recent version of the Java Runtime (class file version 65.0), this version of the Java Runtime only recognizes class file versions up to 61.0
+	at java.base/java.lang.ClassLoader.defineClass1(Native Method)
+]]></log4j:Throwable>
+</log4j:Event>"#;
+
+    let mut parser = LogParser::new();
+    parser.feed(input.as_bytes());
+
+    match parser.parse_next().unwrap() {
+        Some(ParsedItem::LogEntry(entry)) => {
+            assert_eq!(entry.message, "Failed to start the game");
+            let throwable = entry.throwable.expect("the throwable");
+            assert!(
+                throwable.starts_with("java.lang.UnsupportedClassVersionError: a/B"),
+                "{throwable}"
+            );
+            assert!(throwable.contains("defineClass1"), "{throwable}");
+        }
+        other => panic!("Expected LogEntry, got {other:?}"),
+    }
+}
+
+#[test]
+fn test_an_event_without_a_throwable_has_none() {
+    let input = r#"<log4j:Event logger="L" timestamp="1" level="INFO" thread="main">
+            <log4j:Message><![CDATA[Hello]]></log4j:Message>
+        </log4j:Event>"#;
+
+    let mut parser = LogParser::new();
+    parser.feed(input.as_bytes());
+
+    match parser.parse_next().unwrap() {
+        Some(ParsedItem::LogEntry(entry)) => assert_eq!(entry.throwable, None),
+        other => panic!("Expected LogEntry, got {other:?}"),
+    }
+}
+
+#[test]
 fn test_non_utf8_attribute_name_is_skipped() {
     // A complete event whose start tag carries a non-UTF-8 byte inside an attribute *name*
     // (e.g. a non-standard or corrupted log4j layout) must not panic the parser; the

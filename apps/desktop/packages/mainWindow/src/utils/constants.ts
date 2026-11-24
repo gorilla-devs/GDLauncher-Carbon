@@ -54,6 +54,9 @@ export const ModpackPlatforms: ("curseforge" | "modrinth")[] = [
 interface EntityValue {
   translation: NamespacedTranslationKey
   icon: string
+  /** Drawn as this platform's logo instead of `icon` (it follows the
+   *  palette: see components/PlatformLogo). */
+  platform?: "curseforge"
 }
 
 export const ENTITIES: Record<ImportEntity, EntityValue> = {
@@ -67,7 +70,8 @@ export const ENTITIES: Record<ImportEntity, EntityValue> = {
   },
   CurseForge: {
     translation: "enums:_trn_entity.curseforge",
-    icon: CurseForgeLogo
+    icon: CurseForgeLogo,
+    platform: "curseforge"
   },
   FTB: {
     translation: "enums:_trn_entity.ftb",
@@ -91,7 +95,8 @@ export const ENTITIES: Record<ImportEntity, EntityValue> = {
   },
   CurseForgeZip: {
     translation: "enums:_trn_entity.curseforgezip",
-    icon: CurseForgeLogo
+    icon: CurseForgeLogo,
+    platform: "curseforge"
   },
   MRPack: {
     translation: "enums:_trn_entity.mrpack",

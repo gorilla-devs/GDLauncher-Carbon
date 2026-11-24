@@ -8,7 +8,11 @@ interface Props {
 function RightHandSide(props: Props) {
   const c = children(() => props.children)
 
-  return <div class={props.class}>{c()}</div>
+  return (
+    <div data-gdl="settings.row.control" class={props.class}>
+      {c()}
+    </div>
+  )
 }
 
 export default RightHandSide

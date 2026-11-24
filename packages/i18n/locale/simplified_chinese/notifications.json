@@ -17,7 +17,6 @@
   "_trn_cannot_delete_instance": "无法删除实例",
   "_trn_cannot_delete_server": "无法删除服务器",
   "_trn_eula_accept_failed": "接受 EULA 失败",
-  "_trn_custom_java_added": "自定义 Java 路径添加成功",
   "_trn_addon_downloading_to_server": "{{title}} 正在下载到服务器",
   "_trn_addon_installed": "{{title}} 安装成功",
   "_trn_datapack_downloaded": "{{title}} 已下载。请在实例的“附加组件”标签页中将其添加到存档。",

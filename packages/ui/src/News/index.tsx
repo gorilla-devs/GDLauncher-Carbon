@@ -7,6 +7,7 @@ import {
   Show
 } from "solid-js"
 import { cn } from "../util"
+import { withStates } from "../hooks"
 
 interface SlideProps {
   image: string
@@ -50,6 +51,8 @@ const News = (props: CarouselProps) => {
   let slidesRef!: HTMLDivElement
 
   const moveSlide = () => {
+    // The slides may not be mounted yet (the inner Slider mounts them).
+    if (!slidesRef) return
     slidesRef.style.transform = `translateX(-${currentImageIndex() * 100}%)`
   }
 
@@ -191,16 +194,18 @@ const News = (props: CarouselProps) => {
         <For each={copiedSlides()}>
           {(slide) => (
             <div
+              data-gdl="news.slide"
               class="inset-0 box-border flex h-full w-full flex-shrink-0 flex-grow transform items-center justify-center bg-cover bg-center bg-no-repeat"
               style={{
                 "background-image": `url('${slide.image}'), url('${props.fallBackImg}')`
               }}
             >
+              {/* A fixed dark veil, so the words over the picture read on any
+                  palette. Their colours are in the app's controls.css: the
+                  palette's own when it is dark, light ones when it is light. */}
               <div
-                class="absolute bottom-0 left-0 right-0 top-0"
-                style={{
-                  background: "rgba(29, 32, 40, 0.7)"
-                }}
+                data-gdl="news.slide.veil"
+                class="absolute bottom-0 left-0 right-0 top-0 bg-[rgb(29_32_40/0.7)]"
               />
               <div
                 class="absolute box-border flex h-full w-full p-8 cursor-pointer group"
@@ -208,17 +213,23 @@ const News = (props: CarouselProps) => {
               >
                 <div class="flex select-none flex-col gap-2 w-full">
                   <div class="flex items-center gap-2 text-3xl">
-                    <h1 class="m-0 overflow-hidden text-ellipsis whitespace-nowrap group-hover:underline">
+                    <h1
+                      data-gdl="news.slide.title"
+                      class="m-0 overflow-hidden text-ellipsis whitespace-nowrap group-hover:underline"
+                    >
                       {slide.title}
                     </h1>
                   </div>
-                  <h2 class="text-lightSlate-200 m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl">
+                  <h2
+                    data-gdl="news.slide.text"
+                    class="m-0 w-full overflow-hidden text-ellipsis whitespace-nowrap text-xl"
+                  >
                     {slide.description}
                   </h2>
                 </div>
 
                 <div class="absolute bottom-0 left-0 p-8">
-                  <p class="text-lightSlate-200 text-sm">
+                  <p data-gdl="news.slide.date" class="text-sm">
                     {new Date(slide.date).toLocaleDateString(undefined, {
                       year: "numeric",
                       month: "short",
@@ -236,6 +247,7 @@ const News = (props: CarouselProps) => {
 
   return (
     <div
+      data-gdl="news.slideshow"
       class={cn(
         "bg-darkSlate-900 group relative h-84 overflow-hidden rounded-lg",
         props.className
@@ -243,6 +255,7 @@ const News = (props: CarouselProps) => {
     >
       <Show when={mergedProps.showArrows}>
         <div
+          data-gdl="news.slideshow.prev"
           class="bg-darkSlate-800 absolute left-5 top-1/2 z-40 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full opacity-0 duration-200 ease-spring group-hover:opacity-100 "
           onClick={() => {
             if (isMoving()) return
@@ -252,6 +265,7 @@ const News = (props: CarouselProps) => {
           <div class="i-hugeicons:arrow-left-01 text-3xl text-lightSlate-50" />
         </div>
         <div
+          data-gdl="news.slideshow.next"
           class="bg-darkSlate-800 absolute right-5 top-1/2 z-40 flex h-7 w-7 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full opacity-0 duration-200 ease-spring group-hover:opacity-100"
           onClick={() => {
             if (isMoving()) return
@@ -262,10 +276,16 @@ const News = (props: CarouselProps) => {
         </div>
       </Show>
       <Show when={mergedProps.showIndicators}>
-        <div class="absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center justify-between gap-2">
+        <div
+          data-gdl="news.slideshow.dots"
+          class="absolute bottom-4 left-1/2 z-50 flex -translate-x-1/2 items-center justify-between gap-2"
+        >
           <For each={copiedSlides().slice(1, -1)}>
             {(_, i) => (
               <div
+                data-gdl={withStates("news.slideshow.dot", {
+                  active: currentImageIndex() === i() + 1
+                })}
                 class={`h-2 w-2 cursor-pointer rounded-full bg-white ${
                   currentImageIndex() === i() + 1 ? "opacity-100" : "opacity-30"
                 }`}

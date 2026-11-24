@@ -32,7 +32,6 @@
   "_trn_common.read_more": "続きを読む",
   "_trn_common.view_all": "すべて表示",
   "_trn_common.clear_all": "すべてクリア",
-  "_trn_add_custom_java_path": "カスタムJavaパスを追加",
   "_trn_profile_name": "プロファイル名",
   "_trn_assigned_java_path": "割り当てられたJavaパス",
   "_trn_instance_unlock_confirmation": "ロックを解除すると、このインスタンスに追加コンテンツをインストールできるようになります。正しく行わないとインスタンスが起動しなくなる可能性があります。この操作は取り消せません。",
@@ -43,5 +42,6 @@
   "_trn_edit": "編集",
   "_trn_ok": "OK",
   "_trn_field_required": "この項目は必須です",
-  "_trn_dismiss": "閉じる"
+  "_trn_dismiss": "閉じる",
+  "_trn_close": "閉じる"
 }

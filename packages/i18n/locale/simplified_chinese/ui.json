@@ -16,8 +16,6 @@
   "_trn_tooltip.rtp_not_a_folder": "这不是文件夹：它是一个文件，或指向已不存在内容的链接。请选择一个文件夹。",
   "_trn_tooltip.rtp_not_writable": "GDLauncher 无法写入此文件夹。请选择您拥有的文件夹，或允许写入此文件夹。",
   "_trn_tooltip.rtp_has_other_files": "此文件夹中有其他文件。请选择一个空文件夹（例如在其中新建的文件夹），或已包含 GDLauncher 数据的文件夹。",
-  "_trn_path": "路径",
-  "_trn_profile": "配置",
   "_trn_custom": "自定义",
   "_trn_tile_size": "磁贴大小",
   "_trn_sort_options": "排序选项",

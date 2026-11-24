@@ -31,6 +31,10 @@ vi.mock("@/managers/ModalsManager", () => ({
 vi.mock("@/managers/NavigationManager", () => ({
   useGDNavigate: () => ({ lastPathVisited: () => ({ path: "/" }) })
 }))
+// The theme's preferences (its default tile size); none saved here.
+vi.mock("@/utils/rspcClient", () => ({
+  rspc: { createQuery: () => ({ isPending: false, data: undefined }) }
+}))
 vi.mock("@/hooks/useDragSelect", () => ({
   useDragSelect: () => ({ selectionRect: () => null, handlers: {} })
 }))

@@ -4,6 +4,7 @@ import { splitProps } from "solid-js"
 import type { VariantProps } from "class-variance-authority"
 import { cva } from "class-variance-authority"
 import { cn } from "../util"
+import { gdlHooks } from "../hooks"
 
 const badgeVariants = cva(
   "w=fit focus:ring-ring inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-semibold transition-colors duration-100 ease-spring focus:outline-none focus:ring-2 focus:ring-offset-2",
@@ -36,14 +37,35 @@ type BadgeProps = ComponentProps<"div"> &
   }
 
 const Badge: Component<BadgeProps> = (props) => {
-  const [local, others] = splitProps(props, ["class", "variant", "round"])
+  const [local, others] = splitProps(props, [
+    "class",
+    "variant",
+    "round",
+    "data-gdl" as keyof BadgeProps
+  ])
+  const merged = () =>
+    cn(
+      badgeVariants({ variant: local.variant }),
+      local.round && "rounded-full",
+      local.class
+    )
+  // `badge.default` marks a badge that really is gold: the default variant
+  // whose merged classes still have `bg-primary-500` (a caller's own
+  // background class replaces it).
+  const isGold = () => merged().split(/\s+/).includes("bg-primary-500")
+  // On the gold fill the words read `--gdl-on-primary` (style.css), unless a
+  // caller's own text colour replaced the default one.
+  const classes = () =>
+    isGold()
+      ? merged().replace(/(^|\s)text-lightSlate-50(?=\s|$)/, "$1gdl-on-primary")
+      : merged()
   return (
     <div
-      class={cn(
-        badgeVariants({ variant: local.variant }),
-        local.round && "rounded-full",
-        local.class
+      data-gdl={gdlHooks(
+        isGold() ? "badge badge.default" : "badge",
+        (local as Record<string, unknown>)["data-gdl"]
       )}
+      class={classes()}
       {...others}
     />
   )

@@ -35,14 +35,16 @@
 }
 
 /* Don't interpolate the group's size between old/new states.
-   We also paint the group's background with the scroll container's color
-   so the scrollbar-gutter band on the right stays filled even when we
-   clip the sliding content out of it (see ::view-transition-image-pair
-   below). */
+   We also paint the group's background with the scroll container's own
+   color, read when the switch starts (HomeGrid's --gdl-library-gutter), so
+   the scrollbar-gutter band on the right stays filled even when we clip the
+   sliding content out of it (see ::view-transition-image-pair below). A
+   theme's see-through panel stays see-through: a fixed color would darken
+   its glass for the whole slide. */
 ::view-transition-group(library-content) {
   overflow: hidden;
   animation: none;
-  background-color: rgb(var(--darkSlate-800));
+  background-color: var(--gdl-library-gutter, rgb(var(--darkSlate-800)));
 }
 
 /* Clip the image-pair (static — doesn't participate in the slide) so the

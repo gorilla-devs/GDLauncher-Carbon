@@ -19,6 +19,7 @@ const SingleCheckBox = (props: Props) => {
   const uniqueId = () => props.selectionId || props.filename || props.title
 
   const isInvalid = () => props.invalidReason !== undefined
+  let checkboxArea: HTMLDivElement | undefined
 
   const isSelected = () =>
     !isInvalid() && instances().some((instance) => instance === uniqueId())
@@ -49,7 +50,12 @@ const SingleCheckBox = (props: Props) => {
             ? "bg-primary-500/10 ring-1 ring-primary-500 cursor-pointer"
             : "bg-darkSlate-800 outline outline-1 outline-transparent hover:outline-darkSlate-500 cursor-pointer"
       }`}
-      onClick={() => handleChange(!isSelected())}
+      onClick={(e) => {
+        // The checkbox toggles itself, from a press or from Space, whose
+        // click still bubbles up to here.
+        if (checkboxArea?.contains(e.target as Node)) return
+        handleChange(!isSelected())
+      }}
     >
       <Show
         when={!isInvalid()}
@@ -57,10 +63,10 @@ const SingleCheckBox = (props: Props) => {
           <div class="i-hugeicons:alert-02 text-yellow-500 shrink-0 text-xl" />
         }
       >
-        <div onClick={(event) => event.stopPropagation()}>
+        <div ref={checkboxArea} class="contents">
           <Checkbox
             checked={isSelected()}
-            ariaLabel={props.title ?? props.filename}
+            aria-label={props.title ?? props.filename}
             onChange={handleChange}
           />
         </div>

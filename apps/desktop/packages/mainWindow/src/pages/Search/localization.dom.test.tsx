@@ -72,7 +72,9 @@ vi.mock("@/components/VirtuaWrapper", () => ({
   )
 }))
 vi.mock("@/managers/ModalsManager", () => ({
-  useModal: () => ({ closeModal: () => c.effects.push("close") })
+  useModal: () => ({ closeModal: () => c.effects.push("close") }),
+  // A confirm dialog closes through its own stack entry.
+  useModalStackEntry: () => ({ close: () => c.effects.push("close") })
 }))
 vi.mock("@/managers/ModalsManager/ModalLayout", () => ({
   default: (p: any) => <div>{p.children}</div>
@@ -416,7 +418,11 @@ it("sort-order interpolation remains visible and radio deselection retains filte
     </>
   ))
   expect(root.textContent).toContain("Order: Ascending")
-  root.querySelector<HTMLInputElement>('input[value="name"]')!.click()
+  // The pointer lands on the radio's label; the input under it is unseen.
+  root
+    .querySelector<HTMLInputElement>('input[value="name"]')!
+    .closest("label")!
+    .click()
   expect(state.query().platformFilters.filters.sort_field).toBeNull()
   expect(state.query().platformFilters.filters.sort_order).toBe("ascending")
 })
@@ -490,9 +496,20 @@ it("warning preference saves before actual callback; Cancel performs no deletion
   await flush()
   expect(c.effects).toEqual(["save", "saved", "confirm", "close"])
   c.effects = []
-  ;[...root.querySelectorAll("button")]
+  // A confirmed dialog has closed; Cancel is asked of a fresh one.
+  const again = await mount("english", () => (
+    <ConfirmWorldDeletion
+      title="Synthetic confirmation"
+      data={{
+        worldName: "Synthetic World",
+        onConfirm: () => c.effects.push("confirm")
+      }}
+    />
+  ))
+  ;[...again.root.querySelectorAll("button")]
     .find((b) => b.textContent === "Cancel")!
     .click()
+  await flush()
   expect(c.effects).toEqual(["close"])
 })
 

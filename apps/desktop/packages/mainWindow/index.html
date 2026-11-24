@@ -13,7 +13,8 @@
        script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.gdl.gg;
        worker-src 'self' blob:;
        img-src 'self' data: https: blob: http://127.0.0.1:* http://localhost:* http://i.imgur.com;
-       media-src 'self' https://*.gdl.gg;
+       font-src 'self' http://127.0.0.1:*;
+       media-src 'self' https://*.gdl.gg http://127.0.0.1:*;
        default-src 'unsafe-inline' 'self';
        frame-src 'self' https://www.youtube.com https://www.youtube-nocookie.com https://i.imgur.com https://cdn.ko-fi.com;
        connect-src 'self' data: ws://127.0.0.1:* https://www.minecraft.net https://launchercontent.mojang.com http://127.0.0.1:* https://*.gdl.gg;
@@ -22,6 +23,34 @@
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <style>
+      html[data-gdl-background] body {
+        background: transparent !important;
+      }
+      /* The theme's layout menu (themes/layout.ts). (0,2,1) beats the utility
+         classes; theme CSS comes later, so a selector of the same weight
+         (html[data-gdl-panels="off"] [data-gdl~="panel"]) still wins. The
+         News tab bar is a sticky bar, so it keeps its colour (the :where
+         adds no weight). */
+      html[data-gdl-panels="off"]
+        :is(
+          [data-gdl~="panel-frame"],
+          [data-gdl~="panel"],
+          [data-gdl~="page"],
+          [data-gdl~="page.body"]:not(:where([data-gdl~="news.tabs"]))
+        ) {
+        background-color: transparent;
+        background-image: none;
+        border-color: transparent;
+        box-shadow: none;
+      }
+      /* Under the cleared panels, with no background picture, the page is the
+         theme's panel colour rather than the window's boot colour (the inline
+         #1e2129, which only main matches). */
+      html[data-gdl-panels="off"]:not([data-gdl-background]) body {
+        background: rgb(var(--darkSlate-800)) !important;
+      }
+      /* The caption tiles' colours and the panel frame under a background
+         picture are in src/themes/controls.css. */
       @font-face {
         font-family: "Ubuntu";
         font-style: normal;
@@ -109,15 +138,6 @@
           url("/assets/fonts/monocraft-bold.ttf") format("truetype");
       }
 
-      @font-face {
-        font-family: "W95FA";
-        font-style: normal;
-        font-weight: normal;
-        src:
-          local("W95FA"),
-          url("/assets/fonts/w95fa.woff2") format("woff2");
-      }
-
       * {
         font-family: var(--font);
         font-synthesis: none;
@@ -180,11 +200,20 @@
         animation-duration: 0s;
       }
 
-      .slide-right-transition {
+      /* What slides (classes on <html>, NavigationManager/pageSlide.ts): the
+         page's panel, so its frame and frosted glass stay put and live behind
+         it (a backdrop-filter inside a transition snapshot has nothing to
+         blur); the page box when a page has no panel; the body outside the
+         app's layout. */
+      html.slide-right-transition #gdl-content-wrapper,
+      html.slide-right-transition #gdl-page:not(:has(#gdl-content-wrapper)),
+      html.slide-right-transition body:not(:has(#gdl-page)) {
         view-transition-name: slide-right-transition;
       }
 
-      .slide-left-transition {
+      html.slide-left-transition #gdl-content-wrapper,
+      html.slide-left-transition #gdl-page:not(:has(#gdl-content-wrapper)),
+      html.slide-left-transition body:not(:has(#gdl-page)) {
         view-transition-name: slide-left-transition;
       }
 
@@ -206,8 +235,70 @@
         contain: paint;
       }
 
+      /* The page slides inside its own box (see NavigationManager). */
+      ::view-transition-group(slide-right-transition),
+      ::view-transition-group(slide-left-transition) {
+        overflow: clip;
+      }
+
+      /* While only the page slides, the rest of the window doesn't
+         cross-fade: the live view shows, so a theme's snow keeps falling. */
+      html.gdl-page-slide::view-transition-old(root) {
+        animation: none;
+        opacity: 0;
+      }
+      html.gdl-page-slide::view-transition-new(root) {
+        animation: none;
+      }
+
+      /* The snow, the lights and the content's decorations sit above the
+         page. In a view transition the root's view falls behind whatever
+         moves, so in every transition they keep their own place, live and
+         still; the panel's decorations (the ledge) too while its contents
+         slide or switch (the library's Instances and Servers). */
+      [data-gdl-effects] {
+        view-transition-name: gdl-effects;
+      }
+      [data-gdl-decorations="content"] {
+        view-transition-name: gdl-content-decorations;
+      }
+      html.gdl-page-slide [data-gdl-decorations="panel"],
+      html.gdl-library-switch [data-gdl-decorations="panel"] {
+        view-transition-name: gdl-panel-decorations;
+      }
+      ::view-transition-old(gdl-effects),
+      ::view-transition-old(gdl-content-decorations),
+      ::view-transition-old(gdl-panel-decorations) {
+        animation: none;
+        opacity: 0;
+      }
+      ::view-transition-group(gdl-effects),
+      ::view-transition-group(gdl-content-decorations),
+      ::view-transition-group(gdl-panel-decorations),
+      ::view-transition-new(gdl-effects),
+      ::view-transition-new(gdl-content-decorations),
+      ::view-transition-new(gdl-panel-decorations) {
+        animation: none;
+      }
+
+      /* The slide runs on the compositor. As it ends, Chromium can draw one
+         more frame of the leaving page's snapshot where the slide began,
+         under the page that came in: through a see-through panel (Silent
+         Night) that is a flash of the old page. So the leaving page's
+         snapshot is also hidden as it finishes sliding out: visibility is
+         painted by the main thread, not the compositor, and that frame has
+         nothing left to show. */
+      @keyframes gdl-slide-hide {
+        from {
+          visibility: visible;
+        }
+        to {
+          visibility: hidden;
+        }
+      }
+
       ::view-transition-old(slide-right-transition) {
-        animation-name: slide-out-to-left;
+        animation-name: slide-out-to-left, gdl-slide-hide;
       }
 
       ::view-transition-new(slide-right-transition) {
@@ -215,7 +306,7 @@
       }
 
       ::view-transition-old(slide-left-transition) {
-        animation-name: slide-out-to-right;
+        animation-name: slide-out-to-right, gdl-slide-hide;
       }
 
       ::view-transition-new(slide-left-transition) {
@@ -284,7 +375,6 @@
       #server_console_container * {
         user-select: text;
         cursor: auto;
-        font-family: var(--font-mono);
       }
 
       *[data-cursor-pointer] {
@@ -373,6 +463,12 @@
         animation: undraw-selection-border 0.1s ease-in forwards;
       }
 
+      /* With reduced motion no animation runs (.potato-pc), so the outline
+         is drawn whole at once instead of staying undrawn. */
+      .potato-pc .selection-border-draw {
+        stroke-dashoffset: 0;
+      }
+
       .appFatalCrash {
         position: fixed;
         top: 0;
@@ -401,16 +497,31 @@
       #news_article_content a {
         cursor: pointer !important;
       }
+
+      #floating-root {
+        position: fixed;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        right: var(--ad-column-width, 0px);
+        overflow: clip;
+        pointer-events: none;
+        z-index: 10001;
+      }
+
+      #floating-root > * {
+        pointer-events: auto;
+      }
     </style>
     <title>GDLauncher Carbon</title>
     <script type="module">
-      import { mainTheme } from "@gd/ui"
+      import { getBuiltinTheme } from "/src/themes/builtin.ts"
+      import { applyResolvedTheme } from "/src/themes/apply.ts"
 
       window.scrollRestoration = "manual"
 
-      for (const key in mainTheme) {
-        document.documentElement.style.setProperty(`--${key}`, mainTheme[key])
-      }
+      const main = getBuiltinTheme("main")
+      void applyResolvedTheme("main", main, main)
       // TODO: handle sourcemaps decoding + sentry
       if (!import.meta.env.DEV) {
         // These errors can be safely ignored.
@@ -439,69 +550,6 @@
         }
       }
     </script>
-    <script>
-      function ensureAdVisibility() {
-        const adContainer = document.querySelector(
-          "main > div > div:nth-child(2)"
-        )
-
-        if (adContainer) {
-          // Create a style element if it doesn't exist
-          let style = document.getElementById("ad-visibility-style")
-          if (!style) {
-            style = document.createElement("style")
-            style.id = "ad-visibility-style"
-            document.head.appendChild(style)
-          }
-
-          style.textContent = `
-            main > div > div:nth-child(2) {
-              display: flex !important;
-              flex-direction: column !important;
-              justify-content: center !important;
-              visibility: visible !important;
-              opacity: 1 !important;
-              width: auto !important;
-              height: calc(100vh-100px) !important;
-              position: static !important;
-              transform: none !important;
-              clip: auto !important;
-              clip-path: none !important;
-              max-height: none !important;
-              overflow: visible !important;
-              pointer-events: auto !important;
-            }
-          `
-
-          if (!document.body.contains(adContainer)) {
-            const parent = document.querySelector("main > div")
-            if (parent) {
-              parent.appendChild(adContainer)
-            }
-          }
-
-          const observer = new MutationObserver((mutations) => {
-            mutations.forEach((mutation) => {
-              if (
-                mutation.type === "attributes" &&
-                mutation.attributeName === "style"
-              ) {
-                adContainer.removeAttribute("style")
-              }
-            })
-          })
-
-          observer.observe(adContainer, { attributes: true })
-        }
-      }
-
-      // Run the check periodically
-      // setInterval(ensureAdVisibility, 1000)
-
-      // Also run the check when the page loads and when it's resized
-      // window.addEventListener("load", ensureAdVisibility)
-      // window.addEventListener("resize", ensureAdVisibility)
-    </script>
   </head>
   <body
     style="margin: 0; padding: 0; overflow: hidden; background: #1e2129"
@@ -521,6 +569,7 @@
         display: none;
       "
     ></div>
+    <div id="floating-root"></div>
     <div id="root"></div>
     <div id="appFatalCrash"></div>
     <script type="module" src="/src/main.tsx"></script>

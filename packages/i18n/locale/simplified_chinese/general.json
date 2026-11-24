@@ -32,7 +32,6 @@
   "_trn_common.read_more": "阅读更多",
   "_trn_common.view_all": "查看全部",
   "_trn_common.clear_all": "全部清除",
-  "_trn_add_custom_java_path": "添加自定义 Java 路径",
   "_trn_profile_name": "配置名称",
   "_trn_assigned_java_path": "分配的 Java 路径",
   "_trn_instance_unlock_confirmation": "解锁允许您在此实例上安装额外内容。如果操作不当，可能导致实例无法再启动。此操作无法撤销。",
@@ -43,5 +42,6 @@
   "_trn_edit": "编辑",
   "_trn_ok": "确定",
   "_trn_field_required": "此字段为必填",
-  "_trn_dismiss": "忽略"
+  "_trn_dismiss": "忽略",
+  "_trn_close": "关闭"
 }

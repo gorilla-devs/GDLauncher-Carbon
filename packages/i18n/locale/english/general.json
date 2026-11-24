@@ -32,8 +32,7 @@
   "_trn_common.read_more": "Read More",
   "_trn_common.view_all": "View All",
   "_trn_common.clear_all": "Clear all",
-  "_trn_add_custom_java_path": "Add Custom Java Path",
-  "_trn_profile_name": "Profile Name",
+  "_trn_profile_name": "Profile name",
   "_trn_assigned_java_path": "Assigned Java Path",
   "_trn_instance_unlock_confirmation": "Unlocking allows you to install additional content onto this instance. If not done correctly, that could potentially leading to the instance not launching anymore. This action cannot be undone.",
   "_trn_instance_unpair_confirmation": "Unpairing removes the link between your instance and the modpack. This means you won't be able to change modpack version anymore. This action cannot be undone.",
@@ -43,5 +42,6 @@
   "_trn_edit": "Edit",
   "_trn_ok": "OK",
   "_trn_field_required": "This field is required",
-  "_trn_dismiss": "Dismiss"
+  "_trn_dismiss": "Dismiss",
+  "_trn_close": "Close"
 }

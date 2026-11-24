@@ -7,7 +7,13 @@ interface Props {
 function RowsContainer(props: Props) {
   const c = children(() => props.children)
 
-  return <div class="divide-darkSlate-600 flex flex-col divide-y">{c()}</div>
+  // The lines between the rows are in themes/controls.css, at no weight, so
+  // a theme's plain `settings.row` rule replaces them.
+  return (
+    <div data-gdl="settings.rows" class="flex flex-col">
+      {c()}
+    </div>
+  )
 }
 
 export default RowsContainer

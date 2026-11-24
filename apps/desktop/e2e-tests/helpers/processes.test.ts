@@ -8,7 +8,7 @@ import {
   isPidAlive,
   killGameProcesses,
   killProcessTree,
-  windowsPathSpellings
+  pathSpellings
 } from "./processes.js"
 
 const spawned: ReturnType<typeof spawn>[] = []
@@ -106,6 +106,35 @@ describe("killGameProcesses", () => {
     PROCESS_TEST_TIMEOUT
   )
 
+  it(
+    "kills this run's process when the runtime path is spelled another way",
+    async () => {
+      // The core and the game name the runtime path in its canonical form,
+      // which need not be the spelling the harness made it with: Windows
+      // hands Node the short 8.3 temp path (C:\Users\RUNNER~1\...) and the
+      // game runs under the long one; macOS's temp dir is a symlink into
+      // /private. Here the game runs under the canonical path and the
+      // harness holds a link to it, another spelling on every platform.
+      const made = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-real-"))
+      const canonical = fs.realpathSync.native(made)
+      const linked = `${made}-link`
+      fs.symlinkSync(canonical, linked, "junction")
+      runtimePaths.push(made, linked)
+      const child = spawnChildMarkedWith(canonical)
+      await new Promise((resolve) => setTimeout(resolve, 1500))
+
+      const instanceDir = path.join(linked, "instances", "an-instance")
+      fs.mkdirSync(instanceDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(instanceDir, ".gdl_instance.pid"),
+        `${child.pid}\n1700000000`
+      )
+
+      expect(killGameProcesses(linked)).toEqual([child.pid])
+    },
+    PROCESS_TEST_TIMEOUT
+  )
+
   it("reports nothing when there are no pidfiles", () => {
     const runtimePath = fs.mkdtempSync(path.join(os.tmpdir(), "gdl-empty-"))
     runtimePaths.push(runtimePath)
@@ -148,22 +177,22 @@ describe("killProcessTree", () => {
   )
 })
 
-describe("windowsPathSpellings", () => {
+describe("pathSpellings", () => {
   it("adds the expanded spelling of a short (8.3) runtime path", () => {
     const short = "C:\\Users\\PLAYER~1\\AppData\\Local\\Temp\\gdl-e2e-x"
     const long = "C:\\Users\\player-one\\AppData\\Local\\Temp\\gdl-e2e-x"
-    expect(windowsPathSpellings(short, () => long)).toEqual([short, long])
+    expect(pathSpellings(short, () => long)).toEqual([short, long])
   })
 
   it("keeps one spelling when nothing expands", () => {
     const long = "C:\\Users\\player-one\\gdl-e2e-x"
-    expect(windowsPathSpellings(long, (p) => p)).toEqual([long])
+    expect(pathSpellings(long, (p) => p)).toEqual([long])
   })
 
   it("falls back to the given spelling when the path cannot be resolved", () => {
     const gone = "C:\\Users\\PLAYER~1\\gone"
     expect(
-      windowsPathSpellings(gone, () => {
+      pathSpellings(gone, () => {
         throw new Error("ENOENT")
       })
     ).toEqual([gone])

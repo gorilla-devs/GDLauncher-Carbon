@@ -16,8 +16,6 @@
   "_trn_tooltip.rtp_not_a_folder": "Ce n’est pas un dossier : c’est un fichier, ou un lien vers quelque chose qui n’existe plus. Choisissez un dossier.",
   "_trn_tooltip.rtp_not_writable": "GDLauncher ne peut pas écrire dans ce dossier. Choisissez un dossier qui vous appartient, ou autorisez l’écriture dans celui-ci.",
   "_trn_tooltip.rtp_has_other_files": "Ce dossier contient d’autres fichiers. Choisissez un dossier vide, par exemple un nouveau dossier à l’intérieur, ou un dossier qui contient déjà des données GDLauncher.",
-  "_trn_path": "Chemin",
-  "_trn_profile": "Profil",
   "_trn_custom": "Personnalisé",
   "_trn_tile_size": "Taille des tuiles",
   "_trn_sort_options": "Options de tri",

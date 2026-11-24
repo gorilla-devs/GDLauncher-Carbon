@@ -41,7 +41,10 @@ vi.mock("@/managers/ModalsManager", () => ({
     },
     unregisterPreventClose: () => {
       c.prevent = undefined
-    }
+    },
+    setTitleShown: () => {},
+    titleId: "modal-title",
+    name: "instanceCreation"
   })
 }))
 vi.mock("@/utils/adhelper", () => ({ default: { width: 0 } }))

@@ -5,10 +5,14 @@ import * as ContextMenuPrimitive from "@kobalte/core/context-menu"
 import type { PolymorphicProps } from "@kobalte/core/polymorphic"
 
 import { cn } from "../util"
+import { gdlHooks, withStates } from "../hooks"
+import { getFloatingRoot } from "../floatingRoot"
 import { PRESS_CLASSES } from "../Clickable"
 
 const ContextMenuTrigger = ContextMenuPrimitive.Trigger
-const ContextMenuPortal = ContextMenuPrimitive.Portal
+const ContextMenuPortal = (
+  props: ComponentProps<typeof ContextMenuPrimitive.Portal>
+) => <ContextMenuPrimitive.Portal mount={getFloatingRoot()} {...props} />
 const ContextMenuSub = ContextMenuPrimitive.Sub
 const ContextMenuGroup = ContextMenuPrimitive.Group
 const ContextMenuRadioGroup = ContextMenuPrimitive.RadioGroup
@@ -28,11 +32,16 @@ const ContextMenuContent = <T extends ValidComponent = "div">(
   props: PolymorphicProps<T, ContextMenuContentProps<T>>
 ) => {
   const [local, others] = splitProps(props as ContextMenuContentProps, [
-    "class"
+    "class",
+    "data-gdl" as keyof ContextMenuContentProps
   ])
   return (
-    <ContextMenuPrimitive.Portal>
+    <ContextMenuPrimitive.Portal mount={getFloatingRoot()}>
       <ContextMenuPrimitive.Content
+        data-gdl={gdlHooks(
+          "context-menu",
+          (local as Record<string, unknown>)["data-gdl"]
+        )}
         class={cn(
           "z-100000 min-w-40 max-w-[200px] origin-[var(--kb-menu-content-transform-origin)] overflow-visible rounded-md border border-solid border-darkSlate-600 bg-darkSlate-800 p-1 text-lightSlate-200 shadow-md data-[expanded]:animate-menuEnter animate-menuLeave outline-none",
           local.class
@@ -60,6 +69,12 @@ const ContextMenuItem = <T extends ValidComponent = "div">(
         local.class
       )}
       {...others}
+      data-gdl={gdlHooks(
+        withStates("context-menu.item", {
+          disabled: (props as ContextMenuItemProps).disabled
+        }),
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     />
   )
 }
@@ -89,6 +104,10 @@ const ContextMenuSeparator = <T extends ValidComponent = "hr">(
     <ContextMenuPrimitive.Separator
       class={cn("h-[1px] my-1 bg-darkSlate-600 border-none", local.class)}
       {...others}
+      data-gdl={gdlHooks(
+        "context-menu.separator",
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     />
   )
 }
@@ -114,6 +133,12 @@ const ContextMenuSubTrigger = <T extends ValidComponent = "div">(
         local.class
       )}
       {...others}
+      data-gdl={gdlHooks(
+        withStates("context-menu.item", {
+          disabled: (props as ContextMenuSubTriggerProps).disabled
+        }),
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     >
       {local.children}
       <svg
@@ -150,6 +175,10 @@ const ContextMenuSubContent = <T extends ValidComponent = "div">(
         local.class
       )}
       {...others}
+      data-gdl={gdlHooks(
+        "context-menu.submenu",
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     />
   )
 }
@@ -174,6 +203,12 @@ const ContextMenuCheckboxItem = <T extends ValidComponent = "div">(
         local.class
       )}
       {...others}
+      data-gdl={gdlHooks(
+        withStates("context-menu.item", {
+          disabled: (props as ContextMenuCheckboxItemProps).disabled
+        }),
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     >
       <span class="absolute left-2 flex size-3.5 items-center justify-center">
         <ContextMenuPrimitive.ItemIndicator>
@@ -214,6 +249,10 @@ const ContextMenuGroupLabel = <T extends ValidComponent = "span">(
         local.class
       )}
       {...others}
+      data-gdl={gdlHooks(
+        "context-menu.label",
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     />
   )
 }
@@ -238,6 +277,12 @@ const ContextMenuRadioItem = <T extends ValidComponent = "div">(
         local.class
       )}
       {...others}
+      data-gdl={gdlHooks(
+        withStates("context-menu.item", {
+          disabled: (props as ContextMenuRadioItemProps).disabled
+        }),
+        (props as unknown as Record<string, unknown>)["data-gdl"]
+      )}
     >
       <span class="absolute left-2 flex size-3.5 items-center justify-center">
         <ContextMenuPrimitive.ItemIndicator>

@@ -9,5 +9,7 @@
   "_trn_window_close_stops_servers": "実行中のローカルサーバーは停止され、参加中のプレイヤーは切断されます。",
   "_trn_window_close_stops_installs": "進行中のダウンロードとインストールはキャンセルされます。後でもう一度開始できます。",
   "_trn_window_close_game_keeps_running": "ゲームは実行されたままですが、GDLauncher をもう一度開くまで一部の機能が正しく動作しません。",
-  "_trn_view_logs": "ログを表示"
+  "_trn_view_logs": "ログを表示",
+  "_trn_menu_view": "表示",
+  "_trn_menu_reset_theme": "テーマをリセット"
 }

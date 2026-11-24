@@ -77,7 +77,7 @@ vi.mock("@/managers/NavigationManager", () => ({
 vi.mock("@/components/VirtuaWrapper", () => ({
   VList: (p: any) => (
     <div>
-      <For each={p.data}>{(item) => p.children(item)}</For>
+      <For each={p.data}>{(item, index) => p.children(item, index)}</For>
     </div>
   )
 }))
@@ -113,10 +113,13 @@ vi.mock("@gd/i18n", () => ({
 }))
 vi.mock("@gd/ui", async () => {
   const { createContext, useContext, Show } = await import("solid-js")
+  // Theme hook names are plain strings: the real helpers.
+  const hooks = await import("../../../../../../../packages/ui/src/hooks")
   const passthrough = (p: any) => <div>{p.children}</div>
   // A menu that opens and closes as its owner says.
   const Menu = createContext<any>()
   return {
+    ...hooks,
     DropdownMenu: (p: any) => (
       <Menu.Provider value={p}>{p.children}</Menu.Provider>
     ),

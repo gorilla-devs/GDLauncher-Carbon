@@ -9,9 +9,12 @@
  * suite:
  *
  * 1. A `data-testid` on a `@gd/ui` component may not reach the DOM at all, or
- *    may reach an element that cannot be clicked. `Checkbox` does not forward
- *    unknown props; `Radio` and `Switch` do forward, but onto a `display:none`
- *    or zero-size native input. TypeScript accepts a hyphenated attribute on a
+ *    may reach an element that cannot be clicked. `Checkbox` and `Radio` do
+ *    not forward unknown props. Each renders a real native input (`Checkbox`
+ *    only when it has an `onChange`) that is transparent, covers its row or
+ *    label, and lets the pointer through to it: readable (`checked`, role,
+ *    name), but not a click target. `Switch` does forward, but onto a
+ *    zero-size native input. TypeScript accepts a hyphenated attribute on a
  *    component either way, so it type-checks regardless. Verify by reading the
  *    attribute back out of the running app's DOM, never by grepping source.
  *
@@ -43,6 +46,8 @@ export const TEST_IDS = Object.freeze({
   // hazard-1 wrinkle here, unlike Checkbox/Radio/Switch), so this anchor
   // reaches a real clickable element directly.
   navbarSettings: "navbar-settings",
+  // "Don't ask again" on `BetaPrompt`: a `TextLink`, which renders a real
+  // `<button>` and passes `data-testid` through.
   betaPromptNever: "beta-prompt-never",
   addInstance: "library-add-instance",
   instanceCreationCustomTab: "instance-creation-custom-tab",
@@ -59,6 +64,8 @@ export const TEST_IDS = Object.freeze({
   instanceCreationSubmit: "instance-creation-submit",
   instanceTile: "instance-tile",
   instancePlay: "instance-play",
+  /** "Play anyway" in the app's "Not enough memory" warning. */
+  insufficientMemoryPlayAnyway: "insufficient-memory-play-anyway",
   instanceContextDelete: "instance-context-delete",
   /** The tile context menu's "More options" submenu trigger
    *  (components/Instance/Tile.tsx); hover it to mount the entries below. */
@@ -82,9 +89,10 @@ export const TEST_IDS = Object.freeze({
   // `ClickableRow` wrapper rather than on the `Checkbox` inside them:
   // `@gd/ui`'s `Checkbox` forwards no unknown props at all (hazard 1 in
   // this file's header), so a testid placed on it is dropped silently and
-  // with no type error. Each row also exposes `data-checked`, which is the
-  // only readable signal of that scope's state — the `Checkbox` renders no
-  // queryable input either, so there is nothing else to assert against.
+  // with no type error. Each row also exposes `data-checked`, the scope's
+  // state. The `Checkbox` inside renders a real `input[type="checkbox"]`
+  // too, named after the row's title, which reads the same state; it lets
+  // the pointer through, so the row is still what a test clicks.
   //
   // The two `Button` anchors need no such workaround: `@gd/ui`'s `Button`
   // does spread unknown props onto the real `<button>` (the same reason
@@ -324,10 +332,11 @@ export const TEST_IDS = Object.freeze({
    *  (`RepairModpack/index.tsx`) — NOT the `@gd/ui` `Checkbox` itself, which
    *  (hazard 1 in this file's header) does not forward unknown props at all.
    *  The label span is plain JSX `children`, not a spread prop, so it mounts
-   *  regardless, and a click anywhere inside the `Checkbox`'s wrapping `<div>`
-   *  (this span included — the checkbox toggle handlers live on that
-   *  ancestor, not on any native input; there is no native input here) toggles
-   *  it via ordinary event bubbling. */
+   *  regardless, and a press anywhere inside the `Checkbox`'s wrapping `<div>`
+   *  (this span included — the pointer toggle handlers live on that
+   *  ancestor) toggles it. The real `input[type="checkbox"]` it renders, for
+   *  the keyboard, is transparent and lets the pointer through, so it is not
+   *  the click target. */
   repairReenableCheckbox: "repair-reenable-checkbox",
   // The confirm control on `Confirmation`
   // (`ModalsManager/modals/Confirmation`), which `ModalsManager/index.tsx`
@@ -386,13 +395,39 @@ export const TEST_IDS = Object.freeze({
    *  (cancel entirely, or auto-install a recommended loader alongside it)
    *  are a different feature this suite does not otherwise exercise, so
    *  they carry no anchor per this file's "only what a test must click"
-   *  rule. On a `@gd/ui` `Button`, confirmed elsewhere in this file to
-   *  spread unknown props onto the real `<button>` — no hazard-1 wrinkle. */
+   *  rule. On a `TextLink` (a quiet link, not a boxed `Button`), which
+   *  renders a real `<button>` and passes `data-testid` through — no
+   *  hazard-1 wrinkle. */
   shaderLoaderContinueAnyway: "shader-loader-continue-anyway"
 })
 
 export function byTestId(id: string): string {
   return `[data-testid="${id}"]`
+}
+
+/** An element carrying a stable theme hook, `data-gdl="… name …"`. */
+export function byHook(name: string): string {
+  return `[data-gdl~="${name}"]`
+}
+
+/** A theme tile on the Appearance page, located by the theme id. */
+export function byThemeTile(id: string): string {
+  return byTestId(`theme-tile-${id}`)
+}
+
+/** The warning icon of an installed theme's tile, by the theme's folder name. */
+export function byThemeWarning(id: string): string {
+  return byTestId(`theme-warning-${id}`)
+}
+
+/** The open-folder icon of an installed theme's tile. */
+export function byThemeOpenFolder(id: string): string {
+  return byTestId(`theme-open-folder-${id}`)
+}
+
+/** The remove icon of an installed theme's tile (not on a misnamed folder). */
+export function byThemeRemove(id: string): string {
+  return byTestId(`theme-remove-${id}`)
 }
 
 /** An instance tile located by the name the test gave it. */

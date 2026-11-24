@@ -15,7 +15,7 @@ import formatDateTime from "./formatDateTime"
 import FullscreenToggle from "./components/FullscreenToggle"
 import LogsOptions, { Columns, LogDensity } from "./components/LogsOptions"
 import { Trans } from "@gd/i18n"
-import { Button } from "@gd/ui"
+import { Button, withStates } from "@gd/ui"
 import { VList } from "@/components/VirtuaWrapper"
 import { VirtualizerHandle } from "virtua/lib/solid"
 import { SetStoreFunction } from "solid-js/store"
@@ -66,6 +66,7 @@ function DateTimeFormatter(props: {
 }) {
   return (
     <span
+      data-gdl="logs.line.time"
       class="text-lightSlate-600 bg-darkSlate-900 z-10 rounded-md py-2 pr-2 font-thin italic"
       classList={{
         "text-xs": props.fontMultiplier === 0,
@@ -83,6 +84,7 @@ function DateTimeFormatter(props: {
 function LoggerFormatter(props: { logger: string; fontMultiplier: 0 | 1 | 2 }) {
   return (
     <span
+      data-gdl="logs.line.logger"
       class={`bg-darkSlate-900 z-10 rounded-md py-2 pr-2 font-thin italic`}
       classList={{
         "text-xs": props.fontMultiplier === 0,
@@ -103,6 +105,7 @@ function SourceKindFormatter(props: {
 }) {
   return (
     <span
+      data-gdl="logs.line.source"
       class={`bg-darkSlate-900 z-10 rounded-md py-2 pr-2 font-thin italic`}
       classList={{
         "text-xs": props.fontMultiplier === 0,
@@ -124,6 +127,7 @@ function ThreadNameFormatter(props: {
 }) {
   return (
     <span
+      data-gdl="logs.line.thread"
       class={`bg-darkSlate-900 z-10 rounded-md py-2 pr-2 font-thin italic`}
       classList={{
         "text-xs": props.fontMultiplier === 0,
@@ -144,6 +148,7 @@ function LevelFormatter(props: {
 }) {
   return (
     <span
+      data-gdl="logs.line.level"
       class={`py-2 pr-2 font-bold ${color[props.level]} bg-darkSlate-900 z-10 rounded-md italic`}
       classList={{
         "text-xs": props.fontMultiplier === 0,
@@ -176,6 +181,7 @@ function ContentFormatter(props: {
 
   return (
     <span
+      data-gdl="logs.line.message"
       class="whitespace-pre-wrap"
       classList={{
         "text-lightSlate-50": defaultColor() && !isSystemLog(),
@@ -353,7 +359,10 @@ const LogsContent = (props: Props) => {
         </div>
       </div>
       <Show when={props.isActive}>
-        <div class="z-1 bg-darkSlate-700 text-lightSlate-700 absolute right-6 top-20 flex h-10 w-fit items-center rounded-3xl px-4">
+        <div
+          data-gdl="logs.live"
+          class="z-1 bg-darkSlate-700 text-lightSlate-700 absolute right-6 top-20 flex h-10 w-fit items-center rounded-3xl px-4"
+        >
           <div class="animate-liveCirclePulse mr-2 h-3 w-3 rounded-full bg-red-400 text-red-400" />
           <div>
             <Trans key="ui:_trn_live" />
@@ -386,6 +395,7 @@ const LogsContent = (props: Props) => {
         </div>
       </div>
       <div
+        data-gdl="logs.content"
         class="bg-darkSlate-900 relative mb-4 box-border w-full flex-1 overflow-auto py-2 pl-4 pr-2"
         ref={props.assignLogsContentRef}
         id="instance_logs_container" // used to override user select and cursor in index.html
@@ -395,7 +405,10 @@ const LogsContent = (props: Props) => {
             <div />
           </Match>
           <Match when={props.logs.length === 0}>
-            <div class="text-lightSlate-600 flex h-full select-none items-center justify-center text-center text-xl">
+            <div
+              data-gdl="logs.empty"
+              class="text-lightSlate-600 flex h-full select-none items-center justify-center text-center text-xl"
+            >
               <Trans key="logs:_trn_no_logs" />
             </div>
           </Match>
@@ -429,6 +442,10 @@ const LogsContent = (props: Props) => {
 
                 return (
                   <div
+                    data-gdl={withStates("logs.line", {
+                      comfortable: logsDensity() === "medium",
+                      compact: logsDensity() === "high"
+                    })}
                     class="border-b-solid border-darkSlate-600 relative w-full break-words border-b"
                     classList={{
                       "py-3": logsDensity() === "low",
@@ -436,7 +453,9 @@ const LogsContent = (props: Props) => {
                       "py-1": logsDensity() === "high"
                     }}
                   >
-                    <span>{index()}</span>
+                    <span data-gdl="logs.line.number" class="pr-2">
+                      {index()}
+                    </span>
                     <Show when={columns().timestamp}>
                       <DateTimeFormatter
                         timestamp={log.timestamp}

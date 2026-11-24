@@ -15,8 +15,11 @@ export const SelectionActionBar = (props: Props) => {
     <Show when={props.selectedCount() > 0}>
       <Portal>
         <div
-          class="fixed bottom-6 left-0 z-50 flex justify-center animate-popoverEnter"
-          style={{ width: `calc(100vw - ${adSize.width}px)` }}
+          class="fixed bottom-6 z-50 flex justify-center animate-popoverEnter"
+          style={{
+            left: "var(--gdl-rail-width, 0px)",
+            width: `calc(100vw - var(--gdl-rail-width, 0px) - ${adSize.width}px)`
+          }}
         >
           <div class="bg-darkSlate-800 border border-darkSlate-600 flex items-center gap-6 rounded-2xl px-5 py-3 shadow-lg shadow-darkSlate-900/50">
             {/* Selection count */}

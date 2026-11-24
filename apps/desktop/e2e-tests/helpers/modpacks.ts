@@ -770,8 +770,11 @@ const VERSION_OPTION_CLICK_TIMEOUT = 15_000
  * recreates a row a locator has already resolved, before the click lands
  * ("element is not stable", then "element was detached from the DOM", seen
  * on three separate specs). `ModPackVersionUpdate` derives that array
- * through a memo whose identity only changes when the ids do, so the listbox
- * survives a refetch and there is nothing to settle for.
+ * through a memo whose identity only changes when the ids do, and each row
+ * reads its version inside its JSX rather than in `itemComponent`'s tracked
+ * body, so the listbox survives a refetch and there is nothing to settle for.
+ * A row rebuilt under an open list also closes it: the focused row is gone,
+ * the dialog takes focus back, and Kobalte reads that as a dismiss.
  *
  * Exported because two specs must drive the modal *without*
  * `changeModpackVersion`'s trailing `waitForInstallComplete` — they expect the

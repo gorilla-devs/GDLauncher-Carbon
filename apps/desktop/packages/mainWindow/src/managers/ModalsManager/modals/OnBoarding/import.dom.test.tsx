@@ -313,7 +313,7 @@ it.each([false, true])(
     )
     const checkbox = root
       .querySelector('input[type="checkbox"]')!
-      .closest("label") as HTMLElement
+      .closest<HTMLElement>('[data-gdl~="checkbox"]')!
     pointerGesture(checkbox)
     expect(instances()).toEqual(selected ? [] : ["row"])
   }

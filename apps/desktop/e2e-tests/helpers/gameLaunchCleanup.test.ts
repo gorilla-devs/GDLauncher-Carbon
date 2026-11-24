@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url"
 import ts from "typescript"
 import { afterEach, expect, it, vi } from "vitest"
 import { runCleanupSteps, withCleanup } from "./cleanup"
+import { attachGameLogOnFailure, instanceLogsDir } from "./gameLog"
 import { stopHarness, type Harness } from "../fixtures/mockIdp"
 import {
   attachCoreLogOnFailure,
@@ -62,6 +63,12 @@ it.each([
   fs.writeFileSync(
     path.join(runtime, "__gdl_logs__", "core.log"),
     "owned core bytes"
+  )
+  const gameLogs = instanceLogsDir(runtime, "owned")
+  fs.mkdirSync(gameLogs, { recursive: true })
+  fs.writeFileSync(
+    path.join(gameLogs, "2026-01-01_00-00-00"),
+    "owned game bytes"
   )
   fs.writeFileSync(appResource, "app")
   fs.writeFileSync(coreResource, "core")
@@ -129,11 +136,17 @@ it.each([
           }
         }
   const testInfo = {
-    status: "failed",
+    status: "passed",
     expectedStatus: "passed",
-    attach: async (_: string, options: { path: string }) => {
+    attach: async (name: string, options: { path: string }) => {
       if (mode === "attachment" || mode === "multiple") throw attachError
-      fs.copyFileSync(options.path, path.join(root, "attached.log"))
+      fs.copyFileSync(
+        options.path,
+        path.join(
+          root,
+          name === "game-log" ? "attached-game.log" : "attached.log"
+        )
+      )
     }
   }
   const deps = {
@@ -162,6 +175,8 @@ it.each([
       })
     },
     attachCoreLogOnFailure,
+    attachGameLogOnFailure,
+    shortpath: "owned",
     closeAppAndCore: (
       value: Parameters<typeof closeAppAndCore>[0],
       options: Parameters<typeof closeAppAndCore>[1]
@@ -187,7 +202,9 @@ it.each([
   vi.spyOn(console, "error").mockImplementation(() => {})
   try {
     const body = async () => {
-      if (mode === "body-failure") throw bodyError
+      // The logs are attached only for a failed test, so the attachment
+      // can only fail under a body that already did.
+      if (mode === "body-failure" || mode === "attachment") throw bodyError
       // eslint-disable-next-line @typescript-eslint/only-throw-error -- deliberately throws a non-Error value
       if (mode === "body-undefined") throw undefined
       return "passed"
@@ -199,13 +216,11 @@ it.each([
       await expect(operation).rejects.toBe(
         mode === "undefined" || mode === "body-undefined"
           ? undefined
-          : mode === "body-failure"
+          : mode === "body-failure" || mode === "attachment"
             ? bodyError
-            : mode === "attachment"
-              ? attachError
-              : mode === "close"
-                ? closeError
-                : stopError
+            : mode === "close"
+              ? closeError
+              : stopError
       )
     expect(
       fs.readFileSync(
@@ -220,11 +235,18 @@ it.each([
         mode === "close" || mode === "multiple"
       )
       expect(fs.existsSync(coreResource)).toBe(false)
-      if (mode !== "attachment" && mode !== "multiple")
-        expect(fs.readFileSync(path.join(root, "attached.log"), "utf8")).toBe(
-          "owned core bytes"
-        )
     }
+    // Both logs go into the report of a test whose body failed, and of no
+    // other: inside a cleanup the test's own status still reads passed.
+    const attached = ["attached.log", "attached-game.log"].map((name) => {
+      const file = path.join(root, name)
+      return fs.existsSync(file) ? fs.readFileSync(file, "utf8") : undefined
+    })
+    expect(attached).toEqual(
+      mode === "body-failure" || mode === "body-undefined"
+        ? ["owned core bytes", "owned game bytes"]
+        : [undefined, undefined]
+    )
   } finally {
     fs.rmSync(root, { recursive: true, force: true })
   }

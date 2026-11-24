@@ -9,5 +9,7 @@
   "_trn_window_close_stops_servers": "Los servidores locales en ejecución se detendrán y sus jugadores serán desconectados.",
   "_trn_window_close_stops_installs": "Las descargas e instalaciones en curso se cancelarán. Podrás iniciarlas de nuevo después.",
   "_trn_window_close_game_keeps_running": "El juego sigue en ejecución, pero algunas funciones no funcionarán correctamente hasta que se vuelva a abrir GDLauncher.",
-  "_trn_view_logs": "Ver registros"
+  "_trn_view_logs": "Ver registros",
+  "_trn_menu_view": "Ver",
+  "_trn_menu_reset_theme": "Restablecer tema"
 }

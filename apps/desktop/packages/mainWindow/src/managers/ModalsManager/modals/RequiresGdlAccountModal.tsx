@@ -2,6 +2,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { Trans } from "@gd/i18n"
 import { Button } from "@gd/ui"
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import { ModalProps, useModal } from ".."
 
 interface Data {
@@ -40,25 +41,19 @@ function RequiresGdlAccountModal(props: ModalProps) {
 
   return (
     <ModalLayout noHeader={props.noHeader} title={props?.title}>
-      <div class="w-100 flex min-h-40 flex-col justify-between gap-6 overflow-hidden">
+      <div class="w-100 flex min-h-40 flex-col justify-between gap-6">
         <div class="flex flex-col gap-4">
           <div class="text-lightSlate-200 text-sm">
             <Trans key="accounts:_trn_requires_gdl_account_modal_description" />
           </div>
         </div>
 
-        <div class="flex w-full justify-between">
-          <Button
-            type="secondary"
-            size="large"
-            onClick={() => modalsContext?.closeModal()}
-          >
-            <Trans key="accounts:_trn_cancel" />
-          </Button>
+        <DialogFooter>
+          <CancelLink onClick={() => modalsContext?.closeModal()} />
           <Button type="primary" size="large" onClick={handleLinkAccount}>
             <Trans key="accounts:_trn_link_account" />
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )

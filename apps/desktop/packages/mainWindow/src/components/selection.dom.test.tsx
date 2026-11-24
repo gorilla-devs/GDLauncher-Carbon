@@ -110,6 +110,10 @@ function mount(component: () => any) {
 function input(root: HTMLElement) {
   return root.querySelector<HTMLInputElement>('input[type="checkbox"]')!
 }
+// The checkbox's own element, which takes the pointer.
+function control(root: HTMLElement) {
+  return input(root).closest<HTMLElement>('[data-gdl~="checkbox"]')!
+}
 function enter(element: HTMLElement) {
   element.dispatchEvent(
     new KeyboardEvent("keydown", {
@@ -137,6 +141,7 @@ it("actual BaseTile selection is single-owned and does not activate row/play/dra
       isDeleting={false}
       isMultiSelected={selected()}
       showCheckbox
+      decorationKey="instance:1"
       onToggleSelection={toggle}
       isDragging={false}
       isDragActive={false}
@@ -150,7 +155,7 @@ it("actual BaseTile selection is single-owned and does not activate row/play/dra
       infoContent="Info"
     />
   ))
-  pointerGesture(input(root).closest("label")!)
+  pointerGesture(control(root))
   expect(toggle).toHaveBeenCalledTimes(1)
   expect(selected()).toBe(true)
   enter(input(root))
@@ -179,7 +184,7 @@ it("actual FolderTile checkbox does not open folder or begin drag", () => {
       onToggleSelection={toggle}
     />
   ))
-  pointerGesture(input(root).closest("label")!)
+  pointerGesture(control(root))
   expect(toggle).toHaveBeenCalledTimes(1)
   expect(selected()).toBe(true)
   enter(input(root))
@@ -231,7 +236,8 @@ it("actual table header indeterminate and cell selection preserve one callback/d
   const column = createSelectColumn({
     selectedCount: count,
     totalRows: () => 2,
-    onSelectAll: all
+    onSelectAll: all,
+    getDisplayName: (row: any) => row.id
   }) as any
   const root = mount(() => (
     <>
@@ -269,7 +275,8 @@ it("tile, folder, addon-row and legacy mod-row checkboxes stay revealed only whi
   const column = createSelectColumn({
     selectedCount: () => 0,
     totalRows: () => 1,
-    onSelectAll: vi.fn()
+    onSelectAll: vi.fn(),
+    getDisplayName: (row: any) => row.id
   }) as any
   const root = mount(() => (
     <>
@@ -284,6 +291,7 @@ it("tile, folder, addon-row and legacy mod-row checkboxes stay revealed only whi
           isDeleting={false}
           isMultiSelected={false}
           showCheckbox
+          decorationKey="instance:1"
           onToggleSelection={vi.fn()}
           isDragging={false}
           isDragActive={false}
@@ -359,7 +367,7 @@ it("tile, folder, addon-row and legacy mod-row checkboxes stay revealed only whi
       ).toEqual([])
       node = node.parentElement
     }
-    const tokens = Array.from(wrapper(box.closest("label")!).classList)
+    const tokens = Array.from(wrapper(control(scope)).classList)
     expect(tokens, name).toContain("has-[:focus-visible]:opacity-100")
     if (name === "tile" || name === "folder") {
       expect(tokens, name).toContain("has-[:focus-visible]:translate-x-0")
@@ -383,7 +391,7 @@ it("actual search filter late item replacement uses current label and boolean ta
   setItems([{ label: "Current", value: "current" }])
   enter(input(root))
   expect(toggle).toHaveBeenCalledExactlyOnceWith("current", true)
-  input(root).closest("label")!.click()
+  pointerGesture(control(root))
   expect(toggle).toHaveBeenLastCalledWith("current", false)
   expect(toggle).toHaveBeenCalledTimes(2)
 })
@@ -401,7 +409,7 @@ it("actual import row preserves native checked/click and row ownership", () => {
   input(root).click()
   expect(selected()).toEqual(["selection-A"])
   expect(input(root).checked).toBe(true)
-  input(root).closest("label")!.click()
+  pointerGesture(control(root))
   expect(selected()).toEqual([])
   root.firstElementChild!.dispatchEvent(
     new MouseEvent("click", { bubbles: true })

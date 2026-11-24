@@ -61,6 +61,7 @@ mod download_failure;
 pub(crate) mod game_crash;
 pub(crate) mod hook;
 mod java;
+pub mod java_issue;
 mod minecraft;
 pub(super) mod modpack;
 pub(crate) mod turn;
@@ -80,6 +81,28 @@ pub struct InsufficientMemoryError {
     pub requested_mb: u64,
     pub needed_mb: u64,
     pub available_mb: u64,
+}
+
+/// What the JVM needs besides its heap: the JIT compiler, thread stacks,
+/// metaspace, GC structures, direct buffers and so on.
+const JVM_OVERHEAD_MB: u64 = 1500;
+
+/// The shortfall when a heap of `xmx` MB plus [`JVM_OVERHEAD_MB`] is more
+/// than `available_bytes` of free memory. Unknown free memory (0) is none.
+fn memory_shortfall(
+    instance_id: InstanceId,
+    xmx: u16,
+    available_bytes: u64,
+) -> Option<InsufficientMemoryError> {
+    let available_mb = available_bytes / 1024 / 1024;
+    let needed_mb = u64::from(xmx).saturating_add(JVM_OVERHEAD_MB);
+
+    (available_mb > 0 && needed_mb > available_mb).then_some(InsufficientMemoryError {
+        instance_id: instance_id.0,
+        requested_mb: u64::from(xmx),
+        needed_mb,
+        available_mb,
+    })
 }
 
 impl crate::error::FeErrorCode for InsufficientMemoryError {
@@ -195,6 +218,27 @@ impl ManagerRef<'_, InstanceManager> {
                 .get_settings()
                 .await
                 .map(|c| global_heap_mb(c.xms, c.xmx)),
+        }
+    }
+
+    /// Fails with [`InsufficientMemoryError`] when the instance's heap and
+    /// what the JVM needs besides it are more than the free memory, unless
+    /// the user turned that warning off. Every way to play from the UI runs
+    /// it first, so each gets the same warning.
+    pub async fn check_launch_memory(self, instance_id: InstanceId) -> anyhow::Result<()> {
+        let dismissed = crate::api::settings::is_memory_warning_dismissed(&self.app.db)
+            .await
+            .unwrap_or(false);
+        if dismissed {
+            return Ok(());
+        }
+
+        let (_xms, xmx) = self.get_effective_memory(instance_id).await?;
+        let available = self.app.system_info_manager().get_available_ram().await;
+
+        match memory_shortfall(instance_id, xmx, available) {
+            Some(shortfall) => Err(shortfall.into()),
+            None => Ok(()),
         }
     }
 
@@ -323,13 +367,6 @@ impl ManagerRef<'_, InstanceManager> {
             }
             (data.config.clone(), instance.shortpath.clone())
         };
-
-        let auto_manage_java_system_profiles = self
-            .app
-            .settings_manager()
-            .get_settings()
-            .await?
-            .auto_manage_java_system_profiles;
 
         let (xms_memory, xmx_memory) = match config.game_configuration.memory {
             Some(memory) => start_within_max(memory),
@@ -469,13 +506,16 @@ impl ManagerRef<'_, InstanceManager> {
 
         let id = self.app.task_manager().spawn_task(&task).await;
 
-        self.instances
-            .write()
-            .await
-            .get_mut(&instance_id)
-            .ok_or(InvalidInstanceIdError(instance_id))?
-            .data_mut()?
-            .state = LaunchState::Queued(id);
+        {
+            let mut instances = self.instances.write().await;
+            let data = instances
+                .get_mut(&instance_id)
+                .ok_or(InvalidInstanceIdError(instance_id))?
+                .data_mut()?;
+            data.state = LaunchState::Queued(id);
+            // The last game's crash says nothing about this one.
+            data.java_issue = None;
+        }
         let setup_result: anyhow::Result<_> = async {
             let root = instance_path.get_root();
             // A replacement a crash left half-published is the pending setup.
@@ -917,19 +957,41 @@ impl ManagerRef<'_, InstanceManager> {
 
                         t_subtasks.t_request_version_info.complete_opaque();
 
+                        // Read now: a pack update above may have changed the
+                        // version, which drops the floor.
+                        let java_floor = app
+                            .instance_manager()
+                            .instances
+                            .read()
+                            .await
+                            .get(&instance_id)
+                            .and_then(|instance| instance.data().ok())
+                            .and_then(|data| data.java_floor());
+
                         let java = java::check_and_install(
                             Arc::clone(&app),
                             &version_info,
                             &t_subtasks,
                             &version,
                             java_override,
-                            auto_manage_java_system_profiles,
+                            java_floor,
                             log.as_ref(),
                             file.as_mut(),
                             &cancel,
                             &mut turn,
                         )
                         .await?;
+                        // The game keeps this Java even if its instance moves to
+                        // another while it runs, so deleting this one waits for it.
+                        app.java_manager().note_launch_java(instance_id, &java.path);
+
+                        // Appended after the user args as separate argv elements.
+                        let mitigation_args =
+                            crate::managers::java::advisories::mitigation_args_for_path(
+                                &app,
+                                std::path::Path::new(&java.path),
+                            )
+                            .await;
 
                         let (lwjgl_group, assets_dir, version_info) = minecraft::process_minecraft(
                             Arc::clone(&app),
@@ -968,6 +1030,10 @@ impl ManagerRef<'_, InstanceManager> {
                             !cancel.is_cancelled(),
                             "Instance preparation cancelled before launch"
                         );
+
+                        // What a crash's Java issue is measured against.
+                        let used_java_major = u8::try_from(java.version.major).ok();
+
                         match launch_account {
                             Some(account) => {
                                 if let Some(pre_launch_hook) =
@@ -1006,6 +1072,7 @@ impl ManagerRef<'_, InstanceManager> {
                                     xms_memory,
                                     game_resolution,
                                     &extra_java_args,
+                                    &mitigation_args,
                                     &runtime_path,
                                     version_info,
                                     &lwjgl_group,
@@ -1026,7 +1093,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 } else if let Some(ownership) = game_activity.take() {
                                     ownership.finish();
                                 }
-                                Ok(Some(launched?))
+                                Ok(Some((launched?, used_java_major)))
                             }
                             None => {
                                 if let Some(callback_task) = callback_task {
@@ -1123,7 +1190,7 @@ impl ManagerRef<'_, InstanceManager> {
                                 .await;
                         }
                         (Ok(None), _) => {}
-                        (Ok(Some(mut child)), _) => {
+                        (Ok(Some((mut child, used_java_major))), _) => {
                             drop(task);
 
                             let _liveness_watch =
@@ -1379,6 +1446,8 @@ impl ManagerRef<'_, InstanceManager> {
                                 return;
                             }
                             _runtime_activity.settling();
+                            // The Java a mod needed, when the game crashed on an older one.
+                            let mut crash_need = None;
                             if let Ok(Some(exitcode)) = exit_result {
                                 if let Some(ownership) = game_activity.take() {
                                     ownership.finish();
@@ -1428,6 +1497,17 @@ impl ManagerRef<'_, InstanceManager> {
                                         .write_all(format_message_as_log4j_event(&msg).as_bytes())
                                         .await;
                                 }
+
+                                // A game the user stopped didn't crash.
+                                let crashed = !exitcode.success()
+                                    && !stop_requested.load(std::sync::atomic::Ordering::Relaxed);
+                                crash_need = match (crashed, log.as_ref(), used_java_major) {
+                                    (true, Some(log), Some(used)) => {
+                                        java_issue::needed_major_in(&log.borrow(), used)
+                                            .map(|needed| (needed, used))
+                                    }
+                                    _ => None,
+                                };
                             }
 
                             // The game process has exited by this point regardless of
@@ -1465,6 +1545,28 @@ impl ManagerRef<'_, InstanceManager> {
                                         &instance_path.get_data_path(),
                                     )
                                     .await;
+                            }
+
+                            // Last, just before the instance can be launched
+                            // again, so the fix it offers never meets a game
+                            // that's still shutting down.
+                            if let Some((needed, used)) = crash_need {
+                                tracing::info!(
+                                    "Instance {} crashed on Java {used}, a mod needs Java {needed} or later",
+                                    *instance_id
+                                );
+                                let stored =
+                                    match java_issue::JavaIssue::plan(&app, needed, used).await {
+                                        Ok(issue) => {
+                                            app.instance_manager()
+                                                .set_java_issue(instance_id, Some(issue))
+                                                .await
+                                        }
+                                        Err(e) => Err(e),
+                                    };
+                                if let Err(e) = stored {
+                                    tracing::warn!({ error = ?e }, "could not keep the Java issue");
+                                }
                             }
 
                             let _ = app
@@ -1605,7 +1707,7 @@ impl ManagerRef<'_, InstanceManager> {
         Ok((installation_task, id))
     }
 
-    async fn change_launch_state(
+    pub(crate) async fn change_launch_state(
         self,
         instance_id: InstanceId,
         expected_task: VisualTaskId,
@@ -1618,6 +1720,7 @@ impl ManagerRef<'_, InstanceManager> {
             .await?
             .launcher_action_on_game_launch;
         let _operation = self.lock_instance(instance_id).await;
+        let ended = matches!(state, LaunchState::Inactive { .. });
         let mut instances = self.instances.write().await;
         self.running_publication.change(
             &mut instances,
@@ -1631,6 +1734,10 @@ impl ManagerRef<'_, InstanceManager> {
         self.app.invalidate(GET_ALL_INSTANCES, None);
         self.app
             .invalidate(INSTANCE_DETAILS, Some((*instance_id).into()));
+        // The Javas whose delete waited for this game may go.
+        if ended {
+            self.app.java_manager().note_runner_ended();
+        }
 
         Ok(())
     }
@@ -1739,6 +1846,7 @@ impl ManagerRef<'_, InstanceManager> {
                 .publish(&instances, &mut |record| crate::launcher::tell(record));
             shortpath
         };
+        self.app.java_manager().note_runner_ended();
 
         let root = self
             .app
@@ -2466,6 +2574,21 @@ impl RunningInstance {
         }
     }
 
+    /// A game this core spawned, with no task left to signal.
+    #[cfg(test)]
+    pub(crate) fn spawned_for_test(process_id: u32) -> Self {
+        Self {
+            task_id: None,
+            process_id,
+            kill_tx: Some(mpsc::channel(1).0),
+            process_start_time: None,
+            process_identity: None,
+            start_time: Utc::now(),
+            log: None,
+            playtime: None,
+        }
+    }
+
     pub fn adopted_record(
         record: orphan_pid::ProcessRecord,
         start_time: DateTime<Utc>,
@@ -2671,6 +2794,26 @@ async fn process_logs(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn memory_shortfall_counts_the_jvms_overhead() {
+        let mb = 1024 * 1024;
+        let id = InstanceId(7);
+
+        let short = memory_shortfall(id, 4096, 5000 * mb).unwrap();
+        assert_eq!(
+            (
+                short.instance_id,
+                short.requested_mb,
+                short.needed_mb,
+                short.available_mb
+            ),
+            (7, 4096, 5596, 5000)
+        );
+        assert!(memory_shortfall(id, 4096, 5596 * mb).is_none());
+        // Free memory unknown: never what stops a launch.
+        assert!(memory_shortfall(id, 4096, 0).is_none());
+    }
     use crate::managers::instance::{Instance, InstanceData};
 
     fn dummy_config() -> info::Instance {
@@ -2688,6 +2831,7 @@ mod tests {
                 extra_java_args: None,
                 memory: None,
                 java_override: None,
+                java_floor: None,
                 game_resolution: None,
             },
             pre_launch_hook: None,
@@ -2706,6 +2850,7 @@ mod tests {
             modpack_update_curseforge: None,
             modpack_update_modrinth: None,
             icon_revision: None,
+            java_issue: None,
         }
     }
 

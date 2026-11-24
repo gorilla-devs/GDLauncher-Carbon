@@ -5,7 +5,7 @@ import { useGDNavigate } from "@/managers/NavigationManager"
 import { useMatch } from "@solidjs/router"
 import { Trans, useTransContext } from "@gd/i18n"
 import { OnboardingTip } from "@/components/Onboarding"
-import { Popover, PopoverContent, PopoverTrigger } from "@gd/ui"
+import { Popover, PopoverContent, PopoverTrigger, withStates } from "@gd/ui"
 
 const SearchSyntaxTips = () => (
   <div class="space-y-2 text-sm">
@@ -47,7 +47,8 @@ const SearchSyntaxTips = () => (
   </div>
 )
 
-export function EnhancedSearchBar() {
+/** `size` is the box's height in px (40 unless the nav asks for less). */
+export function EnhancedSearchBar(props: { size?: number }) {
   const searchResults = useSearchContext()
   const navigator = useGDNavigate()
   const isSearchPage = useMatch(() => "/search/*")
@@ -90,21 +91,29 @@ export function EnhancedSearchBar() {
       placement="bottom"
     >
       <div
-        class="bg-darkSlate-700 outline-2 outline outline-offset-2 outline-transparent has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 flex h-10 max-w-[600px] items-center gap-2 overflow-hidden rounded-md duration-300"
+        data-gdl="nav.search.box"
+        class="bg-darkSlate-700 outline-2 outline outline-offset-2 outline-transparent has-[:focus-visible]:outline-darkSlate-500 hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500 flex max-w-[min(600px,100%)] items-center overflow-hidden rounded-md duration-300"
         style={{
+          height: `${props.size ?? 40}px`,
           transition:
-            "width 300ms cubic-bezier(0.4, 0, 0.2, 1), padding 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), outline-color 150ms cubic-bezier(0.4, 0, 0.2, 1)",
+            "width 300ms cubic-bezier(0.4, 0, 0.2, 1), padding 300ms cubic-bezier(0.4, 0, 0.2, 1), column-gap 300ms cubic-bezier(0.4, 0, 0.2, 1), opacity 300ms cubic-bezier(0.4, 0, 0.2, 1), outline-color 150ms cubic-bezier(0.4, 0, 0.2, 1)",
           "will-change": "width, padding",
           contain: "layout",
           transform: "translateZ(0)"
         }}
+        // Collapsed, the dropdown, dividers and buttons are zero-wide: no gap
+        // around them, or the gaps eat the placeholder's room. The gaps come
+        // back with them as the box expands.
         classList={{
-          "w-80 px-4": !isExpanded(),
-          "w-full px-2": isExpanded()
+          "w-80 px-4 gap-0": !isExpanded(),
+          "w-full px-2 gap-2": isExpanded()
         }}
       >
+        {/* Under lg the bar can be too narrow for everything; there the
+            type's label gives way (cut with an ellipsis), not the text field.
+            Wider windows always have the room. */}
         <div
-          class="shrink-0 transition-[opacity,max-width] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+          class="lt-lg:min-w-0 transition-[opacity,max-width] duration-300 ease-[cubic-bezier(.4,0,.2,1)] lg:shrink-0"
           classList={{
             "opacity-0 pointer-events-none max-w-0 overflow-hidden":
               !isExpanded(),
@@ -122,14 +131,17 @@ export function EnhancedSearchBar() {
           }}
         />
 
-        <div class="i-hugeicons:search-01 text-darkSlate-400 h-5 w-5 shrink-0" />
+        <div
+          class="i-hugeicons:search-01 text-darkSlate-400 h-5 w-5 shrink-0 transition-[margin] duration-300 ease-[cubic-bezier(.4,0,.2,1)]"
+          classList={{ "mr-2": !isExpanded() }}
+        />
 
         <Show when={!isExpanded()}>
           <input
             ref={simpleInputRef}
             data-testid="search-input"
             placeholder={t("search:_trn_search_discover_anything")}
-            class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 cursor-pointer bg-transparent text-sm outline-none"
+            class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 text-ellipsis cursor-pointer bg-transparent text-sm outline-none"
             value=""
             readOnly
             onClick={handleSimpleClick}
@@ -144,7 +156,7 @@ export function EnhancedSearchBar() {
             ref={expandedInputRef}
             data-testid="search-input"
             placeholder={t("search:_trn_search_discover_anything")}
-            class="placeholder:text-darkSlate-400 text-lightSlate-50 h-full min-w-0 flex-1 bg-transparent text-sm outline-none"
+            class="placeholder:text-darkSlate-400 text-lightSlate-50 lt-lg:min-w-16 h-full min-w-0 flex-1 text-ellipsis bg-transparent text-sm outline-none"
             value={searchResults?.searchQuery().searchQuery ?? ""}
             onInput={(e) => {
               searchResults?.setSearchQuery((prev) => ({
@@ -184,7 +196,7 @@ export function EnhancedSearchBar() {
           }
         >
           <div
-            class="i-hugeicons:cancel-01 text-lg text-darkSlate-500 cursor-pointer transition-colors duration-200 ease-spring hover:text-white"
+            class="i-hugeicons:cancel-01 text-lg text-darkSlate-500 lt-lg:shrink-0 cursor-pointer transition-colors duration-200 ease-spring gdl-white-text-hover"
             onClick={(e) => {
               e.preventDefault()
               e.stopPropagation()
@@ -217,7 +229,8 @@ export function EnhancedSearchBar() {
         >
           <Popover gutter={8} placement="bottom-end">
             <PopoverTrigger
-              class="text-lightSlate-50 hover:bg-darkSlate-600 hover:text-white flex items-center justify-center rounded p-1.5 transition-colors duration-200"
+              data-gdl="nav.search.help"
+              class="text-lightSlate-50 hover:bg-darkSlate-600 gdl-white-text-hover flex items-center justify-center rounded p-1.5 transition-colors duration-200"
               title={t("onboarding:_trn_search_syntax_title")}
             >
               <div class="i-hugeicons:help-circle text-lg" />
@@ -240,11 +253,14 @@ export function EnhancedSearchBar() {
           }}
         >
           <button
+            data-gdl={withStates("nav.search.filters", {
+              open: !!searchResults?.sidebarExpanded()
+            })}
             class="flex items-center justify-center rounded p-1.5 transition-[colors,box-shadow] duration-200"
             classList={{
-              "bg-darkSlate-600 text-white shadow-[inset_0_0_0_1px_rgb(var(--primary-500)/0.4)]":
+              "bg-darkSlate-600 gdl-white-text shadow-[inset_0_0_0_1px_rgb(var(--primary-500)/0.4)]":
                 !!searchResults?.sidebarExpanded(),
-              "text-lightSlate-50 hover:bg-darkSlate-600 hover:text-white":
+              "text-lightSlate-50 hover:bg-darkSlate-600 gdl-white-text-hover":
                 !searchResults?.sidebarExpanded()
             }}
             title={t("search:_trn_filters")}

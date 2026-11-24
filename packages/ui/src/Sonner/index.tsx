@@ -1,9 +1,16 @@
 import { Toaster as Sonner, toast } from "somoto"
+import { onCleanup } from "solid-js"
+import { withStates } from "../hooks"
 
 export { toast }
 
-// Inject CSS utility class to suppress toast entrance animation
-// Use className="toast-no-animate" on any toast that updates content without needing animation
+// Inject CSS utility classes:
+// - className="toast-no-animate" on any toast that updates content without needing animation
+// - className="toast-actions-below" puts a toast's two buttons on their own
+//   line, so long button labels don't squeeze the title into a narrow column
+// - keyboard focus on a toast's buttons shows the app's focus outline, not
+//   somoto's faint shadow. Somoto's rules are `:where(…) :where(…):focus-visible`
+//   (specificity 0,1,0), so these (0,3,0) win.
 if (typeof document !== "undefined") {
   const style = document.createElement("style")
   style.textContent = `
@@ -11,6 +18,25 @@ if (typeof document !== "undefined") {
       transition: none !important;
       opacity: 1 !important;
       --y: translateY(0) !important;
+    }
+    [data-somoto-toast].toast-actions-below {
+      flex-wrap: wrap;
+      row-gap: 10px;
+    }
+    [data-somoto-toast].toast-actions-below [data-content] {
+      flex: 1 1 calc(100% - 32px);
+    }
+    [data-somoto-toast][data-styled=true].toast-actions-below {
+      justify-content: flex-end;
+    }
+    [data-somoto-toast][data-styled=true].toast-actions-below [data-button] {
+      margin-left: 0;
+    }
+    [data-somoto-toast] [data-button]:focus-visible,
+    [data-somoto-toast] [data-close-button]:focus-visible {
+      outline: 2px solid rgb(var(--primary-500));
+      outline-offset: 2px;
+      box-shadow: none;
     }
   `
   document.head.appendChild(style)
@@ -126,66 +152,119 @@ const InfoIcon = () => (
 
 const CloseIcon = () => <div class="i-hugeicons:cancel-01 h-4 w-4" />
 
+const TOAST_SELECTOR = "[data-somoto-toast]"
+
+// The parts of a toast somoto marks with its own attributes, and their hooks.
+const TOAST_PARTS: [string, string][] = [
+  ["[data-action]", "toast.action"],
+  ["[data-cancel]", "toast.cancel"],
+  ["[data-close-button]", "toast.close"],
+  ["[data-icon]", "toast.icon"],
+  ["[data-title]", "toast.title"],
+  ["[data-description]", "toast.description"]
+]
+
+// The kinds of toast that get a state token, by somoto's `data-type`.
+const TOAST_TYPES = ["success", "error", "warning", "info", "loading"]
+
+const setHook = (el: Element, hook: string) => {
+  if (el.getAttribute("data-gdl") !== hook) el.setAttribute("data-gdl", hook)
+}
+
+// somoto renders its toasts inline, so the wrapper observes them and gives each
+// one, and its parts, the `toast` hooks.
+const markToasts = (root: HTMLElement) => {
+  for (const [selector, hook] of TOAST_PARTS) {
+    root
+      .querySelectorAll(`${TOAST_SELECTOR} ${selector}`)
+      .forEach((el) => setHook(el, hook))
+  }
+  root.querySelectorAll(TOAST_SELECTOR).forEach((el) => {
+    const type = el.getAttribute("data-type") ?? ""
+    setHook(el, withStates("toast", { [type]: TOAST_TYPES.includes(type) }))
+  })
+}
+
 export const Toaster = (props: Parameters<typeof Sonner>[0]) => {
+  let observer: MutationObserver | undefined
+
+  // A ref callback (not onMount) so the observer is live before somoto's
+  // first toast is rendered inside the wrapper.
+  const watch = (el: HTMLDivElement) => {
+    if (typeof MutationObserver === "undefined") return
+    observer = new MutationObserver(() => markToasts(el))
+    // A promise toast changes its `data-type` in place (loading, then done).
+    observer.observe(el, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["data-type"]
+    })
+    markToasts(el)
+  }
+  onCleanup(() => observer?.disconnect())
+
   return (
-    <Sonner
-      position="bottom-left"
-      richColors
-      theme="dark"
-      closeButton
-      icons={{
-        success: <SuccessIcon />,
-        error: <ErrorIcon />,
-        warning: <WarningIcon />,
-        info: <InfoIcon />,
-        close: <CloseIcon />
-      }}
-      toastOptions={{
-        classNames: {
-          toast: "group toast border shadow-lg",
-          title: "font-medium",
-          description: "opacity-75",
-          success: "bg-darkSlate-800 text-lightSlate-50 border-green-500/20",
-          error: "bg-darkSlate-800 text-lightSlate-50 border-red-500/20",
-          warning: "bg-darkSlate-800 text-lightSlate-50 border-yellow-500/20",
-          info: "bg-darkSlate-800 text-lightSlate-50 border-primary-500/20",
-          default: "bg-darkSlate-800 text-lightSlate-50 border-darkSlate-600",
-          closeButton:
-            "!bg-darkSlate-700/50 !text-lightSlate-300 hover:!bg-darkSlate-600 hover:!text-lightSlate-50 !border-0 !shadow-none !rounded-md !p-1 transition-colors",
-          actionButton:
-            "transition-all duration-100 ease-spring hover:brightness-110 font-bold rounded-md",
-          cancelButton:
-            "transition-all duration-100 ease-spring hover:brightness-110 hover:bg-darkSlate-500 font-bold rounded-md"
-        },
-        style: {
-          "background-color": "rgb(var(--darkSlate-800))",
-          color: "rgb(var(--lightSlate-50))",
-          "border-color": "rgb(var(--darkSlate-600))"
-        },
-        actionButtonStyle: {
-          "background-color": "rgb(var(--primary-500))",
-          color: "rgb(var(--lightSlate-50))",
-          padding: "0.75rem 1.25rem",
-          "border-radius": "0.375rem",
-          "font-weight": "700",
-          border: "none",
-          cursor: "pointer",
-          transition: "all 100ms ease-spring",
-          "font-family": "inherit"
-        },
-        cancelButtonStyle: {
-          "background-color": "rgb(var(--darkSlate-600))",
-          color: "rgb(var(--lightSlate-300))",
-          padding: "0.75rem 1.25rem",
-          "border-radius": "0.375rem",
-          "font-weight": "700",
-          border: "2px solid rgb(var(--darkSlate-600))",
-          cursor: "pointer",
-          transition: "all 100ms ease-spring",
-          "font-family": "inherit"
-        }
-      }}
-      {...props}
-    />
+    <div data-gdl="toast-region" ref={watch}>
+      <Sonner
+        position="bottom-left"
+        richColors
+        theme="dark"
+        closeButton
+        icons={{
+          success: <SuccessIcon />,
+          error: <ErrorIcon />,
+          warning: <WarningIcon />,
+          info: <InfoIcon />,
+          close: <CloseIcon />
+        }}
+        toastOptions={{
+          classNames: {
+            toast: "group toast border shadow-lg",
+            title: "font-medium",
+            description: "opacity-75",
+            success: "bg-darkSlate-800 text-lightSlate-50 border-green-500/20",
+            error: "bg-darkSlate-800 text-lightSlate-50 border-red-500/20",
+            warning: "bg-darkSlate-800 text-lightSlate-50 border-yellow-500/20",
+            info: "bg-darkSlate-800 text-lightSlate-50 border-primary-500/20",
+            default: "bg-darkSlate-800 text-lightSlate-50 border-darkSlate-600",
+            closeButton:
+              "!bg-darkSlate-700/50 !text-lightSlate-300 hover:!bg-darkSlate-600 hover:!text-lightSlate-50 !border-0 !shadow-none !rounded-md !p-1 transition-colors",
+            actionButton:
+              "transition-all duration-100 ease-spring hover:brightness-110 font-bold rounded-md",
+            cancelButton:
+              "transition-all duration-100 ease-spring hover:brightness-110 hover:bg-darkSlate-500 font-bold rounded-md"
+          },
+          style: {
+            "background-color": "rgb(var(--darkSlate-800))",
+            color: "rgb(var(--lightSlate-50))",
+            "border-color": "rgb(var(--darkSlate-600))"
+          },
+          actionButtonStyle: {
+            "background-color": "rgb(var(--primary-500))",
+            color: "rgb(var(--gdl-on-primary, var(--lightSlate-50)))",
+            padding: "0.75rem 1.25rem",
+            "border-radius": "0.375rem",
+            "font-weight": "700",
+            border: "2px solid transparent",
+            cursor: "pointer",
+            transition: "all 100ms ease-spring",
+            "font-family": "inherit"
+          },
+          cancelButtonStyle: {
+            "background-color": "rgb(var(--darkSlate-600))",
+            color: "rgb(var(--lightSlate-300))",
+            padding: "0.75rem 1.25rem",
+            "border-radius": "0.375rem",
+            "font-weight": "700",
+            border: "2px solid rgb(var(--darkSlate-600))",
+            cursor: "pointer",
+            transition: "all 100ms ease-spring",
+            "font-family": "inherit"
+          }
+        }}
+        {...props}
+      />
+    </div>
   )
 }

@@ -275,6 +275,7 @@ test.describe("state survives a restart", () => {
       pageErrors: Error[]
     } | null = null
 
+    let bodyDone = false
     try {
       current = await launchApp(launchOpts)
       await completeLogin(current.page, harness)
@@ -577,11 +578,14 @@ test.describe("state survives a restart", () => {
           "during the very reconciliation/re-hydration path this test exists " +
           "to exercise"
       }).toEqual([])
+      bodyDone = true
     } finally {
       if (current) {
-        await attachCoreLogOnFailure(testInfo, harness.runtimePath).catch(
-          () => {}
-        )
+        await attachCoreLogOnFailure(
+          testInfo,
+          harness.runtimePath,
+          !bodyDone
+        ).catch(() => {})
         await current.app.close().catch(() => {})
       }
       await stopHarness(harness)

@@ -6,8 +6,7 @@ import {
   getInitials,
   getContrastTextColor
 } from "@/utils/avatarHelpers"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
-import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 export interface Author {
   name: string
@@ -131,11 +130,9 @@ const AuthorAvatars = (props: AuthorAvatarsProps) => {
         <TooltipContent>
           <div class="flex min-w-0 flex-col gap-2">
             <div class="flex items-center gap-2">
-              <img
-                src={
-                  author.platform === "curseforge"
-                    ? CurseforgeLogo
-                    : ModrinthLogo
+              <PlatformLogo
+                platform={
+                  author.platform === "curseforge" ? "curseforge" : "modrinth"
                 }
                 class="h-4 w-4"
                 alt={author.platform}

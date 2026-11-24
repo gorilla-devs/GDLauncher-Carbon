@@ -286,6 +286,11 @@ async fn start_router(
     // Electron renderer can hardcode the same value.
     let api_token = generate_api_token();
     crate::api::auth::set_expected_token(api_token.clone());
+    let port = listener
+        .local_addr()
+        .expect("Failed to get local address from TCP listener")
+        .port();
+    crate::api::auth::set_local_port(port);
 
     let router: Arc<rspc::Router<App>> = crate::api::build_rspc_router(base_api_override.clone())
         .build()
@@ -314,6 +319,11 @@ async fn start_router(
         t.elapsed().as_secs_f64()
     );
 
+    // Before the server answers, so a stale seasonal theme never flashes.
+    if let Err(e) = app.theme_manager().check_season().await {
+        tracing::warn!("the theme season check failed: {e:#}");
+    }
+
     // Detached: a full instance scan must not hold up the rest of startup.
     tokio::spawn({
         let app = app.clone();
@@ -322,24 +332,44 @@ async fn start_router(
 
     refresh_gdl_tokens_in_background(&app);
 
+    // Before the sync below relinks the system profiles, so the Javas picked
+    // by hand are read before anything replaces them.
     let t = std::time::Instant::now();
-    let auto_manage_java_system_profiles = app
-        .settings_manager()
-        .get_settings()
-        .await
-        .unwrap()
-        .auto_manage_java_system_profiles;
+    match app.settings_manager().get_settings().await {
+        Ok(settings) => {
+            match crate::managers::java::major_defaults::migrate_major_defaults(&app.db, &settings)
+                .await
+            {
+                Ok(true) => tracing::info!("Kept the chosen Javas as per-version defaults"),
+                Ok(false) => {}
+                Err(e) => tracing::warn!("Could not migrate the chosen Javas to defaults: {e:#}"),
+            }
+        }
+        Err(e) => tracing::warn!("Could not read settings to migrate Java defaults: {e:#}"),
+    }
     debug!(
-        "[startup-timing] settings.get_settings completed in {:.2}s",
+        "[startup-timing] migrate_major_defaults completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
 
+    // Relinking the profiles before the migration has read them would lose
+    // the Javas picked by hand; it runs again at the next start.
+    let link_profiles = crate::managers::java::major_defaults::major_defaults_migrated(&app.db)
+        .await
+        .unwrap_or_else(|e| {
+            tracing::warn!("Could not tell whether the Java defaults were migrated: {e:#}");
+            false
+        });
+    if !link_profiles {
+        tracing::warn!("Not linking the Java profiles until the Java defaults are migrated");
+    }
+
     let t = std::time::Instant::now();
     crate::managers::java::JavaManager::scan_and_sync(
-        auto_manage_java_system_profiles,
         &app.db,
         &RealDiscovery::new(app.settings_manager().runtime_path.clone()),
         &RealJavaChecker::new(app.runtime_lifecycle.clone()),
+        link_profiles,
     )
     .await
     .expect("Failed to scan and sync java system profiles");
@@ -347,6 +377,8 @@ async fn start_router(
         "[startup-timing] JavaManager::scan_and_sync completed in {:.2}s",
         t.elapsed().as_secs_f64()
     );
+
+    crate::managers::java::maintenance::spawn_java_maintenance(app.clone());
 
     let app1 = app.clone();
     let app2 = app.clone();
@@ -359,11 +391,6 @@ async fn start_router(
         .layer(axum::middleware::from_fn(crate::api::auth::require_token))
         .layer(cors)
         .with_state(app1);
-
-    let port = listener
-        .local_addr()
-        .expect("Failed to get local address from TCP listener")
-        .port();
 
     debug!(
         "[startup-timing] reached axum::serve in {:.2}s total",

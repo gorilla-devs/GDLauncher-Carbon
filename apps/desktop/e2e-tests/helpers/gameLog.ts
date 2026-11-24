@@ -24,7 +24,22 @@
 
 import fs from "node:fs"
 import path from "node:path"
-import { expect, test } from "@playwright/test"
+import { expect, test, type TestInfo } from "@playwright/test"
+
+/**
+ * Skips the calling test on a machine that has no OpenGL, where Minecraft
+ * can't open its window at all. CI says so with `E2E_NO_OPENGL`: GitHub's
+ * Mac runners have no GPU ("NSGL: Failed to find a suitable pixel format").
+ * Only for a test that needs the game to reach its menu or keep running; a
+ * test that only needs the launch to start runs anyway. Call it at the top
+ * of the test.
+ */
+export function skipWithoutOpenGL(): void {
+  test.skip(
+    !!process.env.E2E_NO_OPENGL,
+    "this machine has no OpenGL (E2E_NO_OPENGL), so Minecraft can't open its window"
+  )
+}
 
 /** One complete log4j event, from its start tag to its end tag. */
 const EVENT_RE = /<log4j:Event\b[\s\S]*?<\/log4j:Event>/g
@@ -360,6 +375,11 @@ function sleep(ms: number): Promise<void> {
  * the JVM produced nothing, a different failure from one that started and
  * stopped, worth distinguishing in the message.
  *
+ * Stillness only ends the wait once `LAUNCH_MARKER_QUORUM` of
+ * `LAUNCH_MARKERS` are in the log, so a long pause mid-load is not taken for
+ * the menu. Markers that never come (drifted with a Minecraft version) run
+ * the wait to its timeout, and the caller's own marker check then says so.
+ *
  * A single shared implementation: both `gameLaunch.spec.ts` and
  * `modpackLifecycle.spec.ts` call this rather than each keeping their own
  * copy. Silence and liveness alone do not establish responsiveness or menu rendering.
@@ -386,7 +406,18 @@ export async function waitForLogQuiescence(
     if (size !== lastSize) {
       lastSize = size
       steadySince = Date.now()
-    } else if (Date.now() - steadySince >= LOG_QUIESCENCE_HOLD_MS) {
+    } else if (
+      Date.now() - steadySince >= LOG_QUIESCENCE_HOLD_MS &&
+      // Quiet alone can be a pause mid-load: on a slow machine Forge's early
+      // loading stayed silent past the hold right after "Setting user:", and
+      // the wait ended 35s into a launch. So the quiet only counts once the
+      // log shows the startup got as far as the menu; until the timeout, a
+      // pause short of that keeps waiting.
+      countMatchedMarkers(
+        readLogMessages(newestLogFile(logsDir)),
+        LAUNCH_MARKERS
+      ) >= LAUNCH_MARKER_QUORUM
+    ) {
       break
     }
 
@@ -413,4 +444,33 @@ export async function waitForLogQuiescence(
     `the game log under ${logsDir} never stopped growing within ` +
       `${LOG_QUIESCENCE_TIMEOUT}ms — startup output did not become quiet`
   ).toBeGreaterThanOrEqual(LOG_QUIESCENCE_HOLD_MS)
+}
+
+/**
+ * Attaches the game's own per-launch log to the Playwright report on a
+ * failing run — the game-log analogue of `attachCoreLogOnFailure`, which
+ * only ever covers the core's own tracing log, never the game's. Added
+ * because `stopHarness` deletes the whole runtime path, including
+ * `instances/<shortpath>/logs/`, before any failure diagnosis gets a chance
+ * to read it otherwise — a real gap hit live investigating why the launch
+ * leg's quiescence reading turned out to be premature on one run, with no
+ * way afterward to confirm how far the client actually got.
+ */
+export async function attachGameLogOnFailure(
+  testInfo: TestInfo,
+  runtimePath: string,
+  shortpathToAttach: string | undefined,
+  /** As `attachCoreLogOnFailure`'s: whether the test failed, for a caller
+   *  inside the test body, where `testInfo.status` still reads passed. */
+  failed?: boolean
+): Promise<void> {
+  if (!(failed ?? testInfo.status !== testInfo.expectedStatus)) return
+  if (!shortpathToAttach) return
+
+  const logFile = newestLogFile(instanceLogsDir(runtimePath, shortpathToAttach))
+  if (!logFile) return
+
+  await testInfo
+    .attach("game-log", { path: logFile, contentType: "text/plain" })
+    .catch(() => {})
 }

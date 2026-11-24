@@ -5,9 +5,9 @@ import {
 } from "@/utils/mutationErrorToast"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
-import { Button } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
+import ConfirmActions from "../ConfirmActions"
 
 const ConfirmInstanceDeletion = (props: ModalProps) => {
   const [t] = useTransContext()
@@ -40,11 +40,12 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
     <ModalLayout
       noHeader={props.noHeader}
       title={props?.title}
-      height="h-60"
+      height="h-auto"
       width="w-100"
+      compact
     >
-      <div class="flex h-full flex-col justify-between">
-        <div class="h-h-full">
+      <div class="flex flex-col gap-6">
+        <div>
           <Trans
             key="instances:_trn_instance_confirm_deletion.confirmation_text"
             options={{ instance_name: props.data?.name }}
@@ -54,27 +55,18 @@ const ConfirmInstanceDeletion = (props: ModalProps) => {
             {""}
           </Trans>
         </div>
-        <div class="flex w-full justify-between">
-          <Button
-            onClick={() => {
-              modalsContext?.closeModal()
-            }}
-          >
-            <div class="i-hugeicons:cancel-01" />
-            {t("instances:_trn_instance_confirm_deletion.cancel")}
-          </Button>
-          <Button
-            data-testid="confirm-instance-deletion"
-            type="secondary"
-            onClick={() => {
-              modalsContext?.closeModal()
-              deleteInstanceMutation.mutate(props?.data?.id)
-            }}
-          >
-            <div class="i-hugeicons:delete-02" />
-            {t("instances:_trn_instance_confirm_deletion.delete")}
-          </Button>
-        </div>
+        <ConfirmActions
+          busy={false}
+          confirmTestId="confirm-instance-deletion"
+          onCancel={() => modalsContext?.closeModal()}
+          onConfirm={() => {
+            modalsContext?.closeModal()
+            deleteInstanceMutation.mutate(props?.data?.id)
+          }}
+        >
+          <div class="i-hugeicons:delete-02" />
+          {t("instances:_trn_instance_confirm_deletion.delete")}
+        </ConfirmActions>
       </div>
     </ModalLayout>
   )

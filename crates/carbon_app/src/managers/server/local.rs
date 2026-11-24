@@ -284,6 +284,7 @@ impl ServerProvider for LocalServerProvider {
         xmx: i32,
         xms: i32,
         extra_args: &str,
+        mitigation_args: &[String],
         launch_config: &LaunchConfig,
         modloader_type: Option<&str>,
         log_tx: mpsc::UnboundedSender<String>,
@@ -314,6 +315,10 @@ impl ServerProvider for LocalServerProvider {
                     cmd.arg(arg);
                 }
             }
+        }
+
+        for arg in mitigation_args {
+            cmd.arg(arg);
         }
 
         if let Some(args_file) = &launch_config.args_file {
@@ -712,6 +717,7 @@ mod tests {
                 1024,
                 1024,
                 "",
+                &[],
                 &LaunchConfig::vanilla(),
                 Some("neoforge"),
                 log_tx,
@@ -749,6 +755,7 @@ mod tests {
                 1024,
                 1024,
                 "",
+                &[],
                 &LaunchConfig::vanilla(),
                 None,
                 log_tx,
@@ -824,6 +831,7 @@ mod tests {
                     1024,
                     1024,
                     "",
+                    &[],
                     &LaunchConfig::vanilla(),
                     None,
                     log_tx,
@@ -889,6 +897,7 @@ done
                 1024,
                 1024,
                 "",
+                &[],
                 &LaunchConfig::vanilla(),
                 None,
                 log_tx,
@@ -1017,6 +1026,7 @@ done
                     1024,
                     1024,
                     "",
+                    &[],
                     &LaunchConfig::vanilla(),
                     None,
                     log_tx,

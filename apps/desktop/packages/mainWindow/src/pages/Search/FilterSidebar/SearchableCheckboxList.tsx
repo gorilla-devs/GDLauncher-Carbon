@@ -63,7 +63,10 @@ export function SearchableCheckboxList(props: SearchableCheckboxListProps) {
   }
 
   const renderItem = (item: CheckboxItem) => (
-    <div class="hover:bg-darkSlate-700 rounded-md px-1.5 py-1 transition-colors">
+    <div
+      data-gdl="search.filter.option"
+      class="hover:bg-darkSlate-700 rounded-md px-1.5 py-1 transition-colors"
+    >
       <Checkbox
         checked={props.selectedValues().includes(item.value)}
         onChange={(checked) => props.onToggle(item.value, checked)}

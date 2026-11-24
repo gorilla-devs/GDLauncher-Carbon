@@ -5999,6 +5999,7 @@ mod dependency_tests {
                 state: ServerState::Stopped { failed_task: None },
                 handle: None,
                 last_log_id: None,
+                java_path: None,
             },
         );
         let data = app
@@ -6536,6 +6537,7 @@ mod dependency_tests {
                 state: ServerState::Stopped { failed_task: None },
                 handle: None,
                 last_log_id: None,
+                java_path: None,
             },
         );
         let mods = app
@@ -7768,6 +7770,7 @@ mod dependency_tests {
                 state: ServerState::Stopped { failed_task: None },
                 handle: None,
                 last_log_id: None,
+                java_path: None,
             },
         );
         let mods = app

@@ -1,5 +1,6 @@
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import {
   Button,
   Select,
@@ -215,18 +216,15 @@ const Report = (props: ModalProps) => {
             </div>
           </div>
 
-          <div class="flex justify-between">
-            <Button
-              type="secondary"
+          <DialogFooter>
+            <CancelLink
               onClick={() => modalsContext?.closeModal()}
               disabled={isPending()}
-            >
-              <Trans key="instances:_trn_report.cancel" />
-            </Button>
+            />
             <Button type="primary" onClick={submit} loading={isPending()}>
               <Trans key="instances:_trn_report.submit" />
             </Button>
-          </div>
+          </DialogFooter>
         </div>
       </Show>
     </ModalLayout>

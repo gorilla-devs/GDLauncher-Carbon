@@ -65,6 +65,7 @@ fn settings_note(id: InstanceId) -> crate::domain::instance::InstanceSettingsUpd
         post_exit_hook: None,
         wrapper_command: None,
         game_resolution: None,
+        java_floor: None,
         mod_sources: None,
         modpack_locked: None,
     }
@@ -1209,6 +1210,7 @@ async fn server_scan_and_addon_actions_follow_linked_folders() {
             state: ServerState::Stopped { failed_task: None },
             handle: None,
             last_log_id: None,
+            java_path: None,
         },
     );
     let elsewhere = app
@@ -1321,6 +1323,7 @@ async fn a_world_name_with_a_colon_keeps_its_datapacks_working() {
             state: ServerState::Stopped { failed_task: None },
             handle: None,
             last_log_id: None,
+            java_path: None,
         },
     );
     let datapacks = data.join("SMP: Season 2/datapacks");
@@ -1368,6 +1371,7 @@ async fn an_addon_file_with_a_colon_can_be_toggled_and_deleted() {
             state: ServerState::Stopped { failed_task: None },
             handle: None,
             last_log_id: None,
+            java_path: None,
         },
     );
     let mods = data.join("mods");
@@ -2053,6 +2057,7 @@ async fn server_with_addons(
             state: ServerState::Stopped { failed_task: None },
             handle: None,
             last_log_id: None,
+            java_path: None,
         },
     );
     std::fs::write(data.join("mods/a.jar"), b"a").unwrap();

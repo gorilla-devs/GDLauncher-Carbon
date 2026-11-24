@@ -1,11 +1,21 @@
 import { rspc } from "@/utils/rspcClient"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
+import { DialogFooter } from "../DialogFooter"
+import { TextLink } from "@/components/TextLink"
 import { Button, Spinner, toast } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import type { NamespacedTranslationKey } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
-import { createMemo, createSignal, For, Match, Show, Switch } from "solid-js"
+import {
+  createMemo,
+  createSignal,
+  For,
+  Match,
+  Show,
+  Switch,
+  onMount
+} from "solid-js"
 import { ListGroup, ListServerGroup } from "@gd/core_module/bindings"
 import type { FolderKind } from "@/pages/Library/types"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
@@ -85,6 +95,10 @@ const ConfirmBatchFolderDeletion = (props: ModalProps) => {
   const modalsContext = useModal()
   const navigator = useGDNavigate()
   const globalStore = useGlobalStore()
+
+  let cancelLink: HTMLButtonElement | undefined
+  // Enter or Esc right after opening must leave everything as it was.
+  onMount(() => cancelLink?.focus({ preventScroll: true }))
 
   const [isDeleting, setIsDeleting] = createSignal(false)
   const [deletedCount, setDeletedCount] = createSignal(0)
@@ -221,28 +235,22 @@ const ConfirmBatchFolderDeletion = (props: ModalProps) => {
     }
   }
 
-  const cancelButton = (fullWidth?: boolean) => (
-    <Button
-      fullWidth={fullWidth}
+  // The dialog comes back from its progress view after a partial failure,
+  // so the link is looked up again each time it is drawn.
+  const cancelLinkButton = () => (
+    <TextLink
+      ref={(el) => (cancelLink = el)}
       data-testid="folder-deletion-cancel"
-      onClick={() => {
-        modalsContext?.closeModal()
-      }}
+      onClick={() => modalsContext?.closeModal()}
     >
-      <div class="i-hugeicons:cancel-01" />
-      {t("instances:_trn_instance_confirm_deletion.cancel")}
-    </Button>
+      <Trans key="general:_trn_cancel" />
+    </TextLink>
   )
 
   // The labels are read where they are shown, so they follow the setting
   // and the instance count as those arrive or change.
-  const removeButton = (
-    labelKey: () => NamespacedTranslationKey,
-    fullWidth?: boolean
-  ) => (
+  const removeButton = (labelKey: () => NamespacedTranslationKey) => (
     <Button
-      type="secondary"
-      fullWidth={fullWidth}
       data-testid="folder-deletion-remove"
       disabled={operationMode() === "deleteAll"}
       onClick={() => handleDelete("unlink")}
@@ -252,13 +260,9 @@ const ConfirmBatchFolderDeletion = (props: ModalProps) => {
     </Button>
   )
 
-  const deleteAllButton = (
-    labelKey: () => NamespacedTranslationKey,
-    fullWidth?: boolean
-  ) => (
+  const deleteAllButton = (labelKey: () => NamespacedTranslationKey) => (
     <Button
       type="secondary"
-      fullWidth={fullWidth}
       textColor={target() === "permanent" ? "!text-red-400" : undefined}
       data-testid="folder-deletion-delete-all"
       disabled={operationMode() === "unlink"}
@@ -289,6 +293,7 @@ const ConfirmBatchFolderDeletion = (props: ModalProps) => {
       title={title()}
       height="h-auto"
       width="w-140"
+      compact
     >
       <div class="flex flex-col gap-4" data-testid="folder-deletion-dialog">
         <Show
@@ -395,14 +400,14 @@ const ConfirmBatchFolderDeletion = (props: ModalProps) => {
           </Show>
           <Switch>
             <Match when={dialog() === "remove"}>
-              <div class="flex w-full justify-between gap-2 pt-2">
-                {cancelButton()}
+              <DialogFooter class="pt-2">
+                {cancelLinkButton()}
                 {removeButton(() => folderRemoveLabelKey(folders().length))}
-              </div>
+              </DialogFooter>
             </Match>
             <Match when={dialog() === "deleteAll"}>
-              <div class="flex w-full justify-between gap-2 pt-2">
-                {cancelButton()}
+              <DialogFooter class="pt-2">
+                {cancelLinkButton()}
                 {deleteAllButton(() =>
                   target() === "permanent"
                     ? "instances:_trn_server_delete_permanently"
@@ -411,21 +416,21 @@ const ConfirmBatchFolderDeletion = (props: ModalProps) => {
                         totalInstanceCount()
                       )
                 )}
-              </div>
+              </DialogFooter>
             </Match>
             <Match when={dialog() === "choice"}>
-              <div class="flex w-full flex-col gap-2 pt-2">
-                {removeButton(() => folderKeepLabelKey(folders().length), true)}
-                {deleteAllButton(
-                  () =>
+              <DialogFooter class="pt-2">
+                {cancelLinkButton()}
+                <div class="flex flex-wrap-reverse items-center justify-end gap-3">
+                  {deleteAllButton(() =>
                     folderDeleteAllLabelKey(
                       folders().length,
                       totalInstanceCount()
-                    ),
-                  true
-                )}
-                {cancelButton(true)}
-              </div>
+                    )
+                  )}
+                  {removeButton(() => folderKeepLabelKey(folders().length))}
+                </div>
+              </DialogFooter>
             </Match>
           </Switch>
         </Show>

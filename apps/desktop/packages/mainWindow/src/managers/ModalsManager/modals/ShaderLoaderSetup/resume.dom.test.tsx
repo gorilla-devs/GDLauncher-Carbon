@@ -233,7 +233,7 @@ it("failed task acknowledgement rejection starts no replacement and stays usable
   expect(root.textContent).toContain("synthetic acknowledgement denied")
   expect(shaderInstallRunning()).toBe(false)
   expect(c.complete).not.toHaveBeenCalled()
-  button(root, "shader_loader_cancel").click()
+  button(root, "general:_trn_cancel").click()
   expect(c.complete).toHaveBeenCalledExactlyOnceWith(null)
   expect(toast).toHaveBeenLastCalledWith(
     "Shader install cancelled — steps that already finished were kept",
@@ -327,7 +327,7 @@ it("no-ID rejection offers Cancel and fresh actual caller preflight, never ambig
     )
   ).toBe(false)
   expect(calls("instance.installMod")).toHaveLength(1)
-  button(root, "shader_loader_cancel").click()
+  button(root, "general:_trn_cancel").click()
   await settle()
   expect(shaderInstallRunning()).toBe(false)
   expect(caller.instanceLoadingStates().has(7)).toBe(false)
@@ -341,7 +341,7 @@ it("no-ID rejection offers Cancel and fresh actual caller preflight, never ambig
   expect(preflight).toBe(2)
   expect(modal().recommendation.mc_version).toBe("1.21")
   expect(calls("instance.installMod")).toHaveLength(1)
-  button(root, "shader_loader_cancel").click()
+  button(root, "general:_trn_cancel").click()
   await settle()
   expect(toast).toHaveBeenLastCalledWith(
     "Shader install cancelled — no compatible shader loader is installed",

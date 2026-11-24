@@ -2,10 +2,13 @@ import { ImportEntityStatus } from "@gd/core_module/bindings"
 import { useTransContext, NamespacedTranslationKey } from "@gd/i18n"
 import { PRESS_CLASSES } from "@gd/ui"
 import { Show } from "solid-js"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 export interface EntityCardProps {
   entity: ImportEntityStatus
   icon: string
+  /** Draw this platform's logo instead of `icon`. */
+  platform?: "curseforge"
   onClick?: [(_entity: ImportEntityStatus) => void, ImportEntityStatus]
   translation: NamespacedTranslationKey
   className?: string
@@ -37,11 +40,24 @@ const EntityCard = (props: EntityCardProps) => {
         </span>
       </Show>
       <div class="relative">
-        <img
-          src={props.icon}
-          alt={t(props.translation)}
-          class={`h-7 w-7 object-contain ${props.entity.supported ? "" : "opacity-20"}`}
-        />
+        <Show
+          when={props.platform}
+          fallback={
+            <img
+              src={props.icon}
+              alt={t(props.translation)}
+              class={`h-7 w-7 object-contain ${props.entity.supported ? "" : "opacity-20"}`}
+            />
+          }
+        >
+          {(platform) => (
+            <PlatformLogo
+              platform={platform()}
+              alt={t(props.translation)}
+              class={`h-7 w-7 object-contain ${props.entity.supported ? "" : "opacity-20"}`}
+            />
+          )}
+        </Show>
       </div>
 
       <span class={`text-xs ${props.entity.supported ? "" : "opacity-20"}`}>

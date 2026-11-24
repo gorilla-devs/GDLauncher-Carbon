@@ -12,6 +12,28 @@ import {
 } from "solid-js"
 
 type Marks = Record<number, string | JSX.Element | { label: JSX.Element }>
+
+/** A label's box along the slider, in px. */
+export interface LabelBox {
+  start: number
+  end: number
+}
+
+/**
+ * Which labels to hide so none overlaps the one shown before it: walking from
+ * the start, a label is hidden when it begins less than `gap` px after the
+ * last label kept. The first label is always kept. ("1 GB" and "2 GB" sit a
+ * few px apart on a machine with a lot of memory, and read "1 GB2 GB".)
+ */
+export function overlappingLabels(boxes: LabelBox[], gap = 4): boolean[] {
+  let lastEnd = -Infinity
+  return boxes.map((box) => {
+    if (box.end <= box.start) return false
+    if (box.start < lastEnd + gap) return true
+    lastEnd = box.end
+    return false
+  })
+}
 interface Props {
   max: number
   min: number
@@ -51,6 +73,35 @@ function Slider(props: Props) {
   const mergedProps = mergeProps({ noLabels: false, noTooltip: false }, props)
 
   let sliderRef: HTMLDivElement
+  let rootRef: HTMLDivElement | undefined
+  const labelRefs: HTMLElement[] = []
+  const [hiddenLabels, setHiddenLabels] = createSignal<boolean[]>([])
+
+  // Hides labels that would run into the one before them. Measured after
+  // layout, and again whenever the slider's size or its marks change.
+  const measureLabels = () => {
+    const count = Object.keys(props.marks ?? {}).length
+    const boxes = labelRefs.slice(0, count).map((el) => {
+      if (!el?.isConnected) return { start: 0, end: 0 }
+      const r = el.getBoundingClientRect()
+      return props.vertical
+        ? { start: r.top, end: r.bottom }
+        : { start: r.left, end: r.right }
+    })
+    const next = overlappingLabels(boxes)
+    const prev = hiddenLabels()
+    if (next.length !== prev.length || next.some((h, i) => h !== prev[i])) {
+      setHiddenLabels(next)
+    }
+  }
+
+  let labelObserver: ResizeObserver | undefined
+  const observeLabels = () => {
+    const count = Object.keys(props.marks ?? {}).length
+    for (const el of labelRefs.slice(0, count)) {
+      if (el?.isConnected) labelObserver?.observe(el)
+    }
+  }
 
   const getSliderStart = () => {
     const rect = sliderRef.getBoundingClientRect()
@@ -179,6 +230,26 @@ function Slider(props: Props) {
     if (sliderRef) {
       sliderRef.addEventListener("mousedown", trackMousedown)
     }
+    measureLabels()
+    // Web fonts change the labels' widths once they load.
+    void document.fonts?.ready.then(measureLabels)
+    if (rootRef && typeof ResizeObserver !== "undefined") {
+      // The slider's own size, and each label's (a theme's font or a new
+      // value), change where the labels fall.
+      labelObserver = new ResizeObserver(() => measureLabels())
+      labelObserver.observe(rootRef)
+      observeLabels()
+      onCleanup(() => labelObserver?.disconnect())
+    }
+  })
+
+  createEffect(() => {
+    // Re-measure when the marks change (a new total memory, say).
+    void Object.keys(props.marks ?? {}).length
+    queueMicrotask(() => {
+      observeLabels()
+      measureLabels()
+    })
   })
 
   onCleanup(() => {
@@ -204,6 +275,8 @@ function Slider(props: Props) {
   return (
     <>
       <div
+        ref={rootRef}
+        data-gdl="slider"
         class="group relative flex items-center box-border"
         classList={{
           "h-10 w-full max-w-full": !props.vertical,
@@ -212,6 +285,7 @@ function Slider(props: Props) {
       >
         <Show when={showTooptip() && !mergedProps.noTooltip}>
           <div
+            data-gdl="slider.tooltip"
             class="absolute bg-darkSlate-900 rounded-lg px-2 py-1"
             style={{
               position: "absolute",
@@ -239,6 +313,7 @@ function Slider(props: Props) {
               {([value, label], i) => (
                 <>
                   <div
+                    data-gdl="slider.mark"
                     class="absolute z-10 bg-lightSlate-50/25"
                     style={{
                       ...(props.vertical
@@ -259,6 +334,10 @@ function Slider(props: Props) {
                     }}
                   />
                   <p
+                    ref={(el) => {
+                      labelRefs[i()] = el
+                    }}
+                    data-gdl="slider.label"
                     class="flex flex-col mb-0 text-xs text-darkGray-300 font-semibold"
                     classList={{
                       "-ml-2 mt-2 max-w-25": !props.vertical,
@@ -266,6 +345,7 @@ function Slider(props: Props) {
                     }}
                     style={{
                       position: "absolute",
+                      ...(hiddenLabels()[i()] ? { visibility: "hidden" } : {}),
                       ...(props.vertical
                         ? {
                             right: "10px",
@@ -308,7 +388,8 @@ function Slider(props: Props) {
           </Show>
           <div
             ref={setHandleRef}
-            class="rounded-full border-0 bg-lightSlate-50/15 shadow-md cursor-grab z-20 transition-[color,box-shadow,transform,opacity,background-color] ease-out group-hover:bg-lightSlate-50/80"
+            data-gdl="slider.thumb"
+            class="rounded-full border-0 shadow-md cursor-grab z-20 transition-[color,box-shadow,transform,opacity,background-color] ease-out group-hover:bg-lightSlate-50/80"
             style={{
               position: "absolute",
               ...(props.vertical
@@ -346,6 +427,7 @@ function Slider(props: Props) {
             }}
           />
           <div
+            data-gdl="slider.track"
             class="bg-darkSlate-600 rounded-full relative overflow-hidden"
             classList={{
               "w-full h-4": !props.vertical,
@@ -353,6 +435,7 @@ function Slider(props: Props) {
             }}
           >
             <div
+              data-gdl="slider.fill"
               class="absolute inset-0 bg-primary-500"
               style={{
                 ...(props.vertical

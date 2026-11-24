@@ -60,6 +60,8 @@ vi.mock("@gd/i18n", () => ({
 }))
 vi.mock("@gd/ui", async () => ({
   ...(await import("../../../../../../packages/ui/src/Button")),
+  // Theme hook names are plain strings: the real helpers.
+  ...(await import("../../../../../../packages/ui/src/hooks")),
   Spinner: () => <span>loading</span>,
   Tooltip: (p: any) => <div>{p.children}</div>,
   TooltipTrigger: (p: any) => <div>{p.children}</div>,

@@ -72,7 +72,20 @@ pub fn get_migrations() -> (MigrationSet, i32) {
         historical_migration!("20260325000000_add_server_icon_revision"),
         historical_migration!("20260328000000_add_server_modloader_and_addons"),
         historical_migration!("20260410000000_add_server_modpack_info"),
-        // The downs of 26-28 run on users' data in an older build. Their rows are
+        MigrationDef {
+            name: "20261118172601_add_auto_update_managed_java",
+            up_sql: include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/prisma/migrations/20261118172601_add_auto_update_managed_java/migration.sql"
+            )),
+            down_sql: Some(include_str!(concat!(
+                env!("CARGO_MANIFEST_DIR"),
+                "/prisma/migrations/20261118172601_add_auto_update_managed_java/down.sql"
+            ))),
+            kind: MigrationKind::Breaking,
+            data_down: "full",
+        },
+        // The downs of 27-29 run on users' data in an older build. Their rows are
         // scan caches, so each down drops the rows the older schema cannot hold
         // (datapacks of other worlds, a file name in two folders, two files of
         // one Modrinth version) and that build rescans, rather than refusing.

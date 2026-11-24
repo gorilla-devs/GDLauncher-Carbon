@@ -46,7 +46,10 @@ vi.mock("@/managers/ModalsManager", () => ({
 vi.mock("@/managers/ModalsManager/ModalLayout", () => ({
   default: (p: any) => <div>{p.children}</div>
 }))
-vi.mock("@gd/i18n", () => ({ Trans: (p: any) => <span>{p.key}</span> }))
+vi.mock("@gd/i18n", () => ({
+  Trans: (p: any) => <span>{p.key}</span>,
+  useTransContext: () => [(key: string) => key]
+}))
 vi.mock("@gd/ui", () => ({
   PRESS_CLASSES: "",
   Checkbox: () => null,

@@ -28,12 +28,16 @@ import {
 } from "@gd/ui"
 import { For, Match, Show, Switch } from "solid-js"
 import { Trans, useTransContext } from "@gd/i18n"
-import { rspc } from "@/utils/rspcClient"
+import { queryClient, rspc } from "@/utils/rspcClient"
 import { useGlobalStore } from "@/components/GlobalStoreContext"
 import { useModal } from "@/managers/ModalsManager"
+import { effectiveTileSize, layout } from "@/themes/layout"
+import { createPreferencesMutation } from "@/themes/preferences"
+import { refetchTileSize, storeTileSize } from "@/themes/tileSize"
 import { LibraryHeaderProps, LibraryMode } from "../types"
 import { InstancesGroupBy, InstancesSortBy } from "@gd/core_module/bindings"
 import FeatureStatusBadge from "@/components/FeatureStatusBadge"
+import { DecorationSlot } from "@/themes/DecorationSlot"
 
 export function LibraryHeader(props: LibraryHeaderProps) {
   const [t] = useTransContext()
@@ -42,7 +46,9 @@ export function LibraryHeader(props: LibraryHeaderProps) {
   let inputRef: HTMLInputElement | undefined
 
   const settingsMutation = rspc.createMutation(() => ({
-    mutationKey: ["settings.setSettings"]
+    mutationKey: ["settings.setSettings"],
+    // The tile size goes into the cache before it's saved (storeTileSize)
+    onError: () => refetchTileSize(queryClient)
   }))
 
   const arrangeLibraryMutation = rspc.createMutation(() => ({
@@ -116,9 +122,22 @@ export function LibraryHeader(props: LibraryHeaderProps) {
 
   const isFoldersView = () => props.viewMode() === "folders"
 
+  // Whether the user picked the tile size (it then wins over the theme's).
+  const setPreferences = createPreferencesMutation({
+    onError: () => refetchTileSize(queryClient)
+  })
+
   // Setting helpers — servers and instances share the instances* settings
   const setTileSizeSetting = (size: number) => {
-    settingsMutation.mutate({ instancesTileSize: { Set: size } })
+    storeTileSize(
+      queryClient,
+      (patch) => {
+        setPreferences.mutate(patch)
+        settingsMutation.mutate({ instancesTileSize: { Set: size } })
+      },
+      size,
+      true
+    )
   }
 
   const setSortBySetting = (key: string, asc: boolean) => {
@@ -152,24 +171,36 @@ export function LibraryHeader(props: LibraryHeaderProps) {
     settingsMutation.mutate({ instancesGroupByAsc: { Set: asc } })
   }
 
+  // Puts the theme's default size back, if the theme has one.
   const resetFilters = () => {
-    settingsMutation.mutate({
-      instancesTileSize: { Set: 2 },
-      instancesSortBy: { Set: null },
-      instancesSortByAsc: { Set: false },
-      instancesGroupBy: { Set: null },
-      instancesGroupByAsc: { Set: true }
-    })
-    props.setTileSize(2)
+    storeTileSize(
+      queryClient,
+      (patch) => {
+        setPreferences.mutate(patch)
+        settingsMutation.mutate({
+          instancesTileSize: { Set: 2 },
+          instancesSortBy: { Set: null },
+          instancesSortByAsc: { Set: false },
+          instancesGroupBy: { Set: null },
+          instancesGroupByAsc: { Set: true }
+        })
+      },
+      2,
+      false
+    )
+    props.setTileSize(effectiveTileSize(2, false, layout().tileSize))
   }
 
   return (
     <div
       data-library-header
+      data-gdl="library.toolbar"
       class="bg-darkSlate-800 z-5 sticky top-0 -mx-6 flex items-center gap-4 px-6 py-4"
     >
+      <DecorationSlot anchor="library.toolbar" />
       {/* Library Mode Toggle */}
       <Tabs
+        data-gdl="library.tabs"
         value={props.libraryMode()}
         onChange={(v) => props.setLibraryMode(v as LibraryMode)}
         class="h-fit w-auto flex-shrink-0"
@@ -178,13 +209,19 @@ export function LibraryHeader(props: LibraryHeaderProps) {
           <TabsIndicator />
           <TabsTrigger value="instances">
             <div class="flex items-center gap-1.5">
-              <div class="i-hugeicons:computer h-3.5 w-3.5" />
+              <div
+                data-gdl="tab.icon"
+                class="i-hugeicons:computer h-3.5 w-3.5"
+              />
               <Trans key="instances:_trn_instances" />
             </div>
           </TabsTrigger>
           <TabsTrigger value="servers">
             <div class="relative flex items-center gap-1.5">
-              <div class="i-hugeicons:server-stack-01 h-3.5 w-3.5" />
+              <div
+                data-gdl="tab.icon"
+                class="i-hugeicons:server-stack-01 h-3.5 w-3.5"
+              />
               <Trans key="instances:_trn_library_mode_servers" />
               <div class="absolute -top-5 -right-4">
                 <FeatureStatusBadge type="beta" />
@@ -195,6 +232,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
       </Tabs>
 
       <Input
+        data-gdl="library.search"
         ref={inputRef}
         placeholder={
           isServerMode()
@@ -222,7 +260,11 @@ export function LibraryHeader(props: LibraryHeaderProps) {
       {/* Filter dropdown */}
       <DropdownMenu>
         <DropdownMenuTrigger>
-          <Button type="secondary" size="small">
+          <Button
+            type="secondary"
+            size="small"
+            data-gdl="library.toolbar.filter"
+          >
             <div class="i-hugeicons:filter h-4 w-4" />
           </Button>
         </DropdownMenuTrigger>
@@ -417,6 +459,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
             <Button
               type="secondary"
               size="small"
+              data-gdl="library.toolbar.arrange"
               title={t("instances:_trn_rearrange")}
             >
               <div class="i-hugeicons:arrow-up-down h-4 w-4" />
@@ -463,6 +506,7 @@ export function LibraryHeader(props: LibraryHeaderProps) {
         size="small"
         class="shrink-0"
         data-testid="library-add-instance"
+        data-gdl="library.toolbar.create"
         onClick={() => {
           if (isServerMode()) {
             modals?.openModal({ name: "serverCreation" })

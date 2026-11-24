@@ -12,14 +12,20 @@ import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
-  PRESS_CLASSES_LIGHT
+  PRESS_CLASSES_LIGHT,
+  withStates
 } from "@gd/ui"
 import DefaultImg from "/assets/images/default-instance-img.png"
 import SelectionBorder from "../Instance/SelectionBorder"
+import { DecorationSlot } from "@/themes/DecorationSlot"
+import { tilePlayHooks } from "@/themes/hooks"
+import { layout } from "@/themes/layout"
 
 export interface BaseTileProps {
   // Identity
   name: string
+  // Stable id of the item, so theme decorations can pick a variant per tile
+  decorationKey: string
 
   // Sizing
   size: 1 | 2 | 3 | 4 | 5
@@ -40,6 +46,8 @@ export interface BaseTileProps {
   glowTone?: "yellow" | "orange"
   isDeleting: boolean
   isInvalid?: boolean // Instance only
+  isFavorite?: boolean
+  isNew?: boolean // Shows the NEW badge (instance only)
 
   // Error
   failError?: string
@@ -114,6 +122,7 @@ const BaseTile = (props: BaseTileProps) => {
     onConfirm: () => props.onPlay?.(),
     disabled: () => !stopIsHeld()
   })
+  const isCaption = () => layout().tileStyle === "caption"
 
   // Progress bar computation
   const computedProgressWidth = () => {
@@ -152,6 +161,14 @@ const BaseTile = (props: BaseTileProps) => {
 
   return (
     <div
+      data-gdl={withStates("library.tile", {
+        selected: props.isMultiSelected,
+        running: props.isRunning,
+        busy: props.isBusy && !props.isRunning,
+        loading: isLoadingOrWaiting(),
+        favorite: props.isFavorite,
+        fresh: props.isNew
+      })}
       class={`group isolate relative flex select-none flex-col items-center justify-center ${PRESS_CLASSES_LIGHT}`}
       classList={{
         "opacity-0": props.isDragging,
@@ -187,18 +204,19 @@ const BaseTile = (props: BaseTileProps) => {
     >
       <Tooltip open={props.failError ? undefined : false} placement="top">
         <TooltipTrigger>
+          {/* The frame rounds and clips the picture. It, the picture box, the
+              picture and the layers over it are rounded by `--gdl-tile-radius`. */}
           <div
-            class="relative box-border overflow-hidden rounded-2xl p-[2px]"
+            data-gdl="library.tile.frame"
+            class="relative box-border overflow-hidden p-[2px]"
             classList={{
               [props.glowExtraClass || ""]: !!props.glowExtraClass
             }}
           >
-            <SelectionBorder
-              isSelected={props.isMultiSelected}
-              size={props.size}
-            />
+            <SelectionBorder isSelected={props.isMultiSelected} />
             {/* Running / loading / busy border glow */}
             <div
+              data-gdl="library.tile.glow"
               class="absolute left-0 top-0 h-full w-full transition-[opacity,background] duration-300 ease-spring"
               classList={{
                 "opacity-0 bg-transparent":
@@ -222,7 +240,8 @@ const BaseTile = (props: BaseTileProps) => {
 
             {/* Image container */}
             <div
-              class="relative overflow-hidden rounded-2xl"
+              data-gdl="library.tile.image"
+              class="relative overflow-hidden"
               classList={{
                 "h-120 w-120": props.size === 5,
                 "h-84 w-84": props.size === 4,
@@ -241,7 +260,8 @@ const BaseTile = (props: BaseTileProps) => {
             >
               {/* Background image */}
               <div
-                class="bg-darkSlate-800 relative flex h-full w-full items-center justify-center overflow-hidden rounded-2xl bg-cover bg-center transition-all duration-300 ease-spring"
+                data-gdl="library.tile.picture"
+                class="bg-darkSlate-800 relative flex h-full w-full items-center justify-center overflow-hidden rounded-[var(--gdl-tile-radius,calc(1rem*var(--radius-scale,1)))] bg-cover bg-center transition-all duration-300 ease-spring"
                 classList={{
                   grayscale: isLoadingOrWaiting(),
                   "group-hover:scale-110 group-hover:blur-[2px]":
@@ -265,6 +285,7 @@ const BaseTile = (props: BaseTileProps) => {
 
               {/* Hover dark overlay */}
               <div
+                data-gdl="library.tile.dim"
                 class="z-1 absolute inset-0 bg-black/0 transition-all duration-300 ease-spring [transform:translateZ(0)]"
                 classList={{
                   "!bg-black/0": isLoadingOrWaiting(),
@@ -282,6 +303,7 @@ const BaseTile = (props: BaseTileProps) => {
                 }
               >
                 <div
+                  data-gdl="library.tile.checkbox"
                   class="z-10 absolute left-2 top-2 transition-all duration-200 ease-spring has-[:focus-visible]:translate-x-0 has-[:focus-visible]:opacity-100"
                   classList={{
                     "translate-x-0 opacity-100":
@@ -315,15 +337,15 @@ const BaseTile = (props: BaseTileProps) => {
                 <h2 class="z-2 absolute left-0 top-0 text-center text-sm">
                   <Trans key="instances:_trn_error_invalid" />
                 </h2>
-                <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-50" />
-                <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-50" />
+                <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-[var(--gdl-tile-radius,calc(1rem*var(--radius-scale,1)))] bg-gradient-to-l from-black from-30% opacity-50" />
+                <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-[var(--gdl-tile-radius,calc(1rem*var(--radius-scale,1)))] bg-gradient-to-t from-black opacity-50" />
                 <div class="i-hugeicons:alert-01 z-1 absolute right-1 top-1 text-2xl text-yellow-500 shrink-0" />
               </Show>
 
               {/* Error state overlay */}
               <Show when={props.failError}>
-                <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-l from-black from-30% opacity-60" />
-                <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-t from-black opacity-60" />
+                <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-[var(--gdl-tile-radius,calc(1rem*var(--radius-scale,1)))] bg-gradient-to-l from-black from-30% opacity-60" />
+                <div class="z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-[var(--gdl-tile-radius,calc(1rem*var(--radius-scale,1)))] bg-gradient-to-t from-black opacity-60" />
                 <div class="i-hugeicons:alert-01 z-1 absolute bottom-20 left-0 right-0 top-0 m-auto text-4xl text-red-500 shrink-0" />
                 <div class="z-3 absolute left-1/2 top-1/2 mt-5 w-full -translate-x-1/2 -translate-y-1/2 text-center">
                   <div class="text-3xl font-bold">
@@ -348,9 +370,18 @@ const BaseTile = (props: BaseTileProps) => {
 
               {/* Loading dark overlays (backdrop-blur + gradients) */}
               <Show when={isLoadingOrWaiting() || props.isDeleting}>
-                <div class="z-1 absolute bottom-0 left-0 right-0 top-0 rounded-2xl backdrop-blur-sm" />
-                <div class="from-darkSlate-900 z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-l from-30% opacity-50" />
-                <div class="from-darkSlate-900 z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-2xl bg-gradient-to-t opacity-50" />
+                <div
+                  data-gdl="library.tile.veil"
+                  class="z-1 absolute bottom-0 left-0 right-0 top-0 rounded-[var(--gdl-tile-radius,calc(1rem*var(--radius-scale,1)))] backdrop-blur-sm"
+                />
+                <div
+                  data-gdl="library.tile.fade"
+                  class="from-darkSlate-900 z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-[var(--gdl-tile-radius,calc(1rem*var(--radius-scale,1)))] bg-gradient-to-l from-30% opacity-50"
+                />
+                <div
+                  data-gdl="library.tile.fade"
+                  class="from-darkSlate-900 z-1 absolute bottom-0 left-0 right-0 top-0 h-full w-full rounded-[var(--gdl-tile-radius,calc(1rem*var(--radius-scale,1)))] bg-gradient-to-t opacity-50"
+                />
               </Show>
 
               {/* Progress percentage display */}
@@ -362,6 +393,7 @@ const BaseTile = (props: BaseTileProps) => {
                 }
               >
                 <div
+                  data-gdl="library.tile.progress"
                   class="z-3 animate-enterWithOpacityChange absolute left-0 top-0 box-border flex h-full w-full flex-col items-center justify-center gap-2 p-2 opacity-0"
                   style={
                     props.shouldSetViewTransition
@@ -371,13 +403,17 @@ const BaseTile = (props: BaseTileProps) => {
                       : {}
                   }
                 >
-                  <h3 class="m-0 text-center text-3xl">
+                  <h3
+                    data-gdl="library.tile.progress.percent"
+                    class="m-0 text-center text-3xl"
+                  >
                     {Math.round(props.percentage!)}%
                   </h3>
                   <div class="text-lightSlate-300 h-10">
                     <For each={props.subTasks}>
                       {(subTask) => (
                         <div
+                          data-gdl="library.tile.progress.task"
                           class="text-center"
                           classList={{
                             "text-xs":
@@ -398,7 +434,10 @@ const BaseTile = (props: BaseTileProps) => {
 
               {/* Waiting spinner (queue / indeterminate installing) */}
               <Show when={props.isWaiting && !props.isLoading}>
-                <div class="z-3 absolute left-1/2 top-1/2 box-border flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2 px-2">
+                <div
+                  data-gdl="library.tile.spinner"
+                  class="z-3 absolute left-1/2 top-1/2 box-border flex w-full -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2 px-2"
+                >
                   <Spinner />
                   <span class="text-sm font-bold text-white">
                     {props.waitingText}
@@ -442,7 +481,10 @@ const BaseTile = (props: BaseTileProps) => {
 
               {/* Deleting spinner */}
               <Show when={props.isDeleting}>
-                <div class="z-3 absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2">
+                <div
+                  data-gdl="library.tile.spinner"
+                  class="z-3 absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center gap-2"
+                >
                   <Spinner />
                   <span class="font-bold text-white">
                     {props.deletingText || (
@@ -465,6 +507,7 @@ const BaseTile = (props: BaseTileProps) => {
                 }
               >
                 <div
+                  data-gdl={tilePlayHooks(!!props.isRunning, !!props.isBusy)}
                   class="z-5 absolute right-3 top-3 h-10 items-center justify-center gap-2 overflow-hidden rounded-xl px-4 transition-all duration-200 ease-spring translate-x-3 opacity-0"
                   role={stopIsHeld() ? "button" : undefined}
                   tabIndex={stopIsHeld() ? 0 : undefined}
@@ -528,15 +571,18 @@ const BaseTile = (props: BaseTileProps) => {
                 </div>
               </Show>
 
-              {/* Info overlay */}
-              <div
-                class="z-4 absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity duration-300"
-                classList={{
-                  "opacity-0": isLoadingOrWaiting() || props.isDeleting
-                }}
-              >
-                {props.infoContent}
-              </div>
+              {/* Info overlay (a caption theme puts it under the picture) */}
+              <Show when={!isCaption()}>
+                <div
+                  data-gdl="library.tile.shade"
+                  class="z-4 absolute bottom-0 left-0 right-0 flex flex-col gap-1 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent transition-opacity duration-300"
+                  classList={{
+                    "opacity-0": isLoadingOrWaiting() || props.isDeleting
+                  }}
+                >
+                  {props.infoContent}
+                </div>
+              </Show>
 
               {/* Subtask progress bar */}
               <Show
@@ -546,10 +592,16 @@ const BaseTile = (props: BaseTileProps) => {
                   props.subTasks.find((s) => s.progress !== "opaque")
                 }
               >
-                <div class="z-5 animate-enterWithOpacityChange absolute bottom-0 left-0 right-0 flex items-center gap-2 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent overflow-hidden opacity-0">
-                  <div class="relative min-w-0 flex-1 overflow-hidden rounded-full h-2">
-                    <div class="bg-darkSlate-500/50 absolute inset-0 rounded-full" />
+                <div
+                  data-gdl="library.tile.bar"
+                  class="z-5 animate-enterWithOpacityChange absolute bottom-0 left-0 right-0 flex items-center gap-2 p-3 bg-gradient-to-t from-black/80 via-black/40 to-transparent overflow-hidden opacity-0"
+                >
+                  <div
+                    data-gdl="library.tile.bar.track"
+                    class="bg-darkSlate-500/50 relative min-w-0 flex-1 overflow-hidden rounded-full h-2"
+                  >
                     <div
+                      data-gdl="library.tile.bar.fill"
                       class="bg-primary-500 absolute left-0 top-0 h-full rounded-full transition-all duration-300 ease-linear"
                       style={{
                         width: `${computedProgressWidth()}%`
@@ -558,6 +610,7 @@ const BaseTile = (props: BaseTileProps) => {
                   </div>
                   <Show when={props.size >= 2}>
                     <span
+                      data-gdl="library.tile.bar.text"
                       class="text-lightSlate-200 shrink-0 whitespace-nowrap font-medium"
                       classList={{
                         "text-sm": props.size >= 3,
@@ -603,6 +656,16 @@ const BaseTile = (props: BaseTileProps) => {
           </div>
         </TooltipContent>
       </Tooltip>
+      {/* As wide as the tile's column, so a long name can't spill over */}
+      <Show when={isCaption()}>
+        <div
+          data-gdl="library.tile.caption"
+          class="flex flex-col gap-1 px-1 pt-2 self-stretch overflow-hidden"
+        >
+          {props.infoContent}
+        </div>
+      </Show>
+      <DecorationSlot anchor="library.tile" itemKey={props.decorationKey} />
     </div>
   )
 }

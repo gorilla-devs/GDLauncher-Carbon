@@ -2,15 +2,23 @@ import { afterEach, expect, it, vi } from "vitest"
 import { render } from "solid-js/web"
 import { ThemeProvider, useTheme } from "./theme-context"
 import ThemeSelector from "../components/ThemeSelector"
-import {
-  mainTheme,
-  pixelato,
-  win95,
-  inferno,
-  aether,
-  frost,
-  type Theme
-} from "../../../src/themes"
+
+// The built-in theme packages, read as the provider reads them.
+interface Manifest {
+  colors?: Record<string, string>
+  tokens?: { font?: string; "font-mono"?: string }
+}
+const manifests = import.meta.glob<Manifest>(
+  "../../../themes/*/manifest.json",
+  { eager: true, import: "default" }
+)
+const styles = import.meta.glob<string>("../../../themes/*/theme.css", {
+  eager: true,
+  import: "default",
+  query: "?raw"
+})
+const manifest = (name: string) =>
+  manifests[`../../../themes/${name}/manifest.json`]
 
 let dispose: (() => void) | undefined
 afterEach(() => {
@@ -45,49 +53,43 @@ function fixture(saved?: string, selector = false) {
   )
   return { context, root }
 }
-function applied(theme: Theme) {
-  for (const [key, value] of Object.entries(theme)) {
-    if (key === "additional-styles")
-      expect(document.getElementById(key)?.innerHTML).toBe(value)
-    else
-      expect(document.documentElement.style.getPropertyValue(`--${key}`)).toBe(
-        value
-      )
+function applied(name: string) {
+  const theme = manifest(name)
+  expect(Object.keys(theme.colors ?? {}).length).toBeGreaterThan(0)
+  for (const [key, value] of Object.entries(theme.colors ?? {})) {
+    expect(document.documentElement.style.getPropertyValue(`--${key}`)).toBe(
+      value
+    )
   }
+  expect(document.getElementById("additional-styles")?.innerHTML).toBe(
+    styles[`../../../themes/${name}/theme.css`] ?? ""
+  )
 }
-it.each([
-  ["inferno", inferno],
-  ["aether", aether],
-  ["frost", frost]
-] as const)(
-  "exported offered %s applies through the provider without throwing",
-  (name, theme) => {
+it.each(["inferno", "aether", "frost"] as const)(
+  "offered %s applies through the provider without throwing",
+  (name) => {
     const f = fixture()
-    expect(() => f.context.setTheme(name as any)).not.toThrow()
+    expect(() => f.context.setTheme(name)).not.toThrow()
     expect(f.context.currentTheme()).toBe(name)
-    expect(f.context.themeObject()).toBe(theme)
+    expect(f.context.themeObject()).toBe(manifest(name))
     expect(localStorage.getItem("ui-theme")).toBe(name)
-    applied(theme)
+    applied(name)
   }
 )
-it.each([
-  ["main", mainTheme],
-  ["pixelato", pixelato],
-  ["win95", win95],
-  ["inferno", inferno],
-  ["aether", aether],
-  ["frost", frost]
-] as const)("saved registered %s applies its actual export", (name, theme) => {
-  const f = fixture(name)
-  expect(f.context.currentTheme()).toBe(name)
-  applied(theme)
-})
+it.each(["main", "pixelato", "win95", "inferno", "aether", "frost"] as const)(
+  "saved registered %s applies its own package",
+  (name) => {
+    const f = fixture(name)
+    expect(f.context.currentTheme()).toBe(name)
+    applied(name)
+  }
+)
 it.each(["toString", "constructor", "__proto__", "unknown"])(
   "saved %s falls back to main and applies CSS",
   (name) => {
     const f = fixture(name)
     expect(f.context.currentTheme()).toBe("main")
-    applied(mainTheme)
+    applied("main")
   }
 )
 it.each(["toString", "constructor", "__proto__", "unknown", undefined])(
@@ -97,19 +99,19 @@ it.each(["toString", "constructor", "__proto__", "unknown", undefined])(
     expect(() => f.context.setTheme(name as any)).not.toThrow()
     expect(f.context.currentTheme()).toBe("win95")
     expect(localStorage.getItem("ui-theme")).toBe("win95")
-    applied(win95)
+    applied("win95")
   }
 )
 it.each([
-  ["Main Theme", "main", mainTheme],
-  ["Pixelato", "pixelato", pixelato],
-  ["Windows 95", "win95", win95],
-  ["Inferno", "inferno", inferno],
-  ["Aether", "aether", aether],
-  ["Frost", "frost", frost]
+  ["Main Theme", "main"],
+  ["Pixelato", "pixelato"],
+  ["Windows 95", "win95"],
+  ["Inferno", "inferno"],
+  ["Aether", "aether"],
+  ["Frost", "frost"]
 ] as const)(
-  "actual selector offered %s publishes and persists its registered export",
-  async (label, name, theme) => {
+  "actual selector offered %s publishes and persists its own package",
+  async (label, name) => {
     const computed = window.getComputedStyle.bind(window)
     vi.spyOn(window, "getComputedStyle").mockImplementation(
       (element, pseudo) =>
@@ -159,6 +161,6 @@ it.each([
     expect(errors).toEqual([])
     expect(f.context.currentTheme()).toBe(name)
     expect(localStorage.getItem("ui-theme")).toBe(name)
-    applied(theme)
+    applied(name)
   }
 )

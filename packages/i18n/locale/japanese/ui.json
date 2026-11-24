@@ -16,8 +16,6 @@
   "_trn_tooltip.rtp_not_a_folder": "これはフォルダーではありません（ファイル、またはもう存在しないものへのリンクです）。フォルダーを選んでください。",
   "_trn_tooltip.rtp_not_writable": "GDLauncher はこのフォルダーに書き込めません。自分が所有するフォルダーを選ぶか、このフォルダーへの書き込みを許可してください。",
   "_trn_tooltip.rtp_has_other_files": "このフォルダーにはほかのファイルがあります。空のフォルダー（たとえばこの中に新しく作ったフォルダー）か、すでに GDLauncher のデータがあるフォルダーを選んでください。",
-  "_trn_path": "パス",
-  "_trn_profile": "プロファイル",
   "_trn_custom": "カスタム",
   "_trn_tile_size": "タイルサイズ",
   "_trn_sort_options": "並び替えオプション",

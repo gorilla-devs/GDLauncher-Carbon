@@ -14,6 +14,7 @@ describe("what is at the top of a data folder", () => {
       "logging_configs",
       "temp",
       "world_maps",
+      "themes",
       "download",
       "gdl_conf.db",
       "gdl_conf.db-wal",

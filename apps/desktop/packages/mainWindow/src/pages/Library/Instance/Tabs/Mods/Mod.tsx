@@ -18,12 +18,12 @@ import {
 import { useLocation, useParams } from "@solidjs/router"
 import { SetStoreFunction, produce } from "solid-js/store"
 import { For, Show, createEffect, createSignal } from "solid-js"
-import { getModImageUrl, getModpackPlatformIcon } from "@/utils/instances"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
+import { getModImageUrl } from "@/utils/instances"
 import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
 import { useGDNavigate } from "@/managers/NavigationManager"
 import CopyIcon from "@/components/CopyIcon"
 import { Trans } from "@gd/i18n"
+import { PlatformLogo } from "@/components/PlatformLogo"
 
 interface Props {
   mod: ModType
@@ -317,11 +317,9 @@ const Mod = (props: Props) => {
                   props.mod.metadata?.has_image
                 }
                 fallback={
-                  <img
+                  <PlatformLogo
                     class="w-full"
-                    src={getModpackPlatformIcon(
-                      isCurseForge() ? "curseforge" : "modrinth"
-                    )}
+                    platform={isCurseForge() ? "curseforge" : "modrinth"}
                   />
                 }
               >
@@ -581,7 +579,10 @@ const Mod = (props: Props) => {
                       <div class="mt-4 flex items-center justify-between text-xl">
                         <div class="text-lightSlate-50 flex items-center">
                           <Trans key="content:_trn_curseforge" />
-                          <img src={CurseforgeLogo} class="ml-2 h-4 w-4" />
+                          <PlatformLogo
+                            platform="curseforge"
+                            class="ml-2 h-4 w-4"
+                          />
                         </div>
                       </div>
                       <div class="flex w-full justify-between text-sm">
@@ -745,7 +746,7 @@ const Mod = (props: Props) => {
                           <Trans key="instances:_trn_switch_version" />
                         </div>
                         <div class="flex items-center justify-center">
-                          <img src={CurseforgeLogo} class="h-4 w-4" />
+                          <PlatformLogo platform="curseforge" class="h-4 w-4" />
                         </div>
                       </div>
                     </Show>

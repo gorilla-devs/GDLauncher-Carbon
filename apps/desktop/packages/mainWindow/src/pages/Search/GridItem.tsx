@@ -2,17 +2,20 @@ import { Mod, ServerAddon } from "@gd/core_module/bindings"
 import { createSignal, Match, Show, Switch } from "solid-js"
 import { Trans } from "@gd/i18n"
 import { formatDownloadCount } from "@/utils/helpers"
-import ModrinthLogo from "/assets/images/icons/modrinth_logo.svg"
-import CurseforgeLogo from "/assets/images/icons/curseforge_logo.svg"
 import ModpackDownloadButton from "@/components/ModpackDownloadButton"
 import ServerPackDownloadButton from "@/components/ServerPackDownloadButton"
 import ModDownloadButton from "@/components/ModDownloadButton"
 import { Badge } from "@gd/ui"
 import { LinkedSearchResult } from "@/utils/linkedFile"
 import { LinkedFileLabel } from "./LinkedFileLabel"
+import { withStates } from "@gd/ui"
+import { PlatformLogo } from "@/components/PlatformLogo"
+import { resultImageUrl } from "./resultImage"
 
 interface GridItemProps {
   result: LinkedSearchResult
+  /** Its place in the results, from 1: `--gdl-result-index` for themes. */
+  position?: number
   onItemClick: (id: string, platform: string) => void
   isInstalled: boolean
   instanceId?: number
@@ -28,26 +31,48 @@ export function GridItem(props: GridItemProps) {
 
   const authorName = () => props.result.authors?.[0]?.name
 
+  const image = () => resultImageUrl(props.result, "large")
+
   return (
     <div
       data-testid="search-result-row"
       data-project-id={props.result.id}
+      data-gdl={withStates("search.result", {
+        grid: true,
+        installed: props.isInstalled
+      })}
       class="ease-spring bg-darkSlate-800 hover:border-primary-500/40 hover:shadow-primary-500/10 group relative aspect-square cursor-pointer overflow-hidden rounded-2xl border border-white/5 transition-all duration-150 hover:shadow-2xl"
       classList={{
         "border-primary-500/40 shadow-2xl shadow-primary-500/10":
           isHoverActive()
       }}
+      style={{ "--gdl-result-index": props.position }}
       onClick={() => props.onItemClick(props.result.id, props.result.platform)}
     >
       {/* Background image */}
-      <img
-        class="ease-spring h-full w-full object-cover transition-transform duration-200 group-hover:scale-110"
-        classList={{
-          "scale-110": isHoverActive()
-        }}
-        src={props.result.highResImageUrl || props.result.imageUrl || ""}
-        alt={props.result.title}
-      />
+      <Show
+        when={image()}
+        fallback={
+          <div
+            data-gdl="search.result.image"
+            class="bg-darkSlate-700 flex h-full w-full items-center justify-center"
+          >
+            <div class="i-hugeicons:package text-darkSlate-400 h-12 w-12" />
+          </div>
+        }
+      >
+        {(src) => (
+          <img
+            data-gdl="search.result.image"
+            class="ease-spring h-full w-full object-cover transition-transform duration-200 group-hover:scale-110"
+            classList={{
+              "scale-110": isHoverActive()
+            }}
+            src={src()}
+            alt={props.result.title}
+          />
+        )}
+      </Show>
 
       {/* Subtle vignette overlay */}
       <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-black/40" />
@@ -61,13 +86,12 @@ export function GridItem(props: GridItemProps) {
 
         {/* Platform icon - top right with glassmorphism */}
         <div class="rounded-full border border-white/10 bg-black/50 p-2 backdrop-blur-xl">
-          <img
-            src={
-              props.result.platform === "curseforge"
-                ? CurseforgeLogo
-                : ModrinthLogo
+          <PlatformLogo
+            platform={
+              props.result.platform === "curseforge" ? "curseforge" : "modrinth"
             }
             class="h-4 w-4"
+            color="text-white"
             alt={`${props.result.platform} logo`}
           />
         </div>
@@ -75,6 +99,7 @@ export function GridItem(props: GridItemProps) {
 
       {/* Bottom glassmorphism overlay - expands on hover with spring easing */}
       <div
+        data-gdl="search.result.panel"
         class="ease-spring absolute inset-x-0 bottom-0 flex flex-col border-t border-white/10 bg-black/60 backdrop-blur-xl transition-all duration-200"
         classList={{
           "h-[20%]": !isHoverActive(),
@@ -84,7 +109,10 @@ export function GridItem(props: GridItemProps) {
       >
         <div class="flex flex-1 flex-col p-3">
           {/* Title */}
-          <p class="truncate text-base font-bold text-white">
+          <p
+            data-gdl="search.result.title"
+            class="truncate text-base font-bold text-white"
+          >
             {props.result.title}
           </p>
           <LinkedFileLabel result={props.result} />
@@ -106,6 +134,7 @@ export function GridItem(props: GridItemProps) {
           {/* Description - visible on hover */}
           <Show when={props.result.description}>
             <p
+              data-gdl="search.result.description"
               class="text-lightSlate-500 mt-2 line-clamp-2 text-xs leading-relaxed transition-opacity duration-300"
               classList={{
                 "opacity-0": !isHoverActive(),

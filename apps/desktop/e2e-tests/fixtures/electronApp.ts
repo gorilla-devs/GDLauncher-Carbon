@@ -219,7 +219,11 @@ export async function launchApp(opts: LaunchOptions): Promise<{
   })
   app.process().stderr?.on("data", (data) => console.log(data.toString()))
 
-  const page = await app.firstWindow()
+  await app.firstWindow()
+  // The protected ad column is a native child view of the main window and
+  // Playwright reports it as a page too, so `firstWindow()` can return it.
+  // Pick the main renderer: the first page that is not the ad page.
+  const page = await findMainPage(app)
   page.on("console", (msg) => console.log(msg.text()))
 
   // A failing request otherwise reaches the log as a bare "Failed to load
@@ -619,9 +623,13 @@ export async function relaunchApp(
  */
 export async function attachCoreLogOnFailure(
   testInfo: TestInfo,
-  runtimePath: string
+  runtimePath: string,
+  /** Whether the test failed, for a caller inside the test body (a cleanup
+   *  or a `finally`): `testInfo.status` only turns failed once the body has
+   *  returned, so there it still reads passed and nothing was attached. */
+  failed?: boolean
 ): Promise<void> {
-  if (testInfo.status === testInfo.expectedStatus) return
+  if (!(failed ?? testInfo.status !== testInfo.expectedStatus)) return
 
   const logsDir = path.join(runtimePath, "__gdl_logs__")
   if (!fs.existsSync(logsDir)) return
@@ -645,4 +653,17 @@ export async function attachCoreLogOnFailure(
     path: newest.filePath,
     contentType: "text/plain"
   })
+}
+
+async function findMainPage(app: ElectronApplication): Promise<Page> {
+  const deadline = Date.now() + 30_000
+  while (Date.now() < deadline) {
+    const main = app.windows().find((p) => {
+      const url = p.url()
+      return url !== "" && url !== "about:blank" && !url.includes("adview/")
+    })
+    if (main) return main
+    await new Promise((r) => setTimeout(r, 100))
+  }
+  throw new Error("main window page did not appear")
 }

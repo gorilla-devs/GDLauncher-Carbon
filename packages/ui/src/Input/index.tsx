@@ -10,7 +10,9 @@ import {
   onCleanup
 } from "solid-js"
 import { Portal } from "solid-js/web"
+import { getFloatingRoot } from "../floatingRoot"
 import { cva, type VariantProps } from "class-variance-authority"
+import { gdlHooks, withStates } from "../hooks"
 
 interface AutoCompleteOption {
   value: string
@@ -61,7 +63,7 @@ const input = cva(
 )
 
 const container = cva(
-  "outline-none has-[:focus-visible]:outline-darkSlate-500 h-10 gap-2 box-border transition-[outline,background-color] duration-200 rounded-md ease-spring",
+  "outline-none has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-primary-500 h-10 gap-2 box-border transition-[outline,background-color] duration-200 rounded-md ease-spring",
   {
     variants: {
       hasIcon: {
@@ -76,7 +78,7 @@ const container = cva(
       disabled: {
         true: "cursor-not-allowed",
         false:
-          "hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-darkSlate-500"
+          "hover:outline-darkSlate-600 hover:has-[:focus-visible]:outline-primary-500"
       }
     },
     defaultVariants: {
@@ -117,7 +119,8 @@ function Input(props: Props) {
     "onMouseDown",
     "onSearch",
     "variant",
-    "ref"
+    "ref",
+    "data-gdl" as keyof Props
   ])
 
   const [menuOpened, setMenuOpened] = createSignal(false)
@@ -186,8 +189,16 @@ function Input(props: Props) {
           class: `${!local.disabled ? "animate-icons-on-hover" : ""} ${local.class || ""} ${local.inputColor || ""}`
         })}
         ref={setInputContainerRef}
+        data-gdl={gdlHooks(
+          withStates("input", {
+            disabled: local.disabled,
+            invalid: !!props.errorMessage
+          }),
+          (local as Record<string, unknown>)["data-gdl"]
+        )}
       >
         <input
+          data-gdl="input.field"
           ref={(el) => {
             setInputRef(el)
             if (typeof local.ref === "function") {
@@ -268,21 +279,28 @@ function Input(props: Props) {
           {...otherProps}
         />
         <Show when={local.icon}>
-          <span class="text-darkSlate-300 flex h-full items-center">
+          <span
+            data-gdl="input.icon"
+            class="text-darkSlate-300 flex h-full items-center"
+          >
             {local.icon}
           </span>
         </Show>
       </div>
 
       <Show when={props.errorMessage}>
-        <div class="mt-2 text-left font-light text-red-500">
+        <div
+          data-gdl="input.error"
+          class="mt-2 text-left font-light text-red-500"
+        >
           {props.errorMessage}
         </div>
       </Show>
 
       <Show when={menuOpened()}>
-        <Portal>
+        <Portal mount={getFloatingRoot()}>
           <ul
+            data-gdl="input.suggestions"
             ref={setMenuRef}
             class="absolute h-max max-h-60 bottom-0 overflow-y-auto overflow-x-hidden text-lightSlate-700 shadow-md shadow-darkSlate-900 list-none m-0 p-0 z-100000 min-w-32 max-w-200"
             onMouseOut={() => {
@@ -301,6 +319,7 @@ function Input(props: Props) {
             <For each={props.autoCompleteOptions}>
               {(option) => (
                 <li
+                  data-gdl="input.suggestion"
                   class="first:rounded-t last:rounded-b bg-darkSlate-700 hover:bg-darkSlate-800 py-2 px-4 block break-all text-lightSlate-700 no-underline w-full box-border"
                   onClick={(e) => {
                     e.preventDefault()

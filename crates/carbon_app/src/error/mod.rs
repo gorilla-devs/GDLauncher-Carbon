@@ -44,9 +44,11 @@ fn extract_fe_error(
     use crate::managers::instance::datapacks::AlreadyInWorld;
     use crate::managers::instance::modpack::ChangeVersionRefusal;
     use crate::managers::instance::run::InsufficientMemoryError;
+    use crate::managers::instance::run::java_issue::JavaMismatchError;
     use crate::managers::instance::world_datapack_changes::NoDatapackForVersion;
     use crate::managers::instance::world_refusal::{RefusalWithCause, WorldRefusal};
     use crate::managers::server::{EulaNotAcceptedError, RecoveredServerError};
+    use crate::managers::themes::error::ThemeError;
 
     macro_rules! try_downcast {
         ($entry:expr, $($ty:ty),+ $(,)?) => {
@@ -65,11 +67,13 @@ fn extract_fe_error(
         InsufficientMemoryError,
         SignInExpiredError,
         ChangeVersionRefusal,
+        JavaMismatchError,
         EulaNotAcceptedError,
         RecoveredServerError,
         AlreadyInWorld,
         NoDatapackForVersion,
-        WorldRefusal
+        WorldRefusal,
+        ThemeError
     );
 
     if let Some(e) = entry.downcast_ref::<RefusalWithCause>() {

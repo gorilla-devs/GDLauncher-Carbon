@@ -11,7 +11,10 @@ const c = vi.hoisted(() => ({
   keys: [] as any[]
 }))
 vi.mock("@gd/ui", async () => import("@/test/uiForms.fixture"))
-vi.mock("@gd/i18n", () => ({ useTransContext: () => [(k: string) => k] }))
+vi.mock("@gd/i18n", () => ({
+  Trans: (p: any) => <span>{p.key}</span>,
+  useTransContext: () => [(k: string) => k]
+}))
 vi.mock("@/managers/ModalsManager", () => ({
   useModal: () => ({ closeModal: vi.fn() })
 }))

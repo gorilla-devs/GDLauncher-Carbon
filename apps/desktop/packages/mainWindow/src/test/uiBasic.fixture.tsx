@@ -6,6 +6,9 @@ export {
 } from "../../../../../../packages/ui/src/HoldToConfirm"
 import { createContext, useContext, Show } from "solid-js"
 
+// Theme hook names are plain strings: tests get the real helpers.
+export { gdlHooks, withStates } from "../../../../../../packages/ui/src/hooks"
+
 export const Wrapper = (props: any) => <div>{props.children}</div>
 export const Button = (props: any) => (
   <button disabled={props.disabled} title={props.title} onClick={props.onClick}>

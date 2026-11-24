@@ -5,6 +5,7 @@ import {
 } from "@/utils/mutationErrorToast"
 import { ModalProps, useModal } from ".."
 import ModalLayout from "../ModalLayout"
+import { CancelLink, DialogFooter } from "../DialogFooter"
 import { Button } from "@gd/ui"
 import { Trans, useTransContext } from "@gd/i18n"
 import { useGDNavigate } from "@/managers/NavigationManager"
@@ -82,15 +83,8 @@ const ConfirmServerDeletion = (props: ModalProps) => {
           </ul>
         </div>
         <ServerDeletionNote target={target()} stopsFirst={stopsFirst()} />
-        <div class="flex w-full justify-between pt-2">
-          <Button
-            onClick={() => {
-              modalsContext?.closeModal()
-            }}
-          >
-            <div class="i-hugeicons:cancel-01" />
-            {t("instances:_trn_instance_confirm_deletion.cancel")}
-          </Button>
+        <DialogFooter class="pt-2">
+          <CancelLink onClick={() => modalsContext?.closeModal()} />
           <Button
             data-testid="confirm-server-deletion"
             type="secondary"
@@ -103,7 +97,7 @@ const ConfirmServerDeletion = (props: ModalProps) => {
             <div class="i-hugeicons:delete-02" />
             <Trans key={serverDeleteLabelKey(stopsFirst(), target())} />
           </Button>
-        </div>
+        </DialogFooter>
       </div>
     </ModalLayout>
   )
