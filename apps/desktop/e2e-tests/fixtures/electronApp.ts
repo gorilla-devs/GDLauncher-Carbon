@@ -655,8 +655,16 @@ export async function attachCoreLogOnFailure(
   })
 }
 
-async function findMainPage(app: ElectronApplication): Promise<Page> {
-  const deadline = Date.now() + 30_000
+/**
+ * The launcher's own page. The ad view is a page to Playwright too, and it
+ * can be the first one a new window reports, so `firstWindow()` and a
+ * `window` event are not enough to tell them apart.
+ */
+export async function findMainPage(
+  app: ElectronApplication,
+  timeout = 30_000
+): Promise<Page> {
+  const deadline = Date.now() + timeout
   while (Date.now() < deadline) {
     const main = app.windows().find((p) => {
       const url = p.url()

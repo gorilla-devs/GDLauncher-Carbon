@@ -134,6 +134,7 @@ const WorldsSidebar = (props: WorldsSidebarProps) => {
                   <>
                     <div
                       data-testid="world-entry"
+                      data-world-name={world.name}
                       data-selected={isSelected()}
                       class={`group relative box-border flex w-full cursor-pointer items-center gap-2 rounded-md px-3 py-2 ${PRESS_CLASSES} ${isSelected() ? "bg-darkSlate-600" : "hover:bg-darkSlate-700"}`}
                       onClick={() => props.onSelect(world.name)}

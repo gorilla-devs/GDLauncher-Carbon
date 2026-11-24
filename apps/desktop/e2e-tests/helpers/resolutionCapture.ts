@@ -493,14 +493,14 @@ async function toCandidatesFromCurseforgeResponse(
  * unauthenticated fetch.
  *
  * Two live-confirmed hazards this works around:
- * - `Checkbox` (`packages/ui/src/Checkbox/index.tsx`) renders a `<label>`
- *   wrapping a visually hidden (`sr-only`) native `<input type="checkbox">`,
+ * - `Checkbox` (`packages/ui/src/Checkbox/index.tsx`) renders a `<div>`
+ *   holding a visually hidden (`sr-only`) native `<input type="checkbox">`,
  *   its painted box, and its children — here the "Override Filters"
  *   `<Trans>` (`ExploreVersionsNavbar.tsx`). That text is the input's
  *   accessible name, so the control is found by role and name, the way a
  *   user or a screen reader finds it, not by the navbar's layout classes
- *   (a `div > div` path broke silently when the root became a `<label>`).
- *   The click lands on the visible label, as a user's would, and the
+ *   (a `div > div` path broke silently when the root changed element).
+ *   The click lands on the visible control, as a user's would, and the
  *   input's own `checked` state then proves that click actually turned the
  *   override on before the selector checks below rely on it. The input is
  *   disabled until the Versions tab has resolved its instance target
@@ -516,7 +516,9 @@ async function driveLoaderUnfilteredRequest(page: Page): Promise<void> {
     name: "Override Filters",
     exact: true
   })
-  const overrideLabel = page.locator("label").filter({ has: overrideCheckbox })
+  const overrideLabel = page
+    .locator('[data-gdl~="checkbox"]')
+    .filter({ has: overrideCheckbox })
   await expect(overrideLabel, {
     message:
       "driveLoaderUnfilteredRequest: the addon page's Versions tab " +

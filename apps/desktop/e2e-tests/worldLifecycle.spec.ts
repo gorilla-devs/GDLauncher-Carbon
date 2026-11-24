@@ -23,7 +23,6 @@ import {
 import { readInstanceByName } from "./helpers/versionCache.js"
 import { byModRow, byTestId, TEST_IDS } from "./helpers/selectors.js"
 import {
-  deleteModViaUi,
   INSTALL_TIMEOUT,
   installModIntoInstance,
   openAddonPage,
@@ -284,6 +283,32 @@ test.describe("world addon lifecycle", () => {
     return worldName
   }
 
+  /**
+   * Opens the instance's Worlds tab with `worldName` selected. A world is
+   * not a row of the Addons list: it has its own tab, and Delete there acts
+   * on the selected world.
+   */
+  async function openWorld(page: Page, worldName: string): Promise<void> {
+    const { id } = readInstanceByName(harness.runtimePath, INSTANCE_NAME)
+    await page.evaluate((hash) => {
+      location.hash = hash
+    }, `#/library/${id}/worlds`)
+    const entry = page.locator(
+      `${byTestId(TEST_IDS.worldEntry)}[data-world-name="${worldName}"]`
+    )
+    await expect(entry, {
+      message: `the Worlds tab never listed "${worldName}"`
+    }).toBeVisible({ timeout: RECONCILIATION_WAIT })
+    await entry.click()
+    await expect(entry).toHaveAttribute("data-selected", "true")
+  }
+
+  /** Clicks Delete for `worldName` in the Worlds tab. */
+  async function clickDeleteWorld(page: Page, worldName: string) {
+    await openWorld(page, worldName)
+    await page.locator(byTestId(TEST_IDS.worldDelete)).click()
+  }
+
   test.beforeAll(async () => {
     expect(isCoreModulePresent()).toBeTruthy()
 
@@ -350,60 +375,34 @@ test.describe("world addon lifecycle", () => {
     const { page } = current
     const worldName = fs.readdirSync(saves)[0]
 
-    await openInstanceAddons(page, INSTANCE_NAME)
-    const row = page.locator(byModRow(worldName))
-    // Sanity precondition: a toHaveCount(0) on the toggle below would pass
-    // just as well if the row itself failed to render at all, which would
-    // prove nothing about the behaviour this test exists to check.
-    await expect(row).toBeVisible()
-    await expect(row.locator(byTestId(TEST_IDS.modRowToggle)), {
+    // Sanity precondition: the absence checks below would pass just as well
+    // on a page that never rendered, which would prove nothing. The world is
+    // selected and its own actions are on screen.
+    await openWorld(page, worldName)
+    await expect(page.locator(byTestId(TEST_IDS.worldDelete))).toBeVisible()
+    await expect(page.locator(byTestId(TEST_IDS.modRowToggle)), {
       message:
-        "a world row must render no enable toggle — renaming a save " +
-        "directory cannot disable it, and our own scanner would re-report " +
+        "a world must have no enable toggle — renaming a save directory " +
+        "cannot disable it, and our own scanner would re-report " +
         "<name>.disabled as a new, enabled world"
     }).toHaveCount(0)
 
-    // The column toggle is only one of the routes to `handleToggleMod`. The
-    // row's own right-click menu offered the same Enable/Disable action
-    // unconditionally, so a check that stopped at the column above would go
-    // green while the behaviour was still two clicks away — and, with the
-    // column hidden, with no control left to undo it.
-    await row.click({ button: "right" })
-    // A positive anchor in the same open menu, asserted first: without it a
-    // `toHaveCount(0)` on the toggle would be satisfied just as well by a
-    // menu that never opened, or by `data-testid` silently not reaching the
-    // DOM through `@gd/ui`'s ContextMenuItem (hazard 1 in
-    // `helpers/selectors.ts`'s header).
-    await expect(page.locator(byTestId(TEST_IDS.addonContextDelete)), {
+    // The Addons list is where the toggle and the context menu's
+    // Enable/Disable live, so a world must not be a row there either. The
+    // list itself is on screen first, for the same reason as above.
+    await openInstanceAddons(page, INSTANCE_NAME)
+    await expect(page.locator(byTestId(TEST_IDS.addonsAddButton))).toBeVisible()
+    await expect(page.locator(byModRow(worldName)), {
       message:
-        "the world row's context menu did not open (or its entries carry no " +
-        "test anchors), so the absence check below would prove nothing"
-    }).toBeVisible()
-    await expect(page.locator(byTestId(TEST_IDS.addonContextToggle)), {
-      message:
-        "a world's context menu must offer no Enable/Disable entry — same " +
-        "reason the column toggle is hidden: the rename it performs cannot " +
-        "disable a save, and the scanner re-reports the renamed directory " +
-        "as a new, enabled world"
+        "a world is listed among the addons, where a row can be switched " +
+        "off — worlds belong to the Worlds tab only"
     }).toHaveCount(0)
-
-    // Closed again before leaving: this file's tests share one page, and the
-    // next one clicks the same row's delete control, which an open menu
-    // would intercept.
-    await page.keyboard.press("Escape")
-    await expect(
-      page.locator(byTestId(TEST_IDS.addonContextDelete))
-    ).toHaveCount(0)
   })
 
   test("deleting a world asks first, then removes the save for good", async () => {
     const worldName = fs.readdirSync(saves)[0]
 
-    await openInstanceAddons(current.page, INSTANCE_NAME)
-    await current.page
-      .locator(byModRow(worldName))
-      .locator(byTestId(TEST_IDS.modRowDelete))
-      .click()
+    await clickDeleteWorld(current.page, worldName)
 
     const confirm = current.page.locator(
       byTestId(TEST_IDS.worldDeletionConfirm)
@@ -450,10 +449,7 @@ test.describe("world addon lifecycle", () => {
   test('ticking "don\'t ask again" still deletes the world and marks the warning dismissed in Settings', async () => {
     const worldName = await installWorld(current.page)
 
-    await current.page
-      .locator(byModRow(worldName))
-      .locator(byTestId(TEST_IDS.modRowDelete))
-      .click()
+    await clickDeleteWorld(current.page, worldName)
 
     const confirm = current.page.locator(
       byTestId(TEST_IDS.worldDeletionConfirm)
@@ -503,12 +499,9 @@ test.describe("world addon lifecycle", () => {
 
     // The warning is dismissed from the previous test, so `handleDeleteMod`
     // (useAddonMutations.tsx) must skip straight to performDeleteMod without
-    // ever opening the modal — the exact same rspc round trip every other
-    // addon type's delete already goes through, which is what makes
-    // deleteModViaUi() (helpers/mods.ts) — built for that direct path, not
-    // this dialog-gated one — usable here.
+    // ever opening the modal.
     const dialog = current.page.locator(byTestId(TEST_IDS.worldDeletionConfirm))
-    await deleteModViaUi(current.page, worldName)
+    await clickDeleteWorld(current.page, worldName)
     await expect(dialog, {
       message:
         'the confirmation dialog must not appear once "don\'t ask again" ' +
@@ -521,9 +514,8 @@ test.describe("world addon lifecycle", () => {
       })
       .toBe(false)
 
-    // Re-enable the warning from Settings — deleteModViaUi already left
-    // `page` on the instance's Addons tab, not Settings, so this needs its
-    // own navigation.
+    // Re-enable the warning from Settings — the delete left `page` on the
+    // instance's Worlds tab, not Settings, so this needs its own navigation.
     await current.page.click(byTestId(TEST_IDS.navbarSettings))
     // Click target vs. assertion target are deliberately two different
     // locators, same split as every other Switch anchor in this suite
@@ -548,10 +540,7 @@ test.describe("world addon lifecycle", () => {
 
     // A fresh delete must ask again.
     const secondWorldName = await installWorld(current.page)
-    await current.page
-      .locator(byModRow(secondWorldName))
-      .locator(byTestId(TEST_IDS.modRowDelete))
-      .click()
+    await clickDeleteWorld(current.page, secondWorldName)
 
     const confirmAgain = current.page.locator(
       byTestId(TEST_IDS.worldDeletionConfirm)

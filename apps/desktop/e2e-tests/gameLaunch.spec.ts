@@ -20,6 +20,7 @@ import type { ElectronApplication, Page } from "playwright"
 import {
   attachCoreLogOnFailure,
   closeAppAndCore,
+  findMainPage,
   isCoreModulePresent,
   launchApp,
   type LaunchOptions
@@ -285,11 +286,8 @@ test.describe("game launch", () => {
       })
 
       await test.step("exactly one window comes back when the game exits", async () => {
-        const reopened = session.app().waitForEvent("window", {
-          timeout: STOP_TIMEOUT
-        })
         await session.exitGame()
-        await session.useWindow(await reopened)
+        await session.useWindow(await findMainPage(session.app(), STOP_TIMEOUT))
         expect(await session.windowCount()).toBe(1)
         expect(session.mainLog()).not.toContain("Uncaught Exception")
       })
@@ -311,16 +309,13 @@ test.describe("game launch", () => {
       })
 
       await test.step("launching GDLauncher again while no window exists shows one", async () => {
-        const shown = session.app().waitForEvent("window", {
-          timeout: 60_000
-        })
         // The harness passes --gdl_allow_multiple_instances, which skips the
         // single-instance lock, so a real second launch would start its own
         // app. Emit what the lock delivers to the running one.
         await session.app().evaluate(({ app }) => {
           app.emit("second-instance", {}, [])
         })
-        await session.useWindow(await shown)
+        await session.useWindow(await findMainPage(session.app(), 60_000))
         expect(await session.windowCount()).toBe(1)
       })
 

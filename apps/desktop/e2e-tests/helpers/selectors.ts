@@ -351,6 +351,11 @@ export const TEST_IDS = Object.freeze({
    *  disables while the instance's modpack is locked. */
   addonsAddButton: "addons-add-button",
 
+  /** One world in the Worlds tab's list; its folder name is in
+   *  `data-world-name`, since the label can be the world's own title. */
+  worldEntry: "world-entry",
+  /** Delete among the selected world's own actions, in the Worlds tab. */
+  worldDelete: "world-delete",
   worldDeletionConfirm: "world-deletion-confirm",
   worldDeletionDontAsk: "world-deletion-dont-ask",
   settingsWorldDeletionWarning: "settings-world-deletion-warning",
