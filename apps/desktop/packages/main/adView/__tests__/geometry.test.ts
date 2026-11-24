@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest"
 import {
+  adColumnTop,
   computeAdStackBounds,
   isAdsRoute,
   NAVBAR_HEIGHT,
@@ -67,6 +68,18 @@ describe("computeAdStackBounds", () => {
   })
   it("uses the given top", () => {
     expect(computeAdStackBounds(content, highImpact, 0)?.y).toBe(0)
+  })
+})
+
+describe("adColumnTop", () => {
+  const sky = { width: 160, height: 600, shouldShow: true }
+  it("is under the top bar on a display tall enough for the ad there", () => {
+    expect(adColumnTop({ adSize: { ...sky, besideNavbar: false } })).toBe(60)
+    expect(adColumnTop({ adSize: sky }, 48)).toBe(48)
+  })
+  it("is the window's top when the column runs beside the bar", () => {
+    expect(adColumnTop({ adSize: { ...sky, besideNavbar: true } })).toBe(0)
+    expect(adColumnTop({ adSize: { ...sky, besideNavbar: true } }, 48)).toBe(0)
   })
 })
 

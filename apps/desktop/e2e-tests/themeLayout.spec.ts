@@ -52,9 +52,9 @@ import {
 } from "./helpers/themes.js"
 import { expect, test } from "./fixtures/index.js"
 import {
+  adColumnTop,
   computeAdStackBounds,
   LINK_BLOCK,
-  NAVBAR_HEIGHT,
   SLOT_GAP,
   type AdLayout
 } from "../packages/main/adView/geometry.js"
@@ -418,13 +418,17 @@ const expectAdViewInPlace = async (app: ElectronApplication, page: Page) => {
   const visible = info.children.filter((c) => c.visible)
   expect(visible, "the ad view is the only visible child view").toHaveLength(1)
   const view = visible[0].bounds
+  // Under the top bar, or beside it from the window's top on a display too
+  // short for the ad under the bar.
+  const top = adColumnTop(layout)
   expect(view).toEqual(
     computeAdStackBounds(
       { width: info.content.width, height: info.content.height },
-      layout
+      layout,
+      top
     )
   )
-  expect(view.y).toBe(NAVBAR_HEIGHT)
+  expect(view.y).toBe(top)
   const banner = layout.bannerAdSize?.shouldShow
     ? layout.bannerAdSize.height + SLOT_GAP
     : 0
@@ -432,7 +436,7 @@ const expectAdViewInPlace = async (app: ElectronApplication, page: Page) => {
   expect(view.width, "full width").toBe(layout.adSize.width)
   // macOS keeps a window inside the screen, so on a short screen main can't
   // grow it to its minimum height, and the view stops at the window's bottom.
-  const room = info.content.height - NAVBAR_HEIGHT
+  const room = info.content.height - top
   expect(view.height, "full height, or all the window has").toBe(
     Math.min(banner + layout.adSize.height + link, room)
   )
@@ -508,7 +512,9 @@ test.describe("Theme layouts, particles, sounds and anchors", () => {
           expect(column.x).toBe(view.x)
           expect(column.width).toBe(view.width)
           expect(column.y, "the column runs from under the bar").toBe(
-            nav === "rail" ? 0 : NAV_METRICS[nav].height
+            nav === "rail" || ad.adSize.besideNavbar
+              ? 0
+              : NAV_METRICS[nav].height
           )
           const slots = await page
             .locator(byTestId("ad-slot"))

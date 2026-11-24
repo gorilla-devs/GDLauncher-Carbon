@@ -1,6 +1,7 @@
 // Pure controller: turns inputs into commands on an AdViewPort. Must stay
 // importable without Electron.
 import {
+  adColumnTop,
   computeAdStackBounds,
   isAdsRoute,
   NAVBAR_HEIGHT,
@@ -81,8 +82,7 @@ export function createAdViewController(
     const bounds = computeAdStackBounds(
       content,
       layout,
-      // Beside the top bar the ad starts at the window's top, not under it.
-      layout.adSize.besideNavbar ? 0 : top
+      adColumnTop(layout, top)
     )
     if (bounds !== null && !sameRect(bounds, lastBounds)) {
       port.setBounds(bounds)

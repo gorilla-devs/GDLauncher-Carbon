@@ -1806,7 +1806,10 @@ test.describe("Themes", () => {
     const search = await box("nav.search.box")
     const ad = await box("ad-column-background")
     expect(s.x).toBeGreaterThanOrEqual(search.x + search.width)
-    expect(s.y + s.height).toBeLessThanOrEqual(ad.y)
+    // Above the ad column, or left of it on a display too short for the ad
+    // under the bar, where the column runs beside the bar from the top.
+    if (ad.y > 0) expect(s.y + s.height).toBeLessThanOrEqual(ad.y)
+    else expect(s.x + s.width).toBeLessThanOrEqual(ad.x)
     await page.keyboard.press("Escape")
     await expect(strip).toHaveCount(0)
   })

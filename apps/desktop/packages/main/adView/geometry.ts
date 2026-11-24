@@ -30,6 +30,17 @@ export const SLOT_GAP = 8
 // px reserved for the link pill
 export const LINK_BLOCK = 34
 
+/**
+ * Where the ad column starts: under the top bar, or at the window's top on a
+ * display too short for that, where the column runs beside the bar.
+ */
+export function adColumnTop(
+  layout: AdLayout,
+  navTop: number = NAVBAR_HEIGHT
+): number {
+  return layout.adSize.besideNavbar ? 0 : navTop
+}
+
 export function computeAdStackBounds(
   content: Size,
   layout: AdLayout,

@@ -3,8 +3,8 @@ import { adText, adViewInfo } from "./helpers/adView.js"
 import { AD_HOSTILE_CSS, goToLibrary } from "./helpers/themes.js"
 import { expect, test } from "./fixtures/index.js"
 import {
+  adColumnTop,
   computeAdStackBounds,
-  NAVBAR_HEIGHT,
   type AdLayout
 } from "../packages/main/adView/geometry.js"
 
@@ -24,13 +24,16 @@ test.describe("Protected ad view", () => {
     const ad = info.children.filter((c) => c.visible)
     expect(ad).toHaveLength(1)
 
+    // Under the top bar, or beside it from the window's top on a display
+    // too short for the ad under the bar (the Mac runners' screens).
     const expected = computeAdStackBounds(
       { width: info.content.width, height: info.content.height },
-      layout
+      layout,
+      adColumnTop(layout)
     )
     expect(expected).not.toBeNull()
     expect(ad[0].bounds).toEqual(expected)
-    expect(ad[0].bounds.y).toBe(NAVBAR_HEIGHT)
+    expect(ad[0].bounds.y).toBe(adColumnTop(layout))
   })
 
   test("e2e builds never load real ads", async ({ authenticatedApp }) => {
